@@ -1,0 +1,5 @@
+# Transient clones — consumed during setup, never shipped
+web-interface-guidelines/
+impeccable/
+# Code-tab session worktrees, if any appear here
+.claude/worktrees/
