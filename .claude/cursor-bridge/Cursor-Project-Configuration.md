@@ -160,10 +160,13 @@ The supervisor decides and records; `cursor-configurator` writes the files. See
    builder, the exit code never blocks a write.
 
 5. **CI step (where the project has CI).** Add `npx impeccable@<pinned> detect --json <ui
-   paths>` as a **required** check that fails on **primary** findings; `impeccable ignores`
-   is how intentional exceptions are recorded (they land in `.impeccable/config.json`'s
-   `detector.ignore*` arrays). Where the project has **no** CI, the supervisor runs this
-   same command locally at the merge gate instead.
+   paths>` as a **step inside the project's existing CI `gate` job** — the same workflow
+   that runs the test suite — so a **primary** finding turns the already-required `gate`
+   check red. It is **not** a second, separate required check: there stays one required
+   check, so branch protection and the supervisor's merge-watch are unchanged.
+   `impeccable ignores` is how intentional exceptions are recorded (they land in
+   `.impeccable/config.json`'s `detector.ignore*` arrays). Where the project has **no** CI,
+   the supervisor runs this same command locally at the merge gate instead.
 
 ---
 
