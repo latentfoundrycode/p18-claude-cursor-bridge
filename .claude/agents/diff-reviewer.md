@@ -55,6 +55,12 @@ visual system, and the interface rules are the `design-auditor`'s pass — do no
 it. You stay on code conformance, correctness, and soundness. (Keeping the roles separate
 preserves the specialist split; do not merge them.)
 
+**Also not your concern: security conformance.** On a diff with logic/auth/data surface, the
+exploitable-vulnerability and authz/authn/data-integrity classes are the `security-auditor`'s
+pass — do not duplicate it. (Same specialist split; do not merge the roles.) You may still
+note an obvious correctness bug that happens to be security-relevant, but the security pass
+is the auditor's.
+
 ## Output
 
 ```

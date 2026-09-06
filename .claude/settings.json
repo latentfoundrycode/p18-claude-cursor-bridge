@@ -11,7 +11,10 @@
       "Bash(gh pr merge:*)",
       "Bash(gh pr checks:*)",
       "Bash(gh pr view:*)",
-      "Bash(npx --yes impeccable:*)"
+      "Bash(npx --yes impeccable:*)",
+      "Bash(semgrep:*)",
+      "Bash(osv-scanner:*)",
+      "Bash(socket:*)"
     ]
   }
 }

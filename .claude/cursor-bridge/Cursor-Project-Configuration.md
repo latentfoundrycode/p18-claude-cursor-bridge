@@ -170,6 +170,50 @@ The supervisor decides and records; `cursor-configurator` writes the files. See
 
 ---
 
+## 5c. Security tooling — [Claude], with [Escalate] only for the Socket token
+
+Parallel to §5b. All file-based and local except the one commercial secret (the Socket API
+token), which the owner has already authorised and sets once as a repo secret. The supervisor
+decides and records; `cursor-configurator` writes the files. See `Cursor-File-Formats.md` for
+exact shapes. Pick the ASVS level (L1/L2/L3) from data sensitivity in Phase 0/1. Steps:
+
+1. **Deterministic floor configs.** Write `.semgrep.yml` (pinned ruleset), `osv-scanner.toml`
+   (empty `[[IgnoredVulns]]`), and `socket.yml` (empty ignores). Pin and record in
+   `docs/PROJECT_STATUS.md`: the Semgrep CLI version + ruleset, the OSV-Scanner version, and
+   the Socket setup.
+
+2. **Frozen secure-coding rules.** Write `.cursor/rules/secure-coding.mdc` from the bundled
+   `~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the chosen ASVS
+   tier (+ the LLM supplement for AI-bearing products). ASVS is **stable**, so this pins
+   `v5.0.0` and needs **no** live-fetch-validation dance — the bundled snapshot is the
+   source. Record the ASVS version and level in `docs/PROJECT_STATUS.md`.
+
+3. **CI floor steps (where the project has CI).** Add Semgrep (on `ubuntu-latest`),
+   OSV-Scanner (PR diff, explicit exit-code handling — `128`/no-packages **fails**), and
+   `socket ci` as **steps inside the existing required `gate` job** — the same job that runs
+   the tests and `impeccable detect`. This is **one required check**, so branch protection
+   and the merge-watch are unchanged; a high-severity/primary finding turns the single `gate`
+   check red. Where the project has **no** CI, the supervisor runs the same three locally at
+   the merge gate. Record the ignore mechanisms (`nosemgrep`, `osv-scanner.toml` IgnoredVulns
+   with reason+expiry, `@SocketSecurity ignore`) as the security analogue of `impeccable
+   ignores` — empty until a reasoned exception is agreed.
+
+4. **The security-detect hook.** Add the *third* `afterFileEdit` entry to the existing
+   `.cursor/hooks.json` (see `Cursor-File-Formats.md`): Semgrep run locally, **advisory and
+   best-effort** — the exit code never blocks a write; a no-op on a host that cannot run it is
+   acceptable because CI is authoritative.
+
+5. **SHA-pin everything.** Every security tool and every CI action is pinned to a **full
+   commit SHA, never a mutable tag** (`@v2` is the March-2026 Trivy-compromise vector), the
+   SHA recorded in `docs/PROJECT_STATUS.md`. Scanners get only the minimum environment — no
+   secrets on a scanner's path beyond Socket's read-scoped token.
+
+**Escalation:** only the **Socket API token** — a repo secret, already owner-authorised; set
+once, referenced as a secret, never written to a file or a prompt. Everything else here the
+supervisor decides and records; it does not escalate.
+
+---
+
 ## 6. Explicitly skipped, and why — [Skip]
 
 On record so nobody wonders whether configuration missed them:
@@ -231,8 +275,14 @@ this reliable:
    Vercel fetch-and-freeze into `.cursor/rules/vercel-interface.mdc` (validate or fall back
    to the bundled snapshot, and record source date + pinned Impeccable version in
    `PROJECT_STATUS.md`); append the second `afterFileEdit` detect hook.
-7. §5b step 5 — the design CI check (`npx impeccable@<pinned> detect`) alongside the
-   project's CI setup; where there is no CI, the supervisor runs it locally at the gate.
-8. Commit the configuration changes as their own checkpoint before `TASK-001`.
-9. Record in `docs/PROJECT_STATUS.md` what was configured, so a resuming session
-   doesn't redo it.
+7. §5c security tooling: write `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, and the
+   frozen `.cursor/rules/secure-coding.mdc` from the bundled ASVS snapshot at the chosen
+   level; append the third (Semgrep, advisory) `afterFileEdit` hook; pin and record the
+   Semgrep/OSV/Socket versions, ASVS level, and every SHA in `PROJECT_STATUS.md`. The Socket
+   token escalates once (repo secret).
+8. §5b step 5 + §5c step 3 — the design and security floor steps added **inside the existing
+   `gate` job** (one required check); where there is no CI, the supervisor runs them locally
+   at the gate.
+9. Commit the configuration changes as their own checkpoint before `TASK-001`.
+10. Record in `docs/PROJECT_STATUS.md` what was configured, so a resuming session
+    doesn't redo it.

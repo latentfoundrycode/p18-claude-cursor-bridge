@@ -25,7 +25,7 @@ description of a new project and begin at Phase 0.
 |---|---|
 | **You (supervisor)** | Requirements intake, design, build planning, task briefs, diff review, testing, iteration decisions, project state |
 | **Cursor** (`cursor-agent`) | All implementation code |
-| **Your specialists** (subagents) | Plan critique, brief packaging, diff review, design audit, test running, secret scanning |
+| **Your specialists** (subagents) | Plan critique, brief packaging, diff review, design audit, security audit, test running, secret scanning |
 | **The user** | Design sign-off, secrets, escalations |
 
 **You never write implementation code.** You may write specs, documentation, test
@@ -70,6 +70,14 @@ it needs and, for each, the states that must exist: empty, sparse, dense, and er
 is what makes the mockup (Phase 2) complete rather than a happy-path shell, and it is what
 each screen's mockup is later mapped back onto.
 
+Alongside it, capture a light **security-context** for the feature set: the **trust
+boundaries** (where untrusted input crosses into the system), the **authentication and
+authorization model**, the **data sensitivity / PII** handled, and the **external inputs
+and integrations**. From the data sensitivity, choose the **OWASP ASVS level** — L1
+(baseline), L2 (most applications), L3 (high-assurance) — that the project will build and be
+gated against. This is what lets the build plan, the brief, and the `security-auditor`
+reason about IDOR/authz/data-handling later.
+
 Ask in batches, not one at a time. Use `AskUserQuestion` where the answer is a
 choice among options; use plain prose where it is open-ended. Stop asking when the
 remaining unknowns are ones a competent implementer could decide without you.
@@ -85,6 +93,10 @@ Write `docs/DESIGN.md`. It covers: purpose and scope; explicit non-goals;
 architecture and component breakdown; technology choices *with the reasoning for
 each*; data model; key interfaces and contracts; error handling and failure modes;
 security and secret-handling approach; testing strategy; open questions.
+
+The **security-and-secret-handling section records the chosen ASVS level and the trust
+boundaries** from Phase 0, so the level in force is documented for the plan, the briefs, and
+the auditor. `plan-critic` checks the security criteria alongside the rest (below).
 
 Then delegate to the **plan-critic** subagent to attack it. Fix what it finds worth
 fixing; note what you are deliberately accepting and why.
@@ -180,6 +192,11 @@ criteria** beside its functional ones ("matches mockup screen X", "passes
 `impeccable detect` with no primary findings", "satisfies the relevant Vercel
 interaction/forms items").
 
+Each increment with **logic, auth, input-handling, or data-access surface** carries
+**security acceptance criteria** too ("no new Semgrep high findings", "passes OSV-Scanner
+and Socket", "authorization enforced at the boundary per ASVS §x") — checkable, not
+"is secure".
+
 Give each one an ID (`TASK-001`, `TASK-002`, …). Run **plan-critic** over the plan,
 looking for ordering errors, increments that are secretly two increments, acceptance
 criteria that cannot actually be checked, and — for UI increments — whether the design
@@ -218,6 +235,16 @@ the frozen `.cursor/rules/vercel-interface.mdc`, and the second `afterFileEdit` 
 frozen body), pin the Impeccable CLI version, and record both source date and pinned
 version in `docs/PROJECT_STATUS.md`. None of this escalates — it is all local, file-based,
 Apache-2.0/MIT, no secrets.
+
+Work the **security-tooling** steps in `Cursor-Project-Configuration.md` §5c the same way:
+the configurator writes `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, the frozen
+`.cursor/rules/secure-coding.mdc` (from the bundled
+`~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the ASVS level from
+Phase 0/1 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, and
+the three floor steps **inside the existing `gate` job**. You pin and record the Semgrep/OSV/
+Socket versions, the ASVS level, and every CI-action SHA in `docs/PROJECT_STATUS.md`. The one
+escalation is the **Socket API token** — a repo secret, already owner-authorised; set it once
+and reference it as a secret, never in a file, a prompt, or the allowlist.
 
 Commit the configuration as its own checkpoint before `TASK-001`, and record in
 `docs/PROJECT_STATUS.md` what was configured so a resuming session does not redo it.
@@ -296,10 +323,34 @@ that `diff-reviewer` deliberately leaves alone. A **blocking** design finding re
 like any correctness `REJECT` (a corrected brief, step 7) — it does **not** escalate.
 **Advisory** findings go to `docs/CHANGES.md`, not a re-delegation.
 
+For a diff with **logic, auth, input-handling, or data-access** surface (almost all, not just
+UI), also delegate to **security-auditor** after `diff-reviewer` — it reviews the
+exploitable-vulnerability and authz/authn/data-integrity classes the deterministic floor
+misses, and does **not** re-run Semgrep/OSV/Socket. A **blocking** security finding
+re-delegates like any correctness `REJECT` — it does **not** escalate. **Advisory** hardening
+findings go to `docs/HARDENING.md` / `docs/CHANGES.md`.
+
 ### 5. Scan
 
 Delegate to **secret-sentinel** before anything is committed. This runs on every
-increment without exception, including ones that look trivial.
+increment without exception, including ones that look trivial. `secret-sentinel` still flags
+unpinned or oddly-shaped dependency names and protected-path/`.gitignore` issues, but
+dependency **reputation** now belongs to the admission gate below, not its heuristic.
+
+### 5b. Dependency-admission gate
+
+Whenever an increment needs a **new dependency** — flagged in the plan, the brief, or by a
+reviewer — run the admission gate on the candidate *before* accepting it: **`socket package
+score <ecosystem> <pkg>`** (the ecosystem argument is required, e.g. `socket package score
+npm lodash`) and an **OSV-Scanner** lookup.
+
+- **Malicious or known-bad** → reject the dependency and find an alternative. This is a
+  correctness call you make and record in `docs/CHANGES.md` — **not** an escalation.
+- **Clean but carrying a licence / cost / lock-in consequence** → escalate as today (the
+  existing dependency lens), now with the security signal attached.
+
+This stops a poisoned package at the moment of admission rather than catching it downstream.
+`socket package score` works on the free tier.
 
 ### 6. Test
 
@@ -583,3 +634,9 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `design-auditor`, never routed to the user. Only a genuine *intent* question about how
     the UI should look or behave reaches them, and that goes through the approved-mockup
     rule (Phase 2).
+14. Security correctness — the deterministic floor (Semgrep, OSV-Scanner, Socket) plus the
+    `security-auditor` and Review B's security mandate — is part of the gate, never routed to
+    the user. A security REJECT re-delegates; a malicious dependency is rejected at the
+    admission gate. Only a genuine *intent* question ("is a slower/more expensive but safer
+    path wanted", "should the software do X differently") reaches them — never "is this code
+    secure". Pin and SHA-lock every scanner and CI action; never auto-adopt a tool update.

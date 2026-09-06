@@ -63,6 +63,32 @@ a judgement layer — not as a new human gate.
 
 ---
 
+## Security in the gate
+
+Security is decorrelated the same way the merge gate is — a deterministic floor plus two
+model families — and, like design, adds **no new human gate**.
+
+- **Deterministic floor — model-independent.** Semgrep (SAST), OSV-Scanner (known-vuln +
+  known-malicious dependencies), and Socket (behavioural malicious-package analysis) run as
+  **steps inside the required `gate` job** (Semgrep on Linux; OSV-Scanner on the PR diff with
+  explicit exit-code handling; `socket ci`). A high-severity/primary finding turns the single
+  `gate` check red — one required check, so branch protection and the merge-watch are
+  unchanged. Where there is no CI, the supervisor runs the three locally before merge.
+- **Review A judgement — Anthropic family.** The `security-auditor` subagent (read-only,
+  strong model) catches the classes SAST misses — IDOR/BOLA, broken authN, business-logic
+  and authz gaps. A **blocking** finding re-delegates like any REJECT; an **advisory** one is
+  logged to `docs/HARDENING.md` / `docs/CHANGES.md`. Same convergence-by-class rule below.
+- **Review B judgement — cross-family.** Review B already reads the whole cumulative diff;
+  its mandate is **extended** to cover the same vuln classes and the security anti-gaming
+  checks (below). No new model, no new invocation — a prompt extension (see Review B's
+  invocation section).
+- **No new human gate.** Security correctness never reaches the owner. Only *intent* — should
+  the software do something different, is a slower/costlier-but-safer path wanted — and the
+  pre-existing dependency/irreversibility questions do. A malicious dependency is rejected at
+  the admission gate, not escalated.
+
+---
+
 ## Model roster (this project)
 
 | Role | Model | Family | Notes |
@@ -93,9 +119,21 @@ must never silently approve, any of:
 - narrowing test scope or excluding files so a failure stops being exercised;
 - editing the CI workflow to skip, `continue-on-error`, or drop the failing job.
 
+**Security-control tampering** is a gate-integrity flag on the same footing — both reviewers
+must treat any of these as such:
+
+- adding a `nosemgrep` / inline suppression, an `osv-scanner.toml` `[[IgnoredVulns]]`, or a
+  `@SocketSecurity ignore` to silence a **real** finding rather than a justified, expiring
+  false positive;
+- removing or weakening input validation, an authz check, output encoding, or a crypto choice;
+- editing the CI `gate` job to skip, `continue-on-error`, or drop a security step;
+- downgrading the ASVS level or narrowing the rule globs to dodge coverage;
+- unpinning a security tool or CI action from its SHA to a mutable tag.
+
 Any of these is a **gate-integrity flag**. It is never an auto-approve. It is either a
 `REJECT` (if the change is plainly a workaround) or an `ESCALATE-INTENT` (if it might be
-a legitimate change to what "correct" means — see below), never a quiet pass.
+a legitimate change to what "correct" or "secure enough" means — see below), never a quiet
+pass.
 
 ---
 
@@ -271,7 +309,12 @@ pinned in its frontmatter (`model: opus` or a full strong model ID) and read-onl
 Already part of the loop; this policy only pins its model and adds the anti-gaming checks
 to its mandate.
 
-**Review B (cross-family).** Reach a non-Anthropic frontier model read-only. Two options:
+**Review B (cross-family).** Reach a non-Anthropic frontier model read-only. Its mandate
+covers code correctness/soundness, the gate-integrity checks, **and security** — the same
+exploitable-vulnerability and authz/authn/data-integrity classes the `security-auditor`
+hunts, plus the security anti-gaming checks in §Anti-gaming. This is a **prompt extension**,
+not a new model or invocation: the directive prompt tells it to check those classes too.
+Two options for reaching it:
 
 - *Default — via Cursor's CLI (no new secret, no script):* write the verification brief and
   the diff to a committed file, then invoke `cursor-agent -p --model <Review B family>` with

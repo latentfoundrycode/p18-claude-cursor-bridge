@@ -47,9 +47,14 @@ ignored. A removed line there is how a secrets file becomes a tracked file.
 that a `git add -A` would pick up — config files, local database files, credential
 caches, editor state, build output.
 
-**Dependencies.** For any added dependency: is it a real, correctly spelled package
-from the expected registry? Typosquats and unpinned versions both matter. Report
-the name and version so the supervisor can escalate the licence question to the user.
+**Dependencies (shape only — reputation belongs to the floor).** For any added
+dependency, flag **unpinned versions** and **oddly-shaped or suspicious names** (a
+possible typosquat) and report the name and version. Do **not** adjudicate the package's
+*reputation* — whether it is known-vulnerable or known-malicious is now decided by the
+security floor (OSV-Scanner + Socket) and the supervisor's dependency-admission gate, so
+two voices do not disagree on the same package. Your job here is the shape (pinned? plausibly
+named?) and surfacing it for the licence question and the admission gate; the floor owns
+"is it bad."
 
 **Outbound calls.** New network calls, telemetry, analytics, or any URL that was not
 in the design. Say where it points.

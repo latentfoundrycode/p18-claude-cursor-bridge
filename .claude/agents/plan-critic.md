@@ -27,6 +27,9 @@ Attack it along these lines:
 - **Scope gaps.** Which stated requirement has nothing in the design serving it?
 - **The thing that will hurt in six weeks.** Where is the decision that is cheap now
   and expensive to reverse later?
+- **Security criteria.** Does the design address authorization, input validation, and
+  secret-handling at each trust boundary? Is the chosen ASVS level recorded, and does it fit
+  the data sensitivity? Are the security acceptance criteria it implies actually checkable?
 
 ## When reviewing a build plan
 
@@ -46,6 +49,10 @@ Attack it along these lines:
   acceptance criteria actually checkable (a specific observable outcome — "matches mockup
   screen X", "passes `impeccable detect` with no primary findings") rather than "looks
   good"?
+- **Security criteria (logic/auth/data increments).** Does each increment with logic, auth,
+  input-handling, or data-access surface carry checkable security acceptance criteria ("no
+  new Semgrep high findings", "passes OSV/Socket", "authz enforced at the boundary per ASVS
+  §x") rather than "is secure"?
 
 ## Output
 

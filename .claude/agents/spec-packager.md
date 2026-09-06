@@ -94,6 +94,14 @@ list `.cursor/rules/vercel-interface.mdc` as an applicable rule the builder alre
 force. Design acceptance criteria from the build plan go in **Acceptance criteria** beside
 the functional ones. Name the paths; do not paraphrase the visual system.
 
+**Logic/auth/data-bearing increments carry their security context.** For any increment with
+logic, auth, input-handling, or data-access surface, the brief's **Context** must state the
+relevant **trust boundaries** and the project's **ASVS level**, and must list
+`.cursor/rules/secure-coding.mdc` as an applicable rule the builder already has in force. The
+security acceptance criteria from the build plan go in **Acceptance criteria** ("no new
+Semgrep high findings", "authz enforced at the boundary per ASVS §x"). Never reproduce a
+secret — refer to `.env` and keys by name, as always.
+
 ## Output
 
 Write the file, then report back: the path you wrote, the scope you set, and anything

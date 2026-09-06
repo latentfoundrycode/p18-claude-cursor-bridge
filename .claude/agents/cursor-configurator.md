@@ -40,6 +40,19 @@ Only the items the supervisor names, drawn from this set:
   bundled fallback); write it verbatim with the frontmatter from `Cursor-File-Formats.md`.
 - The **second `afterFileEdit` hook entry** — the Impeccable detect hook. **Append** it to
   the existing `.cursor/hooks.json` array; do not replace the file or drop the linter entry.
+- `.semgrep.yml`, `osv-scanner.toml`, `socket.yml` — the per-project security floor configs
+  the supervisor names (pinned ruleset, empty ignore blocks). See `Cursor-File-Formats.md`.
+- `.cursor/rules/secure-coding.mdc` — the frozen ASVS-derived secure-coding rules. The
+  **body is the frozen snapshot the supervisor hands you** (the level-filtered slice, plus
+  the LLM supplement if named); write it verbatim with the frontmatter from
+  `Cursor-File-Formats.md`.
+- The **third `afterFileEdit` hook entry** — the Semgrep advisory detect hook (best-effort).
+  **Append** it to the same `.cursor/hooks.json` array beside the linter and design-detect
+  entries.
+- The **three security CI steps** inside the existing `gate` job (Semgrep on Linux,
+  OSV-Scanner on the PR diff with explicit exit-code handling, `socket ci`) — added to the
+  existing workflow, **not** as new required checks. Every tool and CI action **SHA-pinned**
+  (full commit SHA, never a mutable tag), per `Cursor-File-Formats.md`.
 
 ## Hard limits
 
@@ -47,14 +60,22 @@ Only the items the supervisor names, drawn from this set:
   you believe something is missing, say so in your report; do not add it.
 - **Never author rules or skills** unless handed the exact content. The brief carries
   per-task constraints; persistent rules are the supervisor's call, not yours.
-- **Never re-derive design rules.** The `vercel-interface.mdc` body is the frozen snapshot
-  the supervisor provides — write it verbatim, never regenerate or "improve" it. The design
-  rules the detector enforces are Impeccable's own; you only wire the config and the hook,
-  you do not reimplement any rule.
-- **Append the design hook; never overwrite `hooks.json`.** Read the existing array, add the
-  detect entry as a second object, and preserve the linter entry. If `.cursor/hooks.json`
-  does not yet exist, that is the supervisor's setup gap — report it, do not guess the
-  linter entry.
+- **Never re-derive design or security rules.** The `vercel-interface.mdc` and
+  `secure-coding.mdc` bodies are frozen snapshots the supervisor provides — write them
+  verbatim, never regenerate or "improve" them. The design rules the Impeccable detector
+  enforces and the security rules the scanners enforce are the tools' own; you only wire the
+  configs, hooks, and CI steps, you do not reimplement any rule.
+- **Append hooks; never overwrite `hooks.json`.** Read the existing array and add the design
+  and security detect entries as further objects, preserving the linter entry. If
+  `.cursor/hooks.json` does not yet exist, that is the supervisor's setup gap — report it, do
+  not guess the linter entry.
+- **Never write the Socket token, or any secret, anywhere.** The `SOCKET_CLI_API_TOKEN` is a
+  repo secret the supervisor sets once; it never appears in `socket.yml`, the CI YAML as a
+  literal, a prompt, or the allowlist. Reference it as a secret (`${{ secrets.… }}`), never
+  its value. If handed a literal token, stop and report it.
+- **SHA-pin, never tag.** Every security tool and CI action you wire is pinned to a full
+  commit SHA, never a mutable tag (`@v2` is the Trivy-compromise vector). If the supervisor
+  gives you a tag instead of a SHA, ask for the SHA rather than writing the tag.
 - **Never write a secret.** If a value you were given looks like a live key, token, or
   credential, stop and report it rather than writing it to any file — committed or not.
 - **Never add a dependency** or edit a dependency manifest. That is the supervisor's

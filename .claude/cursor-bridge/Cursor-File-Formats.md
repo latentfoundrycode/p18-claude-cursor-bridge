@@ -157,6 +157,30 @@ the builder's edits so slop and design-system drift surface live:
   a non-zero exit as a gate — enforcement lives in CI and the `design-auditor`, not here
   (the hook only accelerates convergence). This is the opposite of a security hook.
 
+### Security-detect hook entry — a *third* `afterFileEdit` object (advisory, best-effort)
+
+A third entry in the **same** array runs Semgrep locally on the builder's edits *if* it is
+runnable on the host, beside the linter and design-detect entries:
+
+```json
+{
+  "command": "semgrep --config <pinned-ruleset> --error --quiet",
+  "timeout": 40,
+  "matcher": "Write"
+}
+```
+
+- **Advisory and best-effort — CI is authoritative.** Like the design-detect hook, the exit
+  code never blocks a write; enforcement is the CI floor and the `security-auditor`. Never
+  set `failClosed: true`.
+- **Best-effort on Windows.** Semgrep now supports native Windows (GA, no WSL), so this hook
+  will usually run — but if the host cannot run it, the entry is a **no-op and that is
+  acceptable**, because the CI `gate` job runs Semgrep on Linux authoritatively. Do not make
+  the integration depend on the local hook.
+- **Same Windows quirks apply** (no bare script, strip the stdin BOM, explicit interpreter);
+  invoke Semgrep by its resolved installed path settled at config time, as with the other
+  hooks.
+
 ---
 
 ## `mcp.json` — tools and library docs for the builder
@@ -277,6 +301,92 @@ architecture; `docs/design/DESIGN.md` = visual system; `.cursor/rules/vercel-int
 
 ---
 
+## `.semgrep.yml` (project root) — pinned SAST ruleset
+
+Points the Semgrep floor at the ruleset the project builds against, pinned so a resumed
+session runs the same rules. Either an inline `rules:` set or a reference to pinned registry
+rulesets. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if behaviour looks
+off; native Windows support is now GA, but the floor still runs Semgrep in CI on Linux).
+
+```yaml
+# Pinned ruleset reference — record the exact version/commit in PROJECT_STATUS.md
+rules:
+  - p/default
+  - p/secrets
+  - p/owasp-top-ten
+```
+
+- Prefer curated registry packs (`p/…`) pinned to a recorded version, or vendor a fixed
+  rule file into the repo. Pin the **Semgrep CLI version** too (`PROJECT_STATUS.md`).
+- Findings above the chosen severity block in CI. Inline `# nosemgrep` suppressions are a
+  **gate-integrity flag** (see `Merge-Verification-Policy.md`) unless justified as a false
+  positive with a stated reason.
+
+---
+
+## `osv-scanner.toml` (project root) — known-vuln / malicious-dep floor
+
+Config for OSV-Scanner (OSV.dev + the OpenSSF Malicious Packages feed). Keep
+`[[IgnoredVulns]]` **empty** until a real, reasoned, **expiring** exception is agreed (the
+security analogue of `impeccable ignores`). **Docs-verified 6 September 2026** (OSV-Scanner
+~v2.5.1; cross-platform incl. native Windows).
+
+```toml
+# osv-scanner.toml — no ignores until a reasoned, expiring exception is agreed
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2026-12-31
+# reason = "why this is acceptable, who agreed, and when it is revisited"
+```
+
+- **Exit codes are load-bearing** and must be handled explicitly in CI: `0` clean, `1`
+  findings (fail), `127` execution failed (fail), `128` no packages found (**fail** — never
+  let an empty inventory pass as green). Parse JSON/SARIF for routing but preserve the raw
+  exit code as the pass/fail signal.
+- Run against the **PR diff** (base-vs-feature) so only *newly introduced* vulns/malware
+  block.
+
+---
+
+## `socket.yml` (project root) — behavioural malicious-package floor
+
+Socket policy/ignore config. Empty ignores until an exception is agreed. **Docs-verified
+6 September 2026** (`@socketsecurity/cli`; Node-based, native Windows fine).
+
+```yaml
+# socket.yml — Socket policy; no ignores until agreed
+version: 2
+issueRules: {}
+```
+
+- CI runs `socket ci` (= `socket scan create --report`), non-zero on unhealthy alerts.
+- The admission gate (§ configuration) uses `socket package score <ecosystem> <pkg>` (the
+  ecosystem argument is required, e.g. `socket package score npm lodash`) on the **free
+  tier**; full CI reporting needs `SOCKET_CLI_API_TOKEN` as a **repo secret** — never in a
+  committed file, a prompt, or the allowlist. A `@SocketSecurity ignore` that silences a
+  **real** alert is a gate-integrity flag.
+
+---
+
+## Security CI steps — inside the existing `gate` job
+
+The three floor tools are added as **steps inside the project's existing required CI `gate`
+job** (the same job that runs tests, lint, and `impeccable detect`) — **not** as new
+required checks. One required check keeps branch protection and the merge-watch unchanged; a
+high-severity/primary finding turns the single `gate` check red.
+
+- **Semgrep** runs on `ubuntu-latest` (Linux, fully supported).
+- **OSV-Scanner** runs on the PR diff; the step handles exit codes 0/1/127/128 as above.
+- **Socket** runs `socket ci` with the token from the repo secret.
+
+**SHA-pin rule (load-bearing — see `Merge-Verification-Policy.md` and the Trivy meta-risk):**
+pin every security tool and every CI **action** to a **full commit SHA, never a mutable
+tag**. `uses: some-action@v2` is the exact vector exploited in the March 2026 Trivy
+supply-chain compromise. Record each pinned SHA in `PROJECT_STATUS.md`. Scanners get only
+the minimum environment — no secrets on a scanner's path beyond Socket's read-scoped token.
+
+---
+
 ## `.cursor/rules/*.mdc` — only for a cross-cutting invariant
 
 The bridge adds a rule only for something true of *every* task and awkward to repeat in
@@ -323,3 +433,25 @@ globs: **/*.tsx, **/*.jsx, **/*.ts, **/*.css
 - **Body = the frozen Vercel `AGENTS.md` snapshot**, adopted once per project by the
   fetch-and-freeze step (see `Cursor-Project-Configuration.md`) and never re-derived. Keep
   it under the 500-line guidance (the current `AGENTS.md` is well under it).
+
+### `.cursor/rules/secure-coding.mdc` — the frozen secure-coding rules
+
+The security integration writes a second rule of this form: the **frozen ASVS-derived
+secure-coding rules** so the builder self-applies secure-by-default patterns during
+generation. Use the `.mdc` format above with:
+
+```markdown
+---
+description: Secure-coding rules (OWASP ASVS 5.0.0), frozen for this project
+alwaysApply: false
+globs: **/*.ts, **/*.tsx, **/*.js, **/*.jsx, **/*.py, **/*.go, **/*.rb, **/*.java
+---
+```
+
+- **`globs` scoped to source files** by stack (bare comma list, not quoted, not an array),
+  so it loads when a source file is in context.
+- **Body = the level-filtered slice of `~/.claude/cursor-bridge/secure-coding.snapshot.md`**
+  for the project's chosen ASVS tier (L1/L2/L3), plus the LLM supplement for AI-bearing
+  products. ASVS is **stable**, so the freeze pins `v5.0.0` and does **not** need the
+  per-project live-fetch-validation the beta Vercel rules use — the bundled snapshot is the
+  source. Record the ASVS version and level in `PROJECT_STATUS.md`.
