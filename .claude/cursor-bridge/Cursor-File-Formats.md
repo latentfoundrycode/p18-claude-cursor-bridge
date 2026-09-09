@@ -187,7 +187,17 @@ This is the **one deliberately fail-closed** hook in the bridge — every other 
 advisory/fail-open. It runs *before the builder executes any shell command* and denies a
 tight, high-confidence deny-list of destructive/irreversible/exfil commands; everything
 else passes. It is a **separate event** (`beforeShellExecution`), not another `afterFileEdit`
-object:
+object.
+
+> **Opt-in, off by default — Windows shell caveat (verified 2026-09-09).** On Windows,
+> `beforeShellExecution` hooks fire correctly **only when the builder is launched under
+> PowerShell**. Under **Git Bash** — the bridge's default `cursor-agent` shim path — Cursor
+> generates PowerShell hook-runner syntax (`| & { … }`) that bash cannot execute, so the hook
+> errors on *every* command; because this hook is `failClosed`, that would **block the entire
+> build**, not just dangerous commands. So the configurator writes this hook **only when the
+> supervisor explicitly opts in for a PowerShell-launched builder**, never by default. Confirm
+> it fires on the target setup (see the verification harness) before enabling it. The
+> authoritative security net (CI floor + `security-auditor` + Review B) does not depend on it.
 
 ```json
 {

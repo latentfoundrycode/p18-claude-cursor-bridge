@@ -208,16 +208,20 @@ exact shapes. Pick the ASVS level (L1/L2/L3) from data sensitivity in Phase 0/1.
    SHA recorded in `docs/PROJECT_STATUS.md`. Scanners get only the minimum environment — no
    secrets on a scanner's path beyond Socket's read-scoped token.
 
-6. **The shell guard (fail-closed).** Add a `beforeShellExecution` entry to
-   `.cursor/hooks.json` with `failClosed: true`, and place the guard script at
-   `.cursor/hooks/shell-guard.py` verbatim from the bundled
-   `~/.claude/cursor-bridge/shell-guard.py` (see `Cursor-File-Formats.md`). It runs before the
-   builder executes any shell command and **blocks** a tight deny-list of destructive /
-   irreversible / exfil commands (recursive deletes of dangerous targets, history-rewriting
-   or force git, download-piped-to-a-shell, outbound data transfer, privilege escalation,
-   writes to protected paths); everything else passes. This is the **one** fail-closed hook —
-   confirm `beforeShellExecution` actually fires under `cursor-agent -p --force` on the pinned
-   CLI version (it is documented to, but the CLI is beta) before relying on it.
+6. **The shell guard (fail-closed) — OPT-IN, off by default.** *Only* wire this when the
+   supervisor has explicitly opted in **and** the builder is launched under PowerShell on
+   Windows. When enabled: add a `beforeShellExecution` entry to `.cursor/hooks.json` with
+   `failClosed: true`, and place the guard script at `.cursor/hooks/shell-guard.py` verbatim
+   from the bundled `~/.claude/cursor-bridge/shell-guard.py` (see `Cursor-File-Formats.md`). It
+   runs before the builder executes any shell command and **blocks** a tight deny-list of
+   destructive / irreversible / exfil commands (recursive deletes of dangerous targets,
+   history-rewriting or force git, download-piped-to-a-shell, outbound data transfer,
+   privilege escalation, writes to protected paths); everything else passes.
+   **Do not enable it for a Git-Bash-launched builder** (the bridge's default shim path): a
+   verified Cursor bug (2026-09-09) makes `beforeShellExecution` hooks error under Git Bash,
+   which — being fail-closed — would block *every* command and brick the build. Confirm it
+   fires on the target setup with the verification harness before enabling. The gate does not
+   depend on it (defense-in-depth only).
 
 **Escalation:** only the **Socket API token** — a repo secret, already owner-authorised; set
 once, referenced as a secret, never written to a file or a prompt. Everything else here the
@@ -288,10 +292,10 @@ this reliable:
    `PROJECT_STATUS.md`); append the second `afterFileEdit` detect hook.
 7. §5c security tooling: write `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, and the
    frozen `.cursor/rules/secure-coding.mdc` from the bundled ASVS snapshot at the chosen
-   level; append the third (Semgrep, advisory) `afterFileEdit` hook and the fail-closed
-   `beforeShellExecution` shell-guard hook (+ place `shell-guard.py`); pin and record the
-   Semgrep/OSV/Socket versions, ASVS level, and every SHA in `PROJECT_STATUS.md`. The Socket
-   token escalates once (repo secret).
+   level; append the third (Semgrep, advisory) `afterFileEdit` hook; **(opt-in only, and only
+   for a PowerShell-launched builder)** the fail-closed `beforeShellExecution` shell-guard hook
+   (+ place `shell-guard.py`); pin and record the Semgrep/OSV/Socket versions, ASVS level, and
+   every SHA in `PROJECT_STATUS.md`. The Socket token escalates once (repo secret).
 8. §5b step 5 + §5c step 3 — the design and security floor steps added **inside the existing
    `gate` job** (one required check); where there is no CI, the supervisor runs them locally
    at the gate.

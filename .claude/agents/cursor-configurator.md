@@ -53,10 +53,13 @@ Only the items the supervisor names, drawn from this set:
   OSV-Scanner on the PR diff with explicit exit-code handling, `socket ci`) — added to the
   existing workflow, **not** as new required checks. Every tool and CI action **SHA-pinned**
   (full commit SHA, never a mutable tag), per `Cursor-File-Formats.md`.
-- The **shell-guard hook** — a `beforeShellExecution` entry in `.cursor/hooks.json` with
-  `failClosed: true`, plus the guard script placed at `.cursor/hooks/shell-guard.py` verbatim
-  from the bundled `~/.claude/cursor-bridge/shell-guard.py`. This is the one fail-closed hook.
-  See `Cursor-File-Formats.md`.
+- The **shell-guard hook** — **only when the supervisor explicitly opts in** (off by default;
+  requires a PowerShell-launched builder on Windows — see `Cursor-File-Formats.md`). When told
+  to, add a `beforeShellExecution` entry in `.cursor/hooks.json` with `failClosed: true`, plus
+  the guard script placed at `.cursor/hooks/shell-guard.py` verbatim from the bundled
+  `~/.claude/cursor-bridge/shell-guard.py`. This is the one fail-closed hook. If not told to
+  wire it, do not — a Git-Bash-launched builder with this hook would have every command
+  blocked.
 
 ## Hard limits
 

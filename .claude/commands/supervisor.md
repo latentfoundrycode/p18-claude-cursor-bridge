@@ -240,17 +240,21 @@ Work the **security-tooling** steps in `Cursor-Project-Configuration.md` §5c th
 the configurator writes `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, the frozen
 `.cursor/rules/secure-coding.mdc` (from the bundled
 `~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the ASVS level from
-Phase 0/1 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, the
-fail-closed `beforeShellExecution` **shell-guard** hook (+ its `shell-guard.py`), and the
+Phase 0/1 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, and the
 three floor steps **inside the existing `gate` job**. You pin and record the Semgrep/OSV/
 Socket versions, the ASVS level, and every CI-action SHA in `docs/PROJECT_STATUS.md`. The one
 escalation is the **Socket API token** — a repo secret, already owner-authorised; set it once
 and reference it as a secret, never in a file, a prompt, or the allowlist.
 
-The shell-guard blocks the *builder's* destructive/irreversible/exfil shell commands before
-they run; it does not touch your own `git reset --hard HEAD` recovery (that runs through the
-Bash tool, not `cursor-agent`). If the builder is ever legitimately blocked by it, that is a
-brief/plan question to resolve — never a reason to weaken or remove the guard.
+The fail-closed `beforeShellExecution` **shell-guard** is **opt-in and off by default**. It
+blocks the *builder's* destructive/irreversible/exfil shell commands before they run (and does
+not touch your own `git reset --hard HEAD` recovery, which runs through the Bash tool, not
+`cursor-agent`). But a verified Cursor bug (2026-09-09) makes `beforeShellExecution` hooks
+error under **Git Bash** — the bridge's default builder shell — which, being fail-closed, would
+block *every* command. So enable it only when the builder runs under **PowerShell** on Windows,
+and only after confirming it fires with the verification harness. It is defense-in-depth; the
+gate does not depend on it. If enabled and the builder is legitimately blocked by it, that is a
+brief/plan question — never a reason to weaken the guard.
 
 Commit the configuration as its own checkpoint before `TASK-001`, and record in
 `docs/PROJECT_STATUS.md` what was configured so a resuming session does not redo it.
