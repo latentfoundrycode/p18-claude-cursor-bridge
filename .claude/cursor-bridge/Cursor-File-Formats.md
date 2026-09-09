@@ -198,6 +198,10 @@ object.
 > supervisor explicitly opts in for a PowerShell-launched builder**, never by default. Confirm
 > it fires on the target setup (see the verification harness) before enabling it. The
 > authoritative security net (CI floor + `security-auditor` + Review B) does not depend on it.
+> This is a **documented Cursor bug** (forum: "Project-level hooks fail on Windows with Git
+> Bash due to PowerShell injection") with **no config fix** — the CLI has no `--shell` flag and
+> no shell field in `cli-config.json`. The only way to enable the guard by default is to run
+> the builder under PowerShell (a separate architectural change); until then it stays opt-in.
 
 ```json
 {
