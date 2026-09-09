@@ -222,10 +222,15 @@ permission system does not apply here — `--force` bypasses it — so do not tr
 configure it.
 
 Delegate the actual file-writing to **cursor-configurator**, which writes
-`.gitattributes`, `.cursorignore`, `.worktreeinclude`, linter configs, `hooks.json`, and
-`mcp.json` on your instruction and reports back. You keep the decisions and the
-escalations; it never adds dependencies, handles secrets, or authors rules on its own.
-Clear every escalation with the user before instructing it.
+`.gitattributes`, `.cursorignore`, `.worktreeinclude`, linter configs, `hooks.json`,
+`.githooks/pre-commit`, and `mcp.json` on your instruction and reports back. You keep the
+decisions and the escalations; it never adds dependencies, handles secrets, or authors rules
+on its own. Clear every escalation with the user before instructing it.
+
+After it writes `.githooks/pre-commit`, set the git-native lint gate live once for this clone:
+`git config core.hooksPath .githooks` (run on its own line). From then on a failing lint
+blocks any plain `git commit`; your pre-delegation checkpoint commits bypass it with
+`--no-verify` (below).
 
 For a UI-bearing project, also work the **design-tooling** steps in
 `Cursor-Project-Configuration.md` §5b: the configurator writes `.impeccable/config.json`,
@@ -278,8 +283,14 @@ start from a known-good commit so it can be reverted wholesale:
 ```bash
 git status --short
 git add -A
-git commit -m "checkpoint before TASK-<nnn>"
+git commit --no-verify -m "checkpoint before TASK-<nnn>"
 ```
+
+The checkpoint commit uses `--no-verify` deliberately: it is the recovery anchor and must
+succeed even when the tree does not pass lint (a partial or inherited state). This is the
+**only** commit that bypasses the pre-commit lint gate — your accept/increment commits (step 7)
+run a plain `git commit` and must pass it. Using `--no-verify` on an increment commit is a
+gate-integrity flag, not a shortcut.
 
 Issue each git command on its own line — never join them with `&&`, `|`, or `;`.
 The permission allowlist matches a command against a single rule, so a chained

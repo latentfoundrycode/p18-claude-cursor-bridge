@@ -243,6 +243,54 @@ object.
 
 ---
 
+## `.githooks/pre-commit` — the deterministic lint gate (git-native)
+
+A committed git pre-commit hook that **blocks a commit whose changes fail the project's
+linter** — the mechanical, un-skippable floor beneath the advisory `afterFileEdit` linter
+hook and `test-runner`. This is **git's** hook system, not Cursor's `hooks.json`, so git runs
+it under its own bundled `sh` even on Windows — it does **not** hit the PowerShell/Git-Bash
+hook-runner bug that gates the shell-guard.
+
+**Two-part setup:**
+
+1. A committed script at `.githooks/pre-commit` (version-controlled, so it travels into every
+   session worktree — unlike `.git/hooks/`, which does not):
+
+   ```sh
+   #!/bin/sh
+   # Bridge lint gate. Runs the project's settled, activation-independent lint command;
+   # a non-zero result blocks the commit. Pre-delegation checkpoint commits bypass this
+   # with `git commit --no-verify` (they are recovery anchors and must always succeed).
+   if ! <LINT_CMD>; then
+     echo "pre-commit: lint gate failed — fix the findings. Use --no-verify ONLY for a checkpoint snapshot." 1>&2
+     exit 1
+   fi
+   ```
+
+   `<LINT_CMD>` is the **exact activation-independent lint command** settled in the
+   feedback-loop step (§2 of `Cursor-Project-Configuration.md`), written in git-`sh` form
+   (explicit interpreter by relative path, forward slashes — e.g.
+   `.venv/Scripts/python.exe -m ruff check .` on Windows, `.venv/bin/python -m ruff check .`
+   on POSIX). **Lint only** — type-checking stays with `test-runner`/CI (it is slower and
+   usually needs the whole project); a project may add a fast type-check here at the
+   supervisor's discretion.
+
+2. Point git at it, once per clone (shared across worktrees):
+
+   ```
+   git config core.hooksPath .githooks
+   ```
+
+- **Checkpoint commits bypass, increment commits do not.** The supervisor's pre-delegation
+  `checkpoint before TASK-nnn` commits run `git commit --no-verify` (always succeed, even on a
+  lint-broken tree — they are the revert anchor); accept/increment commits run a plain
+  `git commit` and must pass the gate. A `--no-verify` on an *increment* commit is a
+  gate-integrity flag (see `Merge-Verification-Policy.md`).
+- On POSIX, `chmod +x .githooks/pre-commit`. On Windows executability is not needed (git runs
+  it via its bundled `sh`).
+
+---
+
 ## `mcp.json` — tools and library docs for the builder
 
 User scope `~/.cursor/mcp.json` or project scope `[PROJECT]/.cursor/mcp.json`. Prefer

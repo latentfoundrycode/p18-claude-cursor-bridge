@@ -122,7 +122,9 @@ must never silently approve, any of:
   weaker property) without a stated, intended reason;
 - adding blanket retries, `sleep`s, or `try/except pass` that mask a failure;
 - narrowing test scope or excluding files so a failure stops being exercised;
-- editing the CI workflow to skip, `continue-on-error`, or drop the failing job.
+- editing the CI workflow to skip, `continue-on-error`, or drop the failing job;
+- using `git commit --no-verify` on an increment/accept commit to bypass the pre-commit lint
+  gate (only the supervisor's pre-delegation checkpoint snapshots may use `--no-verify`).
 
 **Security-control tampering** is a gate-integrity flag on the same footing — both reviewers
 must treat any of these as such:

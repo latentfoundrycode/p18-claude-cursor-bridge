@@ -73,6 +73,14 @@ and fix its own lint/type errors without a human in the loop.
   contain no source files yet. Drop an empty `__init__.py` into each type-checked
   package so the check is green until real code exists — otherwise the first delegation
   "fails" for no real reason.
+- **Gate commits on lint failure — the deterministic floor.** Add a committed
+  `.githooks/pre-commit` (see `Cursor-File-Formats.md`) that runs the same settled lint
+  command and blocks a failing commit, then set `git config core.hooksPath .githooks` once.
+  Unlike the `afterFileEdit` hook (advisory, model can ignore) this is mechanical and
+  un-skippable. **Lint only** (type-check stays with `test-runner`/CI). The supervisor's
+  pre-delegation checkpoint commits use `git commit --no-verify` (recovery anchors that must
+  always succeed); accept/increment commits pass the gate. This is the checklist's own "Gate
+  Commits on Lint Failure" step.
 
 ---
 
@@ -282,7 +290,7 @@ this reliable:
 ## Configuration run — order of operations
 
 1. §1 repo hygiene (`.gitattributes` → renormalise, `.cursorignore`, `.worktreeinclude`).
-2. §2 feedback loop: escalate any new linter deps, commit configs, fix command strings, wire the edit hook, handle the empty-target case.
+2. §2 feedback loop: escalate any new linter deps, commit configs, fix command strings, wire the edit hook, handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` + `git config core.hooksPath .githooks`).
 3. §3 Context7 in `~/.cursor/mcp.json` if the project uses third-party libraries.
 4. §4 any other MCP tools the build needs (escalate secrets).
 5. §5 at most one cross-cutting rule, only if warranted; surface any inherited config.

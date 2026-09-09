@@ -29,6 +29,10 @@ Only the items the supervisor names, drawn from this set:
 - `hooks.json` — the `afterFileEdit` hook that runs the linter, using the exact
   activation-independent command string the supervisor gives you (explicit interpreter
   path, never a bare `python -m ...`).
+- `.githooks/pre-commit` — the git-native lint gate, running the same settled lint command
+  (in git-`sh` form) so a failing commit is blocked. Write the file; the supervisor sets
+  `git config core.hooksPath .githooks` (that is a git-config command, not a file you write).
+  Lint only. See `Cursor-File-Formats.md`.
 - `~/.cursor/mcp.json` — MCP servers the supervisor specifies (e.g. Context7). Use
   `${env:NAME}` interpolation for any value that would otherwise be a secret; never
   write a literal key.
