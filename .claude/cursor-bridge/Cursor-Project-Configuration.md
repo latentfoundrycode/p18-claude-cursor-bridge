@@ -246,7 +246,11 @@ On record so nobody wonders whether configuration missed them:
   does not prompt in a bridge run. The CLI also uses a *separate* file
   (`~/.cursor/cli-config.json`) that must not be mixed with `permissions.json`. The
   bridge's real gate is Claude's own `settings.json` allowlist on the `cursor-agent`
-  command plus the review loop.
+  command plus the review loop. **Sandbox specifically includes `sandbox.json` network
+  egress control — empirically confirmed (2026-09-09) NOT enforced under `-p --force`** (a
+  deny-by-default policy allowing only one domain still let a non-allowlisted request through),
+  so it is not worth wiring; exfil/malicious-network risk is covered instead by the
+  dependency-admission gate, Socket, and (opt-in) the shell-guard.
 - **The Customize UI, command palette, keyboard shortcuts, window switching** —
   interactive-only.
 - **Dashboard connections (GitHub/Linear), Cloud Agents, Bugbot, PR routing,
