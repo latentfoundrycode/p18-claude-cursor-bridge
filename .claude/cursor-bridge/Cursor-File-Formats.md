@@ -429,6 +429,15 @@ rules:
 - Findings above the chosen severity block in CI. Inline `# nosemgrep` suppressions are a
   **gate-integrity flag** (see `Merge-Verification-Policy.md`) unless justified as a false
   positive with a stated reason.
+- **Always add the bundled bridge rules.** `cursor-configurator` copies
+  `~/.claude/cursor-bridge/semgrep-bridge-rules.yml` into the project at
+  `.semgrep/bridge-rules.yml` and appends `--config .semgrep/bridge-rules.yml` to the gate
+  command. These close the token-free floor's blind spot for **string-concatenation SQL
+  injection** (the community packs miss it — S10 finding). They are **heuristic shape-matchers,
+  not taint** — laundered/interprocedural cases still need the Pro engine (see
+  `Cursor-Project-Configuration.md` §5c, "CI / Pro"). Validate them per project (flag a planted
+  concat-SQLi probe; zero false positives on the app's real queries) and extend the sink list to
+  the project's DB library if needed.
 
 ---
 

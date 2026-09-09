@@ -1,0 +1,59 @@
+# Bridge token-free Semgrep rules — the OSS-engine SAST supplement.
+#
+# The community packs (p/default, p/secrets, p/owasp-top-ten) do NOT catch string-concatenation
+# SQL injection — that lives in Semgrep Pro's taint engine (S10 finding, 2026-09-09). This file
+# closes that specific class WITHOUT a token, so the local/token-free floor is not blind to the
+# top web-vuln class. cursor-configurator writes it into each project at .semgrep/bridge-rules.yml
+# and adds `--config .semgrep/bridge-rules.yml` to the gate command alongside the packs.
+#
+# HEURISTIC, NOT TAINT: these are shape-matchers. They catch a literal SQL string concatenated
+# with a value at a common DB sink, but input laundered through a helper variable or across
+# functions before the sink still slips past — that needs the Pro engine (see §5c "CI / Pro").
+# VALIDATE PER PROJECT before relying on it: confirm the rule flags a planted concat-SQLi probe
+# AND produces zero false positives on the app's real (parameterised) queries; extend/adjust the
+# sink list to the project's DB library if needed.
+
+rules:
+  - id: bridge-sql-string-concat-js
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      SQL query string built by concatenating a value into it (CWE-89 SQL injection).
+      Use parameterised queries / bound placeholders (e.g. `WHERE id = ?` with a bound arg)
+      rather than string concatenation.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+      owasp: "A03:2021 - Injection"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $DB.query(<... "..." + $X ...>, ...)
+          - pattern: $DB.execute(<... "..." + $X ...>, ...)
+          - pattern: $DB.prepare(<... "..." + $X ...>, ...)
+          - pattern: $DB.run(<... "..." + $X ...>, ...)
+          - pattern: $DB.get(<... "..." + $X ...>, ...)
+          - pattern: $DB.all(<... "..." + $X ...>, ...)
+          - pattern: $DB.exec(<... "..." + $X ...>, ...)
+      # Do not flag pure literal-to-literal concatenation (no untrusted value in play).
+      - pattern-not: $DB.$M(<... "..." + "..." ...>, ...)
+
+  - id: bridge-sql-string-concat-py
+    languages: [python]
+    severity: ERROR
+    message: >
+      SQL query string built by concatenating a value into it (CWE-89 SQL injection).
+      Use parameterised queries (e.g. cursor.execute(sql, params)) with placeholders rather
+      than string concatenation or %-formatting of untrusted values.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+      owasp: "A03:2021 - Injection"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $CUR.execute(<... "..." + $X ...>, ...)
+          - pattern: $CUR.executemany(<... "..." + $X ...>, ...)
+          - pattern: $CUR.execute(<... "..." % $X ...>, ...)
+          - pattern: $CUR.execute(f"...{$X}...", ...)
+      - pattern-not: $CUR.execute(<... "..." + "..." ...>, ...)

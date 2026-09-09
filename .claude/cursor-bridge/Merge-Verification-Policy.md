@@ -73,7 +73,10 @@ model families — and, like design, adds **no new human gate**.
   **steps inside the required `gate` job** (Semgrep on Linux; OSV-Scanner on the PR diff with
   explicit exit-code handling; `socket ci`). A high-severity/primary finding turns the single
   `gate` check red — one required check, so branch protection and the merge-watch are
-  unchanged. Where there is no CI, the supervisor runs the three locally before merge.
+  unchanged. In CI, Semgrep runs the **Pro engine** (`semgrep ci` + `SEMGREP_APP_TOKEN`, taint —
+  the real SQL-injection catch) when the token is set, else the OSS packs + the bundled
+  token-free bridge rules (a heuristic supplement, not taint). Where there is no CI, the
+  supervisor runs the three locally before merge (token-free mode).
 - **Review A judgement — Anthropic family.** The `security-auditor` subagent (read-only,
   strong model) catches the classes SAST misses — IDOR/BOLA, broken authN, business-logic
   and authz gaps. A **blocking** finding re-delegates like any REJECT; an **advisory** one is

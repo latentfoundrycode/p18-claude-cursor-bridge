@@ -247,9 +247,17 @@ the configurator writes `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, the fr
 `~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the ASVS level from
 Phase 0/1 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, and the
 three floor steps **inside the existing `gate` job**. You pin and record the Semgrep/OSV/
-Socket versions, the ASVS level, and every CI-action SHA in `docs/PROJECT_STATUS.md`. The one
-escalation is the **Socket API token** — a repo secret, already owner-authorised; set it once
-and reference it as a secret, never in a file, a prompt, or the allowlist.
+Socket versions, the ASVS level, and every CI-action SHA in `docs/PROJECT_STATUS.md`. The
+escalations are the two **API tokens** — **Socket** and **Semgrep** (`SEMGREP_APP_TOKEN`, for
+the Pro engine) — repo secrets, already owner-authorised; set once and referenced as secrets,
+never in a file, a prompt, or the allowlist.
+
+**Prefer the CI / remote gate for a real project.** Semgrep runs reliably on Linux in CI and,
+with the Semgrep token, uses the Pro (taint) engine that catches the SQL-injection/injection
+classes the token-free OSS packs miss. Local-only mode inherits the OSS coverage gap (only
+partly closed by the bundled heuristic bridge rules) and Windows-local Semgrep fragility — fine
+for a throwaway, but steer a real project to the CI gate (see `Cursor-Project-Configuration.md`
+§5c). Record which mode is in force in `docs/PROJECT_STATUS.md`.
 
 The fail-closed `beforeShellExecution` **shell-guard** is **opt-in and off by default**. It
 blocks the *builder's* destructive/irreversible/exfil shell commands before they run (and does

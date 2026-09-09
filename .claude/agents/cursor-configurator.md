@@ -46,6 +46,10 @@ Only the items the supervisor names, drawn from this set:
   the existing `.cursor/hooks.json` array; do not replace the file or drop the linter entry.
 - `.semgrep.yml`, `osv-scanner.toml`, `socket.yml` — the per-project security floor configs
   the supervisor names (pinned ruleset, empty ignore blocks). See `Cursor-File-Formats.md`.
+- `.semgrep/bridge-rules.yml` — copied verbatim from
+  `~/.claude/cursor-bridge/semgrep-bridge-rules.yml` (the token-free concat-SQLi supplement),
+  and added to the gate command as `--config .semgrep/bridge-rules.yml`. Validate it against the
+  project as the supervisor instructs (flags a planted probe, zero false positives).
 - `.cursor/rules/secure-coding.mdc` — the frozen ASVS-derived secure-coding rules. The
   **body is the frozen snapshot the supervisor hands you** (the level-filtered slice, plus
   the LLM supplement if named); write it verbatim with the frontmatter from

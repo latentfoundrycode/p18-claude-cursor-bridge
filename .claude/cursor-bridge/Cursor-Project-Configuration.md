@@ -178,15 +178,25 @@ The supervisor decides and records; `cursor-configurator` writes the files. See
 
 ---
 
-## 5c. Security tooling — [Claude], with [Escalate] only for the Socket token
+## 5c. Security tooling — [Claude], with [Escalate] only for the Socket and Semgrep tokens
 
-Parallel to §5b. All file-based and local except the one commercial secret (the Socket API
-token), which the owner has already authorised and sets once as a repo secret. The supervisor
-decides and records; `cursor-configurator` writes the files. See `Cursor-File-Formats.md` for
-exact shapes. Pick the ASVS level (L1/L2/L3) from data sensitivity in Phase 0/1. Steps:
+Parallel to §5b. All file-based and local except two commercial secrets (the Socket and
+Semgrep API tokens), which the owner has already authorised and sets once as repo secrets. The
+supervisor decides and records; `cursor-configurator` writes the files. See
+`Cursor-File-Formats.md` for exact shapes. Pick the ASVS level (L1/L2/L3) from data sensitivity
+in Phase 0/1.
 
-1. **Deterministic floor configs.** Write `.semgrep.yml` (pinned ruleset), `osv-scanner.toml`
-   (empty `[[IgnoredVulns]]`), and `socket.yml` (empty ignores). Pin and record in
+**Prefer the CI / remote gate for real projects.** Semgrep runs reliably on Linux in CI and,
+with a token, uses the **Pro engine** (interfile taint) that catches the SQLi/injection classes
+the token-free OSS packs miss. **Local-only** mode inherits two known weaknesses — the OSS
+coverage gap (partly closed by the bundled bridge rules, but those are heuristic, not taint) and
+Windows-local Semgrep fragility — so use it for throwaways, and steer a real project toward the
+CI gate at Phase 0/config. Steps:
+
+1. **Deterministic floor configs.** Write `.semgrep.yml` (pinned ruleset), copy
+   `semgrep-bridge-rules.yml` in as `.semgrep/bridge-rules.yml` (the token-free concat-SQLi
+   supplement — always added, validated per project), `osv-scanner.toml` (empty
+   `[[IgnoredVulns]]`), and `socket.yml` (empty ignores). Pin and record in
    `docs/PROJECT_STATUS.md`: the Semgrep CLI version + ruleset, the OSV-Scanner version, and
    the Socket setup.
 
@@ -196,15 +206,21 @@ exact shapes. Pick the ASVS level (L1/L2/L3) from data sensitivity in Phase 0/1.
    `v5.0.0` and needs **no** live-fetch-validation dance — the bundled snapshot is the
    source. Record the ASVS version and level in `docs/PROJECT_STATUS.md`.
 
-3. **CI floor steps (where the project has CI).** Add Semgrep (on `ubuntu-latest`),
-   OSV-Scanner (PR diff, explicit exit-code handling — `128`/no-packages **fails**), and
-   `socket ci` as **steps inside the existing required `gate` job** — the same job that runs
-   the tests and `impeccable detect`. This is **one required check**, so branch protection
-   and the merge-watch are unchanged; a high-severity/primary finding turns the single `gate`
-   check red. Where the project has **no** CI, the supervisor runs the same three locally at
-   the merge gate. Record the ignore mechanisms (`nosemgrep`, `osv-scanner.toml` IgnoredVulns
-   with reason+expiry, `@SocketSecurity ignore`) as the security analogue of `impeccable
-   ignores` — empty until a reasoned exception is agreed.
+3. **CI floor steps (where the project has CI — the preferred setup).** Add Semgrep (on
+   `ubuntu-latest`), OSV-Scanner (PR diff, explicit exit-code handling — `128`/no-packages
+   **fails**), and `socket ci` as **steps inside the existing required `gate` job** — the same
+   job that runs the tests and `impeccable detect`. This is **one required check**, so branch
+   protection and the merge-watch are unchanged; a high-severity/primary finding turns the
+   single `gate` check red.
+   - **CI / Pro (Semgrep).** Run the Semgrep step as `semgrep ci` with the **`SEMGREP_APP_TOKEN`
+     repo secret** set in the job env — this runs the **Pro engine** (taint/interfile, the real
+     SQL-injection catch and fewer false positives). When no token is configured, fall back to
+     `semgrep --config <pinned packs> --config .semgrep/bridge-rules.yml` (OSS engine + the
+     bundled bridge rules). Record which mode is in force in `docs/PROJECT_STATUS.md`.
+   Where the project has **no** CI, the supervisor runs the three locally at the merge gate
+   (token-free OSS + bridge rules for Semgrep). Record the ignore mechanisms (`nosemgrep`,
+   `osv-scanner.toml` IgnoredVulns with reason+expiry, `@SocketSecurity ignore`) as the security
+   analogue of `impeccable ignores` — empty until a reasoned exception is agreed.
 
 4. **The security-detect hook.** Add the *third* `afterFileEdit` entry to the existing
    `.cursor/hooks.json` (see `Cursor-File-Formats.md`): Semgrep run locally, **advisory and
@@ -231,9 +247,10 @@ exact shapes. Pick the ASVS level (L1/L2/L3) from data sensitivity in Phase 0/1.
    fires on the target setup with the verification harness before enabling. The gate does not
    depend on it (defense-in-depth only).
 
-**Escalation:** only the **Socket API token** — a repo secret, already owner-authorised; set
-once, referenced as a secret, never written to a file or a prompt. Everything else here the
-supervisor decides and records; it does not escalate.
+**Escalation:** only the two **API tokens** — the **Socket** token and the **Semgrep**
+(`SEMGREP_APP_TOKEN`, for the Pro engine) token — both repo secrets, already owner-authorised;
+set once, referenced as secrets, never written to a file, a prompt, or the allowlist.
+Everything else here the supervisor decides and records; it does not escalate.
 
 ---
 
