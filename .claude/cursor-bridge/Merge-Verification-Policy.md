@@ -82,6 +82,11 @@ model families — and, like design, adds **no new human gate**.
   its mandate is **extended** to cover the same vuln classes and the security anti-gaming
   checks (below). No new model, no new invocation — a prompt extension (see Review B's
   invocation section).
+- **Runtime pre-execution control (defense-in-depth).** The fail-closed shell-guard hook
+  (`beforeShellExecution`) blocks the builder's destructive/irreversible/exfil shell commands
+  *before they run*, under `--force`, where nothing else would. It is not part of the merge
+  verdict — it is a live guardrail during the build — but weakening it is a gate-integrity
+  flag (see §Anti-gaming).
 - **No new human gate.** Security correctness never reaches the owner. Only *intent* — should
   the software do something different, is a slower/costlier-but-safer path wanted — and the
   pre-existing dependency/irreversibility questions do. A malicious dependency is rejected at
@@ -128,7 +133,10 @@ must treat any of these as such:
 - removing or weakening input validation, an authz check, output encoding, or a crypto choice;
 - editing the CI `gate` job to skip, `continue-on-error`, or drop a security step;
 - downgrading the ASVS level or narrowing the rule globs to dodge coverage;
-- unpinning a security tool or CI action from its SHA to a mutable tag.
+- unpinning a security tool or CI action from its SHA to a mutable tag;
+- weakening the shell guard — removing its `beforeShellExecution` entry, dropping
+  `failClosed: true`, or deleting/loosening entries in `shell-guard.py`'s deny-list to get a
+  blocked command through (extending the deny-list is fine; gutting it is not).
 
 Any of these is a **gate-integrity flag**. It is never an auto-approve. It is either a
 `REJECT` (if the change is plainly a workaround) or an `ESCALATE-INTENT` (if it might be

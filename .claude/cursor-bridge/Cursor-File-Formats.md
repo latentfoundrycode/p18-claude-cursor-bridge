@@ -181,6 +181,52 @@ runnable on the host, beside the linter and design-detect entries:
   invoke Semgrep by its resolved installed path settled at config time, as with the other
   hooks.
 
+### Shell-guard hook entry — a `beforeShellExecution` object (fail-**closed**)
+
+This is the **one deliberately fail-closed** hook in the bridge — every other hook is
+advisory/fail-open. It runs *before the builder executes any shell command* and denies a
+tight, high-confidence deny-list of destructive/irreversible/exfil commands; everything
+else passes. It is a **separate event** (`beforeShellExecution`), not another `afterFileEdit`
+object:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [ ... linter, design-detect, security-detect ... ],
+    "beforeShellExecution": [
+      {
+        "command": "C:\\Users\\<you>\\AppData\\Local\\Programs\\Python\\Python312\\python.exe .cursor\\hooks\\shell-guard.py",
+        "timeout": 10,
+        "matcher": ".*",
+        "failClosed": true
+      }
+    ]
+  }
+}
+```
+
+- **`failClosed: true` is mandatory here.** Cursor's default is fail-open, and there is a
+  documented bug where a malformed hook response *silently allows* the command — so a crash,
+  timeout, or bad JSON must **block**. The bundled `shell-guard.py` also defaults to `deny`
+  on any internal/parse error (belt-and-suspenders).
+- **Response contract:** the script returns `{"permission":"allow"|"deny", "user_message",
+  "agent_message"}` on stdout; **exit 0 = proceed, exit 2 = block**. On a deny it explains why
+  in `agent_message` so the builder self-corrects.
+- **`matcher: ".*"`** — for `beforeShellExecution` the matcher is a regex over the raw command
+  string; `.*` runs the guard on every command, and the script decides.
+- **Explicit interpreter + Windows quirks** exactly as the other hooks: call `python` by its
+  resolved installed path (settled at config time), never a bare script; the script reads
+  stdin as bytes and decodes `utf-8-sig` to strip the Windows BOM.
+- **Scope:** this hook lives in the project's `.cursor/hooks.json`, so it governs the
+  **builder** (`cursor-agent`). The supervisor's own `git reset --hard HEAD` recovery runs
+  through Claude's Bash tool, not `cursor-agent`, so it is unaffected — which is why the
+  guard can safely block destructive git in the builder.
+- **Body = the bundled `~/.claude/cursor-bridge/shell-guard.py`**, written verbatim into the
+  project's `.cursor/hooks/shell-guard.py` by `cursor-configurator`. The deny-list is the
+  auditable policy at the top of that file; a project may extend it, never silently weaken it
+  (weakening it is a gate-integrity flag — see `Merge-Verification-Policy.md`).
+
 ---
 
 ## `mcp.json` — tools and library docs for the builder

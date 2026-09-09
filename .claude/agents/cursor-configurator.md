@@ -53,6 +53,10 @@ Only the items the supervisor names, drawn from this set:
   OSV-Scanner on the PR diff with explicit exit-code handling, `socket ci`) — added to the
   existing workflow, **not** as new required checks. Every tool and CI action **SHA-pinned**
   (full commit SHA, never a mutable tag), per `Cursor-File-Formats.md`.
+- The **shell-guard hook** — a `beforeShellExecution` entry in `.cursor/hooks.json` with
+  `failClosed: true`, plus the guard script placed at `.cursor/hooks/shell-guard.py` verbatim
+  from the bundled `~/.claude/cursor-bridge/shell-guard.py`. This is the one fail-closed hook.
+  See `Cursor-File-Formats.md`.
 
 ## Hard limits
 
@@ -66,9 +70,14 @@ Only the items the supervisor names, drawn from this set:
   enforces and the security rules the scanners enforce are the tools' own; you only wire the
   configs, hooks, and CI steps, you do not reimplement any rule.
 - **Append hooks; never overwrite `hooks.json`.** Read the existing array and add the design
-  and security detect entries as further objects, preserving the linter entry. If
-  `.cursor/hooks.json` does not yet exist, that is the supervisor's setup gap — report it, do
-  not guess the linter entry.
+  and security detect entries as further objects, preserving the linter entry. The shell-guard
+  goes under a `beforeShellExecution` key (a different event array), added alongside — not
+  merged into `afterFileEdit`. If `.cursor/hooks.json` does not yet exist, that is the
+  supervisor's setup gap — report it, do not guess the linter entry.
+- **Write the shell guard verbatim and fail-closed.** Copy `shell-guard.py` from the bundled
+  snapshot without edits, and set `"failClosed": true` on its hook entry — never omit it. Do
+  not soften or rewrite the guard's deny-list; extending it is a supervisor decision handed to
+  you as content, never yours to invent.
 - **Never write the Socket token, or any secret, anywhere.** The `SOCKET_CLI_API_TOKEN` is a
   repo secret the supervisor sets once; it never appears in `socket.yml`, the CI YAML as a
   literal, a prompt, or the allowlist. Reference it as a secret (`${{ secrets.… }}`), never
