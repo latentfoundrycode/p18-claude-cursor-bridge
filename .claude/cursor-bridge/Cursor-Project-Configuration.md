@@ -254,6 +254,33 @@ Everything else here the supervisor decides and records; it does not escalate.
 
 ---
 
+## 5d. Observability tooling — [Claude], with [Escalate] only for the driver dependency
+
+For **UI-bearing** projects only (those with a Phase-1 screen-and-state inventory). Per
+`Observability-Conventions.md` — gives the gate a view of the *running render*. The supervisor
+owns the tier decision (Tier A default; Tier B opt-in) and records it. Steps:
+
+1. **Observability e2e tests → the CI `gate` job.** Wire the supervisor-authored observability
+   tests (drive each inventory state through the real render path; assert no runtime invariant
+   fired, no `console.error`, required states present) as a step **inside the existing `gate`
+   job** — one required check, on demand, no daemon. Locally (no CI) they run at the merge gate.
+2. **Test-mode determinism.** Configure fixed clock/seed/locale in test mode so state dumps and
+   screenshots are comparable; ensure the app is startable headlessly/reproducibly in CI.
+3. **Artifacts + secret surface.** Gitignore the screenshot/log artifacts dir (ephemeral, never
+   committed); confirm logs redact secrets/PII (already required by `secure-coding.mdc`); ensure
+   any test-mode reachability hook is compiled out of production (ASVS V13). `secret-sentinel`
+   scans retained runtime logs for secret shapes.
+4. **Driver.** Web: **Playwright**, run in CI on Linux (primary), local optional. Mobile/desktop:
+   a per-platform driver (Appium / WinAppDriver / Playwright-Electron). Pin and record the driver
+   + version, the tier, the invariant set, and the state→reachability map in
+   `docs/PROJECT_STATUS.md`.
+
+**Escalation:** only the **driver dependency** (a new dev/CI dependency + CI minutes) — cleared
+with the user like any dependency. The instrumentation the tests exercise is product code Cursor
+builds from the brief; the tests are the supervisor's. Assertions are hand-rolled (no new dep).
+
+---
+
 ## 6. Explicitly skipped, and why — [Skip]
 
 On record so nobody wonders whether configuration missed them:
@@ -325,9 +352,13 @@ this reliable:
    for a PowerShell-launched builder)** the fail-closed `beforeShellExecution` shell-guard hook
    (+ place `shell-guard.py`); pin and record the Semgrep/OSV/Socket versions, ASVS level, and
    every SHA in `PROJECT_STATUS.md`. The Socket token escalates once (repo secret).
-8. §5b step 5 + §5c step 3 — the design and security floor steps added **inside the existing
-   `gate` job** (one required check); where there is no CI, the supervisor runs them locally
-   at the gate.
-9. Commit the configuration changes as their own checkpoint before `TASK-001`.
-10. Record in `docs/PROJECT_STATUS.md` what was configured, so a resuming session
+8. §5d observability (UI-bearing projects): wire the supervisor-authored observability e2e
+   tests into the `gate` job, set test-mode fixed clock/seed/locale, gitignore the artifacts,
+   confirm log redaction; escalate the driver dependency (Playwright / per-platform). Record
+   the tier, driver + version, invariant set, and state→reachability map in `PROJECT_STATUS.md`.
+9. §5b step 5 + §5c step 3 + §5d step 1 — the design, security, and observability floor steps
+   added **inside the existing `gate` job** (one required check); where there is no CI, the
+   supervisor runs them locally at the gate.
+10. Commit the configuration changes as their own checkpoint before `TASK-001`.
+11. Record in `docs/PROJECT_STATUS.md` what was configured, so a resuming session
     doesn't redo it.

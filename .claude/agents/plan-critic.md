@@ -57,6 +57,11 @@ Attack it along these lines:
   input-handling, or data-access surface carry checkable security acceptance criteria ("no
   new Semgrep high findings", "passes OSV/Socket", "authz enforced at the boundary per ASVS
   §x") rather than "is secure"?
+- **Observability criteria (UI increments).** Does each increment that adds/changes a
+  screen-state carry checkable observability criteria — the state is driver-reachable through
+  the real render path, its observability test passes (no fired invariant, no `console.error`),
+  the required empty/sparse/dense/error states exist — rather than "renders fine"? Is each
+  state's reachability mechanism named in `docs/DESIGN.md`'s Observability section?
 
 ## Output
 

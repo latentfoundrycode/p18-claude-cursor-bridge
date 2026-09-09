@@ -36,6 +36,11 @@ quality. Do not duplicate its pass.
    sections of the **visual system** at `docs/design/DESIGN.md` — the brief names which.
 4. Review the changed UI files against all three: does it match the mockup screen, honour
    the visual system (fonts/colours/radii/spacing), and satisfy the interface rules?
+5. If the project runs Tier-B observability (screenshots of the real-rendered states — see
+   `Observability-Conventions.md`) and they are present, **consult them as evidence** for the
+   mockup-fidelity judgement above — the real render, not just the diff. This does **not** add
+   a pass or a verdict class: it is richer input to the same judgement. Do not pixel-diff, and
+   do not re-judge what the detector or the runtime invariants already cover deterministically.
 
 ## Two classes of finding
 

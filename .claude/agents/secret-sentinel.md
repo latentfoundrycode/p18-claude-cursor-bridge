@@ -59,6 +59,13 @@ named?) and surfacing it for the licence question and the admission gate; the fl
 **Outbound calls.** New network calls, telemetry, analytics, or any URL that was not
 in the design. Say where it points.
 
+**Retained runtime logs (the observability surface).** If the increment retains
+observability/runtime logs (e.g. under an artifacts dir), grep them for the same credential
+shapes above before they are kept or read into context — `secret-sentinel` otherwise only sees
+diffs, and a log line or captured state can carry a secret the diff never did. Report any hit,
+never the value. (Screenshots you cannot grep — the guard there is test-mode synthetic data +
+the gitignored ephemeral artifacts dir + the `secure-coding.mdc` "never log secrets" rule.)
+
 ## Output
 
 ```

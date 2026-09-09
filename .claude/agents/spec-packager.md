@@ -102,6 +102,16 @@ security acceptance criteria from the build plan go in **Acceptance criteria** (
 Semgrep high findings", "authz enforced at the boundary per ASVS §x"). Never reproduce a
 secret — refer to `.env` and keys by name, as always.
 
+**UI increments carry their observability contract.** For an increment that adds/changes a
+screen-state (on an observability-enabled project), the brief's **Requirements** must state that
+the state is **reachable through the real render path** by the named mechanism (the
+`docs/DESIGN.md` Observability section says which — deep-link URL, the shared action-path
+command, or a test-mode-only hook) and that it upholds the **runtime invariants** (no
+undefined/NaN/`[object Object]`/untranslated-key rendered; no `console.error`). This
+instrumentation and reachability are **product code the builder implements** — the brief
+specifies them; the observability *tests* that verify them are the supervisor's, not the
+builder's. Cite the `docs/DESIGN.md` Observability section.
+
 ## Output
 
 Write the file, then report back: the path you wrote, the scope you set, and anything

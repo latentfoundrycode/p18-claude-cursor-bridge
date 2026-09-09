@@ -97,6 +97,23 @@ model families — and, like design, adds **no new human gate**.
 
 ---
 
+## Observability in the gate (UI-bearing projects)
+
+Extends the floor with the *running render* — a class the static detector and the
+Vercel-rules-on-diff cannot see (see `Observability-Conventions.md`).
+
+- **Deterministic floor — NEW coverage.** The supervisor-authored observability tests drive
+  every Phase-1 inventory state through the **real render path** and assert no runtime invariant
+  fired (no `undefined`/`NaN`/`[object Object]`/untranslated-key rendered), no `console.error`,
+  and the required states exist. They run as a step **inside the required `gate` job** (on
+  demand, no daemon; locally at the merge gate where there is no CI). A fired invariant, a
+  `console.error`, or an unreachable inventory state **blocks** and re-delegates like any REJECT.
+- **Judgement — existing, richer evidence.** Tier-B screenshots feed `design-auditor`'s existing
+  mockup-fidelity pass — same verdict classes, better input. Not a pixel diff, not a new pass.
+- **No new human gate.** Running-render correctness never reaches the owner.
+
+---
+
 ## Model roster (this project)
 
 | Role | Model | Family | Notes |
@@ -141,7 +158,11 @@ must treat any of these as such:
 - unpinning a security tool or CI action from its SHA to a mutable tag;
 - weakening the shell guard — removing its `beforeShellExecution` entry, dropping
   `failClosed: true`, or deleting/loosening entries in `shell-guard.py`'s deny-list to get a
-  blocked command through (extending the deny-list is fine; gutting it is not).
+  blocked command through (extending the deny-list is fine; gutting it is not);
+- weakening observability — disabling a runtime invariant assertion or the
+  `console.error`-fails rule, or narrowing the reachability set so a state stops being
+  exercised, to get a UI increment through (adding invariants/states is fine; removing them to
+  dodge a failure is not).
 
 Any of these is a **gate-integrity flag**. It is never an auto-approve. It is either a
 `REJECT` (if the change is plainly a workaround) or an `ESCALATE-INTENT` (if it might be
