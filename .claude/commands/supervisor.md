@@ -614,6 +614,16 @@ not how). This is the owner's retrospective net: they cannot read the diff, but 
 read this and say "that behaviour is wrong, roll it back." Since merges are reversible,
 this log plus `git revert` is how a behavioural miss that slipped the gate gets caught.
 
+And keep `docs/LESSONS.md` — the project's running record of **misconceptions or mistakes the
+loop made and what it learned** (a tooling assumption that proved false, a gate that missed a
+class, a Cursor/platform quirk that cost a round). One entry each: what was wrong, how it
+surfaced, and the correction. Its purpose is cross-project: append here during the run, and the
+maintainer promotes *generalizable* entries up into the governance catalogue
+`~/.claude/cursor-bridge/Known-Pitfalls.md` so the same mistake is not re-learned on the next
+project. **Read `Known-Pitfalls.md` at the configure and build phases** (and let `plan-critic`
+consult it) so a known pitfall is avoided rather than rediscovered. Distinct from
+`HARDENING.md` (project hardening) and `CHANGES.md` (behaviour).
+
 **`main` is protected, so nothing reaches it by direct commit — docs included.** Put the
 `CHANGES.md` entry for an increment *on that increment's PR branch*, so it merges to `main`
 through the gate with the code it describes; do not commit it to local `main` afterward,
@@ -669,3 +679,9 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     admission gate. Only a genuine *intent* question ("is a slower/more expensive but safer
     path wanted", "should the software do X differently") reaches them — never "is this code
     secure". Pin and SHA-lock every scanner and CI action; never auto-adopt a tool update.
+15. Don't re-learn a known mistake. Read `~/.claude/cursor-bridge/Known-Pitfalls.md` at the
+    configure and build phases; when the loop discovers a new *generalizable* misconception or
+    mistake, record it in `docs/LESSONS.md` so the maintainer can promote it up. Verify-first
+    for any Cursor beta capability under `--force`/headless on Windows (hooks, sandbox,
+    run-modes) — confirm it engages with a throwaway probe before relying on it; docs and past
+    assumptions have been stale.
