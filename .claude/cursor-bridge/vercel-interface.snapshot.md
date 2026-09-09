@@ -1,5 +1,5 @@
 <!-- Offline fallback: the frozen Vercel Web Interface Guidelines (AGENTS.md), used when a
-project's Phase-4 fetch-and-freeze cannot validate a fresh copy. Source:
+project's Phase-5 fetch-and-freeze cannot validate a fresh copy. Source:
 https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/AGENTS.md —
 snapshot taken 5 September 2026. When this fallback is used, the supervisor records that
 fact and the date in the project's PROJECT_STATUS.md. -->

@@ -15,7 +15,7 @@ without it.
 
 `$ARGUMENTS` — if this says `resume` or is empty and `docs/PROJECT_STATUS.md` exists,
 read that file and continue from where it left off. Otherwise treat it as the seed
-description of a new project and begin at Phase 0.
+description of a new project and begin at Phase 1.
 
 ---
 
@@ -37,7 +37,7 @@ review in the loop. Delegate it.
 
 ---
 
-## Phase 0 — Intake
+## Phase 1 — Intake
 
 Every project begins here. Do not skip it, even if the user's opening description
 seems complete.
@@ -67,7 +67,7 @@ explicit non-goals.
 
 For every **UI-bearing** feature, capture a **screen-and-state inventory** — the screens
 it needs and, for each, the states that must exist: empty, sparse, dense, and error. This
-is what makes the mockup (Phase 2) complete rather than a happy-path shell, and it is what
+is what makes the mockup (Phase 3) complete rather than a happy-path shell, and it is what
 each screen's mockup is later mapped back onto.
 
 Alongside it, capture a light **security-context** for the feature set: the **trust
@@ -87,7 +87,7 @@ confirmation before moving on.
 
 ---
 
-## Phase 1 — Design
+## Phase 2 — Design
 
 Write `docs/DESIGN.md`. It covers: purpose and scope; explicit non-goals;
 architecture and component breakdown; technology choices *with the reasoning for
@@ -95,7 +95,7 @@ each*; data model; key interfaces and contracts; error handling and failure mode
 security and secret-handling approach; testing strategy; open questions.
 
 The **security-and-secret-handling section records the chosen ASVS level and the trust
-boundaries** from Phase 0, so the level in force is documented for the plan, the briefs, and
+boundaries** from Phase 1, so the level in force is documented for the plan, the briefs, and
 the auditor. `plan-critic` checks the security criteria alongside the rest (below).
 
 Then delegate to the **plan-critic** subagent to attack it. Fix what it finds worth
@@ -111,7 +111,7 @@ approve it.
 
 ---
 
-## Phase 2 — UI mockups
+## Phase 3 — UI mockups
 
 After the design is approved and before the build plan, turn the agreed design into
 something the user can *see*. Build an HTML/CSS mockup of the interface — a static,
@@ -147,7 +147,7 @@ For a UI-bearing project, build the mockup through the design tooling rather tha
 3. **Author the visual system.** Record it via `/impeccable document` at
    **`docs/design/DESIGN.md`** (+ `PRODUCT.md` if used). This is the file the detector reads.
 4. **Build the mockup** applying Impeccable's design language + the frozen Vercel interface
-   rules + the empty/sparse/dense/error states from the Phase 0 inventory.
+   rules + the empty/sparse/dense/error states from the Phase 1 inventory.
 5. **Detect before sign-off.** Run `npx impeccable@<pinned> detect docs/mockups/` — now
    design-system-aware because `docs/design/DESIGN.md` exists — and clear it to **no primary
    findings** before presenting.
@@ -165,7 +165,7 @@ with unresolved primary detector findings.
 The existing "approved mockup is guidance; wholesale divergence escalates" rule below
 already governs when the contract is reopened. The design tooling adds **no new escalation
 path** — a blocking design finding during the build re-delegates like any correctness
-defect (Phase 5), it does not go to the user.
+defect (Phase 6), it does not go to the user.
 
 **The approved mockup's authority:** once approved, the mockup is **guidance**, not a
 pixel contract. Hold to it substantially, with some leeway. A reasonable design
@@ -177,7 +177,7 @@ execution → proceed and note it; different intent → escalate.
 
 ---
 
-## Phase 3 — Build plan
+## Phase 4 — Build plan
 
 Write `docs/BUILD_PLAN.md` as an ordered list of increments. Each increment must be:
 
@@ -206,7 +206,7 @@ acceptance criteria are present and checkable.
 
 ---
 
-## Phase 4 — Configure the Cursor build environment
+## Phase 5 — Configure the Cursor build environment
 
 Once, after the plan is approved and before the first delegation, set up the headless
 builder so it can produce and self-correct good code. Work through
@@ -245,7 +245,7 @@ Work the **security-tooling** steps in `Cursor-Project-Configuration.md` §5c th
 the configurator writes `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, the frozen
 `.cursor/rules/secure-coding.mdc` (from the bundled
 `~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the ASVS level from
-Phase 0/1 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, and the
+Phase 1/2 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, and the
 three floor steps **inside the existing `gate` job**. You pin and record the Semgrep/OSV/
 Socket versions, the ASVS level, and every CI-action SHA in `docs/PROJECT_STATUS.md`. The
 escalations are the two **API tokens** — **Socket** and **Semgrep** (`SEMGREP_APP_TOKEN`, for
@@ -279,7 +279,7 @@ yourself and record; do not escalate them.
 
 ---
 
-## Phase 5 — The delegation loop
+## Phase 6 — The delegation loop
 
 For each increment, in order:
 
@@ -662,7 +662,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `impeccable detect` floor — is part of the gate, decided by the detector and the
     `design-auditor`, never routed to the user. Only a genuine *intent* question about how
     the UI should look or behave reaches them, and that goes through the approved-mockup
-    rule (Phase 2).
+    rule (Phase 3).
 14. Security correctness — the deterministic floor (Semgrep, OSV-Scanner, Socket) plus the
     `security-auditor` and Review B's security mandate — is part of the gate, never routed to
     the user. A security REJECT re-delegates; a malicious dependency is rejected at the

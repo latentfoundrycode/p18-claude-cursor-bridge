@@ -184,14 +184,14 @@ Parallel to §5b. All file-based and local except two commercial secrets (the So
 Semgrep API tokens), which the owner has already authorised and sets once as repo secrets. The
 supervisor decides and records; `cursor-configurator` writes the files. See
 `Cursor-File-Formats.md` for exact shapes. Pick the ASVS level (L1/L2/L3) from data sensitivity
-in Phase 0/1.
+in Phase 1/2.
 
 **Prefer the CI / remote gate for real projects.** Semgrep runs reliably on Linux in CI and,
 with a token, uses the **Pro engine** (interfile taint) that catches the SQLi/injection classes
 the token-free OSS packs miss. **Local-only** mode inherits two known weaknesses — the OSS
 coverage gap (partly closed by the bundled bridge rules, but those are heuristic, not taint) and
 Windows-local Semgrep fragility — so use it for throwaways, and steer a real project toward the
-CI gate at Phase 0/config. Steps:
+CI gate at Phase 1/config. Steps:
 
 1. **Deterministic floor configs.** Write `.semgrep.yml` (pinned ruleset), copy
    `semgrep-bridge-rules.yml` in as `.semgrep/bridge-rules.yml` (the token-free concat-SQLi

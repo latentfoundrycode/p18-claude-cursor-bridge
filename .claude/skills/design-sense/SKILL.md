@@ -44,4 +44,4 @@ stack, the colour roles, the radius and spacing scale, the elevation model, and 
 deliberate departure from the interface defaults. Keep it short: pointers into the visual
 system, not a copy of it.
 
-- (none yet — populated at Phase 2 for a UI-bearing project)
+- (none yet — populated at Phase 3 for a UI-bearing project)

@@ -5,7 +5,7 @@ software engineer and cannot judge code correctness, so **no code-correctness de
 is ever routed to the human.** Correctness is decided by an automated, decorrelated gate;
 the human is asked only *intent* questions they are actually competent to answer.
 
-Read this alongside `supervisor.md` (Phase 5) — this file defines the gate; the
+Read this alongside `supervisor.md` (Phase 6) — this file defines the gate; the
 supervisor applies it.
 
 ---
@@ -59,7 +59,7 @@ a judgement layer — not as a new human gate.
   required states) is a correctness class and behaves like any other REJECT.
 - **No new human gate.** Design correctness never reaches the owner. Only a genuine *intent*
   question — how the UI should look or behave — does, and that routes through the
-  approved-mockup rule in `supervisor.md` Phase 2, not through this policy.
+  approved-mockup rule in `supervisor.md` Phase 3, not through this policy.
 
 ---
 
