@@ -144,7 +144,13 @@ must never silently approve, any of:
 - narrowing test scope or excluding files so a failure stops being exercised;
 - editing the CI workflow to skip, `continue-on-error`, or drop the failing job;
 - using `git commit --no-verify` on an increment/accept commit to bypass the pre-commit lint
-  gate (only the supervisor's pre-delegation checkpoint snapshots may use `--no-verify`).
+  gate (only the supervisor's pre-delegation checkpoint snapshots may use `--no-verify`);
+- **compressing, truncating, slicing, or summarizing a gate-critical stream before a
+  reviewer reads it** — the diff, scanner output, test results, or the file Review B reads.
+  These reach the reviewer **whole**: a reviewer that saw a trimmed diff can emit an
+  APPROVE-shaped reply on something it never examined (this has happened with a missing
+  diff). Context economy (see `supervisor.md`) applies only to high-volume, low-stakes
+  material that no verdict rests on.
 
 **Security-control tampering** is a gate-integrity flag on the same footing — both reviewers
 must treat any of these as such:

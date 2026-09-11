@@ -572,3 +572,30 @@ globs: **/*.ts, **/*.tsx, **/*.js, **/*.jsx, **/*.py, **/*.go, **/*.rb, **/*.jav
   products. ASVS is **stable**, so the freeze pins `v5.0.0` and does **not** need the
   per-project live-fetch-validation the beta Vercel rules use — the bundled snapshot is the
   source. Record the ASVS version and level in `PROJECT_STATUS.md`.
+
+### `.cursor/rules/minimal-code.mdc` — the frozen minimal-code rule
+
+A third rule of this form, written for **every** project (not just UI or logic-bearing):
+the bridge-owned "write the least code that meets the acceptance criteria" decision ladder
+(does it need to exist → reuse in codebase → stdlib → native platform → installed dependency
+→ one-liner → minimum viable). It is a cost/quality lever — fewer tokens, less to review,
+fewer defects — **not** a correctness gate. Use the `.mdc` format above with:
+
+```markdown
+---
+description: Minimal-code rule — write the least code that meets the acceptance criteria; safety rules always win
+alwaysApply: false
+globs: **/*.ts, **/*.tsx, **/*.js, **/*.jsx, **/*.py, **/*.go, **/*.rb, **/*.java
+---
+```
+
+- **Body = the bundled `~/.claude/cursor-bridge/minimal-code.snapshot.md`, verbatim.**
+  Bridge-authored and frozen — deliberately *not* an imported third-party rules file, so it
+  cannot drift on someone else's schedule and never needs reconciling with our other frozen
+  rules.
+- **Precedence is built in:** its first section states that acceptance criteria, security
+  controls, observability invariants, and accessibility requirements **always win**, that it
+  never justifies dropping a required control, and that rung 5 means *already-installed*
+  dependencies only (the admission gate is untouched). The configurator never edits this.
+- **Advisory in review:** `diff-reviewer` and `plan-critic` flag unnecessary code as a NOTED
+  item, never a `FAIL` on its own.

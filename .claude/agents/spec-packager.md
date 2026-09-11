@@ -59,6 +59,10 @@ exactly. Patterns established elsewhere in the codebase that this should follow.
 - Do not add dependencies.
 - Do not refactor code outside the scope, even if it looks wrong.
 - Follow existing conventions in the files you touch.
+- Prefer reuse over new code — existing helpers, the standard library, native platform
+  features, already-installed dependencies — and write the minimum that meets the
+  acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a
+  security, observability, or accessibility requirement stated above.
 - <task-specific constraints>
 
 ## Done

@@ -146,6 +146,13 @@ persistent rule is a second voice in every build that can drift from the brief.
   genuine cross-cutting invariant that is true for *every* task and awkward to repeat in
   each brief — e.g. "this repo targets Python 3.11; never use 3.12-only syntax." Keep it
   under the 500-line guidance. **[Claude]**
+- **The bridge's own frozen rules are the deliberate exception.** `cursor-configurator`
+  writes them verbatim from the bundled snapshots, never authored ad hoc:
+  `vercel-interface.mdc` (UI projects, §5b), `secure-coding.mdc` (§5c), and
+  **`minimal-code.mdc` — every project** (the "write the least code that meets the
+  acceptance criteria" ladder, with safety rules taking precedence; see
+  `Cursor-File-Formats.md`). These are owned, frozen, and auditable — not a second drifting
+  voice. **[Claude]**
 - Do **not** port skills or subagents into Cursor. The bridge's specialists live on the
   Claude side; duplicating them in Cursor splits the source of truth. **[Skip]**
 - If a pre-existing repo already ships `.cursor/rules`, `AGENTS.md`, or `CLAUDE.md`,
@@ -368,7 +375,9 @@ this reliable:
 2. §2 feedback loop: escalate any new linter deps, commit configs, fix command strings, wire the edit hook, handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` + `git config core.hooksPath .githooks`).
 3. §3 Context7 in `~/.cursor/mcp.json` if the project uses third-party libraries.
 4. §4 any other MCP tools the build needs (escalate secrets).
-5. §5 at most one cross-cutting rule, only if warranted; surface any inherited config.
+5. §5 at most one *project-specific* cross-cutting rule, only if warranted; write the
+   bridge's frozen `minimal-code.mdc` for every project (§5b/§5c add `vercel-interface.mdc`
+   and `secure-coding.mdc`); surface any inherited config.
 6. §5b design tooling (UI-bearing projects): write `.impeccable/config.json`; run the
    Vercel fetch-and-freeze into `.cursor/rules/vercel-interface.mdc` (validate or fall back
    to the bundled snapshot, and record source date + pinned Impeccable version in

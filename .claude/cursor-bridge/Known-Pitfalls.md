@@ -137,3 +137,17 @@ it applies.**
   `Remove-Item -Recurse` a junction. The shell-guard now also denies
   `git worktree remove --force` for the builder.
 - **Applies:** every worktree teardown on Windows, especially with linked environments.
+
+### KP-012 — Gate-critical streams must reach a reviewer whole; never trim the diff to save tokens
+- **Temptation:** saving tokens by truncating, slicing, or summarizing the diff, scanner
+  output, or test results before a reviewer sees them.
+- **Surfaced:** the Review B "no diff received → APPROVE-shaped reply" failure already
+  recorded in the merge policy; the context-economy work made the boundary explicit.
+- **Correction:** context economy — *slice, don't slurp* — applies **only** to high-volume,
+  low-stakes material no verdict rests on (long logs, orientation reads of big files). The
+  diff, scanner output, test results, and the Review B input file always reach the reviewer
+  complete; trimming one is a gate-integrity flag. To keep verbose output out of the
+  supervisor's context, use the existing summarizer subagents (`test-runner`,
+  `diff-reviewer`) — faithful compression by a model told to preserve what matters — rather
+  than a lossy compressor in front of a reviewer.
+- **Applies:** every review; any future compression-tool trial.

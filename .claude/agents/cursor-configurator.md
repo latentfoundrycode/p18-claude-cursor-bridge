@@ -54,6 +54,11 @@ Only the items the supervisor names, drawn from this set:
   **body is the frozen snapshot the supervisor hands you** (the level-filtered slice, plus
   the LLM supplement if named); write it verbatim with the frontmatter from
   `Cursor-File-Formats.md`.
+- `.cursor/rules/minimal-code.mdc` — the frozen minimal-code rule, for **every** project.
+  Copy the body verbatim from `~/.claude/cursor-bridge/minimal-code.snapshot.md` with the
+  frontmatter from `Cursor-File-Formats.md`. Never regenerate, trim, or "improve" it — and
+  never touch its Precedence section (safety rules always win over minimalism; that text is
+  load-bearing).
 - The **third `afterFileEdit` hook entry** — the Semgrep advisory detect hook (best-effort).
   **Append** it to the same `.cursor/hooks.json` array beside the linter and design-detect
   entries.

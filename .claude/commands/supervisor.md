@@ -239,7 +239,9 @@ configure it.
 
 Delegate the actual file-writing to **cursor-configurator**, which writes
 `.gitattributes`, `.cursorignore`, `.worktreeinclude`, linter configs, `hooks.json`,
-`.githooks/pre-commit`, and `mcp.json` on your instruction and reports back. You keep the
+`.githooks/pre-commit`, `mcp.json`, and the frozen `.cursor/rules/minimal-code.mdc` (every
+project — the write-the-least-code ladder, with safety rules taking precedence) on your
+instruction and reports back. You keep the
 decisions and the escalations; it never adds dependencies, handles secrets, or authors rules
 on its own. Clear every escalation with the user before instructing it.
 
@@ -773,3 +775,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` §1: remove the link with a
     native Windows path, verify the link is gone and the target survives, then remove the
     worktree.
+20. Context economy — slice, don't slurp. Read the *relevant region* of large, low-stakes
+    material (the cited lines of a big file; `grep`/`head`/`tail` on a long log) instead of
+    loading it whole, and keep routing verbose output through the summarizer subagents
+    (`test-runner`, `diff-reviewer`) rather than into your own context. **Hard boundary:**
+    anything a verdict rests on — the diff, scanner output, test results, the file Review B
+    reads — reaches the reviewer **whole**; slicing, compressing, or summarizing it first is a
+    gate-integrity flag (`Merge-Verification-Policy.md` §Anti-gaming). A compression tool, if
+    ever trialled, is admission-gated, local-only, and kept off those streams.

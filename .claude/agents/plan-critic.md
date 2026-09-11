@@ -62,6 +62,11 @@ Attack it along these lines:
   the real render path, its observability test passes (no fired invariant, no `console.error`),
   the required empty/sparse/dense/error states exist — rather than "renders fine"? Is each
   state's reachability mechanism named in `docs/DESIGN.md`'s Observability section?
+- **Unnecessary code (advisory).** Does any increment plan to build what an existing helper,
+  the standard library, a native platform feature, or an already-installed dependency
+  already provides? Is any increment speculative — building for a requirement nobody stated
+  (YAGNI)? Suggest the reuse; never at the expense of a required security, observability, or
+  accessibility control.
 
 ## Output
 

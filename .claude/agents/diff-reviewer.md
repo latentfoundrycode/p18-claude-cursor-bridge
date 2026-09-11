@@ -51,6 +51,11 @@ instead.
 - Anything hardcoded that should be configuration
 - Silent failures — code that continues on an error it should have surfaced
 - Tests that assert nothing, or assert the implementation rather than the behaviour
+- **Unnecessary code (advisory).** Was there a simpler existing way — a built-in, the
+  standard library, an existing dependency, or nothing at all? Flag reinvented wheels,
+  speculative abstraction, and new code where reuse existed, per the project's frozen
+  `minimal-code.mdc`. This goes under NOTED, never a `FAIL` on its own — and never applies
+  to code that is a required security, observability, or accessibility control.
 
 **Not your concern:** formatting, naming preferences, style a linter would catch,
 pre-existing problems in untouched code, or how you would have written it. Say
