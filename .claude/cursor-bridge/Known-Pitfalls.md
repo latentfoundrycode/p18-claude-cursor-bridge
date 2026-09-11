@@ -151,3 +151,12 @@ it applies.**
   `diff-reviewer`) — faithful compression by a model told to preserve what matters — rather
   than a lossy compressor in front of a reviewer.
 - **Applies:** every review; any future compression-tool trial.
+
+### KP-013 — `cursor-agent` auto-update can trip Windows Smart App Control (field-reported)
+- **Surfaced:** a supervisor running the loop for days — the CLI's self-update replaced the
+  binary with one Smart App Control then blocked, breaking every delegation until the agent
+  version was pinned. (Field report; not independently verified here.)
+- **Correction:** pin `cursor-agent` to a known-good version and disable/skip its auto-update;
+  record the pinned version in `PROJECT_STATUS.md`; adopt an agent bump only on a verified
+  pass, never automatically — the same discipline as every other tool in the loop.
+- **Applies:** every Windows host running the bridge.

@@ -207,7 +207,10 @@ tail). Stop entirely only on genuine non-convergence: the **same** defect unfixe
 fix that **regresses** something already passing. A deadlock over what the software should
 **do** is the one thing that reaches the human, as an intent question.
 
-**Split verdicts are resolved by the supervisor, not escalated.** When one reviewer blocks
+**Split verdicts are resolved by the supervisor, not escalated.** First **name the
+disagreement out loud** — `REVIEWERS DISAGREE on <crux>`, which reviewers, and whether the
+crux is correctness or intent — so the split is on the record rather than dissolving into
+"mostly approved"; that flag is where the supervisor's judgement adds the most. When one reviewer blocks
 and the other approves, decide on the merits, biasing toward the project's **established
 invariants** — a rule the codebase already enforces elsewhere. A blocking concern that
 aligns with an existing project standard (e.g. a path-confinement check another increment

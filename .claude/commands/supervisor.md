@@ -419,6 +419,23 @@ misses, and does **not** re-run Semgrep/OSV/Socket. A **blocking** security find
 re-delegates like any correctness `REJECT` — it does **not** escalate. **Advisory** hardening
 findings go to `docs/HARDENING.md` / `docs/CHANGES.md`.
 
+**Reviewer routing — codified by diff shape, not hand-picked.** Every increment gets the
+first row; add the others by what the diff touches:
+
+| Diff shape | Required reviewers / checks |
+|---|---|
+| **Every increment** | deterministic `scope-check.py` → `diff-reviewer` → `secret-sentinel`; at merge, Review A + cross-family Review B |
+| **UI-bearing** (screens, styles, components) | + `design-auditor`; the observability tests run under `test-runner` (Tier B: hand it the screenshots) |
+| **Logic / auth / input-handling / data-access / deletions** (almost all) | + `security-auditor` |
+| **New dependency** | + the dependency-admission gate (`socket package score` + OSV) *before* acceptance |
+| **Touches tests, CI, hooks, scanner config, or a frozen rule** | reviewers apply the anti-gaming checks explicitly (`Merge-Verification-Policy.md`) |
+
+**When reviewers disagree, say so loudly.** Before adjudicating (step 7) or convening a
+resolution round, write it out explicitly — `REVIEWERS DISAGREE on <crux>` — naming which
+reviewers, what they disagree about, and whether the crux is correctness or intent. That flag
+is where your judgement adds the most; never let a split dissolve silently into "mostly
+approved."
+
 ### 5. Scan
 
 Delegate to **secret-sentinel** before anything is committed. This runs on every
