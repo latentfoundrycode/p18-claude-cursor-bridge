@@ -24,11 +24,17 @@ instead.
 
 - Is every requirement in the brief implemented?
 - Is every acceptance criterion actually met by this code, not merely gestured at?
-- Did it stay inside the declared scope? List any file touched that the scope did
-  not name.
+- Did it stay inside the declared scope? File-level drift is already settled
+  deterministically by `scope-check.py` before you read; your scope job is
+  **region-level** — an in-scope file edited beyond what the brief asked (an unrelated
+  style rule, a stray `finally`, a scaffold change). Name each such hunk.
 - Did it do anything the brief did not ask for? Extra work is a deviation even when
   it is an improvement — the supervisor decides whether to keep it, not you and not
   the implementer.
+- **Never treat the builder's own summary as evidence.** Its "files changed" and "what I
+  did" are self-reports that have been wrong in practice — claimed fixes not made,
+  unrequested edits described as the requested ones. Verify every requirement against the
+  diff itself, and say so if the summary and the diff disagree.
 
 **Correctness — is it right?**
 - Logic errors, off-by-one, inverted conditions, wrong operator

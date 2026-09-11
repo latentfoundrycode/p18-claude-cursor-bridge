@@ -358,21 +358,51 @@ Rules for this call, all of which matter:
   that nothing will ever answer.
 - **No secrets in the prompt, ever.** The prompt leaves the machine. Refer to
   `.env` by name; never quote its contents.
-- **The brief carries the constraints,** not the command line. Keep the command
-  stable and put the specifics in the file.
+- **The brief carries the constraints — the command line carries *nothing* but this
+  constant pointer.** Never put task content in the CLI argument: no code, no paths with
+  special characters, no multi-line instructions, no corrections. The shell (Git Bash) eats
+  backticks and `${…}` before Cursor ever sees them, and a builder handed a mangled prompt
+  "improvises" — in practice it has skipped the exact fix it was asked for. **This applies
+  to re-delegations too:** corrections go into the committed brief (revise
+  `handoff/TASK-<nnn>.md` in place, or write `TASK-<nnn>-r2.md`), then re-issue the *same*
+  constant pointer command. If you catch yourself typing instructions inside the quotes,
+  stop and put them in the file.
 - If a run needs a specific model, add `--model <name>`; `cursor-agent --list-models`
   shows what is available.
 
 ### 4. Inspect
 
+**The builder's printed summary and "files I changed" list are a hint, never evidence.**
+It has claimed fixes it did not make and described unrequested edits as the requested ones.
+Never surface "done / N passed" from the builder as status. The working tree is the only
+trustworthy manifest — derive everything from git:
+
 ```bash
 git status --short
+git diff --name-only
+git diff --stat
 git diff
 ```
+
+Then run the **deterministic scope check** — the file-level floor, before any reviewer:
+
+```bash
+python ~/.claude/cursor-bridge/scope-check.py handoff/TASK-<nnn>.md
+```
+
+It compares the git-derived changeset (tracked diffs vs the checkpoint plus untracked new
+files) against the brief's `## Scope` and prints `SCOPE CLEAN` or `SCOPE DRIFT` with the
+out-of-scope files — surfaced, not discovered. **Exit 1 (drift):** the increment does not
+proceed as-is — re-delegate with the scope restated, or, if the out-of-scope edit is a
+genuine improvement you choose to keep, widen the brief's Scope explicitly and record the
+call in `docs/CHANGES.md`; never let drift pass silently. **Exit 2 (cannot verify):** the
+brief has no `## Scope` — a `spec-packager` defect; fix the brief, do not proceed blind.
 
 Delegate the diff to **diff-reviewer**. You are asking two questions: does this
 implement the brief, and is it sound? A diff that does something better than the
 brief asked for is still a deviation — flag it rather than silently accepting it.
+File-level drift is already settled by the scope check before it reads; `diff-reviewer`'s
+scope job is **region-level** — an in-scope file edited beyond what the brief asked.
 
 For a **UI-bearing** diff, also delegate to **design-auditor** after `diff-reviewer` — it
 reviews design conformance (mockup fidelity, visual system, the frozen interface rules)
@@ -430,11 +460,13 @@ existing mockup-fidelity judgement (they do not add a new pass).
   message referencing the task ID. Update `docs/PROJECT_STATUS.md`. Move to the next
   increment. Increments accumulate on the branch; merging to `main` is a separate,
   verified step (below), not something you do per increment.
-- **Iterate** — something is wrong and you understand why. Revise the brief with
-  specific corrections and re-delegate.
+- **Iterate** — something is wrong and you understand why. Revise the brief *file* (in
+  place, or as `TASK-<nnn>-r2.md`) with specific corrections, commit it, and re-issue the
+  same constant delegate command. Never inline the corrections into the CLI prompt (step 3).
 - **Re-delegate on a review REJECT** — if a reviewer rejects the work (see step 8), that
   is a code defect, which is the loop's problem, not the user's. Feed the reasons into a
-  corrected brief and re-delegate. This does not count against the user's attention.
+  corrected brief file and re-delegate — again via the file, never the prompt. This does
+  not count against the user's attention.
 
 **When to stop re-delegating — judge convergence by defect class, not a raw count.** The
 brake exists to stop *grinding on a broken brief or design*, not to interrupt a gate that is
@@ -728,3 +760,10 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     never a user question. The instrumentation + reachability are product code Cursor builds;
     the observability tests are yours to write and run; Cursor never drives its own observation.
     Screenshots (Tier B) are `design-auditor` evidence, not a new judge or a screen for the user.
+17. The delegate command is a constant pointer and carries no task content — ever, including
+    re-delegation corrections. All content lives in the committed brief file; the shell
+    mangles backticks and `${…}` and a mangled prompt makes the builder improvise.
+18. The builder's self-report is a hint, never evidence. Status comes only from the
+    git-derived changeset (`git diff` + the deterministic `scope-check.py`) and the re-run
+    gate. File-level `SCOPE DRIFT` is flagged deterministically before any reviewer reads,
+    and never passes silently — re-delegate, or widen the Scope explicitly and record it.

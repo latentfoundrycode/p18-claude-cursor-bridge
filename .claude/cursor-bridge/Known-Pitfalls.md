@@ -102,3 +102,24 @@ it applies.**
   (hooks, sandbox, run-modes) in a `--force`/headless/Windows context, **confirm it engages
   empirically** with a throwaway probe — do not assume from docs.
 - **Applies:** every new capability the bridge considers adopting.
+
+### KP-009 — Inline task content in the `cursor-agent` prompt gets mangled by the shell
+- **Mistake:** passing code, paths, or corrections inline in the CLI argument
+  (`cursor-agent -p "...code..."`), especially during re-delegation.
+- **Surfaced:** field use — Git Bash consumed backticks and `${…}` before Cursor saw them; the
+  builder "improvised" and twice skipped the exact fix requested (once a CI-breaker). The same
+  instructions in a committed file worked every time.
+- **Correction:** the delegate command is a **constant pointer** to `handoff/TASK-<nnn>.md`
+  and carries no content. Corrections and re-delegations go into the brief file (revised in
+  place or `TASK-<nnn>-r2.md`); never into the prompt.
+- **Applies:** every delegation and re-delegation.
+
+### KP-010 — The builder's self-report is not evidence
+- **Mistake:** treating Cursor's printed "files I changed" / "done, N passed" as status.
+- **Surfaced:** field use — summaries claimed fixes that were not made and described
+  unrequested changes as the requested ones; caught only by `git diff` + re-running the gate.
+- **Correction:** the working tree is the only manifest. Derive the changeset from git, run
+  the deterministic `scope-check.py` (file-level `SCOPE DRIFT` surfaced before any reviewer),
+  and re-run the gate. Never surface a builder claim as fact. A builder-produced "structured
+  manifest" would still be a self-report — do not ask for one; derive it.
+- **Applies:** every increment.

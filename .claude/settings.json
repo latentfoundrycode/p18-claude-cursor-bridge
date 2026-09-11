@@ -14,7 +14,8 @@
       "Bash(npx --yes impeccable:*)",
       "Bash(semgrep:*)",
       "Bash(osv-scanner:*)",
-      "Bash(socket:*)"
+      "Bash(socket:*)",
+      "Bash(python ~/.claude/cursor-bridge/scope-check.py:*)"
     ]
   }
 }
