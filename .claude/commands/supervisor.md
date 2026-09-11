@@ -767,3 +767,9 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     git-derived changeset (`git diff` + the deterministic `scope-check.py`) and the re-run
     gate. File-level `SCOPE DRIFT` is flagged deterministically before any reviewer reads,
     and never passes silently — re-delegate, or widen the Scope explicitly and record it.
+19. Never `git worktree remove --force` a worktree you have not link-checked. A live junction
+    or symlink inside it (a per-worktree venv, a linked `node_modules`) is followed by
+    `--force` and the **real target is deleted**. Use the safe teardown primitive in
+    `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` §1: remove the link with a
+    native Windows path, verify the link is gone and the target survives, then remove the
+    worktree.

@@ -51,8 +51,10 @@ _ALWAYS_DENY = [
     # Irreversible git (builder must never rewrite history or discard the tree)
     ("git-irreversible", _rx(
         r"\bgit\s+reset\s+--hard\b|\bgit\s+clean\s+-[a-z]*f|\bgit\s+push\b[^|]*(--force\b|--force-with-lease\b|(^|\s)-f(\s|$))"
-        r"|\bgit\s+rebase\b|\bgit\s+branch\s+-D\b|\bgit\s+filter-branch\b|git\s+filter-repo\b|\bgit\s+update-ref\s+-d\b"),
-     "Irreversible git operation (history rewrite / hard reset / force push / clean). The builder never does these."),
+        r"|\bgit\s+rebase\b|\bgit\s+branch\s+-D\b|\bgit\s+filter-branch\b|git\s+filter-repo\b|\bgit\s+update-ref\s+-d\b"
+        r"|\bgit\s+worktree\s+remove\b[^|]*(--force\b|(^|\s)-f(\s|$))"),
+     "Irreversible git operation (history rewrite / hard reset / force push / clean / forced worktree removal, "
+     "which follows a live junction and deletes the real target). The builder never does these."),
     # Download piped straight into an interpreter (remote code execution)
     ("download-pipe-to-shell", _rx(
         r"\b(curl|wget|iwr|invoke-webrequest)\b[^|]*\|\s*(sh|bash|zsh|python|python3|node|perl|ruby)\b"

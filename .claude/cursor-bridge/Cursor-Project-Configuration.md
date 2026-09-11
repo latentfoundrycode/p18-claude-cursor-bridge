@@ -48,6 +48,33 @@ the brief.
 - **`.worktreeinclude`** (bridge-specific, not in the Cursor checklist) listing any
   gitignored file the tests need — normally `.env` — so it reaches the session worktree.
 
+### Worktree & junction teardown — the safe primitive (Windows)
+
+A session worktree that contains a **junction or symlink** (a per-worktree venv, a
+`node_modules` linked to the main checkout) is a data-loss hazard on teardown:
+`git worktree remove --force` **follows a live junction and deletes the real target**, and a
+`rmdir` issued *through Git Bash* can silently fail on a mangled path — leaving the junction
+alive for `--force` to follow. This has destroyed a main checkout's `node_modules` in
+practice. Never hand-roll teardown; use this order every time:
+
+1. **Remove the link first, with a native Windows path, not through Git Bash** — from
+   PowerShell: `cmd /c rmdir "<worktree>\node_modules"`. `rmdir` on a junction removes
+   **only the link**, never the target. Never `rm -rf` or `Remove-Item -Recurse` a junction —
+   those follow it into the real directory.
+2. **Verify both halves:** `Test-Path "<worktree>\node_modules"` → `False` (link gone) **and**
+   `Test-Path "<main>\node_modules"` → `True` (target survived).
+3. **Only then** `git worktree remove <worktree>` — without `--force`. Use `--force` only after
+   step 2 has confirmed no live link remains inside the worktree.
+
+Treat `git worktree remove --force` on a worktree you have not link-checked as forbidden. (The
+opt-in shell-guard denies it for the builder too.)
+
+**Warm environment (performance):** rebuilding a from-source toolchain (a mypy build, a large
+`node_modules`) in every new worktree costs minutes per increment. Prefer a **cached/warm
+environment reused across worktrees** — a shared cache the worktree points at — over
+reinstalling per worktree. `.worktreeinclude` carries the gitignored *files* the tests need,
+not a package tree, so plan the reuse explicitly and record it in `docs/PROJECT_STATUS.md`.
+
 ---
 
 ## 2. The feedback loop — highest value — [Claude], with [Escalate] for new deps

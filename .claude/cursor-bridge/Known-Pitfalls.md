@@ -123,3 +123,17 @@ it applies.**
   and re-run the gate. Never surface a builder claim as fact. A builder-produced "structured
   manifest" would still be a self-report — do not ask for one; derive it.
 - **Applies:** every increment.
+
+### KP-011 — `git worktree remove --force` follows a live junction and deletes the real target
+- **Mistake:** tearing down a worktree that held a junction (a per-worktree venv /
+  `node_modules` linked to the main checkout) with `git worktree remove --force`, after a
+  `rmdir` issued through Git Bash had silently failed on a mangled path and left the junction
+  alive.
+- **Surfaced:** field use — the main checkout's `tools/…/node_modules` was destroyed.
+- **Correction:** the safe primitive (`Cursor-Project-Configuration.md` §1): remove the link
+  first with a **native Windows path** from PowerShell (`cmd /c rmdir` — on a junction it
+  removes only the link), `Test-Path`-verify the link is gone **and** the target survives,
+  *then* `git worktree remove` — `--force` only after that check. Never `rm -rf` /
+  `Remove-Item -Recurse` a junction. The shell-guard now also denies
+  `git worktree remove --force` for the builder.
+- **Applies:** every worktree teardown on Windows, especially with linked environments.
