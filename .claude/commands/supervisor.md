@@ -83,7 +83,9 @@ choice among options; use plain prose where it is open-ended. Stop asking when t
 remaining unknowns are ones a competent implementer could decide without you.
 
 **Gate:** summarise your understanding back to the user and get explicit
-confirmation before moving on.
+confirmation before moving on. Where the summary rests on a technical matter the user has
+not met yet, explain it under the `explain-for-decision` skill — parts before the whole, one
+instance, the practical stake — rather than assuming it is self-evident.
 
 ---
 
@@ -120,7 +122,9 @@ library, no screen-and-state inventory) opts out — note that it did. The drive
 the one escalation (see Phase 5).
 
 **Gate:** present the design to the user. Do not proceed to the UI mockups until they
-approve it.
+approve it. Present it as a decision brief (`explain-for-decision` skill): the choices the
+design makes that are theirs to approve, the concepts those rest on, and what you decide
+regardless.
 
 ---
 
@@ -219,6 +223,7 @@ criteria that cannot actually be checked, and — for UI increments — whether 
 acceptance criteria are present and checkable.
 
 **Gate:** present the plan to the user. Do not delegate anything until they approve it.
+Present it as a decision brief (`explain-for-decision` skill), not as the plan file itself.
 
 ---
 
@@ -647,6 +652,13 @@ When you do escalate, lead with the decision and the options, recommend one, the
 Between escalations, do not ask for permission you already have — an approved build plan
 is approval to execute it.
 
+**How you explain it is governed by the `explain-for-decision` skill.** An escalation is the
+moment a technical matter surfaces for a non-engineer to decide, and the decision is only as
+good as their understanding of it. Use the skill's decision-brief shape (the decision; why it
+is theirs; the at-most-three load-bearing concepts, parts before the whole, one instance, one
+stake; the options in the user's currency; your recommendation; what you decide regardless)
+and run its self-check before sending.
+
 ---
 
 ## Reporting to the user
@@ -672,6 +684,12 @@ theirs — if anything — impossible to miss:
 - **Translate, don't transcribe.** State consequences in terms the user can weigh — behaviour,
   cost, risk, reversibility — not implementation. "This is the first step that would spend real
   money on a live call" — not the diff of the rate limiter.
+- **Explain to be understood, not to be complete.** Whatever technical matter a report or a
+  question cannot avoid is explained under the `explain-for-decision` skill: pick the few
+  load-bearing concepts, fix the sense of any ambiguous term, use one term per thing, state how
+  listed things relate, leave no silent step, and cut every tangent. A clarifying question from
+  the user is evidence a guard was skipped — fix that guard, do not repeat the same explanation
+  at greater length.
 
 The test: a non-engineer reading only your first line should know whether the loop is waiting
 on them. If they must read the technical detail to find that out, the report is wrong.
@@ -691,7 +709,12 @@ Last accepted: TASK-<nnn> at commit <sha>
 Awaiting user on: <nothing | the specific question>
 Next: <the next increment and anything the next session needs to know>
 Deviations accepted: <accepted deviations from DESIGN.md and why>
+Terms fixed: <term — the sense fixed with the user — Established | Risky; one per line>
 ```
+
+**Terms fixed** is the `explain-for-decision` skill's lookup: which technical terms have been
+explained to the user in which sense, and which of them the user has stumbled on (Risky). A
+fresh session reads it to know what needs re-anchoring and what can simply be named.
 
 Write it so a fresh session with no memory of this conversation can pick up the work
 from this file alone. That is the actual test of whether it is good enough.
@@ -800,3 +823,12 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     reads — reaches the reviewer **whole**; slicing, compressing, or summarizing it first is a
     gate-integrity flag (`Merge-Verification-Policy.md` §Anti-gaming). A compression tool, if
     ever trialled, is admission-gated, local-only, and kept off those streams.
+21. Explain for decision. Whenever a technical matter surfaces for the user to decide — every
+    phase gate, every escalation, every "what is X" — apply the `explain-for-decision` skill:
+    choose the at-most-three load-bearing concepts by the decision they carry, classify each as
+    Established / New / Risky against `Terms fixed` in `PROJECT_STATUS.md`, and run the nine
+    guards on those (fix the sense of an ambiguous term; one term per thing; relations, not
+    lists; no silent steps; restate faithfully; one concrete instance; the practical stake;
+    parts before the whole; no tangents). Completeness is not the measure; the user's ability
+    to take the decision congruently with the technical reality is. A clarifying question means
+    a guard was skipped — fix that guard, never re-send the same explanation longer.
