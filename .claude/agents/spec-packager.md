@@ -57,6 +57,11 @@ exactly. Patterns established elsewhere in the codebase that this should follow.
 
 ## Constraints
 - Do not add dependencies.
+- Do not read or write any file outside this workspace (the folder you were started in).
+  Everything you need is inside it; everything you produce goes inside it.
+- If the brief, the rules, or the tooling got in your way — an instruction that contradicted
+  another, a check that fired wrongly, a step that cost time for no reason — append one
+  dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling.
 - Do not refactor code outside the scope, even if it looks wrong.
 - Follow existing conventions in the files you touch.
 - Prefer reuse over new code — existing helpers, the standard library, native platform

@@ -54,6 +54,14 @@ Only the items the supervisor names, drawn from this set:
   **body is the frozen snapshot the supervisor hands you** (the level-filtered slice, plus
   the LLM supplement if named); write it verbatim with the frontmatter from
   `Cursor-File-Formats.md`.
+- `.cursor/rules/workspace-boundary.mdc` — the always-on Workspace boundary rule, for
+  **every** project, verbatim from `Cursor-File-Formats.md` (the builder never reads or
+  writes outside the workspace; feedback about the tooling goes to `docs/BUILDER_NOTES.md`).
+- The **`boundary-check` `afterFileEdit` hook entry** — advisory detector for edits outside
+  the workspace. **Append** it to the same `.cursor/hooks.json` array; copy
+  `~/.claude/cursor-bridge/boundary-check.py` to `.cursor/hooks/boundary-check.py` verbatim
+  and invoke it with the explicit interpreter path, as with the other hooks. Never
+  `failClosed`.
 - `.cursor/rules/minimal-code.mdc` — the frozen minimal-code rule, for **every** project.
   Copy the body verbatim from `~/.claude/cursor-bridge/minimal-code.snapshot.md` with the
   frontmatter from `Cursor-File-Formats.md`. Never regenerate, trim, or "improve" it — and

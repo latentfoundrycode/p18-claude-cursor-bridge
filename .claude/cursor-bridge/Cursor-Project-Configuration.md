@@ -47,6 +47,15 @@ the brief.
   `secret-sentinel`.
 - **`.worktreeinclude`** (bridge-specific, not in the Cursor checklist) listing any
   gitignored file the tests need — normally `.env` — so it reaches the session worktree.
+- **The Workspace boundary** (bridge-specific). The builder must never read or write outside
+  `Workspace/` — the sibling `Documents/` folder is the user's and the supervisor's alone.
+  Enforced as an instruction plus a detector, and nothing more: write
+  `.cursor/rules/workspace-boundary.mdc` (always-on; format in `Cursor-File-Formats.md`) and
+  append the advisory **`boundary-check`** `afterFileEdit` hook entry (§2 hook array), which
+  copies `~/.claude/cursor-bridge/boundary-check.py` into `.cursor/hooks/` and logs any edit
+  outside the workspace to `docs/BOUNDARY_VIOLATIONS.md`. It detects after the fact; only the
+  opt-in shell guard (§5c step 6) can deny such a write beforehand. Same Windows quirks as
+  every hook: explicit interpreter, no bare script, BOM-tolerant (the script strips it).
 
 ### Worktree & junction teardown — the safe primitive (Windows)
 
@@ -371,7 +380,8 @@ this reliable:
 
 ## Configuration run — order of operations
 
-1. §1 repo hygiene (`.gitattributes` → renormalise, `.cursorignore`, `.worktreeinclude`).
+1. §1 repo hygiene (`.gitattributes` → renormalise, `.cursorignore`, `.worktreeinclude`,
+   `.cursor/rules/workspace-boundary.mdc` + the `boundary-check` hook entry).
 2. §2 feedback loop: escalate any new linter deps, commit configs, fix command strings, wire the edit hook, handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` + `git config core.hooksPath .githooks`).
 3. §3 Context7 in `~/.cursor/mcp.json` if the project uses third-party libraries.
 4. §4 any other MCP tools the build needs (escalate secrets).

@@ -45,6 +45,10 @@ Attack it along these lines:
 - **Scope boundaries.** Does each increment name the files and directories it may
   touch? Do any two increments overlap on the same files?
 - **First runnable point.** How many increments before something can actually be run?
+- **Stages.** Is every increment in exactly one named stage, and is each stage a coherent,
+  demonstrable chunk (normally three to eight increments) rather than an arbitrary cut? A
+  stage close is where the supervisor reflects and patches the human-facing documents, so a
+  stage that cannot be demonstrated on its own gives that reflection nothing to report.
   If it is more than a few, the plan is back-loading risk.
 - **Missing increments.** What has to happen that no increment covers — error handling,
   configuration, teardown, migration, packaging?

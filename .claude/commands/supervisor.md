@@ -37,6 +37,52 @@ review in the loop. Delegate it.
 
 ---
 
+## The project layout
+
+Every project lives in one folder named `<unique-id>-<project-name>`, with the same two
+children on every project:
+
+- **`Documents/`** — documents written **for the user and for you**, in prose a human can
+  follow. Never part of the git repository. Never read or written by the builder.
+- **`Workspace/`** — the git repository and the build itself. You run here; the builder runs
+  here and **only** here. Inside it, **`docs/`** holds everything written **for the builder
+  and for you**: the design, the build plan, the mockups, and the AI-facing records
+  (`PROJECT_STATUS.md`, `CHANGES.md`, `LESSONS.md`, `HARDENING.md`, `BUILDER_NOTES.md`,
+  `BOUNDARY_VIOLATIONS.md`). `docs/` is written for machine comprehension first; it need
+  not read well to a human, and that is by design.
+
+You start in `Workspace/`; `Documents/` is its sibling (`../Documents`). Resolve both once,
+at intake, and record the resolved paths in `docs/PROJECT_STATUS.md`. If `Documents/` is
+missing, create it. If the folder you started in is not named `Workspace`, stop and ask —
+the boundary below depends on it.
+
+**The Workspace boundary.** The builder must never read or write outside `Workspace/`. This
+is enforced as an **instruction plus a detector**, and you treat it as exactly that — not as
+a wall: (1) every brief states the boundary; (2) `.cursor/rules/workspace-boundary.mdc`
+restates it as an always-on rule; (3) the `boundary-check` after-edit hook (Phase 5)
+receives the path of every file the builder edits and appends any path outside the
+workspace to `docs/BOUNDARY_VIOLATIONS.md`, which you read at step 4 of the loop. A recorded
+violation is handled like `SCOPE DRIFT`: you undo the outside edit yourself (`Documents/` is
+not under git, so look at what changed and restore it by hand), re-delegate, and open an
+issue (see "Reflection points"). Only the opt-in shell guard can stop such a write *before*
+it happens.
+
+**The Documents set.** Four human-facing documents, each named with the **software name**
+fixed at intake (`<Name>`), never renamed:
+
+| Document | Created | Updated |
+|---|---|---|
+| `<Name> Project Summary.md` | Phase 2, once the design is approved | every reflection point |
+| `<Name> Issues During Development and Their Solutions.md` | at the first issue | placeholder when an issue is spotted; full entry once it is fixed |
+| `<Name> Claude-Cursor Bridge Feedback.md` | at the first stage close | every reflection point |
+| `<Name> User Manual.md` | project end | every reflection point after that with a new `CHANGES.md` entry |
+
+Any other document the user keeps in `Documents/` is patched at reflection points too.
+`Documents/` is written **only** at reflection points (the issue placeholder is the one
+exception) — never mid-stage, so a stale copy never survives a stage boundary.
+
+---
+
 ## Phase 1 — Intake
 
 Every project begins here. Do not skip it, even if the user's opening description
@@ -82,6 +128,12 @@ Ask in batches, not one at a time. Use `AskUserQuestion` where the answer is a
 choice among options; use plain prose where it is open-ended. Stop asking when the
 remaining unknowns are ones a competent implementer could decide without you.
 
+Also at intake: **fix the software name** — the name the user will call the product. It
+names the four `Documents/` files (see "The project layout") and never changes; if the user
+has not named it, propose one and get it confirmed with the summary below. And resolve the
+layout: confirm you are in `Workspace/`, that `../Documents` exists (create it if not), and
+record both resolved paths and the software name in `docs/PROJECT_STATUS.md`.
+
 **Gate:** summarise your understanding back to the user and get explicit
 confirmation before moving on. Where the summary rests on a technical matter the user has
 not met yet, explain it under the `explain-for-decision` skill — parts before the whole, one
@@ -125,6 +177,12 @@ the one escalation (see Phase 5).
 approve it. Present it as a decision brief (`explain-for-decision` skill): the choices the
 design makes that are theirs to approve, the concepts those rest on, and what you decide
 regardless.
+
+Once approved, write **`Documents/<Name> Project Summary.md`** — the human-facing account
+of what is being built, for whom, the architecture in plain language, the key decisions and
+their reasons, and the current state. It is the first of the Documents set (see "The project
+layout") and is patched at every reflection point from here on. It is a translation of
+`docs/DESIGN.md` for a reader who will never open `docs/`, not a copy of it.
 
 ---
 
@@ -217,10 +275,14 @@ Each increment with **logic, auth, input-handling, or data-access surface** carr
 and Socket", "authorization enforced at the boundary per ASVS §x") — checkable, not
 "is secure".
 
-Give each one an ID (`TASK-001`, `TASK-002`, …). Run **plan-critic** over the plan,
-looking for ordering errors, increments that are secretly two increments, acceptance
-criteria that cannot actually be checked, and — for UI increments — whether the design
-acceptance criteria are present and checkable.
+Give each one an ID (`TASK-001`, `TASK-002`, …). Group the increments into named
+**stages** — a stage is a coherent, demonstrable chunk of the plan (a milestone), normally
+three to eight increments, and its close is a **reflection point** (see "Reflection
+points"). Every increment belongs to exactly one stage; the last stage ends at project end.
+Run **plan-critic** over the plan, looking for ordering errors, increments that are secretly
+two increments, acceptance criteria that cannot actually be checked, stages that are not
+demonstrable on their own, and — for UI increments — whether the design acceptance criteria
+are present and checkable.
 
 **Gate:** present the plan to the user. Do not delegate anything until they approve it.
 Present it as a decision brief (`explain-for-decision` skill), not as the plan file itself.
@@ -244,8 +306,10 @@ configure it.
 
 Delegate the actual file-writing to **cursor-configurator**, which writes
 `.gitattributes`, `.cursorignore`, `.worktreeinclude`, linter configs, `hooks.json`,
-`.githooks/pre-commit`, `mcp.json`, and the frozen `.cursor/rules/minimal-code.mdc` (every
-project — the write-the-least-code ladder, with safety rules taking precedence) on your
+`.githooks/pre-commit`, `mcp.json`, the frozen `.cursor/rules/minimal-code.mdc` (every
+project — the write-the-least-code ladder, with safety rules taking precedence), and the
+always-on `.cursor/rules/workspace-boundary.mdc` plus the `boundary-check` after-edit hook
+(every project — the Workspace boundary from "The project layout") on your
 instruction and reports back. You keep the
 decisions and the escalations; it never adds dependencies, handles secrets, or authors rules
 on its own. Clear every escalation with the user before instructing it.
@@ -349,7 +413,8 @@ Delegate to **spec-packager** to write `handoff/TASK-<nnn>.md`. The brief must b
 self-contained — Cursor gets no conversation history, only this file. For a UI-bearing
 increment, the brief must name the exact approved mockup file(s) and the relevant
 `docs/design/DESIGN.md` sections, and list the frozen `vercel-interface.mdc` as an
-applicable rule.
+applicable rule. Every brief carries the Workspace boundary and the standing invitation to
+note tooling friction in `docs/BUILDER_NOTES.md` (spec-packager's constraints template).
 
 ### 3. Delegate to Cursor
 
@@ -396,6 +461,11 @@ Then run the **deterministic scope check** — the file-level floor, before any 
 ```bash
 python ~/.claude/cursor-bridge/scope-check.py handoff/TASK-<nnn>.md
 ```
+
+And read `docs/BOUNDARY_VIOLATIONS.md` if it exists. Git cannot see a write outside the
+repository, so this log — written by the `boundary-check` hook — is the only trace of the
+builder reaching outside `Workspace/`. Any new entry is handled like `SCOPE DRIFT`: undo the
+outside edit by hand (`Documents/` is not under git), re-delegate, open an issue.
 
 It compares the git-derived changeset (tracked diffs vs the checkpoint plus untracked new
 files) against the brief's `## Scope` and prints `SCOPE CLEAN` or `SCOPE DRIFT` with the
@@ -584,6 +654,73 @@ the change log, not by a gate the user cannot operate.
 
 ---
 
+## Reflection points — stage close, phase gates, project end
+
+The build plan groups increments into named **stages** (Phase 4); a stage closes when its
+last increment merges. A stage close, each approved phase gate, and project end are the
+**reflection points**: the only times `Documents/` is written (issue placeholders aside), and
+the time you look at the bridge itself. Do the following, in order. None of it is an
+escalation, none of it stalls the loop, and none of it changes the bridge.
+
+1. **Issues.** For every issue opened since the last reflection point (below), make sure its
+   entry in `Documents/<Name> Issues During Development and Their Solutions.md` is complete:
+   context, how it surfaced, how it was solved, how it could have been avoided or mitigated
+   from the start. A repeat gets no new entry — update the counter and the recurring task IDs
+   on the existing one and say prominently that it recurred, because a repeat is the
+   stronger signal.
+2. **Bridge feedback.** Append to `Documents/<Name> Claude-Cursor Bridge Feedback.md`: your
+   own observations about the bridge — criticisms, bottlenecks, ambiguities in the
+   governance, a rule that made something harder, a check that fired wrongly, a suggestion —
+   and any builder observation copied from `docs/BUILDER_NOTES.md` (the builder cannot write
+   to `Documents/`). Mark each with the stage and who raised it (supervisor or builder), with
+   enough context that the maintainer can evaluate it months later. **Never act on it.** The
+   bridge is the maintainer's to change; your job is to record.
+3. **Project Summary and the rest of `Documents/`.** Patch the Project Summary — and any other
+   document the user keeps there — for what changed this stage: decisions taken, scope changes
+   accepted, deviations, the state of the build. Rewrite the affected sections; do not append
+   a changelog to a document that is not one.
+4. **User Manual** (once it exists). Patch it for every `CHANGES.md` entry since the last
+   reflection point — a behaviour change is exactly what a manual tracks.
+5. **Record** the reflection point in `docs/PROJECT_STATUS.md` (`Last reflection:`).
+
+**At project end**, additionally:
+
+- **Write `Documents/<Name> User Manual.md`** from the finished software and `CHANGES.md`:
+  what it does, how to use each feature, screen by screen where there are screens, in the
+  user's language, with the plain-language limits and known gaps. Tier B screenshots, where
+  they exist, may illustrate it. From then on it is patched at reflection points (item 4).
+- **Run the promotion pass.** Read the Issues document and the Feedback document whole, and
+  draft — as a final section of the Feedback document titled **"Proposed bridge changes"** —
+  concrete proposed edits: which file in the governance tree, what wording, and which issue or
+  feedback item motivates each. That section is a proposal for the maintainer to accept or
+  reject; you change nothing in the bridge. (This replaces any automated skill optimiser: the
+  scoring here is the maintainer's judgement, and the loop stays human-approved.)
+
+### Issues — what counts, and where it is written
+
+An **issue** is anything that cost the loop more than the gate's normal single round: a
+defect class that needed a second re-delegation or more; anything reverted, or that reached
+`main` wrongly; a tooling, platform, or bridge failure (a hook that did not fire, a scanner
+that broke, a mangled brief); a Workspace boundary violation. One legitimate reviewer
+rejection that the next round fixed is the gate working — not an issue.
+
+Two renderings, one ID (`ISS-001`, `ISS-002`, …):
+
+- **On detection** — the terse, AI-facing entry in `docs/LESSONS.md` under the ID (what was
+  wrong, how it surfaced), as today, and a **placeholder line** under the same ID in the
+  Documents Issues file (title, task, "open"). This is the one mid-stage write to `Documents/`.
+- **After the fix** — the `LESSONS.md` entry gets its correction, and the Documents entry is
+  written out in full, in prose the user can follow: the context (what was being built, what
+  the loop was doing), how it surfaced, how it was solved, and how it could have been avoided
+  or mitigated from the start.
+- **Repeats** — an issue already in the file gets no new entry: its counter and recurring
+  task IDs are updated and the recurrence is stated prominently.
+
+`LESSONS.md` stays the AI-facing source the maintainer promotes into `Known-Pitfalls.md`; the
+Documents file is its human-facing account. Same ID, so neither drifts from the other.
+
+---
+
 ## Escalate to the user when
 
 Escalate a decision only when the deciding factor is something the user **uniquely owns
@@ -710,6 +847,10 @@ Awaiting user on: <nothing | the specific question>
 Next: <the next increment and anything the next session needs to know>
 Deviations accepted: <accepted deviations from DESIGN.md and why>
 Terms fixed: <term — the sense fixed with the user — Established | Risky; one per line>
+Software name: <the name that names the Documents set>
+Layout: Workspace=<resolved path>  Documents=<resolved path>
+Stage: <current stage name> — Last reflection: <stage close | phase gate | none yet, and when>
+Open issues: <ISS-nnn …, or none>
 ```
 
 **Terms fixed** is the `explain-for-decision` skill's lookup: which technical terms have been
@@ -727,11 +868,14 @@ this log plus `git revert` is how a behavioural miss that slipped the gate gets 
 
 And keep `docs/LESSONS.md` — the project's running record of **misconceptions or mistakes the
 loop made and what it learned** (a tooling assumption that proved false, a gate that missed a
-class, a Cursor/platform quirk that cost a round). One entry each: what was wrong, how it
-surfaced, and the correction. Its purpose is cross-project: append here during the run, and the
-maintainer promotes *generalizable* entries up into the governance catalogue
-`~/.claude/cursor-bridge/Known-Pitfalls.md` so the same mistake is not re-learned on the next
-project. **Read `Known-Pitfalls.md` at the configure and build phases** (and let `plan-critic`
+class, a Cursor/platform quirk that cost a round). One entry each, under an `ISS-nnn` ID: what
+was wrong, how it surfaced, and the correction. Its purpose is cross-project: append here
+during the run, and the maintainer promotes *generalizable* entries up into the governance
+catalogue `~/.claude/cursor-bridge/Known-Pitfalls.md` so the same mistake is not re-learned on
+the next project. Its human-facing twin, under the same IDs, is
+`Documents/<Name> Issues During Development and Their Solutions.md` (see "Reflection
+points"); `docs/BUILDER_NOTES.md` is the builder's own friction log, copied into the
+Documents Feedback file at reflection points. **Read `Known-Pitfalls.md` at the configure and build phases** (and let `plan-critic`
 consult it) so a known pitfall is avoided rather than rediscovered. Distinct from
 `HARDENING.md` (project hardening) and `CHANGES.md` (behaviour).
 
@@ -832,3 +976,16 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     parts before the whole; no tangents). Completeness is not the measure; the user's ability
     to take the decision congruently with the technical reality is. A clarifying question means
     a guard was skipped — fix that guard, never re-send the same explanation longer.
+22. The project layout is fixed: `<id>-<name>/Documents` (human-facing, never in git, never
+    the builder's) beside `<id>-<name>/Workspace` (the repo; `docs/` inside it is AI-facing).
+    You run in `Workspace/`; the builder runs there and **only** there. The boundary is an
+    instruction (brief + `workspace-boundary.mdc`) plus a detector (`boundary-check` hook →
+    `docs/BOUNDARY_VIOLATIONS.md`, read at step 4) — never assume it is a wall. A violation
+    is `SCOPE DRIFT`: undo by hand, re-delegate, open an issue.
+23. `Documents/` is written only at reflection points — stage close, approved phase gate,
+    project end — plus the issue placeholder on detection. At each: complete the Issues
+    entries (one ID, two renderings, repeats counted not duplicated), append bridge feedback
+    (yours and the builder's) without ever acting on it, patch the Project Summary and the
+    rest of `Documents/`, patch the User Manual once it exists. At project end write the User
+    Manual and the "Proposed bridge changes" section — proposals for the maintainer, never
+    edits to the bridge.

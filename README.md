@@ -12,7 +12,9 @@ build loop's *instructions* — governance, not any product. They install over t
   - `commands/` — the `supervisor` command.
   - `agents/` — the specialist subagents (`cursor-configurator`, `spec-packager`,
     `diff-reviewer`, `design-auditor`, `plan-critic`, `test-runner`, `secret-sentinel`).
-  - `cursor-bridge/` — the bridge references: `Cursor-File-Formats.md`,
+  - `cursor-bridge/` — the bridge references (plus the bundled scripts `scope-check.py`,
+    `shell-guard.py`, and `boundary-check.py` — the last an advisory after-edit detector
+    for builder writes outside `Workspace/`): `Cursor-File-Formats.md`,
     `Cursor-Project-Configuration.md`, `Merge-Verification-Policy.md`, the bundled
     `vercel-interface.snapshot.md` fallback, and `design-seeds/` (the vendored
     awesome-design-md corpus — one `DESIGN.md` per brand, a seed to bootstrap a project's

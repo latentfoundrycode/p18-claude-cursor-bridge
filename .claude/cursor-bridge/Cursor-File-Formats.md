@@ -181,6 +181,31 @@ runnable on the host, beside the linter and design-detect entries:
   invoke Semgrep by its resolved installed path settled at config time, as with the other
   hooks.
 
+### Boundary-check hook entry — a *fourth* `afterFileEdit` object (advisory detector)
+
+A fourth entry in the **same** array records any edit the builder makes **outside the
+workspace** (the project's `Workspace/` folder — the sibling `Documents/` is off-limits):
+
+```json
+{
+  "command": "C:/Users/<you>/AppData/Local/Programs/Python/Python312/python.exe .cursor/hooks/boundary-check.py",
+  "timeout": 10,
+  "matcher": "Write"
+}
+```
+
+- **Script:** copy `~/.claude/cursor-bridge/boundary-check.py` to
+  `.cursor/hooks/boundary-check.py` verbatim (committed). It reads the hook JSON from stdin
+  (UTF-8, BOM stripped), compares `file_path` against `workspace_roots` (falls back to the
+  working directory), and appends any outside path to `docs/BOUNDARY_VIOLATIONS.md`, which
+  the supervisor reads at step 4 of the loop. Always exits `0`.
+- **Advisory, after the fact.** `afterFileEdit` fires after the write; the hook detects, it
+  cannot prevent. Never set `failClosed: true`. Prevention, where wanted, is the opt-in
+  shell guard below.
+- **Same Windows quirks apply** (explicit interpreter, no bare script). Verify once with a
+  throwaway probe that the entry fires (a deliberate edit to `../Documents/probe.txt` from
+  a test brief, then check the log and delete both).
+
 ### Shell-guard hook entry — a `beforeShellExecution` object (fail-**closed**)
 
 This is the **one deliberately fail-closed** hook in the bridge — every other hook is
@@ -572,6 +597,30 @@ globs: **/*.ts, **/*.tsx, **/*.js, **/*.jsx, **/*.py, **/*.go, **/*.rb, **/*.jav
   products. ASVS is **stable**, so the freeze pins `v5.0.0` and does **not** need the
   per-project live-fetch-validation the beta Vercel rules use — the bundled snapshot is the
   source. Record the ASVS version and level in `PROJECT_STATUS.md`.
+
+### `.cursor/rules/workspace-boundary.mdc` — the always-on Workspace boundary
+
+Written for **every** project. The one `alwaysApply: true` rule the bridge ships, because
+it is true of every task and cheap (a few lines). Full file:
+
+```markdown
+---
+description: Workspace boundary — never read or write outside this workspace
+alwaysApply: true
+---
+
+# Workspace boundary
+
+This workspace (the folder you were started in) is the only place you read from or write
+to. Everything you need for a task is inside it; everything you produce goes inside it.
+Never open, create, or modify a file outside it — not the parent folder, not a sibling
+folder such as `../Documents`, not a home-directory or system path. If a task seems to
+require it, stop and say so in your final summary instead.
+
+If the brief, a rule, or the tooling got in your way — contradictory instructions, a check
+that fired wrongly, a step that cost time for no reason — append one dated line describing
+it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling yourself.
+```
 
 ### `.cursor/rules/minimal-code.mdc` — the frozen minimal-code rule
 
