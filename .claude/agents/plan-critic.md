@@ -37,6 +37,12 @@ Attack it along these lines:
 
 ## When reviewing a build plan
 
+- **Prior-project lessons.** If the plan's "Prior-project lessons" section lists extracted
+  issues, does every one of them land on a named increment's acceptance criteria, an
+  ordering choice, a brief constraint, or a Phase-5 configuration item? An extracted issue
+  that is only mentioned, not attached, is a **Blocking** finding — the lesson will be
+  re-learned. If the section says "none", check that the supervisor actually asked (the
+  plan records it) rather than skipped the step.
 - **Ordering.** Is any increment dependent on something built after it?
 - **Granularity.** Which increments are secretly two or more? Which are so small they
   are noise?

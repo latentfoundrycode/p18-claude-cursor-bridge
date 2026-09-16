@@ -148,6 +148,13 @@ architecture and component breakdown; technology choices *with the reasoning for
 each*; data model; key interfaces and contracts; error handling and failure modes;
 security and secret-handling approach; testing strategy; open questions.
 
+When the design settles a technology choice or a subsystem kind that an earlier project
+plausibly shared (the same framework, the same platform packager, a media pipeline, a
+payments or auth layer), say so in the design presentation in one line — "an Issues file
+from a project on the same stack would matter at Phase 4" — so the user has time to find
+it before the build plan asks for it. This is a heads-up, not the question itself; the
+question is asked once, at Phase 4 step 0.
+
 The **security-and-secret-handling section records the chosen ASVS level and the trust
 boundaries** from Phase 1, so the level in force is documented for the plan, the briefs, and
 the auditor. `plan-critic` checks the security criteria alongside the rest (below).
@@ -253,6 +260,38 @@ execution → proceed and note it; different intent → escalate.
 ---
 
 ## Phase 4 — Build plan
+
+### Step 0 — Prior-project lessons (ask before drafting)
+
+Before you draft the plan, ask the user — once, explicitly — whether an earlier project
+overlaps with this one and, if so, for the path to its
+`<Name> Issues During Development and Their Solutions.md`. Frame the question so they can
+answer it: state in one paragraph what this project is *technically* (the stack, the
+platform, the kinds of subsystems — a video pipeline, an auth layer, a desktop packager) so
+they can judge overlap against projects they remember. Point them at the bridge's
+`Claude-Cursor Bridge Issues Index.md` in the bridge's own `Documents/` if they keep one.
+If they name none, record "Prior-project lessons: none" in the plan and move on.
+
+For each file they give you, read it whole (it is the size of a report, not a codebase),
+then produce a short **Prior-project lessons** section at the top of `docs/BUILD_PLAN.md`:
+
+- **Extracted** — every issue whose *conditions* this project shares (same stack, same
+  platform quirk, same kind of subsystem, same tooling), each with the issue's ID and
+  source file, and **what it becomes here**: a specific acceptance criterion on a named
+  increment, an ordering choice (build X before Y because the old project learned Y needs
+  X), a constraint the brief will carry, or a configuration item for Phase 5. An issue that
+  cannot be attached to something concrete in the plan has not been extracted — it has been
+  noted, and noting is not the point.
+- **Judged irrelevant** — the rest, one line each with the reason (different stack, the
+  condition does not arise here, already covered by an existing bridge rule). This list
+  exists so the user can overrule a judgement; keep it terse.
+
+`plan-critic` verifies that every extracted issue landed on a named increment or
+configuration item. Do not paste the old file's prose into the plan; the plan carries the
+consequence, not the story. If a lesson is generalizable beyond both projects, say so in
+your report — it is a candidate for `Known-Pitfalls.md`, which is the maintainer's call.
+
+### The plan
 
 Write `docs/BUILD_PLAN.md` as an ordered list of increments. Each increment must be:
 
