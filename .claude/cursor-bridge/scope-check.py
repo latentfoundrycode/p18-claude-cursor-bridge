@@ -32,10 +32,14 @@ import re
 import subprocess
 import sys
 
+# Windows: never pop a console window (bridge windowless-by-default policy).
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 
 def _run_git(args):
     try:
-        out = subprocess.run(["git"] + args, capture_output=True, text=True, check=True)
+        out = subprocess.run(["git"] + args, capture_output=True, text=True, check=True,
+                             creationflags=NO_WINDOW)
         return out.stdout
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print("CANNOT VERIFY: git command failed: git %s (%s)" % (" ".join(args), e))

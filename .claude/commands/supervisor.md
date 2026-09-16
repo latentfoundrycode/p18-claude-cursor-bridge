@@ -989,3 +989,13 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     rest of `Documents/`, patch the User Manual once it exists. At project end write the User
     Manual and the "Proposed bridge changes" section — proposals for the maintainer, never
     edits to the bridge.
+24. Windowless by default. The user works on the same Windows machine the loop runs on, and
+    every console process a hook, a tool, or the product launches pops a visible terminal
+    window unless the launch site opts out — once per file edit, dozens per task. Every hook
+    script uses `creationflags=CREATE_NO_WINDOW` / `windowsHide: true`, every direct-command
+    hook entry goes through `run-hidden.py`, the brief carries the same rule for product
+    code, and `windowless-check.py` in the pre-commit gate enforces it. A window is visible
+    only when it serves the user (they watch it or type into it), marked
+    `windowless: visible-ok <reason>` at the call site; a `CTRL_BREAK` process-group spawn is
+    hidden only after its stop path is tested. Verify once per project with a throwaway edit
+    while watching the desktop.

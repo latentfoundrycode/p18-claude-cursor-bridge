@@ -54,6 +54,13 @@ Only the items the supervisor names, drawn from this set:
   **body is the frozen snapshot the supervisor hands you** (the level-filtered slice, plus
   the LLM supplement if named); write it verbatim with the frontmatter from
   `Cursor-File-Formats.md`.
+- `.cursor/hooks/run-hidden.py` and `.cursor/hooks/windowless-check.py` — copied verbatim
+  from `~/.claude/cursor-bridge/`, for **every** Windows-hosted project. Every hook script
+  you write carries the windowless idiom (`creationflags=NO_WINDOW` / `windowsHide: true`)
+  at every launch site; every direct-command hook entry (design-detect, security-detect,
+  boundary-check) is prefixed with `run-hidden.py`; the pre-commit gate runs
+  `windowless-check.py` beside the lint command. Format and idioms in
+  `Cursor-File-Formats.md` §"Windowless by default".
 - `.cursor/rules/workspace-boundary.mdc` — the always-on Workspace boundary rule, for
   **every** project, verbatim from `Cursor-File-Formats.md` (the builder never reads or
   writes outside the workspace; feedback about the tooling goes to `docs/BUILDER_NOTES.md`).
@@ -93,6 +100,10 @@ Only the items the supervisor names, drawn from this set:
   verbatim, never regenerate or "improve" them. The design rules the Impeccable detector
   enforces and the security rules the scanners enforce are the tools' own; you only wire the
   configs, hooks, and CI steps, you do not reimplement any rule.
+- **Never launch a visible console from a hook.** A hook script or hook entry you write
+  that spawns a console program without the windowless idiom / the `run-hidden.py` wrapper
+  is a defect: it pops a terminal window on the user's desktop once per file edit. The only
+  exception is a launch marked `windowless: visible-ok <reason>` that the supervisor named.
 - **Append hooks; never overwrite `hooks.json`.** Read the existing array and add the design
   and security detect entries as further objects, preserving the linter entry. The shell-guard
   goes under a `beforeShellExecution` key (a different event array), added alongside — not

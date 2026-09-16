@@ -15,7 +15,8 @@
       "Bash(semgrep:*)",
       "Bash(osv-scanner:*)",
       "Bash(socket:*)",
-      "Bash(python ~/.claude/cursor-bridge/scope-check.py:*)"
+      "Bash(python ~/.claude/cursor-bridge/scope-check.py:*)",
+      "Bash(python .cursor/hooks/windowless-check.py:*)"
     ]
   }
 }

@@ -109,9 +109,23 @@ and fix its own lint/type errors without a human in the loop.
   contain no source files yet. Drop an empty `__init__.py` into each type-checked
   package so the check is green until real code exists — otherwise the first delegation
   "fails" for no real reason.
+- **Windowless by default — the user works on the same machine.** Every console process a
+  hook or any agent tooling launches on Windows pops a visible terminal window unless the
+  launch site opts out (`creationflags=CREATE_NO_WINDOW` in Python, `windowsHide: true` in
+  Node); capturing output does not prevent it. Because hooks fire per file edit, the
+  windows come in dozens and cascade over the user's own work. Standing rule: **every hook
+  script uses the idiom at every launch site; every direct-command hook entry is wrapped in
+  `.cursor/hooks/run-hidden.py`**; the only visible processes are ones whose window serves
+  the user (a dev server they follow, an interactive prompt, a deliberate debugging run),
+  marked `windowless: visible-ok <reason>` at the call site. A spawn that relies on
+  `CREATE_NEW_PROCESS_GROUP` for a `CTRL_BREAK` stop is hidden only after its stop path is
+  tested (signal caveat). Idioms, wrapper, marker, and the check are in
+  `Cursor-File-Formats.md` §"Windowless by default". Verify once with a throwaway edit while
+  watching the desktop: no flash.
 - **Gate commits on lint failure — the deterministic floor.** Add a committed
   `.githooks/pre-commit` (see `Cursor-File-Formats.md`) that runs the same settled lint
-  command and blocks a failing commit, then set `git config core.hooksPath .githooks` once.
+  command **and the windowless check** (`.cursor/hooks/windowless-check.py`) and blocks a
+  failing commit, then set `git config core.hooksPath .githooks` once.
   Unlike the `afterFileEdit` hook (advisory, model can ignore) this is mechanical and
   un-skippable. **Lint only** (type-check stays with `test-runner`/CI). The supervisor's
   pre-delegation checkpoint commits use `git commit --no-verify` (recovery anchors that must
@@ -382,7 +396,7 @@ this reliable:
 
 1. §1 repo hygiene (`.gitattributes` → renormalise, `.cursorignore`, `.worktreeinclude`,
    `.cursor/rules/workspace-boundary.mdc` + the `boundary-check` hook entry).
-2. §2 feedback loop: escalate any new linter deps, commit configs, fix command strings, wire the edit hook, handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` + `git config core.hooksPath .githooks`).
+2. §2 feedback loop: escalate any new linter deps, commit configs, fix command strings, wire the edit hook **windowless** (idiom in every hook script; `run-hidden.py` on every direct-command entry), handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` running the lint command + `windowless-check.py`; `git config core.hooksPath .githooks`).
 3. §3 Context7 in `~/.cursor/mcp.json` if the project uses third-party libraries.
 4. §4 any other MCP tools the build needs (escalate secrets).
 5. §5 at most one *project-specific* cross-cutting rule, only if warranted; write the

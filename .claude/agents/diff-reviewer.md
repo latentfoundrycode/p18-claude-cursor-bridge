@@ -56,6 +56,12 @@ instead.
   speculative abstraction, and new code where reuse existed, per the project's frozen
   `minimal-code.mdc`. This goes under NOTED, never a `FAIL` on its own — and never applies
   to code that is a required security, observability, or accessibility control.
+- **Visible console launches (advisory).** A new subprocess launch in product code or
+  tooling that lacks the windowless flag (`creationflags=CREATE_NO_WINDOW` in Python,
+  `windowsHide: true` in Node) and carries no `windowless: visible-ok <reason>` marker will
+  pop a terminal window on the user's desktop on Windows. NOTED, with the file and line;
+  the pre-commit `windowless-check.py` covers hooks and named tooling dirs deterministically,
+  so this lens is for the product-code spawn sites it does not scan.
 
 **Not your concern:** formatting, naming preferences, style a linter would catch,
 pre-existing problems in untouched code, or how you would have written it. Say

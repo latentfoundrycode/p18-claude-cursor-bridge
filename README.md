@@ -13,8 +13,10 @@ build loop's *instructions* — governance, not any product. They install over t
   - `agents/` — the specialist subagents (`cursor-configurator`, `spec-packager`,
     `diff-reviewer`, `design-auditor`, `plan-critic`, `test-runner`, `secret-sentinel`).
   - `cursor-bridge/` — the bridge references (plus the bundled scripts `scope-check.py`,
-    `shell-guard.py`, and `boundary-check.py` — the last an advisory after-edit detector
-    for builder writes outside `Workspace/`): `Cursor-File-Formats.md`,
+    `shell-guard.py`, `boundary-check.py` — an advisory after-edit detector for builder
+    writes outside `Workspace/` — and the windowless pair `run-hidden.py` /
+    `windowless-check.py`, which keep hook- and tool-launched console programs from popping
+    terminal windows on the user's desktop): `Cursor-File-Formats.md`,
     `Cursor-Project-Configuration.md`, `Merge-Verification-Policy.md`, the bundled
     `vercel-interface.snapshot.md` fallback, and `design-seeds/` (the vendored
     awesome-design-md corpus — one `DESIGN.md` per brand, a seed to bootstrap a project's

@@ -110,6 +110,82 @@ read) or user scope `~/.cursor/hooks.json`. Cursor reloads on save.
    and returns "allow" fails open — get this right.
 3. **`chmod +x` is a no-op on Windows** and unneeded; executability comes from the
    interpreter, not a permission bit. (On POSIX, `chmod +x` the script.)
+4. **Every console process a hook launches must be windowless** — see the next section.
+   Without it, each linter/formatter/scanner run pops a visible terminal window on the
+   user's desktop, once per file edit, dozens per task (field-reported, KP-014).
+
+### Windowless by default — no terminal pop-ups on the user's desktop (Windows)
+
+Cursor is a GUI program with no console of its own. When a hook script it started launches
+a console program (`ruff`, `prettier`, `semgrep`, `node`, `taskkill`, `python`, …), Windows
+allocates the child a **new, visible console window** unless the launcher opts out. Piping
+or capturing the output does **not** prevent this — it redirects the handles, not the
+window. Hooks fire once per edited file, so the windows flash in the dozens and cascade
+over whatever the user is doing on the same machine.
+
+**Policy:** every console subprocess launched by a hook, by agent tooling, or by product
+code the builder writes is created windowless, unless its window serves the user (a dev
+server they watch, an interactive prompt, a deliberate debugging run) — and then the reason
+is stated at the call site. Batch, automatic, non-interactive work (linters, formatters,
+type-checkers, test runs, process teardown, dependency installs) is never visible.
+
+The idioms — one line per launch site:
+
+```python
+# Python hook script or tooling
+import subprocess, sys
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+subprocess.run(cmd, capture_output=True, creationflags=NO_WINDOW)
+```
+
+```js
+// Node hook script or tooling
+const { spawn, execFile } = require("child_process");
+spawn(cmd, args, { windowsHide: true });
+execFile(cmd, args, { windowsHide: true }, cb);
+```
+
+**Direct-command hook entries** (design-detect `npx impeccable …`, security-detect
+`semgrep …`, the boundary check) go through the bundled wrapper so they cannot pop a window
+either — copy `~/.claude/cursor-bridge/run-hidden.py` to `.cursor/hooks/run-hidden.py` and
+prefix the command:
+
+```json
+{
+  "command": "C:/…/python.exe .cursor/hooks/run-hidden.py npx impeccable@<pinned> detect --json docs/mockups/",
+  "timeout": 40,
+  "matcher": "Write"
+}
+```
+
+The wrapper inherits stdin (the hook payload), relays stdout/stderr/exit code unchanged,
+runs `.cmd`/`.bat` launchers (`npx`, shims) through a hidden `cmd.exe`, and is a
+pass-through on non-Windows.
+
+**Exception marker.** A launch whose window is meant to be seen carries a comment on the
+same line or on a comment-only line above it, with the reason:
+
+```python
+# windowless: visible-ok dev server the user follows live
+subprocess.Popen(["npm", "run", "dev"])
+```
+
+**Signal caveat — do not apply the flag blindly.** A spawn that uses
+`CREATE_NEW_PROCESS_GROUP` so it can be stopped with `CTRL_BREAK_EVENT` depends on console
+ownership; hiding its window can change signal delivery. Treat adding `CREATE_NO_WINDOW`
+there as a change that needs a test of the stop path, not a formality. The check below
+reports such a spawn as `NOTE`, not `FAIL`.
+
+**The deterministic check.** `~/.claude/cursor-bridge/windowless-check.py`, copied to
+`.cursor/hooks/windowless-check.py`, scans `.cursor/hooks/` (plus any tooling paths given)
+for Python `subprocess.*`/`os.system`/`os.popen` and Node `spawn`/`exec*` calls missing the
+flag; `os.system`/`os.popen` always fail (they cannot be hidden). Exit `0` clean, `1` any
+`FAIL`, `2` nothing scanned. It runs in the pre-commit gate (below) and the supervisor may
+run it by hand:
+
+```bash
+python .cursor/hooks/windowless-check.py .cursor/hooks <tooling-dir …>
+```
 
 Script reads its payload on stdin, returns decisions on stdout. `CURSOR_PROJECT_DIR`,
 `CURSOR_VERSION`, and `CURSOR_USER_EMAIL` are injected into the environment.
@@ -290,7 +366,17 @@ hook-runner bug that gates the shell-guard.
      echo "pre-commit: lint gate failed — fix the findings. Use --no-verify ONLY for a checkpoint snapshot." 1>&2
      exit 1
    fi
+   # Windowless gate: no hook or tooling may launch a visible console (KP-014).
+   if ! <PYTHON> .cursor/hooks/windowless-check.py .cursor/hooks <TOOLING_DIRS>; then
+     echo "pre-commit: a subprocess launch is missing the windowless flag (or a 'windowless: visible-ok <reason>' marker)." 1>&2
+     exit 1
+   fi
    ```
+
+   `<PYTHON>` is the same explicit interpreter path as the lint command; `<TOOLING_DIRS>` is
+   the space-separated list of agent-tooling directories the supervisor named (`scripts/`,
+   `tools/`, …), or nothing. Exit `2` (nothing to scan) also blocks — a Windows project
+   always has `.cursor/hooks/` to scan, so `2` means the path is wrong.
 
    `<LINT_CMD>` is the **exact activation-independent lint command** settled in the
    feedback-loop step (§2 of `Cursor-Project-Configuration.md`), written in git-`sh` form

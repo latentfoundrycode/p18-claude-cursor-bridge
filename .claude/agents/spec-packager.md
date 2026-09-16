@@ -62,6 +62,12 @@ exactly. Patterns established elsewhere in the codebase that this should follow.
 - If the brief, the rules, or the tooling got in your way — an instruction that contradicted
   another, a check that fired wrongly, a step that cost time for no reason — append one
   dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling.
+- Any console process your code launches on Windows is created windowless
+  (`creationflags=subprocess.CREATE_NO_WINDOW` in Python — `0` on other platforms;
+  `windowsHide: true` in Node). Capturing output does not prevent the window. A window is
+  allowed only when it serves the user (they watch it or type into it); then write the
+  reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a
+  process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path.
 - Do not refactor code outside the scope, even if it looks wrong.
 - Follow existing conventions in the files you touch.
 - Prefer reuse over new code — existing helpers, the standard library, native platform

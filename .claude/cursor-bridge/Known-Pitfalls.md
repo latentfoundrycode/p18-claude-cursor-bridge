@@ -160,3 +160,23 @@ it applies.**
   record the pinned version in `PROJECT_STATUS.md`; adopt an agent bump only on a verified
   pass, never automatically — the same discipline as every other tool in the loop.
 - **Applies:** every Windows host running the bridge.
+
+### KP-014 — Hook-launched console programs pop visible terminal windows on Windows (field-reported, fixed in-project)
+- **Surfaced:** a supervisor's project (2026-09-16): during headless runs, dozens of terminal
+  windows flashed on the user's desktop and cascaded over their own work. Cause: the
+  `afterFileEdit` hook scripts launched `ruff`, `prettier`, `taskkill`, and the Python
+  launcher as ordinary console subprocesses. Cursor is a GUI process with no console, so
+  Windows allocates each child a **new visible console**; capturing output does not prevent
+  it. Hooks fire once per file edit, hence the count. The same project had already fixed the
+  identical problem once, locally, in its video renderer — and never generalized it.
+- **Correction:** windowless by default — `creationflags=CREATE_NO_WINDOW` (Python; `0` off
+  Windows) / `windowsHide: true` (Node) at every launch site in hooks, agent tooling, and
+  product code; direct-command hook entries wrapped in the bundled `run-hidden.py`; the
+  bundled `windowless-check.py` in the pre-commit gate so the flag is enforced, not
+  remembered. Exceptions only where the window serves the user, marked
+  `windowless: visible-ok <reason>`. Signal caveat: a `CREATE_NEW_PROCESS_GROUP` spawn used
+  for a `CTRL_BREAK` stop is hidden only after its stop path is tested.
+- **Applies:** every Windows-hosted project; every hook script and every subprocess the
+  builder writes. The meta-lesson is the report's own: a fix made once, locally, recurs in
+  the next subsystem unless it is promoted to a rule — which is what `LESSONS.md` →
+  `Known-Pitfalls.md` is for.
