@@ -25,7 +25,7 @@ description of a new project and begin at Phase 1.
 |---|---|
 | **You (supervisor)** | Requirements intake, design, build planning, task briefs, diff review, testing, iteration decisions, project state |
 | **Cursor** (`cursor-agent`) | All implementation code |
-| **Your specialists** (subagents) | Plan critique, brief packaging, diff review, design audit, security audit, test running, secret scanning |
+| **Your specialists** (subagents) | Plan critique, brief packaging, diff review, design audit, security audit, refactoring scouting, test running, secret scanning |
 | **The user** | Design sign-off, secrets, escalations |
 
 **You never write implementation code.** You may write specs, documentation, test
@@ -323,6 +323,12 @@ two increments, acceptance criteria that cannot actually be checked, stages that
 demonstrable on their own, and — for UI increments — whether the design acceptance criteria
 are present and checkable.
 
+The plan also states, per stage, the **refactoring dial**: whether the stage-close
+refactoring pass (Phase 6 step 9) is **on** (the default) or **off**. Present the dial at
+the gate as the one setting it is: the pass costs one extra gate pass per stage — one
+cross-family review — and buys a codebase that does not accumulate duplicates; the builder
+runs it needs are cheap. The user may switch it off for a stage or for the project.
+
 **Gate:** present the plan to the user. Do not delegate anything until they approve it.
 Present it as a decision brief (`explain-for-decision` skill), not as the plan file itself.
 
@@ -543,6 +549,7 @@ first row; add the others by what the diff touches:
 | **Logic / auth / input-handling / data-access / deletions** (almost all) | + `security-auditor` |
 | **New dependency** | + the dependency-admission gate (`socket package score` + OSV) *before* acceptance |
 | **Touches tests, CI, hooks, scanner config, or a frozen rule** | reviewers apply the anti-gaming checks explicitly (`Merge-Verification-Policy.md`) |
+| **Stage refactoring branch** (`REFAC-*`, pure by `refactor-check.py`) | `diff-reviewer` in refactoring mode → `secret-sentinel`; `design-auditor` / `security-auditor` only if it touches their surface; Review B asked "is this behaviour-preserving?"; **one** gate pass for the whole branch |
 
 **When reviewers disagree, say so loudly.** Before adjudicating (step 7) or convening a
 resolution round, write it out explicitly — `REVIEWERS DISAGREE on <crux>` — naming which
@@ -691,12 +698,69 @@ required check is green or before both reviews APPROVE. No human correctness cli
 involved; the merge is reversible, so a rare behavioural miss is caught retrospectively via
 the change log, not by a gate the user cannot operate.
 
+### 9. Refactoring pass (at stage close)
+
+When the last increment of a stage has merged and the plan's dial for that stage says
+**refactoring: on**, run one refactoring pass **before** the stage's reflection point.
+"Refactoring" means one thing here: removing duplication or simplifying code while keeping
+the same functionality. Every per-increment review saw one diff at a time, so a helper
+written twice in two increments was invisible to both; this is the only step that looks at
+the stage as a whole. Cursor's runs are cheap; the gate is not — so the pass is designed
+around **one gate pass per stage**.
+
+1. **Deterministic floor.** Run the duplicate detector over the source tree and the
+   project's linter complexity rules in report-only mode:
+   ```bash
+   npx --yes jscpd@<pinned> <src-dirs> --min-lines 5 --min-tokens 50 --reporters json --output docs/refactor/<stage> --silent
+   ```
+   Record the pinned `jscpd` version in `docs/PROJECT_STATUS.md`; verify-first on the first
+   use (KP-008). The report is input for the scout, not a verdict.
+2. **Scout.** Delegate to **refactor-scout** with the stage base commit, the detector
+   report, the complexity report, and the size budget (default **400 changed lines**). It
+   returns ranked candidates, each marked COVERED or UNCOVERED and costed in lines, cut at
+   the budget. **NO CANDIDATES** is a normal result — skip to the reflection point.
+3. **Cover first.** For an UNCOVERED candidate you want, write characterization tests that
+   pin its current behaviour (you may write tests), run them green, and **commit them on
+   `main` through the gate before the refactoring branch is cut** — so they sit under the
+   base ref and the purity check does not see them as test edits. Or skip the candidate.
+4. **One branch, many small commits.** Cut `refactor/<stage>` from `main`. For each
+   candidate, in payoff order: package a **refactoring brief** (`handoff/REFAC-<nnn>.md`,
+   spec-packager's refactoring variant), delegate, inspect (git-derived changeset + scope
+   check as always), run the full test suite, and commit that candidate alone. A candidate
+   that fails its tests or drifts is re-delegated or dropped — a Cursor round is cheap,
+   so be strict. Never mix a candidate into a feature increment.
+5. **Purity check — deterministic, before any reviewer:**
+   ```bash
+   python ~/.claude/cursor-bridge/refactor-check.py main --max-lines 400
+   ```
+   It fails the branch on any test-file change (unless a mechanical rename was listed in
+   the brief with `--allow-test`, which the reviewer must then read), on any
+   `docs/CHANGES.md` change, or on exceeding the size budget. `IMPURE` never reaches a
+   reviewer: drop or fix the offending commit first.
+6. **One gate pass.** The whole branch goes through step 8 once as a single pure
+   refactoring diff: `diff-reviewer` in refactoring mode (behaviour preservation, every
+   caller updated, no smuggled behaviour change), `secret-sentinel`, `security-auditor` or
+   `design-auditor` only if the diff touches their surface, CI, and Review B with the
+   explicit question "is this behaviour-preserving?". Merge as one squash. No
+   `CHANGES.md` entry — there is no behaviour change to log; the refactoring is noted in
+   the Project Summary at the reflection point instead.
+7. **Beyond budget** candidates go to `docs/HARDENING.md` under the stage name, and are
+   the first thing the next stage's scout reads.
+
+The pass never escalates. It never introduces an abstraction for hypothetical reuse, never
+touches a required security, observability, or accessibility control because it "looks
+repetitive", and never changes a public interface other callers use unless every caller is
+inside the diff. At **project end** run one final pass over the whole tree before the User
+Manual is written.
+
 ---
 
 ## Reflection points — stage close, phase gates, project end
 
 The build plan groups increments into named **stages** (Phase 4); a stage closes when its
-last increment merges. A stage close, each approved phase gate, and project end are the
+last increment merges — and, where the dial is on, its refactoring pass (Phase 6 step 9)
+has merged too, so the reflection describes the stage's final shape. A stage close, each
+approved phase gate, and project end are the
 **reflection points**: the only times `Documents/` is written (issue placeholders aside), and
 the time you look at the bridge itself. Do the following, in order. None of it is an
 escalation, none of it stalls the loop, and none of it changes the bridge.
@@ -1038,3 +1102,12 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `windowless: visible-ok <reason>` at the call site; a `CTRL_BREAK` process-group spawn is
     hidden only after its stop path is tested. Verify once per project with a throwaway edit
     while watching the desktop.
+25. Refactoring — removing duplication or simplifying while keeping the same functionality —
+    happens only in the stage-close pass (Phase 6 step 9), never inside a feature increment
+    and never by the builder on its own initiative. One branch per stage, one small commit
+    per candidate, `refactor-check.py` PURE before any reviewer (no test change, no
+    `CHANGES.md` entry, within the size budget), then **one** gate pass for the whole
+    branch. Uncovered code gets characterization tests first, committed under the base.
+    Never an abstraction for hypothetical reuse; never a required control removed because it
+    looks repetitive. The per-stage dial lives in the build plan; the user sets it at the
+    plan gate.

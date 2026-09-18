@@ -80,6 +80,26 @@ exactly. Patterns established elsewhere in the codebase that this should follow.
 Print a list of every file you changed and a one-paragraph summary of what you did.
 ```
 
+## The refactoring variant — `handoff/REFAC-<nnn>.md`
+
+At a stage close the supervisor may hand you a **refactoring candidate** from
+`refactor-scout` instead of a build-plan increment. Same file shape, with these
+differences, stated verbatim in the brief:
+
+- **Objective** opens with: "Refactoring — remove duplication / simplify **without any
+  change in behaviour**." Then the candidate's sites (file:lines), its proposed shape, and
+  every caller to update.
+- **Scope** names the sites and the callers, nothing else.
+- **Acceptance criteria** are: the full test suite passes with the **same** test set; every
+  listed caller now uses the single implementation; no public signature outside the listed
+  sites changed; the duplicate/dead code is gone.
+- **Constraints** add: do not edit any test file (if a mechanical rename of a test import
+  is unavoidable, the brief lists that file explicitly and nothing else in it may change);
+  do not add an entry to `docs/CHANGES.md`; do not "improve" behaviour, messages, edge cases,
+  or defaults you notice along the way — report them in your summary instead; do not
+  introduce an abstraction beyond what the listed duplicates need.
+- **Done** adds: state in one sentence why the behaviour is identical.
+
 ## Rules
 
 **No secrets. Ever.** This file's contents go to Cursor's backend. Refer to `.env`

@@ -18,6 +18,17 @@ instead.
 3. Read enough of the surrounding code to judge the changes in context. A diff read
    in isolation hides most of what matters.
 
+**Refactoring mode.** If the brief is a `handoff/REFAC-<nnn>.md` (or the supervisor says
+the diff is a stage's refactoring branch), the single question is **behaviour
+preservation**. For every removed or merged block, read the surviving implementation
+side by side with what it replaced and confirm the same inputs produce the same outputs,
+errors, and side effects — including edge cases the old copy handled and the new one might
+not (an empty list, a `None`, a trailing slash). Confirm every former caller now reaches
+the surviving implementation and none was left calling a deleted name. Any behaviour
+change, however small and however much of an improvement, is a `FAIL`: it belongs in a
+feature increment with its own `CHANGES.md` entry, not smuggled into a refactoring. A test
+file edited beyond a mechanical rename the brief listed is a **gate-integrity flag**.
+
 ## What you are checking
 
 **Conformance — did it do what was asked?**

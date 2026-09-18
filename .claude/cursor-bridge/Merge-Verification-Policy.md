@@ -170,6 +170,21 @@ must treat any of these as such:
   exercised, to get a UI increment through (adding invariants/states is fine; removing them to
   dodge a failure is not).
 
+**Refactoring-diff tampering** is a gate-integrity flag on the same footing. A stage's
+refactoring branch claims "same functionality", and the deterministic `refactor-check.py`
+already fails it on any test-file change, any `docs/CHANGES.md` change, or a diff beyond the
+size budget. Both reviewers must additionally treat as a flag:
+
+- a behaviour change carried inside a refactoring diff — a changed error message, default,
+  edge case, or public signature — however small, and however much of an improvement (it
+  belongs in a feature increment with its own `CHANGES.md` entry);
+- a test file edited beyond the mechanical rename the brief explicitly listed;
+- a "simplification" that removes a required security, observability, or accessibility
+  control because it looked repetitive.
+
+Review B's mandate on a refactoring diff is the explicit question **"is this
+behaviour-preserving?"**, answered on the whole diff.
+
 Any of these is a **gate-integrity flag**. It is never an auto-approve. It is either a
 `REJECT` (if the change is plainly a workaround) or an `ESCALATE-INTENT` (if it might be
 a legitimate change to what "correct" or "secure enough" means — see below), never a quiet

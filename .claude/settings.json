@@ -16,7 +16,9 @@
       "Bash(osv-scanner:*)",
       "Bash(socket:*)",
       "Bash(python ~/.claude/cursor-bridge/scope-check.py:*)",
-      "Bash(python .cursor/hooks/windowless-check.py:*)"
+      "Bash(python .cursor/hooks/windowless-check.py:*)",
+      "Bash(npx --yes jscpd:*)",
+      "Bash(python ~/.claude/cursor-bridge/refactor-check.py:*)"
     ]
   }
 }

@@ -43,6 +43,9 @@ Attack it along these lines:
   that is only mentioned, not attached, is a **Blocking** finding — the lesson will be
   re-learned. If the section says "none", check that the supervisor actually asked (the
   plan records it) rather than skipped the step.
+- **Refactoring dial.** Does the plan state, per stage, whether the stage-close refactoring
+  pass is on or off (default on)? A plan that is silent on it leaves the supervisor guessing
+  at every stage close.
 - **Ordering.** Is any increment dependent on something built after it?
 - **Granularity.** Which increments are secretly two or more? Which are so small they
   are noise?
