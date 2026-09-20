@@ -11,6 +11,20 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.20b
+
+**What changed**
+- `/supervisor` takes no keywords. New vs resume is decided solely by whether
+  `docs/PROJECT_STATUS.md` exists; text after the command is the seed description of a new
+  project (or a message to a resumed one). `new` and `resume` were removed from the
+  argument hint — `new` never had a distinct meaning, and `resume` duplicated the file check.
+
+**Running projects must**
+- *(all phases)* Nothing. Type `/supervisor` to resume, as before; the word `resume` is
+  simply no longer needed.
+
+---
+
 ## 2026.09.20
 
 First stamped release. Covers everything since the observability integration (commit
