@@ -240,6 +240,75 @@ drifting (guard 5).
 
 ---
 
+## Handing the user something to run — the run sheet
+
+Sometimes the user must act on the machine themselves: set a repository secret, install a
+tool, sign in to a CLI, change a GitHub setting, run a verification. The user is not an
+engineer. A description of a command ("run the scanner with the JSON flag on the mockups
+folder", "set the token variable") is unusable to them: they do not know which window to
+open, what the flag is called, or what a variable is. Every such hand-off is written as a
+**run sheet**, and the brevity rules do not apply to it — a run sheet is as long as it
+needs to be to be followed without guessing.
+
+**1. Purpose and end state — two sentences.** What this achieves, and how the user will
+know it worked at the end ("when this is done, the CI job will show a green Socket step").
+
+**2. The terminal — named, with how to open it.** Exactly one of:
+
+| Name it as | How to open it | Use it for |
+|---|---|---|
+| **PowerShell** | Start menu → type `PowerShell` → open *Windows PowerShell* | Windows installers, `winget`, `irm … \| iex`, Windows paths, Test-Path |
+| **Git Bash** | Start menu → type `Git Bash` → open it | `git`, `gh`, `cursor-agent`, `npx`, `python` scripts, anything the supervisor itself runs |
+| **Command Prompt** | Start menu → type `cmd` → open *Command Prompt* | only when a tool's own instructions require it |
+| **The Claude Code chat** | this conversation | slash commands (`/supervisor …`) |
+| **A browser / an app window** | say which site or app, and the exact page | GitHub settings, account sign-ins, dashboards |
+
+Never mix terminals inside one numbered sequence. If the work needs two, finish one
+terminal's steps, then start a new heading for the next. Say **which folder** the terminal
+must be in, and give the `cd` as its own literal step in that terminal's own path syntax
+(`cd /e/p19-my-project/Workspace` in Git Bash; `cd E:\p19-my-project\Workspace` in
+PowerShell). Say whether the window must be opened *as administrator*.
+
+**3. The commands — literal, numbered, one per code block, in the order they run.**
+
+- Every command is complete and copy-pasteable **as written**: the flag is in the command,
+  not described beside it. Never "the usual command", "same as before", "with the verbose
+  option".
+- No variables and no placeholders unless unavoidable. If a value must be the user's own
+  (a repository name, a folder), write it in angle brackets **and**, directly under the
+  command, one line saying where they find that value and one worked example with a
+  realistic value. Never `$HOME`, `%USERPROFILE%`, `<you>` without that line.
+- One command per step. Do not chain with `&&`, `;`, or `|` for the user — a chained line
+  that half-fails is unreadable to them.
+- If a step runs only under a condition, put the condition first, in bold: **"Only if
+  step 2 printed `not found`:"**.
+- A GUI step is written the same way: the exact click path, each click its own step
+  ("Settings → Secrets and variables → Actions → *New repository secret*").
+
+**4. Under every command — what to expect and what to watch for.**
+
+- **You should see:** the shape of a successful result in one line ("a version number
+  such as `2.5.1`", "a line ending in `Done`", "no output at all — that is success here").
+- **If instead you see:** the one or two failure shapes worth naming, and what to do —
+  normally "stop, copy the whole output, paste it to me".
+- **Watch out:** anything that would surprise a non-engineer — a `y/n` prompt and the
+  answer to give; a window that closes by itself; a run that takes minutes and looks
+  frozen; a Windows security dialog (Smart App Control, SmartScreen) and what to click; a
+  browser tab that opens for sign-in; an auto-update offer to decline (KP-013).
+
+**5. Secrets are typed by the user, never pasted to Claude.** When a step involves a
+token, key, or password, the run sheet says where the value comes from, where it goes,
+and that the user types or pastes it **there** — never into this chat. The command that
+consumes it must not put it on the command line where it lands in shell history; prefer
+the tool's prompt or the GUI field.
+
+**6. Report back — one line.** Which step's output to paste, or which single fact to
+confirm ("tell me the version number step 3 printed").
+
+The test: a person who has never opened a terminal, following the sheet with no other
+knowledge, either completes it or stops at a named step with output to paste. If any
+step requires them to know something the sheet did not say, the sheet is not finished.
+
 ## Self-check before sending
 
 Six questions; if any answer is no, fix that guard before sending:
@@ -250,6 +319,9 @@ Six questions; if any answer is no, fix that guard before sending:
 - Does every restatement mean exactly the same as the first statement? (5)
 - Does every fully explained concept have one instance and one stake? (6, 7, 8)
 - Is anything here not on the chain to the decision? (9)
+- If the user must run or click something: is it a run sheet — terminal named with how
+  to open it, `cd` given, every command literal and numbered, expectations and warnings
+  under each, secrets typed by the user, one report-back line?
 
 ---
 

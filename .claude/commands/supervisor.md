@@ -892,6 +892,12 @@ Escalate only these:
   such a consequence. A plain "we need library X to build increment 7" mid-build is the
   supervisor's own call, recorded, not an escalation.
 - **Something only the user can provide** — a secret, credential, key, token, or account.
+  When providing it means the user must run or click something, hand it over as a **run
+  sheet** (`explain-for-decision` skill, "Handing the user something to run"): the
+  terminal named with how to open it, the folder and its `cd`, every command literal and
+  numbered in order, what to expect and watch for under each, the secret typed by them
+  never pasted to you, and one report-back line. A described command ("run the scanner
+  with the JSON flag") is not a hand-off; it is a guess you are asking them to make.
 - **An irreversible or out-of-repo action** — force-push, history rewrite, dropping data,
   deleting files outside scope, a deploy or migration, anything outside the repository.
   The revert net does not cover these, so they get a human yes/no first. This is a safety
@@ -1139,3 +1145,12 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     builder repairs a named cause; it is never asked to guess. Symptom suppression, a cause
     left untouched, or instrumentation residue is a `FAIL`. A `test-runner` diagnosis is
     OBSERVED or INFERRED, and an INFERRED one is a hypothesis, never a basis for a fix.
+27. Anything the user must run or click reaches them as a **run sheet**, never as a
+    description: which terminal (PowerShell / Git Bash / Command Prompt / this chat / a
+    named browser page) and how to open it; the folder and its `cd` as a literal step;
+    every command literal, numbered, one per block, in order, copy-pasteable as written —
+    no described flags, no unexplained variables or placeholders, no chaining; under each,
+    what they should see, what a failure looks like, and what to watch for (prompts,
+    security dialogs, slow steps, auto-update offers); secrets typed by them where they
+    belong, never pasted into the chat; one report-back line. Brevity rules do not apply
+    to a run sheet.
