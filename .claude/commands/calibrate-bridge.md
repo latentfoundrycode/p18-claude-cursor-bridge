@@ -1,6 +1,5 @@
 ---
 description: Re-read the installed bridge and align the running project with it — verifies the install, applies only the adjustments the project's current phase calls for, reopens no gate
-argument-hint: [check]
 ---
 
 # Calibrate to the installed bridge
@@ -11,8 +10,6 @@ supervisor now working from the new rules**. This command answers both, then ali
 project in flight with the new rules **without disturbing its order** — nothing approved is
 re-presented, nothing in progress is restarted, and only the adjustments the new release
 lists for the project's current or future phases are applied.
-
-If `$ARGUMENTS` is `check`, do step 1 only and report.
 
 ## 1. Verify the install — deterministically
 
@@ -54,8 +51,10 @@ remember from earlier in this conversation conflicts with it, the file wins.
 cat ~/.claude/cursor-bridge/VERSION
 ```
 
-Compare with `Bridge version:` in `docs/PROJECT_STATUS.md` (absent means "before
-2026.09.20"). Read `~/.claude/cursor-bridge/CHANGELOG.md` and collect the **Running
+If there is no `docs/PROJECT_STATUS.md` in this folder, there is no project to align:
+report the install check and the re-read, say "no project in this folder", and stop.
+Otherwise compare with its `Bridge version:` line (absent on an existing project means
+"before 2026.09.20"). Read `~/.claude/cursor-bridge/CHANGELOG.md` and collect the **Running
 projects must** items of every entry newer than the recorded version. If the versions are
 equal, there is no delta: say so, still confirm step 2 was done, update nothing but the
 `Calibrated:` line in step 5, and report.

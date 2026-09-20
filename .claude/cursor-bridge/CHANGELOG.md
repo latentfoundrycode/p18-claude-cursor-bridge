@@ -11,6 +11,18 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.20c
+
+**What changed**
+- `/calibrate-bridge` takes no argument. The `check` keyword was redundant: the command is
+  the check. Run in a folder with no `docs/PROJECT_STATUS.md`, it verifies the install,
+  re-reads the governing files, reports "no project in this folder", and stops.
+
+**Running projects must**
+- *(all phases)* Nothing.
+
+---
+
 ## 2026.09.20b
 
 **What changed**
