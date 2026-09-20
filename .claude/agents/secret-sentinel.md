@@ -66,6 +66,11 @@ diffs, and a log line or captured state can carry a secret the diff never did. R
 never the value. (Screenshots you cannot grep — the guard there is test-mode synthetic data +
 the gitignored ephemeral artifacts dir + the `secure-coding.mdc` "never log secrets" rule.)
 
+**Instrumentation residue.** `git grep -n "DEBUG-BUG-"` over the tree and the diff. A
+`DEBUG-BUG-<nnn>` tag is temporary diagnostic logging from the `root-cause-first`
+procedure; it must never reach a commit. Any hit is a **BLOCK**, with file and line, so a
+forgotten log line cannot ship (it can leak values and it is not product code).
+
 ## Output
 
 ```

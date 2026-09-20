@@ -180,3 +180,24 @@ it applies.**
   builder writes. The meta-lesson is the report's own: a fix made once, locally, recurs in
   the next subsystem unless it is promoted to a rule — which is what `LESSONS.md` →
   `Known-Pitfalls.md` is for.
+
+### KP-015 — Fixing from the symptom: a corrected brief without a diagnosed cause makes the builder guess
+- **Temptation:** a test fails or a reviewer rejects; the supervisor writes "fix X" from the
+  symptom and re-delegates. The builder, with no cause to repair, makes the symptom go away —
+  a retry, a broader catch, a widened assertion — and the test goes green. The cause stays.
+- **Surfaced:** the owner's observation (2026-09-19) that Claude Code "appears to be guessing"
+  on bug fixes; the loop's only guard was "same defect twice → stop", which fires *after* the
+  guessed round. Cursor's Debug Mode names the same failure and the cure — runtime evidence
+  before a fix — but its mechanism (an IDE extension log server, a human reproducer) does not
+  exist headless.
+- **Correction:** the `root-cause-first` skill and standing rule 26 — reproduce
+  deterministically first (a failing test / an observability test driving the exact state,
+  under test-mode determinism), write ≥2 hypotheses each with a discriminating observation,
+  instrument only to discriminate (`DEBUG-BUG-<nnn>` tags, never committed — dirty-tree rule +
+  `secret-sentinel` block), capture the run to the artifacts dir, confirm one cause with
+  evidence, then a `BUG-<nnn>` fix brief that names the cause and forbids suppression;
+  `test-runner` labels diagnoses OBSERVED / INFERRED and INFERRED never grounds a fix.
+  Proportionality: a failure that *is* its own cause (a named missing import, an omitted
+  requirement) is fixed directly.
+- **Applies:** every behaviour defect in the loop; every Claude Code session fixing a bug —
+  the skill needs no bridge machinery.

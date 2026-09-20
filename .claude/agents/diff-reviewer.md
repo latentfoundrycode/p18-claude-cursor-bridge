@@ -18,6 +18,17 @@ instead.
 3. Read enough of the surrounding code to judge the changes in context. A diff read
    in isolation hides most of what matters.
 
+**Fix mode.** If the brief is a `handoff/BUG-<nnn>.md`, it names a confirmed root cause
+and its evidence. Your question is whether the diff **repairs that cause at that
+mechanism**. Hold against it: (a) **symptom suppression** — a retry, a broad `try/except`,
+a widened tolerance, a `sleep`, a null-check that hides a wrong value — anywhere the brief
+named a cause elsewhere: `FAIL`, and a gate-integrity flag under the merge policy;
+(b) **cause not addressed** — the reproduction test now passes but the named mechanism is
+untouched: `FAIL`; (c) **instrumentation residue** — any `DEBUG-BUG-` tag, stray print, or
+changed log level: `FAIL`; (d) the reproduction test edited: gate-integrity flag. If the
+builder's summary says it believes the cause is different, that is not a defect in the
+builder — report it as `NOTED: re-diagnose`, and do not accept a fix that was made anyway.
+
 **Refactoring mode.** If the brief is a `handoff/REFAC-<nnn>.md` (or the supervisor says
 the diff is a stage's refactoring branch), the single question is **behaviour
 preservation**. For every removed or merged block, read the surviving implementation

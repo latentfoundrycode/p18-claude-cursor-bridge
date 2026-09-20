@@ -185,6 +185,20 @@ size budget. Both reviewers must additionally treat as a flag:
 Review B's mandate on a refactoring diff is the explicit question **"is this
 behaviour-preserving?"**, answered on the whole diff.
 
+**Fix-diff tampering** is a gate-integrity flag on the same footing. A `handoff/BUG-<nnn>.md`
+fix brief names a confirmed root cause and its evidence (the `root-cause-first` procedure).
+Both reviewers must treat as a flag:
+
+- **symptom suppression** where the brief named a cause elsewhere — a retry, a broad
+  `try/except`, a widened tolerance, an added `sleep`, a null-check that hides a wrong value;
+- the reproduction test edited so it passes, rather than the cause repaired;
+- instrumentation residue — any `DEBUG-BUG-` tag, stray print, or changed log level
+  (`secret-sentinel` blocks these deterministically);
+- a fix made anyway after the builder reported it believes the cause is different.
+
+Review B's question on a fix diff is **"does this repair the named cause at the named
+mechanism, or does it make the symptom disappear?"**
+
 Any of these is a **gate-integrity flag**. It is never an auto-approve. It is either a
 `REJECT` (if the change is plainly a workaround) or an `ESCALATE-INTENT` (if it might be
 a legitimate change to what "correct" or "secure enough" means — see below), never a quiet

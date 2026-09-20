@@ -100,6 +100,30 @@ differences, stated verbatim in the brief:
   introduce an abstraction beyond what the listed duplicates need.
 - **Done** adds: state in one sentence why the behaviour is identical.
 
+## The fix variant — `handoff/BUG-<nnn>.md`
+
+When the supervisor hands you a **confirmed root cause** from the `root-cause-first`
+procedure (its `docs/debug/BUG-<nnn>.md` with an Evidence section), write a fix brief.
+Same file shape, with these differences, stated verbatim:
+
+- **Objective** opens with: "Fix the following confirmed defect — repair the named cause,
+  nothing else." Then the **root cause in one sentence**, the **evidence lines** copied
+  from the debug file, and the **reproduction test** (path and name) that currently fails
+  and must pass.
+- **Scope** names the file(s) the cause lives in and the reproduction test. Nothing else.
+- **Acceptance criteria**: the reproduction test passes; the full suite passes with no
+  other change in results; the named cause is addressed at the mechanism the evidence
+  points at (state the mechanism).
+- **Constraints** add: do not fix by suppressing the symptom — no retry, broad
+  `try/except`, widened tolerance, added `sleep`, or null-check that hides a wrong value;
+  do not edit the reproduction test; do not leave any `DEBUG-BUG-` line or stray print;
+  **if you believe the real cause is different from the one named, stop, do not change
+  code, and report why in your summary** — the supervisor will re-diagnose.
+- **Done** adds: state in one sentence how the change addresses the named cause.
+
+Never write a fix brief from a symptom. If the supervisor hands you a failure without a
+confirmed cause and evidence, hand it back: that is a diagnosis task, not a packaging task.
+
 ## Rules
 
 **No secrets. Ever.** This file's contents go to Cursor's backend. Refer to `.env`

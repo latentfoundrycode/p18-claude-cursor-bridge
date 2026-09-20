@@ -23,9 +23,11 @@ build loop's *instructions* — governance, not any product. They install over t
     `vercel-interface.snapshot.md` fallback, and `design-seeds/` (the vendored
     awesome-design-md corpus — one `DESIGN.md` per brand, a seed to bootstrap a project's
     own identity, never shipped as-is).
-  - `skills/` — the `design-sense` house-design-sense skill and the `explain-for-decision`
+  - `skills/` — the `design-sense` house-design-sense skill, the `explain-for-decision`
     skill (how a technical matter is explained to the non-engineer owner when it surfaces for
-    a decision: the selection heuristic, the nine guards, the decision-brief shape).
+    a decision: the selection heuristic, the nine guards, the decision-brief shape), and the
+    `root-cause-first` skill (evidence-before-fix debugging: reproduce, hypothesize,
+    instrument to discriminate, read the run, fix the confirmed cause — usable by any session).
   - `settings.json` — the bridge's permission allowlist.
 
 Transient clones (`web-interface-guidelines/`, `impeccable/`) are **gitignored** and are

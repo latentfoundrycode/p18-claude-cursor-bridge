@@ -40,8 +40,9 @@ FAILURES
    Expected: <what>
    Actual:   <what>
    Cause:    implementation | test | environment
-   Diagnosis: <one or two sentences, specific>
-   Suggested fix: <what should change, and where>
+   Diagnosis: OBSERVED | INFERRED — <one or two sentences, specific>
+   Evidence:  <the traceback line / log line / value the diagnosis rests on, or "none — inferred from reading code">
+   Suggested fix: <what should change, and where — omit when the diagnosis is INFERRED>
 
 NEW FAILURES vs PREVIOUS RUN: <if you can determine this>
 FLAKY: <any test whose result changed between runs of the same code>
@@ -60,3 +61,8 @@ FLAKY: <any test whose result changed between runs of the same code>
   report on that instead.
 - Never modify a test to make it pass, and never mark a test skipped. If a test is
   wrong, that is a finding, not a task.
+- **Label every diagnosis OBSERVED or INFERRED, and say what it rests on.** OBSERVED means
+  a traceback line, a log line, or a value in the output points at the cause. INFERRED
+  means you deduced it from reading the code — which is a hypothesis, not a finding. The
+  supervisor runs the `root-cause-first` procedure on an INFERRED diagnosis before any fix
+  is delegated; a confident-sounding guess in this report is how a wrong fix starts.

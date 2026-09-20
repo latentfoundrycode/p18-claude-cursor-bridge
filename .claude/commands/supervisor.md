@@ -608,6 +608,26 @@ existing mockup-fidelity judgement (they do not add a new pass).
   corrected brief file and re-delegate — again via the file, never the prompt. This does
   not count against the user's attention.
 
+**Diagnose before you re-delegate a defect — the `root-cause-first` skill.** A corrected
+brief written from a *symptom* makes the builder guess, and a guessed fix passes the
+failing test by suppressing what it saw. So before any Iterate or Re-delegate for a
+behaviour defect, ask: *is the cause already proven by the failure itself?* If the
+traceback names it, or the brief listed a requirement the diff simply omitted, fix
+directly. Otherwise — an assertion on an output, a fired invariant, an unreachable state,
+a timing or intermittent failure, a regression, a user-reported bug, a `test-runner`
+diagnosis labelled **INFERRED**, or **any second re-delegation for the same defect** — run
+the procedure: reproduce deterministically (a failing test, or an observability test that
+drives the exact state), write two or more hypotheses each with its discriminating
+observation in `docs/debug/BUG-<nnn>.md`, instrument only to tell them apart (tagged
+`DEBUG-BUG-<nnn>`, in the working tree, never committed), capture the run to the
+gitignored artifacts dir, keep the hypothesis the evidence supports, clean up and prove it
+(`git status` clean, `git grep DEBUG-BUG-` empty), then package the **fix brief**
+(`handoff/BUG-<nnn>.md`, spec-packager's fix variant) carrying the confirmed cause, the
+evidence, and the reproduction test that must go red to green. Three diagnostic rounds
+without a confirmed cause go to a resolution round, never to a guessed fix and never to the
+user. The fix goes through the normal gate once — no extra gate pass; `diff-reviewer`'s fix
+mode rejects symptom suppression and a cause left untouched.
+
 **When to stop re-delegating — judge convergence by defect class, not a raw count.** The
 brake exists to stop *grinding on a broken brief or design*, not to interrupt a gate that is
 successfully hardening the code — and **reaching some number of rounds is never itself a
@@ -1111,3 +1131,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     Never an abstraction for hypothetical reuse; never a required control removed because it
     looks repetitive. The per-stage dial lives in the build plan; the user sets it at the
     plan gate.
+26. Root cause first — no reproduction, no fix; no confirmed cause, no fix brief. A defect
+    whose cause the failure does not itself prove is diagnosed with the `root-cause-first`
+    skill before anything is delegated: deterministic reproduction, written hypotheses
+    with discriminators, tagged temporary instrumentation that never reaches a commit,
+    captured runtime evidence, a one-sentence cause a second engineer could verify. The
+    builder repairs a named cause; it is never asked to guess. Symptom suppression, a cause
+    left untouched, or instrumentation residue is a `FAIL`. A `test-runner` diagnosis is
+    OBSERVED or INFERRED, and an INFERRED one is a hypothesis, never a basis for a fix.
