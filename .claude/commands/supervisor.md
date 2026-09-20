@@ -335,14 +335,66 @@ two increments, acceptance criteria that cannot actually be checked, stages that
 demonstrable on their own, and — for UI increments — whether the design acceptance criteria
 are present and checkable.
 
-The plan also states, per stage, the **refactoring dial**: whether the stage-close
-refactoring pass (Phase 6 step 9) is **on** (the default) or **off**. Present the dial at
-the gate as the one setting it is: the pass costs one extra gate pass per stage — one
-cross-family review — and buys a codebase that does not accumulate duplicates; the builder
-runs it needs are cheap. The user may switch it off for a stage or for the project.
+The settings that govern *how the run proceeds* — whether the loop pauses at stage closes,
+who merges, whether the refactoring pass runs — are **not** part of the plan and are not
+asked at this gate. They are asked once, together, at the **Run parameters** step right
+after the plan is approved (below).
 
 **Gate:** present the plan to the user. Do not delegate anything until they approve it.
 Present it as a decision brief (`explain-for-decision` skill), not as the plan file itself.
+
+---
+
+## Run parameters — asked once, after the plan is approved, before configuration
+
+The plan says *what* will be built; the run parameters say *how the loop proceeds* while
+building it. They are the owner's settings, and they are asked **once, together, right
+before the build process starts** — after the plan gate, before Phase 5 — as a single
+decision brief (`explain-for-decision` skill; use `AskUserQuestion` for the choices, each
+with its default marked). Three parameters:
+
+1. **Stage pause** — what happens when a stage closes (its last increment merged, the
+   refactoring pass merged if on, the reflection point written).
+   - `run` *(default)* — report the stage close as a notification and **continue into the
+     next stage without waiting.** In practice: do not end your turn at a stage close; the
+     stage-close report is text in the transcript, and the next action follows in the same
+     turn. Only the escalation list (below) and project end stop the loop.
+   - `pause` — stop at every stage close with "Stage <name> closed — say *continue*" and
+     wait. The owner chooses this when they want to look at each milestone before the next
+     begins.
+2. **Merge authority** — who completes a merge to `main` once the full gate holds (CI green,
+   Review A and Review B APPROVE, no gate-integrity flag).
+   - `supervisor` *(default)* — you arm and complete the merge yourself (step 8, the merge
+     policy). This is what "AI-handled automatic merging" in the guides means, and it needs
+     the per-repo setup the startup guide describes.
+   - `owner` — you do everything up to the merge, then stop with **"READY TO MERGE"**: the
+     PR link, the four gate conditions with their evidence, and the one-line run sheet to
+     merge it. You never arm auto-merge under this setting. This is a deliberate pause per
+     PR, so with `stage pause = run` the loop still waits here; say so when the owner picks
+     it.
+3. **Refactoring pass** — whether Phase 6 step 9 runs at each stage close: `on` *(default)*
+   or `off`, for the whole project or for named stages. It costs one extra gate pass per
+   stage (one cross-family review) and buys a codebase that does not accumulate duplicates;
+   the builder runs it needs are cheap.
+
+Record the answers in **`docs/RUN_PARAMETERS.md`**, which you read at every resume and
+before every stage close and merge:
+
+```markdown
+# Run parameters
+Set: <date>   (owner may change any of these at any time by saying so; update this file)
+Stage pause: run | pause
+Merge authority: supervisor | owner
+Refactoring pass: on | off | off for <stages>
+```
+
+**What no parameter changes.** The "Escalate to the user when" list stays in force under
+every setting: product behaviour, scope, a user-level consequence, something only the owner
+can provide, an irreversible or out-of-repo action, a change to what "correct" means. Those
+stop the loop whether stage pause is `run` or `pause`. Project end always stops. And no
+parameter loosens the gate: `run` means *no waiting between stages*, never *less checking
+within them*. The owner may change a parameter mid-project by saying so; you update the
+file and apply it from the next stage close or merge on, never retroactively.
 
 ---
 
@@ -720,7 +772,10 @@ yourself, favouring the project's established invariants; escalate it only if it
 intent. An `ESCALATE-INTENT` verdict, and only that, surfaces to the user — as a plain
 intent question, never a correctness one.
 
-When all four hold the merge is authorised. Arm `gh pr merge --squash --auto` and watch the
+When all four hold the merge is authorised. **Check `docs/RUN_PARAMETERS.md` first:** under
+`Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
+conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
+auto-merge. Under `supervisor` (the default), arm `gh pr merge --squash --auto` and watch the
 required `gate` check; once it is green (and the PR is mergeable), **complete the squash
 directly with `gh pr merge --squash`** rather than waiting on GitHub's auto-merge queue,
 which routinely lags by minutes. This is safe — branch protection enforces the required
@@ -732,8 +787,8 @@ the change log, not by a gate the user cannot operate.
 
 ### 9. Refactoring pass (at stage close)
 
-When the last increment of a stage has merged and the plan's dial for that stage says
-**refactoring: on**, run one refactoring pass **before** the stage's reflection point.
+When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says
+**Refactoring pass: on** for that stage, run one refactoring pass **before** the stage's reflection point.
 "Refactoring" means one thing here: removing duplication or simplifying code while keeping
 the same functionality. Every per-increment review saw one diff at a time, so a helper
 written twice in two increments was invisible to both; this is the only step that looks at
@@ -790,7 +845,7 @@ Manual is written.
 ## Reflection points — stage close, phase gates, project end
 
 The build plan groups increments into named **stages** (Phase 4); a stage closes when its
-last increment merges — and, where the dial is on, its refactoring pass (Phase 6 step 9)
+last increment merges — and, where the refactoring pass is on, that pass (Phase 6 step 9)
 has merged too, so the reflection describes the stage's final shape. A stage close, each
 approved phase gate, and project end are the
 **reflection points**: the only times `Documents/` is written (issue placeholders aside), and
@@ -817,6 +872,13 @@ escalation, none of it stalls the loop, and none of it changes the bridge.
 4. **User Manual** (once it exists). Patch it for every `CHANGES.md` entry since the last
    reflection point — a behaviour change is exactly what a manual tracks.
 5. **Record** the reflection point in `docs/PROJECT_STATUS.md` (`Last reflection:`).
+6. **Then, at a stage close, obey `Stage pause` in `docs/RUN_PARAMETERS.md`.** Under `run`
+   (the default) the stage-close report is a notification — "Stage <name> closed; next:
+   <stage>" plus the FYI block — and you **continue into the next stage in the same turn**
+   without waiting for a reply. Under `pause`, end with "Stage <name> closed — say
+   *continue*" and wait. A pause is never the default behaviour of a stage close; only the
+   parameter, an escalation, or project end stops the loop. (An approved phase gate is a
+   different thing: those are always waited on, and they are all behind you by now.)
 
 **At project end**, additionally:
 
@@ -995,6 +1057,7 @@ Open issues: <ISS-nnn …, or none>
 Bridge version: <contents of ~/.claude/cursor-bridge/VERSION when last calibrated>
 Calibrated: <date> from <old> to <new> — applied: …; pending: … @ <phase>; not applied (gate passed): …
 Calibration pending: <items still to apply, each with the phase that triggers it — or none>
+Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refactoring pass)
 ```
 
 **Terms fixed** is the `explain-for-decision` skill's lookup: which technical terms have been
@@ -1150,8 +1213,8 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `CHANGES.md` entry, within the size budget), then **one** gate pass for the whole
     branch. Uncovered code gets characterization tests first, committed under the base.
     Never an abstraction for hypothetical reuse; never a required control removed because it
-    looks repetitive. The per-stage dial lives in the build plan; the user sets it at the
-    plan gate.
+    looks repetitive. Whether the pass runs is the `Refactoring pass` run parameter in
+    `docs/RUN_PARAMETERS.md`, set by the owner at the Run parameters step.
 26. Root cause first — no reproduction, no fix; no confirmed cause, no fix brief. A defect
     whose cause the failure does not itself prove is diagnosed with the `root-cause-first`
     skill before anything is delegated: deterministic reproduction, written hypotheses
@@ -1177,3 +1240,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     later for phases not yet reached, never for a gate already passed. A calibration
     reopens no approval, restarts no increment, and defaults any new owner setting with a
     one-line notice rather than a question.
+29. The run parameters — `Stage pause`, `Merge authority`, `Refactoring pass` — are asked
+    once, together, right after the plan is approved, and recorded in
+    `docs/RUN_PARAMETERS.md`, read at every resume, stage close, and merge. A stage close
+    never waits by itself: under `run` (the default) you report and continue in the same
+    turn; only `pause`, the escalation list, or project end stops the loop. Under
+    `Merge authority: owner` you stop at READY TO MERGE with the evidence and never arm
+    auto-merge. No parameter loosens the gate, and the escalation list holds under every
+    setting. The owner may change a parameter at any time by saying so.

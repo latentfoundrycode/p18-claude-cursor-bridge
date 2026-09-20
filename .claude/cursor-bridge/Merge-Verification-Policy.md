@@ -299,6 +299,16 @@ ordinary re-delegation loop as a fresh finding.
 
 ---
 
+## Who completes the merge — the `Merge authority` run parameter
+
+The gate decides *whether* a branch may merge; the owner's `Merge authority` run parameter
+(`docs/RUN_PARAMETERS.md`, set once after the plan is approved) decides *who* completes it.
+Under `supervisor` (the default) the supervisor arms and completes the merge as described
+below. Under `owner` the supervisor does everything up to the merge and then stops with
+**READY TO MERGE** — the PR link, the four conditions with their evidence, and a one-line
+run sheet — and never arms auto-merge. The parameter changes the last step only: the four
+conditions, the anti-gaming checks, and the resolution round are identical under both.
+
 ## Enforcement at merge — how GitHub auto-merge composes with this gate
 
 GitHub's auto-merge only knows about **GitHub checks** — i.e. CI. It cannot see Review A

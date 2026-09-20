@@ -11,6 +11,29 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.20d
+
+**What changed**
+- **Run parameters** — asked once, together, right after the plan is approved and before
+  configuration; recorded in `docs/RUN_PARAMETERS.md`: `Stage pause` (`run` default:
+  report a stage close and continue in the same turn; `pause`: wait for "continue"),
+  `Merge authority` (`supervisor` default; `owner`: stop at READY TO MERGE, never arm
+  auto-merge), `Refactoring pass` (`on` default; moved here from the plan gate). The
+  escalation list and the gate are unchanged under every setting. Standing rule 29;
+  plan-critic no longer checks a dial in the plan.
+
+**Running projects must**
+- *(Phase 6 — building)* Ask the three run parameters at the next stage close or, if the
+  loop is between increments, now — as one decision brief; this is the one decision line
+  of the calibration report. Until answered, keep the behaviour the project has had
+  (`Stage pause: pause`, `Merge authority` as the repo is set up, `Refactoring pass: on`),
+  and say so. Write `docs/RUN_PARAMETERS.md` from the answers.
+- *(Phase 4 — planning, plan not yet approved)* Nothing extra: the step follows the plan
+  gate as written.
+- *(Phase 5 — configuration)* Ask the run parameters before continuing configuration.
+
+---
+
 ## 2026.09.20c
 
 **What changed**
