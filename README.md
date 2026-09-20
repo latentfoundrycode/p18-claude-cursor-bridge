@@ -9,7 +9,9 @@ build loop's *instructions* — governance, not any product. They install over t
 ## Layout
 
 - **`.claude/`** — the bridge governance tree:
-  - `commands/` — the `supervisor` command.
+  - `commands/` — the `supervisor` command and `calibrate-bridge` (verifies an installed tree
+    against the release manifest, re-reads the governing files, applies a release's
+    adjustments by phase without reopening a gate).
   - `agents/` — the specialist subagents (`cursor-configurator`, `spec-packager`,
     `diff-reviewer`, `design-auditor`, `security-auditor`, `refactor-scout`, `plan-critic`,
     `test-runner`, `secret-sentinel`).
@@ -18,7 +20,8 @@ build loop's *instructions* — governance, not any product. They install over t
     writes outside `Workspace/` — and the windowless pair `run-hidden.py` /
     `windowless-check.py`, which keep hook- and tool-launched console programs from popping
     terminal windows on the user's desktop, and `refactor-check.py`, the purity check for a
-    stage's refactoring diff): `Cursor-File-Formats.md`,
+    stage's refactoring diff; plus `bridge-check.py`, `VERSION`, `MANIFEST.json`, and
+    `CHANGELOG.md` — the release stamp): `Cursor-File-Formats.md`,
     `Cursor-Project-Configuration.md`, `Merge-Verification-Policy.md`, the bundled
     `vercel-interface.snapshot.md` fallback, and `design-seeds/` (the vendored
     awesome-design-md corpus — one `DESIGN.md` per brand, a seed to bootstrap a project's
@@ -33,6 +36,13 @@ build loop's *instructions* — governance, not any product. They install over t
 Transient clones (`web-interface-guidelines/`, `impeccable/`) are **gitignored** and are
 not part of the repo — they are consumed once during setup and deleted. Their content that
 the bridge needs is already vendored (the Vercel snapshot; the design seeds).
+
+## Release stamp (maintainer)
+
+Before every commit that changes `.claude/`: add a `## <version>` entry to
+`.claude/cursor-bridge/CHANGELOG.md` (with its **Running projects must** list, by phase),
+then run `python tools/make-manifest.py` — it writes `VERSION` and `MANIFEST.json`. An
+installed machine verifies the copy with `python ~/.claude/cursor-bridge/bridge-check.py`.
 
 ## Install
 

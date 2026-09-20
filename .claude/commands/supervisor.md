@@ -17,6 +17,14 @@ without it.
 read that file and continue from where it left off. Otherwise treat it as the seed
 description of a new project and begin at Phase 1.
 
+**On every start and resume, compare the bridge version first.** Read
+`~/.claude/cursor-bridge/VERSION` and the `Bridge version:` line of `docs/PROJECT_STATUS.md`
+(a new project records the current version at intake). If they differ, or the line is
+absent on an existing project, run the `/calibrate-bridge` procedure before doing anything
+else: it verifies the installed tree against its manifest, re-reads the governing files, and
+applies only the release's adjustments for the project's current and future phases, reopening
+no gate. The owner may also run `/calibrate-bridge` at any time after updating the bridge.
+
 ---
 
 ## The division of labour
@@ -980,6 +988,9 @@ Software name: <the name that names the Documents set>
 Layout: Workspace=<resolved path>  Documents=<resolved path>
 Stage: <current stage name> — Last reflection: <stage close | phase gate | none yet, and when>
 Open issues: <ISS-nnn …, or none>
+Bridge version: <contents of ~/.claude/cursor-bridge/VERSION when last calibrated>
+Calibrated: <date> from <old> to <new> — applied: …; pending: … @ <phase>; not applied (gate passed): …
+Calibration pending: <items still to apply, each with the phase that triggers it — or none>
 ```
 
 **Terms fixed** is the `explain-for-decision` skill's lookup: which technical terms have been
@@ -1154,3 +1165,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     security dialogs, slow steps, auto-update offers); secrets typed by them where they
     belong, never pasted into the chat; one report-back line. Brevity rules do not apply
     to a run sheet.
+28. The installed bridge is the governing text, and its version is recorded in
+    `PROJECT_STATUS.md`. On every start or resume, and whenever the owner runs
+    `/calibrate-bridge`, verify the tree with `bridge-check.py` (stop on STALE/MISSING and
+    hand the owner a run sheet), re-read the governing files whole, and apply the
+    `CHANGELOG.md` delta **by phase**: now for the current phase and record-keeping,
+    later for phases not yet reached, never for a gate already passed. A calibration
+    reopens no approval, restarts no increment, and defaults any new owner setting with a
+    one-line notice rather than a question.
