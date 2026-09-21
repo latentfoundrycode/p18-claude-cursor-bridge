@@ -11,6 +11,32 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.22
+
+**What changed**
+- **The change cycle.** A request on a finished project (`Phase: done`) runs the same
+  workflow scaled to the delta: intake of the change (impact on existing behaviour; this
+  project's own Issues file in place of prior-project lessons), a dated **Change:** section
+  in `docs/DESIGN.md` with plan-critic on the delta, mockups only for touched screens, a
+  plan addendum of new stages with a version bump and the Packaging & installer stage
+  re-run last, run parameters kept, configuration only for new tooling, the loop, project
+  end again with the manual patched and the deliverable rebuilt. Same three gates, no
+  others. `Phase: changing` + `Change cycle:` in `PROJECT_STATUS.md`. Standing rule 34;
+  plan-critic checks the addendum.
+- **A process question is never the owner's.** "Should I follow the workflow for this?"
+  is settled by the governance; where it is silent, the supervisor follows the closest
+  defined procedure, says which, and records the gap as bridge feedback. Cause: a
+  finished project's supervisor asked the owner whether a minor design change should go
+  through the workflow.
+
+**Running projects must**
+- *(Phase: done, a change request pending or already being discussed)* Treat the request
+  as a change cycle from step 1; nothing discussed so far is lost — fold it into the change
+  intake summary and confirm it.
+- *(all other phases)* Nothing.
+
+---
+
 ## 2026.09.21d
 
 **What changed**

@@ -21,6 +21,14 @@ project: `$ARGUMENTS` is the seed description and Phase 1 begins with it — or,
 was typed, Phase 1 begins by asking for it. One Workspace holds one project, so the file's
 presence is unambiguous.
 
+**A finished project that receives a request is a change cycle.** If the status file says
+`Phase: done` and the owner asks for something that changes what the software does or
+looks like, that is a **change request**, and it runs the **same workflow scaled to the
+delta** (see "The change cycle" after Phase 6). Do not ask whether to follow the workflow;
+the workflow is what a change request gets. A request that changes nothing about the
+software — a question, a run sheet, help using it — is answered as such and does not open a
+cycle.
+
 **On every start and resume, compare the bridge version first.** Read
 `~/.claude/cursor-bridge/VERSION` and the `Bridge version:` line of `docs/PROJECT_STATUS.md`
 (a new project records the current version at intake). If they differ, or the line is
@@ -884,6 +892,54 @@ Manual is written.
 
 ---
 
+## The change cycle — a request on a finished project
+
+A project whose status is `Phase: done` and whose owner asks for a change runs the same
+phases as the original build, **scaled to the delta**: everything already approved stays
+approved, everything the change touches goes through its gate again, and nothing else is
+re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md` under
+`Change cycle:` with a short name and the date.
+
+1. **Intake of the change** (Phase 1, scaled). Interrogate the request the same way as a
+   new project's description — gaps, contradictions, better options — but only about the
+   delta: what changes, what explicitly stays, and the **impact on existing behaviour**
+   (which current features, screens, data, or commands the change touches, and whether any
+   existing behaviour is altered or removed). Read this project's own Issues file in place
+   of the prior-project lessons step: the issues already recorded are the ones this change
+   must not repeat. Gate: summarise the change back and get confirmation.
+2. **Design revision** (Phase 2, scaled). Append a dated **Change: <name>** section to
+   `docs/DESIGN.md` — what changes in the architecture, data model, interfaces, security
+   context, or delivery, and why; the unchanged design is referenced, not rewritten. Run
+   `plan-critic` on the delta section with the existing design as context. Gate: present
+   it as a decision brief and get approval. Patch the Project Summary at this gate.
+3. **UI mockups** (Phase 3) **only if the change touches the UI**, and only for the
+   affected screens and states; the visual system is amended, not replaced. Gate as in
+   Phase 3.
+4. **Plan addendum** (Phase 4, scaled). Append one or more new **stages** to
+   `docs/BUILD_PLAN.md` for the change, with the same increment discipline, and bump the
+   **version** in the single version source (a fix → patch; a feature → minor; a change
+   that alters or removes existing behaviour → say so plainly in the brief and the
+   change log). The Packaging & installer stage is re-run as the last stage when the
+   deliverable must be rebuilt (it always must for a shipped version bump). Run
+   `plan-critic` on the addendum. Gate: present it and get approval.
+5. **Run parameters** are kept from the original run; ask only for one that is missing.
+   **Configuration** (Phase 5) is skipped unless the change needs new tooling, in which
+   case only the additions are configured, append-only.
+6. **The loop** (Phase 6) runs the new stages exactly as before — briefs, scope check,
+   reviewers, gate, refactoring pass, reflection points. Every increment's brief states
+   which existing behaviour it may change and that everything else is unchanged, and the
+   tests that pin the existing behaviour must stay green.
+7. **Project end again.** The close of the addendum's last stage is project end: the User
+   Manual is patched for every `CHANGES.md` entry, the deliverable is rebuilt and verified
+   under the new version, the release is attached, the Issues and Feedback files are
+   completed, and `Phase: done` is set. Report "Project complete — <Name> <new version>".
+
+The gates of a change cycle are the same approvals the original build had — the change
+design, the mockup if any, the plan addendum. They are the only questions a change cycle
+asks the owner. Whether the workflow applies is not one of them.
+
+---
+
 ## Reflection points — stage close, phase gates, project end
 
 The build plan groups increments into named **stages** (Phase 4); a stage closes when its
@@ -1009,6 +1065,14 @@ The self-test before escalating: *if I asked the user "why did you choose that?"
 their answer come from what they want and must live with, or from knowing the software?*
 If the latter, do not escalate — decide and proceed.
 
+**A process question is never the owner's.** "Which procedure applies here?", "should I
+follow the workflow for this?", "is this a stage close or project end?", "do I need a
+brief for this?" — these are settled by this file and the bridge references, never by
+asking. Where the governance is silent, follow the **closest defined procedure**, say in
+the report which one you chose and why, and record the gap in the Bridge Feedback file at
+the next reflection point so the maintainer can close it. Asking the owner a process
+question hands a non-engineer a choice they cannot judge and stalls the loop on it.
+
 Two judgments that feel like they need the user but do not: **how many re-delegation rounds
 to run** (you draw a by-class line and record it — step 7) and **how to resolve a hard
 reviewer split** (you convene a resolution round and decide on its record — step 8 and the
@@ -1119,7 +1183,8 @@ Keep `docs/PROJECT_STATUS.md` current after every accepted increment:
 ```markdown
 # Project Status
 Last updated: <timestamp>
-Phase: <intake | design | mockups | planning | configuration | building | done>
+Phase: <intake | design | mockups | planning | configuration | building | done | changing>
+Change cycle: <none | "<short name>" opened <date> — step <n> of the change cycle>
 Increment: TASK-<nnn> — <title>
 Last accepted: TASK-<nnn> at commit <sha>
 Awaiting user on: <nothing | the specific question>
@@ -1353,3 +1418,9 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     Deferred increments do not postpone it. Run the project-end items in the same turn as
     that stage close, set `Phase: done`, and open the report with "Project complete". A
     project whose last stage closed without this is in the wrong state — run it now.
+34. A request on a finished project is a change cycle: the same workflow scaled to the
+    delta — intake of the change, a design-revision section, mockups only for touched
+    screens, a plan addendum with a version bump, the loop, project end again — with the
+    same three gates and no others. Never ask whether to follow the workflow. A process
+    question ("which procedure applies?") is never the owner's: follow the closest defined
+    procedure, say which, and record the gap as bridge feedback.

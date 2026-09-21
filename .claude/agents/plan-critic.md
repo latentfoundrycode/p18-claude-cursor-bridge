@@ -72,6 +72,12 @@ Attack it along these lines:
   and the CI currency check, and does every later command-changing increment carry
   "reference regenerated" as a criterion? Without it the supervisor has nothing to look
   commands up in and will instruct the owner from memory — **Blocking**.
+- **Change-cycle addendum (a finished project being changed).** Does each new stage state
+  which existing behaviour it may alter and that everything else is unchanged? Are the
+  tests that pin existing behaviour kept, not rewritten? Is the version bumped in the
+  single version source, and is the Packaging & installer stage re-run last so the shipped
+  deliverable carries the new version? An addendum that quietly changes existing behaviour
+  without saying so is **Blocking**.
 - **Project end is the last stage close.** Does the plan name its last stage so that its
   close is unambiguous? A plan whose end is "when everything is done" leaves the supervisor
   unable to recognise project end.
