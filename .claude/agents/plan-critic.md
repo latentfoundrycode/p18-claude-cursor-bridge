@@ -58,6 +58,12 @@ Attack it along these lines:
   If it is more than a few, the plan is back-loading risk.
 - **Missing increments.** What has to happen that no increment covers — error handling,
   configuration, teardown, migration, packaging?
+- **Packaging stage (desktop applications).** Is the last stage "Packaging & installer",
+  and does it carry `Packaging-Conventions.md` §1 and §6 as checkable acceptance criteria —
+  one-command build, committed installer script, per-user install registered in Apps &
+  features, upgrade in place keeping data, Upgrade / Uninstall / Cancel when already
+  installed, uninstall keeping data, `installer-check.ps1` passing, the manual's install
+  chapter? A desktop plan without it is **Blocking**: the owner cannot install the result.
 - **Design criteria (UI increments).** Does each UI-bearing increment cite an approved
   mockup screen and the relevant `docs/design/DESIGN.md` sections, and are its design
   acceptance criteria actually checkable (a specific observable outcome — "matches mockup

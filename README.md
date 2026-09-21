@@ -21,7 +21,9 @@ build loop's *instructions* — governance, not any product. They install over t
     `windowless-check.py`, which keep hook- and tool-launched console programs from popping
     terminal windows on the user's desktop, and `refactor-check.py`, the purity check for a
     stage's refactoring diff; plus `bridge-check.py`, `VERSION`, `MANIFEST.json`, and
-    `CHANGELOG.md` — the release stamp): `Cursor-File-Formats.md`,
+    `CHANGELOG.md` — the release stamp; and `installer-check.ps1`, the install / upgrade /
+    uninstall lifecycle check for desktop applications): `Cursor-File-Formats.md`,
+    `Packaging-Conventions.md`,
     `Cursor-Project-Configuration.md`, `Merge-Verification-Policy.md`, the bundled
     `vercel-interface.snapshot.md` fallback, and `design-seeds/` (the vendored
     awesome-design-md corpus — one `DESIGN.md` per brand, a seed to bootstrap a project's

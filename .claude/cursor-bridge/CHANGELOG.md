@@ -11,6 +11,33 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.21b
+
+**What changed**
+- **Desktop applications ship as an installer.** New `Packaging-Conventions.md`: Windows 11
+  x64, one `dist/<Name>-Setup-<version>-x64.exe`, per-user by default (no UAC), registered
+  in Apps & features with a working uninstall, **upgrade in place** keeping user data,
+  the installer offering Upgrade / Uninstall / Cancel when already installed, uninstall
+  keeping data unless opted out, one-command build, single version source, unsigned by
+  default (code signing is the one Phase-2 escalation). Toolchain per stack (Electron /
+  Tauri bundlers; Inno Setup for .NET, Python, Rust, Go, C++) with a committed Inno
+  template. New `installer-check.ps1` proves install / smoke / upgrade-in-place / uninstall
+  silently and reversibly. Intake captures it; Phase 2 designs it; the plan's last stage is
+  "Packaging & installer" (plan-critic blocks a desktop plan without it); a fourth run
+  parameter `Installer verification` (`local` default / `ci-only`); project end delivers
+  the installer and the manual's install chapter. Standing rule 31.
+
+**Running projects must**
+- *(all phases, desktop applications only)* If the plan has no "Packaging & installer"
+  stage, add it as the final stage — this is an addition to the approved plan, so tell the
+  owner in one line; it reopens no gate. Add `Installer verification` to
+  `docs/RUN_PARAMETERS.md` (ask; default `local`). Add the Packaging & distribution
+  section to `docs/DESIGN.md` at the next reflection point, and raise the code-signing
+  question once.
+- *(all phases, other projects)* Nothing.
+
+---
+
 ## 2026.09.21
 
 **What changed**

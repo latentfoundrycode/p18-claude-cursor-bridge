@@ -21,7 +21,8 @@
       "Bash(npx --yes jscpd:*)",
       "Bash(python ~/.claude/cursor-bridge/refactor-check.py:*)",
       "Bash(cat ~/.claude/cursor-bridge/VERSION)",
-      "Bash(python ~/.claude/cursor-bridge/bridge-check.py:*)"
+      "Bash(python ~/.claude/cursor-bridge/bridge-check.py:*)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
     ]
   }
 }
