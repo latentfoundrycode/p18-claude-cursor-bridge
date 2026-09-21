@@ -11,6 +11,20 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.21d
+
+**What changed**
+- Inno Setup is a **standard machine prerequisite** of the bridge (setup guide Step 10),
+  not a desktop-only optional step. `Delivery-Conventions.md` §2.1 tells the supervisor to
+  locate `ISCC.exe` in both possible folders (per-user winget install under
+  `%LOCALAPPDATA%\Programs\Inno Setup 6\`, all-users under `%ProgramFiles(x86)%`), record
+  the resolved path, and hand the owner the Step 10 run sheet if neither exists.
+
+**Running projects must**
+- *(all phases)* Nothing.
+
+---
+
 ## 2026.09.21c
 
 **What changed**
