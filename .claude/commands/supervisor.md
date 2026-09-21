@@ -143,6 +143,16 @@ per-user (the default, no administrator prompt), where its data should live, and
 anything with a command-line surface — that a generated **command reference** will exist
 (§4). This is not optional and not a late addition: it is a stage of the build plan.
 
+**Performance and cost budgets** (`~/.claude/cursor-bridge/Performance-Conventions.md` §1).
+Turn the stated performance, scale, and cost expectations into numbered budgets — one
+operation, one condition, one number, one measurement: "a search over 10,000 documents
+answers within 2 s at p95", "startup under 1 s", "syncing 1,000 files costs at most $0.50".
+Propose the numbers from the platform and the expected data; the owner sets them (a
+decision brief: what each number means for the user and what meeting it costs). "No
+budgets" is a legitimate answer for software with no operation the owner cares about the
+speed or cost of — it must be an answer, not a default. The budgets are recorded as prose
+in `docs/DESIGN.md` and as `bench/budgets.json` at configuration.
+
 For every **UI-bearing** feature, capture a **screen-and-state inventory** — the screens
 it needs and, for each, the states that must exist: empty, sparse, dense, and error. This
 is what makes the mockup (Phase 3) complete rather than a happy-path shell, and it is what
@@ -186,7 +196,14 @@ this stack (§2.1 for a desktop app; the install-script contract of §3 for a CL
 server), per-user or per-machine with the reason, the data location, the single version
 source, whether a server runs as a service, the command-reference generator for any CLI
 (§4), and the installer behaviour (already installed → Upgrade / Uninstall / Cancel;
-upgrade in place keeps data; uninstall keeps data unless opted out). **Code signing is the one escalation here**: a certificate costs money
+upgrade in place keeps data; uninstall keeps data unless opted out).
+
+For every **performance or cost budget** the design names the **mechanism** that meets it
+and the **hot path** it runs on — the index or data structure, caching, batching,
+streaming, concurrency, where the work happens, what is precomputed
+(`Performance-Conventions.md` §2). These are the choices that are cheap now and expensive
+after the build, so they are decided here, and `plan-critic`'s performance lens checks
+them against the stated data sizes. **Code signing is the one escalation here**: a certificate costs money
 and identity verification, so present it once as a user-level consequence — unsigned
 (SmartScreen warns on first run, the manual explains the two clicks) or signed (the owner
 buys a certificate) — and record the answer.
@@ -366,6 +383,12 @@ verbatim. The increment that first adds a command-line surface carries the
 command-reference generator (§4). A plan for installable software without this stage, or a
 CLI plan without the generator, is incomplete.
 
+For every **budget** the plan carries a **benchmark increment** — a benchmark in `bench/`
+that drives the budgeted operation with a fixed dataset and seed and reports the metric —
+scheduled in the stage where the operation first exists, so a baseline is committed before
+anything is optimized (`Performance-Conventions.md` §3). From that stage on the checker
+runs in the gate.
+
 Give each one an ID (`TASK-001`, `TASK-002`, …). Group the increments into named
 **stages** — a stage is a coherent, demonstrable chunk of the plan (a milestone), normally
 three to eight increments, and its close is a **reflection point** (see "Reflection
@@ -467,6 +490,8 @@ Delegate the actual file-writing to **cursor-configurator**, which writes
 `.gitattributes`, `.cursorignore`, `.worktreeinclude`, linter configs, `hooks.json`,
 `.githooks/pre-commit`, `mcp.json`, the frozen `.cursor/rules/minimal-code.mdc` (every
 project — the write-the-least-code ladder, with safety rules taking precedence), and the
+performance floor where budgets exist (`bench/budgets.json`, the bench runner script, the
+`bench-check.py` step in CI, the pinned profiler — `Performance-Conventions.md` §3), the
 always-on `.cursor/rules/workspace-boundary.mdc` plus the `boundary-check` after-edit hook
 (every project — the Workspace boundary from "The project layout") on your
 instruction and reports back. You keep the
@@ -699,6 +724,13 @@ Delegate to **test-runner**. If the increment's acceptance criteria are not yet
 covered by tests, write those tests yourself first — you are allowed to write tests,
 and tests written by the reviewer rather than the implementer are worth more.
 
+Where budgets exist and their benchmarks are built, the **benchmark floor** runs with the
+tests: `scripts/bench.ps1` then
+`python ~/.claude/cursor-bridge/bench-check.py bench/budgets.json bench/baseline.json bench/results/latest.json`.
+`OVER BUDGET`, `REGRESSION`, or `NOT MEASURED` is a correctness-class block: re-delegate
+with the numbers in the brief, never route it to the user, and never fix it by loosening a
+budget or moving the baseline (`Merge-Verification-Policy.md` §Anti-gaming).
+
 For a UI-bearing increment, the tests you write include the **observability tests** (Tier A):
 drive the app to each affected inventory state *through the real render path* and assert no
 runtime invariant fired, no `console.error`, and the required states exist (see
@@ -835,7 +867,7 @@ required check is green or before both reviews APPROVE. No human correctness cli
 involved; the merge is reversible, so a rare behavioural miss is caught retrospectively via
 the change log, not by a gate the user cannot operate.
 
-### 9. Refactoring pass (at stage close)
+### 9. Refactoring and optimization pass (at stage close)
 
 When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says
 **Refactoring pass: on** for that stage, run one refactoring pass **before** the stage's reflection point.
@@ -853,9 +885,15 @@ around **one gate pass per stage**.
    Record the pinned `jscpd` version in `docs/PROJECT_STATUS.md`; verify-first on the first
    use (KP-008). The report is input for the scout, not a verdict.
 2. **Scout.** Delegate to **refactor-scout** with the stage base commit, the detector
-   report, the complexity report, and the size budget (default **400 changed lines**). It
-   returns ranked candidates, each marked COVERED or UNCOVERED and costed in lines, cut at
-   the budget. **NO CANDIDATES** is a normal result — skip to the reflection point.
+   report, the complexity report, and the size budget (default **400 changed lines**) —
+   and, where budgets exist, the **performance inputs**: `bench/budgets.json`,
+   `bench/baseline.json`, the latest `bench/results/latest.json`, and a profile of each
+   budgeted operation (`scripts/profile.ps1 <benchmark>` → `bench/profiles/<benchmark>.txt`;
+   `Performance-Conventions.md` §5). It returns two ranked lists — refactoring candidates
+   and **optimization candidates ranked by measured impact on a budgeted metric**, each
+   naming the benchmark that will prove it — marked COVERED or UNCOVERED, costed in lines,
+   cut at the size budget together. **NO CANDIDATES** is a normal result — skip to the
+   reflection point.
 3. **Cover first.** For an UNCOVERED candidate you want, write characterization tests that
    pin its current behaviour (you may write tests), run them green, and **commit them on
    `main` through the gate before the refactoring branch is cut** — so they sit under the
@@ -866,6 +904,12 @@ around **one gate pass per stage**.
    check as always), run the full test suite, and commit that candidate alone. A candidate
    that fails its tests or drifts is re-delegated or dropped — a Cursor round is cheap,
    so be strict. Never mix a candidate into a feature increment.
+   An **optimization candidate** is a refactoring candidate with numbers: its brief names
+   the metric, the current value, and the target; its commit message states before and
+   after; the same commit moves `bench/baseline.json` with `--update-baseline`; a gain
+   inside the tolerance band, or complexity added without a measured gain, is dropped — the
+   minimal-code rule wins. Never touch `bench/budgets.json`, a benchmark, its dataset, or
+   its seed in this pass.
 5. **Purity check — deterministic, before any reviewer:**
    ```bash
    python ~/.claude/cursor-bridge/refactor-check.py main --max-lines 400
@@ -1424,3 +1468,13 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     same three gates and no others. Never ask whether to follow the workflow. A process
     question ("which procedure applies?") is never the owner's: follow the closest defined
     procedure, say which, and record the gap as bridge feedback.
+35. Optimization — speed, memory, cost — exists only when measured. Budgets are set by the
+    owner at intake (one operation, one condition, one number, one measurement; "no
+    budgets" is an answer, not a default); the design names the mechanism per budget; the
+    plan builds a benchmark per budget before anything is optimized; the benchmark floor
+    (`bench-check.py` against `budgets.json` and the committed baseline) runs in the gate
+    and a regression blocks like a failing test; the stage-close pass's performance lens
+    ranks candidates by measured impact, and every optimization commit carries its
+    before/after numbers and moves the baseline. A budget passes by the software getting
+    faster, never by the budget getting looser. Complexity without a measured gain is
+    rejected.

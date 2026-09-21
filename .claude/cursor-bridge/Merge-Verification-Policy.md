@@ -185,6 +185,16 @@ size budget. Both reviewers must additionally treat as a flag:
 Review B's mandate on a refactoring diff is the explicit question **"is this
 behaviour-preserving?"**, answered on the whole diff.
 
+**Performance-floor tampering** is a gate-integrity flag on the same footing
+(`Performance-Conventions.md` §4). Both reviewers must treat as a flag: raising a `max`,
+lowering a `min`, or widening a `tolerance_pct` in `bench/budgets.json` without an owner
+decision recorded in `CHANGES.md`; a `bench/baseline.json` change in a commit that is not
+an optimization with its before/after numbers in the message; a benchmark deleted, skipped,
+or its fixed dataset or seed changed so a number passes; a warm-cache measurement where the
+budget stated a cold one. A budget passes by the software getting faster, never by the
+budget getting looser; relaxing one is a product decision that goes through the change
+cycle's intake.
+
 **Fix-diff tampering** is a gate-integrity flag on the same footing. A `handoff/BUG-<nnn>.md`
 fix brief names a confirmed root cause and its evidence (the `root-cause-first` procedure).
 Both reviewers must treat as a flag:

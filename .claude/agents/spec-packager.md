@@ -104,6 +104,16 @@ differences, stated verbatim in the brief:
   introduce an abstraction beyond what the listed duplicates need.
 - **Done** adds: state in one sentence why the behaviour is identical.
 
+**Optimization candidates** (the pass's performance lens, `Performance-Conventions.md` §5)
+use the same refactoring brief with three more lines: the **Objective** names the budgeted
+metric, its current value, and the target ("`search_10k_docs` p95_ms 1450 → ≤ 1000; budget
+PERF-001 ≤ 2000"); the **Acceptance criteria** add "the benchmark `<name>` reports the
+target or better, median of 5 runs, via `scripts/bench.ps1`; `bench-check.py` passes; no
+other budgeted metric regresses beyond its tolerance"; and the **Done** section requires the
+commit message to state before and after, and the same commit to update
+`bench/baseline.json` with `--update-baseline`. Never edit `bench/budgets.json`, a
+benchmark, its dataset, or its seed in an optimization brief.
+
 ## The fix variant — `handoff/BUG-<nnn>.md`
 
 When the supervisor hands you a **confirmed root cause** from the `root-cause-first`

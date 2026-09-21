@@ -338,6 +338,17 @@ builds from the brief; the tests are the supervisor's. Assertions are hand-rolle
 
 ---
 
+## 5e. Performance floor — [Claude], only where budgets exist
+
+Per `Performance-Conventions.md`. Write `bench/budgets.json` from the intake budgets; the
+bench runner (`scripts/bench.ps1`, median of ≥5 runs for timings, peak for memory, accounted
+total for cost) and the profiler wrapper (`scripts/profile.ps1`) are increments the builder
+builds, not configuration; add the `bench-check.py` step to the CI `gate` job after the tests
+(fail on exit 1); pin the benchmark and profiling tools for the stack; gitignore
+`bench/results/` and `bench/profiles/`, commit `bench/baseline.json`. Where CI runners are too
+noisy for an absolute budget, CI checks the regression band and the absolute number is checked
+locally at stage close — record which in `docs/PROJECT_STATUS.md`.
+
 ## 6. Explicitly skipped, and why — [Skip]
 
 On record so nobody wonders whether configuration missed them:
@@ -412,6 +423,7 @@ this reliable:
    for a PowerShell-launched builder)** the fail-closed `beforeShellExecution` shell-guard hook
    (+ place `shell-guard.py`); pin and record the Semgrep/OSV/Socket versions, ASVS level, and
    every SHA in `PROJECT_STATUS.md`. The Socket token escalates once (repo secret).
+8b. §5e performance floor (where budgets exist): `bench/budgets.json`, the `bench-check.py` CI step, pinned bench/profile tools, gitignores.
 8. §5d observability (UI-bearing projects): wire the supervisor-authored observability e2e
    tests into the `gate` job, set test-mode fixed clock/seed/locale, gitignore the artifacts,
    confirm log redaction; escalate the driver dependency (Playwright / per-platform). Record

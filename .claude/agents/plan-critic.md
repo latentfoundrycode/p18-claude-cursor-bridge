@@ -34,6 +34,12 @@ Attack it along these lines:
 - **Security criteria.** Does the design address authorization, input validation, and
   secret-handling at each trust boundary? Is the chosen ASVS level recorded, and does it fit
   the data sensitivity? Are the security acceptance criteria it implies actually checkable?
+- **Performance lens (where budgets exist).** For each budget in the design: is a mechanism
+  named that plausibly meets it at the stated data size — or is there an O(n²) step over
+  thousands of items, a full scan where an index is implied, a per-item network or model
+  call in a loop, an unbounded collection or cache, IO on the UI or request thread? Is the
+  budgeted operation measurable in isolation with fixed inputs? A budget with no mechanism
+  behind it is **Blocking**; a mechanism that cannot scale to the stated size is **Blocking**.
 
 ## When reviewing a build plan
 
@@ -78,6 +84,10 @@ Attack it along these lines:
   single version source, and is the Packaging & installer stage re-run last so the shipped
   deliverable carries the new version? An addendum that quietly changes existing behaviour
   without saying so is **Blocking**.
+- **Benchmark increments (where budgets exist).** Is there a benchmark increment per
+  budget, in the stage where the budgeted operation first exists, so a baseline is
+  committed before any optimization? A budget with no benchmark in the plan is **Blocking**:
+  it can never be checked.
 - **Project end is the last stage close.** Does the plan name its last stage so that its
   close is unambiguous? A plan whose end is "when everything is done" leaves the supervisor
   unable to recognise project end.

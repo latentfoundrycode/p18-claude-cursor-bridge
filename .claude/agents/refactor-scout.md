@@ -43,6 +43,27 @@ message, an edge case, or a public interface, it is not a candidate.
    the changed lines each candidate would cost, and stop listing when the running total
    reaches the budget; everything after that goes under "Beyond budget".
 
+## The performance lens — optimization candidates, ranked by measured impact
+
+When the supervisor also hands you `bench/budgets.json`, `bench/baseline.json`, the latest
+`bench/results/latest.json`, and the profiles under `bench/profiles/`
+(`Performance-Conventions.md` §5), add a second list of candidates: changes that would make
+a **budgeted metric** faster, lighter, or cheaper without changing behaviour. Look for:
+
+- a budget that is failing, or within its tolerance band of failing;
+- a hot spot in a profile that this stage's diff introduced or touched;
+- the known patterns: a query or model call repeated inside a loop, recomputation of an
+  unchanged value, synchronous IO on a hot path, unbounded growth of a collection or cache,
+  serialization of large objects on every call, a full scan where the access pattern wants
+  an index, work on the UI thread that belongs in the background.
+
+Rank these by **measured impact on a budgeted metric** — the profile's share of time or
+memory, or the accounted cost — never by how elegant the change would be. For each
+candidate name the benchmark that will prove it, the current value, and the expected value.
+A candidate with no budgeted metric behind it, or whose expected gain is inside the
+tolerance band, is not a candidate: it would add complexity for no measurable return, and
+the minimal-code rule wins. Uncovered regions follow the same COVERED / UNCOVERED rule.
+
 ## What is never a candidate
 
 - Three similar lines. Merging them creates an abstraction that costs more than it saves.
@@ -68,6 +89,11 @@ REFACTOR CANDIDATES — stage <name>, base <sha>..HEAD, budget <N> lines
    Payoff: <why this one ranks here>
 
 2. ...
+
+OPTIMIZATION CANDIDATES (performance lens, if inputs were given)
+1. <title>  [~<lines> lines]  [COVERED | UNCOVERED]  proves with: <benchmark>/<metric>  now <value> → expected <value>  budget <PERF-nnn: limit>
+   Site: <file:lines>   Pattern: <which one>   Evidence: <profile share / accounted cost>
+   Proposed shape: <one sentence>
 
 Beyond budget (record to docs/HARDENING.md): <titles, one line each>
 Not candidates (detector noise, deliberate repetition): <one line, count only>

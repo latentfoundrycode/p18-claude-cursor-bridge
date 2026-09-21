@@ -40,6 +40,15 @@ change, however small and however much of an improvement, is a `FAIL`: it belong
 feature increment with its own `CHANGES.md` entry, not smuggled into a refactoring. A test
 file edited beyond a mechanical rename the brief listed is a **gate-integrity flag**.
 
+For an **optimization commit** on the same branch (`Performance-Conventions.md` §5), also
+check the numbers, not the story: the commit message states before and after for a
+budgeted metric; `bench/baseline.json` changed in the same commit and matches; the gain is
+outside the tolerance band (a gain inside the noise, or added complexity with no measured
+gain, is a `FAIL` — the minimal-code rule wins); and none of the anti-gaming items occurred
+— `bench/budgets.json` loosened, a benchmark deleted or skipped, its dataset shrunk or seed
+changed, a warm cache measured where the budget stated cold. Any of those is a
+**gate-integrity flag**.
+
 ## What you are checking
 
 **Conformance — did it do what was asked?**

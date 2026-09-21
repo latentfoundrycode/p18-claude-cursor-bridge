@@ -11,6 +11,37 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.22b
+
+**What changed**
+- **Optimization is measured or it does not exist.** New `Performance-Conventions.md`:
+  owner-set **budgets** at intake (`bench/budgets.json`: one operation, one condition, one
+  number, one measurement; speed, memory, size, and money/tokens alike; "no budgets" is an
+  answer); the design names the **mechanism and hot path** per budget (plan-critic
+  performance lens: scaling, per-item calls, unbounded growth, thread blocking,
+  measurability); a **benchmark increment per budget** before any optimization; the
+  **benchmark floor** — fixed dataset and seed, median of ≥5 runs, committed
+  `bench/baseline.json`, new `bench-check.py` (OVER BUDGET / REGRESSION / NOT MEASURED
+  fail; IMPROVED noted; `--update-baseline` only in optimization commits; tested) in the CI
+  gate and at stage close; the stage-close pass gains a **performance lens**
+  (`refactor-scout` ranks optimization candidates by measured impact on a budgeted metric)
+  under the same one-branch one-gate mechanics, every optimization commit carrying its
+  before/after numbers and moving the baseline; **anti-gaming**: loosening a budget, moving
+  the baseline outside an optimization commit, deleting/skipping a benchmark, shrinking its
+  dataset, or measuring warm where cold was stated is a gate-integrity flag. Configuration
+  §5e. Standing rule 35.
+
+**Running projects must**
+- *(Phase 6 — building, or done)* At the next reflection point, propose budgets to the owner
+  for the operations whose speed or cost they care about (a decision brief; "none" is a
+  valid answer). If budgets are set: add the benchmark increments and the `bench-check.py`
+  gate step as an addition to the plan (tell the owner in one line; reopens no gate), commit
+  a baseline, then the performance lens applies from the next stage close.
+- *(Phases 1–5)* Budgets are asked at intake going forward; a project already past intake
+  asks them at its next gate as one extra decision.
+
+---
+
 ## 2026.09.22
 
 **What changed**
