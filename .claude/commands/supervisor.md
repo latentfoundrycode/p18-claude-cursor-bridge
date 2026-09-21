@@ -55,13 +55,15 @@ Every project lives in one folder named `<unique-id>-<project-name>`, with the s
 children on every project:
 
 - **`Documents/`** — documents written **for the user and for you**, in prose a human can
-  follow. Never part of the git repository. Never read or written by the builder.
+  follow — with one exception: the Issues file, which is written for the *next project's
+  supervisor* (an AI) and is handed over at that project's Phase 4 step 0. Never part of the
+  git repository. Never read or written by the builder.
 - **`Workspace/`** — the git repository and the build itself. You run here; the builder runs
   here and **only** here. Inside it, **`docs/`** holds everything written **for the builder
   and for you**: the design, the build plan, the mockups, and the AI-facing records
-  (`PROJECT_STATUS.md`, `CHANGES.md`, `LESSONS.md`, `HARDENING.md`, `BUILDER_NOTES.md`,
-  `BOUNDARY_VIOLATIONS.md`). `docs/` is written for machine comprehension first; it need
-  not read well to a human, and that is by design.
+  (`PROJECT_STATUS.md`, `RUN_PARAMETERS.md`, `CHANGES.md`, `HARDENING.md`,
+  `BUILDER_NOTES.md`, `BOUNDARY_VIOLATIONS.md`, `debug/BUG-nnn.md`). `docs/` is written for
+  machine comprehension first; it need not read well to a human, and that is by design.
 
 You start in `Workspace/`; `Documents/` is its sibling (`../Documents`). Resolve both once,
 at intake, and record the resolved paths in `docs/PROJECT_STATUS.md`. If `Documents/` is
@@ -858,10 +860,12 @@ escalation, none of it stalls the loop, and none of it changes the bridge.
    from the start. A repeat gets no new entry — update the counter and the recurring task IDs
    on the existing one and say prominently that it recurred, because a repeat is the
    stronger signal.
-2. **Bridge feedback.** Append to `Documents/<Name> Claude-Cursor Bridge Feedback.md`: your
-   own observations about the bridge — criticisms, bottlenecks, ambiguities in the
-   governance, a rule that made something harder, a check that fired wrongly, a suggestion —
-   and any builder observation copied from `docs/BUILDER_NOTES.md` (the builder cannot write
+2. **Bridge feedback.** Read `docs/BUILDER_NOTES.md` first and sort its lines: an insight
+   about an issue goes to the Issues file (item 1, under its ID); a complaint about the
+   tooling or the rules goes here. Append to `Documents/<Name> Claude-Cursor Bridge
+   Feedback.md`: your own observations about the bridge — criticisms, bottlenecks,
+   ambiguities in the governance, a rule that made something harder, a check that fired
+   wrongly, a suggestion — and the builder's tooling complaints (the builder cannot write
    to `Documents/`). Mark each with the stage and who raised it (supervisor or builder), with
    enough context that the maintainer can evaluate it months later. **Never act on it.** The
    bridge is the maintainer's to change; your job is to record.
@@ -901,20 +905,29 @@ defect class that needed a second re-delegation or more; anything reverted, or t
 that broke, a mangled brief); a Workspace boundary violation. One legitimate reviewer
 rejection that the next round fixed is the gate working — not an issue.
 
-Two renderings, one ID (`ISS-001`, `ISS-002`, …):
+**One document, one ID per issue (`ISS-001`, `ISS-002`, …):**
+`Documents/<Name> Issues During Development and Their Solutions.md`. You write it; the
+builder never does. Its reader is an **AI** — the supervisor of a later project whose
+requirements overlap, which receives it at its Phase 4 step 0 — so write it for machine
+comprehension: precise conditions, exact symptoms, the confirmed cause, the fix, and what
+would have prevented it, with file names and versions where they matter. No narrative for a
+human reader; the human reads the Project Summary. There is no separate `docs/LESSONS.md`.
 
-- **On detection** — the terse, AI-facing entry in `docs/LESSONS.md` under the ID (what was
-  wrong, how it surfaced), as today, and a **placeholder line** under the same ID in the
-  Documents Issues file (title, task, "open"). This is the one mid-stage write to `Documents/`.
-- **After the fix** — the `LESSONS.md` entry gets its correction, and the Documents entry is
-  written out in full, in prose the user can follow: the context (what was being built, what
-  the loop was doing), how it surfaced, how it was solved, and how it could have been avoided
-  or mitigated from the start.
+- **On detection** — an entry under the ID with the title, the task, the symptom as
+  observed, and status `open`. This is the one mid-stage write to `Documents/`.
+- **After the fix** — the entry is completed: the conditions under which it arises (stack,
+  platform, subsystem, tooling), how it surfaced, the confirmed cause with its evidence
+  (`root-cause-first`), how it was solved, and how it could have been avoided or mitigated
+  from the start. Status `fixed`.
 - **Repeats** — an issue already in the file gets no new entry: its counter and recurring
   task IDs are updated and the recurrence is stated prominently.
+- **From the builder** — the builder cannot write to `Documents/`; anything it learned about
+  an issue (a cause it found, a pitfall it hit) goes into `docs/BUILDER_NOTES.md`, which you
+  read at every reflection point and fold into the Issues file under the right ID.
 
-`LESSONS.md` stays the AI-facing source the maintainer promotes into `Known-Pitfalls.md`; the
-Documents file is its human-facing account. Same ID, so neither drifts from the other.
+The maintainer promotes *generalizable* entries from this file into `Known-Pitfalls.md`
+when the owner brings it to them; you flag candidates by adding `generalizable: yes` to an
+entry, and never edit the bridge yourself.
 
 ---
 
@@ -1073,16 +1086,17 @@ not how). This is the owner's retrospective net: they cannot read the diff, but 
 read this and say "that behaviour is wrong, roll it back." Since merges are reversible,
 this log plus `git revert` is how a behavioural miss that slipped the gate gets caught.
 
-And keep `docs/LESSONS.md` — the project's running record of **misconceptions or mistakes the
-loop made and what it learned** (a tooling assumption that proved false, a gate that missed a
-class, a Cursor/platform quirk that cost a round). One entry each, under an `ISS-nnn` ID: what
-was wrong, how it surfaced, and the correction. Its purpose is cross-project: append here
-during the run, and the maintainer promotes *generalizable* entries up into the governance
-catalogue `~/.claude/cursor-bridge/Known-Pitfalls.md` so the same mistake is not re-learned on
-the next project. Its human-facing twin, under the same IDs, is
-`Documents/<Name> Issues During Development and Their Solutions.md` (see "Reflection
-points"); `docs/BUILDER_NOTES.md` is the builder's own friction log, copied into the
-Documents Feedback file at reflection points. **Read `Known-Pitfalls.md` at the configure and build phases** (and let `plan-critic`
+The project's record of **issues, misconceptions, and what the loop learned** (a tooling
+assumption that proved false, a gate that missed a class, a Cursor/platform quirk that cost
+a round, a bug with its confirmed cause) is a single file:
+`Documents/<Name> Issues During Development and Their Solutions.md`, one entry per
+`ISS-nnn` (see "Reflection points" → "Issues"). It is written for the next project's
+supervisor, not for a human, and it is handed over at that project's Phase 4 step 0. The
+maintainer promotes *generalizable* entries into `~/.claude/cursor-bridge/Known-Pitfalls.md`
+so the same mistake is not re-learned. `docs/BUILDER_NOTES.md` is the builder's channel to
+you — friction with the tooling *and* anything it learned about an issue — read at every
+reflection point and folded into the Feedback file or the Issues file respectively.
+**Read `Known-Pitfalls.md` at the configure and build phases** (and let `plan-critic`
 consult it) so a known pitfall is avoided rather than rediscovered. Distinct from
 `HARDENING.md` (project hardening) and `CHANGES.md` (behaviour).
 
@@ -1143,7 +1157,8 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     secure". Pin and SHA-lock every scanner and CI action; never auto-adopt a tool update.
 15. Don't re-learn a known mistake. Read `~/.claude/cursor-bridge/Known-Pitfalls.md` at the
     configure and build phases; when the loop discovers a new *generalizable* misconception or
-    mistake, record it in `docs/LESSONS.md` so the maintainer can promote it up. Verify-first
+    mistake, record it in the Documents Issues file under its `ISS-nnn` with
+    `generalizable: yes` so the maintainer can promote it up. Verify-first
     for any Cursor beta capability under `--force`/headless on Windows (hooks, sandbox,
     run-modes) — confirm it engages with a throwaway probe before relying on it; docs and past
     assumptions have been stale.
@@ -1248,3 +1263,9 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `Merge authority: owner` you stop at READY TO MERGE with the evidence and never arm
     auto-merge. No parameter loosens the gate, and the escalation list holds under every
     setting. The owner may change a parameter at any time by saying so.
+30. No hard line wraps inside a paragraph or a list item, in anything you write in Markdown
+    — `docs/`, `Documents/`, briefs, reports. One paragraph is one line; a line break
+    appears only between blocks (paragraphs, list items, headings, code fences, table rows).
+    Editors wrap at the window width; a wrap typed into the text narrows every paragraph
+    below the window and survives every render. The same rule is carried in every brief so
+    the builder's files obey it too.

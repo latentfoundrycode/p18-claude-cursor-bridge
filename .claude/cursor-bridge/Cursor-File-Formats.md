@@ -705,7 +705,11 @@ require it, stop and say so in your final summary instead.
 
 If the brief, a rule, or the tooling got in your way — contradictory instructions, a check
 that fired wrongly, a step that cost time for no reason — append one dated line describing
-it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling yourself.
+it to `docs/BUILDER_NOTES.md`. Do the same for anything you learned about a defect or a
+pitfall. Do not try to fix the tooling yourself.
+
+In Markdown, never break a line inside a paragraph or a list item; one paragraph is one
+line, with line breaks only between blocks.
 ```
 
 ### `.cursor/rules/minimal-code.mdc` — the frozen minimal-code rule

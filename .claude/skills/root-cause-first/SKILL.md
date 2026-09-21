@@ -134,8 +134,9 @@ suite permanently.
 
 ### 8. Record the cause, not the story
 
-The bug becomes an issue (`ISS-nnn` in `docs/LESSONS.md`, then the human-facing Issues
-document) with the confirmed cause and the evidence. "How could it have been avoided" is
+The bug becomes an issue (`ISS-nnn` in `Documents/<Name> Issues During Development and
+Their Solutions.md`, the file the next project's supervisor reads) with the confirmed cause
+and the evidence. "How could it have been avoided" is
 only honest once the cause is known — which is the point of the whole procedure.
 
 ## What reviewers hold against a fix

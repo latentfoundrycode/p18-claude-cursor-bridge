@@ -61,7 +61,11 @@ exactly. Patterns established elsewhere in the codebase that this should follow.
   Everything you need is inside it; everything you produce goes inside it.
 - If the brief, the rules, or the tooling got in your way — an instruction that contradicted
   another, a check that fired wrongly, a step that cost time for no reason — append one
-  dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling.
+  dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the
+  same for anything you learned about a defect or a pitfall (a cause you found, a platform
+  quirk that cost you a round): one dated line, so the supervisor can carry it forward.
+- In any Markdown you write, never break a line inside a paragraph or a list item; one
+  paragraph is one line. Line breaks only between blocks.
 - Any console process your code launches on Windows is created windowless
   (`creationflags=subprocess.CREATE_NO_WINDOW` in Python — `0` on other platforms;
   `windowsHide: true` in Node). Capturing output does not prevent the window. A window is

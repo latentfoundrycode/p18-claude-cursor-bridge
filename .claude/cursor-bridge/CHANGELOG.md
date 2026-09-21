@@ -11,6 +11,35 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.21
+
+**What changed**
+- **One Issues document.** `docs/LESSONS.md` is gone. The project's record of issues,
+  misconceptions, causes, and fixes is the single
+  `Documents/<Name> Issues During Development and Their Solutions.md`, written by the
+  supervisor **for the next project's supervisor (an AI)**, one entry per `ISS-nnn`,
+  `generalizable: yes` marking Known-Pitfalls candidates. The human reads the Project
+  Summary instead.
+- **Builder channel widened.** `docs/BUILDER_NOTES.md` now carries both tooling friction
+  (→ Bridge Feedback) and anything the builder learned about a defect or pitfall (→ the
+  Issues file); the supervisor sorts it at every reflection point.
+- **No hard line wraps** in any Markdown the supervisor or the builder writes: one
+  paragraph is one line; breaks only between blocks (rule 30; brief constraint;
+  `workspace-boundary.mdc`).
+- The User Manual at project end was already in place (Reflection points → project end);
+  no change, restated for clarity.
+
+**Running projects must**
+- *(all phases)* If `docs/LESSONS.md` exists, fold each entry into the Documents Issues
+  file under its `ISS-nnn` at the next reflection point, then delete `docs/LESSONS.md`.
+- *(all phases)* Write without hard wraps from now on; do not reflow existing files
+  mid-stage (a reflow is a noisy diff); the Documents may be reflowed at the next
+  reflection point.
+- *(Phase 6 — building)* The next brief carries the widened `BUILDER_NOTES.md` line and
+  the no-wrap constraint (spec-packager template).
+
+---
+
 ## 2026.09.20d
 
 **What changed**

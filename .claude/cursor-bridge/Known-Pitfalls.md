@@ -10,13 +10,13 @@ the per-project `docs/HARDENING.md` (project-local hardening) and `docs/CHANGES.
 **How it flows (respecting the governance/loop boundary):**
 - The supervisor **reads** this file — it is instructions, like every other bridge doc.
 - When the loop discovers a *generalizable* misconception/mistake during a run, the supervisor
-  **appends it to the project's `docs/LESSONS.md`** (a build-contract artifact the loop may
-  write), not here.
-- The **maintainer periodically promotes** generalizable entries from a project's
-  `docs/LESSONS.md` up into this file. Governance changes at maintenance time, not mid-run.
+  **records it in the project's `Documents/<Name> Issues During Development and Their
+  Solutions.md`** under its `ISS-nnn`, marked `generalizable: yes` — not here.
+- The **maintainer promotes** generalizable entries from a project's Issues file up into this
+  file when the owner brings it. Governance changes at maintenance time, not mid-run.
 
 **Curation rule:** keep entries *generalizable* (they recur across projects). Project-specific
-trivia stays in that project's `docs/LESSONS.md`. Prune entries that a later bridge change has
+trivia stays in that project's Issues file. Prune entries that a later bridge change has
 made obsolete. Each entry: **misconception/mistake → how it surfaced → the correction → where
 it applies.**
 
@@ -178,7 +178,7 @@ it applies.**
   for a `CTRL_BREAK` stop is hidden only after its stop path is tested.
 - **Applies:** every Windows-hosted project; every hook script and every subprocess the
   builder writes. The meta-lesson is the report's own: a fix made once, locally, recurs in
-  the next subsystem unless it is promoted to a rule — which is what `LESSONS.md` →
+  the next subsystem unless it is promoted to a rule — which is what the Issues file →
   `Known-Pitfalls.md` is for.
 
 ### KP-015 — Fixing from the symptom: a corrected brief without a diagnosed cause makes the builder guess
