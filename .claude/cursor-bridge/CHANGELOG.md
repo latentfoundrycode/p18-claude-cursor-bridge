@@ -11,6 +11,48 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.21c
+
+**What changed**
+- **Project end is a defined trigger.** The close of the approved plan's last stage *is*
+  project end: the project-end items (final refactoring pass, User Manual, promotion pass,
+  installer delivery) run in the same turn as that stage close, `Phase: done` is set, and
+  the report opens with "Project complete". Deferred increments do not postpone it. The
+  procedure existed since 2026.09.20 but had no trigger, so a finished project (Technical
+  Documentation Provider, 2026-09-21) closed its last stage and never produced its manual.
+  Standing rule 33; plan-critic checks the last stage is named.
+- **Delivery broadened from desktop apps to all installable software.**
+  `Packaging-Conventions.md` → `Delivery-Conventions.md`: §1 which kind ships what; §2 the
+  desktop installer (unchanged); **§3 command-line tools and local servers** — a
+  double-clickable `install.cmd` + `install.ps1` that checks prerequisites, builds an
+  isolated environment from the lock file under `%LOCALAPPDATA%\Programs\<Name>`, puts the
+  command on the user PATH via a launcher, registers an Apps & features entry and an
+  uninstaller, offers Upgrade / Uninstall / Cancel when already installed, keeps data on
+  uninstall, supports `-Silent`; the project writes its own `scripts/install-check.ps1`
+  lifecycle test. Run parameter 4 applies to all installable kinds. Standing rule 31.
+- **Command reference — never a made-up command again.** A project with a CLI keeps
+  `docs/cli-reference.json`, generated from the real command tree by `scripts/dump-cli.py`
+  in the increment that first adds a command, kept current by a CI diff check and the
+  pre-commit gate; `diff-reviewer` fails a command change without a reference change;
+  every run sheet, report, and manual passage copies commands from it or from a `--help`
+  just run. Cause: the same project's supervisor instructed the owner with commands that
+  did not exist. Standing rule 32; run-sheet rule; plan-critic check.
+
+**Running projects must**
+- *(Phase 6 — building, last stage already closed without a project-end reflection)* Run
+  the project-end items now: final refactoring pass (if on), User Manual, promotion pass,
+  deliverable; set `Phase: done`; report "Project complete" with deferred items listed.
+- *(all phases, projects with a command-line surface)* Add the command-reference generator
+  and its CI currency check as an increment in the current or next stage (an addition to
+  the approved plan — tell the owner in one line; reopens no gate). Until it exists, run
+  `--help` before every instruction that names a project command.
+- *(all phases, installable software of any kind)* If the plan has no "Packaging &
+  installer" last stage, add it (tell the owner in one line). Ask `Installer verification`
+  if not yet in `docs/RUN_PARAMETERS.md` (default `local`).
+- *(all phases, other projects)* Nothing.
+
+---
+
 ## 2026.09.21b
 
 **What changed**

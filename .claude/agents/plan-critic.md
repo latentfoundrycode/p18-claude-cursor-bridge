@@ -58,12 +58,23 @@ Attack it along these lines:
   If it is more than a few, the plan is back-loading risk.
 - **Missing increments.** What has to happen that no increment covers — error handling,
   configuration, teardown, migration, packaging?
-- **Packaging stage (desktop applications).** Is the last stage "Packaging & installer",
-  and does it carry `Packaging-Conventions.md` §1 and §6 as checkable acceptance criteria —
-  one-command build, committed installer script, per-user install registered in Apps &
-  features, upgrade in place keeping data, Upgrade / Uninstall / Cancel when already
-  installed, uninstall keeping data, `installer-check.ps1` passing, the manual's install
-  chapter? A desktop plan without it is **Blocking**: the owner cannot install the result.
+- **Packaging stage (installable software: desktop application, command-line tool, local
+  server).** Is the last stage "Packaging & installer", and does it carry
+  `Delivery-Conventions.md` §2 / §3 / §4 as checkable acceptance criteria — one-command
+  build or install, committed installer or install script, per-user install registered in
+  Apps & features (a CLI on PATH from an isolated environment built from the lock file),
+  upgrade in place keeping data, Upgrade / Uninstall / Cancel when already installed,
+  uninstall keeping data, the lifecycle verification passing, the manual's install chapter?
+  A plan for installable software without it is **Blocking**: the owner cannot install the
+  result.
+- **Command reference (any command-line surface).** Does the increment that first adds a
+  command also add the reference generator (`scripts/dump-cli.py` → `docs/cli-reference.json`)
+  and the CI currency check, and does every later command-changing increment carry
+  "reference regenerated" as a criterion? Without it the supervisor has nothing to look
+  commands up in and will instruct the owner from memory — **Blocking**.
+- **Project end is the last stage close.** Does the plan name its last stage so that its
+  close is unambiguous? A plan whose end is "when everything is done" leaves the supervisor
+  unable to recognise project end.
 - **Design criteria (UI increments).** Does each UI-bearing increment cite an approved
   mockup screen and the relevant `docs/design/DESIGN.md` sections, and are its design
   acceptance criteria actually checkable (a specific observable outcome — "matches mockup

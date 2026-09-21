@@ -46,6 +46,10 @@ file edited beyond a mechanical rename the brief listed is a **gate-integrity fl
 
 - Is every requirement in the brief implemented?
 - Is every acceptance criterion actually met by this code, not merely gestured at?
+- If the diff adds, renames, or changes a command, sub-command, flag, or argument of the
+  project's command-line surface: was `docs/cli-reference.json` regenerated in the same
+  diff? A command change without a reference change is a `FAIL` — the reference is what the
+  supervisor instructs the owner from, and a stale one produces made-up commands.
 - Did it stay inside the declared scope? File-level drift is already settled
   deterministically by `scope-check.py` before you read; your scope job is
   **region-level** — an in-scope file edited beyond what the brief asked (an unrelated

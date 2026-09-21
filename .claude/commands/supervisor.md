@@ -125,13 +125,15 @@ platform, and runtime context; data and persistence; external services and
 integrations; performance, scale, and security expectations; testing expectations;
 explicit non-goals.
 
-For a **desktop application**, the platform context includes the **delivery**: the project
-ends with a Windows 11 x64 installer that installs, upgrades in place, and uninstalls
-cleanly, per `~/.claude/cursor-bridge/Packaging-Conventions.md`. Confirm the target (Windows
-11 x64 unless the user says otherwise), whether the app must be per-machine (a service, a
-driver, a machine-wide file association) or can be per-user (the default, no administrator
-prompt), and where its data should live. This is not optional and not a late addition: it
-is a stage of the build plan.
+For **installable software** — a desktop application, a command-line tool, a local server
+— the platform context includes the **delivery**: the project ends with one file the owner
+double-clicks on Windows 11 x64 that installs it, upgrades it in place, and uninstalls it
+cleanly, per `~/.claude/cursor-bridge/Delivery-Conventions.md` §1 (which kind ships what).
+Confirm the kind and the target (Windows 11 x64 unless the user says otherwise), whether it
+must be per-machine (a service, a driver, a machine-wide file association) or can be
+per-user (the default, no administrator prompt), where its data should live, and — for
+anything with a command-line surface — that a generated **command reference** will exist
+(§4). This is not optional and not a late addition: it is a stage of the build plan.
 
 For every **UI-bearing** feature, capture a **screen-and-state inventory** — the screens
 it needs and, for each, the states that must exist: empty, sparse, dense, and error. This
@@ -170,12 +172,13 @@ architecture and component breakdown; technology choices *with the reasoning for
 each*; data model; key interfaces and contracts; error handling and failure modes;
 security and secret-handling approach; testing strategy; open questions.
 
-For a **desktop application** it also has a **Packaging & distribution** section
-(`~/.claude/cursor-bridge/Packaging-Conventions.md` §7): the executable and installer
-toolchain for this stack (§2 of that file), per-user or per-machine with the reason, the
-data location, the single version source, and the installer behaviour of §1 (already
-installed → Upgrade / Uninstall / Cancel; upgrade in place keeps data; uninstall keeps data
-unless opted out). **Code signing is the one escalation here**: a certificate costs money
+For **installable software** it also has a **Delivery** section
+(`~/.claude/cursor-bridge/Delivery-Conventions.md` §6): the kind (§1), the toolchain for
+this stack (§2.1 for a desktop app; the install-script contract of §3 for a CLI or local
+server), per-user or per-machine with the reason, the data location, the single version
+source, whether a server runs as a service, the command-reference generator for any CLI
+(§4), and the installer behaviour (already installed → Upgrade / Uninstall / Cancel;
+upgrade in place keeps data; uninstall keeps data unless opted out). **Code signing is the one escalation here**: a certificate costs money
 and identity verification, so present it once as a user-level consequence — unsigned
 (SmartScreen warns on first run, the manual explains the two clicks) or signed (the owner
 buys a certificate) — and record the answer.
@@ -346,16 +349,20 @@ Each increment with **logic, auth, input-handling, or data-access surface** carr
 and Socket", "authorization enforced at the boundary per ASVS §x") — checkable, not
 "is secure".
 
-For a **desktop application** the plan's **last stage is "Packaging & installer"**: the
-one-command build script, the committed installer script, the CI artifact, the deterministic
-verification (`installer-check.ps1`), and the User Manual's install chapter — with
-`Packaging-Conventions.md` §1's rows and §6's six steps as its acceptance criteria,
-verbatim. A desktop plan without this stage is incomplete.
+For **installable software** the plan's **last stage is "Packaging & installer"**: the
+build script or install script, the committed installer script (desktop), the CI artifact,
+the lifecycle verification (`installer-check.ps1`, or the project's `install-check.ps1` for
+a CLI), the command reference's currency check, and the User Manual's install and command
+chapters — with `Delivery-Conventions.md` §2/§3/§4's rows as its acceptance criteria,
+verbatim. The increment that first adds a command-line surface carries the
+command-reference generator (§4). A plan for installable software without this stage, or a
+CLI plan without the generator, is incomplete.
 
 Give each one an ID (`TASK-001`, `TASK-002`, …). Group the increments into named
 **stages** — a stage is a coherent, demonstrable chunk of the plan (a milestone), normally
 three to eight increments, and its close is a **reflection point** (see "Reflection
-points"). Every increment belongs to exactly one stage; the last stage ends at project end.
+points"). Every increment belongs to exactly one stage; **the close of the last stage is
+project end** (see "Reflection points" — it is a defined trigger, not a judgement).
 Run **plan-critic** over the plan, looking for ordering errors, increments that are secretly
 two increments, acceptance criteria that cannot actually be checked, stages that are not
 demonstrable on their own, and — for UI increments — whether the design acceptance criteria
@@ -402,8 +409,10 @@ with its default marked). Three parameters:
    or `off`, for the whole project or for named stages. It costs one extra gate pass per
    stage (one cross-family review) and buys a codebase that does not accumulate duplicates;
    the builder runs it needs are cheap.
-4. **Installer verification** *(desktop applications only)* — where the packaging stage's
-   install / upgrade-in-place / uninstall check (`installer-check.ps1`) runs.
+4. **Installer verification** *(installable software: desktop applications, command-line
+   tools, local servers)* — where the packaging stage's install / upgrade-in-place /
+   uninstall lifecycle check runs (`installer-check.ps1` for a desktop installer; the
+   project's `scripts/install-check.ps1` for an install script).
    - `local` *(default)* — on this machine, per-user, silently, fully reversed at the end
      (nothing is left installed, user data is never touched). Say plainly that the check
      installs and uninstalls the app on the owner's PC while it runs.
@@ -915,21 +924,35 @@ escalation, none of it stalls the loop, and none of it changes the bridge.
    parameter, an escalation, or project end stops the loop. (An approved phase gate is a
    different thing: those are always waited on, and they are all behind you by now.)
 
+**Project end is a defined trigger, not a judgement.** The project has ended when the
+**last stage of the approved build plan closes** — its last increment merged, its
+refactoring pass (if on) merged. Deferred increments do not postpone it: they are listed as
+deferred in the report and in `PROJECT_STATUS.md`, and the owner can reopen the project by
+adding work (the phase returns to `building`; the manual is then patched at reflection
+points as usual). At that stage close, run items 1–5 above and then the project-end items
+below **in the same turn** (under `Stage pause: run`; under `pause`, they run before the
+pause). Set `Phase: done` in `PROJECT_STATUS.md`. The report's first line is
+**"Project complete — <Name> <version>"** followed by the one thing the owner owns, if any
+(a deferred item to decide on, a release to publish); everything else is FYI. A project
+whose last stage has closed without this having run is in the wrong state: run it now.
+
 **At project end**, additionally:
 
 - **Write `Documents/<Name> User Manual.md`** from the finished software and `CHANGES.md`:
   what it does, how to use each feature, screen by screen where there are screens, in the
   user's language, with the plain-language limits and known gaps. Tier B screenshots, where
   they exist, may illustrate it. From then on it is patched at reflection points (item 4).
-  For a **desktop application** its first chapter is *Install, upgrade, uninstall*: where the
-  installer file is (`dist/<Name>-Setup-<version>-x64.exe`, or the release asset), the
-  SmartScreen note for an unsigned installer, what running it again offers (Upgrade /
-  Uninstall / Cancel), and where the user's data lives and that uninstalling keeps it.
-- **Deliver the installer** (desktop): run `installer-check.ps1` one final time on the
-  release build (per the `Installer verification` parameter), exercise the "already
-  installed" dialog once interactively, then attach `dist/<Name>-Setup-<version>-x64.exe`
-  as a GitHub Release asset where a remote exists, or name its path in the report and the
-  manual where there is none.
+  For **installable software** its first chapter is *Install, upgrade, uninstall*: where the
+  deliverable is (`dist/<Name>-Setup-<version>-x64.exe`, or `install.cmd`, or the release
+  asset), the SmartScreen note for an unsigned installer, what running it again offers
+  (Upgrade / Uninstall / Cancel), and where the user's data lives and that uninstalling
+  keeps it. For anything with a command-line surface the next chapter is the **command
+  reference rendered from `docs/cli-reference.json`** — never written from memory.
+- **Deliver the installer** (installable software): run the lifecycle verification one
+  final time on the release build (per the `Installer verification` parameter), exercise the
+  "already installed" dialog once interactively, then attach the deliverable as a GitHub
+  Release asset where a remote exists, or name its path in the report and the manual where
+  there is none.
 - **Run the promotion pass.** Read the Issues document and the Feedback document whole, and
   draft — as a final section of the Feedback document titled **"Proposed bridge changes"** —
   concrete proposed edits: which file in the governance tree, what wording, and which issue or
@@ -1309,12 +1332,24 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     Editors wrap at the window width; a wrap typed into the text narrows every paragraph
     below the window and survives every render. The same rule is carried in every brief so
     the builder's files obey it too.
-31. A desktop application is finished only when the owner can double-click one installer
-    file on Windows 11 x64 and get a properly installed application — per
-    `Packaging-Conventions.md`: per-user by default, registered in Apps & features with a
-    working uninstall, upgrade **in place** keeping user data, the installer offering
-    Upgrade / Uninstall / Cancel when already installed, one command to build it, and the
-    lifecycle proven by `installer-check.ps1`. Captured at intake, designed at Phase 2 (code
-    signing is the one escalation), the plan's last stage, verified per the
+31. Installable software — a desktop application, a command-line tool, a local server — is
+    finished only when the owner can double-click one file on Windows 11 x64 and get a
+    properly installed result — per `Delivery-Conventions.md`: per-user by default,
+    registered in Apps & features with a working uninstall, upgrade **in place** keeping
+    user data, Upgrade / Uninstall / Cancel when already installed, a CLI put on PATH from
+    an isolated environment built from the lock file, one command to build or install it,
+    and the lifecycle proven silently and reversibly. Captured at intake, designed at Phase
+    2 (code signing is the one escalation), the plan's last stage, verified per the
     `Installer verification` run parameter, delivered at project end with the manual's
     install chapter.
+32. Never instruct the owner with a project command you have not looked up. A project with a
+    command-line surface keeps `docs/cli-reference.json`, generated from the code and kept
+    current by a CI check; every run sheet, report, and manual passage that names a project
+    command copies its spelling, flags, and argument order from that file, or from a `--help`
+    you just ran — never from memory of the design, the plan, or an earlier conversation. A
+    command absent from the reference does not exist until `--help` proves otherwise; a
+    made-up command in a run sheet is a `FAIL` of the run-sheet rule.
+33. Project end is a trigger, not a judgement: the close of the approved plan's last stage.
+    Deferred increments do not postpone it. Run the project-end items in the same turn as
+    that stage close, set `Phase: done`, and open the report with "Project complete". A
+    project whose last stage closed without this is in the wrong state — run it now.

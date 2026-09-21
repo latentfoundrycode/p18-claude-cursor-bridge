@@ -35,7 +35,7 @@ the version has not changed (the owner is asking for certainty, not a version ch
 3. `~/.claude/cursor-bridge/Cursor-Project-Configuration.md`
 4. `~/.claude/cursor-bridge/Known-Pitfalls.md`
 5. `~/.claude/cursor-bridge/Observability-Conventions.md` (UI-bearing projects)
-6. `~/.claude/cursor-bridge/Packaging-Conventions.md` (desktop applications)
+6. `~/.claude/cursor-bridge/Delivery-Conventions.md` (installable software: desktop apps, CLIs, local servers)
 7. Every `SKILL.md` under `~/.claude/skills/`
 
 Subagent definitions under `~/.claude/agents/` are loaded fresh each time a subagent is

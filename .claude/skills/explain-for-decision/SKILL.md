@@ -271,6 +271,13 @@ PowerShell). Say whether the window must be opened *as administrator*.
 
 **3. The commands — literal, numbered, one per code block, in the order they run.**
 
+- A command that belongs to **the project's own software** is copied from
+  `docs/cli-reference.json` (or from a `--help` you ran in this session), never written from
+  memory. If it is not in the reference and `--help` does not show it, it does not exist —
+  do not hand the user a command you have not seen the program accept. A made-up command
+  is the worst failure a run sheet can have: it costs the user an error they cannot
+  interpret and their trust in every command after it.
+
 - Every command is complete and copy-pasteable **as written**: the flag is in the command,
   not described beside it. Never "the usual command", "same as before", "with the verbose
   option".

@@ -1,6 +1,6 @@
 <#
 installer-check.ps1 - drive a Windows installer through install / upgrade-in-place / uninstall
-silently and assert each state (Packaging-Conventions.md section 6).
+silently and assert each state (Delivery-Conventions.md section 2.3).
 
   powershell -NoProfile -ExecutionPolicy Bypass -File installer-check.ps1 `
       -Installer dist\App-Setup-1.2.0-x64.exe -AppName "App" -AppId "{GUID}" -Exe "App.exe" -Version "1.2.0" `
