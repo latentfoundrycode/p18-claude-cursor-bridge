@@ -11,6 +11,27 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.22c
+
+**What changed**
+- **`Performance-Patterns.md`** — the bridge's catalogue of recurring causes of slowness
+  and cost, in Known-Pitfalls' discipline: fixed entry shape (pattern, symptom, fix,
+  measure, applies to, evidence), nine seeded entries `PP-001`–`PP-009` (N+1 calls, full
+  scans, recomputation, synchronous IO on hot paths, unbounded growth, large-object
+  serialization, interface-thread work, per-item model calls, eager startup), admission
+  rule (recurs across projects, not covered, measurable), promotion from optimization
+  commits with their numbers. Three readers wired: `plan-critic`'s performance lens names
+  the `PP-nnn` a design walks into; `refactor-scout` uses the symptom column as its search
+  list and names the entry (or `PP-new`) per candidate; the supervisor writes a failing
+  benchmark's corrected brief from the named pattern's fix. Promotion pass proposes entries.
+  Rule 15 extended.
+
+**Running projects must**
+- *(all phases)* Nothing to change in the project; the readers pick the catalogue up at
+  their next use.
+
+---
+
 ## 2026.09.22b
 
 **What changed**

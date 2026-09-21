@@ -52,10 +52,11 @@ a **budgeted metric** faster, lighter, or cheaper without changing behaviour. Lo
 
 - a budget that is failing, or within its tolerance band of failing;
 - a hot spot in a profile that this stage's diff introduced or touched;
-- the known patterns: a query or model call repeated inside a loop, recomputation of an
-  unchanged value, synchronous IO on a hot path, unbounded growth of a collection or cache,
-  serialization of large objects on every call, a full scan where the access pattern wants
-  an index, work on the UI thread that belongs in the background.
+- the known patterns in `~/.claude/cursor-bridge/Performance-Patterns.md` (read it by that
+  absolute path first): use each entry's **symptom** as a search over the profiles and the
+  diff, and name the matching entry (`PP-nnn`) in the candidate, carrying its fix and its
+  measure. A hot spot that matches no entry is still a candidate if a profile and a
+  budgeted metric back it — mark it `PP-new` so the promotion pass can propose an entry.
 
 Rank these by **measured impact on a budgeted metric** — the profile's share of time or
 memory, or the accounted cost — never by how elegant the change would be. For each
@@ -92,7 +93,7 @@ REFACTOR CANDIDATES — stage <name>, base <sha>..HEAD, budget <N> lines
 
 OPTIMIZATION CANDIDATES (performance lens, if inputs were given)
 1. <title>  [~<lines> lines]  [COVERED | UNCOVERED]  proves with: <benchmark>/<metric>  now <value> → expected <value>  budget <PERF-nnn: limit>
-   Site: <file:lines>   Pattern: <which one>   Evidence: <profile share / accounted cost>
+   Site: <file:lines>   Pattern: PP-nnn <name> | PP-new   Evidence: <profile share / accounted cost>
    Proposed shape: <one sentence>
 
 Beyond budget (record to docs/HARDENING.md): <titles, one line each>

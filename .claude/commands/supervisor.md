@@ -729,7 +729,11 @@ tests: `scripts/bench.ps1` then
 `python ~/.claude/cursor-bridge/bench-check.py bench/budgets.json bench/baseline.json bench/results/latest.json`.
 `OVER BUDGET`, `REGRESSION`, or `NOT MEASURED` is a correctness-class block: re-delegate
 with the numbers in the brief, never route it to the user, and never fix it by loosening a
-budget or moving the baseline (`Merge-Verification-Policy.md` §Anti-gaming).
+budget or moving the baseline (`Merge-Verification-Policy.md` §Anti-gaming). Write the
+corrected brief from a **named cause**: profile the failing benchmark, match the hot spot
+against `~/.claude/cursor-bridge/Performance-Patterns.md`, and put the entry's fix and
+measure in the brief — never "make it faster". A hot spot that matches no entry goes through
+`root-cause-first` like any other defect.
 
 For a UI-bearing increment, the tests you write include the **observability tests** (Tier A):
 drive the app to each affected inventory state *through the real render path* and assert no
@@ -1058,7 +1062,13 @@ whose last stage has closed without this having run is in the wrong state: run i
   concrete proposed edits: which file in the governance tree, what wording, and which issue or
   feedback item motivates each. That section is a proposal for the maintainer to accept or
   reject; you change nothing in the bridge. (This replaces any automated skill optimiser: the
-  scoring here is the maintainer's judgement, and the loop stays human-approved.)
+  scoring here is the maintainer's judgement, and the loop stays human-approved.) The same
+  section proposes **Performance-Patterns entries**: for every optimization commit whose
+  before/after numbers proved a pattern the catalogue lacks (`PP-new` in the scout's
+  output) or sharpened one it has, draft the entry in the catalogue's shape — pattern,
+  symptom, fix, measure, applies to — with this project, the commit, and the numbers as
+  evidence. The admission rule applies: recurring across projects or plainly will, not
+  already covered, measurable.
 
 ### Issues — what counts, and where it is written
 
@@ -1327,7 +1337,10 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     admission gate. Only a genuine *intent* question ("is a slower/more expensive but safer
     path wanted", "should the software do X differently") reaches them — never "is this code
     secure". Pin and SHA-lock every scanner and CI action; never auto-adopt a tool update.
-15. Don't re-learn a known mistake. Read `~/.claude/cursor-bridge/Known-Pitfalls.md` at the
+15. Don't re-learn a known mistake — or a known slowness. Read
+    `~/.claude/cursor-bridge/Performance-Patterns.md` wherever a budget is designed, a
+    benchmark fails, or the stage-close pass runs its performance lens; a candidate or a
+    corrected brief names its `PP-nnn`. Read `~/.claude/cursor-bridge/Known-Pitfalls.md` at the
     configure and build phases; when the loop discovers a new *generalizable* misconception or
     mistake, record it in the Documents Issues file under its `ISS-nnn` with
     `generalizable: yes` so the maintainer can promote it up. Verify-first

@@ -24,7 +24,9 @@ build loop's *instructions* — governance, not any product. They install over t
     `CHANGELOG.md` — the release stamp; and `installer-check.ps1`, the install / upgrade /
     uninstall lifecycle check for desktop installers; and `bench-check.py`, the benchmark floor
     checker against budgets and a committed baseline): `Cursor-File-Formats.md`,
-    `Delivery-Conventions.md`, `Performance-Conventions.md`,
+    `Delivery-Conventions.md`, `Performance-Conventions.md`, `Performance-Patterns.md`
+    (the catalogue of recurring causes of slowness and cost, maintained like
+    `Known-Pitfalls.md`),
     `Cursor-Project-Configuration.md`, `Merge-Verification-Policy.md`, the bundled
     `vercel-interface.snapshot.md` fallback, and `design-seeds/` (the vendored
     awesome-design-md corpus — one `DESIGN.md` per brand, a seed to bootstrap a project's

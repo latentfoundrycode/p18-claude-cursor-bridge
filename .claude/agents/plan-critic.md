@@ -34,12 +34,15 @@ Attack it along these lines:
 - **Security criteria.** Does the design address authorization, input validation, and
   secret-handling at each trust boundary? Is the chosen ASVS level recorded, and does it fit
   the data sensitivity? Are the security acceptance criteria it implies actually checkable?
-- **Performance lens (where budgets exist).** For each budget in the design: is a mechanism
-  named that plausibly meets it at the stated data size — or is there an O(n²) step over
-  thousands of items, a full scan where an index is implied, a per-item network or model
-  call in a loop, an unbounded collection or cache, IO on the UI or request thread? Is the
-  budgeted operation measurable in isolation with fixed inputs? A budget with no mechanism
-  behind it is **Blocking**; a mechanism that cannot scale to the stated size is **Blocking**.
+- **Performance lens (where budgets exist).** Read `~/.claude/cursor-bridge/Performance-Patterns.md`
+  (by that absolute path). For each budget in the design: is a mechanism named that
+  plausibly meets it at the stated data size — or does the design walk into a catalogued
+  pattern (name the `PP-nnn`): a per-item query or model call in a loop, a full scan where
+  an index is implied, recomputation of unchanged values, synchronous IO on a hot path, an
+  unbounded collection or cache, work on the interface thread, eager startup, per-item model
+  calls where batching or a cheaper model would do? Is the budgeted operation measurable in
+  isolation with fixed inputs? A budget with no mechanism behind it is **Blocking**; a
+  mechanism that cannot scale to the stated size is **Blocking**.
 
 ## When reviewing a build plan
 

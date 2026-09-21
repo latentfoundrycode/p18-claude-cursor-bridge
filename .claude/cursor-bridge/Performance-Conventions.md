@@ -61,7 +61,7 @@ The stage-close pass (supervisor Phase 6 step 9) gains a second lens beside dupl
 
 - a budget that is failing or within its tolerance band of failing;
 - a hot spot in a profile that the stage's diff introduced or touched;
-- the known patterns: repeated queries or model calls inside a loop, recomputation of an unchanged value, synchronous IO on a hot path, unbounded growth, serialization of large objects on every call, a missing index or the wrong data structure for the access pattern, blocking the UI thread.
+- the known patterns — the catalogue `Performance-Patterns.md` (`PP-nnn`): its *symptom* column is the search list, and each candidate names the entry it matches, with the entry's fix and measure carried into the brief. A pattern the catalogue does not have is still a candidate if a profile and a budgeted metric back it; it is then a promotion candidate at project end.
 
 It ranks candidates by **measured impact** on a budgeted metric — never by how elegant the change would be — and marks each with the benchmark that will prove it. Candidates then follow the pass's mechanics unchanged: one branch per stage, one small brief and one commit per candidate, the purity check (an optimization is behaviour-preserving; the tests do not change), and **one gate pass** for the whole branch. Two additions:
 
