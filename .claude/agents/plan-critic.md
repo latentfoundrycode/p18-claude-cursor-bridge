@@ -34,6 +34,12 @@ Attack it along these lines:
 - **Security criteria.** Does the design address authorization, input validation, and
   secret-handling at each trust boundary? Is the chosen ASVS level recorded, and does it fit
   the data sensitivity? Are the security acceptance criteria it implies actually checkable?
+- **Migration policy.** Does the data model state which regime the project is in —
+  pre-release (edit the schema definitions, rebuild disposable databases, no migrations) or
+  shipped (additive migrations first, destructive only with a data-preserving path) — and
+  when it switches? A design that plans destructive migrations on a pre-release, disposable
+  database is spending risk for nothing; one that plans schema edits after data exists in
+  the field is destroying it. Missing regime: **Should fix**.
 - **Performance lens (where budgets exist).** Read `~/.claude/cursor-bridge/Performance-Patterns.md`
   (by that absolute path). For each budget in the design: is a mechanism named that
   plausibly meets it at the stated data size — or does the design walk into a catalogued

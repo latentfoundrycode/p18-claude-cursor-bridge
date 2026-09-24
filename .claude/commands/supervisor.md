@@ -187,7 +187,11 @@ instance, the practical stake — rather than assuming it is self-evident.
 
 Write `docs/DESIGN.md`. It covers: purpose and scope; explicit non-goals;
 architecture and component breakdown; technology choices *with the reasoning for
-each*; data model; key interfaces and contracts; error handling and failure modes;
+each*; data model **and its migration policy** (pre-release: schema definitions are
+edited and disposable databases rebuilt, no migrations; from the first shipped version:
+migrations, additive first, destructive only with a data-preserving path — record which
+regime the project is in and when it switches); key interfaces and contracts; error
+handling and failure modes;
 security and secret-handling approach; testing strategy; open questions.
 
 For **installable software** it also has a **Delivery** section
@@ -599,6 +603,10 @@ increment, the brief must name the exact approved mockup file(s) and the relevan
 `docs/design/DESIGN.md` sections, and list the frozen `vercel-interface.mdc` as an
 applicable rule. Every brief carries the Workspace boundary and the standing invitation to
 note tooling friction in `docs/BUILDER_NOTES.md` (spec-packager's constraints template).
+spec-packager's **reality check** runs first: the schema, configuration, data, and
+interfaces the increment assumes must exist in the codebase *as built*; "approved in the
+plan" is not "fits the data" (KP-019). A mismatch comes back to you as a scope question,
+not as a brief.
 
 ### 3. Delegate to Cursor
 
@@ -710,6 +718,15 @@ reviewer — run the admission gate on the candidate *before* accepting it: **`s
 score <ecosystem> <pkg>`** (the ecosystem argument is required, e.g. `socket package score
 npm lodash`) and an **OSV-Scanner** lookup.
 
+- **The lockfile is part of the dependency.** After admitting one, the increment must
+  change the manifest *and* the lockfile CI installs from. Reviewers read what is in a diff,
+  not what is missing from it, so this is checked deterministically before any reviewer:
+  ```bash
+  python ~/.claude/cursor-bridge/lock-check.py <checkpoint-sha>
+  ```
+  `LOCKFILE MISSING FROM DIFF` re-delegates with "regenerate the lockfile with the project's
+  lock command and commit it in the same increment" (KP-018). Name the project's lock command
+  and lockfile in `PROJECT_STATUS.md` at configuration.
 - **Malicious or known-bad** → reject the dependency and find an alternative. This is a
   correctness call you make and record in `docs/CHANGES.md` — **not** an escalation.
 - **Clean but carrying a licence / cost / lock-in consequence** → escalate as today (the
@@ -840,16 +857,26 @@ instead. In short, a branch merges to `main` only when **all** hold:
 2. **Review A** — the `diff-reviewer` subagent (pinned to a strong model) returns
    APPROVE on the cumulative diff;
 3. **Review B** — a **cross-family**, non-Anthropic verifier returns APPROVE on the same
-   diff, invoked read-only per the policy. **Write the diff to a committed file and have
-   Review B read it from that file — never pass it inline through the shell** (inline
-   heredocs mangle or drop the diff, and a reviewer that received no diff can still emit an
-   APPROVE-shaped reply). Launch it with the trust-bypass flag (`-f`) so it runs in a fresh
+   diff, invoked read-only per the policy. **Write the diff to a committed file inside the
+   workspace and have Review B read it from that file — never pass it inline through the
+   shell** (inline heredocs mangle or drop the diff, and a reviewer that received no diff can
+   still emit an APPROVE-shaped reply). Two rules make that file whole and reachable:
+   (a) **generate it only from committed state** — `git status --porcelain` must print
+   nothing first, then `git diff <merge-base>...HEAD > run/review/REVIEW-<nnn>.diff`; a diff
+   taken from the working tree silently omits every untracked new file (KP-017);
+   (b) **the file lives inside `Workspace/`** at `run/review/`, committed on the increment's
+   branch and removed with `git rm` before the merge — never in a temp folder outside the
+   project, which the Workspace boundary rightly blocks (KP-016). Launch it with the trust-bypass flag (`-f`) so it runs in a fresh
    worktree, and give a **directive** prompt ("the diff is already at `<path>`; read it;
    do not ask for it"). A reply that does not name something specific from the diff — or
    that asks for the diff, or errors on trust — is a failed launch, not a verdict: re-run.
    Confirm receipt before trusting the verdict, and `git status` clean afterward;
 4. no gate-integrity flag is open — the diff does not weaken tests, assertions, or CI, and
    the builder's model family differs from both reviewers'.
+
+**Convergence is a signal.** When two or more reviewers or auditors independently name the
+same line or the same defect, treat it as blocking even if each alone marked it advisory:
+decorrelated reviewers agreeing is the strongest evidence the loop produces.
 
 A `REJECT` from either reviewer goes back through re-delegation (step 7), not to the user
 — continue while concerns converge and get fixed, stopping only on non-convergence per
@@ -1491,3 +1518,10 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     before/after numbers and moves the baseline. A budget passes by the software getting
     faster, never by the budget getting looser. Complexity without a measured gain is
     rejected.
+36. Every artifact the loop writes lives inside `Workspace/` — the reviewer's diff file, the
+    resolution-round file, debug captures, benchmark results — never in a temp folder
+    outside it. A reviewer's diff is generated only from committed state (`git status`
+    clean, `git diff <merge-base>...HEAD`) so a new file is never silently absent; a
+    manifest change without its lockfile change fails `lock-check.py` before any reviewer;
+    a brief is packaged only after a reality check that what it assumes exists as built;
+    two reviewers converging on one line is blocking.

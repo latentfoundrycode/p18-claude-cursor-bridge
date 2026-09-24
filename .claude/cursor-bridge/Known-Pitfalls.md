@@ -201,3 +201,49 @@ it applies.**
   requirement) is fixed directly.
 - **Applies:** every behaviour defect in the loop; every Claude Code session fixing a bug —
   the skill needs no bridge machinery.
+
+### KP-016 — Loop artifacts written outside `Workspace/` break as soon as the boundary is installed
+- **Surfaced:** Technical Documentation Provider, 2026-09-20 (ISS-003). Calibration installed
+  the always-on workspace-boundary rule; the very next Review B hand-off failed because the
+  reviewer's diff file had been written to a scratch folder outside the project, which the
+  builder/reviewer now (correctly) refused to read.
+- **Correction:** every artifact the loop writes lives inside `Workspace/` at a named path —
+  `run/review/` for reviewer diffs and resolution-round files, `bench/` for results and
+  profiles, the artifacts dir for debug captures. A calibration that installs the boundary
+  relocates any existing scratch files first. Standing rule 36.
+- **Applies:** every project; every calibration that adds the boundary.
+
+### KP-017 — `git diff` from the working tree omits untracked new files, so a reviewer gets an incomplete diff
+- **Surfaced:** the same project, twice in one stage: a new module, then a new test file,
+  absent from the diff written for Review B because they had not been committed yet. The
+  reviewer refused the incomplete diff — the gate held, but a round was lost each time.
+- **Correction:** the reviewer's diff is generated only from committed state:
+  `git status --porcelain` must be empty, then `git diff <merge-base>...HEAD`. Never a
+  working-tree diff for a reviewer. (`scope-check.py` already counts untracked files; the
+  reviewer diff must too.)
+- **Applies:** every Review B invocation; any diff handed to a reviewer from a file.
+
+### KP-018 — A dependency added to the manifest without its lockfile passes every reviewer and fails CI
+- **Surfaced:** the same project, 2026-09-21 (ISS-004). `apscheduler` was added to
+  `pyproject.toml`; plan-critic, four reviewers, and secret-sentinel all passed the diff —
+  the sentinel even read "no lockfile churn" as a clean sign — and CI failed at test
+  collection with `ModuleNotFoundError`, because CI installs from `requirements.lock`.
+- **Correction:** reviewers read what is *in* a diff; the missing lockfile change was an
+  absence nothing looked for. `lock-check.py` now fails a manifest change without its
+  lockfile change, at the admission gate and in secret-sentinel, before any reviewer. The
+  general lesson: for every "must also change" pair, add an *expected-file-missing* check;
+  a reviewer cannot notice an absence.
+- **Applies:** every dependency admission; every project with a lockfile CI installs from.
+
+### KP-019 — "Approved in the plan" is not "fits the data"; and CI events can simply be late
+- **Surfaced:** the same project, three times: a web-fallback feature in the approved plan
+  had no valid target because the corpora were pinned local snapshots; a per-snapshot cost
+  field had no home in the schema; a cost figure had no requirement behind it. Separately,
+  a `gate` workflow run appeared ~5 minutes after the pull-request event and, read as
+  dropped, prompted empty commits and close/reopen nudges that were not needed.
+- **Correction:** spec-packager runs a **reality check** before every brief — the schema,
+  configuration, data sources, and interfaces the increment assumes must exist as built;
+  a mismatch comes back as a scope question, never as a brief. And for CI: poll for the
+  run against the exact head SHA with a patient timeout (several minutes) before
+  concluding an event was lost; never stack empty commits to force one.
+- **Applies:** every brief; every wait on a CI run.

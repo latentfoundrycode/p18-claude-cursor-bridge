@@ -11,6 +11,41 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.24
+
+**What changed** — from the first Bridge Feedback document to come through the channel
+(Technical Documentation Provider, three stage closes).
+- `scope-check.py` strips a trailing annotation from a scope entry (`path (new)`,
+  `path - note`, `path # note`) instead of reading it as a different path (false drift).
+- New `lock-check.py`: a dependency-manifest change without its lockfile change fails at the
+  admission gate and in `secret-sentinel` before any reviewer — an *expected-file-missing*
+  check reviewers cannot perform (ISS-004, KP-018).
+- The reviewer's diff is generated only from committed state and lives inside the workspace
+  at `run/review/REVIEW-<nnn>.diff` (committed on the branch, removed before merge) —
+  never a working-tree diff (omits untracked new files, KP-017), never a temp path outside
+  `Workspace/` (the boundary blocks it, KP-016 / ISS-003). Standing rule 36.
+- `spec-packager` runs a **reality check** before every brief: what the increment assumes
+  must exist as built; a mismatch returns as a scope question (KP-019).
+- **Convergence is a signal:** two or more reviewers naming the same line is blocking even
+  if each called it advisory (merge policy; step 8).
+- The design records a **migration policy** (pre-release rebuild vs shipped migrations);
+  plan-critic checks it.
+- KP-016–KP-019 (artifacts outside the workspace; untracked-file diffs; lockfile; plan vs
+  data, and CI event lag: poll the head SHA patiently, never stack empty commits).
+
+**Running projects must**
+- *(all phases)* Move any loop artifact written outside `Workspace/` (reviewer diffs,
+  resolution files, captures) to its in-workspace path; from now on generate reviewer diffs
+  from committed state only.
+- *(Phase 5 or later)* Record the project's lock command and lockfile in `PROJECT_STATUS.md`;
+  `lock-check.py` runs at the next dependency admission.
+- *(Phase 6)* The next brief goes through the reality check; the next split or advisory
+  convergence follows the new rule.
+- *(Phase 2 not yet passed)* Add the migration policy to the design; *(later phases)* record
+  the regime in `PROJECT_STATUS.md` at the next reflection point.
+
+---
+
 ## 2026.09.22c
 
 **What changed**

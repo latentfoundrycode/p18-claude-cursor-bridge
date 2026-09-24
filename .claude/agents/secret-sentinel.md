@@ -56,6 +56,14 @@ two voices do not disagree on the same package. Your job here is the shape (pinn
 named?) and surfacing it for the licence question and the admission gate; the floor owns
 "is it bad."
 
+**The lockfile is part of the dependency — check for what is missing.** If the diff changes
+a dependency manifest (`pyproject.toml`, `requirements.in`, `package.json`, `Cargo.toml`,
+`go.mod`, …) and the lockfile CI installs from (`requirements.lock`, `uv.lock`,
+`package-lock.json`, `Cargo.lock`, `go.sum`, …) is **not** in the same diff, that is a
+**BLOCK**, and "no lockfile churn" is never a clean sign when the manifest moved. Run
+`python ~/.claude/cursor-bridge/lock-check.py <base>` and report its output; a
+`LOCKFILE MISSING FROM DIFF` line is the finding.
+
 **Outbound calls.** New network calls, telemetry, analytics, or any URL that was not
 in the design. Say where it points.
 

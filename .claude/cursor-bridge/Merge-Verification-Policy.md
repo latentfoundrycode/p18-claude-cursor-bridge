@@ -246,6 +246,11 @@ tail). Stop entirely only on genuine non-convergence: the **same** defect unfixe
 fix that **regresses** something already passing. A deadlock over what the software should
 **do** is the one thing that reaches the human, as an intent question.
 
+**Convergence is a signal.** When two or more reviewers or auditors independently name the
+same line or the same defect, it is blocking even if each alone marked it advisory —
+decorrelated reviewers agreeing is the strongest evidence this gate produces (three of four
+converged on a lock-leaking lifecycle bug that each had called advisory).
+
 **Split verdicts are resolved by the supervisor, not escalated.** First **name the
 disagreement out loud** — `REVIEWERS DISAGREE on <crux>`, which reviewers, and whether the
 crux is correctness or intent — so the split is on the record rather than dissolving into
@@ -409,7 +414,12 @@ not a new model or invocation: the directive prompt tells it to check those clas
 Two options for reaching it:
 
 - *Default — via Cursor's CLI (no new secret, no script):* write the verification brief and
-  the diff to a committed file, then invoke `cursor-agent -p --model <Review B family>` with
+  the diff to a committed file **inside the workspace** (`run/review/REVIEW-<nnn>.diff`,
+  committed on the increment's branch, `git rm`-ed before the merge — never a temp path
+  outside `Workspace/`, which the boundary blocks), **generated only from committed state**
+  (`git status --porcelain` empty, then `git diff <merge-base>...HEAD`; a working-tree diff
+  omits every untracked new file, and a reviewer that receives an incomplete diff has
+  correctly refused it twice), then invoke `cursor-agent -p --model <Review B family>` with
   a prompt that tells it to **read the diff from that file** — do **not** pass the diff
   inline through the shell. (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a

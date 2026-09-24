@@ -20,6 +20,16 @@ Read `docs/BUILD_PLAN.md` for the increment, `docs/DESIGN.md` for the constraint
 must respect, and the actual source files it will touch. Do not describe code you
 have not looked at.
 
+**Reality check before writing — "approved in the plan" is not "fits the data".** Confirm
+that everything the increment *assumes* exists in the codebase as built today: the tables,
+columns, and fields it reads or writes; the configuration keys and their loading path; the
+data sources it targets (a live source that is actually a pinned local snapshot has no
+target); the interfaces and signatures it calls. Open the files and check. If an assumption
+does not hold, **do not write the brief** — hand back to the supervisor a one-paragraph
+mismatch ("the plan assumes X; the code has Y") so it becomes a scope question or a plan
+correction. Three times on one project the frozen plan met the as-built data and had to
+bend; catching it here costs minutes, catching it after delegation costs a round.
+
 ## Write to `handoff/TASK-<nnn>.md`
 
 ```markdown

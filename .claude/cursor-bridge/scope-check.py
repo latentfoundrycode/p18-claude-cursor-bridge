@@ -68,7 +68,11 @@ def parse_scope(brief_path):
         if in_scope:
             m = re.match(r"^\s*[-*]\s+(.+?)\s*$", line)
             if m:
-                entry = m.group(1).strip().strip("`").strip()
+                entry = m.group(1).strip()
+                # Strip a trailing annotation: "path  (new)", "path - comment", "path # note",
+                # "path -- note". Only the leading path token is the scope entry.
+                entry = re.split(r"\s+(?:\(|#|--|-\s|—)", entry, maxsplit=1)[0]
+                entry = entry.strip().strip("`").strip().rstrip(",;")
                 if entry and not entry.lower().startswith("do not"):
                     entries.append(_norm(entry))
     if not entries:

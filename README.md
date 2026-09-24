@@ -23,7 +23,8 @@ build loop's *instructions* — governance, not any product. They install over t
     stage's refactoring diff; plus `bridge-check.py`, `VERSION`, `MANIFEST.json`, and
     `CHANGELOG.md` — the release stamp; and `installer-check.ps1`, the install / upgrade /
     uninstall lifecycle check for desktop installers; and `bench-check.py`, the benchmark floor
-    checker against budgets and a committed baseline): `Cursor-File-Formats.md`,
+    checker against budgets and a committed baseline; and `lock-check.py`, which fails a
+    dependency-manifest change that lacks its lockfile change): `Cursor-File-Formats.md`,
     `Delivery-Conventions.md`, `Performance-Conventions.md`, `Performance-Patterns.md`
     (the catalogue of recurring causes of slowness and cost, maintained like
     `Known-Pitfalls.md`),
