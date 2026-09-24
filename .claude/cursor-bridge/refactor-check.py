@@ -13,9 +13,13 @@ checkable without judgement, and this script checks them against a base ref:
   3. The diff is within the size budget one reviewer can hold well
      (default 400 changed lines = insertions + deletions).
 
-Usage:  python refactor-check.py <base-ref> [--max-lines N] [--allow-test <path> ...]
+Usage:  python refactor-check.py <base-ref> [--max-lines N] [--allow-test <path> ...] [--lane tests]
         --allow-test lists test files the brief explicitly allowed (a mechanical
         rename or an import path), each of which the reviewer must then read.
+        --lane tests   the TEST-INFRASTRUCTURE lane: the supervisor consolidating its own
+        test helpers. Inverts the rule - no production file may change, test files may;
+        the supervisor separately proves the collected test set is identical before and
+        after (e.g. `pytest --collect-only -q`). Still no docs/CHANGES.md change.
 
 Prints PURE or IMPURE with the reasons. Exit 0 = pure, 1 = impure, 2 = cannot
 verify (not a git repo, bad ref). ASCII-only on purpose (cp1252 consoles).
@@ -61,12 +65,15 @@ def main():
     base = argv[0]
     max_lines = 400
     allowed = set()
+    lane = "production"
     i = 1
     while i < len(argv):
         if argv[i] == "--max-lines" and i + 1 < len(argv):
             max_lines = int(argv[i + 1]); i += 2
         elif argv[i] == "--allow-test" and i + 1 < len(argv):
             allowed.add(argv[i + 1].replace("\\", "/")); i += 2
+        elif argv[i] == "--lane" and i + 1 < len(argv):
+            lane = argv[i + 1]; i += 2
         else:
             i += 1
 
@@ -80,9 +87,16 @@ def main():
     files += [l[3:].strip() for l in untracked.splitlines() if l.startswith("??")]
 
     reasons = []
-    tests = [f for f in files if is_test(f) and f.replace("\\", "/") not in allowed]
-    if tests:
-        reasons.append("test file(s) changed: " + ", ".join(tests))
+    if lane == "tests":
+        prod = [f for f in files if not is_test(f) and f.replace("\\", "/") != "docs/CHANGES.md"]
+        if prod:
+            reasons.append("production file(s) changed in the tests lane: " + ", ".join(prod))
+        if not any(is_test(f) for f in files):
+            reasons.append("tests lane but no test file changed")
+    else:
+        tests = [f for f in files if is_test(f) and f.replace("\\", "/") not in allowed]
+        if tests:
+            reasons.append("test file(s) changed: " + ", ".join(tests))
     if any(f.replace("\\", "/") == "docs/CHANGES.md" for f in files):
         reasons.append("docs/CHANGES.md changed (a refactoring has no behaviour change to log)")
     ins = re.search(r"(\d+) insertion", stat)
@@ -91,8 +105,8 @@ def main():
     if changed > max_lines:
         reasons.append("diff size %d changed lines exceeds budget %d" % (changed, max_lines))
 
-    print("base: %s | files: %d | changed lines: %d (budget %d) | allowed test files: %d"
-          % (base, len(files), changed, max_lines, len(allowed)))
+    print("base: %s | lane: %s | files: %d | changed lines: %d (budget %d) | allowed test files: %d"
+          % (base, lane, len(files), changed, max_lines, len(allowed)))
     for a in sorted(allowed):
         print("  reviewer must read allowed test file: %s" % a)
     if reasons:
@@ -100,7 +114,7 @@ def main():
         for r in reasons:
             print("  - " + r)
         return 1
-    print("PURE: no test change, no CHANGES.md entry, within size budget.")
+    print("PURE: %s, no CHANGES.md entry, within size budget." % ("no production change (tests lane - prove the collected test set is unchanged)" if lane == "tests" else "no test change"))
     return 0
 
 

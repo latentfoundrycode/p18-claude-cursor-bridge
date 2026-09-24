@@ -51,6 +51,19 @@ changed, a warm cache measured where the budget stated cold. Any of those is a
 
 ## What you are checking
 
+**The design the diff embodies — not only its fidelity to the brief.** The brief can be
+wrong: it is written by the supervisor from a plan that met the as-built data late, and a
+reviewer once caught a brief whose reserved-region design would have zeroed out a real
+charge. Review what the change *does* to the system — its scope, its failure modes, what it
+allows — and report a flaw in the commissioned design as a finding, not as "matches the
+brief". A design flaw the brief caused is a `FAIL` with the reason, and the supervisor
+corrects the brief.
+
+**External-service code — was the contract recorded or assumed?** For any adapter or
+client of a third-party API: do its tests replay fixtures recorded from the real service
+(the contract-capture increment), or a mock the builder wrote? A builder-invented mock is a
+`FAIL` — it proves the assumption, not the service (KP-020).
+
 **Conformance — did it do what was asked?**
 
 - Is every requirement in the brief implemented?

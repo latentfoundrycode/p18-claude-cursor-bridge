@@ -247,3 +247,44 @@ it applies.**
   run against the exact head SHA with a patient timeout (several minutes) before
   concluding an event was lost; never stack empty commits to force one.
 - **Applies:** every brief; every wait on a CI run.
+
+### KP-020 — A mock the builder wrote tests the builder's assumption, not the external service
+- **Surfaced:** SFVF, Stage P (2026-09-20). Six provider adapters merged green — RED
+  contract, decorrelated review, CI — against mocked responses. Every one failed on its
+  first real call. The mocks encoded each adapter author's assumption about hosts, required
+  fields, and next-step URLs; a wrong assumption produced a self-consistent green test.
+- **Correction:** for any external service, the first increment is a **contract capture**:
+  an attended live call (owner's key; the usual once-per-service escalation) whose real
+  responses are recorded as fixtures with secrets scrubbed; adapter tests replay them, and
+  "done" means passing against recorded real responses or a live smoke. The brief forbids
+  invented mocks; plan-critic blocks an integration plan without a capture; diff-reviewer
+  fails an adapter tested only against a builder-written mock. Standing rule 37.
+- **Applies:** every project integrating a third-party API, SDK, or provider.
+
+### KP-021 — A status-gated error scrub hides real errors; redact by pattern instead
+- **Surfaced:** SFVF, Stage P. A hardening change blanked error bodies on 401/403 to stop a
+  reflected API key leaking — correct aim — and thereby blanked a legitimate Google 403
+  body during live diagnosis, forcing a separate raw diagnostic.
+- **Correction:** redact credential *patterns* from all error output; never blank a whole
+  body on a status code. Both security and diagnosability survive. Added to
+  `secure-coding.snapshot.md` (V15) and to `security-auditor`'s review.
+- **Applies:** every error-handling or logging hardening.
+
+### KP-022 — The builder silently ran on a reviewer's model family; nothing enforced the roster
+- **Surfaced:** SFVF, Stage P. The delegated builder had been run as an OpenAI-family model —
+  the same family as Review B — for several increments, collapsing the decorrelation the
+  merge gate depends on. Caught only when calibration re-read the merge policy.
+- **Correction:** `docs/ROSTER.json` names the three models; `roster-check.py` fails a shared
+  or unknown family and a delegate command without `--model <builder>`; it runs at
+  configuration, at every calibration, and at every checkpoint. Standing rule 38.
+- **Applies:** every project; every time a model is changed.
+
+### KP-023 — A worktree with a real, briefly locked environment fails teardown; it is not the junction hazard
+- **Surfaced:** SFVF, Stage P, on every increment that built a real `.venv` inside its
+  worktree: `git worktree remove` hit `Permission denied` (antivirus or a lingering handle),
+  leaving an orphaned directory that a later delete removed cleanly.
+- **Correction:** distinguish the two cases. A linked environment → the junction primitive
+  (KP-011). A real, locked environment → wait and retry, else defer the delete to the next
+  checkpoint; `--force` unlocks nothing and is still forbidden without a link check.
+  `Cursor-Project-Configuration.md` §1.
+- **Applies:** every Windows worktree teardown with a real environment inside.

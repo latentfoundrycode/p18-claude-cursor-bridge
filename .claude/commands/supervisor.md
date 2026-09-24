@@ -387,6 +387,17 @@ verbatim. The increment that first adds a command-line surface carries the
 command-reference generator (§4). A plan for installable software without this stage, or a
 CLI plan without the generator, is incomplete.
 
+For every **external service** the software talks to (a third-party API, SDK, or
+provider), the plan's first increment on that integration is a **contract capture**: an
+attended live call that records the service's real responses as fixtures (secrets
+scrubbed), which the adapter's tests then replay. A mock the builder invents encodes the
+builder's *assumption* about the service, and a wrong assumption produces a
+self-consistent green test — six adapters once merged green that way and every one failed
+on its first real call (KP-020). "Done" for an external-integration increment means passing
+against recorded real responses or an attended live smoke, never against an invented mock.
+The live call needs the owner's key and possibly money: that is the existing
+secret/cost escalation, asked once per service.
+
 For every **budget** the plan carries a **benchmark increment** — a benchmark in `bench/`
 that drives the budgeted operation with a fixed dataset and seed and reports the metric —
 scheduled in the stage where the operation first exists, so a baseline is committed before
@@ -494,6 +505,8 @@ Delegate the actual file-writing to **cursor-configurator**, which writes
 `.gitattributes`, `.cursorignore`, `.worktreeinclude`, linter configs, `hooks.json`,
 `.githooks/pre-commit`, `mcp.json`, the frozen `.cursor/rules/minimal-code.mdc` (every
 project — the write-the-least-code ladder, with safety rules taking precedence), and the
+model roster `docs/ROSTER.json` (`{"builder": ..., "review_a": ..., "review_b": ...}`,
+verified by `roster-check.py` at configuration and at every checkpoint), the
 performance floor where budgets exist (`bench/budgets.json`, the bench runner script, the
 `bench-check.py` step in CI, the pinned profiler — `Performance-Conventions.md` §3), the
 always-on `.cursor/rules/workspace-boundary.mdc` plus the `boundary-check` after-edit hook
@@ -573,7 +586,16 @@ For each increment, in order:
 ### 1. Checkpoint
 
 Confirm the working tree is clean and commit if it is not. Every delegation must
-start from a known-good commit so it can be reverted wholesale:
+start from a known-good commit so it can be reverted wholesale. Also confirm the model
+roster still holds — three families, and the delegate command sets the builder's model
+explicitly (KP-022):
+
+```bash
+python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --command "<the delegate command you are about to run>"
+```
+
+`INVALID ROSTER` stops the delegation until the roster or the command is corrected.
+Then:
 
 ```bash
 git status --short
@@ -929,6 +951,12 @@ around **one gate pass per stage**.
    pin its current behaviour (you may write tests), run them green, and **commit them on
    `main` through the gate before the refactoring branch is cut** — so they sit under the
    base ref and the purity check does not see them as test edits. Or skip the candidate.
+3b. **The test-infrastructure lane.** Duplication in the *tests* — helpers copied across
+   test files — is yours to consolidate, since you own the tests. Do it in its own commit on
+   the same branch, checked with `refactor-check.py <base> --lane tests` (no production file
+   may change) and by proving the **collected test set is identical** before and after
+   (`pytest --collect-only -q` or the stack's equivalent, diffed). Never mix it into a
+   production-lane commit; the two lanes share the one gate pass.
 4. **One branch, many small commits.** Cut `refactor/<stage>` from `main`. For each
    candidate, in payoff order: package a **refactoring brief** (`handoff/REFAC-<nnn>.md`,
    spec-packager's refactoring variant), delegate, inspect (git-derived changeset + scope
@@ -1525,3 +1553,12 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     manifest change without its lockfile change fails `lock-check.py` before any reviewer;
     a brief is packaged only after a reality check that what it assumes exists as built;
     two reviewers converging on one line is blocking.
+37. Code that talks to an external service is not done against a mock the builder invented.
+    The integration's first increment is a contract capture — an attended live call whose
+    real responses become the fixtures the tests replay — and "done" means passing against
+    recorded real responses or a live smoke. A green test against an assumed contract is a
+    green test of the assumption.
+38. The model roster (`docs/ROSTER.json`) is checked, not remembered: `roster-check.py` at
+    configuration, at every calibration, and before every delegation confirms three distinct
+    families and that the delegate command sets the builder's model. Reviewers review the
+    design a diff embodies, not only its fidelity to the brief — a flawed brief is a finding.

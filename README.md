@@ -24,7 +24,8 @@ build loop's *instructions* — governance, not any product. They install over t
     `CHANGELOG.md` — the release stamp; and `installer-check.ps1`, the install / upgrade /
     uninstall lifecycle check for desktop installers; and `bench-check.py`, the benchmark floor
     checker against budgets and a committed baseline; and `lock-check.py`, which fails a
-    dependency-manifest change that lacks its lockfile change): `Cursor-File-Formats.md`,
+    dependency-manifest change that lacks its lockfile change; and `roster-check.py`, which
+    fails a model roster whose three roles do not sit on three families): `Cursor-File-Formats.md`,
     `Delivery-Conventions.md`, `Performance-Conventions.md`, `Performance-Patterns.md`
     (the catalogue of recurring causes of slowness and cost, maintained like
     `Known-Pitfalls.md`),

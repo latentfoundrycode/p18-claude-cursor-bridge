@@ -133,6 +133,7 @@ MUST/SHOULD/NEVER. Tags: **[L1]** baseline, **[L2]** most applications, **[L3]**
 
 - MUST [L1]: Fail securely — an error denies access, it does not fall through to allow
 - MUST [L1]: NEVER swallow a security-relevant error silently; surface and handle it
+- MUST [L1]: Redact secrets from error output by PATTERN (credential shapes, bearer tokens, key formats) — NEVER blank an entire error body on a status code; a legitimate provider error must stay diagnosable
 - MUST [L2]: Validate and pin the integrity of build-time and run-time dependencies; treat the toolchain as an attack surface
 - MUST [L2]: Deserialise only trusted data with a safe deserialiser; NEVER native-deserialise untrusted input
 - SHOULD [L2]: Keep the trusted computing base small; isolate untrusted processing

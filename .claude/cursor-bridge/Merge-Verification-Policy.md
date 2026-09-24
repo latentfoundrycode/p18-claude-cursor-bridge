@@ -122,6 +122,15 @@ Vercel-rules-on-diff cannot see (see `Observability-Conventions.md`).
 | Review A | Claude Opus 4-8 | Anthropic | `diff-reviewer` subagent, `model: claude-opus-4-8`, read-only |
 | Review B | GPT-5.6 Sol | OpenAI | Cross-family verifier via `cursor-agent --model` |
 
+**The roster is a checked file, not a table to remember.** Each project records its three
+models in `docs/ROSTER.json` (`{"builder": "...", "review_a": "...", "review_b": "..."}`),
+and `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --command "<delegate
+command>"` fails on a shared family, an unknown family (add a `family` override), or a
+delegate command that does not set `--model` to the roster's builder. It runs at
+configuration, at every calibration, and at every checkpoint before a delegation — because
+a project once ran its builder on Review B's family for several increments before anyone
+noticed (KP-022).
+
 **The invariant, not just the current picks:** Review B must be a family that is *neither
 the builder's nor Review A's*. Today the builder is Grok (xAI), so Review B must **never**
 be a Grok model (4.5 and 4.6 are the same family — a different version is not

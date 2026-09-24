@@ -93,6 +93,12 @@ Attack it along these lines:
   single version source, and is the Packaging & installer stage re-run last so the shipped
   deliverable carries the new version? An addendum that quietly changes existing behaviour
   without saying so is **Blocking**.
+- **External-service integrations.** For every third-party API, SDK, or provider the
+  software talks to: is the first increment on it a **contract capture** (an attended live
+  call recorded to fixtures, secrets scrubbed) that later increments replay, with "passes
+  against recorded real responses" as the acceptance criterion? An adapter increment whose
+  only evidence is a mock the builder writes is **Blocking**: it tests the builder's
+  assumption about the service, not the service (KP-020).
 - **Benchmark increments (where budgets exist).** Is there a benchmark increment per
   budget, in the stage where the budgeted operation first exists, so a baseline is
   committed before any optimization? A budget with no benchmark in the plan is **Blocking**:

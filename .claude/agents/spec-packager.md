@@ -76,6 +76,11 @@ exactly. Patterns established elsewhere in the codebase that this should follow.
   quirk that cost you a round): one dated line, so the supervisor can carry it forward.
 - In any Markdown you write, never break a line inside a paragraph or a list item; one
   paragraph is one line. Line breaks only between blocks.
+- If this increment talks to an external service: its tests replay the **recorded real
+  responses** in the contract fixtures the brief names; do not invent a mock of the
+  service's responses, hosts, fields, or next-step URLs. If a fixture you need does not
+  exist, stop and report it — that is a capture the supervisor must run, not a shape for
+  you to assume.
 - Any console process your code launches on Windows is created windowless
   (`creationflags=subprocess.CREATE_NO_WINDOW` in Python — `0` on other platforms;
   `windowsHide: true` in Node). Capturing output does not prevent the window. A window is

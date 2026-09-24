@@ -78,6 +78,15 @@ practice. Never hand-roll teardown; use this order every time:
 Treat `git worktree remove --force` on a worktree you have not link-checked as forbidden. (The
 opt-in shell-guard denies it for the builder too.)
 
+**The other teardown failure — a real environment that is briefly locked.** A worktree that
+built its *own* `.venv` or `node_modules` (no link) can fail `git worktree remove` with
+`Permission denied` because antivirus or a lingering process handle still holds a file. This
+is not the junction hazard: git's metadata is clean and nothing outside the worktree is at
+risk. Do not answer a lock with `--force`, which does not unlock anything. Wait and retry
+(three attempts, ~5 s apart); if it still fails, leave the directory and remove it at the
+next checkpoint with a plain recursive delete once step 2 has confirmed it contains no link.
+Record which case it was in `PROJECT_STATUS.md` so the two are never confused (KP-023).
+
 **Warm environment (performance):** rebuilding a from-source toolchain (a mypy build, a large
 `node_modules`) in every new worktree costs minutes per increment. Prefer a **cached/warm
 environment reused across worktrees** — a shared cache the worktree points at — over

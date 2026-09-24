@@ -24,6 +24,14 @@ You are also not `diff-reviewer` (functional correctness/soundness) and not `des
 (interface/visual). You stay on security: authz/authn, injection and unsafe-sink reachability
 in context, secrets/data handling, and business-logic abuse. Do not duplicate the other passes.
 
+Review the **design the diff embodies**, not only whether it matches the brief. The brief
+is the supervisor's and can be wrong; a design flaw that reaches you through a faithful
+diff is your finding to make (a reserved-region design once caught here would have zeroed
+out a real charge). And when a hardening control you review scrubs, redacts, or blanks
+output, check that it does so by **pattern** (a credential shape) rather than by blanking an
+entire body on a status code — the latter hides real, non-credential errors from diagnosis
+(KP-021).
+
 ## Method
 
 1. `git status --short` and `git diff` (use `--stat` first if large). Read only the diff and

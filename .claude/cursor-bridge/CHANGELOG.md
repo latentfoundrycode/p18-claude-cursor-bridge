@@ -11,6 +11,39 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.24b
+
+**What changed** — from the SFVF Bridge Feedback document (Stage P).
+- **External services: contract capture, never an invented mock.** The first increment on
+  any third-party API/SDK is an attended live call recorded to fixtures the tests replay;
+  "done" means passing against recorded real responses. Brief constraint; plan-critic
+  Blocking; diff-reviewer FAIL on a builder-written mock. Standing rule 37; KP-020.
+- **Test-infrastructure lane in the stage-close pass.** The supervisor consolidates its own
+  test helpers in a separate commit on the same branch; `refactor-check.py --lane tests`
+  asserts no production file changed; the collected test set must be identical before and
+  after. Same one gate pass.
+- **Reviewers review the design a diff embodies**, not only fidelity to the brief; a flawed
+  brief is a finding (diff-reviewer, security-auditor).
+- **Redact by pattern, never blank by status** (`secure-coding.snapshot.md` V15;
+  security-auditor; KP-021).
+- **Teardown: a real, briefly locked environment** is retried then deferred, never forced
+  (configuration §1; KP-023).
+- **Model roster is checked**: `docs/ROSTER.json` + new `roster-check.py` (three distinct
+  families; delegate command sets `--model <builder>`) at configuration, calibration, and
+  every checkpoint. Standing rule 38; KP-022.
+
+**Running projects must**
+- *(all phases)* Create `docs/ROSTER.json` from the merge policy's roster and run
+  `roster-check.py` now; fix the delegate command if it lacks `--model`.
+- *(Phase 6, projects with external integrations)* For each adapter whose tests replay a
+  builder-written mock: add a contract-capture increment (an addition to the plan — tell the
+  owner in one line; needs the service key once) and re-point the tests at the recorded
+  fixtures before the next increment on that adapter.
+- *(Phase 6)* The next stage-close pass may run the tests lane; the next brief carries the
+  external-fixture constraint; reviewers apply the design lens from the next diff.
+
+---
+
 ## 2026.09.24
 
 **What changed** — from the first Bridge Feedback document to come through the channel
