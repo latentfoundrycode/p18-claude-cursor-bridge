@@ -15,6 +15,7 @@ without it.
 
 **Whether this is a new project or a resumed one is decided by one fact: does
 `docs/PROJECT_STATUS.md` exist.** There are no keywords. If the file exists, read it and
+`docs/INVENTORY.md` **whole** — both are bounded so that they can be — and
 continue from where it left off; anything typed after `/supervisor` is then a message to
 the resumed session, not a new description. If the file does not exist, this is a new
 project: `$ARGUMENTS` is the seed description and Phase 1 begins with it — or, if nothing
@@ -71,7 +72,7 @@ children on every project:
 - **`Workspace/`** — the git repository and the build itself. You run here; the builder runs
   here and **only** here. Inside it, **`docs/`** holds everything written **for the builder
   and for you**: the design, the build plan, the mockups, and the AI-facing records
-  (`PROJECT_STATUS.md`, `RUN_PARAMETERS.md`, `CHANGES.md`, `HARDENING.md`,
+  (`PROJECT_STATUS.md`, `INVENTORY.md`, `RUN_PARAMETERS.md`, `CHANGES.md`, `HARDENING.md`,
   `BUILDER_NOTES.md`, `BOUNDARY_VIOLATIONS.md`, `debug/BUG-nnn.md`). `docs/` is written for
   machine comprehension first; it need not read well to a human, and that is by design.
 
@@ -272,6 +273,8 @@ of what is being built, for whom, the architecture in plain language, the key de
 their reasons, and the current state. It is the first of the Documents set (see "The project
 layout") and is patched at every reflection point from here on. It is a translation of
 `docs/DESIGN.md` for a reader who will never open `docs/`, not a copy of it.
+
+At the same moment create **`docs/INVENTORY.md`** (format under "Project state"): the design's decisions, each with the reason that made it right, and every resource known so far — each key, token, account, or tool the owner has provided or will be asked for. Features fill in as increments merge. From here on, anything the owner provides is entered the moment they provide it.
 
 ---
 
@@ -860,7 +863,7 @@ existing mockup-fidelity judgement (they do not add a new pass).
 ### 7. Decide (accept the increment)
 
 - **Accept** — local review, scan, and tests pass. Commit to the increment branch with a
-  message referencing the task ID. Update `docs/PROJECT_STATUS.md`. Move to the next
+  message referencing the task ID. Update `docs/PROJECT_STATUS.md` (rewrite the fields; never append history) and, when the increment changes behaviour or needs a new resource, `docs/INVENTORY.md` — in the same commit as the increment's `CHANGES.md` entry, moving `Reflected through:` to that entry (rule 41). Move to the next
   increment. Increments accumulate on the branch; merging to `main` is a separate,
   verified step (below), not something you do per increment.
 - **Iterate** — something is wrong and you understand why. Revise the brief *file* (in
@@ -1087,7 +1090,10 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
    (which current features, screens, data, or commands the change touches, and whether any
    existing behaviour is altered or removed). Read this project's own Issues file in place
    of the prior-project lessons step: the issues already recorded are the ones this change
-   must not repeat. A report of **several defects** is triaged before any of them is diagnosed — the `root-cause-first` skill's step 0: shared cause binned only on evidence, otherwise one at a time. Gate: summarise the change back and get confirmation.
+   must not repeat. Read `docs/INVENTORY.md` whole before anything else: a request that
+   Features already satisfies is answered by pointing at the feature, not by proposing it;
+   a request that reverses a Decision is named as such, with the recorded reason, and goes
+   through the gates as a change to that decision. A report of **several defects** is triaged before any of them is diagnosed — the `root-cause-first` skill's step 0: shared cause binned only on evidence, otherwise one at a time. Gate: summarise the change back and get confirmation.
 2. **Design revision** (Phase 2, scaled). Append a dated **Change: <name>** section to
    `docs/DESIGN.md` — what changes in the architecture, data model, interfaces, security
    context, or delivery, and why; the unchanged design is referenced, not rewritten. Run
@@ -1155,7 +1161,7 @@ escalation, none of it stalls the loop, and none of it changes the bridge.
 5. **Record** the reflection point in `docs/PROJECT_STATUS.md` (`Last reflection:`), and
    check the worktrees: `git worktree prune`, then `git worktree list` must show nothing
    under `Worktrees/`. A leftover is torn down now (safe primitive, rule 19) and opened as an
-   issue — it means a merge closed without its teardown. Then run `python ~/.claude/cursor-bridge/sync-check.py --apply`: local `main` must match the remote, or the `Remote sync:` line must name the reason it cannot.
+   issue — it means a merge closed without its teardown. Run `python ~/.claude/cursor-bridge/inventory-check.py` — it fails on a status file over its cap, a change-log entry the inventory has not absorbed, an environment variable or repository secret the code reads that Resources does not name, a secret value written into the inventory, or a malformed table; fix each before continuing. Then run `python ~/.claude/cursor-bridge/sync-check.py --apply`: local `main` must match the remote, or the `Remote sync:` line must name the reason it cannot.
 6. **Then, at a stage close, obey `Stage pause` in `docs/RUN_PARAMETERS.md`.** Under `run`
    (the default) the stage-close report is a notification — "Stage <name> closed; next:
    <stage>" plus the FYI block — and you **continue into the next stage in the same turn**
@@ -1243,6 +1249,8 @@ entry, and never edit the bridge yourself.
 ---
 
 ## Escalate to the user when
+
+**Look it up before you ask or propose.** Before asking the owner to create, set, install, or provide anything, check Resources in `docs/INVENTORY.md` — they may have provided it already, and asking twice costs them a redundant key and their trust. Before proposing a change to how the software works, check Features (it may already exist) and Decisions (it may have been settled for a reason). A proposal that reverses a settled decision quotes the decision and its reason and states what has changed since; without a changed circumstance, it is not made. A project whose app keeps secrets in its own store records each by name in Resources — the scan in `inventory-check.py` sees environment variables and CI secrets, not an app's private store.
 
 Escalate a decision only when the deciding factor is something the user **uniquely owns
 or must live with** — not when it is a technical judgment, even one with real trade-offs.
@@ -1370,7 +1378,7 @@ on them. If they must read the technical detail to find that out, the report is 
 
 ## Project state
 
-Keep `docs/PROJECT_STATUS.md` current after every accepted increment:
+Keep `docs/PROJECT_STATUS.md` current after every accepted increment. **It is current state, not history:** every field is rewritten in place, nothing is appended, and the file stays within **120 lines and 12,000 characters** (`inventory-check.py` fails it above that). What happened belongs in `CHANGES.md` and git; what the software is, has, and has settled belongs in `docs/INVENTORY.md`. A status file that has grown into a log is read in slices, and the fact the next session needed is in the slice it skipped.
 
 ```markdown
 # Project Status
@@ -1381,7 +1389,7 @@ Increment: TASK-<nnn> — <title>
 Last accepted: TASK-<nnn> at commit <sha>
 Awaiting user on: <nothing | the specific question>
 Next: <the next increment and anything the next session needs to know>
-Deviations accepted: <accepted deviations from DESIGN.md and why>
+Deviations accepted: <none | see docs/INVENTORY.md → Decisions>
 Terms fixed: <term — the sense fixed with the user — Established | Risky; one per line>
 Software name: <the name that names the Documents set>
 Layout: Workspace=<resolved path>  Documents=<resolved path>
@@ -1400,7 +1408,37 @@ explained to the user in which sense, and which of them the user has stumbled on
 fresh session reads it to know what needs re-anchoring and what can simply be named.
 
 Write it so a fresh session with no memory of this conversation can pick up the work
-from this file alone. That is the actual test of whether it is good enough.
+from this file and the inventory alone. That is the actual test of whether it is good enough. **Claude Code's private memory is not project state:** it is tied to one machine and one folder path, the next session may not read it, and nothing checks it. Anything a later session must know goes into these two files, never only into memory.
+
+**The inventory — `docs/INVENTORY.md`** is the project's current-state record of what the software *is*: its features, the resources it depends on, the decisions that shaped it, and what was deferred. Where `CHANGES.md` is the history, the inventory is the present — rows are edited in place when a feature changes and removed when it is removed, so the file stays proportional to the product, not to the time spent on it. It is AI-facing, committed, and rides each increment's PR like `CHANGES.md`; it never holds a secret value, only a secret's name and where it lives. The format, which `inventory-check.py` parses:
+
+```markdown
+# Inventory — <Name>
+Reflected through: <the exact heading of the newest docs/CHANGES.md entry absorbed here | none>
+Updated: <date>
+
+## Features
+| Feature | What it does | Where | Tests | Since |
+|---|---|---|---|---|
+| <name, in the owner's words> | <one line, user's terms> | <main file(s) / module> | <test file(s)> | <date or TASK-nnn> |
+
+## Resources
+| Name | Kind | Where it lives | Used by | Provided |
+|---|---|---|---|---|
+| <OPENROUTER_API_KEY / "Socket account" / "Inno Setup 6"> | <secret · repo secret · config · test-only · account · tool> | <user env var · the app's encrypted store · GitHub secret · path — never the value> | <file / feature / CI> | <date the owner provided it · n/a> |
+
+## Decisions
+| Decision | Reason | Settled | Revisit only if |
+|---|---|---|---|
+| <what was decided> | <why — the reason that made it right> | <date, and who: owner / design gate / supervisor> | <the circumstance that would reopen it> |
+
+## Deferred
+| Item | Why deferred | Since | Owner decision needed |
+|---|---|---|---|
+| <item> | <reason> | <date> | <yes — the question · no> |
+```
+
+`Reflected through:` names the newest `CHANGES.md` heading the inventory has absorbed; `CHANGES.md` is kept newest-first. The check lists every entry above that heading as not absorbed. Resources lists **every** environment variable the code reads and every repository secret CI uses (the check scans tracked code, committed `.env` examples, and workflows, ignoring operating-system and CI variables), plus every account, token, and tool the owner provided, whether or not code reads it.
 
 Also keep `docs/CHANGES.md` — a running, plain-language log of what *behaviour* changed
 with each merged increment (one or two lines each: what the software now does differently,
@@ -1513,7 +1551,9 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     anything a verdict rests on — the diff, scanner output, test results, the file Review B
     reads — reaches the reviewer **whole**; slicing, compressing, or summarizing it first is a
     gate-integrity flag (`Merge-Verification-Policy.md` §Anti-gaming). A compression tool, if
-    ever trialled, is admission-gated, local-only, and kept off those streams.
+    ever trialled, is admission-gated, local-only, and kept off those streams. **Exception:**
+    `PROJECT_STATUS.md` and `INVENTORY.md` are read whole at every start and resume; they are
+    capped and current-state precisely so that they can be.
 21. Explain for decision. Whenever a technical matter surfaces for the user to decide — every
     phase gate, every escalation, every "what is X" — apply the `explain-for-decision` skill:
     choose the at-most-three load-bearing concepts by the decision they carry, classify each as
@@ -1668,3 +1708,4 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `git worktree list`: nothing under `Worktrees/` may remain — a leftover is torn down
     now and gets an issue entry, not silent cleanup.
 40. Local and remote agree, or the status file says why not. `sync-check.py` runs at every start and resume, before every new branch (which starts from `origin/main`, never local `main`), after every merge (`git switch main` + `--apply`), at every reflection point, and with `--strict` at project end, where only IN SYNC or NO REMOTE lets "Project complete" be written. BEHIND is fast-forwarded; AHEAD or DIVERGED is stranded work on protected `main`, rescued to a branch without deleting anything and carried through a PR, with an issue; NO REMOTE, OFFLINE, and UNPUBLISHED are recorded on `Remote sync:` as the reason. A commit on local `main` is always a mistake: nothing reaches `main` except through a merge.
+41. The project's state lives in two bounded files, both read whole at every start and resume: `PROJECT_STATUS.md` (where the work is — rewritten in place, within 120 lines and 12,000 characters) and `INVENTORY.md` (what the software is — Features, Resources, Decisions, Deferred — edited in place, updated in the same commit as each `CHANGES.md` entry, and entered the moment the owner provides a resource). Look it up before you ask or propose: never ask the owner for something Resources already lists, never propose what Features already has, never reverse a Decision without quoting its reason and the circumstance that changed. Private memory is not project state. `inventory-check.py` runs at every reflection point and must pass.

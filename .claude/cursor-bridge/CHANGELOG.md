@@ -11,6 +11,20 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.25g
+
+**What changed**
+- **Current-state record.** `docs/PROJECT_STATUS.md` is current position only — rewritten in place, capped at 120 lines / 12,000 characters. New `docs/INVENTORY.md` holds what the software is: Features, Resources (every environment variable, CI secret, key, account, and tool — names and locations, never values), Decisions (with reasons), Deferred. Created at the design gate, updated in the same commit as each `CHANGES.md` entry (`Reflected through:` marker), both files read whole at every start and resume (rule 20 exception). Private memory is declared not to be project state.
+- **Look it up before you ask or propose.** Never ask the owner for a listed resource, never propose a listed feature, never reverse a Decision without quoting its reason and what changed. Change-cycle intake reads the inventory first; spec-packager's reality check starts from it; plan-critic blocks a plan that rebuilds, re-asks, or silently reverses.
+- **`inventory-check.py`** (tested; also run read-only on two finished projects, where it flagged both status files and 11 and 15 unlisted configuration variables) at every reflection point. Rule 41, KP-027. Allowlisted.
+
+**Running projects must**
+- *(all phases)* **Build `docs/INVENTORY.md`** in the format in supervisor.md → "Project state", from what exists: the design document(s) and any "settled" or "do not relitigate" notes → Decisions, with reasons; `CHANGES.md` and the User Manual → Features; `.env` examples, the code's environment reads, CI secrets, the app's own secret store listing (names only), and anything the owner provided according to the status file, the Documents, or private memory → Resources; backlog and deferred items → Deferred. Set `Reflected through:` to the newest `CHANGES.md` heading once Features covers it.
+- *(all phases)* **Shrink `docs/PROJECT_STATUS.md` under the cap**: move its current content verbatim to `docs/archive/PROJECT_STATUS-<date>.md` (nothing is deleted; the archive is never read at resume), then rewrite the status file from the template. Fold any project state held only in Claude Code's private memory into the two files.
+- *(all phases)* Run `inventory-check.py` until it prints `RESULT: OK`; commit the inventory on the next branch so it reaches `main` through a PR.
+
+---
+
 ## 2026.09.25f
 
 **What changed**

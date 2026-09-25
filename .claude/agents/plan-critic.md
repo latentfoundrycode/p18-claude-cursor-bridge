@@ -93,6 +93,7 @@ Attack it along these lines:
   single version source, and is the Packaging & installer stage re-run last so the shipped
   deliverable carries the new version? An addendum that quietly changes existing behaviour
   without saying so is **Blocking**.
+- **Already built, already settled (any project with `docs/INVENTORY.md`).** Read the inventory first. An increment that builds what Features already lists, a step that asks the owner for a resource Resources already lists, or a design change that reverses a Decision without quoting its recorded reason and the circumstance that changed is **Blocking**.
 - **External-service integrations.** For every third-party API, SDK, or provider the
   software talks to: is the first increment on it a **contract capture** (an attended live
   call recorded to fixtures, secrets scrubbed) that later increments replay, with "passes

@@ -28,6 +28,7 @@
       "Bash(cat ~/.claude/cursor-bridge/VERSION)",
       "Bash(python ~/.claude/cursor-bridge/bridge-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/sync-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/inventory-check.py:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
     ]
   }
