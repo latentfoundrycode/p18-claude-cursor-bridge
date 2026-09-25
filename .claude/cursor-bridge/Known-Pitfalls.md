@@ -289,6 +289,19 @@ it applies.**
   `Cursor-Project-Configuration.md` §1.
 - **Applies:** every Windows worktree teardown with a real environment inside.
 
+### KP-025 — A worktree per increment is habit, not need; loose worktrees pile up in the project root
+- **Surfaced:** SFVF, project end. The supervisor created a worktree for essentially every
+  increment as a loose `wt-<thing>` sibling of `Workspace/`; the work was sequential, so none
+  was needed, and four were left behind, three of them empty. The bridge itself had nudged
+  it: the loop said "commit to the worktree branch", vocabulary inherited from Cursor's
+  parallel-agents feature, where every agent gets a worktree.
+- **Correction:** sequential increments are branches in the single checkout. A worktree only
+  while two branches must be live at once; then under `<project-root>/Worktrees/<name>`,
+  recorded in `PROJECT_STATUS.md`, removed at merge (KP-011 / KP-023 for the teardown) and
+  checked at every reflection point. Never nested inside `Workspace/`: jscpd, test discovery
+  and `scope-check.py` walk into it. Supervisor rule 39 and "The project layout".
+- **Applies:** every project, every time the word worktree comes to mind.
+
 ### KP-024 — Quota exhaustion cannot be probed; the model pool state is an owner setting
 - **Surfaced:** 2026-09-25. The owner's Cursor "other models" usage (OpenAI / Google /
   Anthropic / unprefixed Grok) stood at 99% used — unusable for a build — yet a one-word

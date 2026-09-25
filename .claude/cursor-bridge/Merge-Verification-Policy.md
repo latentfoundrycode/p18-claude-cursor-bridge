@@ -485,10 +485,11 @@ Two options for reaching it:
 
   **Two launch failures that have actually happened — prevent both, don't just catch them:**
 
-  1. **Workspace-trust gate.** In a *fresh worktree* `cursor-agent` refuses to run
+  1. **Workspace-trust gate.** In a folder Cursor has not trusted yet (a fresh clone or
+     worktree) `cursor-agent` refuses to run
      non-interactively until the folder is trusted, so Review B silently doesn't launch.
-     Invoke Review B with the same trust-bypass flag the builder uses (`-f`/`--force`) so it
-     runs in a new worktree. Giving a *reviewer* `--force` is only to clear that gate, not to
+     Invoke Review B with the same trust-bypass flag the builder uses (`-f`/`--force`) so the
+     prompt cannot stall it. Giving a *reviewer* `--force` is only to clear that gate, not to
      let it write — the read-only guarantee is the post-run `git status` check above
      (reject the verdict and re-run if the tree changed), not the absence of the flag.
   2. **Prompt-as-preamble.** Review B has replied "please provide the diff" instead of

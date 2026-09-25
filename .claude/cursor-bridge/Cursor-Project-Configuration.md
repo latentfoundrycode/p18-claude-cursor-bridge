@@ -48,7 +48,11 @@ the brief.
 - **`.worktreeinclude`** (bridge-specific, not in the Cursor checklist) listing any
   gitignored file the tests need — normally `.env` — so it reaches the session worktree.
 - **The Workspace boundary** (bridge-specific). The builder must never read or write outside
-  `Workspace/` — the sibling `Documents/` folder is the user's and the supervisor's alone.
+  the checkout it was launched in — `Workspace/`, or one worktree under the project root's
+  `Worktrees/` (supervisor rule 39) — and never in the sibling `Documents/` folder, which is
+  the user's and the supervisor's alone. `Worktrees/` sits beside the repo, not inside it, so
+  it needs no `.gitignore` entry; a worktree's own root is the boundary for work done in it
+  (the hook takes its root from the launch folder).
   Enforced as an instruction plus a detector, and nothing more: write
   `.cursor/rules/workspace-boundary.mdc` (always-on; format in `Cursor-File-Formats.md`) and
   append the advisory **`boundary-check`** `afterFileEdit` hook entry (§2 hook array), which
@@ -59,7 +63,8 @@ the brief.
 
 ### Worktree & junction teardown — the safe primitive (Windows)
 
-A session worktree that contains a **junction or symlink** (a per-worktree venv, a
+A worktree (under `<project-root>/Worktrees/`, supervisor rule 39) that contains a
+**junction or symlink** (a per-worktree venv, a
 `node_modules` linked to the main checkout) is a data-loss hazard on teardown:
 `git worktree remove --force` **follows a live junction and deletes the real target**, and a
 `rmdir` issued *through Git Bash* can silently fail on a mangled path — leaving the junction

@@ -11,6 +11,26 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.25e
+
+**What changed**
+- **Worktree convention** (SFVF feedback item 8). Sequential work is branches in the single
+  checkout; a git worktree exists only while two branches must be live at once, lives under
+  `<project-root>/Worktrees/<name>` (sibling of `Workspace/`, never inside it, never a loose
+  `wt-*` folder), is recorded in `PROJECT_STATUS.md` (`Worktrees:`), removed at merge with
+  the safe primitive, and checked at every reflection point (`git worktree list`). The
+  boundary is now "the checkout the builder was launched in". The loop's "worktree branch"
+  became "increment branch" and the Review B note no longer says the reviewer runs in a
+  worktree — that vocabulary was the nudge. Rule 39, KP-025, layout section, status block.
+
+**Running projects must**
+- *(all phases)* Run `git worktree list`. Any worktree you still need moves under
+  `<project-root>/Worktrees/`; every other one is removed with the safe teardown primitive
+  (link check first). Add the `Worktrees:` line to `docs/PROJECT_STATUS.md`. From now on,
+  no worktree for sequential increments.
+
+---
+
 ## 2026.09.25d
 
 **What changed**

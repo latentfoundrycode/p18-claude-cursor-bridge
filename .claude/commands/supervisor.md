@@ -78,7 +78,23 @@ at intake, and record the resolved paths in `docs/PROJECT_STATUS.md`. If `Docume
 missing, create it. If the folder you started in is not named `Workspace`, stop and ask —
 the boundary below depends on it.
 
-**The Workspace boundary.** The builder must never read or write outside `Workspace/`. This
+**Branches and worktrees.** Sequential work — one increment built, reviewed, merged, then
+the next — is plain branches in the single checkout: `git checkout -B <branch> <base>` →
+work → merge → `git switch <base>`. It needs no worktree; a worktree per increment is habit,
+not need (KP-025). A git worktree is warranted **only** when two branches must be checked
+out at the same time — a long build or test running on one branch while you work on
+another, or a background run on its own branch. When one is, every worktree lives under
+**`<id>-<name>/Worktrees/<name>`**, a sibling of `Workspace/` and `Documents/` that is
+empty or absent between uses — never a loose folder in the project root, and never nested
+inside `Workspace/` (jscpd, test discovery and `scope-check.py` would walk into it). Record
+it in `docs/PROJECT_STATUS.md` (`Worktrees:`) with its branch and the reason two branches had
+to be live, and remove it the moment its branch merges, with the safe teardown primitive
+(rule 19). The project root is then always three things: `Documents/`, `Workspace/`, and a
+`Worktrees/` that is empty or absent.
+
+**The Workspace boundary.** The builder must never read or write outside **the checkout it
+was launched in** — `Workspace/`, or, during a concurrent episode, the one worktree under
+`Worktrees/` you launched it in; `Documents/` and every other checkout are out of bounds. This
 is enforced as an **instruction plus a detector**, and you treat it as exactly that — not as
 a wall: (1) every brief states the boundary; (2) `.cursor/rules/workspace-boundary.mdc`
 restates it as an always-on rule; (3) the `boundary-check` after-edit hook (Phase 5)
@@ -848,7 +864,7 @@ existing mockup-fidelity judgement (they do not add a new pass).
 
 ### 7. Decide (accept the increment)
 
-- **Accept** — local review, scan, and tests pass. Commit to the worktree branch with a
+- **Accept** — local review, scan, and tests pass. Commit to the increment branch with a
   message referencing the task ID. Update `docs/PROJECT_STATUS.md`. Move to the next
   increment. Increments accumulate on the branch; merging to `main` is a separate,
   verified step (below), not something you do per increment.
@@ -951,8 +967,8 @@ instead. In short, a branch merges to `main` only when **all** hold:
    taken from the working tree silently omits every untracked new file (KP-017);
    (b) **the file lives inside `Workspace/`** at `run/review/`, committed on the increment's
    branch and removed with `git rm` before the merge — never in a temp folder outside the
-   project, which the Workspace boundary rightly blocks (KP-016). Launch it with the trust-bypass flag (`-f`) so it runs in a fresh
-   worktree, and give a **directive** prompt ("the diff is already at `<path>`; read it;
+   project, which the Workspace boundary rightly blocks (KP-016). Launch it with the trust-bypass flag (`-f`) so the workspace-trust
+   prompt cannot stall it, and give a **directive** prompt ("the diff is already at `<path>`; read it;
    do not ask for it"). A reply that does not name something specific from the diff — or
    that asks for the diff, or errors on trust — is a failed launch, not a verdict: re-run.
    Confirm receipt before trusting the verdict, and `git status` clean afterward. Launch
@@ -1139,7 +1155,10 @@ escalation, none of it stalls the loop, and none of it changes the bridge.
    a changelog to a document that is not one.
 4. **User Manual** (once it exists). Patch it for every `CHANGES.md` entry since the last
    reflection point — a behaviour change is exactly what a manual tracks.
-5. **Record** the reflection point in `docs/PROJECT_STATUS.md` (`Last reflection:`).
+5. **Record** the reflection point in `docs/PROJECT_STATUS.md` (`Last reflection:`), and
+   check the worktrees: `git worktree prune`, then `git worktree list` must show nothing
+   under `Worktrees/`. A leftover is torn down now (safe primitive, rule 19) and opened as an
+   issue — it means a merge closed without its teardown.
 6. **Then, at a stage close, obey `Stage pause` in `docs/RUN_PARAMETERS.md`.** Under `run`
    (the default) the stage-close report is a notification — "Stage <name> closed; next:
    <stage>" plus the FYI block — and you **continue into the next stage in the same turn**
@@ -1367,6 +1386,7 @@ Deviations accepted: <accepted deviations from DESIGN.md and why>
 Terms fixed: <term — the sense fixed with the user — Established | Risky; one per line>
 Software name: <the name that names the Documents set>
 Layout: Workspace=<resolved path>  Documents=<resolved path>
+Worktrees: <none | <name> — branch <branch> — since <date> — <why two branches had to be live>>
 Stage: <current stage name> — Last reflection: <stage close | phase gate | none yet, and when>
 Open issues: <ISS-nnn …, or none>
 Bridge version: <contents of ~/.claude/cursor-bridge/VERSION when last calibrated>
@@ -1505,7 +1525,8 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     a guard was skipped — fix that guard, never re-send the same explanation longer.
 22. The project layout is fixed: `<id>-<name>/Documents` (human-facing, never in git, never
     the builder's) beside `<id>-<name>/Workspace` (the repo; `docs/` inside it is AI-facing).
-    You run in `Workspace/`; the builder runs there and **only** there. The boundary is an
+    You run in `Workspace/`; the builder runs in the checkout it is launched in and **only**
+    there — `Workspace/`, or one worktree under `Worktrees/` (rule 39). The boundary is an
     instruction (brief + `workspace-boundary.mdc`) plus a detector (`boundary-check` hook →
     `docs/BOUNDARY_VIOLATIONS.md`, read at step 4) — never assume it is a wall. A violation
     is `SCOPE DRIFT`: undo by hand, re-delegate, open an issue.
@@ -1637,3 +1658,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     restores the preferred profile by itself; the owner's "usage reset" only brings it
     earlier. Reviewers review the design a
     diff embodies, not only its fidelity to the brief — a flawed brief is a finding.
+39. Sequential work is branches in one checkout, never a worktree per increment. A git
+    worktree exists only while two branches must be live at once; it lives under
+    `<project-root>/Worktrees/<name>` (a sibling of `Workspace/`, never inside it, never a
+    loose `wt-*` folder in the project root), is recorded in `PROJECT_STATUS.md` with its
+    branch and reason, and is removed the moment its branch merges, via the safe teardown
+    primitive (rule 19). At every reflection point `git worktree prune` then
+    `git worktree list`: nothing under `Worktrees/` may remain — a leftover is torn down
+    now and gets an issue entry, not silent cleanup.
