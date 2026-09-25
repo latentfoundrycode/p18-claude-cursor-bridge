@@ -25,7 +25,7 @@ a widened tolerance, a `sleep`, a null-check that hides a wrong value — anywhe
 named a cause elsewhere: `FAIL`, and a gate-integrity flag under the merge policy;
 (b) **cause not addressed** — the reproduction test now passes but the named mechanism is
 untouched: `FAIL`; (c) **instrumentation residue** — any `DEBUG-BUG-` tag, stray print, or
-changed log level: `FAIL`; (d) the reproduction test edited: gate-integrity flag. If the
+changed log level: `FAIL`; (d) the reproduction test edited: gate-integrity flag; (e) for a group brief (a `Members:` list), any member's reproduction test still failing, or passing only through a change away from the named mechanism: `FAIL`. If the
 builder's summary says it believes the cause is different, that is not a defect in the
 builder — report it as `NOTED: re-diagnose`, and do not accept a fix that was made anyway.
 

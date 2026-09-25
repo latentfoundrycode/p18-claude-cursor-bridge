@@ -289,6 +289,29 @@ it applies.**
   `Cursor-Project-Configuration.md` §1.
 - **Applies:** every Windows worktree teardown with a real environment inside.
 
+### KP-024 — Quota exhaustion cannot be probed; it is detected from the error and reversed by the calendar
+- **Surfaced:** 2026-09-25. The owner's Cursor "other models" usage (every third-party
+  model: OpenAI, Google, Anthropic, …) stood at 99% used — unusable for a build — yet a one-word
+  probe to GPT-5.6 Sol still answered. A call succeeds at 1% remaining exactly as at 90%,
+  so no probe can see exhaustion coming; only the dashboard can.
+- **Correction:** `docs/ROSTER.json` carries an `other_pool` field. It flips to exhausted
+  **automatically** when a call returns a usage-limit message or a model fails twice in a
+  row (`roster-check.py --record-failure`; the loop re-resolves and restarts the
+  interrupted step from its checkpoint — the owner may be asleep), or pre-emptively when
+  the owner says "usage exhausted". `roster-check.py` then falls to the **native** profile
+  (builder Composer 2.5, Review B Grok 4.7 — roles swapped so the stronger
+  native reasoner reviews). The return is a **calendar fact**: the roster's `reset_day` (UTC) after the
+  exhaustion stamp restores the pool automatically; a probe is never used for it, because
+  a probe cannot tell a reset from 1% remaining and would oscillate. The exact usage-limit text
+  Cursor prints was unknown when the classifier was written; every auto-switch records the
+  stderr excerpt in the Issues file so the patterns can be sharpened. Standing rule 38.
+- **Addendum (2026-09-25):** the first roster template put Grok 4.6 in the native profile
+  and classed `grok-4.7-*` as metered — inferred from the id's shape, without reading
+  Cursor's documentation, which the maintainer could have fetched in one call. The docs say
+  Grok 4.7 is in the Cursor Models pool. Vendor facts (pools, limits, reset rules) are read
+  from the vendor's page at the time of the decision, never inferred from naming — the same
+  verify-first rule the bridge imposes on the loop (KP-008).
+- **Applies:** every project; every time a usage limit is reached or reset.
 ### KP-025 — A worktree per increment is habit, not need; loose worktrees pile up in the project root
 - **Surfaced:** SFVF, project end. The supervisor created a worktree for essentially every
   increment as a loose `wt-<thing>` sibling of `Workspace/`; the work was sequential, so none
@@ -302,26 +325,8 @@ it applies.**
   and `scope-check.py` walk into it. Supervisor rule 39 and "The project layout".
 - **Applies:** every project, every time the word worktree comes to mind.
 
-### KP-024 — Quota exhaustion cannot be probed; the model pool state is an owner setting
-- **Surfaced:** 2026-09-25. The owner's Cursor "other models" usage (OpenAI / Google /
-  Anthropic / unprefixed Grok) stood at 99% used — unusable for a build — yet a one-word
-  probe to GPT-5.6 Sol still answered. A call succeeds at 1% remaining exactly as at 90%,
-  so no probe can see exhaustion coming; only the dashboard can.
-- **Correction:** `docs/ROSTER.json` carries an `other_pool` field. It flips to exhausted
-  **automatically** when a call returns a usage-limit message or a model fails twice in a
-  row (`roster-check.py --record-failure`; the loop re-resolves and restarts the
-  interrupted step from its checkpoint — the owner may be asleep), or pre-emptively when
-  the owner says "usage exhausted". `roster-check.py` then falls to the **native** profile
-  (builder Composer 2.5, Review B Cursor-hosted Grok 4.6 — roles swapped so the stronger
-  native reasoner reviews). The return is a **calendar fact**: the roster's `reset_day` (UTC) after the
-  exhaustion stamp restores the pool automatically; a probe is never used for it, because
-  a probe cannot tell a reset from 1% remaining and would oscillate. The exact usage-limit text
-  Cursor prints was unknown when the classifier was written; every auto-switch records the
-  stderr excerpt in the Issues file so the patterns can be sharpened. Standing rule 38.
-- **Addendum (2026-09-25):** the first roster template put Grok 4.6 in the native profile
-  and classed `grok-4.7-*` as metered — inferred from the id's shape, without reading
-  Cursor's documentation, which the maintainer could have fetched in one call. The docs say
-  Grok 4.7 is in the Cursor Models pool. Vendor facts (pools, limits, reset rules) are read
-  from the vendor's page at the time of the decision, never inferred from naming — the same
-  verify-first rule the bridge imposes on the loop (KP-008).
-- **Applies:** every project; every time a usage limit is reached or reset.
+### KP-026 — A finished project's local copy lagged the remote; nothing brought local `main` along
+- **Surfaced:** an earlier project concluded with the latest version on the remote and the local repository behind it. The supervisor merges with a squash merge on GitHub, which completes on the remote; nothing in the loop then fast-forwarded local `main`, so after the last merge the local copy was behind by design — and a new branch cut from it would have started from stale code.
+- **Correction:** `sync-check.py` (deterministic: IN SYNC / BEHIND / AHEAD / DIVERGED / NO REMOTE / OFFLINE / UNPUBLISHED) at every start and resume, after every merge (`git switch main` + `--apply` fast-forwards), before every new branch (cut from `origin/main`, never local `main`), at every reflection point, and `--strict` at project end, where only IN SYNC or NO REMOTE allows "Project complete". Stranded commits on protected `main` are rescued to a branch, never deleted. Supervisor rule 40.
+- **Applies:** every project with a remote; every merge.
+

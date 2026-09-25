@@ -6,14 +6,15 @@ prove three distinct families, and (optionally) prove each model answers.
 
 docs/ROSTER.json (v2):
 {
-  "other_pool": "available" | "exhausted",      <- OWNER-SET. Cursor's "other models" usage
-                                                    pool (OpenAI / Google / Anthropic / unprefixed
-                                                    Grok). A probe cannot see 1% remaining; the
-                                                    owner flips this when the dashboard says so.
+  "other_pool": "available" | "exhausted",      <- Cursor's "Other Models" usage pool (every
+                                                    third-party model). Set automatically by
+                                                    --record-failure, restored on reset_day, or
+                                                    by the owner (--mark-exhausted/--mark-reset).
+                                                    A probe cannot see 1% remaining.
   "review_a": "claude-opus-4-8",                  <- Review A runs in Claude Code, not Cursor.
   "profiles": [                                   <- tried in order; the first usable one wins
-    {"name": "full",   "builder": "cursor-grok-4.6-high", "review_b": "gpt-5.6-sol-high"},
-    {"name": "native", "builder": "composer-2.5",         "review_b": "cursor-grok-4.6-high"}
+    {"name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high"},
+    {"name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high"}
   ]
 }
 A model entry is an id string or {"model": id, "family": name, "pool": "native"|"other"}.
@@ -79,7 +80,7 @@ def family_of(model_id, override=None):
     if override:
         return override.lower()
     m = model_id.lower().replace("_", "-").strip()
-    core = m[len("cursor-"):] if m.startswith("cursor-") else m   # cursor-grok-4.6 is xAI, hosted by Cursor
+    core = m[len("cursor-"):] if m.startswith("cursor-") else m   # cursor-grok-* is xAI, hosted by Cursor
     for prefix, fam in FAMILY_PREFIXES:
         if core.startswith(prefix) or ("-" + prefix) in core or ("/" + prefix) in core:
             return fam

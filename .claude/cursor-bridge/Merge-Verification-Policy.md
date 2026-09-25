@@ -173,9 +173,9 @@ a project once ran its builder on Review B's family for several increments befor
 noticed (KP-022).
 
 **The invariant, not just the current picks:** Review B must be a family that is *neither
-the builder's nor Review A's*. Today the builder is Grok (xAI), so Review B must **never**
-be a Grok model (4.5 and 4.6 are the same family — a different version is not
-decorrelation) and never a Claude model. GPT-5.6 Sol satisfies this. If the builder's
+the builder's nor Review A's*. Under the full profile the builder is Grok (xAI), so Review B must **never**
+be a Grok model (4.5, 4.6 and 4.7 are one family — a different version is not
+decorrelation) and never a Claude model; GPT-5.6 Sol satisfies this. Under the native profile the builder is Composer (Cursor) and Review B is Grok 4.7 (xAI), which satisfies it the other way round. If the builder's
 model is ever changed, re-check this invariant before the next run — a verifier that
 shares the builder's family is no verifier at all.
 
@@ -475,7 +475,7 @@ Two options for reaching it:
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
   real failure that has happened — the file path avoids it.) Confirm from its reply that it
   actually saw the diff before trusting the verdict. Per the roster above, Review B is
-  **GPT-5.6 Sol** while the builder is Grok 4.6 — a genuine third family.
+  **GPT-5.6 Sol** while the builder is Grok 4.7 (full profile), or **Grok 4.7** while the builder is Composer 2.5 (native profile) — a genuine third family either way; the ids in use are always the ones in `docs/ROSTER.resolved.json`.
   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
   nothing; run it on a clean committed checkpoint and confirm `git status` is unchanged

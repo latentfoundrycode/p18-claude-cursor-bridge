@@ -11,6 +11,20 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.25f
+
+**What changed**
+- **Several bugs in one report are triaged before diagnosis.** New step 0 in the `root-cause-first` skill: reproduce each, compare on concrete signals (code path, trigger, component, first-bad commit), bin only on evidence with one discriminator that must move every member, split out any member that does not respond, and default to one diagnosis per bug when nothing is apparent. A confirmed group gets one fix brief (spec-packager) and one gate pass; every member keeps its own reproduction test; diff-reviewer fails a partly fixed group. Rule 26, change-cycle intake.
+- **Local and remote must agree.** New `sync-check.py` (tested against a local bare remote across all seven states). Runs at start and resume, before every new branch (now cut from `origin/main`, never local `main`), after every merge (`git switch main` + `--apply`), at reflection points, and `--strict` at project end, where only IN SYNC or NO REMOTE allows "Project complete". Stranded commits on protected `main` are rescued to a branch, never deleted. New `Remote sync:` status line; the status file may stay local only uncommitted. Rule 40, KP-026. Allowlist: `sync-check.py`, `git fetch`, `git switch`.
+- **Remaining pool/Grok staleness removed.** The checkpoint text still called `other_pool` owner-set and quoted Grok 4.6; KP-024, the merge policy's invariant paragraph and Review B note, and the roster-check docstring still placed "unprefixed Grok" in the Other Models pool or used Grok 4.6. All now match Cursor's documentation and the automatic switch.
+
+**Running projects must**
+- *(all phases)* Run `sync-check.py --apply` now. BEHIND is fast-forwarded; AHEAD or DIVERGED: follow the printed rescue, carry what is still needed through a PR, open an issue. Add the `Remote sync:` line to `docs/PROJECT_STATUS.md`. If the status file is committed on local `main`, it is stranded: rescue it.
+- *(building, changing)* Cut every new branch from `origin/main`; after every merge `git switch main` and `sync-check.py --apply`.
+- *(done)* A project already marked done runs `sync-check.py --apply --strict` once; anything other than IN SYNC or NO REMOTE is resolved and recorded as an issue.
+
+---
+
 ## 2026.09.25e
 
 **What changed**

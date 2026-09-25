@@ -32,6 +32,18 @@ omitted. Then fix directly. Do not turn a one-line omission into a diagnosis.
 
 ## The procedure
 
+### 0. Several bugs in one report — look for a shared cause first
+
+A report often names several defects at once. Before diagnosing them one by one, ask whether some share a cause: one cause fixed once is cheaper and more honest than several symptoms fixed separately. But a shared cause is a **hypothesis**, held to the same standard as any other.
+
+1. **Reproduce each bug separately** (step 1, for each). The reproductions are needed anyway, and they are what makes comparison possible.
+2. **Compare them on concrete signals:** the same code path or frame in the traces; the same trigger (input, state, timing, platform); the same component; the same first-bad commit (run each reproduction against older commits — `git bisect run <reproduction>` where the history allows).
+3. **Bin only on evidence.** If the signals point at one cause, open **one** debug file for the group with a `Members:` line naming each bug and its reproduction. The shared cause is H1, and its discriminator must move **every** member — instrument the shared mechanism, and each member's reproduction must show it. "These are separate defects" is always one of the competing hypotheses.
+4. **Split out any member that does not respond.** A member whose reproduction does not show the shared mechanism leaves the group and gets its own file; the group's evidence never stands in for it.
+5. **Nothing readily apparent → separate.** If the reproductions share no concrete signal, do not spend rounds hunting for one: each bug goes through steps 2–8 on its own. Grouping is an optimisation, never a precondition.
+
+A confirmed group is fixed by **one** brief and passes the gate **once**, but every member keeps its own reproduction test, so a later regression names the bug it brings back.
+
 ### 1. Reproduce deterministically — no reproduction, no fix
 
 Before anything else, make the bug fail **reliably**, on demand, without a human:
@@ -58,6 +70,7 @@ Write `docs/debug/BUG-<nnn>.md` with:
 # BUG-<nnn> — <symptom, one line>
 Reproduction: <command>  → fails with: <the key line>
 Trigger: <failing test | invariant | reviewer REJECT | user report | 2nd re-delegation>
+Members: <group only — BUG-<a>: <symptom> — <reproduction>; BUG-<b>: …>
 
 ## Hypotheses
 H1: <candidate cause>  — would show as: <the observation that confirms it>  — refuted by: <the observation that rules it out>
@@ -123,7 +136,7 @@ root cause** in one sentence, the **evidence lines**, the **reproduction test** 
 from red to green, and two constraints — *fix that cause and nothing else*, and *if you
 believe the cause is different, stop and report instead of fixing*. The builder is not
 asked to diagnose; it is asked to repair a named defect. A fix that makes the test pass
-without touching the named cause is a `FAIL` at review, however green it is.
+without touching the named cause is a `FAIL` at review, however green it is. For a **group**, the brief states the cause once and lists every member's reproduction test; all of them must go from red to green.
 
 ### 7. Verify like the bug was reproduced
 
@@ -136,7 +149,7 @@ suite permanently.
 
 The bug becomes an issue (`ISS-nnn` in `Documents/<Name> Issues During Development and
 Their Solutions.md`, the file the next project's supervisor reads) with the confirmed cause
-and the evidence. "How could it have been avoided" is
+and the evidence — one issue for a confirmed group, naming every symptom, because they were one defect. "How could it have been avoided" is
 only honest once the cause is known — which is the point of the whole procedure.
 
 ## What reviewers hold against a fix
@@ -146,6 +159,7 @@ only honest once the cause is known — which is the point of the whole procedur
   elsewhere. A `FAIL`, and under the merge policy a gate-integrity flag.
 - **Cause not addressed:** the diff does not touch the mechanism the brief named.
 - **Instrumentation residue:** a `DEBUG-BUG-` tag, a stray print, a changed log level.
+- **Group partly fixed:** for a group brief, any member's reproduction test still red, or green only through a change away from the named mechanism.
 - **Diagnosis by assertion:** a "Diagnosis" or "Cause" in a report with no observation
   behind it. Reports label every diagnosis **OBSERVED** (from a traceback, a log line, a
   value) or **INFERRED** (from reading code). An INFERRED diagnosis is a hypothesis and

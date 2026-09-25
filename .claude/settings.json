@@ -8,6 +8,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git switch:*)",
       "Bash(gh pr create:*)",
       "Bash(gh pr merge:*)",
       "Bash(gh pr checks:*)",
@@ -25,6 +27,7 @@
       "Bash(python ~/.claude/cursor-bridge/roster-check.py:*)",
       "Bash(cat ~/.claude/cursor-bridge/VERSION)",
       "Bash(python ~/.claude/cursor-bridge/bridge-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/sync-check.py:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
     ]
   }

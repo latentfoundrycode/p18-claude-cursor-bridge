@@ -37,6 +37,8 @@ else: it verifies the installed tree against its manifest, re-reads the governin
 applies only the release's adjustments for the project's current and future phases, reopening
 no gate. The owner may also run `/calibrate-bridge` at any time after updating the bridge.
 
+**Then check that the local repository and the remote agree** — `python ~/.claude/cursor-bridge/sync-check.py --apply` (rule 40). A squash merge completes on GitHub, and local `main` does not move unless you move it; a project once ended with the release on the remote and the local copy behind it (KP-026). BEHIND is fast-forwarded by the script. AHEAD or DIVERGED means commits stranded on protected `main`: follow the rescue it prints (nothing is deleted), carry anything still needed through a PR, and open an issue. NO REMOTE, OFFLINE, and UNPUBLISHED are legitimate reasons for a disparity; write the reason on the `Remote sync:` line of the status file, never ignore it silently.
+
 ---
 
 ## The division of labour
@@ -530,7 +532,7 @@ Delegate the actual file-writing to **cursor-configurator**, which writes
 project — the write-the-least-code ladder, with safety rules taking precedence), and the
 model roster `docs/ROSTER.json` (the two-profile template in
 `Merge-Verification-Policy.md` §Model roster — a *full* profile and a *native* profile with
-the roles swapped, plus the owner-set `other_pool` state; resolved by `roster-check.py` at
+the roles swapped, plus the `other_pool` state and the subscription's `reset_day`; resolved by `roster-check.py` at
 configuration and at every checkpoint), the
 performance floor where budgets exist (`bench/budgets.json`, the bench runner script, the
 `bench-check.py` step in CI, the pinned profiler — `Performance-Conventions.md` §3), the
@@ -618,16 +620,9 @@ today, three distinct families, each model proven to answer (KP-022, KP-024):
 python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --command "<the delegate command you are about to run>"
 ```
 
-It skips every profile that needs Cursor's "other models" pool while `docs/ROSTER.json`
-says `"other_pool": "exhausted"` (an **owner-set** field — a probe cannot see a nearly-empty
-quota, only a refusal), probes the rest with a one-word request, and writes the chosen
-profile to `docs/ROSTER.resolved.json`. Read the builder id from that file into the
-delegate command (`--model <builder>`) and the Review B id into the Review B invocation.
-`FAIL` stops the delegation. If the profile in use is not the preferred one, say so in the
-report's first line ("running on the native profile: builder Composer 2.5, Review B Grok
-4.6 — say *usage reset* when the other-models pool is back"). When the owner says the
-pool is back, set `"other_pool": "available"` and the next checkpoint returns to the
-preferred profile by itself. Then:
+It skips every profile that needs Cursor's Other Models pool while `docs/ROSTER.json` says `"other_pool": "exhausted"` — set **automatically** when a call returns a usage-limit error or a model fails twice in a row (step 3b), or when the owner says *usage exhausted*, because a probe cannot see a nearly-empty quota, only a refusal — and it restores the pool by itself on the roster's `reset_day` (UTC). It probes the remaining profiles with a one-word request and writes the chosen one to `docs/ROSTER.resolved.json`. Read the builder id from that file into the delegate command (`--model <builder>`) and the Review B id into the Review B invocation. `FAIL` stops the delegation. If the profile in use is not the preferred one, say so in the report's first line, with the ids taken from the resolved file, never from this example: "running on the native profile: builder composer-2.5, Review B grok-4.7-high — the full profile returns on <the next reset day> UTC, or earlier if you say *usage reset*".
+
+**Start every new branch from the remote's base.** When this checkpoint opens a new branch (the first increment of a merge unit, a refactoring pass, a fix), first run `python ~/.claude/cursor-bridge/sync-check.py --apply`, then create the branch from the remote-tracking base — `git switch -c <branch> origin/main` — never from local `main`. A stale local copy then can never become the starting point of new work (KP-026). Then:
 
 ```bash
 git status --short
@@ -1001,6 +996,8 @@ required check is green or before both reviews APPROVE. No human correctness cli
 involved; the merge is reversible, so a rare behavioural miss is caught retrospectively via
 the change log, not by a gate the user cannot operate.
 
+**After every merge, bring local `main` along.** `git switch main`, then `python ~/.claude/cursor-bridge/sync-check.py --apply`; it must end IN SYNC or FAST-FORWARDED before anything else happens, and the next branch starts from there. Under `Merge authority: owner`, do the same at the first resume after the owner has merged. A worktree the merged branch had is torn down now (rule 39).
+
 ### 9. Refactoring and optimization pass (at stage close)
 
 When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says
@@ -1090,7 +1087,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
    (which current features, screens, data, or commands the change touches, and whether any
    existing behaviour is altered or removed). Read this project's own Issues file in place
    of the prior-project lessons step: the issues already recorded are the ones this change
-   must not repeat. Gate: summarise the change back and get confirmation.
+   must not repeat. A report of **several defects** is triaged before any of them is diagnosed — the `root-cause-first` skill's step 0: shared cause binned only on evidence, otherwise one at a time. Gate: summarise the change back and get confirmation.
 2. **Design revision** (Phase 2, scaled). Append a dated **Change: <name>** section to
    `docs/DESIGN.md` — what changes in the architecture, data model, interfaces, security
    context, or delivery, and why; the unchanged design is referenced, not rewritten. Run
@@ -1158,7 +1155,7 @@ escalation, none of it stalls the loop, and none of it changes the bridge.
 5. **Record** the reflection point in `docs/PROJECT_STATUS.md` (`Last reflection:`), and
    check the worktrees: `git worktree prune`, then `git worktree list` must show nothing
    under `Worktrees/`. A leftover is torn down now (safe primitive, rule 19) and opened as an
-   issue — it means a merge closed without its teardown.
+   issue — it means a merge closed without its teardown. Then run `python ~/.claude/cursor-bridge/sync-check.py --apply`: local `main` must match the remote, or the `Remote sync:` line must name the reason it cannot.
 6. **Then, at a stage close, obey `Stage pause` in `docs/RUN_PARAMETERS.md`.** Under `run`
    (the default) the stage-close report is a notification — "Stage <name> closed; next:
    <stage>" plus the FYI block — and you **continue into the next stage in the same turn**
@@ -1180,6 +1177,8 @@ pause). Set `Phase: done` in `PROJECT_STATUS.md`. The report's first line is
 whose last stage has closed without this having run is in the wrong state: run it now.
 
 **At project end**, additionally:
+
+- **Confirm the remote holds the release — first.** `python ~/.claude/cursor-bridge/sync-check.py --apply --strict` must print IN SYNC, or NO REMOTE for a project that never had one, before the "Project complete" line is written. Anything else is resolved before the project is declared finished: a project whose local copy lags the remote, or whose last commits never left the machine, is not finished.
 
 - **Write `Documents/<Name> User Manual.md`** from the finished software and `CHANGES.md`:
   what it does, how to use each feature, screen by screen where there are screens, in the
@@ -1387,6 +1386,7 @@ Terms fixed: <term — the sense fixed with the user — Established | Risky; on
 Software name: <the name that names the Documents set>
 Layout: Workspace=<resolved path>  Documents=<resolved path>
 Worktrees: <none | <name> — branch <branch> — since <date> — <why two branches had to be live>>
+Remote sync: <in sync at <date> | NO REMOTE | OFFLINE since <date> | UNPUBLISHED — first push pending>
 Stage: <current stage name> — Last reflection: <stage close | phase gate | none yet, and when>
 Open issues: <ISS-nnn …, or none>
 Bridge version: <contents of ~/.claude/cursor-bridge/VERSION when last calibrated>
@@ -1427,7 +1427,7 @@ consult it) so a known pitfall is avoided rather than rediscovered. Distinct fro
 through the gate with the code it describes; do not commit it to local `main` afterward,
 where branch protection will strand it off the remote. `PROJECT_STATUS.md` is session-resume
 bookkeeping and may stay local — but if a fresh clone on another machine must resume, it too
-has to ride PRs to reach the remote; decide per project which you need and keep it consistent.
+has to ride PRs to reach the remote; decide per project which you need and keep it consistent. Staying local means an uncommitted or gitignored file — never a commit on local `main`, which `sync-check.py` reports as stranded.
 
 ---
 
@@ -1564,6 +1564,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     builder repairs a named cause; it is never asked to guess. Symptom suppression, a cause
     left untouched, or instrumentation residue is a `FAIL`. A `test-runner` diagnosis is
     OBSERVED or INFERRED, and an INFERRED one is a hypothesis, never a basis for a fix.
+    A report of several defects is triaged before any is diagnosed (skill step 0): reproduce each, bin together only those whose shared cause the evidence shows, confirm it with one discriminator that moves every member, and split out any member that does not respond; nothing readily apparent means one diagnosis per defect. A confirmed group gets one fix brief and one gate pass, and every member keeps its own regression test.
 27. Anything the user must run or click reaches them as a **run sheet**, never as a
     description: which terminal (PowerShell / Git Bash / Command Prompt / this chat / a
     named browser page) and how to open it; the folder and its `cd` as a literal step;
@@ -1666,3 +1667,4 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     primitive (rule 19). At every reflection point `git worktree prune` then
     `git worktree list`: nothing under `Worktrees/` may remain — a leftover is torn down
     now and gets an issue entry, not silent cleanup.
+40. Local and remote agree, or the status file says why not. `sync-check.py` runs at every start and resume, before every new branch (which starts from `origin/main`, never local `main`), after every merge (`git switch main` + `--apply`), at every reflection point, and with `--strict` at project end, where only IN SYNC or NO REMOTE lets "Project complete" be written. BEHIND is fast-forwarded; AHEAD or DIVERGED is stranded work on protected `main`, rescued to a branch without deleting anything and carried through a PR, with an issue; NO REMOTE, OFFLINE, and UNPUBLISHED are recorded on `Remote sync:` as the reason. A commit on local `main` is always a mistake: nothing reaches `main` except through a merge.

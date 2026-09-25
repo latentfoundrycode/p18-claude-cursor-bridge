@@ -149,6 +149,7 @@ Same file shape, with these differences, stated verbatim:
   **if you believe the real cause is different from the one named, stop, do not change
   code, and report why in your summary** — the supervisor will re-diagnose.
 - **Done** adds: state in one sentence how the change addresses the named cause.
+- **A group** (a debug file with a `Members:` line — several reported bugs confirmed to share one cause) gets **one** brief: the cause stated once, every member's reproduction test named in Scope and in the Acceptance criteria, all of which must pass.
 
 Never write a fix brief from a symptom. If the supervisor hands you a failure without a
 confirmed cause and evidence, hand it back: that is a diagnosis task, not a packaging task.
