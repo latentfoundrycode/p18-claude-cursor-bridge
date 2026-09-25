@@ -294,10 +294,14 @@ it applies.**
   Anthropic / unprefixed Grok) stood at 99% used — unusable for a build — yet a one-word
   probe to GPT-5.6 Sol still answered. A call succeeds at 1% remaining exactly as at 90%,
   so no probe can see exhaustion coming; only the dashboard can.
-- **Correction:** `docs/ROSTER.json` carries an owner-set `other_pool` field; the supervisor
-  flips it when the owner says "usage exhausted" / "usage reset". `roster-check.py` skips
-  every profile that needs the exhausted pool and falls to the **native** profile (builder
-  Composer 2.5, Review B Cursor-hosted Grok 4.6 — roles swapped so the stronger native
-  reasoner reviews). The probe stays for what it *can* see: a refusal, an empty reply, a
-  timeout. Standing rule 38.
+- **Correction:** `docs/ROSTER.json` carries an `other_pool` field. It flips to exhausted
+  **automatically** when a call returns a usage-limit message or a model fails twice in a
+  row (`roster-check.py --record-failure`; the loop re-resolves and restarts the
+  interrupted step from its checkpoint — the owner may be asleep), or pre-emptively when
+  the owner says "usage exhausted". `roster-check.py` then falls to the **native** profile
+  (builder Composer 2.5, Review B Cursor-hosted Grok 4.6 — roles swapped so the stronger
+  native reasoner reviews). Only the return to the preferred profile waits for the owner's
+  "usage reset", because an automatic return would oscillate. The exact usage-limit text
+  Cursor prints was unknown when the classifier was written; every auto-switch records the
+  stderr excerpt in the Issues file so the patterns can be sharpened. Standing rule 38.
 - **Applies:** every project; every time a usage limit is reached or reset.

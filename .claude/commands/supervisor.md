@@ -477,8 +477,10 @@ Installer verification: local | ci-only | n/a (not a desktop application)
 ```
 
 The **model pool state** is not a run parameter — it changes with the owner's usage, not
-with the project — but it is an owner setting in the same spirit: `"other_pool"` in
-`docs/ROSTER.json`, flipped when the owner says "usage exhausted" or "usage reset".
+with the project. `"other_pool"` in `docs/ROSTER.json` is flipped to `exhausted`
+**automatically** when a call returns a usage-limit error (Phase 6 step 3b) or by the owner
+saying "usage exhausted" pre-emptively; it returns to `available` only when the owner says
+"usage reset".
 
 **What no parameter changes.** The "Escalate to the user when" list stays in force under
 every setting: product behaviour, scope, a user-level consequence, something only the owner
@@ -646,8 +648,12 @@ not as a brief.
 ### 3. Delegate to Cursor
 
 ```bash
-cursor-agent -p --force "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary."
+cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
 ```
+
+The `--model` value is copied from `docs/ROSTER.resolved.json` (step 1), never typed from
+memory; the stderr redirect keeps the CLI's own messages in a file, which is what the
+automatic model switch below reads. (`run/agent/` is gitignored.)
 
 Rules for this call, all of which matter:
 
@@ -668,6 +674,45 @@ Rules for this call, all of which matter:
   stop and put them in the file.
 - If a run needs a specific model, add `--model <name>`; `cursor-agent --list-models`
   shows what is available.
+
+### 3b. A model fails mid-step — switch automatically, restart the step, never wait
+
+The owner may be asleep while the loop runs. A usage limit reached at 03:00 must not stall
+the build until morning, so a model failure is handled by the loop, never by a question.
+When any `cursor-agent` call — a delegation, a Review B launch, a resolution round, the
+stage-close pass — exits non-zero, produces no output, or times out:
+
+```bash
+python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --record-failure <model id> --stderr-file <the .err file of that call>
+```
+
+- **Exit 4 — transient.** A first failure with no usage-limit message. Retry the same step
+  once, unchanged. If it fails again the next record is exit 3.
+- **Exit 3 — exhausted or unavailable.** A usage-limit message (usage / quota / limit
+  reached / upgrade your plan / billing), or a second consecutive failure. The script has
+  already marked the pool exhausted (or the model unavailable) in `docs/ROSTER.json`. Now:
+  1. **Re-resolve:** `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` —
+     the next profile that answers is written to `docs/ROSTER.resolved.json`. `FAIL` here
+     (no profile answers at all) is the one case that stops the loop: report it as the
+     single decision — buy usage, or add a candidate — and wait.
+  2. **Restart the interrupted step from its checkpoint** with the newly resolved models.
+     A delegation: the working tree goes back to the pre-delegation checkpoint
+     (`git reset --hard <checkpoint sha>` then `git clean -fd` inside the workspace — the
+     checkpoint exists exactly for this), and the same brief is re-issued with the new
+     `--model`. A Review B launch: re-run on the same committed diff file with the new
+     reviewer. A resolution round or a stage-close pass: re-run the failed call with the
+     new model; earlier completed calls stand. Nothing partial survives, nothing completed
+     is redone.
+  3. **Record and report.** Open an issue (`ISS-nnn`) whose entry carries the stderr
+     excerpt — that text is how the maintainer sharpens the classifier — and put the switch
+     in the **first line of the next report**: "auto-switched to the native profile at
+     <time> (<model> returned: <excerpt>); TASK-<nnn> restarted with builder <id>, Review B
+     <id>; say *usage reset* when the other-models pool is back." Then continue.
+
+A wrong switch costs a weaker reviewer until the owner says "usage reset"; a stall costs a
+night. The rule therefore errs toward switching. **Returning** to the preferred profile is
+the owner's word alone: a probe cannot tell a reset from 1% remaining, and an automatic
+return would oscillate, failing a step at every checkpoint.
 
 ### 4. Inspect
 
@@ -905,7 +950,9 @@ instead. In short, a branch merges to `main` only when **all** hold:
    worktree, and give a **directive** prompt ("the diff is already at `<path>`; read it;
    do not ask for it"). A reply that does not name something specific from the diff — or
    that asks for the diff, or errors on trust — is a failed launch, not a verdict: re-run.
-   Confirm receipt before trusting the verdict, and `git status` clean afterward;
+   Confirm receipt before trusting the verdict, and `git status` clean afterward. Launch
+   it with `--model <review_b from docs/ROSTER.resolved.json>` and `2> run/review/REVIEW-<nnn>.err`
+   so a failure can be classified (below);
 4. no gate-integrity flag is open — the diff does not weaken tests, assertions, or CI, and
    the builder's model family differs from both reviewers'.
 
@@ -1576,6 +1623,10 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     usable **profile** (skipping any that needs the "other models" pool while the owner has
     marked it exhausted, probing the rest), confirms three distinct families, writes
     `docs/ROSTER.resolved.json`, and checks the delegate command sets that builder. The
-    delegate and Review B commands read their model ids from the resolved file. A
-    non-preferred profile in use is the report's first line. Reviewers review the design a
+    delegate and Review B commands read their model ids from the resolved file and capture
+    stderr to a file. A model that returns a usage-limit error, or fails twice in a row, is
+    marked exhausted/unavailable **automatically** (`--record-failure`); the loop
+    re-resolves and restarts the interrupted step from its checkpoint with the new models,
+    never waiting for the owner; the switch is the next report's first line. Only the
+    return to the preferred profile waits for the owner's "usage reset". Reviewers review the design a
     diff embodies, not only its fidelity to the brief — a flawed brief is a finding.

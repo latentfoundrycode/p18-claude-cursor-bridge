@@ -24,8 +24,16 @@ one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty rep
 timeout marks the profile unusable (this catches hard failures only, never a nearly-empty
 quota). The chosen profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read.
+--record-failure <model> --stderr-file <path> [--stdout-file <path>]
+  Classify a failed cursor-agent call. USAGE-LIMIT (a usage/quota/limit/billing message) or
+  a second consecutive failure of the same model marks the model's pool exhausted in
+  docs/ROSTER.json automatically (auto_exhausted_at / auto_exhausted_reason) and exits 3 =
+  "re-resolve and restart the step". A first non-limit failure exits 4 = "transient - retry
+  the same step once". The count lives in the roster (failures.<model>) and resets on
+  success or on marking.
 Exit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;
-2 = cannot read. ASCII-only on purpose.
+2 = cannot read; 3 = pool/model marked exhausted, re-resolve; 4 = transient, retry once.
+ASCII-only on purpose.
 """
 import datetime
 import json
@@ -114,10 +122,59 @@ def probe(model_id):
     return False, "exit %d; stdout=%r; stderr=%r" % (p.returncode, out[:80], err)
 
 
+USAGE_LIMIT_PATTERNS = [
+    r"usage[\s-]*limit", r"\busage\b.*\b(exhaust|exceed|reached|used up)", r"\bquota\b",
+    r"\blimit\b.*\b(reached|exceeded)", r"exceeded.*\blimit", r"insufficient (credits|balance|usage)",
+    r"no (remaining|more) (credits|usage|requests)", r"upgrade (your )?plan", r"billing", r"out of (credits|usage)",
+    r"spend(ing)? limit", r"\b402\b", r"payment required",
+]
+
+
+def classify_failure(text):
+    t = (text or "").lower()
+    for pat in USAGE_LIMIT_PATTERNS:
+        if re.search(pat, t):
+            return "USAGE-LIMIT", pat
+    return "OTHER", ""
+
+
+def record_failure(path, roster, model, text):
+    """Mark the model's pool exhausted on a usage-limit message or a second consecutive
+    failure; otherwise count it. Writes the roster. Returns the exit code (3 or 4)."""
+    kind, pat = classify_failure(text)
+    failures = roster.setdefault("failures", {})
+    count = failures.get(model, 0) + 1
+    failures[model] = count
+    pool = pool_of(model)
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    excerpt = (text or "").strip().replace("\n", " ")[:300]
+    if kind == "USAGE-LIMIT" or count >= 2:
+        reason = "usage-limit message (%s)" % pat if kind == "USAGE-LIMIT" else "%d consecutive failures" % count
+        if pool == "other":
+            roster["other_pool"] = "exhausted"
+            roster["auto_exhausted_at"] = stamp
+            roster["auto_exhausted_reason"] = "%s: %s -- %s" % (model, reason, excerpt)
+            print("EXHAUSTED  %s (%s pool): %s" % (model, pool, reason))
+            print("           other_pool set to 'exhausted' automatically; re-resolve and restart the step.")
+        else:
+            roster.setdefault("unavailable", {})[model] = "%s: %s -- %s" % (stamp, reason, excerpt)
+            print("UNAVAILABLE  %s (%s pool): %s" % (model, pool, reason))
+            print("             marked unavailable in the roster; re-resolve and restart the step.")
+        failures[model] = 0
+        code = 3
+    else:
+        print("TRANSIENT  %s: first failure, not a usage-limit message - retry the same step once." % model)
+        print("           excerpt: %s" % excerpt)
+        code = 4
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(roster, f, indent=2); f.write("\n")
+    return code
+
+
 def main():
     argv = sys.argv[1:]
     if not argv or argv[0].startswith("--"):
-        print("usage: roster-check.py docs/ROSTER.json [--command \"<delegate command>\"] [--no-probe] [--out <path>]")
+        print("usage: roster-check.py docs/ROSTER.json [--command ...] [--no-probe] [--out <path>] | --record-failure <model> --stderr-file <path>")
         return 2
     path = argv[0]
     command = argv[argv.index("--command") + 1] if "--command" in argv and argv.index("--command") + 1 < len(argv) else None
@@ -129,7 +186,19 @@ def main():
         print("CANNOT VERIFY: cannot read %s (%s)" % (path, e))
         return 2
 
+    if "--record-failure" in argv:
+        model = argv[argv.index("--record-failure") + 1]
+        text = ""
+        for flag in ("--stderr-file", "--stdout-file"):
+            if flag in argv and argv.index(flag) + 1 < len(argv):
+                try:
+                    text += open(argv[argv.index(flag) + 1], encoding="utf-8", errors="replace").read() + "\n"
+                except OSError:
+                    pass
+        return record_failure(path, roster, model, text)
+
     other_pool = (roster.get("other_pool") or "available").lower()
+    unavailable = roster.get("unavailable") or {}
     ra_id, ra_fam_o, _ = norm_entry(roster.get("review_a"))
     ra_fam = family_of(ra_id, ra_fam_o) if ra_id else None
     if not ra_id or ra_fam is None:
@@ -154,7 +223,10 @@ def main():
         if b_fam is None or r_fam is None:
             print("    skip: family unknown - add {\"model\": ..., \"family\": ...}"); continue
         if other_pool == "exhausted" and ("other" in (b_pool, r_pool)):
-            print("    skip: uses the other-models pool, which the owner marked exhausted"); continue
+            how = (" automatically at " + roster["auto_exhausted_at"]) if roster.get("auto_exhausted_at") else " by the owner"
+            print("    skip: uses the other-models pool, marked exhausted%s" % how); continue
+        if b_id in unavailable or r_id in unavailable:
+            print("    skip: a model was marked unavailable after repeated failures (%s)" % ", ".join(m for m in (b_id, r_id) if m in unavailable)); continue
         fams = {"builder": b_fam, "review_a": ra_fam, "review_b": r_fam}
         if len(set(fams.values())) < 3:
             print("    skip: family collision %s" % fams); continue

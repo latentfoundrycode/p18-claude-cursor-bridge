@@ -11,6 +11,28 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.25b
+
+**What changed**
+- **Automatic model switch — the owner is never in the loop for it.** Every `cursor-agent`
+  call sets `--model` from `docs/ROSTER.resolved.json` and captures stderr to a file. On a
+  failure, `roster-check.py --record-failure <model> --stderr-file <file>` classifies it: a
+  usage-limit message (or a second consecutive failure) marks the pool exhausted / the model
+  unavailable in `docs/ROSTER.json` by itself (exit 3); a first non-limit failure is a
+  transient retry (exit 4). On exit 3 the supervisor re-resolves the roster and **restarts
+  the interrupted step from its checkpoint** with the new models — a delegation from the
+  pre-delegation commit, a Review B on the same committed diff — records the stderr excerpt
+  as an issue, and puts the switch in the next report's first line. Only the return to the
+  preferred profile waits for the owner's "usage reset". Phase 6 step 3b; rule 38; KP-024.
+
+**Running projects must**
+- *(Phase 6)* Add `--model <builder>` from `docs/ROSTER.resolved.json` and
+  `2> run/agent/TASK-<nnn>.err` to the delegate command; the same for Review B launches
+  (`run/review/REVIEW-<nnn>.err`); gitignore `run/agent/`. Apply step 3b from the next
+  failure on.
+
+---
+
 ## 2026.09.25
 
 **What changed**

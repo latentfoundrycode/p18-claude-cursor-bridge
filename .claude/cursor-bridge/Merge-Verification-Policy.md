@@ -137,10 +137,14 @@ always Claude through Claude Code (it never touches Cursor usage).
 }
 ```
 
-`other_pool` is **owner-set**: Cursor's dashboard shows the "other models" usage, and a
-one-word probe succeeds at 1% remaining exactly as at 90%, so no check can see exhaustion
-coming — the owner says "usage exhausted" or "usage reset" and the supervisor flips the
-field. `roster-check.py` then skips profiles that need the exhausted pool, probes the
+`other_pool` flips to `exhausted` in two ways: **automatically**, when a call to a model
+in that pool returns a usage-limit message or fails twice in a row
+(`roster-check.py --record-failure`, supervisor Phase 6 step 3b — the loop then re-resolves
+and restarts the interrupted step without waiting for anyone), or **pre-emptively by the
+owner** saying "usage exhausted" when the dashboard shows the pool nearly gone (a one-word
+probe succeeds at 1% remaining exactly as at 90%, so a nearly-empty pool cannot be
+detected, only a refused call). It returns to `available` only on the owner's "usage
+reset". `roster-check.py` then skips profiles that need the exhausted pool, probes the
 candidates for hard failures (refusal, empty reply, timeout), verifies three distinct
 families, and writes `docs/ROSTER.resolved.json`, which the delegate and Review B commands
 read. Running on the native profile is a weaker cross-family verdict than GPT-5.6 Sol and
