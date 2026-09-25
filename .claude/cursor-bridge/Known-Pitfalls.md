@@ -300,8 +300,9 @@ it applies.**
   interrupted step from its checkpoint — the owner may be asleep), or pre-emptively when
   the owner says "usage exhausted". `roster-check.py` then falls to the **native** profile
   (builder Composer 2.5, Review B Cursor-hosted Grok 4.6 — roles swapped so the stronger
-  native reasoner reviews). Only the return to the preferred profile waits for the owner's
-  "usage reset", because an automatic return would oscillate. The exact usage-limit text
+  native reasoner reviews). The return is a **calendar fact**: the roster's `reset_day` (UTC) after the
+  exhaustion stamp restores the pool automatically; a probe is never used for it, because
+  a probe cannot tell a reset from 1% remaining and would oscillate. The exact usage-limit text
   Cursor prints was unknown when the classifier was written; every auto-switch records the
   stderr excerpt in the Issues file so the patterns can be sharpened. Standing rule 38.
 - **Applies:** every project; every time a usage limit is reached or reset.

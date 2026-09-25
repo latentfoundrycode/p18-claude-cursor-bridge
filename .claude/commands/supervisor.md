@@ -479,8 +479,9 @@ Installer verification: local | ci-only | n/a (not a desktop application)
 The **model pool state** is not a run parameter — it changes with the owner's usage, not
 with the project. `"other_pool"` in `docs/ROSTER.json` is flipped to `exhausted`
 **automatically** when a call returns a usage-limit error (Phase 6 step 3b) or by the owner
-saying "usage exhausted" pre-emptively; it returns to `available` only when the owner says
-"usage reset".
+saying "usage exhausted" pre-emptively; it returns to `available` **automatically on the
+roster's `reset_day` (UTC)** after the exhaustion, or earlier when the owner says "usage
+reset".
 
 **What no parameter changes.** The "Escalate to the user when" list stays in force under
 every setting: product behaviour, scope, a user-level consequence, something only the owner
@@ -709,10 +710,14 @@ python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --record-failure
      <time> (<model> returned: <excerpt>); TASK-<nnn> restarted with builder <id>, Review B
      <id>; say *usage reset* when the other-models pool is back." Then continue.
 
-A wrong switch costs a weaker reviewer until the owner says "usage reset"; a stall costs a
-night. The rule therefore errs toward switching. **Returning** to the preferred profile is
-the owner's word alone: a probe cannot tell a reset from 1% remaining, and an automatic
-return would oscillate, failing a step at every checkpoint.
+A wrong switch costs a weaker reviewer until the pool resets; a stall costs a night. The
+rule therefore errs toward switching. **Returning** to the preferred profile is a calendar
+fact, not a probe: the roster's `reset_day` (day of month, UTC — the owner's subscription
+resets on the 15th, so `16`) and the UTC exhaustion stamp let `roster-check.py` restore the
+pool by itself at the first checkpoint on or after 00:00 UTC of the first reset day after
+the exhaustion (`AUTO-RESET` in its output; put it in the report's first line). The owner
+can also say "usage reset" (`--mark-reset`) or "usage exhausted" (`--mark-exhausted`) at
+any time. A probe is never used for the return: it cannot tell a reset from 1% remaining.
 
 ### 4. Inspect
 
@@ -1627,6 +1632,8 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     stderr to a file. A model that returns a usage-limit error, or fails twice in a row, is
     marked exhausted/unavailable **automatically** (`--record-failure`); the loop
     re-resolves and restarts the interrupted step from its checkpoint with the new models,
-    never waiting for the owner; the switch is the next report's first line. Only the
-    return to the preferred profile waits for the owner's "usage reset". Reviewers review the design a
+    never waiting for the owner; the switch is the next report's first line. The return
+    is automatic too: on the roster's `reset_day` (UTC) after the exhaustion the check
+    restores the preferred profile by itself; the owner's "usage reset" only brings it
+    earlier. Reviewers review the design a
     diff embodies, not only its fidelity to the brief — a flawed brief is a finding.

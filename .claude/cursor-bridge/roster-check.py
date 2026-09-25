@@ -31,6 +31,13 @@ docs/ROSTER.resolved.json for the delegate and Review B commands to read.
   "re-resolve and restart the step". A first non-limit failure exits 4 = "transient - retry
   the same step once". The count lives in the roster (failures.<model>) and resets on
   success or on marking.
+--mark-exhausted   the owner said "usage exhausted": stamp other_pool exhausted now (UTC).
+--mark-reset       the owner said "usage reset": restore other_pool and clear marks now.
+Automatic reset: "reset_day" (day of month, UTC; e.g. 16) in the roster. When other_pool is
+exhausted and the current UTC time is at or past 00:00 UTC of the first reset_day strictly
+after exhausted_at, the check restores other_pool to "available" by itself, clears the
+unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NOW=<ISO UTC>
+overrides "now" for tests.
 Exit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;
 2 = cannot read; 3 = pool/model marked exhausted, re-resolve; 4 = transient, retry once.
 ASCII-only on purpose.
@@ -122,6 +129,63 @@ def probe(model_id):
     return False, "exit %d; stdout=%r; stderr=%r" % (p.returncode, out[:80], err)
 
 
+def now_utc():
+    forced = os.environ.get("ROSTER_NOW")
+    if forced:
+        return datetime.datetime.strptime(forced, "%Y-%m-%dT%H:%M").replace(tzinfo=datetime.timezone.utc)
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def stamp(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M UTC")
+
+
+def parse_stamp(text):
+    try:
+        return datetime.datetime.strptime(text, "%Y-%m-%dT%H:%M UTC").replace(tzinfo=datetime.timezone.utc)
+    except Exception:
+        return None
+
+
+def next_reset_after(exhausted_at, reset_day):
+    """00:00 UTC of the first `reset_day` strictly after exhausted_at."""
+    y, m = exhausted_at.year, exhausted_at.month
+    candidate = datetime.datetime(y, m, reset_day, tzinfo=datetime.timezone.utc)
+    if candidate <= exhausted_at:
+        m += 1
+        if m == 13:
+            y, m = y + 1, 1
+        candidate = datetime.datetime(y, m, reset_day, tzinfo=datetime.timezone.utc)
+    return candidate
+
+
+def clear_marks(roster, how):
+    roster["other_pool"] = "available"
+    for k in ("auto_exhausted_at", "auto_exhausted_reason", "exhausted_at", "exhausted_reason", "unavailable", "failures"):
+        roster.pop(k, None)
+    roster["last_reset"] = "%s (%s)" % (stamp(now_utc()), how)
+
+
+def maybe_auto_reset(path, roster):
+    """If the pool is exhausted and the reset day has passed since exhaustion, restore it."""
+    if (roster.get("other_pool") or "available").lower() != "exhausted":
+        return False
+    reset_day = roster.get("reset_day")
+    ex = parse_stamp(roster.get("exhausted_at") or roster.get("auto_exhausted_at") or "")
+    if not reset_day or ex is None:
+        return False
+    due = next_reset_after(ex, int(reset_day))
+    now = now_utc()
+    if now >= due:
+        clear_marks(roster, "automatic reset: reset_day %d, exhausted %s, due %s" % (int(reset_day), stamp(ex), stamp(due)))
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(roster, f, indent=2); f.write("\n")
+        print("AUTO-RESET  other_pool restored to 'available' (reset day %d passed at %s; exhausted since %s)" % (int(reset_day), stamp(due), stamp(ex)))
+        return True
+    print("note  other_pool exhausted since %s; automatic reset due %s (reset_day %d)" % (stamp(ex), stamp(due), int(reset_day)))
+    return False
+
+
 USAGE_LIMIT_PATTERNS = [
     r"usage[\s-]*limit", r"\busage\b.*\b(exhaust|exceed|reached|used up)", r"\bquota\b",
     r"\blimit\b.*\b(reached|exceeded)", r"exceeded.*\blimit", r"insufficient (credits|balance|usage)",
@@ -146,18 +210,19 @@ def record_failure(path, roster, model, text):
     count = failures.get(model, 0) + 1
     failures[model] = count
     pool = pool_of(model)
-    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    when = stamp(now_utc())
     excerpt = (text or "").strip().replace("\n", " ")[:300]
     if kind == "USAGE-LIMIT" or count >= 2:
         reason = "usage-limit message (%s)" % pat if kind == "USAGE-LIMIT" else "%d consecutive failures" % count
         if pool == "other":
             roster["other_pool"] = "exhausted"
-            roster["auto_exhausted_at"] = stamp
+            roster["exhausted_at"] = when
+            roster["auto_exhausted_at"] = when
             roster["auto_exhausted_reason"] = "%s: %s -- %s" % (model, reason, excerpt)
             print("EXHAUSTED  %s (%s pool): %s" % (model, pool, reason))
             print("           other_pool set to 'exhausted' automatically; re-resolve and restart the step.")
         else:
-            roster.setdefault("unavailable", {})[model] = "%s: %s -- %s" % (stamp, reason, excerpt)
+            roster.setdefault("unavailable", {})[model] = "%s: %s -- %s" % (when, reason, excerpt)
             print("UNAVAILABLE  %s (%s pool): %s" % (model, pool, reason))
             print("             marked unavailable in the roster; re-resolve and restart the step.")
         failures[model] = 0
@@ -186,6 +251,20 @@ def main():
         print("CANNOT VERIFY: cannot read %s (%s)" % (path, e))
         return 2
 
+    if "--mark-exhausted" in argv:
+        roster["other_pool"] = "exhausted"
+        roster["exhausted_at"] = stamp(now_utc())
+        roster["exhausted_reason"] = "owner said usage exhausted"
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(roster, f, indent=2); f.write("\n")
+        print("MARKED  other_pool exhausted at %s (owner)" % roster["exhausted_at"])
+        return 0
+    if "--mark-reset" in argv:
+        clear_marks(roster, "owner said usage reset")
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(roster, f, indent=2); f.write("\n")
+        print("RESET   other_pool available (owner)")
+        return 0
     if "--record-failure" in argv:
         model = argv[argv.index("--record-failure") + 1]
         text = ""
@@ -197,6 +276,7 @@ def main():
                     pass
         return record_failure(path, roster, model, text)
 
+    maybe_auto_reset(path, roster)
     other_pool = (roster.get("other_pool") or "available").lower()
     unavailable = roster.get("unavailable") or {}
     ra_id, ra_fam_o, _ = norm_entry(roster.get("review_a"))
@@ -241,7 +321,7 @@ def main():
                 print("    skip: a model did not answer"); continue
         chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": r_id, "families": fams,
                   "other_pool": other_pool, "probed": do_probe,
-                  "resolved_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
+                  "resolved_at": stamp(now_utc()), "reset_day": roster.get("reset_day")}
         break
 
     if chosen is None:

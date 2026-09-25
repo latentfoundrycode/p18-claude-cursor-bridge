@@ -129,6 +129,7 @@ always Claude through Claude Code (it never touches Cursor usage).
 ```json
 {
   "other_pool": "available",
+  "reset_day": 16,
   "review_a": "claude-opus-4-8",
   "profiles": [
     { "name": "full",   "builder": "cursor-grok-4.6-high", "review_b": "gpt-5.6-sol-high" },
@@ -143,8 +144,11 @@ in that pool returns a usage-limit message or fails twice in a row
 and restarts the interrupted step without waiting for anyone), or **pre-emptively by the
 owner** saying "usage exhausted" when the dashboard shows the pool nearly gone (a one-word
 probe succeeds at 1% remaining exactly as at 90%, so a nearly-empty pool cannot be
-detected, only a refused call). It returns to `available` only on the owner's "usage
-reset". `roster-check.py` then skips profiles that need the exhausted pool, probes the
+detected, only a refused call). It returns to `available` **automatically**: `reset_day` is the
+day of month (UTC) on which the owner's subscription has reset (the owner's resets on the
+15th, so `16`); at the first checkpoint on or after 00:00 UTC of the first reset day after
+the exhaustion stamp, `roster-check.py` restores the pool and clears the marks. The owner's
+"usage reset" brings it earlier; a probe is never used for the return. `roster-check.py` then skips profiles that need the exhausted pool, probes the
 candidates for hard failures (refusal, empty reply, timeout), verifies three distinct
 families, and writes `docs/ROSTER.resolved.json`, which the delegate and Review B commands
 read. Running on the native profile is a weaker cross-family verdict than GPT-5.6 Sol and

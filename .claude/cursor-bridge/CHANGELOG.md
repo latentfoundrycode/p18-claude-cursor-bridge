@@ -11,6 +11,26 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.25c
+
+**What changed**
+- **Automatic return on the reset day.** `docs/ROSTER.json` gains `reset_day` (day of month,
+  UTC; the owner's subscription resets on the 15th, so `16`). Exhaustion is stamped in UTC
+  (automatically on a usage-limit failure, or by `--mark-exhausted` when the owner says so);
+  at the first checkpoint on or after 00:00 UTC of the first reset day after that stamp,
+  `roster-check.py` restores `other_pool` to available, clears the failure and unavailable
+  marks, prints `AUTO-RESET`, and the preferred profile is used again — no owner action.
+  `--mark-reset` still brings it earlier. `ROSTER_NOW` overrides the clock for tests
+  (eight cases pass, including the 23:59 / 00:00 boundary and a same-month vs next-month
+  exhaustion).
+
+**Running projects must**
+- *(all phases)* Add `"reset_day": 16` to `docs/ROSTER.json`. If the pool is currently
+  marked exhausted without a UTC `exhausted_at`, set it to the date the owner reported
+  (2026-09-25T00:00 UTC) so the October reset is computed.
+
+---
+
 ## 2026.09.25b
 
 **What changed**
