@@ -11,6 +11,29 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.25
+
+**What changed**
+- **Roster profiles and the owner-set pool state.** `docs/ROSTER.json` now lists
+  **profiles** tried in order — *full* (builder Cursor-hosted Grok 4.6, Review B GPT-5.6
+  Sol) and *native* (builder Composer 2.5, Review B Cursor-hosted Grok 4.6; roles swapped so
+  the stronger native reasoner reviews) — plus `other_pool: available | exhausted`, set by
+  the owner because a probe cannot see a nearly-empty quota (the owner's pool stood at 99%
+  used while a one-word call still answered). `roster-check.py` skips profiles that need
+  the exhausted pool, probes the rest through the real CLI (refusal / empty / timeout =
+  unusable), verifies three families, writes `docs/ROSTER.resolved.json`, and the delegate
+  and Review B commands read their model ids from it. Family mapping fixed: `cursor-grok-*`
+  is xAI hosted by Cursor, not Cursor's own family. KP-024; rule 38.
+
+**Running projects must**
+- *(all phases)* Rewrite `docs/ROSTER.json` to the two-profile template with
+  `"other_pool": "exhausted"` (the owner's pool is exhausted as of 2026-09-25), run
+  `roster-check.py`, and switch the delegate and Review B commands to read
+  `docs/ROSTER.resolved.json`. Report in the first line that the native profile is in use.
+  When the owner says "usage reset", set `other_pool` to `available`.
+
+---
+
 ## 2026.09.24b
 
 **What changed** — from the SFVF Bridge Feedback document (Stage P).

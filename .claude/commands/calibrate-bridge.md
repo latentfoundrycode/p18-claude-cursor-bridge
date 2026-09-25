@@ -47,9 +47,11 @@ under the rules in force at the time.
 From this point on, the text you just read is the governing text. Where anything you
 remember from earlier in this conversation conflicts with it, the file wins.
 
-Also run `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` if the file
-exists (create it from the merge policy's roster if it does not): the builder must not
-share a family with either reviewer.
+Also run `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` — create the
+file from the merge policy's two-profile template if it does not exist, and ask the owner
+whether the "other models" pool is available or exhausted if `other_pool` is unset. The
+resolved profile goes into `docs/ROSTER.resolved.json`; a non-preferred profile is the
+report's first line.
 
 ## 3. Find the release delta
 

@@ -116,17 +116,41 @@ Vercel-rules-on-diff cannot see (see `Observability-Conventions.md`).
 
 ## Model roster (this project)
 
-| Role | Model | Family | Notes |
-|---|---|---|---|
-| Builder | Cursor Grok 4.6 | xAI | Set explicitly with `--model` so the family is known |
-| Review A | Claude Opus 4-8 | Anthropic | `diff-reviewer` subagent, `model: claude-opus-4-8`, read-only |
-| Review B | GPT-5.6 Sol | OpenAI | Cross-family verifier via `cursor-agent --model` |
+Two **profiles**, tried in order; the first usable one fills the roles. Review A is
+always Claude through Claude Code (it never touches Cursor usage).
 
-**The roster is a checked file, not a table to remember.** Each project records its three
-models in `docs/ROSTER.json` (`{"builder": "...", "review_a": "...", "review_b": "..."}`),
-and `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --command "<delegate
-command>"` fails on a shared family, an unknown family (add a `family` override), or a
-delegate command that does not set `--model` to the roster's builder. It runs at
+| Profile | Builder | Review B | When |
+|---|---|---|---|
+| **full** (preferred) | `cursor-grok-4.6-high` (xAI, Cursor-native) | `gpt-5.6-sol-high` (OpenAI, "other models" pool) | while the owner's Cursor "other models" usage is available |
+| **native** | `composer-2.5` (Cursor's own model) | `cursor-grok-4.6-high` (xAI, Cursor-native) | when the other-models pool is exhausted — the roles swap so the stronger native reasoner reviews and the plentiful native coder builds |
+
+`docs/ROSTER.json`:
+
+```json
+{
+  "other_pool": "available",
+  "review_a": "claude-opus-4-8",
+  "profiles": [
+    { "name": "full",   "builder": "cursor-grok-4.6-high", "review_b": "gpt-5.6-sol-high" },
+    { "name": "native", "builder": "composer-2.5",         "review_b": "cursor-grok-4.6-high" }
+  ]
+}
+```
+
+`other_pool` is **owner-set**: Cursor's dashboard shows the "other models" usage, and a
+one-word probe succeeds at 1% remaining exactly as at 90%, so no check can see exhaustion
+coming — the owner says "usage exhausted" or "usage reset" and the supervisor flips the
+field. `roster-check.py` then skips profiles that need the exhausted pool, probes the
+candidates for hard failures (refusal, empty reply, timeout), verifies three distinct
+families, and writes `docs/ROSTER.resolved.json`, which the delegate and Review B commands
+read. Running on the native profile is a weaker cross-family verdict than GPT-5.6 Sol and
+is reported as such; the decorrelation the gate depends on is intact under both profiles.
+
+**The roster is a resolved file, not a table to remember.**
+`python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --command "<delegate
+command>"` resolves the profile as above and fails on a shared family, an unknown family
+(add a `family` override), no usable profile, or a delegate command that does not set
+`--model` to the resolved builder. It runs at
 configuration, at every calibration, and at every checkpoint before a delegation — because
 a project once ran its builder on Review B's family for several increments before anyone
 noticed (KP-022).

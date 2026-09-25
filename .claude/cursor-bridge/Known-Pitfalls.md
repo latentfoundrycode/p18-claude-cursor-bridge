@@ -288,3 +288,16 @@ it applies.**
   checkpoint; `--force` unlocks nothing and is still forbidden without a link check.
   `Cursor-Project-Configuration.md` §1.
 - **Applies:** every Windows worktree teardown with a real environment inside.
+
+### KP-024 — Quota exhaustion cannot be probed; the model pool state is an owner setting
+- **Surfaced:** 2026-09-25. The owner's Cursor "other models" usage (OpenAI / Google /
+  Anthropic / unprefixed Grok) stood at 99% used — unusable for a build — yet a one-word
+  probe to GPT-5.6 Sol still answered. A call succeeds at 1% remaining exactly as at 90%,
+  so no probe can see exhaustion coming; only the dashboard can.
+- **Correction:** `docs/ROSTER.json` carries an owner-set `other_pool` field; the supervisor
+  flips it when the owner says "usage exhausted" / "usage reset". `roster-check.py` skips
+  every profile that needs the exhausted pool and falls to the **native** profile (builder
+  Composer 2.5, Review B Cursor-hosted Grok 4.6 — roles swapped so the stronger native
+  reasoner reviews). The probe stays for what it *can* see: a refusal, an empty reply, a
+  timeout. Standing rule 38.
+- **Applies:** every project; every time a usage limit is reached or reset.

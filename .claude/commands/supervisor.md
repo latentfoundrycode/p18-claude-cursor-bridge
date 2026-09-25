@@ -476,6 +476,10 @@ Refactoring pass: on | off | off for <stages>
 Installer verification: local | ci-only | n/a (not a desktop application)
 ```
 
+The **model pool state** is not a run parameter — it changes with the owner's usage, not
+with the project — but it is an owner setting in the same spirit: `"other_pool"` in
+`docs/ROSTER.json`, flipped when the owner says "usage exhausted" or "usage reset".
+
 **What no parameter changes.** The "Escalate to the user when" list stays in force under
 every setting: product behaviour, scope, a user-level consequence, something only the owner
 can provide, an irreversible or out-of-repo action, a change to what "correct" means. Those
@@ -505,8 +509,10 @@ Delegate the actual file-writing to **cursor-configurator**, which writes
 `.gitattributes`, `.cursorignore`, `.worktreeinclude`, linter configs, `hooks.json`,
 `.githooks/pre-commit`, `mcp.json`, the frozen `.cursor/rules/minimal-code.mdc` (every
 project — the write-the-least-code ladder, with safety rules taking precedence), and the
-model roster `docs/ROSTER.json` (`{"builder": ..., "review_a": ..., "review_b": ...}`,
-verified by `roster-check.py` at configuration and at every checkpoint), the
+model roster `docs/ROSTER.json` (the two-profile template in
+`Merge-Verification-Policy.md` §Model roster — a *full* profile and a *native* profile with
+the roles swapped, plus the owner-set `other_pool` state; resolved by `roster-check.py` at
+configuration and at every checkpoint), the
 performance floor where budgets exist (`bench/budgets.json`, the bench runner script, the
 `bench-check.py` step in CI, the pinned profiler — `Performance-Conventions.md` §3), the
 always-on `.cursor/rules/workspace-boundary.mdc` plus the `boundary-check` after-edit hook
@@ -586,16 +592,23 @@ For each increment, in order:
 ### 1. Checkpoint
 
 Confirm the working tree is clean and commit if it is not. Every delegation must
-start from a known-good commit so it can be reverted wholesale. Also confirm the model
-roster still holds — three families, and the delegate command sets the builder's model
-explicitly (KP-022):
+start from a known-good commit so it can be reverted wholesale. Also **resolve the model roster** — which profile fills the builder and Review B roles
+today, three distinct families, each model proven to answer (KP-022, KP-024):
 
 ```bash
 python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --command "<the delegate command you are about to run>"
 ```
 
-`INVALID ROSTER` stops the delegation until the roster or the command is corrected.
-Then:
+It skips every profile that needs Cursor's "other models" pool while `docs/ROSTER.json`
+says `"other_pool": "exhausted"` (an **owner-set** field — a probe cannot see a nearly-empty
+quota, only a refusal), probes the rest with a one-word request, and writes the chosen
+profile to `docs/ROSTER.resolved.json`. Read the builder id from that file into the
+delegate command (`--model <builder>`) and the Review B id into the Review B invocation.
+`FAIL` stops the delegation. If the profile in use is not the preferred one, say so in the
+report's first line ("running on the native profile: builder Composer 2.5, Review B Grok
+4.6 — say *usage reset* when the other-models pool is back"). When the owner says the
+pool is back, set `"other_pool": "available"` and the next checkpoint returns to the
+preferred profile by itself. Then:
 
 ```bash
 git status --short
@@ -1558,7 +1571,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     real responses become the fixtures the tests replay — and "done" means passing against
     recorded real responses or a live smoke. A green test against an assumed contract is a
     green test of the assumption.
-38. The model roster (`docs/ROSTER.json`) is checked, not remembered: `roster-check.py` at
-    configuration, at every calibration, and before every delegation confirms three distinct
-    families and that the delegate command sets the builder's model. Reviewers review the
-    design a diff embodies, not only its fidelity to the brief — a flawed brief is a finding.
+38. The model roster (`docs/ROSTER.json`) is resolved, not remembered: `roster-check.py` at
+    configuration, at every calibration, and before every delegation picks the first
+    usable **profile** (skipping any that needs the "other models" pool while the owner has
+    marked it exhausted, probing the rest), confirms three distinct families, writes
+    `docs/ROSTER.resolved.json`, and checks the delegate command sets that builder. The
+    delegate and Review B commands read their model ids from the resolved file. A
+    non-preferred profile in use is the report's first line. Reviewers review the design a
+    diff embodies, not only its fidelity to the brief — a flawed brief is a finding.
