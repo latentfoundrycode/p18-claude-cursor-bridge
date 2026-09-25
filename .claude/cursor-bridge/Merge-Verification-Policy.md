@@ -121,8 +121,17 @@ always Claude through Claude Code (it never touches Cursor usage).
 
 | Profile | Builder | Review B | When |
 |---|---|---|---|
-| **full** (preferred) | `cursor-grok-4.6-high` (xAI, Cursor-native) | `gpt-5.6-sol-high` (OpenAI, "other models" pool) | while the owner's Cursor "other models" usage is available |
-| **native** | `composer-2.5` (Cursor's own model) | `cursor-grok-4.6-high` (xAI, Cursor-native) | when the other-models pool is exhausted — the roles swap so the stronger native reasoner reviews and the plentiful native coder builds |
+| **full** (preferred) | `grok-4.7-high` (xAI; Cursor Models pool) | `gpt-5.6-sol-high` (OpenAI; Other Models pool) | while the owner's Cursor "Other Models" usage is available |
+| **native** | `composer-2.5` (Cursor's own model; Cursor Models pool) | `grok-4.7-high` (xAI; Cursor Models pool) | when the Other Models pool is exhausted — the roles swap so the stronger native reasoner reviews and the plentiful native coder builds |
+
+**Pool membership is taken from Cursor's Models & Pricing page, never from an id's shape.**
+Read on 2026-09-25: *"The Cursor Models pool includes Grok 4.7, Grok 4.6, Grok 4.5, and
+Composer 2.5"*; every third-party model (GPT, Gemini, Claude, GLM, Kimi, …) draws from
+*"Other Models"* at its API rate; at the limit requests *stop* unless pay-as-you-go is
+enabled — never a degraded mode; usage resets with the billing cycle. **At configuration,
+check the ids against `cursor-agent --list-models` and the pools against that page**, and
+pick the strongest model each pool offers at that time — this table records the picks of
+2026-09-25, and a newer Grok or Composer supersedes them.
 
 `docs/ROSTER.json`:
 
@@ -132,8 +141,8 @@ always Claude through Claude Code (it never touches Cursor usage).
   "reset_day": 16,
   "review_a": "claude-opus-4-8",
   "profiles": [
-    { "name": "full",   "builder": "cursor-grok-4.6-high", "review_b": "gpt-5.6-sol-high" },
-    { "name": "native", "builder": "composer-2.5",         "review_b": "cursor-grok-4.6-high" }
+    { "name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high" },
+    { "name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high" }
   ]
 }
 ```

@@ -17,7 +17,8 @@ docs/ROSTER.json (v2):
   ]
 }
 A model entry is an id string or {"model": id, "family": name, "pool": "native"|"other"}.
-Pool is inferred from the id: `composer-*` and `cursor-*` are Cursor-native, all else "other".
+Pool is inferred from the id per Cursor's docs: Grok (any effort/host prefix) and Composer are
+the "Cursor Models" pool (native); every third-party model is "Other Models".
 A profile is skipped when other_pool is "exhausted" and any of its models is in the other
 pool. Unless --no-probe, the builder and Review B of a candidate profile are each sent a
 one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply, or
@@ -85,11 +86,19 @@ def family_of(model_id, override=None):
     return None
 
 
+# Pool membership per Cursor's Models & Pricing page (cursor.com/docs/models, read 2026-09-25):
+# "The Cursor Models pool includes Grok 4.7, Grok 4.6, Grok 4.5, and Composer 2.5." Every
+# third-party model (GPT, Gemini, Claude, GLM, Kimi, ...) draws from "Other Models". Re-check
+# the page when a new model appears; an id not matching either list is treated as "other".
+NATIVE_MARKERS = ("composer", "grok")
+
+
 def pool_of(model_id, override=None):
     if override:
         return override.lower()
     m = model_id.lower()
-    return "native" if (m.startswith("composer") or m.startswith("cursor-")) else "other"
+    core = m[len("cursor-"):] if m.startswith("cursor-") else m
+    return "native" if any(core.startswith(k) or ("-" + k) in core for k in NATIVE_MARKERS) else "other"
 
 
 def cursor_agent_cmd():

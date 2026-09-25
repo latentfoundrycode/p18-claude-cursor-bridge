@@ -305,4 +305,10 @@ it applies.**
   a probe cannot tell a reset from 1% remaining and would oscillate. The exact usage-limit text
   Cursor prints was unknown when the classifier was written; every auto-switch records the
   stderr excerpt in the Issues file so the patterns can be sharpened. Standing rule 38.
+- **Addendum (2026-09-25):** the first roster template put Grok 4.6 in the native profile
+  and classed `grok-4.7-*` as metered — inferred from the id's shape, without reading
+  Cursor's documentation, which the maintainer could have fetched in one call. The docs say
+  Grok 4.7 is in the Cursor Models pool. Vendor facts (pools, limits, reset rules) are read
+  from the vendor's page at the time of the decision, never inferred from naming — the same
+  verify-first rule the bridge imposes on the loop (KP-008).
 - **Applies:** every project; every time a usage limit is reached or reset.

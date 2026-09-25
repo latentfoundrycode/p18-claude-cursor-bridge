@@ -11,6 +11,25 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.25d
+
+**What changed**
+- **Roster corrected from Cursor's documentation.** Grok 4.7 is in the *Cursor Models*
+  pool ("Grok 4.7, Grok 4.6, Grok 4.5, and Composer 2.5"); the template had inferred
+  "metered" from the id's shape and fallen back to Grok 4.6. Now: full profile builder
+  `grok-4.7-high` / Review B `gpt-5.6-sol-high`; native profile builder `composer-2.5` /
+  Review B `grok-4.7-high`. `roster-check.py` classes any Grok or Composer id as native.
+  The merge policy now says pools and ids are read from the docs and `--list-models` at
+  configuration, and the strongest model in each pool at that time is picked. KP-024
+  addendum.
+
+**Running projects must**
+- *(all phases)* Replace `cursor-grok-4.6-high` with `grok-4.7-high` in both profiles of
+  `docs/ROSTER.json` and re-run `roster-check.py`; the next delegation and Review B use the
+  re-resolved ids.
+
+---
+
 ## 2026.09.25c
 
 **What changed**
