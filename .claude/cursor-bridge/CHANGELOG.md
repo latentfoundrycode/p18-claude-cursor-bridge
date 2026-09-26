@@ -11,6 +11,21 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.26
+
+**What changed**
+- **The builder reports where it guessed.** Every brief's Done section (all variants) now requires an `Assumed, not verified` list: each fact the change relies on that neither the brief nor the code settled — what, why, what would confirm it — or an explicit `none`. The run is one-shot, so the question must be in the brief; asked afterwards, a fresh session no longer knows.
+- **The supervisor triages it** at step 4: copied verbatim first; a missing list is unknown, not none; each item gets one disposition — test, contract (rule 37), council, or accepted (an inventory Decisions row) — recorded in the accept commit's `Assumptions:` body. At merge the branch's lists go to Review B in `run/review/ASSUMPTIONS-<nnn>.md` beside the diff.
+- **Reviewers use it as extra places to look, never as scope.** diff-reviewer checks each item and hunts unlisted ones (an unlisted external-service assumption is a `FAIL`); new anti-gaming bullet in the merge policy.
+- **Least confident, at every stage close and project end** (reflection item 2b): the supervisor names its three least-sure parts with the check that settles each, in `HARDENING.md`; testable ones become tests before the next stage. Rule 42; KP-020 cross-reference.
+
+**Running projects must**
+- *(building, changing)* From the next delegation on, every brief carries the `Assumed, not verified` section (spec-packager does this); a brief already written but not yet delegated gets the section added. Triage each list at step 4 and record dispositions in the accept commit.
+- *(building, changing)* At the next merge, include `run/review/ASSUMPTIONS-<nnn>.md` for Review B (increments accepted before this release have no lists; say so in the file).
+- *(building, changing)* At the next stage close, run reflection item 2b.
+
+---
+
 ## 2026.09.25g
 
 **What changed**

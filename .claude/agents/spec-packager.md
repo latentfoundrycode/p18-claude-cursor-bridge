@@ -96,8 +96,10 @@ exactly. Patterns established elsewhere in the codebase that this should follow.
 - <task-specific constraints>
 
 ## Done
-Print a list of every file you changed and a one-paragraph summary of what you did.
+Print a list of every file you changed and a one-paragraph summary of what you did. Then print a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, print `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
 ```
+
+The `Assumed, not verified` section belongs to the Done section of **every** brief, in every variant below; never drop or shorten it. The builder's run is one-shot: where it guessed is known only while it runs, so the brief must ask before the run ends (supervisor rule 42).
 
 ## The refactoring variant — `handoff/REFAC-<nnn>.md`
 

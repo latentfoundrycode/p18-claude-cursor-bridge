@@ -258,7 +258,10 @@ it applies.**
   responses are recorded as fixtures with secrets scrubbed; adapter tests replay them, and
   "done" means passing against recorded real responses or a live smoke. The brief forbids
   invented mocks; plan-critic blocks an integration plan without a capture; diff-reviewer
-  fails an adapter tested only against a builder-written mock. Standing rule 37.
+  fails an adapter tested only against a builder-written mock. Standing rule 37. Since
+  2026.09.26 the builder's `Assumed, not verified` list (rule 42) also names such guesses at
+  the end of the run, where a reviewer reading the code cannot see which facts were never
+  checked.
 - **Applies:** every project integrating a third-party API, SDK, or provider.
 
 ### KP-021 — A status-gated error scrub hides real errors; redact by pattern instead

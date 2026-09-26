@@ -64,6 +64,8 @@ client of a third-party API: do its tests replay fixtures recorded from the real
 (the contract-capture increment), or a mock the builder wrote? A builder-invented mock is a
 `FAIL` — it proves the assumption, not the service (KP-020).
 
+**The builder's `Assumed, not verified` list — extra places to look, never the scope.** The supervisor hands you the list with the brief. Check each item against the diff and the code: is the assumption true, tested, or at least isolated behind one seam? Then hunt for the ones it left out — any fact the diff relies on that neither the brief nor the code settles. An unlisted assumption about an external service is a `FAIL` (KP-020); any other unlisted, unverified assumption the change depends on is `NOTED`, with the check that would settle it. A list reading `none` proves nothing, and a listed guess is not a fix: never approve on the strength of the list.
+
 **Conformance — did it do what was asked?**
 
 - Is every requirement in the brief implemented?

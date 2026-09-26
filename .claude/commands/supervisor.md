@@ -758,6 +758,15 @@ repository, so this log — written by the `boundary-check` hook — is the only
 builder reaching outside `Workspace/`. Any new entry is handled like `SCOPE DRIFT`: undo the
 outside edit by hand (`Documents/` is not under git), re-delegate, open an issue.
 
+**Then triage the builder's `Assumed, not verified` list** (rule 42). It is the one thing the builder knows that no reviewer can see — where it guessed — and it exists only in this run's output, so copy it verbatim into `run/agent/TASK-<nnn>.assumptions.md` before anything else. A missing section means *unknown*, never *none*: note it, and the reviewers hunt unaided. Give every item exactly one disposition:
+
+- **test** — a test settles it; you write it (N4 permits tests), and a failing one re-delegates like any defect;
+- **contract** — a fact about an external service; the increment is not done until recorded real responses or a live smoke confirm it (rule 37);
+- **council** — a design or requirement ambiguity; the resolution round settles it, or an intent escalation if it turns on what the software should do;
+- **accepted** — a risk you knowingly carry; a row in `docs/INVENTORY.md` → Decisions with the reason and what would reopen it.
+
+Record the dispositions in the accept commit's message body under `Assumptions:` (one line per item: assumption → disposition). Hand the list to `diff-reviewer` and `security-auditor` — and at merge to Review B — as **extra places to look, never as the places to look**: a review that checks only the listed items is not a review, and an empty list proves nothing.
+
 It compares the git-derived changeset (tracked diffs vs the checkpoint plus untracked new
 files) against the brief's `## Scope` and prints `SCOPE CLEAN` or `SCOPE DRIFT` with the
 out-of-scope files — surfaced, not discovered. **Exit 1 (drift):** the increment does not
@@ -965,7 +974,7 @@ instead. In short, a branch merges to `main` only when **all** hold:
    taken from the working tree silently omits every untracked new file (KP-017);
    (b) **the file lives inside `Workspace/`** at `run/review/`, committed on the increment's
    branch and removed with `git rm` before the merge — never in a temp folder outside the
-   project, which the Workspace boundary rightly blocks (KP-016). Launch it with the trust-bypass flag (`-f`) so the workspace-trust
+   project, which the Workspace boundary rightly blocks (KP-016); (c) **the branch's assumption lists travel with it** — write `run/review/ASSUMPTIONS-<nnn>.md` from the `Assumptions:` sections of the branch's commit messages (`git log <merge-base>..HEAD --format=%B`), commit it beside the diff, remove it with the diff before the merge, and name both files in the prompt: the list as extra places to look, never as the review's scope. Launch it with the trust-bypass flag (`-f`) so the workspace-trust
    prompt cannot stall it, and give a **directive** prompt ("the diff is already at `<path>`; read it;
    do not ask for it"). A reply that does not name something specific from the diff — or
    that asks for the diff, or errors on trust — is a failed launch, not a verdict: re-run.
@@ -1152,6 +1161,7 @@ escalation, none of it stalls the loop, and none of it changes the bridge.
    to `Documents/`). Mark each with the stage and who raised it (supervisor or builder), with
    enough context that the maintainer can evaluate it months later. **Never act on it.** The
    bridge is the maintainer's to change; your job is to record.
+2b. **Least confident** (stage close and project end). Name the three parts of the stage — at project end, of the whole build — you are least sure of, each with the concrete check that would settle it, and write them to `docs/HARDENING.md` under the stage name. Be specific: a module, a behaviour, an interaction — never "error handling". Each one a test can settle becomes a test you write before the next stage's first delegation (a failing one enters `root-cause-first`); an external-service doubt becomes a contract capture or a live smoke; the rest stay in `HARDENING.md` as leads the next stage's `refactor-scout` reads. None of it escalates.
 3. **Project Summary and the rest of `Documents/`.** Patch the Project Summary — and any other
    document the user keeps there — for what changed this stage: decisions taken, scope changes
    accepted, deviations, the state of the build. Rewrite the affected sections; do not append
@@ -1709,3 +1719,4 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     now and gets an issue entry, not silent cleanup.
 40. Local and remote agree, or the status file says why not. `sync-check.py` runs at every start and resume, before every new branch (which starts from `origin/main`, never local `main`), after every merge (`git switch main` + `--apply`), at every reflection point, and with `--strict` at project end, where only IN SYNC or NO REMOTE lets "Project complete" be written. BEHIND is fast-forwarded; AHEAD or DIVERGED is stranded work on protected `main`, rescued to a branch without deleting anything and carried through a PR, with an issue; NO REMOTE, OFFLINE, and UNPUBLISHED are recorded on `Remote sync:` as the reason. A commit on local `main` is always a mistake: nothing reaches `main` except through a merge.
 41. The project's state lives in two bounded files, both read whole at every start and resume: `PROJECT_STATUS.md` (where the work is — rewritten in place, within 120 lines and 12,000 characters) and `INVENTORY.md` (what the software is — Features, Resources, Decisions, Deferred — edited in place, updated in the same commit as each `CHANGES.md` entry, and entered the moment the owner provides a resource). Look it up before you ask or propose: never ask the owner for something Resources already lists, never propose what Features already has, never reverse a Decision without quoting its reason and the circumstance that changed. Private memory is not project state. `inventory-check.py` runs at every reflection point and must pass.
+42. Every builder run ends with an `Assumed, not verified` list — it is in the Done section of every brief — because the run is one-shot and where the builder guessed is lost when it ends. Copy it before anything else; a missing list is *unknown*, never *none*. Give every item one disposition — test, contract, council, or accepted (a Decisions row) — record them in the accept commit's `Assumptions:` body, and hand the list to the reviewers (Review B through `run/review/ASSUMPTIONS-<nnn>.md`) as extra places to look, never as their scope. At every stage close and at project end, name your own three least-confident parts, each with the check that settles it, in `HARDENING.md`, and settle the testable ones before the next stage.
