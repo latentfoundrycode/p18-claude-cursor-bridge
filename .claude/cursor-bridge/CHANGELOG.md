@@ -11,6 +11,18 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.27
+
+**What changed**
+- **The loop no longer stalls after a green CI run** (KP-028). The Claude desktop app now tells Claude Code to register PRs with its CI monitor and not to watch CI itself, and that monitor reports failures and review comments only, never a green gate; supervisors armed auto-merge, registered the PR, ended their turn, and waited forever. Seen at least eight times in three projects from 2026-09-24. The merge step now names the mechanism: one background `gh pr checks <n> --watch --required --fail-fast` per PR, whose completion wakes the supervisor; the owner authorises it; the app's monitor is never the wake-up. While it runs, the supervisor keeps building what does not overlap the pending PR.
+- **Rule 43 + `loop-guard.py` Stop hook** (registered in `settings.json`). During `building` / `changing`, a turn may end only with a background task pending or with `Awaiting user on:` naming an owner wait. The hook refuses such a stop once (exit 2, reason to the model), never twice in a row (`stop_hook_active`), never outside a bridge Workspace or in other phases, and fails open on any error; it re-reads the transcript after 2 s because the transcript is written asynchronously. Contract verified against the Claude Code hooks reference; tested on 21 cases and read-only against three real transcripts. `Awaiting user on:` semantics documented in "Project state". This is the pinned Unlazy stop-hook idea, adopted because its trigger occurred.
+
+**Running projects must**
+- *(all phases)* Make `Awaiting user on:` in `docs/PROJECT_STATUS.md` true now: `nothing` if the loop is running, otherwise the specific wait. A stale entry either lets the loop idle unseen or makes the guard nudge a session that is legitimately waiting.
+- *(building, changing)* For the next PR and every one after: arm auto-merge, then start the background watch; do not end the turn to wait for the app's CI monitor.
+
+---
+
 ## 2026.09.26
 
 **What changed**

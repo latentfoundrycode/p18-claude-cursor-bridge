@@ -386,7 +386,7 @@ The composition that keeps the gate intact:
 
 1. The supervisor opens the PR and runs Review A and Review B on the PR's diff.
 2. **Only if both APPROVE and no gate-integrity flag is open** does the supervisor arm the
-   merge — `gh pr merge --squash --auto` — and then watch the required `gate` check.
+   merge — `gh pr merge --squash --auto` — and then watch the required `gate` check with **one background command** (`gh pr checks <n> --watch --required --fail-fast`, run in the background). Its completion is what wakes the supervisor; the desktop app's CI monitor reports failures and review comments only, never a green gate, so it cannot be the wake-up (KP-028).
 3. The merge lands only when the required CI check is green — which, thanks to branch
    protection on the Team plan, is a *required* check, so a red or missing CI run blocks
    the merge at the repo level as a hard backstop.

@@ -999,14 +999,14 @@ When all four hold the merge is authorised. **Check `docs/RUN_PARAMETERS.md` fir
 `Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
 conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
 auto-merge. Under `supervisor` (the default), arm `gh pr merge --squash --auto` and watch the
-required `gate` check; once it is green (and the PR is mergeable), **complete the squash
+required `gate` check — **with one background command, never by ending your turn**: run `gh pr checks <n> --watch --required --fail-fast` in the background (`run_in_background`). Its completion notification is what wakes you; nothing else will. Start the command with `gh pr checks` exactly (the allowlist matches the start of a command; a prefix such as `sleep` would stop on a permission prompt). If it returns at once reporting no checks, CI has not registered the push yet: start the same watch again. The desktop app's CI monitor ("Auto-fix pull requests", `<ci-monitor-event>`) reports only problems — a failed check, a review comment — and **never a green gate**, so waiting for it after a green run waits forever (KP-028). Registering the PR with it is fine and its autofix of a failure is welcome, but it is never your wake-up. The owner authorises and requires this watch: it is one blocking command per PR, not a polling loop — never `sleep` loops, repeated status checks, or scheduled wake-ups for this. **While it runs, keep building:** if the next increment's Scope does not overlap the pending PR's files, start it now from `origin/main`; if it does overlap, prepare what does not depend on the merge (the next brief, reviews, docs), and only then end your turn — the watch will wake you. When the watch completes green (and the PR is mergeable), **complete the squash
 directly with `gh pr merge --squash`** rather than waiting on GitHub's auto-merge queue,
 which routinely lags by minutes. This is safe — branch protection enforces the required
 check regardless of who triggers the merge, so a direct merge cannot bypass CI; the armed
 `--auto` is only a safety net if the session ends first. Never complete a merge before the
 required check is green or before both reviews APPROVE. No human correctness click is
 involved; the merge is reversible, so a rare behavioural miss is caught retrospectively via
-the change log, not by a gate the user cannot operate.
+the change log, not by a gate the user cannot operate. If the watch completes red, the failure is a defect like any other: diagnose, re-delegate, re-run the gate — never merge around it.
 
 **After every merge, bring local `main` along.** `git switch main`, then `python ~/.claude/cursor-bridge/sync-check.py --apply`; it must end IN SYNC or FAST-FORWARDED before anything else happens, and the next branch starts from there. Under `Merge authority: owner`, do the same at the first resume after the owner has merged. A worktree the merged branch had is torn down now (rule 39).
 
@@ -1397,7 +1397,7 @@ Phase: <intake | design | mockups | planning | configuration | building | done |
 Change cycle: <none | "<short name>" opened <date> — step <n> of the change cycle>
 Increment: TASK-<nnn> — <title>
 Last accepted: TASK-<nnn> at commit <sha>
-Awaiting user on: <nothing | the specific question>
+Awaiting user on: <nothing | the specific question | paused by the owner — resume on their word | stage pause — say continue>
 Next: <the next increment and anything the next session needs to know>
 Deviations accepted: <none | see docs/INVENTORY.md → Decisions>
 Terms fixed: <term — the sense fixed with the user — Established | Risky; one per line>
@@ -1412,6 +1412,8 @@ Calibrated: <date> from <old> to <new> — applied: …; pending: … @ <phase>;
 Calibration pending: <items still to apply, each with the phase that triggers it — or none>
 Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refactoring pass)
 ```
+
+**Awaiting user on** is read by the `loop-guard` Stop hook (rule 43): `nothing` means the loop is running and must not stop without a pending background task to wake it; anything else means you are legitimately waiting for the owner. Set it whenever you stop for them — an escalation, a gate, a pause they asked for, a stage pause — and clear it when they answer. A stale entry either traps the loop in idleness or hides a real wait, so it is rewritten at every stop.
 
 **Terms fixed** is the `explain-for-decision` skill's lookup: which technical terms have been
 explained to the user in which sense, and which of them the user has stumbled on (Risky). A
@@ -1720,3 +1722,4 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
 40. Local and remote agree, or the status file says why not. `sync-check.py` runs at every start and resume, before every new branch (which starts from `origin/main`, never local `main`), after every merge (`git switch main` + `--apply`), at every reflection point, and with `--strict` at project end, where only IN SYNC or NO REMOTE lets "Project complete" be written. BEHIND is fast-forwarded; AHEAD or DIVERGED is stranded work on protected `main`, rescued to a branch without deleting anything and carried through a PR, with an issue; NO REMOTE, OFFLINE, and UNPUBLISHED are recorded on `Remote sync:` as the reason. A commit on local `main` is always a mistake: nothing reaches `main` except through a merge.
 41. The project's state lives in two bounded files, both read whole at every start and resume: `PROJECT_STATUS.md` (where the work is — rewritten in place, within 120 lines and 12,000 characters) and `INVENTORY.md` (what the software is — Features, Resources, Decisions, Deferred — edited in place, updated in the same commit as each `CHANGES.md` entry, and entered the moment the owner provides a resource). Look it up before you ask or propose: never ask the owner for something Resources already lists, never propose what Features already has, never reverse a Decision without quoting its reason and the circumstance that changed. Private memory is not project state. `inventory-check.py` runs at every reflection point and must pass.
 42. Every builder run ends with an `Assumed, not verified` list — it is in the Done section of every brief — because the run is one-shot and where the builder guessed is lost when it ends. Copy it before anything else; a missing list is *unknown*, never *none*. Give every item one disposition — test, contract, council, or accepted (a Decisions row) — record them in the accept commit's `Assumptions:` body, and hand the list to the reviewers (Review B through `run/review/ASSUMPTIONS-<nnn>.md`) as extra places to look, never as their scope. At every stage close and at project end, name your own three least-confident parts, each with the check that settles it, in `HARDENING.md`, and settle the testable ones before the next stage.
+43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background command or agent you started is still running — its completion notification wakes you — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase.

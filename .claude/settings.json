@@ -31,5 +31,18 @@
       "Bash(python ~/.claude/cursor-bridge/inventory-check.py:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/cursor-bridge/loop-guard.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }
