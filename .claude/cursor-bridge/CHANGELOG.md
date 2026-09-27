@@ -11,6 +11,20 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.27b
+
+**What changed**
+- **Done is measured against the requirements, not the plan** (KP-029: SFVF shipped its specified Settings tab as a placeholder reading "Arrives in a later stage" and was declared done). New requirements register `docs/REQUIREMENTS.md` — one ID per requirement from intake, the owner's requirements document, the design, and every mockup screen and state — written at the design gate and confirmed by the owner. Increments name the IDs they satisfy; tests carry the IDs; briefs list them and forbid stand-ins; plan-critic blocks an untraced requirement; diff-reviewer fails a stand-in presented as the feature.
+- **Deferral is the owner's.** A requirement becomes `deferred` or `dropped` only with the owner's dated answer; a stand-in screen is never a deferral (escalation list, Scope).
+- **`completion-check.py`** (16 tests; run read-only on three real projects: it found the SFVF Settings placeholder and a 501 "not implemented yet" admin function in the documentation provider, with no false positives). `--mode plan` at the plan gate and every stage close; `--mode done` must pass before "Project complete" and runs first in every change cycle, so an inherited "done" is verified. Rule 44. Allowlisted.
+
+**Running projects must**
+- *(all phases after design)* **Build `docs/REQUIREMENTS.md` now** from the intake record, any requirements document, `DESIGN.md` (and its Change sections), and the approved mockup's screens and states; mark each row `built` (with the tests that prove it — add the ID to those tests), `planned` (and name it in a build-plan increment), or put it to the owner for a dated deferral. Present the register to the owner once as an FYI with any requirement found unbuilt.
+- *(done)* Run `completion-check.py --mode done`. Every failure is a gap in the delivered product: report it to the owner plainly and open a change cycle for it unless they defer it.
+- *(building, changing)* From the next brief on, briefs carry `Satisfies:`; the plan passes `--mode plan` at the next stage close.
+
+---
+
 ## 2026.09.27
 
 **What changed**

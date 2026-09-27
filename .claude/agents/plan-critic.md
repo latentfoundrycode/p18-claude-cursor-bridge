@@ -28,7 +28,7 @@ Attack it along these lines:
 - **Unjustified choices.** Which technology choices have no reasoning attached, or
   reasoning that does not survive a follow-up question?
 - **Scope creep.** What is in this design that no requirement asked for?
-- **Scope gaps.** Which stated requirement has nothing in the design serving it?
+- **Scope gaps.** Which stated requirement has nothing in the design serving it? Is every requirement from intake, the owner's requirements document, and the design a row in `docs/REQUIREMENTS.md` with an ID? A requirement that appears in a source but not in the register is **Blocking**.
 - **The thing that will hurt in six weeks.** Where is the decision that is cheap now
   and expensive to reverse later?
 - **Security criteria.** Does the design address authorization, input validation, and
@@ -58,6 +58,7 @@ Attack it along these lines:
   that is only mentioned, not attached, is a **Blocking** finding — the lesson will be
   re-learned. If the section says "none", check that the supervisor actually asked (the
   plan records it) rather than skipped the step.
+- **Requirement trace.** Read `docs/REQUIREMENTS.md`. Does every `planned` requirement — every screen and state of the approved mockup included — have at least one increment that names its ID under `Satisfies`? Is any increment's claimed requirement only partly covered by its acceptance criteria? An untraced requirement, or a deferral without the owner's dated answer, is **Blocking**.
 - **Ordering.** Is any increment dependent on something built after it?
 - **Granularity.** Which increments are secretly two or more? Which are so small they
   are noise?

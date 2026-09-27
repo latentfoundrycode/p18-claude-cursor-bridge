@@ -39,6 +39,8 @@ bend; catching it here costs minutes, catching it after delegation costs a round
 One paragraph. What this increment achieves and why. Enough context to make good
 decisions inside the scope, not a retelling of the whole project.
 
+Satisfies: <the requirement IDs from the build plan, e.g. R-004, R-011 — each with its one-line text from docs/REQUIREMENTS.md>
+
 ## Scope
 Files and directories you may create or modify:
 - path/one
@@ -64,6 +66,7 @@ exactly. Patterns established elsewhere in the codebase that this should follow.
 ## Acceptance criteria
 - [ ] Observable outcomes that determine whether this is done.
 - [ ] Copied from the build plan, made concrete.
+- [ ] Every requirement under "Satisfies" is fully met — no stand-in, placeholder screen, "coming soon" or "arrives in a later stage" text — and at least one test names each requirement ID (in its name, docstring, or a comment) so the trace is checkable.
 
 ## Constraints
 - Do not add dependencies.

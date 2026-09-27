@@ -68,7 +68,7 @@ client of a third-party API: do its tests replay fixtures recorded from the real
 
 **Conformance — did it do what was asked?**
 
-- Is every requirement in the brief implemented?
+- Is every requirement in the brief implemented? For each requirement ID under "Satisfies": is it fully met, and does a test name that ID? A stand-in presented as the feature — a placeholder screen, "coming soon", "arrives in a later stage", a stub returning "not implemented" — is a `FAIL`, however green the suite is.
 - Is every acceptance criterion actually met by this code, not merely gestured at?
 - If the diff adds, renames, or changes a command, sub-command, flag, or argument of the
   project's command-line surface: was `docs/cli-reference.json` regenerated in the same

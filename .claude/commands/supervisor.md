@@ -72,7 +72,7 @@ children on every project:
 - **`Workspace/`** — the git repository and the build itself. You run here; the builder runs
   here and **only** here. Inside it, **`docs/`** holds everything written **for the builder
   and for you**: the design, the build plan, the mockups, and the AI-facing records
-  (`PROJECT_STATUS.md`, `INVENTORY.md`, `RUN_PARAMETERS.md`, `CHANGES.md`, `HARDENING.md`,
+  (`PROJECT_STATUS.md`, `INVENTORY.md`, `REQUIREMENTS.md`, `RUN_PARAMETERS.md`, `CHANGES.md`, `HARDENING.md`,
   `BUILDER_NOTES.md`, `BOUNDARY_VIOLATIONS.md`, `debug/BUG-nnn.md`). `docs/` is written for
   machine comprehension first; it need not read well to a human, and that is by design.
 
@@ -274,6 +274,17 @@ their reasons, and the current state. It is the first of the Documents set (see 
 layout") and is patched at every reflection point from here on. It is a translation of
 `docs/DESIGN.md` for a reader who will never open `docs/`, not a copy of it.
 
+**Before presenting the design, write the requirements register — `docs/REQUIREMENTS.md`.** Every requirement the owner stated at intake, every one in a requirements document they supplied, and every one the design commits to becomes **one row with an ID** (`R-001`, `R-002`, … — never reused, never renumbered): one checkable sentence in the owner's terms, where it came from, and its status. A screen, a tab, a setting, a command, a behaviour — each is a row; a requirement too large to check in one sentence is split. This is the list "done" is measured against: the project is finished when every row is built and tested or the owner has deferred or dropped it, and not before (rule 44). Format, parsed by `completion-check.py`:
+
+```markdown
+# Requirements — <Name>
+| ID | Requirement | Source | Status | Evidence |
+|---|---|---|---|---|
+| R-001 | <one checkable requirement, in the owner's terms> | <intake answer · requirements document §n · DESIGN.md §n · mockup screen "<name>" / state "<name>"> | <planned · built · deferred — owner YYYY-MM-DD · dropped — owner YYYY-MM-DD> | <test file(s) that name R-001 · —> |
+```
+
+Present the register with the design: the owner confirms the list is complete — a requirement missing here is missing from everything downstream.
+
 At the same moment create **`docs/INVENTORY.md`** (format under "Project state"): the design's decisions, each with the reason that made it right, and every resource known so far — each key, token, account, or tool the owner has provided or will be asked for. Features fill in as increments merge. From here on, anything the owner provides is entered the moment they provide it.
 
 ---
@@ -323,6 +334,8 @@ For a UI-bearing project, build the mockup through the design tooling rather tha
 
 Save the mockup files under `docs/mockups/` (one file per screen or view is fine). The
 design documents already live under `docs/`. Saving these concludes the planning stage.
+
+**Before the gate, add every mockup screen and every required state on it to `docs/REQUIREMENTS.md`** as its own row (Source: mockup screen "<name>"), unless an existing row already covers it — a screen in the mockup is a promise to the owner, and a tab that exists only as a picture is how a Settings screen went unbuilt (KP-029).
 
 **Gate:** present the mockup **and the visual `docs/design/DESIGN.md`** to the user and get
 explicit approval of the pair before writing the build plan. Do not proceed on an
@@ -384,6 +397,7 @@ Write `docs/BUILD_PLAN.md` as an ordered list of increments. Each increment must
 - **Independently testable** — with acceptance criteria written before it is built
 - **Ordered** — dependencies before dependents; something runnable as early as possible
 - **Scoped** — the files and directories it may touch are named
+- **Traced** — it names the requirement IDs it satisfies (`Satisfies: R-004, R-011`). Every `planned` requirement in `docs/REQUIREMENTS.md` is satisfied by at least one increment; `python ~/.claude/cursor-bridge/completion-check.py --mode plan` must pass before the plan gate. A requirement no increment satisfies is either planned now or put to the owner as a deferral — never left out silently.
 
 Each **UI-bearing** increment additionally **cites the approved mockup screen(s) and the
 relevant `docs/design/DESIGN.md` sections** it implements, and carries **design acceptance
@@ -433,7 +447,7 @@ project end** (see "Reflection points" — it is a defined trigger, not a judgem
 Run **plan-critic** over the plan, looking for ordering errors, increments that are secretly
 two increments, acceptance criteria that cannot actually be checked, stages that are not
 demonstrable on their own, and — for UI increments — whether the design acceptance criteria
-are present and checkable.
+are present and checkable — and whether every requirement in the register is satisfied by an increment.
 
 The settings that govern *how the run proceeds* — whether the loop pauses at stage closes,
 who merges, whether the refactoring pass runs — are **not** part of the plan and are not
@@ -872,7 +886,7 @@ existing mockup-fidelity judgement (they do not add a new pass).
 ### 7. Decide (accept the increment)
 
 - **Accept** — local review, scan, and tests pass. Commit to the increment branch with a
-  message referencing the task ID. Update `docs/PROJECT_STATUS.md` (rewrite the fields; never append history) and, when the increment changes behaviour or needs a new resource, `docs/INVENTORY.md` — in the same commit as the increment's `CHANGES.md` entry, moving `Reflected through:` to that entry (rule 41). Move to the next
+  message referencing the task ID. Update `docs/PROJECT_STATUS.md` (rewrite the fields; never append history) and, when the increment changes behaviour or needs a new resource, `docs/INVENTORY.md` — in the same commit as the increment's `CHANGES.md` entry, moving `Reflected through:` to that entry (rule 41). When the increment completes a requirement, set its row in `docs/REQUIREMENTS.md` to `built` and name the tests — which carry the requirement's ID — in its Evidence cell, in the same commit. Move to the next
   increment. Increments accumulate on the branch; merging to `main` is a separate,
   verified step (below), not something you do per increment.
 - **Iterate** — something is wrong and you understand why. Revise the brief *file* (in
@@ -1099,7 +1113,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
    (which current features, screens, data, or commands the change touches, and whether any
    existing behaviour is altered or removed). Read this project's own Issues file in place
    of the prior-project lessons step: the issues already recorded are the ones this change
-   must not repeat. Read `docs/INVENTORY.md` whole before anything else: a request that
+   must not repeat. **Verify the inherited "done" before anything else:** run `python ~/.claude/cursor-bridge/completion-check.py --mode done` on the product as it stands. Every failure is a gap in the previous delivery — a requirement never built, a stand-in shipped as a feature — and it is reported to the owner first, plainly, as such ("the previous release was marked complete but R-012 Settings tab was never built"), then planned into this cycle ahead of the new request unless the owner defers it. A project with no register gets one built from its requirements document, design, and mockup before the check runs. Read `docs/INVENTORY.md` whole next: a request that
    Features already satisfies is answered by pointing at the feature, not by proposing it;
    a request that reverses a Decision is named as such, with the recorded reason, and goes
    through the gates as a change to that decision. A report of **several defects** is triaged before any of them is diagnosed — the `root-cause-first` skill's step 0: shared cause binned only on evidence, otherwise one at a time. Gate: summarise the change back and get confirmation.
@@ -1171,7 +1185,7 @@ escalation, none of it stalls the loop, and none of it changes the bridge.
 5. **Record** the reflection point in `docs/PROJECT_STATUS.md` (`Last reflection:`), and
    check the worktrees: `git worktree prune`, then `git worktree list` must show nothing
    under `Worktrees/`. A leftover is torn down now (safe primitive, rule 19) and opened as an
-   issue — it means a merge closed without its teardown. Run `python ~/.claude/cursor-bridge/inventory-check.py` — it fails on a status file over its cap, a change-log entry the inventory has not absorbed, an environment variable or repository secret the code reads that Resources does not name, a secret value written into the inventory, or a malformed table; fix each before continuing. Then run `python ~/.claude/cursor-bridge/sync-check.py --apply`: local `main` must match the remote, or the `Remote sync:` line must name the reason it cannot.
+   issue — it means a merge closed without its teardown. Run `python ~/.claude/cursor-bridge/completion-check.py --mode plan` — every requirement still planned in a build plan, no deferral without the owner's dated approval; stand-ins it lists are expected only for later stages. Run `python ~/.claude/cursor-bridge/inventory-check.py` — it fails on a status file over its cap, a change-log entry the inventory has not absorbed, an environment variable or repository secret the code reads that Resources does not name, a secret value written into the inventory, or a malformed table; fix each before continuing. Then run `python ~/.claude/cursor-bridge/sync-check.py --apply`: local `main` must match the remote, or the `Remote sync:` line must name the reason it cannot.
 6. **Then, at a stage close, obey `Stage pause` in `docs/RUN_PARAMETERS.md`.** Under `run`
    (the default) the stage-close report is a notification — "Stage <name> closed; next:
    <stage>" plus the FYI block — and you **continue into the next stage in the same turn**
@@ -1194,7 +1208,8 @@ whose last stage has closed without this having run is in the wrong state: run i
 
 **At project end**, additionally:
 
-- **Confirm the remote holds the release — first.** `python ~/.claude/cursor-bridge/sync-check.py --apply --strict` must print IN SYNC, or NO REMOTE for a project that never had one, before the "Project complete" line is written. Anything else is resolved before the project is declared finished: a project whose local copy lags the remote, or whose last commits never left the machine, is not finished.
+- **Prove the product is complete — before anything else.** `python ~/.claude/cursor-bridge/completion-check.py --mode done` must print `RESULT: OK`: every requirement `built` with a test that names it, or deferred or dropped by the owner with a date; no stand-in ("arrives in a later stage", "coming soon", "not yet implemented", a placeholder screen) in shipped code unless it names an owner-deferred requirement. Any failure means the project has **not** ended, whatever the plan says: the missing requirement is planned and built as a new stage, or put to the owner as a deferral. The "Project complete" line lists every deferred and dropped requirement by ID and name.
+- **Confirm the remote holds the release.** `python ~/.claude/cursor-bridge/sync-check.py --apply --strict` must print IN SYNC, or NO REMOTE for a project that never had one, before the "Project complete" line is written. Anything else is resolved before the project is declared finished: a project whose local copy lags the remote, or whose last commits never left the machine, is not finished.
 
 - **Write `Documents/<Name> User Manual.md`** from the finished software and `CHANGES.md`:
   what it does, how to use each feature, screen by screen where there are screens, in the
@@ -1309,7 +1324,7 @@ Escalate only these:
 - **Product behaviour** — should the software do something different, from a user's
   perspective, than what was agreed? (Not: how to implement agreed behaviour.)
 - **Scope** — the work diverges from what the user signed off on in the design, the
-  mockups, or the build plan.
+  mockups, or the build plan. **Leaving out or postponing a specified requirement is always this:** a row in `docs/REQUIREMENTS.md` becomes `deferred` or `dropped` only with the owner's answer and the date, recorded in the row and in the inventory's Deferred table. A stand-in screen ("arrives in a later stage") is never a way to defer.
 - **A user-level consequence the user would bear** — a materially larger cost, or a
   legal, licensing, privacy, or lock-in exposure. Dependencies reach the user *only*
   through this lens and *only* at the design stage, when a technical requirement carries
@@ -1723,3 +1738,4 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
 41. The project's state lives in two bounded files, both read whole at every start and resume: `PROJECT_STATUS.md` (where the work is — rewritten in place, within 120 lines and 12,000 characters) and `INVENTORY.md` (what the software is — Features, Resources, Decisions, Deferred — edited in place, updated in the same commit as each `CHANGES.md` entry, and entered the moment the owner provides a resource). Look it up before you ask or propose: never ask the owner for something Resources already lists, never propose what Features already has, never reverse a Decision without quoting its reason and the circumstance that changed. Private memory is not project state. `inventory-check.py` runs at every reflection point and must pass.
 42. Every builder run ends with an `Assumed, not verified` list — it is in the Done section of every brief — because the run is one-shot and where the builder guessed is lost when it ends. Copy it before anything else; a missing list is *unknown*, never *none*. Give every item one disposition — test, contract, council, or accepted (a Decisions row) — record them in the accept commit's `Assumptions:` body, and hand the list to the reviewers (Review B through `run/review/ASSUMPTIONS-<nnn>.md`) as extra places to look, never as their scope. At every stage close and at project end, name your own three least-confident parts, each with the check that settles it, in `HARDENING.md`, and settle the testable ones before the next stage.
 43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background command or agent you started is still running — its completion notification wakes you — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase.
+44. Done is measured against the requirements register, not against the plan. Every requirement the owner stated, supplied, or approved — each screen and state of the approved mockup included — is a row in `docs/REQUIREMENTS.md` with an ID; every build-plan increment names the IDs it satisfies; tests carry the IDs they prove. Only the owner defers or drops a requirement, with a date. `completion-check.py --mode plan` passes at the plan gate and every stage close; `--mode done` must pass before "Project complete" and runs first in every change cycle, so an inherited "done" is verified, never trusted. A stand-in in shipped code is a failure, not a feature.
