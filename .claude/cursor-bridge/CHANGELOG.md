@@ -11,6 +11,25 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.27c
+
+**What changed**
+- **Diagram-based planning** (the owner's method, adopted after review). The design is a Project Design Document: `docs/DESIGN.md` plus normative Mermaid diagrams in `docs/diagrams/`. New `Diagram-Planning-Conventions.md`: an 18-kind catalogue over five levels (functional workflows; infrastructure; components; data structures; runtime logic), selected per project with every omission reasoned; three rules — top-down, Level 4-5 detail only where load-bearing (concurrency, security, integrity, performance, protocol, prior-failure), normative only if enforced (deterministic check, tests, or named review item). Notation conventions verified against the Mermaid 12.0 docs (use cases stay flowcharts because Typora bundles Mermaid 11.13; no element named `end`; spaces around links).
+- **`diagram-specialist`** subagent drafts diagrams level by level (parallel kinds at once, mutually dependent pairs in one run); the supervisor integrates; `plan-critic` gains diagram lenses (selection, load-bearing detail, enforcement, meaning across diagrams).
+- **`diagram-check.py`** (22 tests, including an untracked new file): index and catalogue coverage, notation per kind, refinement only upward, sequence participants against the diagrams they refine, use cases and screens traced to requirement IDs; in code mode, imports checked against the component diagram (Python, JavaScript, TypeScript), the schema dump against the entity-relationship diagram, and state machines against their tests. Step 4 of the loop runs it on every increment.
+- **Explicit build plans**: every increment states Parent, Depends on, Parallel, Satisfies, Diagrams, Scope; stages are vertical slices; status is derived from `origin/main` commit subjects, so PR titles now start with the increment IDs. **`plan-check.py`** (13 tests) validates the fields and lists ready increments.
+- **Parallel increments** — run parameter 5, `off` by default. With `on`, the builders of ready independent increments run at once, each in its own worktree (`cursor-agent --workspace`), committing a hand-off snapshot; the supervisor never works inside a worktree (Claude Code prompts for git in another folder and for files outside the working directory) and processes the finished branches one at a time in its own checkout. Not yet exercised on a real project.
+- **Objections and bottom-up escalation**: a new section and rules 45-47; `Glossary.md` fixes the bridge's vocabulary (phase vs stage, brief vs contract, specialist vs auditor vs supervisor, objection, autonomous resolution); `/calibrate-bridge` now re-reads the conventions and the glossary. Reviewers fail design regression; the refactoring scout treats normative diagrams as constraints; the security auditor checks trust-boundary crossings drawn in data flow diagrams.
+
+**Running projects must**
+- *(all phases)* Re-read `Diagram-Planning-Conventions.md` and `Glossary.md`, and use the glossary's terms from now on.
+- *(intake, design)* Design by diagram-based planning now: write the diagram index, draft with specialists, pass `diagram-check.py --mode design` before the design gate.
+- *(mockups, planning)* The design gate has passed and is not reopened. Write or finish the build plan with the placement fields and vertical stages; `plan-check.py` must pass at the plan gate.
+- *(building, changing)* No gate is reopened: no retroactive diagrams and no rewrite of the approved plan. New plan addenda use the placement fields; PR titles start with the increment IDs from the next pull request on; add `Parallel increments: off` to `docs/RUN_PARAMETERS.md` with a one-line notice to the owner that it can be switched on. The next change cycle's design revision builds at least the component diagram with its element map, and the entity-relationship diagram where data is stored.
+- *(done)* Nothing until the next change cycle, which applies the item above.
+
+---
+
 ## 2026.09.27b
 
 **What changed**

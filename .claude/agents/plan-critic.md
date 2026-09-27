@@ -49,6 +49,10 @@ Attack it along these lines:
   calls where batching or a cheaper model would do? Is the budgeted operation measurable in
   isolation with fixed inputs? A budget with no mechanism behind it is **Blocking**; a
   mechanism that cannot scale to the stated size is **Blocking**.
+- **Diagram selection (any project with `docs/diagrams/INDEX.md`).** Read `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md`. Does every omitted catalogue kind have a reason that holds for this design? A kind omitted that the design needs — a lifecycle with no state machine, an external service with no inter-system sequence, stored data with no entity-relationship diagram, secrets or personal data with no data flow diagram and its trust boundaries, more than one module with no component diagram — is **Blocking**.
+- **Load-bearing detail.** Does every Level 4-5 diagram's stated reason hold, or is it implementation detail that should stay the builder's (**Should fix**)? Conversely, is a load-bearing mechanism — a concurrency protocol, a reservation scheme, a security flow — described only in prose where a diagram would pin it (**Blocking** when getting it wrong corrupts data or money)?
+- **Enforcement.** Would what enforces each normative diagram actually catch drift? `review:` where a deterministic check or tests would work is **Should fix**; a diagram nothing enforces is **Blocking**.
+- **Meaning across diagrams.** Contradictions the deterministic check cannot see: a sequence that calls in a direction the component diagram does not allow, a state no transition reaches, an entity no component owns, a data flow that crosses a trust boundary with no validation stated, an operational workflow that reaches a screen the mockup does not have. Each is **Blocking**.
 
 ## When reviewing a build plan
 
@@ -67,6 +71,8 @@ Attack it along these lines:
 - **Scope boundaries.** Does each increment name the files and directories it may
   touch? Do any two increments overlap on the same files?
 - **First runnable point.** How many increments before something can actually be run?
+- **Vertical slices.** Is every stage a vertical slice — crossing the layers its features need so the parts are proven to work together and something can be run? A horizontal stage (one layer across many features: all the storage, then all the interface) is **Blocking**.
+- **Placement.** Does every increment state `Depends on`, `Parallel`, `Diagrams`, and `Scope`? Are two `Parallel: yes` increments truly independent beyond their files — no shared schema change, API contract, configuration, or fixture? A false `Parallel: yes` is **Blocking** (`plan-check.py` only sees file scopes). An increment whose `Diagrams` omits a diagram it implements is **Should fix**.
 - **Stages.** Is every increment in exactly one named stage, and is each stage a coherent,
   demonstrable chunk (normally three to eight increments) rather than an arbitrary cut? A
   stage close is where the supervisor reflects and patches the human-facing documents, so a

@@ -45,6 +45,8 @@ entire body on a status code — the latter hides real, non-credential errors fr
 
 ## What you are hunting
 
+**Trust-boundary crossings drawn in the design.** Where the brief names data flow diagrams (context, component, or domain level), read them: every flow the diff implements that crosses a `tb_` trust-boundary subgraph needs the validation, authentication, and redaction the design states for it. A crossing the diff creates that no diagram draws is a finding in itself: the design did not account for it.
+
 - **AuthZ / IDOR / BOLA** — object access without an ownership/role check; missing function-level
   authz; trusting client-supplied identifiers.
 - **AuthN** — broken/again-guessable session handling, missing re-auth on sensitive actions,

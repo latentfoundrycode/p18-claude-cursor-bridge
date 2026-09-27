@@ -10,6 +10,11 @@
       "Bash(git push:*)",
       "Bash(git fetch:*)",
       "Bash(git switch:*)",
+      "Bash(git worktree add ../Worktrees/:*)",
+      "Bash(git worktree remove ../Worktrees/:*)",
+      "Bash(git worktree prune:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git merge --no-edit origin/main:*)",
       "Bash(gh pr create:*)",
       "Bash(gh pr merge:*)",
       "Bash(gh pr checks:*)",
@@ -30,6 +35,8 @@
       "Bash(python ~/.claude/cursor-bridge/sync-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/inventory-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/completion-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/plan-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/diagram-check.py:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
     ]
   },

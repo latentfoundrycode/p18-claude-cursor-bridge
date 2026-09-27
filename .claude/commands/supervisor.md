@@ -91,7 +91,7 @@ another, or a background run on its own branch. When one is, every worktree live
 empty or absent between uses — never a loose folder in the project root, and never nested
 inside `Workspace/` (jscpd, test discovery and `scope-check.py` would walk into it). Record
 it in `docs/PROJECT_STATUS.md` (`Worktrees:`) with its branch and the reason two branches had
-to be live, and remove it the moment its branch merges, with the safe teardown primitive
+to be live, and remove it the moment it is no longer needed — a parallel builder's as soon as the builder finishes, any other at the latest when its branch merges — with the safe teardown primitive
 (rule 19). The project root is then always three things: `Documents/`, `Workspace/`, and a
 `Worktrees/` that is empty or absent.
 
@@ -129,7 +129,7 @@ exception) — never mid-stage, so a stale copy never survives a stage boundary.
 Every project begins here. Do not skip it, even if the user's opening description
 seems complete.
 
-The user describes what they want built. Your job is to interrogate that description
+The user describes what they want built — in the prompt, or in an **Initial Design Draft** they wrote beforehand and keep in `Documents/` (read it whole; it is input, and you never rewrite it). Your job is to interrogate that description
 until it can survive contact with an implementer. Read what they gave you, then come
 back with questions that fall into three buckets:
 
@@ -204,6 +204,13 @@ instance, the practical stake — rather than assuming it is self-evident.
 
 ## Phase 2 — Design
 
+**The design is a Project Design Document: the text of `docs/DESIGN.md` plus the normative diagrams in `docs/diagrams/`, produced by diagram-based planning** (`~/.claude/cursor-bridge/Diagram-Planning-Conventions.md`, read whole by that absolute path; terms per `~/.claude/cursor-bridge/Glossary.md`). The text carries what diagrams cannot — purpose, non-goals, rationale, the **target environment**, the **technology selection** with the alternatives considered, constraints, budgets, failure modes, the security context. The diagrams carry what prose lets slip — every component, connection, state, entity, and interaction — in a form `diagram-check.py` verifies. The procedure (conventions §5):
+
+1. **Select.** Write `docs/diagrams/INDEX.md`: every catalogue kind selected or omitted with a one-line reason, IDs assigned, each selected diagram tied to the requirement IDs it realizes and to what enforces it. Levels 4 and 5 only where a detail is **load-bearing** (concurrency, security, integrity — every persistent schema — performance, protocol, prior-failure), each with its reason; everything else stays the builder's free implementation space.
+2. **Draft top-down, level by level, with `diagram-specialist` subagents**: kinds the catalogue marks parallel in separate runs at once, a mutually dependent pair in one run, each run given the approved upstream diagrams, its register rows, the design text, and (Levels 4-5) its load-bearing reason as fixed inputs.
+3. **Integrate.** Reconcile the drafts — identifiers, boundaries, contradictions, open points; settle each specialist objection or escalate it per "Objections — bottom-up escalation". `python ~/.claude/cursor-bridge/diagram-check.py --mode design` must pass.
+4. **Critique.** `plan-critic` reviews the text and the diagrams together.
+
 Write `docs/DESIGN.md`. It covers: purpose and scope; explicit non-goals;
 architecture and component breakdown; technology choices *with the reasoning for
 each*; data model **and its migration policy** (pre-release: schema definitions are
@@ -266,7 +273,7 @@ the one escalation (see Phase 5).
 **Gate:** present the design to the user. Do not proceed to the UI mockups until they
 approve it. Present it as a decision brief (`explain-for-decision` skill): the choices the
 design makes that are theirs to approve, the concepts those rest on, and what you decide
-regardless.
+regardless. The **Level 1 diagrams** (use cases, operational workflows) state what the software does, so present them as part of what the owner approves; the other levels are technical, named in the brief and available to read (they render in Markdown viewers that support Mermaid), not put to the owner as questions.
 
 Once approved, write **`Documents/<Name> Project Summary.md`** — the human-facing account
 of what is being built, for whom, the architecture in plain language, the key decisions and
@@ -335,7 +342,7 @@ For a UI-bearing project, build the mockup through the design tooling rather tha
 Save the mockup files under `docs/mockups/` (one file per screen or view is fine). The
 design documents already live under `docs/`. Saving these concludes the planning stage.
 
-**Before the gate, add every mockup screen and every required state on it to `docs/REQUIREMENTS.md`** as its own row (Source: mockup screen "<name>"), unless an existing row already covers it — a screen in the mockup is a promise to the owner, and a tab that exists only as a picture is how a Settings screen went unbuilt (KP-029).
+**Before the gate, make the mockup and the operational activity diagram agree** — every mockup screen is a `scr_` node and every `scr_` node is a mockup screen — **and add every mockup screen and every required state on it to `docs/REQUIREMENTS.md`** as its own row (Source: mockup screen "<name>"), unless an existing row already covers it — a screen in the mockup is a promise to the owner, and a tab that exists only as a picture is how a Settings screen went unbuilt (KP-029).
 
 **Gate:** present the mockup **and the visual `docs/design/DESIGN.md`** to the user and get
 explicit approval of the pair before writing the build plan. Do not proceed on an
@@ -397,6 +404,7 @@ Write `docs/BUILD_PLAN.md` as an ordered list of increments. Each increment must
 - **Independently testable** — with acceptance criteria written before it is built
 - **Ordered** — dependencies before dependents; something runnable as early as possible
 - **Scoped** — the files and directories it may touch are named
+- **Placed** — its heading is `### TASK-nnn — <title>` and its field lines state `Parent:` (a group increment it helps fulfil, or none), `Depends on:` (the increments that must be merged first, or none), `Parallel:` (yes if it may be built alongside other ready increments), `Diagrams:` (the normative diagrams its brief carries), and `Scope:`. A large task is a `Kind: group` heading whose children are increments; the group is done when all its children are. Status is never written in the plan: `python ~/.claude/cursor-bridge/plan-check.py` derives it from the commits on `origin/main`, validates the fields (missing dependencies, cycles, parallel increments whose scopes overlap, diagrams not in the index), and lists what is ready.
 - **Traced** — it names the requirement IDs it satisfies (`Satisfies: R-004, R-011`). Every `planned` requirement in `docs/REQUIREMENTS.md` is satisfied by at least one increment; `python ~/.claude/cursor-bridge/completion-check.py --mode plan` must pass before the plan gate. A requirement no increment satisfies is either planned now or put to the owner as a deferral — never left out silently.
 
 Each **UI-bearing** increment additionally **cites the approved mockup screen(s) and the
@@ -440,7 +448,7 @@ anything is optimized (`Performance-Conventions.md` §3). From that stage on the
 runs in the gate.
 
 Give each one an ID (`TASK-001`, `TASK-002`, …). Group the increments into named
-**stages** — a stage is a coherent, demonstrable chunk of the plan (a milestone), normally
+**stages** — a stage is a coherent, demonstrable chunk of the plan (a milestone) and a **vertical slice**: it crosses the layers its features need (interface, logic, storage) so the parts are proven to work together and the owner can see something run. A **horizontal** stage — one layer across many features, all the storage and then all the interface — is rejected by `plan-critic`. Normally
 three to eight increments, and its close is a **reflection point** (see "Reflection
 points"). Every increment belongs to exactly one stage; **the close of the last stage is
 project end** (see "Reflection points" — it is a defined trigger, not a judgement).
@@ -465,7 +473,7 @@ The plan says *what* will be built; the run parameters say *how the loop proceed
 building it. They are the owner's settings, and they are asked **once, together, right
 before the build process starts** — after the plan gate, before Phase 5 — as a single
 decision brief (`explain-for-decision` skill; use `AskUserQuestion` for the choices, each
-with its default marked). Three parameters:
+with its default marked). The parameters:
 
 1. **Stage pause** — what happens when a stage closes (its last increment merged, the
    refactoring pass merged if on, the reflection point written).
@@ -498,6 +506,9 @@ with its default marked). Three parameters:
      (nothing is left installed, user data is never touched). Say plainly that the check
      installs and uninstalls the app on the owner's PC while it runs.
    - `ci-only` — only on a `windows-latest` CI runner; nothing is ever installed here.
+5. **Parallel increments** — whether independent increments the plan marks `Parallel: yes` may have their builders run at the same time (Phase 6 step 3, "Parallel increments").
+   - `off` *(default)* — one builder at a time.
+   - `on` — ready independent increments are built at once, each builder in its own worktree; reviews, tests, and merges stay one at a time. It saves elapsed time on plans with many independent increments. Say the price plainly: a builder in a worktree cannot run the project's tests, so its first delivery may need one more round; and this mode has not yet run on a real project, so its first use is a trial.
 
 Record the answers in **`docs/RUN_PARAMETERS.md`**, which you read at every resume and
 before every stage close and merge:
@@ -509,6 +520,7 @@ Stage pause: run | pause
 Merge authority: supervisor | owner
 Refactoring pass: on | off | off for <stages>
 Installer verification: local | ci-only | n/a (not a desktop application)
+Parallel increments: off | on
 ```
 
 The **model pool state** is not a run parameter — it changes with the owner's usage, not
@@ -648,8 +660,8 @@ git commit --no-verify -m "checkpoint before TASK-<nnn>"
 ```
 
 The checkpoint commit uses `--no-verify` deliberately: it is the recovery anchor and must
-succeed even when the tree does not pass lint (a partial or inherited state). This is the
-**only** commit that bypasses the pre-commit lint gate — your accept/increment commits (step 7)
+succeed even when the tree does not pass lint (a partial or inherited state). This and a parallel builder's hand-off commit in its worktree (step 3, a snapshot of its work made where no environment exists to lint it) are the
+**only** commits that bypass the pre-commit lint gate — your accept/increment commits (step 7)
 run a plain `git commit` and must pass it. Using `--no-verify` on an increment commit is a
 gate-integrity flag, not a shortcut.
 
@@ -703,6 +715,21 @@ Rules for this call, all of which matter:
   stop and put them in the file.
 - If a run needs a specific model, add `--model <name>`; `cursor-agent --list-models`
   shows what is available.
+
+**Parallel increments** (only when `docs/RUN_PARAMETERS.md` says `Parallel increments: on`). When `python ~/.claude/cursor-bridge/plan-check.py` lists ready increments under `TOGETHER` (all `Parallel: yes`, scopes disjoint, no dependency between them), you may run their **builders** at the same time. Only the builders run concurrently — that is where the time goes; everything you do stays sequential and happens in your own checkout. Claude Code asks before running git in another folder (that folder's hooks could run) and before touching files outside your working directory, so **you never work inside a worktree**: it exists only so a second builder has a checkout of its own.
+
+1. **Prepare each branch in your own checkout**, after `sync-check.py --apply`: `git switch -c task-<nnn> origin/main`, write and commit the brief (spec-packager's parallel variant: the builder commits its own work at the end and knows its checkout has no project environment), note the branch's starting commit (`git rev-parse HEAD`) on the status file's `In flight:` line, and switch back.
+2. **Create each worktree from your checkout**: `git worktree add ../Worktrees/TASK-<nnn> task-<nnn>`.
+3. **Delegate each in the background**, pointing the builder at its checkout with `--workspace` and keeping the command starting with `cursor-agent`:
+
+```bash
+cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
+```
+
+4. **When a builder finishes**, remove its worktree from your checkout (`git worktree remove ../Worktrees/TASK-<nnn>` — never `--force`; nothing is linked inside), switch your checkout to its branch, and run steps 4 to 8 there like any increment: the scope check with `--base <the recorded starting commit>`, the diagram check, the reviews, the tests, the accept commit, the pull request, the gate, the merge. Process finished branches **one at a time**. Before the accept commit of every branch after the first, run `git merge --no-edit origin/main` to bring in what merged meanwhile — the other increment's code, disjoint by construction, and its record updates, so the change log, the inventory, and the register do not conflict. CI runs on the pull request's merge with `main`, so the combined state is tested either way.
+5. **A re-delegation** after a review runs in your own checkout like any sequential increment.
+
+Never use Cursor's own `--worktree` option: it places the checkout under your home folder, outside the project and outside the Workspace boundary. **One writer per checkout** holds throughout: no two builders share a checkout, and you never touch a checkout a builder is running in. The price is known: a builder in a worktree has no project environment (no virtual environment, no installed packages), so it cannot run the test suite and its first delivery may need one more iteration. Record each running builder on `In flight:`; each is a background task, so the loop guard knows something will wake you.
 
 ### 3b. A model fails mid-step — switch automatically, restart the step, never wait
 
@@ -766,6 +793,14 @@ Then run the **deterministic scope check** — the file-level floor, before any 
 ```bash
 python ~/.claude/cursor-bridge/scope-check.py handoff/TASK-<nnn>.md
 ```
+
+Where the project has a diagram index, run the **design-conformance check** too — before any reviewer, like the scope check:
+
+```bash
+python ~/.claude/cursor-bridge/diagram-check.py --mode code
+```
+
+An `IMPORT` or `SCHEMA` failure is **design regression**: the code crossed a boundary the component diagram does not draw, or the schema drifted from the entity-relationship diagram. It is handled like `SCOPE DRIFT` — re-delegate with the diagram restated — unless the builder raised an objection in its summary, which goes to "Objections — bottom-up escalation" instead.
 
 And read `docs/BOUNDARY_VIOLATIONS.md` if it exists. Git cannot see a write outside the
 repository, so this log — written by the `boundary-check` hook — is the only trace of the
@@ -1009,6 +1044,8 @@ yourself, favouring the project's established invariants; escalate it only if it
 intent. An `ESCALATE-INTENT` verdict, and only that, surfaces to the user — as a plain
 intent question, never a correctness one.
 
+**PR titles start with every increment ID the branch carries** (`TASK-012 TASK-013: settings key store`): the squash commit takes the title, and that subject on `origin/main` is how `plan-check.py` knows an increment is merged.
+
 When all four hold the merge is authorised. **Check `docs/RUN_PARAMETERS.md` first:** under
 `Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
 conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
@@ -1032,7 +1069,7 @@ When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says
 the same functionality. Every per-increment review saw one diff at a time, so a helper
 written twice in two increments was invisible to both; this is the only step that looks at
 the stage as a whole. Cursor's runs are cheap; the gate is not — so the pass is designed
-around **one gate pass per stage**.
+around **one gate pass per stage**. **Normative diagrams are constraints on it:** a candidate that would change what a diagram draws — a component boundary, a class a Level 4 diagram fixes, a schema — is a design change, raised as an objection, never slipped in as a refactoring.
 
 1. **Deterministic floor.** Run the duplicate detector over the source tree and the
    project's linter complexity rules in report-only mode:
@@ -1119,7 +1156,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
    through the gates as a change to that decision. A report of **several defects** is triaged before any of them is diagnosed — the `root-cause-first` skill's step 0: shared cause binned only on evidence, otherwise one at a time. Gate: summarise the change back and get confirmation.
 2. **Design revision** (Phase 2, scaled). Append a dated **Change: <name>** section to
    `docs/DESIGN.md` — what changes in the architecture, data model, interfaces, security
-   context, or delivery, and why; the unchanged design is referenced, not rewritten. Run
+   context, or delivery, and why; the unchanged design is referenced, not rewritten. **Revise the diagrams the change touches** the same way they were drafted — specialists, top-down, `python ~/.claude/cursor-bridge/diagram-check.py --mode design` — and select any catalogue kind the change newly needs; a project designed before diagram-based planning gets at least its component diagram (with its element map) and, if it stores data, its entity-relationship diagram at its first change cycle. Run
    `plan-critic` on the delta section with the existing design as context. Gate: present
    it as a decision brief and get approval. Patch the Project Summary at this gate.
 3. **UI mockups** (Phase 3) **only if the change touches the UI**, and only for the
@@ -1273,6 +1310,19 @@ entry, and never edit the bridge yourself.
 
 ---
 
+## Objections — bottom-up escalation
+
+An **objection** is any dispute raised upward that halts progress on the item until it is resolved: an auditor or reviewer to you (a blocking finding), the builder to you (it stopped and reported instead of complying), a specialist to you (a conflict with an upstream diagram), you to the owner (an escalation). A problem settled by the agent that found it, within its own authority, is an **autonomous resolution**, not an objection.
+
+When the reality of implementing something differs from what the plan imagined, the problem is resolved at the **lowest level with the authority to resolve it**, and a level that cannot resolve it reopens the level above through that level's gate (conventions §7):
+
+- **Inside the free implementation space** → the builder, autonomously.
+- **A brief detail or a Level 4-5 diagram** → you: revise the diagram, re-run `diagram-check.py`, record the revision as a Decisions row in the inventory, re-brief.
+- **A Level 2-3 diagram** → you with the design critique: specialists redraw the affected diagrams, `plan-critic` re-reviews, `diagram-check.py`, a Decisions row. It reaches the owner only if the change carries a user-level consequence (cost, privacy, licensing, lock-in, delivery).
+- **A Level 1 diagram or a requirement** → the owner, through the design gate: it changes what the software does.
+
+A deviation without an objection is design regression, and reviewers fail it. An objection is never answered by weakening the check that raised it.
+
 ## Escalate to the user when
 
 **Look it up before you ask or propose.** Before asking the owner to create, set, install, or provide anything, check Resources in `docs/INVENTORY.md` — they may have provided it already, and asking twice costs them a redundant key and their trust. Before proposing a change to how the software works, check Features (it may already exist) and Decisions (it may have been settled for a reason). A proposal that reverses a settled decision quotes the decision and its reason and states what has changed since; without a changed circumstance, it is not made. A project whose app keeps secrets in its own store records each by name in Resources — the scan in `inventory-check.py` sees environment variables and CI secrets, not an app's private store.
@@ -1419,6 +1469,7 @@ Terms fixed: <term — the sense fixed with the user — Established | Risky; on
 Software name: <the name that names the Documents set>
 Layout: Workspace=<resolved path>  Documents=<resolved path>
 Worktrees: <none | <name> — branch <branch> — since <date> — <why two branches had to be live>>
+In flight: <none | TASK-nnn in <checkout> since <time>; one line per parallel increment>
 Remote sync: <in sync at <date> | NO REMOTE | OFFLINE since <date> | UNPUBLISHED — first push pending>
 Stage: <current stage name> — Last reflection: <stage close | phase gate | none yet, and when>
 Open issues: <ISS-nnn …, or none>
@@ -1726,11 +1777,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     restores the preferred profile by itself; the owner's "usage reset" only brings it
     earlier. Reviewers review the design a
     diff embodies, not only its fidelity to the brief — a flawed brief is a finding.
-39. Sequential work is branches in one checkout, never a worktree per increment. A git
+39. Sequential work is branches in one checkout, never a worktree per increment (parallel increments under rule 46 are the concurrent case, one worktree per builder). You never work inside a worktree yourself — Claude Code prompts before running git in another folder or touching files outside your working directory; a worktree's work comes back to your checkout as its branch. A git
     worktree exists only while two branches must be live at once; it lives under
     `<project-root>/Worktrees/<name>` (a sibling of `Workspace/`, never inside it, never a
     loose `wt-*` folder in the project root), is recorded in `PROJECT_STATUS.md` with its
-    branch and reason, and is removed the moment its branch merges, via the safe teardown
+    branch and reason, and is removed as soon as it is no longer needed (at the latest when its branch merges), via the safe teardown
     primitive (rule 19). At every reflection point `git worktree prune` then
     `git worktree list`: nothing under `Worktrees/` may remain — a leftover is torn down
     now and gets an issue entry, not silent cleanup.
@@ -1739,3 +1790,6 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
 42. Every builder run ends with an `Assumed, not verified` list — it is in the Done section of every brief — because the run is one-shot and where the builder guessed is lost when it ends. Copy it before anything else; a missing list is *unknown*, never *none*. Give every item one disposition — test, contract, council, or accepted (a Decisions row) — record them in the accept commit's `Assumptions:` body, and hand the list to the reviewers (Review B through `run/review/ASSUMPTIONS-<nnn>.md`) as extra places to look, never as their scope. At every stage close and at project end, name your own three least-confident parts, each with the check that settles it, in `HARDENING.md`, and settle the testable ones before the next stage.
 43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background command or agent you started is still running — its completion notification wakes you — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase.
 44. Done is measured against the requirements register, not against the plan. Every requirement the owner stated, supplied, or approved — each screen and state of the approved mockup included — is a row in `docs/REQUIREMENTS.md` with an ID; every build-plan increment names the IDs it satisfies; tests carry the IDs they prove. Only the owner defers or drops a requirement, with a date. `completion-check.py --mode plan` passes at the plan gate and every stage close; `--mode done` must pass before "Project complete" and runs first in every change cycle, so an inherited "done" is verified, never trusted. A stand-in in shipped code is a failure, not a feature.
+45. Design is diagram-based. The Project Design Document is `docs/DESIGN.md` plus the normative diagrams in `docs/diagrams/`, drawn per `Diagram-Planning-Conventions.md`: every catalogue kind selected or omitted with a reason; top-down, level by level, drafted by `diagram-specialist` subagents and integrated by you; Level 4-5 detail only where it is load-bearing, with the reason recorded; every normative diagram enforced by a deterministic check, tests, or a named review item. `diagram-check.py --mode design` passes before the design gate, `--mode code` at step 4 of every increment and every stage close, `--mode done` at project end. Briefs carry the diagram slices their increment touches. The terms in `Glossary.md` are the bridge's vocabulary; use them in that sense in everything you write.
+46. The build plan is explicit. Every increment states its parent, dependencies, parallel flag, requirements, diagrams, and scope; stages are vertical slices; status is derived from the commits on `origin/main`, never written by hand. `plan-check.py` passes at the plan gate and lists what is ready. With `Parallel increments: on`, the builders of ready increments it lists as `TOGETHER` may run at once, each in its own worktree with `--workspace`, committing their own work; you never work inside a worktree, and you process the finished branches one at a time in your own checkout — scope, diagrams, reviews, tests, gate, merge.
+47. Objections escalate bottom-up to the lowest level that can resolve them: the builder inside its free implementation space; you for briefs and Level 4-5 diagrams; you with the design critique for Level 2-3; the owner for Level 1 and the requirements. Every revision is recorded (a Decisions row, the diagram's history, the design's Change section). A deviation without an objection is design regression.

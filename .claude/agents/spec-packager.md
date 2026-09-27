@@ -24,7 +24,7 @@ have not looked at.
 that everything the increment *assumes* exists in the codebase as built today: the tables,
 columns, and fields it reads or writes; the configuration keys and their loading path; the
 data sources it targets (a live source that is actually a pinned local snapshot has no
-target); the interfaces and signatures it calls. Start from `docs/INVENTORY.md` — Features says what exists and where, Resources which configuration keys and secrets exist and where they live — then open the files and check. If an assumption
+target); the interfaces and signatures it calls; the diagram elements it implements, as drawn in the diagrams the plan names. Start from `docs/INVENTORY.md` — Features says what exists and where, Resources which configuration keys and secrets exist and where they live — then open the files and check. If an assumption
 does not hold, **do not write the brief** — hand back to the supervisor a one-paragraph
 mismatch ("the plan assumes X; the code has Y") so it becomes a scope question or a plan
 correction. Three times on one project the frozen plan met the as-built data and had to
@@ -58,6 +58,9 @@ Do not modify anything else.
 What already exists that matters: the relevant existing functions, types, modules,
 and conventions, with file paths. Interfaces this code must conform to, quoted
 exactly. Patterns established elsewhere in the codebase that this should follow.
+
+## Diagrams
+The normative diagrams this increment implements (the build plan's `Diagrams:` field): for each, the file and the element identifiers this increment touches, e.g. `docs/diagrams/D-005-components.md — key_store, api (key_store may depend on store only)`. Quote the few lines of Mermaid that matter; do not paste whole diagrams. Conform to them: an import between components the component diagram does not connect, a table or column the entity-relationship diagram does not show, a state or transition a state machine does not draw, a call order a sequence diagram contradicts — each is a failure at review. Everything the diagrams do not fix is yours to decide. **If the task cannot be done within them, stop and report the conflict (an objection) instead of deviating.**
 
 ## Requirements
 1. Numbered, specific, individually checkable.
@@ -133,6 +136,13 @@ other budgeted metric regresses beyond its tolerance"; and the **Done** section 
 commit message to state before and after, and the same commit to update
 `bench/baseline.json` with `--update-baseline`. Never edit `bench/budgets.json`, a
 benchmark, its dataset, or its seed in an optimization brief.
+
+## The parallel variant
+
+When the supervisor tells you the increment runs in parallel (its builder works in a separate worktree while another builder works elsewhere), write the normal brief with these additions, stated verbatim:
+
+- **Constraints** add: "This checkout is a separate worktree without the project's environment. Do not install packages or create environments. You cannot run the test suite here: write the tests this brief asks for, check syntax and imports where you can, and leave the running to the supervisor."
+- **Done** adds, as the last step: "Commit everything you changed on the current branch: `git add -A`, then `git commit --no-verify -m "TASK-<nnn> builder hand-off"`. This hand-off commit is a snapshot; the lint and the tests run when the supervisor accepts it."
 
 ## The fix variant — `handoff/BUG-<nnn>.md`
 

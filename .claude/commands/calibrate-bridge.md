@@ -37,7 +37,8 @@ the version has not changed (the owner is asking for certainty, not a version ch
 5. `~/.claude/cursor-bridge/Observability-Conventions.md` (UI-bearing projects)
 6. `~/.claude/cursor-bridge/Delivery-Conventions.md` (installable software: desktop apps, CLIs, local servers)
 7. `~/.claude/cursor-bridge/Performance-Conventions.md` and `Performance-Patterns.md` (projects with performance or cost budgets)
-8. Every `SKILL.md` under `~/.claude/skills/`
+8. `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` and `Glossary.md` (every project: the diagram catalogue, its rules, and the bridge's vocabulary)
+9. Every `SKILL.md` under `~/.claude/skills/`
 
 Subagent definitions under `~/.claude/agents/` are loaded fresh each time a subagent is
 spawned, so they need no re-read here — but note that any subagent spawned **before** the

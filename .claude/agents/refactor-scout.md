@@ -67,6 +67,8 @@ the minimal-code rule wins. Uncovered regions follow the same COVERED / UNCOVERE
 
 ## What is never a candidate
 
+- Anything that changes what a normative diagram in `docs/diagrams/` draws: a component boundary or dependency, a class structure a Level 4 diagram fixes, a table or column, a state or transition. List such an idea separately under **Design change proposals** with the diagram ID; the supervisor treats it as an objection, never as a refactoring.
+
 - Three similar lines. Merging them creates an abstraction that costs more than it saves.
   Duplicates worth removing are whole blocks or whole functions, or a pattern repeated
   three or more times.
