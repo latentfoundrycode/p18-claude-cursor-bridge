@@ -25,6 +25,8 @@ missing, the terminal to use, the literal copy commands from the bridge release 
 "then run `/calibrate-bridge` again". Do nothing else until the check passes — calibrating
 to a half-copied tree would leave the project on a mixture of two releases.
 
+**One exception (KP-030).** `~/.claude/settings.json` is shared with Claude Code, which writes its own keys into it. If it is the *only* STALE file, compare its bridge-owned content with the release's copy — every `permissions.allow` entry of the release present, the Stop hook registered — and if that matches, say so, record the difference as a known exception in `docs/PROJECT_STATUS.md`, and continue. Never ask the owner to remove a key the bridge does not own, and never offer the release's file as a replacement for theirs.
+
 ## 2. Re-read the governing files — they supersede what you hold in context
 
 Read, whole, in this order — even if you believe you already know them, and even if

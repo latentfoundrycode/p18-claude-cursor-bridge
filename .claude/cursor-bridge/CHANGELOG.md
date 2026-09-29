@@ -11,6 +11,16 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.09.29a
+
+**What changed**
+- **KP-030**: `~/.claude/settings.json` is shared with Claude Code, which writes its own keys into it (`switchModelsOnFlag`, `/fast`, `/effort`, `/advisor`, some approvals). A difference confined to keys the bridge does not own is not a failed install. Until `bridge-check.py` verifies only the bridge-owned entries and installation merges instead of copying (Restructuring Plan, release A), the calibration procedure compares the bridge-owned content by hand and continues with the difference recorded; the owner is never asked to remove a key the bridge does not own. Also: a vendor fact quoted to the owner is read from that setting's own documentation page. Governance text only; no program changed.
+
+**Running projects must**
+- *(all phases)* Apply KP-030 at the next `/calibrate-bridge`: if `settings.json` is the only STALE file and its bridge-owned content matches, record the exception and continue.
+
+---
+
 ## 2026.09.27c
 
 **What changed**
