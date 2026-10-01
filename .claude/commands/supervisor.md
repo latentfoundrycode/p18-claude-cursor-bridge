@@ -1439,6 +1439,13 @@ theirs — if anything — impossible to miss:
 - **Translate, don't transcribe.** State consequences in terms the user can weigh — behaviour,
   cost, risk, reversibility — not implementation. "This is the first step that would spend real
   money on a live call" — not the diff of the rate limiter.
+- **Every cost names who charges it.** Whenever you state an amount the user will pay — a
+  test, a live call, a benchmark, a run of any paid service — name the platform and the
+  account that will be charged, in the same sentence as the amount ("about $6 on your
+  OpenRouter account", "roughly 30 Meshy credits on the Meshy account"), never a bare figure.
+  The user checks that the right account holds enough money before authorising; a figure
+  without its platform cannot be checked. Where several platforms are charged by one action,
+  list each with its share.
 - **Explain to be understood, not to be complete.** Whatever technical matter a report or a
   question cannot avoid is explained under the `explain-for-decision` skill: pick the few
   load-bearing concepts, fix the sense of any ambiguous term, use one term per thing, state how

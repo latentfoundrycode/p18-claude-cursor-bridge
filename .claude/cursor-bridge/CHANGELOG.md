@@ -11,6 +11,16 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.10.01a
+
+**What changed**
+- **Every cost names who charges it.** When the supervisor states an amount the owner will pay (a test, a live call, a benchmark, any paid service), the platform and the account charged are named in the same sentence as the amount; several platforms charged by one action are each listed with their share. Reporting section of the supervisor's instructions and guard 7 of `explain-for-decision`. Owner-reported: a figure without its platform cannot be checked against the account's balance. Governance text only.
+
+**Running projects must**
+- *(all phases)* From the next report on, state every cost with its platform and account.
+
+---
+
 ## 2026.09.29a
 
 **What changed**

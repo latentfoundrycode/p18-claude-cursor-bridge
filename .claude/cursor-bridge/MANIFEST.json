@@ -1,6 +1,6 @@
 {
-  "version": "2026.09.29a",
-  "generated": "2026-09-29 14:17",
+  "version": "2026.10.01a",
+  "generated": "2026-10-01 17:41",
   "files": {
     "agents/cursor-configurator.md": "09fcf432c04b9093856f554325a8c9fa759e68b80adcc5a3df4786e7ed00f429",
     "agents/design-auditor.md": "e79114b1bc25ef47e0d7a8f1290fc7a52b7a7e2aed215d4b67dbeda29c023c8c",
@@ -13,8 +13,8 @@
     "agents/spec-packager.md": "e16cbff7a62de005afba7d10e46a1d296485c9f1b6c1570de6097679a021005b",
     "agents/test-runner.md": "3bd2f913741fcc5eff5f6d514c4606eac47125e73153ba18898ea5af35f86d2e",
     "commands/calibrate-bridge.md": "e556631b25fd69283be247d40cb285fb1740872beb889f44e5d846710025672a",
-    "commands/supervisor.md": "d908d59f26605acee45c8806d0b9593822220d6cf61cb51e15ab46e504f38e27",
-    "cursor-bridge/CHANGELOG.md": "bd9ddff726719bc5daea6fe55e4b568a96418d3ab32fa155bf55af6115e5406d",
+    "commands/supervisor.md": "129c4825e51e32e7615f53ea62b19831e9c21d8463aa515d38b36d1e3dcbb2a3",
+    "cursor-bridge/CHANGELOG.md": "407ab5b38de3f9e196bc0809fb3f6b7ecdaf8fb2cbdd7b34d92de2e2e0435e57",
     "cursor-bridge/Cursor-File-Formats.md": "64ae778b72d41a7ddd743064cad672e9656b13cda638baef2657bef1c09dea16",
     "cursor-bridge/Cursor-Project-Configuration.md": "3449158ecad20e973fe6a28d83d21fda3f4503e06ef7d55a64a718099b2d8dd9",
     "cursor-bridge/Delivery-Conventions.md": "15ca7b19586ce71058104bc30698cf0f61265a4a15c6b774c2285082e3a7ed19",
@@ -25,7 +25,7 @@
     "cursor-bridge/Observability-Conventions.md": "344eb2c53150c032fe57d1181fb76b4b1e622a9f3ff8a7e70c5192b489edcaa8",
     "cursor-bridge/Performance-Conventions.md": "6372756ad71cd93114e97c3e71c1c6737566b0b90884f04097ce19435f96ec24",
     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
-    "cursor-bridge/VERSION": "5a5e6d97e613947bc0225916f6fe1c5449386a8d69650ae59b43cf946eed2228",
+    "cursor-bridge/VERSION": "2a0df889f14a7825864ff32a646a3719acf02f612d60109a7a20ef40b3f8f329",
     "cursor-bridge/bench-check.py": "37a66677aae4028db43033737781f644871147d6a9e43dddd127a9999e4ee867",
     "cursor-bridge/boundary-check.py": "e7825d6d2a7a07aed601437b490954b6630b183b947ed7746a19365320a7e3bd",
     "cursor-bridge/bridge-check.py": "f3b31f4f6b3f5f0e66f4806e11801de869f8aa296ffb14ba6a96bc3b9b78eb62",
@@ -89,7 +89,7 @@
     "cursor-bridge/windowless-check.py": "8bc2e1ad48608c916014be42347f42f883a1e8e32f8d30f21599a8268a52cfbc",
     "settings.json": "f3c13f6085e90ebf0e2c3c5d37709efc7f34724cc3e576bb98d1b0fd7f60a599",
     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
-    "skills/explain-for-decision/SKILL.md": "d0647343178aab1627f8f7239f85a593950195c0431a9099999fc721d53af941",
+    "skills/explain-for-decision/SKILL.md": "6d714ded1b66bb9795a95c30b870da656bb59fd52b9f18265b2f95452a4564d8",
     "skills/root-cause-first/SKILL.md": "cc25c65a9df9e57b1fe5fe1fa451022ebbd4cbe1f1af51d397217327388109bb"
   }
 }

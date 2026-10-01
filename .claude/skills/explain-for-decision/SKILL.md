@@ -171,7 +171,10 @@ total."
 **Trigger:** every concept given full treatment.
 **Rule:** one sentence on what it does for the product in use, or what goes wrong without it,
 in the user's currency: behaviour, cost, risk, reversibility, time. This is what lets them
-weigh it; a concept without a stake is a definition they cannot act on.
+weigh it; a concept without a stake is a definition they cannot act on. When the stake is
+money, the amount always comes with the platform and account that charges it ("about $6 on
+your OpenRouter account"): the user must be able to check that the right account holds enough
+before authorising, and a bare figure cannot be checked.
 
 Example. Right: "Without the dependency-admission gate, the builder can pull in any package
 it likes; a compromised package is the way attackers most often get into a small project, and
