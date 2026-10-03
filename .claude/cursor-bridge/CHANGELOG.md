@@ -11,6 +11,16 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.10.03a
+
+**What changed**
+- **KP-031: a running server is not a wake source.** `loop-guard.py` now counts a background command as something that will wake the supervisor only if it is of a kind that finishes: the builder (`cursor-agent`), the CI watch (`gh pr checks … --watch`), or a command marked with the comment `# wake`; servers, workers and probes no longer satisfy the guard. It also reads completion notices from queue records and queued-command attachments, which it had missed, so a finished task no longer counts as pending for six hours. Rule 43 states the marker. Replayed against the reAngle transcript: the old guard saw two pending tasks at the stop that stalled the loop for seven hours; the new guard sees none and would have refused the stop with its nudge. Tests: seven wake-source cases, a finished run, a background agent, and the transcript replay (in the maintainer's harness; the bridge's own test suite is release A of the restructuring plan).
+
+**Running projects must**
+- *(building, changing)* Append `# wake` to any background command you start and intend to wait for that is neither the builder nor the CI watch. Nothing else changes.
+
+---
+
 ## 2026.10.01a
 
 **What changed**

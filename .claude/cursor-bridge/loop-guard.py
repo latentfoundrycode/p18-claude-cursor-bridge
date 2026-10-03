@@ -9,9 +9,13 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
   1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;
   2. its `Phase:` is building or changing;
   3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner);
-  4. nothing is pending that will wake the session: no background command, background
-     agent, or scheduled wake-up started in the last GRACE_HOURS without a completion
-     notification in the transcript;
+  4. nothing is pending that will wake the session: no background agent or scheduled
+     wake-up, and no background command *of a kind that finishes* - a builder run
+     (cursor-agent), a CI watch (gh pr checks --watch), or any command the supervisor marked
+     with `# wake` - started in the last GRACE_HOURS without a completion notification in
+     the transcript. A background command of any other kind (a dev server, a worker, a
+     probe) is NOT a wake source: a server never finishes, so nothing would ever wake the
+     session (KP-031: a dev stack left running masqueraded as a wake source for 7 hours);
   5. this is not already a continuation forced by this hook (`stop_hook_active`), so it
      nudges at most once per stop sequence and can never trap the session.
 
@@ -27,6 +31,14 @@ import time
 from datetime import datetime, timezone
 
 GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source
+# A background command counts as a wake source only if it is of a kind that finishes: the
+# builder, the CI watch, or a command the supervisor marked with "# wake". Everything else
+# (servers, workers, probes) runs until killed and can never wake the session.
+WAKE_PATTERNS = (
+    re.compile(r"\bcursor-agent\b"),
+    re.compile(r"\bgh\s+pr\s+checks\b.*--watch"),
+    re.compile(r"#\s*wake\b", re.I),
+)
 TAIL_BYTES = 12 * 1024 * 1024
 RECHECK_SECONDS = 2.0      # grace for the asynchronously written transcript
 ACTIVE_PHASES = ("building", "changing")
@@ -35,12 +47,15 @@ NOTHING = ("nothing", "none", "-", "")
 REASON = (
     "Loop guard (Claude-Cursor Bridge): docs/PROJECT_STATUS.md says Phase: {phase} and "
     "Awaiting user on: nothing, and no background command or agent is running that would wake "
-    "you. Ending the turn now stalls the build until the owner notices. Do the next step of the "
-    "loop instead. If you are waiting for CI, start ONE background watch of the PR's required "
+    "you (a running server, worker or probe is not one: it never finishes). Ending the turn now "
+    "stalls the build until the owner notices. Do the next step of the loop instead. If you are "
+    "waiting for CI, start ONE background watch of the PR's required "
     "checks (gh pr checks <n> --watch --required --fail-fast, run in the background) - its completion wakes "
     "you; the desktop app's CI monitor never reports a green gate. If you are genuinely waiting "
     "for the owner (an escalation, a gate, a pause they asked for, a stage pause), write that on "
-    "the `Awaiting user on:` line first, then stop."
+    "the `Awaiting user on:` line first, then stop. A background command of your own that will "
+    "finish and should wake you is recognised only if it is the builder, the CI watch, or "
+    "carries the comment `# wake`."
 )
 
 
@@ -71,6 +86,26 @@ def parse_ts(s):
         return None
 
 
+def wakes(tur, content, uses):
+    """Does this background task's completion count as a wake source?
+
+    Agents and non-Bash tasks finish by nature. A background Bash command counts only if
+    its text matches WAKE_PATTERNS; a command the transcript cannot be mapped back to is
+    counted (fail open)."""
+    if not tur.get("backgroundTaskId"):
+        return True                                # an async agent or a tracked task: finishes
+    if not isinstance(content, list):
+        return True
+    for x in content:
+        if isinstance(x, dict) and x.get("type") == "tool_result" and x.get("tool_use_id") in uses:
+            name, inp = uses[x["tool_use_id"]]
+            if name != "Bash":
+                return True
+            cmd = str(inp.get("command") or "")
+            return any(pat.search(cmd) for pat in WAKE_PATTERNS)
+    return True
+
+
 def pending_wakeups(transcript_path, now):
     """Return a list of descriptions of background work that will still wake the session."""
     try:
@@ -82,7 +117,7 @@ def pending_wakeups(transcript_path, now):
             raw = f.read().decode("utf-8", "replace")
     except OSError:
         return None                                # unknown -> caller fails open
-    started, done, wakeups = {}, set(), []
+    started, done, wakeups, uses = {}, set(), [], {}
     cutoff = now - GRACE_HOURS * 3600
     for line in raw.splitlines():
         try:
@@ -90,11 +125,17 @@ def pending_wakeups(transcript_path, now):
         except ValueError:
             continue
         ts = parse_ts(o.get("timestamp") or "") or now
+        msg = o.get("message") or {}
+        content = msg.get("content")
+        if isinstance(content, list):
+            for x in content:
+                if isinstance(x, dict) and x.get("type") == "tool_use" and x.get("id"):
+                    uses[x["id"]] = (x.get("name") or "", x.get("input") or {})
         tur = o.get("toolUseResult")
         if isinstance(tur, dict):
             tid = tur.get("backgroundTaskId") or (tur.get("agentId") if tur.get("isAsync") else None) \
                 or tur.get("taskId")
-            if tid and ts >= cutoff:
+            if tid and ts >= cutoff and wakes(tur, content, uses):
                 started[str(tid)] = ts
         origin = o.get("origin")
         if isinstance(origin, dict) and origin.get("senderTaskId"):
@@ -102,6 +143,13 @@ def pending_wakeups(transcript_path, now):
         msg = o.get("message") or {}
         content = msg.get("content")
         texts = []
+        # Completion notifications also arrive as queue records (`content` at the top level)
+        # and as queued-command attachments (`attachment.prompt`), not only as message text.
+        if isinstance(o.get("content"), str):
+            texts.append(o["content"])
+        att = o.get("attachment")
+        if isinstance(att, dict) and isinstance(att.get("prompt"), str):
+            texts.append(att["prompt"])
         if isinstance(content, str):
             texts.append(content)
         elif isinstance(content, list):
