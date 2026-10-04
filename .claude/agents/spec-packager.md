@@ -2,8 +2,8 @@
 name: spec-packager
 description: Turns one increment of the build plan into a self-contained handoff brief for the Cursor CLI. Use before every delegation to cursor-agent.
 tools: Read, Grep, Glob, Write
-model: inherit
 color: blue
+model: claude-opus-5-5
 ---
 
 You write handoff briefs. Each one is the complete and only instruction set an

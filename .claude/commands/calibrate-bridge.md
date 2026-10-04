@@ -58,7 +58,9 @@ From this point on, the text you just read is the governing text. Where anything
 remember from earlier in this conversation conflicts with it, the file wins.
 
 Also run `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` — create the
-file from the merge policy's two-profile template if it does not exist, and ask the owner
+file from the merge policy's two-profile template if it does not exist, set `review_a` to
+the template's current value if it names an older model (the agent definitions decide the
+model; the roster records it for the family check), and ask the owner
 whether the "other models" pool is available or exhausted if `other_pool` is unset. The
 resolved profile goes into `docs/ROSTER.resolved.json`; a non-preferred profile is the
 report's first line.
@@ -131,6 +133,7 @@ Delta: <old> → <new>
   pending:         <item @ phase>
   not applied:     <item — gate already passed>
 Defaults set for you: <e.g. refactoring pass ON for remaining stages — say "off" to change>
+Session model for this phase: <Fable 5.1 | Opus 5.5> — set it in the model menu if the status bar shows another (rule 48)
 Project position unchanged: <phase / increment / stage>
 ```
 

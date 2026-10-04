@@ -11,7 +11,7 @@ docs/ROSTER.json (v2):
                                                     --record-failure, restored on reset_day, or
                                                     by the owner (--mark-exhausted/--mark-reset).
                                                     A probe cannot see 1% remaining.
-  "review_a": "claude-opus-4-8",                  <- Review A runs in Claude Code, not Cursor.
+  "review_a": "claude-opus-5-5",                  <- Review A runs in Claude Code, not Cursor.
   "profiles": [                                   <- tried in order; the first usable one wins
     {"name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high"},
     {"name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high"}

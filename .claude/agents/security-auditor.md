@@ -2,8 +2,9 @@
 name: security-auditor
 description: Read-only security-conformance review of a diff for exploitable-vulnerability and authorization/authentication/data-integrity classes that SAST misses. Use after diff-reviewer on any diff with logic, auth, input-handling, or data-access surface, before commit.
 tools: Read, Grep, Glob, Bash
-model: claude-opus-4-8
 color: yellow
+model: claude-opus-5-5
+effort: high
 ---
 
 You review code you did not write, for **security conformance** — the exploitable-vulnerability

@@ -11,6 +11,20 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.10.04d
+
+**The models each role runs on, and Review A off a legacy model.** The owner's decision of 2026-10-04 after the verified fact that Fable is not a second usage pool (it draws from the weekly limit, at most half of it, faster — KP-036).
+
+**What changed**
+- **Review A was pinned to `claude-opus-4-8` since 2026-09-05** — a legacy model two generations behind the supervisor — in four reviewer definitions and the roster template. Now: `diff-reviewer`, `security-auditor`, `design-auditor`, `refactor-scout` on `claude-opus-5-5` at `effort: high`; `spec-packager` and `diagram-specialist` on `claude-opus-5-5`; `plan-critic` on `claude-fable-5-1`; `test-runner`, `secret-sentinel`, `cursor-configurator` on `claude-sonnet-5-5`. No definition inherits the session's model any more. The roster template's `review_a` is `claude-opus-5-5`.
+- **Rule 48: the session's model follows the phase** — Fable 5.1 through intake, design, interface and plan and in any design revision; Opus 5.5 from configuration on. The switch is the owner's by hand (the app refuses a session re-pricing itself), so the report that closes the stage before a switch names it right after the decision it leads with: the plan gate, the arrival of a change request, the design revision's gate. A supervisor whose system prompt names another model than the phase's leads its next report with the switch. The calibration report now carries a `Session model for this phase` line.
+- Tests: every agent definition names a current model, the reviewers carry high effort, the roster template matches `diff-reviewer`, and no legacy id remains in the tree.
+
+**Running projects must**
+- *(all phases)* Install with `python <release .claude folder>/cursor-bridge/bridge-install.py`, restart the app, run `/calibrate-bridge`: the calibration sets `review_a` in `docs/ROSTER.json` to `claude-opus-5-5` and its report tells the owner the session model for the project's phase (Opus 5.5 for every project in build or done; Fable 5.1 only while a design revision is open). Subagents spawned before the restart ran on the old definitions; their results stand.
+
+---
+
 ## 2026.10.04c
 
 **Release 0b of the restructuring plan: the rules that survive a compaction, the founding rules in the core, the conformance check, the guides corrected — and, from its own pre-install review, the checkpoint guard for a reviewer with execution.** Built on a branch and brought in through the bridge's own pull-request gate: `main` is now protected (both CI jobs required, administrators included, no force-push).
