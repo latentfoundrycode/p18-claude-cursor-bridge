@@ -34,7 +34,9 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the
     examples) and <folder>/.env that look like account keys or tokens are MISSING; local
     service passwords the tests need (POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD, ...) are a
-    NOTE; values are never read or printed (KP-032);
+    NOTE; values are never read or printed (KP-032); the advice is a key file outside the
+    Workspace, never the Windows user environment; key-like variable NAMES in the session's
+    own environment are a NOTE (the launcher withholds them from builder and reviewer runs);
   - the private memory notes Claude Code keeps for this project (names only; calibration
     step 2b reviews them, rule 41);
   - the recorded bridge version against the installed one (calibration due).
@@ -52,6 +54,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 SECRET_NAME = re.compile(r"(TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|API_?KEY)", re.I)
 LOCAL_SERVICE = re.compile(r"^(POSTGRES|PG|MYSQL|MARIADB|MONGO|REDIS|MINIO|RABBITMQ|CLICKHOUSE|ELASTIC|OPENSEARCH|NEO4J|DB|DATABASE|LOCAL|DEV|TEST)[A-Z0-9_]*(PASSWORD|PASSWD|PASS|SECRET)$", re.I)
+ENV_SECRET = re.compile(r"((^|_)TOKEN(_|$)|(^|_)SECRET(_|$)|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEY$)")  # as bridge_env.SECRET_LIKE
 SCANNERS = (("Semgrep", r"\bsemgrep\b"), ("OSV-Scanner", r"osv-scanner"), ("Socket", r"\bsocket\b"))
 GH_TIMEOUT = 25
 
@@ -365,13 +368,18 @@ def main():
                 accounts.append(shown)
     if any(os.path.isfile(p) for p in env_files):
         if accounts:
-            add("MISSING", "Keys out of the builder's reach", "account keys or tokens within the builder's reach: %s (KP-032): move them to the user's environment or the product's encrypted store" % ", ".join(accounts))
+            add("MISSING", "Keys out of the builder's reach", "account keys or tokens within the builder's reach: %s (KP-032): move them to a key file OUTSIDE the Workspace (for example under %%APPDATA%%\\<product>\\) or the product's encrypted store; NOT into the Windows user environment, which hands them to every program the owner starts" % ", ".join(accounts))
         else:
             add("OK", "Keys out of the builder's reach")
         if locals_:
             add("NOTE", "Local service passwords in .env", "%s: passwords of local development services the tests need; keep them non-production, they are not account secrets" % ", ".join(locals_))
         if own:
             add("NOTE", "The product's own tokens in .env", "%s: named after the project, so taken as the product's own per-instance tokens, not an external account; say so in the inventory if that is wrong" % ", ".join(own))
+
+    # --- account keys in this session's own environment (names only)
+    env_keys = sorted(k for k in os.environ if ENV_SECRET.search(k.upper()) and not k.upper().startswith(("CURSOR_", "GIT_CONFIG_KEY_")))
+    if env_keys:
+        add("NOTE", "Account keys in the session's environment", "%s: every program the owner starts inherits these; the launcher withholds them from builder and reviewer runs (since 2026.10.04e), and a key file outside the Workspace is the better home" % (", ".join(env_keys[:8]) + (" ..." if len(env_keys) > 8 else "")))
 
     # --- private memory notes (names only)
     for d, notes in memory_dirs(ws):

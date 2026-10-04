@@ -234,3 +234,17 @@ def test_second_pass_residue(tmp_path):
     rc, out = run(proj / "Workspace")
     v, line = verdict(out, "docs/RUN_PARAMETERS.md")
     assert v == "MISSING" and "gitignored" in line
+
+
+def test_key_advice_and_the_environment_note(tmp_path):
+    """2026.10.04e: the advice names a key file outside the Workspace, never the user
+    environment; key-like variables in the session's environment are a NOTE, names only."""
+    make_workspace(tmp_path, conformant=False)
+    env = dict(os.environ, HF_TOKEN="hf_value_never_printed", TOKENIZERS_PARALLELISM="false")
+    p = subprocess.run([sys.executable, PROG, str(tmp_path), "--offline"], capture_output=True, text=True, env=env)
+    out = p.stdout
+    v, line = verdict(out, "Keys out of the builder's reach")
+    assert v == "MISSING" and "OUTSIDE the Workspace" in line and "NOT into the Windows user environment" in line
+    v, line = verdict(out, "Account keys in the session's environment")
+    assert v == "NOTE" and "HF_TOKEN" in line and "TOKENIZERS_PARALLELISM" not in line
+    assert "hf_value_never_printed" not in out
