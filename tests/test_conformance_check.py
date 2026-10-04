@@ -127,7 +127,11 @@ def test_cli_reference_checked_by_a_test_counts(tmp_path):
     rc, out = run(tmp_path)
     assert verdict(out, "CLI reference checked")[0] == "MISSING"
     (tmp_path / "backend" / "tests").mkdir(parents=True)
-    (tmp_path / "backend" / "tests" / "test_cli_ref.py").write_text('def test_ref():\n    assert open("docs/cli-reference.json")\n', encoding="utf-8")
+    (tmp_path / "backend" / "tests" / "test_cli.py").write_text('def test_reads():\n    data = open("docs/cli-reference.json").read()\n    assert data\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    v, line = verdict(out, "CLI reference checked")
+    assert v == "MISSING" and "backend/tests/test_cli.py reads" in line, "S9: a test that only reads the file is not a check"
+    (tmp_path / "backend" / "tests" / "test_cli_ref.py").write_text('def test_ref():\n    assert open("docs/cli-reference.json").read() == generate()\n', encoding="utf-8")
     rc, out = run(tmp_path)
     v, line = verdict(out, "CLI reference checked")
     assert v == "OK" and "backend/tests/test_cli_ref.py" in line
@@ -203,3 +207,30 @@ def test_writes_nothing(tmp_path):
     run(tmp_path)
     after = sorted(str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*"))
     assert before == after
+
+
+def test_second_pass_residue(tmp_path):
+    """S9: a version in the install step's download URL counts as pinned; a scanner step
+    that guards itself in its script is a note; the product's own token is not an account
+    key. S3: a gitignored record is MISSING."""
+    make_workspace(tmp_path)
+    gate = GATE.replace("      - name: osv\n        run: osv-scanner@v2.3.1 --lockfile package-lock.json\n",
+                        "      - name: get osv\n        run: curl -L https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64 -o osv-scanner\n"
+                        "      - name: osv\n        run: ./osv-scanner --lockfile package-lock.json\n")
+    gate = gate.replace("npx socket@1.2.3 ci", 'if [ -n "${SOCKET_CLI_API_TOKEN}" ]; then npx socket@1.2.3 ci; else echo skipping; fi')
+    (tmp_path / ".github" / "workflows" / "ci.yml").write_text(gate, encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "OSV-Scanner in the gate")[0] == "OK" and verdict(out, "OSV-Scanner version pinned")[0] is None
+    assert verdict(out, "Socket in the gate")[0] == "OK" and verdict(out, "Socket step guards itself")[0] == "NOTE"
+    proj = tmp_path / "ck04-reangle-prototype"
+    make_workspace(proj / "Workspace")
+    (proj / "Workspace" / ".env").write_text("REANGLE_API_TOKEN=abc\nHF_TOKEN=hf\n", encoding="utf-8")
+    rc, out = run(proj / "Workspace")
+    v, line = verdict(out, "Keys out of the builder's reach")
+    assert v == "MISSING" and "HF_TOKEN" in line and "REANGLE_API_TOKEN" not in line
+    assert verdict(out, "The product's own tokens in .env")[0] == "NOTE"
+    subprocess.run(["git", "init", "-q"], cwd=proj / "Workspace", check=True)
+    (proj / "Workspace" / ".gitignore").write_text("docs/RUN_PARAMETERS.md\n", encoding="utf-8")
+    rc, out = run(proj / "Workspace")
+    v, line = verdict(out, "docs/RUN_PARAMETERS.md")
+    assert v == "MISSING" and "gitignored" in line

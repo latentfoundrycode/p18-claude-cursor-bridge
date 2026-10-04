@@ -147,6 +147,7 @@ def test_fork_source_is_named(tmp_path, home):
     (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
     rc, out = run_hook(root, home, "pointers", source="fork")
     assert "forked from another session" in out
+    assert "This session is a COPY" in out and "Continue from where" not in out, "S8: a fork must not be told to continue the loop"
 
 
 def test_silent_outside_a_bridge_project(tmp_path, home):
@@ -154,20 +155,19 @@ def test_silent_outside_a_bridge_project(tmp_path, home):
     assert rc == 0 and out == ""
 
 
-def test_silent_in_a_session_that_never_invoked_supervisor(tmp_path, home):
+def test_fails_open_for_every_session_under_the_project_with_a_conditional_first_line(tmp_path, home):
+    """0b review second pass, S1: a gate on the transcript silenced two live supervisor
+    sessions (a Skill-tool invocation, a continued transcript). The hook prints for any
+    session under the project and tells a non-supervisor to ignore it."""
     root = tmp_path / "proj"
     (root / "Workspace" / "docs").mkdir(parents=True)
     (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
     other = tmp_path / "review-session.jsonl"
     other.write_text('{"type":"user","message":{"content":"<command-name>/calibrate-bridge</command-name>"}}\n', encoding="utf-8")
-    rc, out = run_hook(root / "Documents", home, transcript=other)
-    assert rc == 0 and out == ""
-    sup = tmp_path / "supervisor-session.jsonl"
-    sup.write_text('{"type":"user","message":{"content":"<command-name>/supervisor</command-name>"}}\n', encoding="utf-8")
-    rc, out = run_hook(root, home, "pointers", transcript=sup)
-    assert "CLAUDE-CURSOR BRIDGE" in out
-    rc, out = run_hook(root, home, "pointers", transcript=tmp_path / "missing.jsonl")   # no transcript to consult: fail open
-    assert "CLAUDE-CURSOR BRIDGE" in out
+    for cwd, transcript in ((root / "Documents", other), (root, tmp_path / "missing.jsonl"), (root / "Workspace", None)):
+        rc, out = run_hook(cwd, home, "pointers", transcript=transcript)
+        assert rc == 0 and "CLAUDE-CURSOR BRIDGE" in out
+        assert "If you are not the project's supervisor" in out and "ignore this message and the digest" in out
 
 
 def test_never_blocks_on_bad_input(home):

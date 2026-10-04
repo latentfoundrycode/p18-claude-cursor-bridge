@@ -495,18 +495,25 @@ Two options for reaching it:
   the hooks folder and the ignored entries), `verify <nnn>` after the run, and
   `premerge <nnn>` before `gh pr merge`. **What the restore covers and what it does not:**
   `verify` puts tracked and untracked files back with `git reset --hard` and `git clean -fd`
-  and lists what it removed — a temporary file or mutation the reviewer made for a check is
-  expected. A commit, a moved HEAD or branch, a new ref or stash, a changed `.git/config` or
-  hook file, or a changed `.env` is **not restorable in the same sense and is reported as
-  `GATE-INTEGRITY`**: the tree is put back, the flag opens, the merge waits. The
-  configuration is read as a file before any git command runs, because a `core.fsmonitor`
-  or `core.hooksPath` line left in it would run the reviewer's program with the owner's
-  identity on the supervisor's next `git status`. The guard does not see the contents of
-  ignored folders, anything outside the checkout (the owner's profile, the installed
-  bridge, other projects), or a reviewer that reaches for the credential store on purpose:
-  it is a guard against what a reviewer does in passing, not a sandbox (KP-032). `premerge`
-  then proves the head about to merge descends from the reviewed head and differs from it
-  only by the `git rm` of the review files. **Then check it wrote nowhere else:**
+  (keeping the launcher's own `run/review/REVIEW-<nnn>.err`, whose first line it prints) and
+  lists what it removed — a temporary file or mutation the reviewer made for a check is
+  expected. A commit, a moved HEAD or branch, a new or moved local ref or stash, a changed
+  `.git/config` or hook file, a changed record under `docs/`, `handoff/` or `run/review/`
+  even where the project gitignores it, or a changed `.env` is **reported as
+  `GATE-INTEGRITY`**: the tree and the refs are put back, the flag opens, the merge waits.
+  The configuration, the active hooks folder (`core.hooksPath`) and `.git/hooks` are read as
+  files before any git command runs, because a `core.fsmonitor` line or a planted hook
+  would run the reviewer's program with the owner's identity on the supervisor's next git
+  command — and every git command the guard runs has the repository's hooks and file
+  monitor switched off, so the guard itself never runs one. A moved remote-tracking ref (a
+  fetch) is only a note. The guard prints the snapshot file's hash at both ends, because a
+  reviewer could rewrite the snapshot. It does not see the contents of cache folders,
+  anything outside the checkout (the owner's profile, the installed bridge, other projects),
+  or a reviewer that reaches for the credential store on purpose: it is a guard against
+  what a reviewer does in passing, not a sandbox (KP-032). `premerge <nnn> <pr>`, run after
+  the review files are removed, committed and pushed, then proves the head about to merge
+  descends from the reviewed head, differs from it only by that removal, and is the pull
+  request's head on GitHub; the merge uses `--match-head-commit` with that head. **Then check it wrote nowhere else:**
   `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the launch time>`, where
   the launch time is the launcher's first stderr line (`bridge-run: started <time>Z`, the
   first line of the `.err` file; a time without a zone is refused). It lists every comment

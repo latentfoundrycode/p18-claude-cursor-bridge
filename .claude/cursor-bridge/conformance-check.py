@@ -129,6 +129,20 @@ def gh(args, cwd):
     return p.stdout, None
 
 
+def git_ignored(ws, rel):
+    try:
+        p = subprocess.run(["git", "-c", "core.fsmonitor=false", "check-ignore", "-q", rel], cwd=ws, capture_output=True, timeout=GH_TIMEOUT, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return p.returncode == 0
+
+
+def project_words(ws):
+    """Words of the project's own name (the folder above Workspace), to tell the product's
+    own tokens (REANGLE_API_TOKEN) from account keys."""
+    return set(w for w in re.findall(r"[a-z]{4,}", os.path.basename(os.path.dirname(ws)).lower()) if w not in ("prototype", "project", "workspace"))
+
+
 def memory_dirs(ws):
     """Claude Code's memory folders for the project root and the Workspace (names only)."""
     home = os.path.expanduser("~")
@@ -176,8 +190,12 @@ def main():
                 add("MISSING", "%s in the gate" % name, "the step is guarded by `if:` and skipped silently when its condition is false; make it unconditional (the token is a repository secret)")
                 continue
             add("OK", "%s in the gate" % name)
-            if not any(re.search(r"(==\s*\d|@v?\d|@[0-9a-f]{40}|version:\s*['\"]?\d)", body) for body, _ in hits):
-                add("NOTE", "%s version pinned" % name, "no version in the step; pin it (rule 14: never auto-adopt a tool update)")
+            # the version may sit in the step that installs the scanner rather than the one that runs it
+            scanner_lines = [l for l in wf_text.splitlines() if re.search(pattern, l, re.I)]
+            if not any(re.search(r"(==\s*\d|@v?\d|@[0-9a-f]{40}|version:\s*['\"]?\d|/v?\d+\.\d+(\.\d+)?/)", l) for l in scanner_lines):
+                add("NOTE", "%s version pinned" % name, "no version where the step installs or runs it; pin it (rule 14: never auto-adopt a tool update)")
+            if any(re.search(r"\bif\s+\[\[?\s*-[nz]\s+\"?\$\{?[A-Z0-9_]*(TOKEN|KEY|SECRET)", body) for body, _ in hits):
+                add("NOTE", "%s step guards itself" % name, "its script skips the scan when the token variable is empty; true only while the repository secret exists")
         sem = [cmds for body, _, cmds in steps if re.search(r"\bsemgrep\b", cmds, re.I)]
         if sem:
             if any(re.search(r"semgrep(==\S+)?\s+ci\b", b) or "bridge-rules" in b or re.search(r"--config\s+\.semgrep", b) for b in sem):
@@ -278,6 +296,9 @@ def main():
         ("docs/ROSTER.json", "the model roster (rule 38)"),
     ):
         ok = os.path.isfile(os.path.join(ws, rel))
+        if ok and os.path.isdir(os.path.join(ws, ".git")) and git_ignored(ws, rel):
+            add("MISSING", rel, "exists but is gitignored: the records are versioned, a reviewer's change to an ignored record leaves no trace and no history (0b review, S3)")
+            continue
         add("OK" if ok else "MISSING", rel, "" if ok else detail)
     if os.path.isfile(os.path.join(ws, "docs", "DESIGN.md")):
         add("OK", "docs/DESIGN.md")
@@ -297,22 +318,34 @@ def main():
         has_ref = os.path.isfile(os.path.join(ws, "docs", "cli-reference.json"))
         add("OK" if has_ref else "MISSING", "docs/cli-reference.json", "" if has_ref else "the generated command reference (rule 32)")
         checked = bool(re.search(r"cli-reference", wf_text))
-        where = "CI"
+        where, reads_only = "CI", []
         if not checked:
             for tests_dir in glob.glob(os.path.join(ws, "tests")) + glob.glob(os.path.join(ws, "*", "tests")):
-                for p in glob.glob(os.path.join(tests_dir, "**", "*.py"), recursive=True):
-                    if "cli-reference.json" in (read(p) or ""):
-                        checked, where = True, os.path.relpath(p, ws).replace("\\", "/")
+                for p in sorted(glob.glob(os.path.join(tests_dir, "**", "*.py"), recursive=True)):
+                    text = read(p) or ""
+                    if "cli-reference.json" not in text:
+                        continue
+                    relp = os.path.relpath(p, ws).replace("\\", "/")
+                    # a check regenerates the reference and compares; a test that merely reads the file is not one
+                    if re.search(r"assert[^\n]*==|assertEqual|--exit-code|--check|\bcompare", text):
+                        checked, where = True, relp
                         break
+                    reads_only.append(relp)
                 if checked:
                     break
-        add("OK" if checked else "MISSING", "CLI reference checked (%s)" % where if checked else "CLI reference checked", "" if checked else "nothing keeps docs/cli-reference.json current: no CI step and no test names it (rule 32)")
+        if checked:
+            add("OK", "CLI reference checked (%s)" % where)
+        elif reads_only:
+            add("MISSING", "CLI reference checked", "%s reads docs/cli-reference.json but nothing compares it with the generator's output (rule 32)" % ", ".join(reads_only[:3]))
+        else:
+            add("MISSING", "CLI reference checked", "nothing keeps docs/cli-reference.json current: no CI step and no test names it (rule 32)")
 
     # --- secrets within the builder's reach (names only)
     env_files = [os.path.join(ws, ".env")]
     env_files += [p for p in glob.glob(os.path.join(ws, ".env.*")) if not re.search(r"\.(example|template|sample|dist)$", p, re.I)]
     env_files += [os.path.join(ws, d, ".env") for d in subdirs]
-    accounts, locals_ = [], []
+    accounts, locals_, own = [], [], []
+    words = project_words(ws)
     for env_path in env_files:
         env_text = read(env_path)
         if env_text is None:
@@ -322,7 +355,14 @@ def main():
             m = re.match(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
             if not m or not SECRET_NAME.search(m.group(1)):
                 continue
-            (locals_ if LOCAL_SERVICE.match(m.group(1)) else accounts).append("%s (%s)" % (m.group(1), rel) if rel != ".env" else m.group(1))
+            name = m.group(1)
+            shown = "%s (%s)" % (name, rel) if rel != ".env" else name
+            if LOCAL_SERVICE.match(name):
+                locals_.append(shown)
+            elif name.split("_")[0].lower() in words:
+                own.append(shown)
+            else:
+                accounts.append(shown)
     if any(os.path.isfile(p) for p in env_files):
         if accounts:
             add("MISSING", "Keys out of the builder's reach", "account keys or tokens within the builder's reach: %s (KP-032): move them to the user's environment or the product's encrypted store" % ", ".join(accounts))
@@ -330,6 +370,8 @@ def main():
             add("OK", "Keys out of the builder's reach")
         if locals_:
             add("NOTE", "Local service passwords in .env", "%s: passwords of local development services the tests need; keep them non-production, they are not account secrets" % ", ".join(locals_))
+        if own:
+            add("NOTE", "The product's own tokens in .env", "%s: named after the project, so taken as the product's own per-instance tokens, not an external account; say so in the inventory if that is wrong" % ", ".join(own))
 
     # --- private memory notes (names only)
     for d, notes in memory_dirs(ws):

@@ -23,10 +23,13 @@ event, each run printing one part under its own cap:
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
-or a worktree), and nothing in a session whose transcript shows that /supervisor was never
-invoked (a review or planning session opened in a project folder is not the supervisor; the
-0b review, finding 7). It never blocks (exit 0 always), never writes anything, and keeps
-each part under the cap. ASCII-only apart from what it quotes.
+or a worktree). It FAILS OPEN on purpose: a session that is not the project's supervisor
+(a review or a planning session opened in a project folder) is told to ignore the message,
+because a gate on the transcript silenced the hook on two of three live supervisor sessions
+(one invoked through the Skill tool, one continuing an earlier transcript; the 0b review's
+second pass, S1), and a silent supervisor is the failure this hook exists to prevent. A
+forked session is told not to continue the loop (S8). It never blocks (exit 0 always), never
+writes anything, and keeps each part under the cap. ASCII-only apart from what it quotes.
 """
 import json
 import os
@@ -35,7 +38,6 @@ import sys
 
 MAX_OUTPUT = 9800           # per part; Claude Code's cap is 10,000
 AWAITING_MAX = 300          # the quoted "Awaiting user on" text; the file is read whole anyway
-SUPERVISOR_MARKER = "<command-name>/supervisor</command-name>"
 
 PHASE_SECTIONS = {
     "intake": ["## Phase 1 — Intake"],
@@ -103,21 +105,6 @@ def supervisor_path():
     return os.path.join(home, ".claude", "commands", "supervisor.md")
 
 
-def supervisor_invoked(transcript_path):
-    """True when the transcript shows a /supervisor invocation, or when there is no
-    transcript to consult (older inputs, tests): the hook fails open, never silent by error."""
-    if not transcript_path or not os.path.isfile(transcript_path):
-        return True
-    try:
-        with open(transcript_path, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                if SUPERVISOR_MARKER in line:
-                    return True
-    except OSError:
-        return True
-    return False
-
-
 def digest_and_sections(path):
     """The digest text and {heading: (first line, last line)} for every '## ' section.
     Lines inside fenced code blocks are never headings (a template's '# Requirements' line
@@ -156,8 +143,9 @@ def pointers_part(status, sections, source):
         awaiting = awaiting[:AWAITING_MAX] + "... (read it whole in docs/PROJECT_STATUS.md)"
     version = field(status, "Bridge version") or "?"
     waiting = awaiting.lower() not in ("nothing", "none", "", "-")
-    out = ["CLAUDE-CURSOR BRIDGE: this session is the supervisor of a bridge project (bridge %s). The context was just %s, "
-           "and a compaction keeps only the first part of your instructions; the core digest is re-injected beside this message." % (version, source),
+    out = ["CLAUDE-CURSOR BRIDGE: this folder belongs to a bridge project (bridge %s) and this message is for its supervisor session. "
+           "If you are not the project's supervisor (you were not asked to act as supervisor here), ignore this message and the digest. "
+           "The context was just %s, and a compaction keeps only the first part of your instructions; the core digest is re-injected beside this message." % (version, source),
            "",
            "PROJECT STATE: Phase: %s. Awaiting user on: %s." % (phase_raw or "unknown", awaiting)]
     wanted = PHASE_SECTIONS.get(phase, [])
@@ -174,7 +162,9 @@ def pointers_part(status, sections, source):
     for conv in PHASE_CONVENTIONS.get(phase, []):
         out.append("  - and %s, whole" % conv)
     out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")
-    if waiting:
+    if source == "forked from another session":
+        out.append("This session is a COPY; the original may still be the supervisor. Do not continue the loop unless the owner says this session is the supervisor now.")
+    elif waiting:
         out.append("The status file says you are WAITING FOR THE OWNER on: %s. Do not continue the loop; wait for their word, and clear the line when they give it." % awaiting)
     else:
         out.append("Continue from where the status file says the work is.")
@@ -201,8 +191,6 @@ def main():
     cwd = data.get("cwd") or os.getcwd()
     status = read_status(cwd)
     if status is None:
-        return 0
-    if not supervisor_invoked(data.get("transcript_path")):
         return 0
     sv = supervisor_path()
     if not os.path.isfile(sv):
