@@ -157,8 +157,8 @@ version-specific library docs is the **Context7 MCP server** (see `Cursor-File-F
   a known post-Customize bug stops some project-level `.cursor/mcp.json` servers from
   registering, and user scope keeps any future API key out of the committed repo.
 - The free tier is keyless — commit-safe, nothing to escalate. Adding a Context7 **API
-  key** for higher limits is **[Escalate]** (it's a secret; it goes in an env var or
-  `~/.cursor/mcp.json`, never a committed file).
+  key** for higher limits is **[Escalate]** (it's a secret; it goes in
+  `~/.cursor/mcp.json`, never a committed file and never an environment variable the owner sets).
 - Note the interaction with `--force`: a normal Cursor session prompts before first use
   of an MCP tool. Under `--force` that prompt is auto-approved, so Context7 is available
   to the builder immediately once configured. This is a case where `--force` helps.

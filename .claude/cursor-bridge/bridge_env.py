@@ -18,10 +18,11 @@ TOKEN_VARS = ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPR
 # Every variable whose NAME looks like an account key is withheld as well (2026.10.04e): a
 # builder, and a reviewer that may execute code, must not inherit the owner's paid keys from
 # the Windows user environment. The same test, word for word, is in cursor-agent.shim.
-# TOKEN and SECRET count only as whole words (HF_TOKEN, MODAL_TOKEN_ID; not
-# TOKENIZERS_PARALLELISM); KEY only as API/ACCESS/PRIVATE key or a name ending in _KEY (not
+# TOKEN and SECRET count only as whole words, singular or plural (HF_TOKEN, MODAL_TOKEN_ID,
+# SFVF_SECRETS_PASSPHRASE; not TOKENIZERS_PARALLELISM); a store's unlock PASSPHRASE is a
+# key; KEY only as API/ACCESS/PRIVATE key or a name ending in _KEY or _KEYS (not
 # GIT_CONFIG_KEY_0, which the recipe itself sets). Cursor's own variables are kept.
-SECRET_LIKE = re.compile(r"((^|_)TOKEN(_|$)|(^|_)SECRET(_|$)|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEY$)")
+SECRET_LIKE = re.compile(r"((^|_)TOKENS?(_|$)|(^|_)SECRETS?(_|$)|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEYS?$)")
 KEEP_PREFIXES = ("CURSOR_", "GIT_CONFIG_KEY_")
 
 

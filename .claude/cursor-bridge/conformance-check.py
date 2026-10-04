@@ -54,7 +54,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 SECRET_NAME = re.compile(r"(TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|API_?KEY)", re.I)
 LOCAL_SERVICE = re.compile(r"^(POSTGRES|PG|MYSQL|MARIADB|MONGO|REDIS|MINIO|RABBITMQ|CLICKHOUSE|ELASTIC|OPENSEARCH|NEO4J|DB|DATABASE|LOCAL|DEV|TEST)[A-Z0-9_]*(PASSWORD|PASSWD|PASS|SECRET)$", re.I)
-ENV_SECRET = re.compile(r"((^|_)TOKEN(_|$)|(^|_)SECRET(_|$)|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEY$)")  # as bridge_env.SECRET_LIKE
+ENV_SECRET = re.compile(r"((^|_)TOKENS?(_|$)|(^|_)SECRETS?(_|$)|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEYS?$)")  # as bridge_env.SECRET_LIKE
+LOCATION_NAME = re.compile(r"_(PATH|DIR|FILE|FOLDER|URL)$")  # where a store is, not a secret
 SCANNERS = (("Semgrep", r"\bsemgrep\b"), ("OSV-Scanner", r"osv-scanner"), ("Socket", r"\bsocket\b"))
 GH_TIMEOUT = 25
 
@@ -375,6 +376,21 @@ def main():
             add("NOTE", "Local service passwords in .env", "%s: passwords of local development services the tests need; keep them non-production, they are not account secrets" % ", ".join(locals_))
         if own:
             add("NOTE", "The product's own tokens in .env", "%s: named after the project, so taken as the product's own per-instance tokens, not an external account; say so in the inventory if that is wrong" % ", ".join(own))
+
+    # --- no secret through an environment variable the owner sets (the inventory says how each arrives)
+    inv = read(os.path.join(ws, "docs", "INVENTORY.md")) or ""
+    by_env = []
+    for line in inv.splitlines():
+        if not line.lstrip().startswith("|") or not re.search(r"env(ironment)? var", line, re.I) or re.search(r"test-only", line, re.I):
+            continue
+        for name in re.findall(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b", line.split("|")[1] if line.count("|") > 2 else line):
+            if ENV_SECRET.search(name) and not LOCATION_NAME.search(name) and name not in by_env:
+                by_env.append(name)
+    if inv:
+        if by_env:
+            add("MISSING", "No secret through an environment variable", "the inventory says the owner supplies %s through an environment variable; every program started in that environment inherits it: the product reads it from a key file outside the Workspace or the operating system's credential store instead, and no run sheet asks the owner to set a secret as a variable (KP-032)" % ", ".join(by_env[:8]))
+        else:
+            add("OK", "No secret through an environment variable")
 
     # --- account keys in this session's own environment (names only)
     env_keys = sorted(k for k in os.environ if ENV_SECRET.search(k.upper()) and not k.upper().startswith(("CURSOR_", "GIT_CONFIG_KEY_")))
