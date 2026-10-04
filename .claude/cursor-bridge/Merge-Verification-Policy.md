@@ -139,7 +139,7 @@ pick the strongest model each pool offers at that time — this table records th
 {
   "other_pool": "available",
   "reset_day": 16,
-  "review_a": "claude-opus-4-8",
+  "review_a": "claude-opus-5-5",
   "profiles": [
     { "name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high" },
     { "name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high" }

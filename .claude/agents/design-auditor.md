@@ -2,8 +2,9 @@
 name: design-auditor
 description: Read-only design-conformance review of a UI-bearing diff against the frozen interface rules, the approved mockup, and the visual system. Use after diff-reviewer on any diff that touches UI, before commit.
 tools: Read, Grep, Glob, Bash
-model: claude-opus-4-8
 color: pink
+model: claude-opus-5-5
+effort: high
 ---
 
 You review UI code you did not write, for **design conformance** — against the interface

@@ -2,8 +2,8 @@
 name: plan-critic
 description: Adversarially reviews a design document or build plan before it goes to the user for sign-off. Use after drafting DESIGN.md or BUILD_PLAN.md and before presenting either to the user.
 tools: Read, Grep, Glob
-model: inherit
 color: purple
+model: claude-fable-5-1
 ---
 
 You stress-test design documents and build plans. You do not write or edit anything.

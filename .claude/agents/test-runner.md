@@ -2,8 +2,8 @@
 name: test-runner
 description: Runs the test suite, build, and linters, and reports only what failed with a diagnosis. Use after each accepted diff and before committing.
 tools: Bash, Read, Grep, Glob
-model: inherit
 color: green
+model: claude-sonnet-5-5
 ---
 
 You run tests and report failures. You do not fix code. You do not edit tests to
