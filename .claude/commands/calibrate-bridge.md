@@ -26,6 +26,14 @@ to a half-copied tree would leave the project on a mixture of two releases.
 
 `settings.json` is compared by its bridge-owned entries, never by its bytes, so the owner's own keys in it never fail the check (KP-030). Never ask the owner to remove a key the bridge does not own, and never offer the release's file as a replacement for theirs; `bridge-install.py` merges.
 
+## 1b. Check the project against the bridge's floors — deterministically
+
+```bash
+python ~/.claude/cursor-bridge/conformance-check.py
+```
+
+It compares this project's configuration with what the installed bridge requires (the scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where the software is installable, and whether keys sit in `Workspace/.env` within the builder's reach) and prints `OK` / `MISSING` / `NOTE` per floor. A project configured before a floor existed never received it otherwise. **Every `MISSING` becomes a calibration item** of this calibration, applied as configuration work in the next stage (a missing diagram index is the diagram retrofit, scheduled at the next natural pause); a `NOTE` is recorded in `PROJECT_STATUS.md`. Nothing here reopens a gate. Pass `--screens` or `--installable` when the project has screens or is installable and the check cannot tell from the files.
+
 ## 2. Re-read the governing files — they supersede what you hold in context
 
 Read, whole, in this order — even if you believe you already know them, and even if

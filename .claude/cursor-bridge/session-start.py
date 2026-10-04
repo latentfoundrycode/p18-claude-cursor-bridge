@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""session-start: a Claude Code SessionStart hook (matchers: compact, resume) that puts the
+supervisor's core rules back after a compaction or a resume (KP-035).
+
+Why: when a session's context is compacted, Claude Code re-attaches only the first part of
+an invoked command (measured: 20,000 of the supervisor's 150,000 characters, 13%), so the
+supervisor carried on for hours without its loop, its gate and its standing rules, and the
+record shows the rule-breaking that followed. This hook prints, into the new context:
+
+  1. the digest at the top of ~/.claude/commands/supervisor.md (between the markers
+     <!-- digest:start --> and <!-- digest:end -->), the one text the maintainer keeps as
+     the condensed core;
+  2. the project's phase from docs/PROJECT_STATUS.md, with the exact section of
+     supervisor.md to re-read before the next action, and the conventions that phase relies on.
+
+It prints nothing outside a bridge project (no docs/PROJECT_STATUS.md found from the
+session's folder, its Workspace, a parent, or a worktree). It never blocks (exit 0 always),
+never writes anything, and stays under 10,000 characters of output. ASCII-only apart from
+what it quotes.
+"""
+import json
+import os
+import re
+import sys
+
+MAX_OUTPUT = 9800
+
+PHASE_SECTIONS = {
+    "intake": ["## Phase 1 — Intake"],
+    "design": ["## Phase 2 — Design"],
+    "mockups": ["## Phase 3 — UI mockups"],
+    "interface": ["## Phase 3 — UI mockups"],
+    "planning": ["## Phase 4 — Build plan", "## Run parameters — asked once, after the plan is approved, before configuration"],
+    "configuring": ["## Phase 5 — Configure the Cursor build environment"],
+    "configure": ["## Phase 5 — Configure the Cursor build environment"],
+    "building": ["## Phase 6 — The delegation loop", "## Reflection points — stage close, phase gates, project end"],
+    "changing": ["## The change cycle — a request on a finished project", "## Phase 6 — The delegation loop"],
+    "done": ["## The change cycle — a request on a finished project"],
+}
+PHASE_CONVENTIONS = {
+    "building": ["~/.claude/cursor-bridge/Merge-Verification-Policy.md", "~/.claude/cursor-bridge/Known-Pitfalls.md"],
+    "changing": ["~/.claude/cursor-bridge/Merge-Verification-Policy.md", "~/.claude/cursor-bridge/Known-Pitfalls.md"],
+    "design": ["~/.claude/cursor-bridge/Diagram-Planning-Conventions.md", "~/.claude/cursor-bridge/Glossary.md"],
+    "configuring": ["~/.claude/cursor-bridge/Cursor-Project-Configuration.md", "~/.claude/cursor-bridge/Known-Pitfalls.md"],
+    "configure": ["~/.claude/cursor-bridge/Cursor-Project-Configuration.md", "~/.claude/cursor-bridge/Known-Pitfalls.md"],
+}
+
+
+def status_candidates(cwd):
+    bases = []
+    for start in (cwd, os.environ.get("CLAUDE_PROJECT_DIR") or ""):
+        if not start:
+            continue
+        d = os.path.abspath(start)
+        parts = d.replace("\\", "/").split("/")
+        if "Worktrees" in parts:
+            bases.append(os.path.join("/".join(parts[:parts.index("Worktrees")]), "Workspace"))
+        for _ in range(4):
+            bases.append(d)
+            bases.append(os.path.join(d, "Workspace"))
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+    seen, out = set(), []
+    for b in bases:
+        if b not in seen:
+            seen.add(b)
+            out.append(os.path.join(b, "docs", "PROJECT_STATUS.md"))
+    return out
+
+
+def read_status(cwd):
+    for p in status_candidates(cwd):
+        if os.path.isfile(p):
+            with open(p, encoding="utf-8-sig", errors="replace") as f:
+                return f.read()
+    return None
+
+
+def field(text, name):
+    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
+    m = re.search(pat, text, re.M | re.I)
+    return m.group(1).strip().strip("*_`").strip() if m else None
+
+
+def supervisor_path():
+    home = os.path.expanduser("~")
+    return os.path.join(home, ".claude", "commands", "supervisor.md")
+
+
+def digest_and_sections(path):
+    """The digest text and {heading: (first line, last line)} for every '## ' section."""
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        lines = f.read().split("\n")
+    text = "\n".join(lines)
+    a, b = text.find("<!-- digest:start -->"), text.find("<!-- digest:end -->")
+    digest = text[a + len("<!-- digest:start -->"):b].strip() if a >= 0 and b > a else ""
+    sections, current = {}, None
+    for i, line in enumerate(lines, 1):
+        if line.startswith("## ") or line.startswith("# "):
+            if current:
+                sections[current][1] = i - 1
+            current = line.strip()
+            sections[current] = [i, len(lines)]
+    return digest, {k: tuple(v) for k, v in sections.items()}
+
+
+def main():
+    try:
+        data = json.load(sys.stdin)
+    except Exception:
+        data = {}
+    cwd = (data.get("cwd") if isinstance(data, dict) else None) or os.getcwd()
+    status = read_status(cwd)
+    if status is None:
+        return 0
+    sv = supervisor_path()
+    if not os.path.isfile(sv):
+        return 0
+    digest, sections = digest_and_sections(sv)
+    phase_raw = (field(status, "Phase") or "").strip()
+    phase = phase_raw.split()[0].lower() if phase_raw else ""
+    awaiting = field(status, "Awaiting user on") or "nothing"
+    version = field(status, "Bridge version") or "?"
+
+    out = []
+    out.append("CLAUDE-CURSOR BRIDGE: this session is the supervisor of a bridge project (bridge %s). The context was just "
+               "compacted or resumed, and a compaction keeps only the first part of your instructions; here is the core again." % version)
+    out.append("")
+    out.append(digest if digest else "(no digest found in supervisor.md; re-read the whole file)")
+    out.append("")
+    out.append("PROJECT STATE: Phase: %s. Awaiting user on: %s." % (phase_raw or "unknown", awaiting))
+    wanted = PHASE_SECTIONS.get(phase, [])
+    if wanted:
+        out.append("BEFORE YOUR NEXT ACTION, re-read these sections of ~/.claude/commands/supervisor.md with the Read tool (offset = first line, limit = the line count):")
+        for h in wanted:
+            rng = sections.get(h)
+            if rng:
+                out.append("  - '%s': lines %d-%d" % (h.lstrip("# ").strip(), rng[0], rng[1]))
+            else:
+                out.append("  - '%s'" % h.lstrip("# ").strip())
+    for conv in PHASE_CONVENTIONS.get(phase, []):
+        out.append("  - and %s, whole" % conv)
+    out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41), and continue from where the status file says the work is.")
+    text = "\n".join(out)
+    if len(text) > MAX_OUTPUT:
+        text = text[:MAX_OUTPUT - 60] + "\n[digest truncated; re-read supervisor.md's digest section]"
+    sys.stdout.write(text + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    for _s in (sys.stdout, sys.stderr):      # Claude Code reads the hook's output as UTF-8
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(encoding="utf-8", errors="backslashreplace")
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit(0)                             # a hook that fails must never block a session

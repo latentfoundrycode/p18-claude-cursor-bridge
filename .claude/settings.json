@@ -43,6 +43,7 @@
       "Bash(python ~/.claude/cursor-bridge/roster-check.py:*)",
       "Bash(cat ~/.claude/cursor-bridge/VERSION)",
       "Bash(python ~/.claude/cursor-bridge/bridge-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/conformance-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/bridge-install.py:*)",
       "Bash(python ~/.claude/cursor-bridge/sync-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/inventory-check.py:*)",
@@ -92,6 +93,18 @@
             "type": "command",
             "command": "python \"$HOME/.claude/cursor-bridge/permission-guard.py\"",
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/cursor-bridge/session-start.py\"",
+            "timeout": 20
           }
         ]
       }

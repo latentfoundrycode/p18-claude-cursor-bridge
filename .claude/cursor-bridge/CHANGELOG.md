@@ -11,6 +11,21 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.10.04c
+
+**Release 0b of the restructuring plan: the rules that survive a compaction, the founding rules in the core, the conformance check, and the guides corrected.** Built on a branch and merged through the bridge's own pull-request gate: `main` is now protected (both CI jobs required, administrators included, no force-push).
+
+**What changed**
+- **KP-035: the core survives a compaction.** `supervisor.md` now opens with a **digest** of the core (the founding rules, the loop, the escalation list, the reporting rules, every standing rule in one line; under 9,000 characters, inside the 20,000 a compaction keeps), and the new `session-start.py` hook (SessionStart, matchers `compact` and `resume`) re-injects it after every compaction and resume together with the project's phase and the exact sections of `supervisor.md` to re-read before the next action, with their line ranges. Measured cause: a compaction re-attached exactly 20,000 of the file's 150,000 characters, and the record shows rule-breaking within minutes of several compactions. Tests keep the digest within the window and check that it names every rule. Rule 28 says to read the re-injected sections, never to work from memory of the rules.
+- **The founding rules N1–N9 are stated in the core**, in a section of their own after the digest, each with what enforces it, restated as the restructuring plan decided: N1 (files are the truth, programs one-shot, a background process only under five conditions) and N6 (the verified gate, the owner choosing who merges). The Project Summary's N1, N5 and N6 are aligned; the merge policy no longer says "Team plan".
+- **The project conformance check** (`conformance-check.py`, review R4): compares a project's configuration with the floors the bridge requires (scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where installable, keys in `Workspace/.env` within the builder's reach, the recorded bridge version) and prints `OK`/`MISSING`/`NOTE` per floor. It runs at step 1b of `/calibrate-bridge` and first at every reflection point; every `MISSING` is a calibration item. Run on the three projects today it names the video factory's missing floor, detector, secure-coding rule, lockfile and design documents; the TDP's and reAngle's paid keys in `.env`; reAngle's unchecked command reference. Values are never read.
+- **The setup guide** corrects the worktree statement (a bridge project is opened at its root, which is not a repository, so no worktree is made).
+
+**Running projects must**
+- *(all phases)* Install with `python <release .claude folder>/cursor-bridge/bridge-install.py`, restart the app, run `/calibrate-bridge`: it now runs the conformance check at step 1b, and every `MISSING` floor becomes a calibration item for the next stage. The TDP: move `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` and `AZURE_DI_API_KEY` out of `Workspace/.env` (the user's environment or the product's store) as the next increment, like reAngle's keys under 2026.10.04a.
+
+---
+
 ## 2026.10.04b
 
 **The fixes from the pre-install review of 2026.10.04a** (`Claude-Cursor Bridge Release 2026.10.04a Review.md`, findings F1-F12). Install this release, not 2026.10.04a.

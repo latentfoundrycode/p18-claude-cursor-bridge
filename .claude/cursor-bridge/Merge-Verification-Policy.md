@@ -17,7 +17,7 @@ A branch merges to `main` only when every one of these is true. Any failure mean
 
 1. **Executable floor — CI is green.** The required GitHub status check ran the real
    test suite and passed. This is the one part of the gate no model can talk its way
-   past: tests either run and pass or they don't. On the Team plan this check is
+   past: tests either run and pass or they don't. On a paid plan (GitHub Pro for a personal account, Team for an organization) this check is
    *required* via branch protection, so a red or missing check blocks the merge at the
    repo level, not just by convention.
 
