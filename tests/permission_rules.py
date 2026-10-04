@@ -5,8 +5,13 @@ Rules (code.claude.com/docs/en/permissions, checked 2026-10-04):
 - `:*` at the end of a pattern is the same as a trailing ` *`;
 - a pattern with no `*` matches one exact command;
 - a compound command (`a && b`, `a; b`, `a | b`) is matched part by part;
-- deny rules are evaluated before allow rules, in every permission mode.
-A wrapper changes what is matched: `timeout 5 git push` does not match `Bash(git push *)`.
+- deny rules are evaluated before allow rules, in every permission mode;
+- Claude Code strips the wrappers `timeout`, `time`, `nice`, `nohup` and `stdbuf` and a
+  leading variable assignment before matching deny and ask rules; `cd … &&` and a shell are
+  not stripped, so a command wrapped in them matches no allow rule and falls to the
+  classifier. This helper does not model the stripping; the bridge's instructions never use
+  a wrapper, and the permission-guard hook, not a rule, is what refuses the forbidden
+  actions through any wrapper.
 """
 import re
 

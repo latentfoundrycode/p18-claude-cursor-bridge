@@ -32,10 +32,14 @@ docs/ROSTER.resolved.json for the delegate and Review B commands to read.
   second failure of the same model within 2 hours marks the model's pool exhausted in
   docs/ROSTER.json automatically (auto_exhausted_at / auto_exhausted_reason) and exits 3 =
   "re-resolve and restart the step". A connection error (lost, reset, reconnect, 5xx, 429)
-  is transient, never counted, exits 4 = "retry the same step once"; so does a first
-  other failure. The count lives in the roster (failures.<model> = {count, last}); it
-  expires after 2 hours, and --record-success <model> clears it. An automatic
-  "unavailable" mark expires after 6 hours.
+  or a hit run limit (bridge-run's LIMIT line) is not the model's fault: exit 4 = "retry
+  the same step once", twice per window, then exit 5 = "stop and tell the owner" (no
+  switch helps a dead line). A first other failure is exit 4 too. The counts expire after
+  8 hours, longer than any run limit, and --record-success <model> clears them. An
+  automatic "unavailable" mark expires after 6 hours.
+The changing state (pool, marks, counts) is kept in <git common dir>/bridge/roster-state.json,
+never in the tracked roster, so a reset of the working tree cannot erase a switch; a roster
+from an older release seeds the state file once.
 --mark-exhausted   the owner said "usage exhausted": stamp other_pool exhausted now (UTC).
 --mark-reset       the owner said "usage reset": restore other_pool and clear marks now.
 Automatic reset: "reset_day" (day of month, UTC; e.g. 16) in the roster. When other_pool is
@@ -44,7 +48,8 @@ after exhausted_at, the check restores other_pool to "available" by itself, clea
 unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NOW=<ISO UTC>
 overrides "now" for tests.
 Exit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;
-2 = cannot read; 3 = pool/model marked exhausted, re-resolve; 4 = transient, retry once.
+2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;
+4 = transient, retry once; 5 = repeated connection failures or time-outs, tell the owner.
 ASCII-only on purpose.
 """
 import datetime
@@ -59,8 +64,14 @@ sys.path.insert(0, HERE)
 import bridge_env  # noqa: E402  (the stripped environment and the cursor-agent launcher, KP-032)
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-FAILURE_WINDOW_HOURS = 2      # two failures count as consecutive only within this window
+FAILURE_WINDOW_HOURS = 8      # failures count as consecutive only within this window (longer than any run limit)
 UNAVAILABLE_TTL_HOURS = 6     # an automatic "unavailable" mark expires after this
+CONNECTION_RETRIES = 2        # connection failures / time-outs retried this often per window, then exit 5
+# The roster's changing state never lives in the tracked docs/ROSTER.json: a reset of the
+# working tree would erase it (release 0a review, F1). It lives in the repository's own
+# .git/bridge/roster-state.json, which no reset, clean or checkout touches.
+STATE_KEYS = ("other_pool", "exhausted_at", "exhausted_reason", "auto_exhausted_at", "auto_exhausted_reason",
+              "unavailable", "failures", "connection_failures", "last_reset")
 NL = chr(10)
 PROBE_PROMPT = "Reply with exactly the single word OK and nothing else."
 PROBE_TIMEOUT = 150
@@ -167,6 +178,55 @@ def next_reset_after(exhausted_at, reset_day):
     return candidate
 
 
+def state_path(roster_path):
+    """Where the mutable state lives: <git common dir>/bridge/roster-state.json for a roster
+    inside a git checkout; otherwise run/roster-state.json beside the roster's folder."""
+    roster_dir = os.path.dirname(os.path.abspath(roster_path)) or "."
+    try:
+        g = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=roster_dir, capture_output=True,
+                           text=True, timeout=20, creationflags=NO_WINDOW)
+        if g.returncode == 0 and g.stdout.strip():
+            common = g.stdout.strip()
+            if not os.path.isabs(common):
+                common = os.path.join(roster_dir, common)
+            return os.path.join(os.path.abspath(common), "bridge", "roster-state.json")
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    base = os.path.dirname(roster_dir) if os.path.basename(roster_dir) == "docs" else roster_dir
+    return os.path.join(base, "run", "roster-state.json")
+
+
+def load_roster(path):
+    """The tracked configuration merged with the untracked state. A roster written by an
+    older release carries state keys in the tracked file: they seed the state file once."""
+    with open(path, encoding="utf-8-sig") as f:
+        config = json.load(f)
+    sp = state_path(path)
+    state = None
+    if os.path.isfile(sp):
+        try:
+            with open(sp, encoding="utf-8-sig") as f:
+                state = json.load(f)
+        except Exception:
+            state = None
+    if state is None:
+        state = {k: config[k] for k in STATE_KEYS if k in config}
+        if state:
+            print("note  migrated the roster's state out of %s into %s" % (path, sp))
+        save_state(path, state)
+    roster = {k: v for k, v in config.items() if k not in STATE_KEYS}
+    roster.update(state)
+    return roster
+
+
+def save_state(path, roster):
+    sp = state_path(path)
+    os.makedirs(os.path.dirname(sp), exist_ok=True)
+    state = {k: roster[k] for k in STATE_KEYS if k in roster}
+    with open(sp, "w", encoding="utf-8", newline=NL) as f:
+        json.dump(state, f, indent=2); f.write(NL)
+
+
 def clear_marks(roster, how):
     roster["other_pool"] = "available"
     for k in ("auto_exhausted_at", "auto_exhausted_reason", "exhausted_at", "exhausted_reason", "unavailable", "failures"):
@@ -186,8 +246,7 @@ def maybe_auto_reset(path, roster):
     now = now_utc()
     if now >= due:
         clear_marks(roster, "automatic reset: reset_day %d, exhausted %s, due %s" % (int(reset_day), stamp(ex), stamp(due)))
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump(roster, f, indent=2); f.write("\n")
+        save_state(path, roster)
         print("AUTO-RESET  other_pool restored to 'available' (reset day %d passed at %s; exhausted since %s)" % (int(reset_day), stamp(due), stamp(ex)))
         return True
     print("note  other_pool exhausted since %s; automatic reset due %s (reset_day %d)" % (stamp(ex), stamp(due), int(reset_day)))
@@ -207,6 +266,7 @@ CONNECTION_PATTERNS = [
     r"\benotfound\b", r"network (error|unreachable|is unreachable)", r"reconnect", r"socket hang up",
     r"\b(502|503|504)\b", r"gateway time-?out", r"service unavailable", r"\brate limit",
     r"\b429\b", r"too many requests",
+    r"bridge-run: limit \d+s reached",   # the launcher's limit was hit: the run hung, the model did not fail
 ]
 
 
@@ -245,7 +305,7 @@ def expire_unavailable(roster):
     marks = roster.get("unavailable") or {}
     now = now_utc()
     for mid, note in list(marks.items()):
-        when = parse_stamp(str(note)[:len("2026-01-01T00:00 UTC")])
+        when = parse_stamp(str(note)[:len("2026-01-01T00:00 UTC")])     # automatic marks start with their stamp
         if when is not None and (now - when).total_seconds() > UNAVAILABLE_TTL_HOURS * 3600:
             del marks[mid]
             dropped.append(mid)
@@ -267,7 +327,21 @@ def record_failure(path, roster, model, text):
     when = stamp(now)
     excerpt = (text or "").strip().replace(NL, " ")[:300]
     if kind == "CONNECTION":
-        print("TRANSIENT  %s: connection error (%s), not counted - retry the same step once." % (model, pat))
+        conn = roster.setdefault("connection_failures", {})
+        prev = conn.get(model)
+        count = 1
+        if isinstance(prev, dict):
+            last = parse_stamp(prev.get("last") or "")
+            if last is not None and (now - last).total_seconds() <= FAILURE_WINDOW_HOURS * 3600:
+                count = int(prev.get("count", 0)) + 1
+        conn[model] = {"count": count, "last": when}
+        save_state(path, roster)
+        if count > CONNECTION_RETRIES:
+            print("ESCALATE   %s: connection failure or time-out %d times in %d hours (%s)." % (model, count, FAILURE_WINDOW_HOURS, pat))
+            print("           Not a model problem, so no switch: stop the step, write it on the Awaiting user on: line, and tell the owner.")
+            print("           excerpt: %s" % excerpt)
+            return 5
+        print("TRANSIENT  %s: connection error or time-out (%s), %d of %d - retry the same step once." % (model, pat, count, CONNECTION_RETRIES))
         print("           excerpt: %s" % excerpt)
         return 4
     failures = roster.setdefault("failures", {})
@@ -277,8 +351,7 @@ def record_failure(path, roster, model, text):
         last = parse_stamp(prev.get("last") or "")
         if last is not None and (now - last).total_seconds() <= FAILURE_WINDOW_HOURS * 3600:
             count = int(prev.get("count", 0)) + 1
-    elif isinstance(prev, int) and prev > 0:
-        count = prev + 1                               # a count written by an older release
+    # an integer count was written by an older release with no time stamp: treat it as expired
     failures[model] = {"count": count, "last": when}
     pool = pool_of(model)
     if kind == "USAGE-LIMIT" or count >= 2:
@@ -295,13 +368,13 @@ def record_failure(path, roster, model, text):
             print("UNAVAILABLE  %s (%s pool): %s" % (model, pool, reason))
             print("             marked unavailable in the roster; re-resolve and restart the step.")
         failures.pop(model, None)
+        roster.get("connection_failures", {}).pop(model, None)
         code = 3
     else:
         print("TRANSIENT  %s: first failure in %d hours, not a usage-limit message - retry the same step once." % (model, FAILURE_WINDOW_HOURS))
         print("           excerpt: %s" % excerpt)
         code = 4
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(roster, f, indent=2); f.write("\n")
+    save_state(path, roster)
     return code
 
 
@@ -315,7 +388,7 @@ def main():
     do_probe = "--no-probe" not in argv
     out_path = argv[argv.index("--out") + 1] if "--out" in argv and argv.index("--out") + 1 < len(argv) else os.path.join(os.path.dirname(path) or ".", "ROSTER.resolved.json")
     try:
-        roster = json.load(open(path, encoding="utf-8-sig"))
+        roster = load_roster(path)
     except Exception as e:
         print("CANNOT VERIFY: cannot read %s (%s)" % (path, e))
         return 2
@@ -324,14 +397,12 @@ def main():
         roster["other_pool"] = "exhausted"
         roster["exhausted_at"] = stamp(now_utc())
         roster["exhausted_reason"] = "owner said usage exhausted"
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump(roster, f, indent=2); f.write("\n")
+        save_state(path, roster)
         print("MARKED  other_pool exhausted at %s (owner)" % roster["exhausted_at"])
         return 0
     if "--mark-reset" in argv:
         clear_marks(roster, "owner said usage reset")
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump(roster, f, indent=2); f.write("\n")
+        save_state(path, roster)
         print("RESET   other_pool available (owner)")
         return 0
     if "--record-failure" in argv:
@@ -348,17 +419,16 @@ def main():
     if "--record-success" in argv:
         model = argv[argv.index("--record-success") + 1]
         changed = (roster.get("failures") or {}).pop(model, None) is not None
+        changed = ((roster.get("connection_failures") or {}).pop(model, None) is not None) or changed
         if changed:
-            with open(path, "w", encoding="utf-8", newline=NL) as f:
-                json.dump(roster, f, indent=2); f.write(NL)
+            save_state(path, roster)
         print(("ok    failure count cleared for %s" if changed else "ok    no failure count for %s") % model)
         return 0
 
     maybe_auto_reset(path, roster)
     dropped = expire_unavailable(roster)
     if dropped:
-        with open(path, "w", encoding="utf-8", newline=NL) as f:
-            json.dump(roster, f, indent=2); f.write(NL)
+        save_state(path, roster)
         print("note  unavailable mark expired after %d hours: %s" % (UNAVAILABLE_TTL_HOURS, ", ".join(dropped)))
     other_pool = (roster.get("other_pool") or "available").lower()
     unavailable = roster.get("unavailable") or {}

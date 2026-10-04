@@ -485,12 +485,19 @@ Two options for reaching it:
   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
   nothing; run it on a clean committed checkpoint and confirm `git status` is unchanged
-  afterward, so the review stays read-only in practice. **Then prove it wrote nowhere else:**
-  `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the UTC time the review was launched>`
-  lists every comment and review on the pull request since the launch and flags any written
-  as the owner (the reviewer once posted its verdict on a pull request under the owner's
-  name, twice: KP-032). `GATE-INTEGRITY` means do not merge; record the flag and an issue.
-  `CANNOT VERIFY` is not clean: fix the cause and re-run before the merge.
+  afterward, so the review stays read-only in practice. **Then check it wrote nowhere else:**
+  `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the launch time>`, where
+  the launch time is the launcher's first stderr line (`bridge-run: started <time>Z`, the
+  first line of the `.err` file; a time without a zone is refused). It lists every comment
+  and review on the pull request since the launch and flags any written as the owner (the
+  reviewer once posted its verdict on a pull request under the owner's name, twice:
+  KP-032), and it flags what the owner's account did elsewhere in the repository meanwhile
+  that an agent would cause: a comment or review on another pull request, a merge, a push
+  to `main`. `GATE-INTEGRITY` means do not merge; record the flag and an issue (a merge of
+  *another* pull request by the supervisor itself while the review ran is legitimate and is
+  simply recorded). `CANNOT VERIFY` is not clean: fix the cause and re-run before the
+  merge. The check sees the likely cases, not every edit; the identity withheld from the
+  agents is what stops the rest.
 
   **Two launch failures that have actually happened — prevent both, don't just catch them:**
 

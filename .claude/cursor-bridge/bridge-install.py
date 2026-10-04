@@ -10,11 +10,13 @@ tree of the release). The program:
      overwriting the bridge's files and leaving every other file alone;
   2. MERGES the bridge-owned settings (cursor-bridge/settings.bridge.json) into the target's
      settings.json: every allow and deny entry and every hook the bridge needs is added if
-     missing, and every key the owner or Claude Code wrote there is kept untouched (KP-030).
-     The previous settings.json is saved beside it as settings.json.bak-<date> first;
+     missing, entries the bridge has RETIRED (its "retired" list) are removed, and every
+     key the owner or Claude Code wrote there is kept untouched (KP-030). The previous
+     settings.json is saved beside it as settings.json.bak-<date>-<time> first;
   3. installs the cursor-agent shim (cursor-bridge/cursor-agent.shim) at
      %LOCALAPPDATA%/cursor-agent/cursor-agent, the file Claude Code's Bash tool runs for
-     `cursor-agent` on Windows (KP-032), when that folder exists;
+     `cursor-agent` on Windows (KP-032), when that folder exists, keeping a different
+     previous file as cursor-agent.bak-<date>-<time>;
   4. runs bridge-check.py on the result and prints its verdict.
 
 Exit 0 = installed and verified; 1 = verification failed; 2 = could not install.
@@ -52,9 +54,14 @@ def merge_settings(target_settings, bridge_settings):
     merged = json.loads(json.dumps(target_settings))  # deep copy
     changes = []
     perms = merged.setdefault("permissions", {})
+    retired = set(bridge_settings.get("retired") or [])
     for key in ("allow", "deny"):
         want = (bridge_settings.get("permissions") or {}).get(key) or []
         have = perms.setdefault(key, [])
+        for entry in list(have):
+            if entry in retired and entry not in want:
+                have.remove(entry)
+                changes.append("permissions.%s -= %s (retired)" % (key, entry))
         for entry in want:
             if entry not in have:
                 have.append(entry)
@@ -102,6 +109,9 @@ def install_shim(dry):
     dst = os.path.join(folder, "cursor-agent")
     data = open(src, "rb").read().replace(b"\r\n", b"\n")
     if not dry:
+        if os.path.isfile(dst) and open(dst, "rb").read().replace(b"\r\n", b"\n") != data:
+            bak = dst + ".bak-" + datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
+            shutil.copyfile(dst, bak)
         with open(dst, "wb") as f:
             f.write(data)
         try:
@@ -149,7 +159,7 @@ def main():
     merged, changes = merge_settings(existing, bridge_settings)
     if changes and not dry:
         if os.path.isfile(settings_path):
-            bak = settings_path + ".bak-" + datetime.date.today().isoformat()
+            bak = settings_path + ".bak-" + datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
             shutil.copyfile(settings_path, bak)
             print("  settings.json  backup at %s" % bak)
         os.makedirs(target, exist_ok=True)

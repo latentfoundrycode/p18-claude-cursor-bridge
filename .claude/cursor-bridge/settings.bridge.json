@@ -1,9 +1,10 @@
 {
-  "_comment": "The bridge-owned part of ~/.claude/settings.json. bridge-install.py merges these entries into the owner's file and keeps everything else there; bridge-check.py verifies that every entry below is present. Rules follow Claude Code's documented matching: a * matches any text anywhere in the rule; deny is evaluated before allow in every permission mode.",
+  "_comment": "The bridge-owned part of ~/.claude/settings.json. bridge-install.py merges these entries into the owner's file, removes the entries listed under 'retired' (which earlier releases added), and keeps everything else there; bridge-check.py verifies that every entry below is present. Rules follow Claude Code's documented matching: a * matches any text anywhere in the rule; deny is evaluated before allow in every permission mode; a Bash rule covers the Bash tool only, so the deny rules are mirrored for the PowerShell tool. The PreToolUse hook permission-guard.py reads every Bash and PowerShell command and refuses the override merge and every form of force-push.",
   "permissions": {
     "allow": [
       "Bash(cursor-agent:*)",
-      "Bash(python ~/.claude/cursor-bridge/bridge-run.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/bridge-run.py --limit * -- cursor-agent *)",
+      "Bash(python ~/.claude/cursor-bridge/bridge-run.py --limit * -- gh pr checks *)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git grep:*)",
@@ -56,9 +57,22 @@
       "Bash(*pr merge*--admin*)",
       "Bash(*push*--force*)",
       "Bash(*push* -f *)",
-      "Bash(*push* -f)"
+      "Bash(*push* -f)",
+      "PowerShell(*pr merge*--admin*)",
+      "PowerShell(*push*--force*)",
+      "PowerShell(*push* -f *)",
+      "PowerShell(*push* -f)",
+      "PowerShell(*cursor-agent*)",
+      "PowerShell(*bridge-run*)"
     ]
   },
+  "retired": [
+    "Bash(git worktree add ../Worktrees/:*)",
+    "Bash(git worktree remove ../Worktrees/:*)",
+    "Bash(npx --yes impeccable:*)",
+    "Bash(npx --yes jscpd:*)",
+    "Bash(python ~/.claude/cursor-bridge/bridge-run.py:*)"
+  ],
   "hooks": {
     "Stop": [
       {
@@ -67,6 +81,18 @@
             "type": "command",
             "command": "python \"$HOME/.claude/cursor-bridge/loop-guard.py\"",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/cursor-bridge/permission-guard.py\"",
+            "timeout": 15
           }
         ]
       }

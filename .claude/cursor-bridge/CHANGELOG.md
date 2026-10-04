@@ -11,6 +11,27 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.10.04b
+
+**The fixes from the pre-install review of 2026.10.04a** (`Claude-Cursor Bridge Release 2026.10.04a Review.md`, findings F1-F12). Install this release, not 2026.10.04a.
+
+**What changed**
+- **F1: the model switch can no longer undo itself, and a dead line no longer loops forever.** The roster's changing state (the pool's exhaustion, the marks, the failure counts) moved out of the tracked `docs/ROSTER.json` into the repository's own `.git/bridge/roster-state.json`, which no reset, clean or checkout touches; a roster from an older release seeds it once. The failure window is eight hours, longer than any run limit. A connection failure or a hit run limit is retried twice, then exit 5: stop and tell the owner, because no model switch fixes a network. A legacy integer count is treated as expired (F9). A test runs record → reset → re-resolve in a git repository.
+- **F2: the supervisor's own merge step now matches the merge policy.** Review B is launched through the launcher with `--trust --mode ask`, the launch time is read from the launcher's first stderr line, and `pr-activity-check.py` printing `OK` is part of condition 3. The parallel delegation step no longer says "starting with `cursor-agent`". A test checks every `cursor-agent` invocation in the instructions: all go through the launcher, every read-only review carries `--trust --mode ask` and never `-f`.
+- **F3, F7: the guardrails hold in both shells and every form.** New `permission-guard.py`, a PreToolUse hook for the Bash and PowerShell tools that parses each command and refuses `gh pr merge --admin`, the REST merge, and every force-push form (`--force`, `--force-with-lease`, `-f`, `-fu`, `--mirror`, a `+` refspec), through chains, wrappers and `git -C`, in every permission mode; 73 tests. The deny rules are mirrored for the PowerShell tool, which also refuses `cursor-agent` and `bridge-run` from PowerShell (where `~` is not expanded and the shim does not apply). The instructions say to run the bridge's commands with the Bash tool only, and the text no longer calls the rules a boundary.
+- **F4: the tests touch nothing outside their temporary folders.** `LOCALAPPDATA` points at a temporary folder in every test run; the shim and the `gh-empty` folder are created there. The install program keeps a previous, different shim as `cursor-agent.bak-<date>-<time>`, and names the settings backup with the time too.
+- **F5: honest claims and a closed window.** `pr-activity-check.py` refuses a `--since` without a time zone, and also flags what the owner's account did elsewhere in the repository since the launch that an agent would cause (a comment or review on another pull request, a merge, a push to `main`); the supervisor's own task-branch pushes are not flagged. The texts in KP-032, the merge policy and the setup guide say what the mechanism is (identity withheld, so an accidental post or push fails) and is not (a sandbox).
+- **F6: the launcher accepts only the loop's commands**, `cursor-agent` and `gh pr checks`, and refuses anything else (exit 125); its allow rules name those two forms.
+- **F8: rule 8's reason corrected** to Claude Code's documented behaviour: `timeout`, `time`, `nice`, `nohup` and `stdbuf` are stripped before matching, `cd` and a shell are not; deny and ask rules see through chains and wrappers.
+- **F10: the launcher puts itself into the job before starting the command**, so every child is born inside it; at a normal end the job's closing kills any orphan the command left (proven on a dev-server-like child). Signatures declared for the Windows calls (the pseudo-handle was truncated before).
+- **F11: tests added** for the activity check (with canned `gh` answers), the shim's recipe against the Python one, the stripped environment reaching the child, a program printing a character the console lacks, and the consistency of the instructions; CI actions pinned by commit and `pytest` by version.
+- **F12: retired entries are removed at install** (`settings.bridge.json` lists them: the old worktree, jscpd and impeccable patterns and the first launcher rule); the setup guide names the release's `.claude` folder correctly; the usage-limit text in step 3b matches the classifier; a project's own commands go to the classifier and are not called defects.
+
+**Running projects must**
+- *(all phases)* Install with `python <release .claude folder>/cursor-bridge/bridge-install.py`, restart the app, run `/calibrate-bridge`; the items of 2026.10.04a apply unchanged. At the first `roster-check.py` run the roster's state moves to `.git/bridge/roster-state.json` (a `note  migrated` line); nothing to do.
+
+---
+
 ## 2026.10.04a
 
 **Release 0a of the restructuring plan: the safety fixes the plan review of 2026-10-04 ranked above everything else, shipped ahead of the TDP.** Every program change carries tests under `Workspace/tests/`, run by the bridge's own CI from this release on.
@@ -29,7 +50,7 @@ arrives. An item marked *(all phases)* applies immediately.
 
 **Running projects must**
 - *(all phases)* Install this release with `python <release>/cursor-bridge/bridge-install.py` (never by copying files; it merges `settings.json`), restart the app, run `/calibrate-bridge`. From then on every delegation and Review B goes through `bridge-run.py` as the instructions now show, Review B with `--trust --mode ask`, and `pr-activity-check.py` runs before every merge.
-- *(building, changing)* On the next checkpoint, run `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` once: a roster whose `failures` carry the old integer counts is read correctly, and an `unavailable` mark older than six hours expires. Keys of paid providers (Modal, Hugging Face, OpenRouter) must not sit in `Workspace/.env` where the builder reads them: move them to the user's environment or the product's encrypted store, as the next increment of the part that uses them, and record where in the inventory.
+- *(building, changing)* On the next checkpoint, run `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` once (superseded by 2026.10.04b: the state migrates to `.git/bridge/`). Keys of paid providers (Modal, Hugging Face, OpenRouter) must not sit in `Workspace/.env` where the builder reads them: move them to the user's environment or the product's encrypted store, as the next increment of the part that uses them, and record where in the inventory.
 - *(configure, building)* The video factory: add the security floor to its gate (Semgrep with the Pro engine, OSV-Scanner, Socket), pin its CI actions by commit, and move the gate to Linux runners, as the next increment. The TDP: run Semgrep's Pro engine and the bundled bridge rules in its gate, as the next increment.
 
 ---

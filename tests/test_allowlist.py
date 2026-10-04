@@ -51,6 +51,7 @@ KNOWN_PROSE = (
     "git reset --hard HEAD",            # covered: 'git reset --hard:*'
     "git add -A && git commit",         # rule 8's example of what never to do
     "gh pr merge --admin",              # named as the thing the deny rules forbid
+    "python ~/.claude/" + chr(0x2026),  # the permissions paragraph's "every python ~/.claude/... command"
 )
 
 
@@ -96,3 +97,27 @@ def test_documented_matching_examples():
     assert rule_matches("Bash(npm run build)", "npm run build")
     assert not rule_matches("Bash(npm run build)", "npm run build --watch")
     assert not rule_matches("Bash(git push *)", "git -C . push")
+
+
+def collect_agent_invocations():
+    found = []
+    for path in DOCS:
+        text = open(path, encoding="utf-8").read()
+        for m in re.finditer(r"```(?:bash|sh)\n(.*?)```", text, re.S):
+            for line in m.group(1).splitlines():
+                if "cursor-agent -p" in line:
+                    found.append((os.path.basename(path), line.strip()))
+        for m in re.finditer(r"`([^`\n]*cursor-agent -p[^`\n]*)`", text):
+            found.append((os.path.basename(path), m.group(1).strip()))
+    return found
+
+
+@pytest.mark.parametrize("src,cmd", collect_agent_invocations())
+def test_every_agent_run_goes_through_the_launcher_and_reviews_are_read_only(src, cmd):
+    """Release 0a review, F2: the launcher gives the limit and withholds the identity, and a
+    reviewer runs in the CLI's read-only mode, never force-allowing commands."""
+    assert cmd.startswith("python ~/.claude/cursor-bridge/bridge-run.py --limit "), "%s: not through the launcher: %r" % (src, cmd)
+    if "--mode ask" in cmd:
+        assert " -f " not in cmd and "--force" not in cmd, "%s: a read-only review with a force flag: %r" % (src, cmd)
+    if "--limit 1800" in cmd:
+        assert "--mode ask" in cmd and "--trust" in cmd, "%s: a review without the read-only mode: %r" % (src, cmd)

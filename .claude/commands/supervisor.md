@@ -87,10 +87,18 @@ the boundary below depends on it.
 **Permissions.** Sessions run in Claude Code's *auto* permission mode: a classifier
 approves routine commands, nothing prompts the owner, and the allowlist in the owner's
 settings (installed from the bridge's `settings.bridge.json`) spares the classifier the
-bridge's own commands. The hard guardrails are the **deny rules**, which hold in every
-mode: no `gh pr merge --admin` (the override of a repository's rules) and no force-push.
-Never ask the owner to add a permission; a command the rules do not cover is a bridge
-defect to report, not a question for the owner.
+bridge's own commands. **Run the bridge's commands with the Bash tool only**, exactly as
+written here: in the PowerShell tool `~` is not expanded for programs, so every
+`python ~/.claude/…` command fails there, and a bare `cursor-agent` from PowerShell runs
+with the owner's full identity and no limit. The guardrails against the two actions the
+loop must never take — merging past a repository's rules (`gh pr merge --admin`) and
+force-pushing — are three layers: the bridge's `permission-guard` hook, which reads every
+Bash and PowerShell command in every permission mode and refuses those; deny rules for
+the usual spellings; and the repository's own branch rules on GitHub, which refuse what
+the first two cannot see. They stop the loop from doing these things; they are not a
+sandbox around the agents (KP-032). Never ask the owner to add a permission: a bridge
+command the rules do not cover is a bridge defect to report; a project's own command (a
+benchmark script, a teardown) simply goes to the classifier.
 
 **Branches and worktrees.** Sequential work — one increment built, reviewed, merged, then
 the next — is plain branches in the single checkout: `git switch -C <branch> <base>` →
@@ -735,7 +743,7 @@ Rules for this call, all of which matter:
 
 1. **Prepare each branch in your own checkout**, after `sync-check.py --apply`: `git switch -c task-<nnn> origin/main`, write and commit the brief (spec-packager's parallel variant: the builder commits its own work at the end and knows its checkout has no project environment), note the branch's starting commit (`git rev-parse HEAD`) on the status file's `In flight:` line, and switch back.
 2. **Create each worktree from your checkout**: `git worktree add ../Worktrees/TASK-<nnn> task-<nnn>`.
-3. **Delegate each in the background**, pointing the builder at its checkout with `--workspace` and keeping the command starting with `cursor-agent`:
+3. **Delegate each in the background**, pointing the builder at its checkout with `--workspace` and otherwise exactly as in step 3 (the launcher first, then `cursor-agent`):
 
 ```bash
 python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
@@ -769,18 +777,23 @@ The argument after `--record-failure` is the **model id** of the failed call, co
 that is not a model of the roster (exit 2) and changes nothing (KP-034).
 
 - **Exit 4 — transient.** A connection error (lost, reset, reconnecting, a 5xx, a rate
-  limit), which is never counted, or a first other failure. Retry the same step once,
-  unchanged. A second other failure within two hours is exit 3.
-- **Exit 3 — exhausted or unavailable.** A usage-limit message (usage / quota / limit
-  reached / upgrade your plan / payment required), or a second failure of the same model
-  within two hours. The script has already marked the pool exhausted (or the model
-  unavailable, for six hours) in `docs/ROSTER.json`. Now, **in this order**:
+  limit) or a hit limit, each retried at most twice in eight hours, or a first other
+  failure. Retry the same step once, unchanged. A second other failure within eight hours
+  is exit 3; a third connection failure is exit 5.
+- **Exit 5 — a dead line, not a dead model.** A third connection failure or hit limit of
+  the same model within eight hours. No switch helps; stop the step, write it on the
+  `Awaiting user on:` line and tell the owner what failed and how often.
+- **Exit 3 — exhausted or unavailable.** A usage-limit message (a usage, quota, plan or
+  spending limit reached or exceeded; insufficient credits; upgrade your plan; payment
+  required), or a second other failure of the same model within eight hours. The script
+  has already marked the pool exhausted (or the model unavailable, for six hours) in the
+  roster's state file (`.git/bridge/roster-state.json`, which no reset touches). Now, **in
+  this order**:
   1. **Restart point first.** A delegation: the working tree goes back to the
      pre-delegation checkpoint (`git reset --hard <checkpoint sha>` then `git clean -fd`
-     inside the workspace — the checkpoint exists exactly for this). This comes *before*
-     the re-resolve because `docs/ROSTER.json` and `docs/ROSTER.resolved.json` are tracked
-     files: a reset after the re-resolve would revert them and silently put the exhausted
-     model back (KP-034).
+     inside the workspace — the checkpoint exists exactly for this). The reset cannot
+     erase the switch: the roster's state lives under `.git/bridge/`, and the re-resolve
+     that follows rewrites `docs/ROSTER.resolved.json` after the reset (KP-034).
   2. **Re-resolve:** `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` —
      the next profile that answers is written to `docs/ROSTER.resolved.json`. `FAIL` here
      (no profile answers at all) is the one case that stops the loop: report it as the
@@ -1054,13 +1067,16 @@ instead. In short, a branch merges to `main` only when **all** hold:
    taken from the working tree silently omits every untracked new file (KP-017);
    (b) **the file lives inside `Workspace/`** at `run/review/`, committed on the increment's
    branch and removed with `git rm` before the merge — never in a temp folder outside the
-   project, which the Workspace boundary rightly blocks (KP-016); (c) **the branch's assumption lists travel with it** — write `run/review/ASSUMPTIONS-<nnn>.md` from the `Assumptions:` sections of the branch's commit messages (`git log <merge-base>..HEAD --format=%B`), commit it beside the diff, remove it with the diff before the merge, and name both files in the prompt: the list as extra places to look, never as the review's scope. Launch it with the trust-bypass flag (`-f`) so the workspace-trust
-   prompt cannot stall it, and give a **directive** prompt ("the diff is already at `<path>`; read it;
-   do not ask for it"). A reply that does not name something specific from the diff — or
-   that asks for the diff, or errors on trust — is a failed launch, not a verdict: re-run.
-   Confirm receipt before trusting the verdict, and `git status` clean afterward. Launch
-   it with `--model <review_b from docs/ROSTER.resolved.json>` and `2> run/review/REVIEW-<nnn>.err`
-   so a failure can be classified (below);
+   project, which the Workspace boundary rightly blocks (KP-016); (c) **the branch's assumption lists travel with it** — write `run/review/ASSUMPTIONS-<nnn>.md` from the `Assumptions:` sections of the branch's commit messages (`git log <merge-base>..HEAD --format=%B`), commit it beside the diff, remove it with the diff before the merge, and name both files in the prompt: the list as extra places to look, never as the review's scope. Launch it exactly as the policy shows, through the launcher and read-only:
+   `python ~/.claude/cursor-bridge/bridge-run.py --limit 1800 -- cursor-agent -p --trust --mode ask --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<nnn>.err`
+   (`--trust` clears the workspace-trust prompt and nothing else; `--mode ask` is the CLI's
+   read-only mode; never `-f` for a reviewer). **Note the launch time in UTC** — the
+   launcher prints `bridge-run: started <time>Z` as its first stderr line, so it is the
+   first line of the `.err` file. Give a **directive** prompt ("the diff is already at
+   `<path>`; read it; do not ask for it"). A reply that does not name something specific
+   from the diff — or that asks for the diff, or errors on trust — is a failed launch, not
+   a verdict: re-run. Confirm receipt before trusting the verdict, `git status` clean
+   afterward, and then **`python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <that launch time>` printing `OK`**: it lists what was written to the pull request since the launch and flags anything written as the owner (KP-032). `GATE-INTEGRITY` opens a gate-integrity flag (condition 4) and an issue; `CANNOT VERIFY` is not `OK`;
 4. no gate-integrity flag is open — the diff does not weaken tests, assertions, or CI, and
    the builder's model family differs from both reviewers'.
 
@@ -1604,11 +1620,14 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
    there, or you reverted a run, or a test is passing for the wrong reason, say so.
    You are a quality signal in this loop, alongside the merge gate.
 8. Never chain shell commands with `&&`, `|`, or `;`, and never wrap one in `cd …`,
-   `timeout`, `env` or a shell. Run each as its own call, as written in these instructions.
-   Each part of a compound command is matched against the rules on its own, and a wrapper
-   is not stripped, so a wrapped or chained command matches no rule, falls to the
-   classifier, and a deny rule may not see what it wraps. The one launcher the bridge
-   allows is its own `bridge-run.py`, which the rules name.
+   `env`, a variable assignment or a shell. Run each as its own call, as written in these
+   instructions. An allow rule must match every part of a compound command, so a chained
+   command usually falls to the classifier instead of running at once; `cd` and a shell are
+   not stripped before matching (Claude Code strips only `timeout`, `time`, `nice`,
+   `nohup` and `stdbuf`), so a command wrapped in them matches nothing. Deny rules do see
+   through chains and wrappers, so chaining buys nothing and costs a classifier round. The
+   one launcher the bridge allows is its own `bridge-run.py`, which the rules name and
+   which accepts only the commands the loop runs through it.
 9. Never merge to `main` unless the full gate holds: CI green, both the Claude reviewer
    and the cross-family verifier APPROVE, and no gate-integrity flag. See
    `~/.claude/cursor-bridge/Merge-Verification-Policy.md`.
