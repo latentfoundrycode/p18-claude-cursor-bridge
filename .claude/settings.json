@@ -43,6 +43,7 @@
       "Bash(python ~/.claude/cursor-bridge/roster-check.py:*)",
       "Bash(cat ~/.claude/cursor-bridge/VERSION)",
       "Bash(python ~/.claude/cursor-bridge/bridge-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/conformance-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/bridge-install.py:*)",
       "Bash(python ~/.claude/cursor-bridge/sync-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/inventory-check.py:*)",
@@ -50,6 +51,7 @@
       "Bash(python ~/.claude/cursor-bridge/plan-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/diagram-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/pr-activity-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/review-guard.py:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
     ],
     "deny": [
@@ -92,6 +94,23 @@
             "type": "command",
             "command": "python \"$HOME/.claude/cursor-bridge/permission-guard.py\"",
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|resume|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/cursor-bridge/session-start.py\" --part pointers",
+            "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/cursor-bridge/session-start.py\" --part digest",
+            "timeout": 20
           }
         ]
       }

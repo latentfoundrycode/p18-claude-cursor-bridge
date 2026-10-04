@@ -1,5 +1,5 @@
 {
-  "_comment": "The bridge-owned part of ~/.claude/settings.json. bridge-install.py merges these entries into the owner's file, removes the entries listed under 'retired' (which earlier releases added), and keeps everything else there; bridge-check.py verifies that every entry below is present. Rules follow Claude Code's documented matching: a * matches any text anywhere in the rule; deny is evaluated before allow in every permission mode; a Bash rule covers the Bash tool only, so the deny rules are mirrored for the PowerShell tool. The PreToolUse hook permission-guard.py reads every Bash and PowerShell command and refuses the override merge and every form of force-push.",
+  "_comment": "The bridge-owned part of ~/.claude/settings.json. bridge-install.py merges these entries into the owner's file, removes the entries listed under 'retired' (which earlier releases added), and keeps everything else there; bridge-check.py verifies that every entry below is present. Rules follow Claude Code's documented matching: a * matches any text anywhere in the rule; deny is evaluated before allow in every permission mode; a Bash rule covers the Bash tool only, so the deny rules are mirrored for the PowerShell tool. The PreToolUse hook permission-guard.py reads every Bash and PowerShell command and refuses the override merge and every form of force-push. The SessionStart hook session-start.py re-injects the supervisor's core digest and the phase's sections after a compaction or a resume (KP-035).",
   "permissions": {
     "allow": [
       "Bash(cursor-agent:*)",
@@ -44,6 +44,7 @@
       "Bash(python ~/.claude/cursor-bridge/roster-check.py:*)",
       "Bash(cat ~/.claude/cursor-bridge/VERSION)",
       "Bash(python ~/.claude/cursor-bridge/bridge-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/conformance-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/bridge-install.py:*)",
       "Bash(python ~/.claude/cursor-bridge/sync-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/inventory-check.py:*)",
@@ -51,6 +52,7 @@
       "Bash(python ~/.claude/cursor-bridge/plan-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/diagram-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/pr-activity-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/review-guard.py:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
     ],
     "deny": [
@@ -93,6 +95,23 @@
             "type": "command",
             "command": "python \"$HOME/.claude/cursor-bridge/permission-guard.py\"",
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|resume|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/cursor-bridge/session-start.py\" --part pointers",
+            "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/cursor-bridge/session-start.py\" --part digest",
+            "timeout": 20
           }
         ]
       }

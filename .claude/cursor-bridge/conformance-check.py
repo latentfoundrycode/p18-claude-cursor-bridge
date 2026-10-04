@@ -1,0 +1,410 @@
+#!/usr/bin/env python3
+"""conformance-check: does this project's configuration carry the floors the bridge requires?
+
+  python ~/.claude/cursor-bridge/conformance-check.py [<project root or Workspace>] [--screens] [--installable] [--offline] [--quiet]
+
+Why (plan review R4): the bridge added floors over time (the security scanners in the gate,
+SHA-pinned actions, the workspace boundary, the records), and nothing compared a project
+configured before a floor existed with what the bridge now requires; the video factory ran
+its gate with no scanner and actions pinned by tag while the Project Summary said the floor
+applied everywhere. This check reads the project's files and reports, per floor, OK, MISSING
+or NOTE. It runs at every calibration and every reflection point; each MISSING is a
+calibration item, applied as configuration work in the next stage. It never changes anything.
+
+What it checks, with the file it reads (the 0b review corrected several of these):
+  - the gate workflows (.github/workflows/*.yml), step by step: a step runs Semgrep,
+    OSV-Scanner and Socket; a scanner step guarded by `if:` is MISSING (it is skipped
+    silently when its condition is false); Semgrep runs the bridge rules or the Pro engine
+    (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner
+    without a pinned version is a NOTE (rule 14); every `uses:` is pinned by a 40-character
+    commit; the runner is Linux (a note otherwise);
+  - on GitHub, read-only through `gh` unless --offline: the default branch has a required
+    status check (N6), and the repository's visibility (a public repository is a NOTE);
+  - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
+    .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen
+    secure-coding rule (.cursor/rules/secure-coding.mdc);
+  - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for
+    a root requirements.txt (direct pins alone are not a lock; KP-018);
+  - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,
+    ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and
+    docs/diagrams/INDEX.md (missing = a diagram retrofit item);
+  - with --screens (or a docs/mockups folder): the design detector in the gate;
+  - with --installable (or docs/cli-reference.json present): the CLI reference and a check
+    of it, in CI or in the test suite;
+  - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the
+    examples) and <folder>/.env that look like account keys or tokens are MISSING; local
+    service passwords the tests need (POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD, ...) are a
+    NOTE; values are never read or printed (KP-032);
+  - the private memory notes Claude Code keeps for this project (names only; calibration
+    step 2b reviews them, rule 41);
+  - the recorded bridge version against the installed one (calibration due).
+Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
+ASCII-only on purpose (cp1252 consoles). Never writes.
+"""
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+SECRET_NAME = re.compile(r"(TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|API_?KEY)", re.I)
+LOCAL_SERVICE = re.compile(r"^(POSTGRES|PG|MYSQL|MARIADB|MONGO|REDIS|MINIO|RABBITMQ|CLICKHOUSE|ELASTIC|OPENSEARCH|NEO4J|DB|DATABASE|LOCAL|DEV|TEST)[A-Z0-9_]*(PASSWORD|PASSWD|PASS|SECRET)$", re.I)
+SCANNERS = (("Semgrep", r"\bsemgrep\b"), ("OSV-Scanner", r"osv-scanner"), ("Socket", r"\bsocket\b"))
+GH_TIMEOUT = 25
+
+
+def read(path):
+    try:
+        with open(path, encoding="utf-8-sig", errors="replace") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def resolve_workspace(path):
+    """The Workspace folder for a path that may be the project root (where sessions start)
+    or the Workspace itself."""
+    p = os.path.abspath(path)
+    for cand in (p, os.path.join(p, "Workspace")):
+        if os.path.isdir(os.path.join(cand, "docs")) or os.path.isdir(os.path.join(cand, ".git")):
+            return cand
+    return None
+
+
+def workflow_steps(text):
+    """Each step of a workflow as (step text, guarded by if:), by indentation under `steps:`."""
+    steps, cur, indent, in_steps = [], [], None, False
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if re.match(r"^steps:\s*$", stripped):
+            in_steps, indent, cur = True, None, []
+            continue
+        if not in_steps:
+            continue
+        if stripped and not line.startswith(" ") and not line.startswith("\t"):
+            in_steps = False                     # back at the top level (another job key or job)
+            if cur:
+                steps.append(cur)
+            cur = []
+            continue
+        if stripped.startswith("- "):
+            this_indent = len(line) - len(stripped)
+            if indent is None:
+                indent = this_indent
+            if this_indent == indent:
+                if cur:
+                    steps.append(cur)
+                cur = [stripped[2:]]
+                continue
+            if this_indent < indent:
+                in_steps = False
+                if cur:
+                    steps.append(cur)
+                cur = []
+                continue
+        if cur is not None and (indent is None or (len(line) - len(stripped)) > indent or not stripped):
+            cur.append(stripped)
+    if cur:
+        steps.append(cur)
+    out = []
+    for s in steps:
+        body = "\n".join(s)
+        guarded = any(re.match(r"^if:\s*\S", l) for l in s)
+        # what the step executes: its run:/uses: lines and the continuation lines of a block scalar
+        commands = "\n".join(l for l in s if re.match(r"^(run|uses):", l) or not re.match(r"^[A-Za-z_-]+:", l))
+        out.append((body, guarded, commands))
+    return out
+
+
+def gh(args, cwd):
+    try:
+        p = subprocess.run(["gh"] + args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=GH_TIMEOUT, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, str(e)[:120]
+    if p.returncode != 0:
+        return None, (p.stderr.strip() or p.stdout.strip())[:160]
+    return p.stdout, None
+
+
+def git_ignored(ws, rel):
+    try:
+        p = subprocess.run(["git", "-c", "core.fsmonitor=false", "check-ignore", "-q", rel], cwd=ws, capture_output=True, timeout=GH_TIMEOUT, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return p.returncode == 0
+
+
+def project_words(ws):
+    """Words of the project's own name (the folder above Workspace), to tell the product's
+    own tokens (REANGLE_API_TOKEN) from account keys."""
+    return set(w for w in re.findall(r"[a-z]{4,}", os.path.basename(os.path.dirname(ws)).lower()) if w not in ("prototype", "project", "workspace"))
+
+
+def memory_dirs(ws):
+    """Claude Code's memory folders for the project root and the Workspace (names only)."""
+    home = os.path.expanduser("~")
+    out = []
+    for folder in (os.path.dirname(ws), ws):
+        encoded = re.sub(r"[:\\/]", "-", folder)
+        d = os.path.join(home, ".claude", "projects", encoded, "memory")
+        if os.path.isdir(d):
+            notes = sorted(n for n in os.listdir(d) if n.endswith(".md") and n != "MEMORY.md")
+            out.append((d, notes))
+    return out
+
+
+def main():
+    argv = sys.argv[1:]
+    quiet = "--quiet" in argv
+    screens = "--screens" in argv
+    installable = "--installable" in argv
+    offline = "--offline" in argv
+    positional = [a for a in argv if not a.startswith("--")]
+    ws = resolve_workspace(positional[0] if positional else os.getcwd())
+    if ws is None:
+        print("conformance-check: %s is not a project workspace or root (no docs/ and no .git/ here or in Workspace/)" % os.path.abspath(positional[0] if positional else os.getcwd()))
+        return 2
+    results = []                                   # (verdict, floor, detail)
+
+    def add(verdict, floor, detail=""):
+        results.append((verdict, floor, detail))
+
+    # --- the gate workflows, step by step
+    workflows = sorted(glob.glob(os.path.join(ws, ".github", "workflows", "*.yml")) + glob.glob(os.path.join(ws, ".github", "workflows", "*.yaml")))
+    wf_text = "\n".join(read(p) or "" for p in workflows)
+    steps = []
+    for p in workflows:
+        steps.extend(workflow_steps(read(p) or ""))
+    if not workflows:
+        add("MISSING", "CI gate", "no workflow under .github/workflows/; the merge gate needs a required check")
+    else:
+        for name, pattern in SCANNERS:
+            hits = [(cmds, guarded) for body, guarded, cmds in steps if re.search(pattern, cmds, re.I)]
+            if not hits:
+                add("MISSING", "%s in the gate" % name, "the security floor (N8) rides the required CI check")
+                continue
+            if all(g for _, g in hits):
+                add("MISSING", "%s in the gate" % name, "the step is guarded by `if:` and skipped silently when its condition is false; make it unconditional (the token is a repository secret)")
+                continue
+            add("OK", "%s in the gate" % name)
+            # the version may sit in the step that installs the scanner rather than the one that runs it
+            scanner_lines = [l for l in wf_text.splitlines() if re.search(pattern, l, re.I)]
+            if not any(re.search(r"(==\s*\d|@v?\d|@[0-9a-f]{40}|version:\s*['\"]?\d|/v?\d+\.\d+(\.\d+)?/)", l) for l in scanner_lines):
+                add("NOTE", "%s version pinned" % name, "no version where the step installs or runs it; pin it (rule 14: never auto-adopt a tool update)")
+            if any(re.search(r"\bif\s+\[\[?\s*-[nz]\s+\"?\$\{?[A-Z0-9_]*(TOKEN|KEY|SECRET)", body) for body, _ in hits):
+                add("NOTE", "%s step guards itself" % name, "its script skips the scan when the token variable is empty; true only while the repository secret exists")
+        sem = [cmds for body, _, cmds in steps if re.search(r"\bsemgrep\b", cmds, re.I)]
+        if sem:
+            if any(re.search(r"semgrep(==\S+)?\s+ci\b", b) or "bridge-rules" in b or re.search(r"--config\s+\.semgrep", b) for b in sem):
+                add("OK", "Semgrep bridge rules or Pro engine")
+            else:
+                add("MISSING", "Semgrep bridge rules or Pro engine", "Semgrep runs public rulesets only; the floor is `.semgrep/bridge-rules.yml` or `semgrep ci` (Cursor-Project-Configuration.md 5c, KP-001)")
+        unpinned = sorted(set(m.group(1) for m in re.finditer(r"uses:\s*([^\s#]+@[^\s#]+)", wf_text) if not re.search(r"@[0-9a-f]{40}$", m.group(1))))
+        if unpinned:
+            add("MISSING", "CI actions pinned by commit", "pinned by tag only: " + ", ".join(unpinned[:6]) + (" ..." if len(unpinned) > 6 else ""))
+        else:
+            add("OK", "CI actions pinned by commit")
+        if re.search(r"runs-on:\s*windows", wf_text, re.I):
+            add("NOTE", "Runner OS", "a Windows runner counts double against the Actions allowance; the floor runs on Linux unless the build needs Windows")
+        if screens or os.path.isdir(os.path.join(ws, "docs", "mockups")):
+            if re.search(r"impeccable", wf_text, re.I):
+                add("OK", "Design detector in the gate")
+            else:
+                add("MISSING", "Design detector in the gate", "the project has screens (N7); `npx impeccable@<pinned> detect` belongs in the gate")
+
+    # --- the repository on GitHub (read-only)
+    if offline:
+        add("NOTE", "Required check on the default branch", "not checked (--offline)")
+    else:
+        out, err = gh(["repo", "view", "--json", "nameWithOwner,visibility,defaultBranchRef"], ws)
+        if out is None:
+            add("NOTE", "Required check on the default branch", "cannot verify through gh (%s)" % (err or "no output"))
+        else:
+            try:
+                info = json.loads(out)
+                nwo = info["nameWithOwner"]
+                branch = (info.get("defaultBranchRef") or {}).get("name") or "main"
+                if str(info.get("visibility", "")).lower() == "public":
+                    add("NOTE", "Repository visibility", "%s is public: the diffs, briefs and records are readable by anyone (plan review R4)" % nwo)
+                checks, err2 = gh(["api", "repos/%s/branches/%s/protection/required_status_checks" % (nwo, branch)], ws)
+                if checks is None:
+                    add("MISSING", "Required check on the default branch", "no branch protection with a required status check on %s (%s); N6 needs the gate job required" % (branch, (err2 or "")[:80]))
+                else:
+                    contexts = json.loads(checks).get("contexts") or [c.get("context") for c in json.loads(checks).get("checks") or []]
+                    if contexts:
+                        add("OK", "Required check on the default branch (%s)" % ", ".join(str(c) for c in contexts[:4]))
+                    else:
+                        add("MISSING", "Required check on the default branch", "branch protection exists but requires no status check; N6 needs the gate job required")
+            except (ValueError, KeyError, TypeError) as e:
+                add("NOTE", "Required check on the default branch", "cannot read gh's answer (%s)" % e)
+
+    # --- the builder's configuration
+    for floor, rel, detail in (
+        ("Workspace boundary rule", os.path.join(".cursor", "rules", "workspace-boundary.mdc"), "the builder's always-on boundary rule (rule 22)"),
+        ("Secure-coding rule", os.path.join(".cursor", "rules", "secure-coding.mdc"), "the frozen ASVS-derived rule the builder self-applies (N8)"),
+    ):
+        add("OK" if os.path.isfile(os.path.join(ws, rel)) else "MISSING", floor, "" if os.path.isfile(os.path.join(ws, rel)) else detail)
+    hooks = read(os.path.join(ws, ".cursor", "hooks.json")) or ""
+    add("OK" if "boundary-check" in hooks else "MISSING", "Boundary-check hook", "" if "boundary-check" in hooks else ".cursor/hooks.json does not run boundary-check (rule 22)")
+    windowless = "windowless-check" in hooks or os.path.isfile(os.path.join(ws, ".cursor", "hooks", "windowless-check.py"))
+    add("OK" if windowless else "MISSING", "Windowless check", "" if windowless else "no windowless-check in the hooks; rule 24 puts it in the pre-commit gate")
+
+    # --- lockfiles
+    if os.path.isfile(os.path.join(ws, "package.json")):
+        locks = [n for n in ("package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb") if os.path.isfile(os.path.join(ws, n))]
+        add("OK" if locks else "MISSING", "Lockfile for package.json", "" if locks else "no lockfile; the gate installs from the lock (KP-018)")
+    subdirs = [d for d in sorted(os.listdir(ws)) if os.path.isdir(os.path.join(ws, d)) and not d.startswith(".")]
+    for sub in subdirs:
+        if os.path.isfile(os.path.join(ws, sub, "package.json")):
+            locks = [n for n in ("package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb") if os.path.isfile(os.path.join(ws, sub, n))]
+            add("OK" if locks else "MISSING", "Lockfile for %s/package.json" % sub, "" if locks else "no lockfile beside the manifest (KP-018)")
+    root_req = read(os.path.join(ws, "requirements.txt"))
+    editable = set()
+    if root_req is not None:
+        for line in root_req.splitlines():
+            m = re.match(r"^\s*-e\s+\.?/?([A-Za-z0-9_.-]+)", line)
+            if m:
+                editable.add(m.group(1))
+    transitive_locks = [n for n in ("uv.lock", "poetry.lock", "pdm.lock", "requirements.lock") if os.path.isfile(os.path.join(ws, n))]
+    transitive_locks += [os.path.basename(p) for p in glob.glob(os.path.join(ws, "requirements*.txt")) if "--hash=" in (read(p) or "")]
+    for root_dir in [ws] + [os.path.join(ws, d) for d in subdirs]:
+        if os.path.isfile(os.path.join(root_dir, "pyproject.toml")):
+            label = "Lockfile for %spyproject.toml" % ("" if root_dir == ws else os.path.basename(root_dir) + "/")
+            if root_dir != ws and os.path.basename(root_dir) in editable:
+                continue                           # installed editable from the root requirements: the root's lock covers it
+            locks = [n for n in ("uv.lock", "poetry.lock", "pdm.lock", "requirements.lock") if os.path.isfile(os.path.join(root_dir, n))]
+            locks += [os.path.basename(p) for p in glob.glob(os.path.join(root_dir, "requirements*.txt")) if "--hash=" in (read(p) or "")]
+            if not locks and root_dir == ws and transitive_locks:
+                locks = transitive_locks
+            add("OK" if locks else "MISSING", label, "" if locks else "no transitive lock beside the manifest (uv.lock, poetry.lock, pdm.lock, or hashed requirements; KP-018)")
+    if root_req is not None and not os.path.isfile(os.path.join(ws, "pyproject.toml")):
+        direct = [l for l in root_req.splitlines() if l.strip() and not l.strip().startswith(("#", "-"))]
+        if transitive_locks:
+            add("OK", "Transitive lock for requirements.txt")
+        else:
+            add("MISSING", "Transitive lock for requirements.txt", "requirements.txt pins %d direct dependenc%s and no transitive ones; the gate needs a full lock (uv.lock, or `pip-compile --generate-hashes`; KP-018)" % (len(direct), "y" if len(direct) == 1 else "ies"))
+
+    # --- the records
+    for rel, detail in (
+        ("docs/PROJECT_STATUS.md", "the bounded status file (rule 41)"),
+        ("docs/INVENTORY.md", "the inventory (rule 41)"),
+        ("docs/REQUIREMENTS.md", "the requirements register (rule 44)"),
+        ("docs/RUN_PARAMETERS.md", "the run parameters (rule 29)"),
+        ("docs/ROSTER.json", "the model roster (rule 38)"),
+    ):
+        ok = os.path.isfile(os.path.join(ws, rel))
+        if ok and os.path.isdir(os.path.join(ws, ".git")) and git_ignored(ws, rel):
+            add("MISSING", rel, "exists but is gitignored: the records are versioned, a reviewer's change to an ignored record leaves no trace and no history (0b review, S3)")
+            continue
+        add("OK" if ok else "MISSING", rel, "" if ok else detail)
+    if os.path.isfile(os.path.join(ws, "docs", "DESIGN.md")):
+        add("OK", "docs/DESIGN.md")
+    else:
+        others = sorted(n for n in (os.listdir(os.path.join(ws, "docs")) if os.path.isdir(os.path.join(ws, "docs")) else []) if n.lower().endswith(".md") and re.search(r"design|architecture", n, re.I))
+        if others:
+            add("NOTE", "docs/DESIGN.md", "the design exists under other names (%s); the diagram retrofit (plan 8.7) gives it the fixed name or a DESIGN.md that points at them" % ", ".join(others[:5]))
+        else:
+            add("MISSING", "docs/DESIGN.md", "the design document (rule 45)")
+    if os.path.isfile(os.path.join(ws, "docs", "diagrams", "INDEX.md")):
+        add("OK", "docs/diagrams/INDEX.md")
+    else:
+        add("MISSING", "docs/diagrams/INDEX.md", "no diagram index: a diagram retrofit item (restructuring plan 8.7), scheduled at the next natural pause")
+
+    # --- installable software
+    if installable or os.path.isfile(os.path.join(ws, "docs", "cli-reference.json")):
+        has_ref = os.path.isfile(os.path.join(ws, "docs", "cli-reference.json"))
+        add("OK" if has_ref else "MISSING", "docs/cli-reference.json", "" if has_ref else "the generated command reference (rule 32)")
+        checked = bool(re.search(r"cli-reference", wf_text))
+        where, reads_only = "CI", []
+        if not checked:
+            for tests_dir in glob.glob(os.path.join(ws, "tests")) + glob.glob(os.path.join(ws, "*", "tests")):
+                for p in sorted(glob.glob(os.path.join(tests_dir, "**", "*.py"), recursive=True)):
+                    text = read(p) or ""
+                    if "cli-reference.json" not in text:
+                        continue
+                    relp = os.path.relpath(p, ws).replace("\\", "/")
+                    # a check regenerates the reference and compares; a test that merely reads the file is not one
+                    if re.search(r"assert[^\n]*==|assertEqual|--exit-code|--check|\bcompare", text):
+                        checked, where = True, relp
+                        break
+                    reads_only.append(relp)
+                if checked:
+                    break
+        if checked:
+            add("OK", "CLI reference checked (%s)" % where)
+        elif reads_only:
+            add("MISSING", "CLI reference checked", "%s reads docs/cli-reference.json but nothing compares it with the generator's output (rule 32)" % ", ".join(reads_only[:3]))
+        else:
+            add("MISSING", "CLI reference checked", "nothing keeps docs/cli-reference.json current: no CI step and no test names it (rule 32)")
+
+    # --- secrets within the builder's reach (names only)
+    env_files = [os.path.join(ws, ".env")]
+    env_files += [p for p in glob.glob(os.path.join(ws, ".env.*")) if not re.search(r"\.(example|template|sample|dist)$", p, re.I)]
+    env_files += [os.path.join(ws, d, ".env") for d in subdirs]
+    accounts, locals_, own = [], [], []
+    words = project_words(ws)
+    for env_path in env_files:
+        env_text = read(env_path)
+        if env_text is None:
+            continue
+        rel = os.path.relpath(env_path, ws).replace("\\", "/")
+        for line in env_text.splitlines():
+            m = re.match(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
+            if not m or not SECRET_NAME.search(m.group(1)):
+                continue
+            name = m.group(1)
+            shown = "%s (%s)" % (name, rel) if rel != ".env" else name
+            if LOCAL_SERVICE.match(name):
+                locals_.append(shown)
+            elif name.split("_")[0].lower() in words:
+                own.append(shown)
+            else:
+                accounts.append(shown)
+    if any(os.path.isfile(p) for p in env_files):
+        if accounts:
+            add("MISSING", "Keys out of the builder's reach", "account keys or tokens within the builder's reach: %s (KP-032): move them to the user's environment or the product's encrypted store" % ", ".join(accounts))
+        else:
+            add("OK", "Keys out of the builder's reach")
+        if locals_:
+            add("NOTE", "Local service passwords in .env", "%s: passwords of local development services the tests need; keep them non-production, they are not account secrets" % ", ".join(locals_))
+        if own:
+            add("NOTE", "The product's own tokens in .env", "%s: named after the project, so taken as the product's own per-instance tokens, not an external account; say so in the inventory if that is wrong" % ", ".join(own))
+
+    # --- private memory notes (names only)
+    for d, notes in memory_dirs(ws):
+        if notes:
+            add("NOTE", "Private memory notes", "%d note(s) in %s: %s; calibration step 2b reviews them (rule 41: a note never holds a rule or project state)" % (len(notes), d, ", ".join(notes[:8]) + (" ..." if len(notes) > 8 else "")))
+
+    # --- the bridge version
+    status = read(os.path.join(ws, "docs", "PROJECT_STATUS.md")) or ""
+    m = re.search(r"^\s*(?:[-*]\s+)?[*_`]*Bridge version[*_`]*\s*:[*_`]*\s*([0-9.]+[a-z]?)", status, re.M | re.I)
+    installed = (read(os.path.join(HERE, "VERSION")) or "").strip()
+    if m and installed:
+        if m.group(1) == installed:
+            add("OK", "Calibrated to the installed bridge (%s)" % installed)
+        else:
+            add("MISSING", "Calibrated to the installed bridge", "the status file says %s, the installed bridge is %s: run /calibrate-bridge" % (m.group(1), installed))
+
+    missing = [r for r in results if r[0] == "MISSING"]
+    print("conformance-check: %s" % ws)
+    for verdict, floor, detail in results:
+        if quiet and verdict == "OK":
+            continue
+        print("  %-8s %s%s" % (verdict, floor, ("  - " + detail) if detail else ""))
+    print("conformance-check: %d OK, %d MISSING, %d NOTE" % (
+        sum(1 for r in results if r[0] == "OK"), len(missing), sum(1 for r in results if r[0] == "NOTE")))
+    if missing:
+        print("RESULT: %d floor(s) missing - each is a calibration item, applied as configuration work in the next stage" % len(missing))
+        return 1
+    print("RESULT: CONFORMANT")
+    return 0
+
+
+if __name__ == "__main__":
+    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(errors="backslashreplace")
+    sys.exit(main())

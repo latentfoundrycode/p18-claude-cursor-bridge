@@ -17,7 +17,7 @@ A branch merges to `main` only when every one of these is true. Any failure mean
 
 1. **Executable floor — CI is green.** The required GitHub status check ran the real
    test suite and passed. This is the one part of the gate no model can talk its way
-   past: tests either run and pass or they don't. On the Team plan this check is
+   past: tests either run and pass or they don't. On a paid plan (GitHub Pro for a personal account, Team for an organization) this check is
    *required* via branch protection, so a red or missing check blocks the merge at the
    repo level, not just by convention.
 
@@ -346,11 +346,12 @@ that makes the reviewers argue rather than vote blind).
    from this file** — nothing load-bearing is passed inline through the shell.
 2. **Each reviewer answers the other.** Invoke Review A and Review B once more, each told to
    read the file, engage the *other's* argument directly (not merely restate its own), and
-   return a **reasoned vote** for one candidate answer with its decisive reason. Launch each
-   read-only with the same discipline Review B already requires: through the launcher with
-   `--trust --mode ask` (never `-f`), a directive prompt ("the material is at `<path>`; read it; do not ask for it"),
-   and a **receipt check** — a reply that does not name something specific from the file is a
-   failed launch, not a vote; re-run it. Confirm `git status` is unchanged afterward.
+   return a **reasoned vote** for one candidate answer with its decisive reason. Review A is the
+   `diff-reviewer` subagent, given the file's path; Review B is launched exactly as in the
+   merge step (`review-guard.py snapshot`, the launcher with `--force` in the background,
+   `review-guard.py verify` printing `OK` afterwards) with a directive prompt ("the material
+   is at `<path>`; read it; do not ask for it"). Both get a **receipt check** — a reply that
+   does not name something specific from the file is a failed launch, not a vote; re-run it.
 3. **The supervisor decides on the record.** With both reasoned votes in hand it makes the
    call, still biasing to established invariants, and records the decision *and the reasoning
    that settled it* in `docs/CHANGES.md`.
@@ -457,7 +458,7 @@ pinned in its frontmatter (`model: opus` or a full strong model ID) and read-onl
 Already part of the loop; this policy only pins its model and adds the anti-gaming checks
 to its mandate.
 
-**Review B (cross-family).** Reach a non-Anthropic frontier model read-only. Its mandate
+**Review B (cross-family).** Reach a non-Anthropic frontier model with execution, on a committed checkpoint restored afterwards. Its mandate
 covers code correctness/soundness, the gate-integrity checks, **and security** — the same
 exploitable-vulnerability and authz/authn/data-integrity classes the `security-auditor`
 hunts, plus the security anti-gaming checks in §Anti-gaming. This is a **prompt extension**,
@@ -470,12 +471,14 @@ Two options for reaching it:
   outside `Workspace/`, which the boundary blocks), **generated only from committed state**
   (`git status --porcelain` empty, then `git diff <merge-base>...HEAD`; a working-tree diff
   omits every untracked new file, and a reviewer that receives an incomplete diff has
-  correctly refused it twice), then invoke Review B **through the launcher, read-only**:
-  `python ~/.claude/cursor-bridge/bridge-run.py --limit 1800 -- cursor-agent -p --trust --mode ask --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<nnn>.err`
-  (`--mode ask` is the CLI's own read-only mode: it reads files and answers, and cannot edit
-  or run commands; `--trust` clears the workspace-trust gate without force-allowing anything;
-  the launcher withholds the owner's GitHub identity from the process and ends it at the
-  limit, KP-032 and KP-033) with
+  correctly refused it twice), then invoke Review B **through the launcher, with execution**:
+  `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- cursor-agent -p --force --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<nnn>.err`
+  (`--force` lets it run the project's tests, write throwaway reproductions, and try a
+  temporary mutation to see whether the tests catch it — the reviewer's strongest findings
+  in the record came from exactly that, and the owner decided on 2026-10-04 to keep it
+  after a read-only mode was tried and found weaker; the launcher withholds the owner's
+  GitHub identity from the process, so a post, push or merge from inside the review fails,
+  and ends the run at the limit, KP-032 and KP-033) with
   a prompt that tells it to **read the diff from that file** — do **not** pass the diff
   inline through the shell. (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
@@ -484,8 +487,33 @@ Two options for reaching it:
   **GPT-5.6 Sol** while the builder is Grok 4.7 (full profile), or **Grok 4.7** while the builder is Composer 2.5 (native profile) — a genuine third family either way; the ids in use are always the ones in `docs/ROSTER.resolved.json`.
   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
-  nothing; run it on a clean committed checkpoint and confirm `git status` is unchanged
-  afterward, so the review stays read-only in practice. **Then check it wrote nowhere else:**
+  nothing that reaches the branch: run it on a clean committed checkpoint, **commit your
+  own work first and write nothing to the checkout while it runs** (no builder, no
+  `test-runner`, no commit; the launch is in the background and its completion wakes you).
+  The checkpoint is guarded by `review-guard.py`: `snapshot <nnn>` before the launch (it
+  refuses a dirty tree and records HEAD, the branch, the refs, the stashes, `.git/config`,
+  the hooks folder and the ignored entries), `verify <nnn>` after the run, and
+  `premerge <nnn>` before `gh pr merge`. **What the restore covers and what it does not:**
+  `verify` puts tracked and untracked files back with `git reset --hard` and `git clean -fd`
+  (keeping the launcher's own `run/review/REVIEW-<nnn>.err`, whose first line it prints) and
+  lists what it removed — a temporary file or mutation the reviewer made for a check is
+  expected. A commit, a moved HEAD or branch, a new or moved local ref or stash, a changed
+  `.git/config` or hook file, a changed record under `docs/`, `handoff/` or `run/review/`
+  even where the project gitignores it, or a changed `.env` is **reported as
+  `GATE-INTEGRITY`**: the tree and the refs are put back, the flag opens, the merge waits.
+  The configuration, the active hooks folder (`core.hooksPath`) and `.git/hooks` are read as
+  files before any git command runs, because a `core.fsmonitor` line or a planted hook
+  would run the reviewer's program with the owner's identity on the supervisor's next git
+  command — and every git command the guard runs has the repository's hooks and file
+  monitor switched off, so the guard itself never runs one. A moved remote-tracking ref (a
+  fetch) is only a note. The guard prints the snapshot file's hash at both ends, because a
+  reviewer could rewrite the snapshot. It does not see the contents of cache folders,
+  anything outside the checkout (the owner's profile, the installed bridge, other projects),
+  or a reviewer that reaches for the credential store on purpose: it is a guard against
+  what a reviewer does in passing, not a sandbox (KP-032). `premerge <nnn> <pr>`, run after
+  the review files are removed, committed and pushed, then proves the head about to merge
+  descends from the reviewed head, differs from it only by that removal, and is the pull
+  request's head on GitHub; the merge uses `--match-head-commit` with that head. **Then check it wrote nowhere else:**
   `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the launch time>`, where
   the launch time is the launcher's first stderr line (`bridge-run: started <time>Z`, the
   first line of the `.err` file; a time without a zone is refused). It lists every comment
@@ -504,11 +532,11 @@ Two options for reaching it:
   1. **Workspace-trust gate.** In a folder Cursor has not trusted yet (a fresh clone or
      worktree) `cursor-agent` refuses to run
      non-interactively until the folder is trusted, so Review B silently doesn't launch.
-     Invoke Review B with `--trust`, which clears that gate and nothing else. Never give a
-     reviewer `-f`/`--force`: that flag force-allows commands, which is the builder's need,
-     not a reviewer's. The read-only guarantee is `--mode ask` plus the post-run `git status`
-     check above (reject the verdict and re-run if the tree changed) plus the pull-request
-     activity check.
+     Invoke Review B with `--force` (which also clears that gate), through the launcher.
+     What keeps a reviewer with execution from doing harm: its identity is withheld (it
+     cannot post, push or merge as the owner), it runs on a committed checkpoint that is
+     restored afterwards (nothing it writes reaches the branch), the launcher's limit ends
+     a hung reproduction, and the pull-request activity check runs before the merge.
   2. **Prompt-as-preamble.** Review B has replied "please provide the diff" instead of
      reading the file, treating the instructions as chatter. Use a **directive** prompt that
      removes all ambiguity: state that the diff is *already written to `<path>`*, that it must
