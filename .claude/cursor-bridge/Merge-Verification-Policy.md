@@ -550,7 +550,7 @@ Two options for reaching it:
 - *Maximum independence — a direct provider API or MCP server:* a separate vendor entirely,
   truly read-only (send diff, get a JSON verdict). Cleanest decorrelation, but needs that
   provider's API key — a **secret**, so setting it up is a one-time human escalation, and
-  the key lives in an env var or MCP config, never in a prompt or the repo.
+  the key lives in a key file outside the Workspace or in the MCP config, never in a prompt, the repo, or an environment variable the owner sets.
 
 Prefer the default unless the builder is already using the only non-Anthropic family your
 Cursor plan offers (in which case use the API option to get a genuinely different family

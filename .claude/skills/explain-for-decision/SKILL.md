@@ -310,7 +310,10 @@ PowerShell). Say whether the window must be opened *as administrator*.
 token, key, or password, the run sheet says where the value comes from, where it goes,
 and that the user types or pastes it **there** — never into this chat. The command that
 consumes it must not put it on the command line where it lands in shell history; prefer
-the tool's prompt or the GUI field.
+the tool's prompt or the GUI field. **Never ask the user to set a secret as an environment
+variable,** for a session or for their account: every program started in that environment
+inherits it. A secret goes into a key file outside the Workspace, the product's own store,
+the system's credential store, or a GitHub secret.
 
 **6. Report back — one line.** Which step's output to paste, or which single fact to
 confirm ("tell me the version number step 3 printed").

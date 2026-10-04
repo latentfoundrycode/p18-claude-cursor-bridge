@@ -234,3 +234,38 @@ def test_second_pass_residue(tmp_path):
     rc, out = run(proj / "Workspace")
     v, line = verdict(out, "docs/RUN_PARAMETERS.md")
     assert v == "MISSING" and "gitignored" in line
+
+
+def test_key_advice_and_the_environment_note(tmp_path):
+    """2026.10.04e: the advice names a key file outside the Workspace, never the user
+    environment; key-like variables in the session's environment are a NOTE, names only."""
+    make_workspace(tmp_path, conformant=False)
+    env = dict(os.environ, HF_TOKEN="hf_value_never_printed", TOKENIZERS_PARALLELISM="false")
+    p = subprocess.run([sys.executable, PROG, str(tmp_path), "--offline"], capture_output=True, text=True, env=env)
+    out = p.stdout
+    v, line = verdict(out, "Keys out of the builder's reach")
+    assert v == "MISSING" and "OUTSIDE the Workspace" in line and "NOT into the Windows user environment" in line
+    v, line = verdict(out, "Account keys in the session's environment")
+    assert v == "NOTE" and "HF_TOKEN" in line and "TOKENIZERS_PARALLELISM" not in line
+    assert "hf_value_never_printed" not in out
+
+
+def test_a_secret_supplied_through_an_environment_variable_is_a_missing_floor(tmp_path):
+    """The owner, 2026-10-05: no secret through an environment variable the owner sets. The
+    inventory says how each resource arrives; a passphrase is a secret, a path is not."""
+    make_workspace(tmp_path)
+    (tmp_path / "docs" / "INVENTORY.md").write_text(
+        "## Resources\n"
+        "| Name | Kind | Where | Used by | Since |\n|---|---|---|---|---|\n"
+        "| SFVF_DATA_DIR | env var | user env var / installer | app/paths.py | owner |\n"
+        "| SFVF_SECRETS_PATH SFVF_SECRETS_PASSPHRASE | env var | user env var | app.core.secrets | owner |\n"
+        "| SFVF_MARKER_KEEP | test-only env var | tests | test | n/a |\n"
+        "| OPENROUTER_API_KEY | secret | the app's encrypted store | workflows | 2026-10-04 |\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    v, line = verdict(out, "No secret through an environment variable")
+    assert v == "MISSING" and "SFVF_SECRETS_PASSPHRASE" in line
+    assert "SFVF_SECRETS_PATH" not in line and "SFVF_DATA_DIR" not in line and "OPENROUTER_API_KEY" not in line
+    (tmp_path / "docs" / "INVENTORY.md").write_text(
+        "| OPENROUTER_API_KEY | secret | key file outside the Workspace | workflows | 2026-10-04 |\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "No secret through an environment variable")[0] == "OK"

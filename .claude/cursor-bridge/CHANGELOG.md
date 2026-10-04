@@ -11,6 +11,22 @@ arrives. An item marked *(all phases)* applies immediately.
 
 ---
 
+## 2026.10.04e
+
+**Account keys are withheld from builder and reviewer runs, and the advice of 2026.10.04c is corrected.** Found by the first evaluation of the projects' reports, in two projects independently.
+
+**What changed**
+- **The advice was wrong.** 2026.10.04c told projects to move paid keys out of `Workspace/.env` "to the user's environment". A variable in the Windows user environment is handed to every program the owner starts, and the launcher withheld only the GitHub variables, so the keys would have reached every builder run and every Review B run, and Review B executes code. The TDP's supervisor saw this and chose a key file outside the Workspace; reAngle's wrote its run sheet as instructed.
+- **The launcher and the shim withhold every key-like variable** (`bridge_env.stripped_env`, `cursor-agent.shim`, one test of the name in both): a whole-word `TOKEN` or `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL`, an API, access or private key, or a name ending in `_KEY`. Cursor's own variables (`CURSOR_*`) are kept. A test runs both recipes on the same sample and requires the same answer.
+- **No secret through an environment variable the owner sets** (the owner, 2026-10-05). Founding rule N2 itself said keys live in "the owner's environment", and the inventory template offered "user env var"; both now name a key file outside the Workspace, the product's encrypted store or the system's credential store. A store's unlock passphrase counts as a key (the video factory's `SFVF_SECRETS_PASSPHRASE` is given through a variable today), and the launcher's filter withholds it. The run-sheet guidance forbids asking the owner to set a secret as a variable. The conformance check gains the floor: an inventory row that says a secret arrives through an environment variable is `MISSING`.
+- **The conformance check** advises a key file outside the Workspace (for example under `%APPDATA%\<product>\`) or the product's encrypted store, and never the user environment; it notes key-like variable names found in the session's own environment. KP-032 records it.
+
+**Running projects must**
+- *(all phases)* Install with `python <release .claude folder>/cursor-bridge/bridge-install.py`, restart the app, run `/calibrate-bridge`. **Where a run sheet of 2026.10.04c asked the owner to put account keys into the Windows user environment (reAngle: `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`, `HF_TOKEN`), replace it:** the keys go into a key file outside the Workspace that the product, or the supervisor's own paid scripts, read; any of them already set in the user environment are removed from it by a run sheet. A project's tests that need a local service's password read it from the project's `.env`, not from the environment: the builder no longer inherits key-like variables.
+- *(all phases)* **A product that takes a secret or an unlock passphrase from an environment variable the owner sets** (the conformance check names them from the inventory: the video factory's store passphrase; the TDP's and reAngle's account keys where the product reads them from its process environment) gets one increment that makes the product read it from a key file outside the Workspace or the system's credential store, and its run sheets and User Manual change with it. Until that increment has merged, the owner is asked for no new variable; a paid run the supervisor itself starts loads the key file into that one process only.
+
+---
+
 ## 2026.10.04d
 
 **The models each role runs on, and Review A off a legacy model.** The owner's decision of 2026-10-04 after the verified fact that Fable is not a second usage pool (it draws from the weekly limit, at most half of it, faster — KP-036).
