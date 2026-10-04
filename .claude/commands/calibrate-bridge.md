@@ -32,7 +32,7 @@ to a half-copied tree would leave the project on a mixture of two releases.
 python ~/.claude/cursor-bridge/conformance-check.py
 ```
 
-It compares this project's configuration with what the installed bridge requires (the scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where the software is installable, and whether keys sit in `Workspace/.env` within the builder's reach) and prints `OK` / `MISSING` / `NOTE` per floor. A project configured before a floor existed never received it otherwise. **Every `MISSING` becomes a calibration item** of this calibration, applied as configuration work in the next stage (a missing diagram index is the diagram retrofit, scheduled at the next natural pause); a `NOTE` is recorded in `PROJECT_STATUS.md`. Nothing here reopens a gate. Pass `--screens` or `--installable` when the project has screens or is installable and the check cannot tell from the files.
+Run it from the project root or from `Workspace/` (it resolves either). It compares this project's configuration with what the installed bridge requires (the scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where the software is installable, and whether keys sit in `Workspace/.env` within the builder's reach) and prints `OK` / `MISSING` / `NOTE` per floor. A project configured before a floor existed never received it otherwise. **Every `MISSING` becomes a calibration item** of this calibration, applied as configuration work in the next stage (a missing diagram index is the diagram retrofit, scheduled at the next natural pause); a `NOTE` is recorded in `PROJECT_STATUS.md`. Nothing here reopens a gate. Pass `--screens` or `--installable` when the project has screens or is installable and the check cannot tell from the files.
 
 ## 2. Re-read the governing files — they supersede what you hold in context
 
@@ -62,6 +62,10 @@ file from the merge policy's two-profile template if it does not exist, and ask 
 whether the "other models" pool is available or exhausted if `other_pool` is unset. The
 resolved profile goes into `docs/ROSTER.resolved.json`; a non-preferred profile is the
 report's first line.
+
+## 2b. Review your private memory notes — they are not project state
+
+The conformance check names the project's memory folder and its notes (`NOTE Private memory notes`). Read the index, then every note. A note that **restates a bridge rule** (the installed files are the governing text, and a note written under an older release contradicts them silently after every compaction, when Claude Code re-attaches the index beside the digest) or that **holds project state** (a phase, an increment, a model id, a plan — all of which live in `PROJECT_STATUS.md`, `INVENTORY.md`, the roster and the plan, rule 41) is deleted, or reduced to a pointer at the file that holds the fact. Keep what a note is for: who the owner is, how they want things explained, feedback on your work. Report the result as one FYI line (`Memory notes: <n> read, <m> removed or reduced: <names>`); nothing here needs the owner.
 
 ## 3. Find the release delta
 

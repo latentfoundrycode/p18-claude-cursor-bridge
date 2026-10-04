@@ -113,10 +113,18 @@ def collect_agent_invocations():
 
 
 @pytest.mark.parametrize("src,cmd", collect_agent_invocations())
-def test_every_agent_run_goes_through_the_launcher_and_reviews_are_read_only(src, cmd):
+def test_every_agent_run_goes_through_the_launcher_and_review_b_keeps_execution(src, cmd):
     """Release 0a review, F2: the launcher gives the limit and withholds the identity; Review B
     keeps execution (it runs tests and reproductions) on a checkpoint restored afterwards."""
     assert cmd.startswith("python ~/.claude/cursor-bridge/bridge-run.py --limit "), "%s: not through the launcher: %r" % (src, cmd)
     assert "--mode ask" not in cmd, "%s: the read-only mode was dropped (owner, 2026-10-04): %r" % (src, cmd)
     if "REVIEW-" in cmd:
         assert "--force" in cmd and "--limit 3600" in cmd, "%s: Review B runs with execution under a one-hour limit: %r" % (src, cmd)
+
+
+def test_the_digest_and_the_merge_step_show_the_same_review_b_form():
+    """0b review, finding 4: the digest's Review B command carries the .err redirect the
+    activity check reads the launch time from, so the consistency check covers it too."""
+    forms = [cmd for src, cmd in collect_agent_invocations() if "REVIEW-" in cmd]
+    assert len(forms) >= 2, forms
+    assert all("2> run/review/REVIEW-<nnn>.err" in f and "--force" in f and "--limit 3600" in f for f in forms), forms

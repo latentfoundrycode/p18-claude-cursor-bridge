@@ -346,11 +346,12 @@ that makes the reviewers argue rather than vote blind).
    from this file** — nothing load-bearing is passed inline through the shell.
 2. **Each reviewer answers the other.** Invoke Review A and Review B once more, each told to
    read the file, engage the *other's* argument directly (not merely restate its own), and
-   return a **reasoned vote** for one candidate answer with its decisive reason. Launch each
-   with the same discipline Review B already requires: through the launcher with `--force`
-   on a committed checkpoint restored afterwards, a directive prompt ("the material is at `<path>`; read it; do not ask for it"),
-   and a **receipt check** — a reply that does not name something specific from the file is a
-   failed launch, not a vote; re-run it. Confirm `git status` is unchanged afterward.
+   return a **reasoned vote** for one candidate answer with its decisive reason. Review A is the
+   `diff-reviewer` subagent, given the file's path; Review B is launched exactly as in the
+   merge step (`review-guard.py snapshot`, the launcher with `--force` in the background,
+   `review-guard.py verify` printing `OK` afterwards) with a directive prompt ("the material
+   is at `<path>`; read it; do not ask for it"). Both get a **receipt check** — a reply that
+   does not name something specific from the file is a failed launch, not a vote; re-run it.
 3. **The supervisor decides on the record.** With both reasoned votes in hand it makes the
    call, still biasing to established invariants, and records the decision *and the reasoning
    that settled it* in `docs/CHANGES.md`.
@@ -457,7 +458,7 @@ pinned in its frontmatter (`model: opus` or a full strong model ID) and read-onl
 Already part of the loop; this policy only pins its model and adds the anti-gaming checks
 to its mandate.
 
-**Review B (cross-family).** Reach a non-Anthropic frontier model read-only. Its mandate
+**Review B (cross-family).** Reach a non-Anthropic frontier model with execution, on a committed checkpoint restored afterwards. Its mandate
 covers code correctness/soundness, the gate-integrity checks, **and security** — the same
 exploitable-vulnerability and authz/authn/data-integrity classes the `security-auditor`
 hunts, plus the security anti-gaming checks in §Anti-gaming. This is a **prompt extension**,
@@ -487,12 +488,25 @@ Two options for reaching it:
   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
   nothing that reaches the branch: run it on a clean committed checkpoint, **commit your
-  own work first and write nothing to the checkout while it runs**, and afterwards restore
-  the checkpoint exactly: `git status --porcelain`, and if anything shows, `git checkout -- .`
-  then `git clean -fd`, noting in the record that the reviewer left something behind. A
-  temporary file or mutation the reviewer made for a check is expected; one that survives
-  into the branch is not, and the restore makes that impossible. **Then check it wrote
-  nowhere else:**
+  own work first and write nothing to the checkout while it runs** (no builder, no
+  `test-runner`, no commit; the launch is in the background and its completion wakes you).
+  The checkpoint is guarded by `review-guard.py`: `snapshot <nnn>` before the launch (it
+  refuses a dirty tree and records HEAD, the branch, the refs, the stashes, `.git/config`,
+  the hooks folder and the ignored entries), `verify <nnn>` after the run, and
+  `premerge <nnn>` before `gh pr merge`. **What the restore covers and what it does not:**
+  `verify` puts tracked and untracked files back with `git reset --hard` and `git clean -fd`
+  and lists what it removed — a temporary file or mutation the reviewer made for a check is
+  expected. A commit, a moved HEAD or branch, a new ref or stash, a changed `.git/config` or
+  hook file, or a changed `.env` is **not restorable in the same sense and is reported as
+  `GATE-INTEGRITY`**: the tree is put back, the flag opens, the merge waits. The
+  configuration is read as a file before any git command runs, because a `core.fsmonitor`
+  or `core.hooksPath` line left in it would run the reviewer's program with the owner's
+  identity on the supervisor's next `git status`. The guard does not see the contents of
+  ignored folders, anything outside the checkout (the owner's profile, the installed
+  bridge, other projects), or a reviewer that reaches for the credential store on purpose:
+  it is a guard against what a reviewer does in passing, not a sandbox (KP-032). `premerge`
+  then proves the head about to merge descends from the reviewed head and differs from it
+  only by the `git rm` of the review files. **Then check it wrote nowhere else:**
   `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the launch time>`, where
   the launch time is the launcher's first stderr line (`bridge-run: started <time>Z`, the
   first line of the `.err` file; a time without a zone is refused). It lists every comment
