@@ -1,4 +1,5 @@
 {
+  "_comment": "The bridge-owned part of ~/.claude/settings.json. bridge-install.py merges these entries into the owner's file and keeps everything else there; bridge-check.py verifies that every entry below is present. Rules follow Claude Code's documented matching: a * matches any text anywhere in the rule; deny is evaluated before allow in every permission mode.",
   "permissions": {
     "allow": [
       "Bash(cursor-agent:*)",

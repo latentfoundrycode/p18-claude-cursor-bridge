@@ -20,12 +20,11 @@ python ~/.claude/cursor-bridge/bridge-check.py
 It hashes every governance file against the release manifest and prints `OK` / `STALE` /
 `MISSING` per file and a `RESULT` line. **If the result is `NOT CALIBRATED`, stop here.**
 Report it as a **run sheet** (`explain-for-decision` skill): which files are stale or
-missing, the terminal to use, the literal copy commands from the bridge release folder to
-`C:\Users\<you>\.claude\…` with the placeholder explained, the app restart, and
+missing, the terminal to use (Git Bash), the one install command — `python <release folder>/cursor-bridge/bridge-install.py`, which copies the release, merges the bridge's entries into `settings.json` without touching the owner's own keys, and installs the `cursor-agent` shim — with the placeholder explained, the app restart, and
 "then run `/calibrate-bridge` again". Do nothing else until the check passes — calibrating
 to a half-copied tree would leave the project on a mixture of two releases.
 
-**One exception (KP-030).** `~/.claude/settings.json` is shared with Claude Code, which writes its own keys into it. If it is the *only* STALE file, compare its bridge-owned content with the release's copy — every `permissions.allow` entry of the release present, the Stop hook registered — and if that matches, say so, record the difference as a known exception in `docs/PROJECT_STATUS.md`, and continue. Never ask the owner to remove a key the bridge does not own, and never offer the release's file as a replacement for theirs.
+`settings.json` is compared by its bridge-owned entries, never by its bytes, so the owner's own keys in it never fail the check (KP-030). Never ask the owner to remove a key the bridge does not own, and never offer the release's file as a replacement for theirs; `bridge-install.py` merges.
 
 ## 2. Re-read the governing files — they supersede what you hold in context
 

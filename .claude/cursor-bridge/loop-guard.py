@@ -63,11 +63,36 @@ def allow():
     sys.exit(0)
 
 
-def read_status(cwd):
-    for base in (cwd, os.environ.get("CLAUDE_PROJECT_DIR") or ""):
-        if not base:
+def status_candidates(cwd):
+    """Where the project's status file may be, for a session started in Workspace, in the
+    project root above it, or inside a worktree under <root>/Worktrees (KP-031 follow-up:
+    the guard used to look only under cwd and so was blind in sessions started at the root)."""
+    bases = []
+    for start in (cwd, os.environ.get("CLAUDE_PROJECT_DIR") or ""):
+        if not start:
             continue
-        p = os.path.join(base, "docs", "PROJECT_STATUS.md")
+        d = os.path.abspath(start)
+        parts = d.replace("\\", "/").split("/")
+        if "Worktrees" in parts:                       # a worktree root: use the project's own checkout
+            root = "/".join(parts[:parts.index("Worktrees")])
+            bases.append(os.path.join(root, "Workspace"))
+        for _ in range(4):
+            bases.append(d)
+            bases.append(os.path.join(d, "Workspace"))
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+    seen, out = set(), []
+    for b in bases:
+        if b not in seen:
+            seen.add(b)
+            out.append(os.path.join(b, "docs", "PROJECT_STATUS.md"))
+    return out
+
+
+def read_status(cwd):
+    for p in status_candidates(cwd):
         if os.path.isfile(p):
             with open(p, encoding="utf-8-sig", errors="replace") as f:
                 return f.read()
@@ -75,8 +100,13 @@ def read_status(cwd):
 
 
 def field(text, name):
-    m = re.search(r"^\s*%s\s*:\s*(.*?)\s*$" % re.escape(name), text, re.M | re.I)
-    return m.group(1) if m else None
+    """The value of a `Name: value` line, tolerating list bullets, bold markers and backticks
+    around the name or the value (`**Phase:** building`, `- Phase: building`)."""
+    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
+    m = re.search(pat, text, re.M | re.I)
+    if not m:
+        return None
+    return m.group(1).strip().strip("*_`").strip()
 
 
 def parse_ts(s):
@@ -99,9 +129,9 @@ def wakes(tur, content, uses):
     for x in content:
         if isinstance(x, dict) and x.get("type") == "tool_result" and x.get("tool_use_id") in uses:
             name, inp = uses[x["tool_use_id"]]
-            if name != "Bash":
-                return True
-            cmd = str(inp.get("command") or "")
+            if not isinstance(inp, dict) or "command" not in inp:
+                return True                        # not a shell tool: finishes by nature
+            cmd = str(inp.get("command") or "")    # Bash, PowerShell, any shell tool alike
             return any(pat.search(cmd) for pat in WAKE_PATTERNS)
     return True
 
@@ -192,7 +222,8 @@ def main():
     if not phase.lower().startswith(ACTIVE_PHASES):
         allow()
     awaiting = (field(status, "Awaiting user on") or "").strip().strip("<>").strip()
-    if awaiting.lower() not in NOTHING and not awaiting.lower().startswith("nothing"):
+    a = awaiting.lower()
+    if a not in NOTHING and not a.startswith(("nothing", "none", "n/a")):
         allow()
     tp = data.get("transcript_path")
     if not tp or not os.path.isfile(tp):
@@ -211,6 +242,9 @@ def main():
 
 
 if __name__ == "__main__":
+    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(errors="backslashreplace")
     try:
         main()
     except SystemExit:

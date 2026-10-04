@@ -76,13 +76,24 @@ children on every project:
   `BUILDER_NOTES.md`, `BOUNDARY_VIOLATIONS.md`, `debug/BUG-nnn.md`). `docs/` is written for
   machine comprehension first; it need not read well to a human, and that is by design.
 
-You start in `Workspace/`; `Documents/` is its sibling (`../Documents`). Resolve both once,
-at intake, and record the resolved paths in `docs/PROJECT_STATUS.md`. If `Documents/` is
-missing, create it. If the folder you started in is not named `Workspace`, stop and ask —
+You work in `Workspace/`; `Documents/` is its sibling (`../Documents`). The owner may start
+the session in `Workspace/` or in the project root above it (the folder that holds
+`Documents/` and `Workspace/`): in the root, `cd Workspace` once before anything else, and
+every path below is relative to `Workspace/`. Resolve both folders once, at intake, and
+record the resolved paths in `docs/PROJECT_STATUS.md`. If `Documents/` is missing, create
+it. If the folder you started in is neither `Workspace` nor a project root, stop and ask —
 the boundary below depends on it.
 
+**Permissions.** Sessions run in Claude Code's *auto* permission mode: a classifier
+approves routine commands, nothing prompts the owner, and the allowlist in the owner's
+settings (installed from the bridge's `settings.bridge.json`) spares the classifier the
+bridge's own commands. The hard guardrails are the **deny rules**, which hold in every
+mode: no `gh pr merge --admin` (the override of a repository's rules) and no force-push.
+Never ask the owner to add a permission; a command the rules do not cover is a bridge
+defect to report, not a question for the owner.
+
 **Branches and worktrees.** Sequential work — one increment built, reviewed, merged, then
-the next — is plain branches in the single checkout: `git checkout -B <branch> <base>` →
+the next — is plain branches in the single checkout: `git switch -C <branch> <base>` →
 work → merge → `git switch <base>`. It needs no worktree; a worktree per increment is habit,
 not need (KP-025). A git worktree is warranted **only** when two branches must be checked
 out at the same time — a long build or test running on one branch while you work on
@@ -689,12 +700,16 @@ not as a brief.
 ### 3. Delegate to Cursor
 
 ```bash
-cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
+python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
 ```
 
 The `--model` value is copied from `docs/ROSTER.resolved.json` (step 1), never typed from
 memory; the stderr redirect keeps the CLI's own messages in a file, which is what the
-automatic model switch below reads. (`run/agent/` is gitignored.)
+automatic model switch below reads. (`run/agent/` is gitignored.) **The launcher** gives
+the run a hard limit of two hours and kills the whole process tree at it (exit code 124),
+and withholds the owner's GitHub identity from the builder (KP-032, KP-033). Exit 124 is
+handled in step 3b: inspect the tree first, because a builder that hung on its way out may
+have finished its work.
 
 Rules for this call, all of which matter:
 
@@ -723,7 +738,7 @@ Rules for this call, all of which matter:
 3. **Delegate each in the background**, pointing the builder at its checkout with `--workspace` and keeping the command starting with `cursor-agent`:
 
 ```bash
-cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
+python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
 ```
 
 4. **When a builder finishes**, remove its worktree from your checkout (`git worktree remove ../Worktrees/TASK-<nnn>` — never `--force`; nothing is linked inside), switch your checkout to its branch, and run steps 4 to 8 there like any increment: the scope check with `--base <the recorded starting commit>`, the diagram check, the reviews, the tests, the accept commit, the pull request, the gate, the merge. Process finished branches **one at a time**. Before the accept commit of every branch after the first, run `git merge --no-edit origin/main` to bring in what merged meanwhile — the other increment's code, disjoint by construction, and its record updates, so the change log, the inventory, and the register do not conflict. CI runs on the pull request's merge with `main`, so the combined state is tested either way.
@@ -736,30 +751,46 @@ Never use Cursor's own `--worktree` option: it places the checkout under your ho
 The owner may be asleep while the loop runs. A usage limit reached at 03:00 must not stall
 the build until morning, so a model failure is handled by the loop, never by a question.
 When any `cursor-agent` call — a delegation, a Review B launch, a resolution round, the
-stage-close pass — exits non-zero, produces no output, or times out:
+stage-close pass — exits non-zero, produces no output, or hits the launcher's limit (exit
+124):
+
+**First, when the exit code is 124, look before you discard** (KP-033): `git status` and
+`git diff --stat` in the checkout. A builder that completed its edits and then hung on its
+way out (a lost connection while reporting, an orphaned server it started) has done the
+work; take the tree through the normal inspect, scan and test steps as if the run had
+returned. Only a tree with no finished work goes through the restart below.
 
 ```bash
 python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --record-failure <model id> --stderr-file <the .err file of that call>
 ```
 
-- **Exit 4 — transient.** A first failure with no usage-limit message. Retry the same step
-  once, unchanged. If it fails again the next record is exit 3.
+The argument after `--record-failure` is the **model id** of the failed call, copied from
+`docs/ROSTER.resolved.json` — never a file path or a task name; the script refuses anything
+that is not a model of the roster (exit 2) and changes nothing (KP-034).
+
+- **Exit 4 — transient.** A connection error (lost, reset, reconnecting, a 5xx, a rate
+  limit), which is never counted, or a first other failure. Retry the same step once,
+  unchanged. A second other failure within two hours is exit 3.
 - **Exit 3 — exhausted or unavailable.** A usage-limit message (usage / quota / limit
-  reached / upgrade your plan / billing), or a second consecutive failure. The script has
-  already marked the pool exhausted (or the model unavailable) in `docs/ROSTER.json`. Now:
-  1. **Re-resolve:** `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` —
+  reached / upgrade your plan / payment required), or a second failure of the same model
+  within two hours. The script has already marked the pool exhausted (or the model
+  unavailable, for six hours) in `docs/ROSTER.json`. Now, **in this order**:
+  1. **Restart point first.** A delegation: the working tree goes back to the
+     pre-delegation checkpoint (`git reset --hard <checkpoint sha>` then `git clean -fd`
+     inside the workspace — the checkpoint exists exactly for this). This comes *before*
+     the re-resolve because `docs/ROSTER.json` and `docs/ROSTER.resolved.json` are tracked
+     files: a reset after the re-resolve would revert them and silently put the exhausted
+     model back (KP-034).
+  2. **Re-resolve:** `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` —
      the next profile that answers is written to `docs/ROSTER.resolved.json`. `FAIL` here
      (no profile answers at all) is the one case that stops the loop: report it as the
      single decision — buy usage, or add a candidate — and wait.
-  2. **Restart the interrupted step from its checkpoint** with the newly resolved models.
-     A delegation: the working tree goes back to the pre-delegation checkpoint
-     (`git reset --hard <checkpoint sha>` then `git clean -fd` inside the workspace — the
-     checkpoint exists exactly for this), and the same brief is re-issued with the new
-     `--model`. A Review B launch: re-run on the same committed diff file with the new
-     reviewer. A resolution round or a stage-close pass: re-run the failed call with the
-     new model; earlier completed calls stand. Nothing partial survives, nothing completed
-     is redone.
-  3. **Record and report.** Open an issue (`ISS-nnn`) whose entry carries the stderr
+  3. **Restart the interrupted step** with the newly resolved models. A delegation: the
+     same brief is re-issued with the new `--model`. A Review B launch: re-run on the same
+     committed diff file with the new reviewer. A resolution round or a stage-close pass:
+     re-run the failed call with the new model; earlier completed calls stand. Nothing
+     partial survives, nothing completed is redone.
+  4. **Record and report.** Open an issue (`ISS-nnn`) whose entry carries the stderr
      excerpt — that text is how the maintainer sharpens the classifier — and put the switch
      in the **first line of the next report**: "auto-switched to the native profile at
      <time> (<model> returned: <excerpt>); TASK-<nnn> restarted with builder <id>, Review B
@@ -1050,7 +1081,7 @@ When all four hold the merge is authorised. **Check `docs/RUN_PARAMETERS.md` fir
 `Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
 conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
 auto-merge. Under `supervisor` (the default), arm `gh pr merge --squash --auto` and watch the
-required `gate` check — **with one background command, never by ending your turn**: run `gh pr checks <n> --watch --required --fail-fast` in the background (`run_in_background`). Its completion notification is what wakes you; nothing else will. Start the command with `gh pr checks` exactly (the allowlist matches the start of a command; a prefix such as `sleep` would stop on a permission prompt). If it returns at once reporting no checks, CI has not registered the push yet: start the same watch again. The desktop app's CI monitor ("Auto-fix pull requests", `<ci-monitor-event>`) reports only problems — a failed check, a review comment — and **never a green gate**, so waiting for it after a green run waits forever (KP-028). Registering the PR with it is fine and its autofix of a failure is welcome, but it is never your wake-up. The owner authorises and requires this watch: it is one blocking command per PR, not a polling loop — never `sleep` loops, repeated status checks, or scheduled wake-ups for this. **While it runs, keep building:** if the next increment's Scope does not overlap the pending PR's files, start it now from `origin/main`; if it does overlap, prepare what does not depend on the merge (the next brief, reviews, docs), and only then end your turn — the watch will wake you. When the watch completes green (and the PR is mergeable), **complete the squash
+required `gate` check — **with one background command, never by ending your turn**: run `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast` in the background (`run_in_background`). Its completion notification is what wakes you; nothing else will. The launcher ends a watch that outlives an hour (exit 124: look at the pull request's checks yourself, then start a new watch); never prefix the command with anything else (`sleep`, `cd`, `timeout`): the rules match the command as written, and a wrapped command matches nothing. If it returns at once reporting no checks, CI has not registered the push yet: start the same watch again. The desktop app's CI monitor ("Auto-fix pull requests", `<ci-monitor-event>`) reports only problems — a failed check, a review comment — and **never a green gate**, so waiting for it after a green run waits forever (KP-028). Registering the PR with it is fine and its autofix of a failure is welcome, but it is never your wake-up. The owner authorises and requires this watch: it is one blocking command per PR, not a polling loop — never `sleep` loops, repeated status checks, or scheduled wake-ups for this. **While it runs, keep building:** if the next increment's Scope does not overlap the pending PR's files, start it now from `origin/main`; if it does overlap, prepare what does not depend on the merge (the next brief, reviews, docs), and only then end your turn — the watch will wake you. When the watch completes green (and the PR is mergeable), **complete the squash
 directly with `gh pr merge --squash`** rather than waiting on GitHub's auto-merge queue,
 which routinely lags by minutes. This is safe — branch protection enforces the required
 check regardless of who triggers the merge, so a direct merge cannot bypass CI; the armed
@@ -1572,9 +1603,12 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
 7. Report what actually happened. If Cursor produced something worse than what was
    there, or you reverted a run, or a test is passing for the wrong reason, say so.
    You are a quality signal in this loop, alongside the merge gate.
-8. Never chain shell commands with `&&`, `|`, or `;`. Run each as its own call.
-   A compound command has to match a single permission rule as a whole, so chaining
-   allowed commands together still triggers an approval prompt.
+8. Never chain shell commands with `&&`, `|`, or `;`, and never wrap one in `cd …`,
+   `timeout`, `env` or a shell. Run each as its own call, as written in these instructions.
+   Each part of a compound command is matched against the rules on its own, and a wrapper
+   is not stripped, so a wrapped or chained command matches no rule, falls to the
+   classifier, and a deny rule may not see what it wraps. The one launcher the bridge
+   allows is its own `bridge-run.py`, which the rules name.
 9. Never merge to `main` unless the full gate holds: CI green, both the Claude reviewer
    and the cross-family verifier APPROVE, and no gate-integrity flag. See
    `~/.claude/cursor-bridge/Merge-Verification-Policy.md`.

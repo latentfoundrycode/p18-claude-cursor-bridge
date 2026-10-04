@@ -1,0 +1,21 @@
+#!/bin/sh
+# Claude-Cursor Bridge: the cursor-agent shim for Claude Code's Bash tool on Windows.
+# Installed by bridge-install.py at $LOCALAPPDATA/cursor-agent/cursor-agent from
+# ~/.claude/cursor-bridge/cursor-agent.shim; bridge-check.py verifies the installed copy.
+#
+# It forwards every call to cursor-agent.cmd with the owner's identity withheld from the
+# process (KP-032): the builder and the cross-family reviewer must never be able to post,
+# approve, push or merge as the owner. Three things make that so:
+#   - gh reads its login from GH_CONFIG_DIR, which points at an empty folder;
+#   - no token variable reaches the agent;
+#   - git has no credential helper for this process and never prompts, so a push or a
+#     fetch from a private remote fails at once instead of using the owner's stored login.
+# The agent still has everything it needs: the checkout on disk and Cursor's own account.
+BRIDGE_GH_EMPTY="${LOCALAPPDATA:-$HOME/AppData/Local}/cursor-bridge/gh-empty"
+mkdir -p "$BRIDGE_GH_EMPTY" 2>/dev/null
+export GH_CONFIG_DIR="$BRIDGE_GH_EMPTY"
+unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
+export GIT_TERMINAL_PROMPT=0
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0=
+unset GIT_ASKPASS SSH_ASKPASS
+exec cursor-agent.cmd "$@"

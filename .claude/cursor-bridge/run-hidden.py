@@ -60,4 +60,7 @@ def main():
 
 
 if __name__ == "__main__":
+    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(errors="backslashreplace")
     sys.exit(main())

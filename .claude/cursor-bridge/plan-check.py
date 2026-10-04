@@ -40,6 +40,8 @@ import re
 import subprocess
 import sys
 
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 ID = r"TASK-\d{3,}[a-z]?"
 HEAD_RX = re.compile(r"^###\s+(%s)\s*(?:[-:—–]+)?\s*(.*)$" % ID)
 FIELD_RX = re.compile(r"^\s*(?:[-*]\s+)?(Kind|Parent|Depends on|Parallel|Satisfies|Diagrams|Scope|Deferred)\s*:\s*(.*?)\s*$", re.I)
@@ -107,7 +109,7 @@ def parse(paths):
 
 def merged_ids(base):
     p = subprocess.run(["git", "log", base, "--format=%s"], capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
+                       encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
     if p.returncode != 0:
         return None
     return set(ID_RX.findall(p.stdout))
@@ -272,4 +274,7 @@ def main():
 
 
 if __name__ == "__main__":
+    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(errors="backslashreplace")
     sys.exit(main())

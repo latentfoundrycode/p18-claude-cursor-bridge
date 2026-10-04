@@ -9,7 +9,7 @@ It (1) takes the version from the newest "## <version>" entry in
 .claude/cursor-bridge/CHANGELOG.md (so a release starts by writing its note;
 --version overrides), (2) refuses a version with no entry, (3) writes .claude/cursor-bridge/VERSION, and (4) writes
 .claude/cursor-bridge/MANIFEST.json with a normalized sha256 of every file under
-.claude/ except the manifest itself. bridge-check.py on an installed machine then
+.claude/ except the manifest itself and settings.json (compared by entries, see bridge-check.py). bridge-check.py on an installed machine then
 proves whether the copy landed. ASCII-only on purpose.
 """
 import datetime
@@ -66,16 +66,27 @@ def main():
     if version not in changelog_versions():
         print("make-manifest: CHANGELOG.md has no '## %s' entry - write the release note first." % version)
         return 1
+    # settings.json is shared with the owner and Claude Code (KP-030): the bridge's part of it
+    # lives in cursor-bridge/settings.bridge.json, which is the source; the tree's own
+    # settings.json is regenerated from it here (for sessions run inside this Workspace) and
+    # is not fingerprinted, because an installed copy legitimately holds the owner's keys too.
+    src = os.path.join(CB, "settings.bridge.json")
+    with open(src, encoding="utf-8-sig") as f:
+        bridge_settings = json.load(f)
+    bridge_settings.pop("_comment", None)
+    with open(os.path.join(TREE, "settings.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(bridge_settings, f, indent=2)
+        f.write("\n")
     files = {}
     for dirpath, dirs, names in os.walk(TREE):
         dirs[:] = [d for d in dirs if d != "__pycache__"]
         for n in names:
-            if n == "MANIFEST.json":
+            if n == "MANIFEST.json" or n.endswith(".pyc"):
                 continue
             p = os.path.join(dirpath, n)
             rel = os.path.relpath(p, TREE).replace("\\", "/")
-            if rel == "cursor-bridge/VERSION":
-                continue  # written below, hashed after
+            if rel in ("cursor-bridge/VERSION", "settings.json"):
+                continue  # VERSION is written below and hashed after; settings.json is compared by entries
             files[rel] = norm_hash(p)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     with open(os.path.join(CB, "VERSION"), "w", encoding="utf-8", newline="\n") as f:

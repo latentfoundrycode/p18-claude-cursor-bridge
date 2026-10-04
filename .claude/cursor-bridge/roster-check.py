@@ -27,12 +27,15 @@ timeout marks the profile unusable (this catches hard failures only, never a nea
 quota). The chosen profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read.
 --record-failure <model> --stderr-file <path> [--stdout-file <path>]
-  Classify a failed cursor-agent call. USAGE-LIMIT (a usage/quota/limit/billing message) or
-  a second consecutive failure of the same model marks the model's pool exhausted in
+  Classify a failed cursor-agent call. <model> must be a model id of this roster (a wrong
+  argument exits 2 and changes nothing). USAGE-LIMIT (a usage/quota/limit message) or a
+  second failure of the same model within 2 hours marks the model's pool exhausted in
   docs/ROSTER.json automatically (auto_exhausted_at / auto_exhausted_reason) and exits 3 =
-  "re-resolve and restart the step". A first non-limit failure exits 4 = "transient - retry
-  the same step once". The count lives in the roster (failures.<model>) and resets on
-  success or on marking.
+  "re-resolve and restart the step". A connection error (lost, reset, reconnect, 5xx, 429)
+  is transient, never counted, exits 4 = "retry the same step once"; so does a first
+  other failure. The count lives in the roster (failures.<model> = {count, last}); it
+  expires after 2 hours, and --record-success <model> clears it. An automatic
+  "unavailable" mark expires after 6 hours.
 --mark-exhausted   the owner said "usage exhausted": stamp other_pool exhausted now (UTC).
 --mark-reset       the owner said "usage reset": restore other_pool and clear marks now.
 Automatic reset: "reset_day" (day of month, UTC; e.g. 16) in the roster. When other_pool is
@@ -51,7 +54,14 @@ import re
 import subprocess
 import sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env  # noqa: E402  (the stripped environment and the cursor-agent launcher, KP-032)
+
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+FAILURE_WINDOW_HOURS = 2      # two failures count as consecutive only within this window
+UNAVAILABLE_TTL_HOURS = 6     # an automatic "unavailable" mark expires after this
+NL = chr(10)
 PROBE_PROMPT = "Reply with exactly the single word OK and nothing else."
 PROBE_TIMEOUT = 150
 
@@ -103,21 +113,8 @@ def pool_of(model_id, override=None):
 
 
 def cursor_agent_cmd():
-    """Locate the CLI the way Windows needs it: the .cmd launcher run through cmd.exe, or the
-    binary/shim elsewhere. Python's subprocess does not resolve a Git-Bash shim or a .cmd by
-    bare name."""
-    import shutil
-    for cand in ("cursor-agent.cmd", "cursor-agent.exe", "cursor-agent"):
-        found = shutil.which(cand)
-        if found:
-            break
-    else:
-        found = os.path.join(os.environ.get("LOCALAPPDATA", ""), "cursor-agent", "cursor-agent.cmd")
-        if not os.path.isfile(found):
-            return None
-    if found.lower().endswith((".cmd", ".bat")):
-        return ["cmd.exe", "/d", "/c", found]
-    return [found]
+    """The CLI the way Windows needs it (see bridge_env.cursor_agent_launcher)."""
+    return bridge_env.cursor_agent_launcher()
 
 
 def probe(model_id):
@@ -127,7 +124,8 @@ def probe(model_id):
         return False, "cursor-agent not found (PATH or %LOCALAPPDATA%/cursor-agent)"
     try:
         p = subprocess.run(launcher + ["-p", "-f", "--model", model_id, PROBE_PROMPT],
-                           capture_output=True, text=True, timeout=PROBE_TIMEOUT, creationflags=NO_WINDOW)
+                           capture_output=True, text=True, timeout=PROBE_TIMEOUT, creationflags=NO_WINDOW,
+                           env=bridge_env.stripped_env())
     except subprocess.TimeoutExpired:
         return False, "timeout after %ds" % PROBE_TIMEOUT
     except FileNotFoundError:
@@ -197,31 +195,92 @@ def maybe_auto_reset(path, roster):
 
 
 USAGE_LIMIT_PATTERNS = [
-    r"usage[\s-]*limit", r"\busage\b.*\b(exhaust|exceed|reached|used up)", r"\bquota\b",
-    r"\blimit\b.*\b(reached|exceeded)", r"exceeded.*\blimit", r"insufficient (credits|balance|usage)",
-    r"no (remaining|more) (credits|usage|requests)", r"upgrade (your )?plan", r"billing", r"out of (credits|usage)",
-    r"spend(ing)? limit", r"\b402\b", r"payment required",
+    r"usage[\s-]*limit", r"\busage\b.*\b(exhaust|exceed|reached|used up)", r"\bquota\b.*\b(exhaust|exceed|reached)",
+    r"\b(monthly|plan|usage|request|spend(ing)?)\s+limit\b.*\b(reached|exceeded)", r"insufficient (credits|balance|usage)",
+    r"no (remaining|more) (credits|usage|requests)", r"upgrade (your )?plan", r"out of (credits|usage)",
+    r"spend(ing)? limit", r"\b402\b", r"payment required", r"billing (issue|problem|limit)",
+]
+# A dropped line is neither the model's fault nor a usage limit: it never counts toward
+# "consecutive failures" (KP-034: two reconnects once marked Grok unavailable in both profiles).
+CONNECTION_PATTERNS = [
+    r"connection (lost|reset|refused|closed|timed out)", r"\becon(nreset|nrefused)\b", r"\betimedout\b",
+    r"\benotfound\b", r"network (error|unreachable|is unreachable)", r"reconnect", r"socket hang up",
+    r"\b(502|503|504)\b", r"gateway time-?out", r"service unavailable", r"\brate limit",
+    r"\b429\b", r"too many requests",
 ]
 
 
 def classify_failure(text):
+    """USAGE-LIMIT (the pool is used up), CONNECTION (transient, never counted), or OTHER."""
     t = (text or "").lower()
     for pat in USAGE_LIMIT_PATTERNS:
         if re.search(pat, t):
             return "USAGE-LIMIT", pat
+    for pat in CONNECTION_PATTERNS:
+        if re.search(pat, t):
+            return "CONNECTION", pat
     return "OTHER", ""
+
+
+def roster_models(roster):
+    ids = set()
+    rid, _, _ = norm_entry(roster.get("review_a"))
+    if rid:
+        ids.add(rid)
+    for prof in roster.get("profiles") or []:
+        for role in ("builder", "review_b"):
+            mid, _, _ = norm_entry(prof.get(role))
+            if mid:
+                ids.add(mid)
+    for role in ("builder", "review_b"):
+        mid, _, _ = norm_entry(roster.get(role))
+        if mid:
+            ids.add(mid)
+    return ids
+
+
+def expire_unavailable(roster):
+    """Drop automatic 'unavailable' marks older than UNAVAILABLE_TTL_HOURS. Returns the dropped ids."""
+    dropped = []
+    marks = roster.get("unavailable") or {}
+    now = now_utc()
+    for mid, note in list(marks.items()):
+        when = parse_stamp(str(note)[:len("2026-01-01T00:00 UTC")])
+        if when is not None and (now - when).total_seconds() > UNAVAILABLE_TTL_HOURS * 3600:
+            del marks[mid]
+            dropped.append(mid)
+    if not marks:
+        roster.pop("unavailable", None)
+    return dropped
 
 
 def record_failure(path, roster, model, text):
     """Mark the model's pool exhausted on a usage-limit message or a second consecutive
-    failure; otherwise count it. Writes the roster. Returns the exit code (3 or 4)."""
+    failure within FAILURE_WINDOW_HOURS; a connection error is transient and never counted;
+    otherwise count it. Writes the roster. Returns the exit code (2, 3 or 4)."""
+    if model not in roster_models(roster):
+        print("CANNOT RECORD: %r is not a model in this roster (%s)" % (model, ", ".join(sorted(roster_models(roster)))))
+        print("               the argument after --record-failure must be the model id of the failed call; nothing was changed")
+        return 2
     kind, pat = classify_failure(text)
+    now = now_utc()
+    when = stamp(now)
+    excerpt = (text or "").strip().replace(NL, " ")[:300]
+    if kind == "CONNECTION":
+        print("TRANSIENT  %s: connection error (%s), not counted - retry the same step once." % (model, pat))
+        print("           excerpt: %s" % excerpt)
+        return 4
     failures = roster.setdefault("failures", {})
-    count = failures.get(model, 0) + 1
-    failures[model] = count
+    prev = failures.get(model)
+    count = 1
+    if isinstance(prev, dict):
+        last = parse_stamp(prev.get("last") or "")
+        if last is not None and (now - last).total_seconds() <= FAILURE_WINDOW_HOURS * 3600:
+            count = int(prev.get("count", 0)) + 1
+    elif isinstance(prev, int) and prev > 0:
+        count = prev + 1                               # a count written by an older release
+    failures[model] = {"count": count, "last": when}
     pool = pool_of(model)
-    when = stamp(now_utc())
-    excerpt = (text or "").strip().replace("\n", " ")[:300]
     if kind == "USAGE-LIMIT" or count >= 2:
         reason = "usage-limit message (%s)" % pat if kind == "USAGE-LIMIT" else "%d consecutive failures" % count
         if pool == "other":
@@ -235,10 +294,10 @@ def record_failure(path, roster, model, text):
             roster.setdefault("unavailable", {})[model] = "%s: %s -- %s" % (when, reason, excerpt)
             print("UNAVAILABLE  %s (%s pool): %s" % (model, pool, reason))
             print("             marked unavailable in the roster; re-resolve and restart the step.")
-        failures[model] = 0
+        failures.pop(model, None)
         code = 3
     else:
-        print("TRANSIENT  %s: first failure, not a usage-limit message - retry the same step once." % model)
+        print("TRANSIENT  %s: first failure in %d hours, not a usage-limit message - retry the same step once." % (model, FAILURE_WINDOW_HOURS))
         print("           excerpt: %s" % excerpt)
         code = 4
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -286,7 +345,21 @@ def main():
                     pass
         return record_failure(path, roster, model, text)
 
+    if "--record-success" in argv:
+        model = argv[argv.index("--record-success") + 1]
+        changed = (roster.get("failures") or {}).pop(model, None) is not None
+        if changed:
+            with open(path, "w", encoding="utf-8", newline=NL) as f:
+                json.dump(roster, f, indent=2); f.write(NL)
+        print(("ok    failure count cleared for %s" if changed else "ok    no failure count for %s") % model)
+        return 0
+
     maybe_auto_reset(path, roster)
+    dropped = expire_unavailable(roster)
+    if dropped:
+        with open(path, "w", encoding="utf-8", newline=NL) as f:
+            json.dump(roster, f, indent=2); f.write(NL)
+        print("note  unavailable mark expired after %d hours: %s" % (UNAVAILABLE_TTL_HOURS, ", ".join(dropped)))
     other_pool = (roster.get("other_pool") or "available").lower()
     unavailable = roster.get("unavailable") or {}
     ra_id, ra_fam_o, _ = norm_entry(roster.get("review_a"))
@@ -356,4 +429,7 @@ def main():
 
 
 if __name__ == "__main__":
+    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(errors="backslashreplace")
     sys.exit(main())

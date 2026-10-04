@@ -1,0 +1,24 @@
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  tests:
+    name: bridge programs (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - run: python -m pytest tests -q
+      - name: windowless check over the bridge's programs
+        run: python .claude/cursor-bridge/windowless-check.py .claude/cursor-bridge
+      - name: the manifest matches the tree
+        run: python .claude/cursor-bridge/bridge-check.py --root .claude --quiet

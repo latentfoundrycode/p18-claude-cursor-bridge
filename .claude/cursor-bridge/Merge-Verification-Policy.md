@@ -347,8 +347,8 @@ that makes the reviewers argue rather than vote blind).
 2. **Each reviewer answers the other.** Invoke Review A and Review B once more, each told to
    read the file, engage the *other's* argument directly (not merely restate its own), and
    return a **reasoned vote** for one candidate answer with its decisive reason. Launch each
-   read-only with the same discipline Review B already requires: the trust-bypass flag
-   (`-f`), a directive prompt ("the material is at `<path>`; read it; do not ask for it"),
+   read-only with the same discipline Review B already requires: through the launcher with
+   `--trust --mode ask` (never `-f`), a directive prompt ("the material is at `<path>`; read it; do not ask for it"),
    and a **receipt check** — a reply that does not name something specific from the file is a
    failed launch, not a vote; re-run it. Confirm `git status` is unchanged afterward.
 3. **The supervisor decides on the record.** With both reasoned votes in hand it makes the
@@ -398,7 +398,7 @@ reviews APPROVE, no gate-integrity flag, the required `gate` check green, and th
 mergeable/`CLEAN` — the supervisor may **complete the squash directly** (`gh pr merge
 --squash`). This is safe and equivalent to the queue landing it: branch protection enforces
 the required check regardless of *who* triggers the merge, so a direct `gh pr merge` cannot
-bypass CI any more than auto-merge can. `git pr merge --squash --auto` is still armed first,
+bypass CI any more than auto-merge can. `gh pr merge --squash --auto` is still armed first,
 as a **safety net** in case the session ends before the check is green; it is not the
 mechanism to wait on. Never complete a merge before the required check is green or before
 both reviews have APPROVED — the direct path is a convenience over the queue, never a
@@ -470,7 +470,12 @@ Two options for reaching it:
   outside `Workspace/`, which the boundary blocks), **generated only from committed state**
   (`git status --porcelain` empty, then `git diff <merge-base>...HEAD`; a working-tree diff
   omits every untracked new file, and a reviewer that receives an incomplete diff has
-  correctly refused it twice), then invoke `cursor-agent -p --model <Review B family>` with
+  correctly refused it twice), then invoke Review B **through the launcher, read-only**:
+  `python ~/.claude/cursor-bridge/bridge-run.py --limit 1800 -- cursor-agent -p --trust --mode ask --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<nnn>.err`
+  (`--mode ask` is the CLI's own read-only mode: it reads files and answers, and cannot edit
+  or run commands; `--trust` clears the workspace-trust gate without force-allowing anything;
+  the launcher withholds the owner's GitHub identity from the process and ends it at the
+  limit, KP-032 and KP-033) with
   a prompt that tells it to **read the diff from that file** — do **not** pass the diff
   inline through the shell. (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
@@ -480,19 +485,23 @@ Two options for reaching it:
   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
   nothing; run it on a clean committed checkpoint and confirm `git status` is unchanged
-  afterward, so the review stays read-only in practice. This reuses existing auth and adds
-  no orchestration, keeping it inside the bridge's "no scripts, no secrets in prompts"
-  constraints.
+  afterward, so the review stays read-only in practice. **Then prove it wrote nowhere else:**
+  `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the UTC time the review was launched>`
+  lists every comment and review on the pull request since the launch and flags any written
+  as the owner (the reviewer once posted its verdict on a pull request under the owner's
+  name, twice: KP-032). `GATE-INTEGRITY` means do not merge; record the flag and an issue.
+  `CANNOT VERIFY` is not clean: fix the cause and re-run before the merge.
 
   **Two launch failures that have actually happened — prevent both, don't just catch them:**
 
   1. **Workspace-trust gate.** In a folder Cursor has not trusted yet (a fresh clone or
      worktree) `cursor-agent` refuses to run
      non-interactively until the folder is trusted, so Review B silently doesn't launch.
-     Invoke Review B with the same trust-bypass flag the builder uses (`-f`/`--force`) so the
-     prompt cannot stall it. Giving a *reviewer* `--force` is only to clear that gate, not to
-     let it write — the read-only guarantee is the post-run `git status` check above
-     (reject the verdict and re-run if the tree changed), not the absence of the flag.
+     Invoke Review B with `--trust`, which clears that gate and nothing else. Never give a
+     reviewer `-f`/`--force`: that flag force-allows commands, which is the builder's need,
+     not a reviewer's. The read-only guarantee is `--mode ask` plus the post-run `git status`
+     check above (reject the verdict and re-run if the tree changed) plus the pull-request
+     activity check.
   2. **Prompt-as-preamble.** Review B has replied "please provide the diff" instead of
      reading the file, treating the instructions as chatter. Use a **directive** prompt that
      removes all ambiguity: state that the diff is *already written to `<path>`*, that it must

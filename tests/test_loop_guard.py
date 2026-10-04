@@ -1,0 +1,104 @@
+"""loop-guard.py: which background work counts as a wake source (KP-031), where the status
+file is found, and how its fields are read. Synthetic transcripts only."""
+import json
+import os
+import time
+from datetime import datetime, timezone
+
+import pytest
+
+
+@pytest.fixture
+def lg(program):
+    return program("loop-guard")
+
+
+NOW = time.time()
+
+
+def ts(offset=0):
+    return datetime.fromtimestamp(NOW + offset, tz=timezone.utc).isoformat()
+
+
+def write_transcript(tmp_path, cmd, tool="Bash", done=False, done_as="message"):
+    lines = [
+        {"timestamp": ts(-60), "message": {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "u1", "name": tool, "input": {"command": cmd, "run_in_background": True}}]}},
+        {"timestamp": ts(-59), "toolUseResult": {"backgroundTaskId": "b1"},
+         "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "u1", "content": "started"}]}},
+    ]
+    note = "<task-notification><task-id>b1</task-id><status>completed</status></task-notification>"
+    if done and done_as == "message":
+        lines.append({"timestamp": ts(-10), "message": {"role": "user", "content": [{"type": "text", "text": note}]}})
+    elif done and done_as == "queue":
+        lines.append({"timestamp": ts(-10), "type": "queue-operation", "operation": "enqueue", "content": note})
+    elif done and done_as == "attachment":
+        lines.append({"timestamp": ts(-10), "type": "attachment", "attachment": {"type": "queued_command", "prompt": note}})
+    f = tmp_path / "t.jsonl"
+    f.write_text("\n".join(json.dumps(o) for o in lines) + "\n", encoding="utf-8")
+    return str(f)
+
+
+@pytest.mark.parametrize("name,cmd,expect", [
+    ("a dev server is not a wake source", "uv run --project backend reangle dev start > log 2>&1", False),
+    ("docker compose up is not a wake source", "docker compose up -d", False),
+    ("a builder run is a wake source", "cursor-agent -p --force --model grok-4.7-high \"Read handoff/TASK-001.md\" 2> run/agent/TASK-001.err", True),
+    ("a builder run through bridge-run is a wake source", "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --model x \"Read handoff/TASK-001.md\"", True),
+    ("the CI watch is a wake source", "gh pr checks 62 --repo x/y --watch --required --fail-fast 2>&1 | tail -6", True),
+    ("a marked command is a wake source", "python scratch/pgtest.py . # wake", True),
+    ("the marker is case-insensitive", "python bench.py  #WAKE", True),
+    ("an unmarked script is not a wake source", "python scratch/pgtest.py .", False),
+])
+def test_wake_sources(lg, tmp_path, name, cmd, expect):
+    assert bool(lg.pending_wakeups(write_transcript(tmp_path, cmd), NOW)) == expect, name
+
+
+def test_a_server_started_with_the_powershell_tool_is_not_a_wake_source(lg, tmp_path):
+    assert not lg.pending_wakeups(write_transcript(tmp_path, "npm run dev", tool="PowerShell"), NOW)
+
+
+@pytest.mark.parametrize("how", ["message", "queue", "attachment"])
+def test_a_finished_task_is_not_pending_however_its_notice_arrived(lg, tmp_path, how):
+    assert not lg.pending_wakeups(write_transcript(tmp_path, "cursor-agent -p --force x", done=True, done_as=how), NOW)
+
+
+def test_a_background_agent_is_a_wake_source(lg, tmp_path):
+    lines = [{"timestamp": ts(-60), "message": {"role": "assistant", "content": [
+        {"type": "tool_use", "id": "u2", "name": "Agent", "input": {"prompt": "review", "run_in_background": True}}]}},
+        {"timestamp": ts(-59), "toolUseResult": {"agentId": "a1", "isAsync": True},
+         "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "u2", "content": "launched"}]}}]
+    f = tmp_path / "t.jsonl"
+    f.write_text("\n".join(json.dumps(o) for o in lines) + "\n", encoding="utf-8")
+    assert lg.pending_wakeups(str(f), NOW)
+
+
+def test_status_file_is_found_from_every_start_folder(lg, tmp_path):
+    root = tmp_path
+    (root / "Workspace" / "docs").mkdir(parents=True)
+    (root / "Workspace" / "src").mkdir()
+    (root / "Worktrees" / "TASK-012" / "docs").mkdir(parents=True)
+    (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text("**Phase:** building\n- Awaiting user on: none (nothing pending)\n", encoding="utf-8")
+    (root / "Worktrees" / "TASK-012" / "docs" / "PROJECT_STATUS.md").write_text("Phase: planning\n", encoding="utf-8")
+    for cwd in (root / "Workspace", root, root / "Worktrees" / "TASK-012", root / "Workspace" / "src"):
+        status = lg.read_status(str(cwd))
+        assert status is not None, cwd
+        assert lg.field(status, "Phase") == "building", cwd
+        assert lg.field(status, "Awaiting user on").startswith("none"), cwd
+
+
+@pytest.mark.parametrize("text,value", [
+    ("Phase: building (stage 2)", "building (stage 2)"),
+    ("**Phase:** building", "building"),
+    ("- Phase: `changing`", "changing"),
+    ("* **Phase**: done", "done"),
+])
+def test_field_variants(lg, text, value):
+    assert lg.field(text, "Phase") == value
+
+
+def test_stop_hook_active_allows(lg, monkeypatch, capsys):
+    import io, sys
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"stop_hook_active": True})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 0

@@ -35,6 +35,8 @@ import re
 import subprocess
 import sys
 
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 CATALOGUE = {
     # kind: (level, allowed notations)
     "use-case": (1, ("flowchart", "graph")),
@@ -380,7 +382,7 @@ def tracked():
     """Tracked files plus untracked, non-ignored ones: at loop step 4 the builder's new files
     are not committed yet, and an import in a new file must not escape the check."""
     p = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                       capture_output=True)
+                       capture_output=True, creationflags=NO_WINDOW)
     if p.returncode != 0:
         return None
     files = {f.replace("\\", "/") for f in p.stdout.decode("utf-8", "replace").split("\0") if f}
@@ -815,4 +817,7 @@ def main():
 
 
 if __name__ == "__main__":
+    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(errors="backslashreplace")
     sys.exit(main())
