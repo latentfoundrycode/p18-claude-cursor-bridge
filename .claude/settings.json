@@ -18,6 +18,7 @@
       "Bash(git revert:*)",
       "Bash(git reset --hard:*)",
       "Bash(git clean -fd:*)",
+      "Bash(git checkout -- *)",
       "Bash(git config core.hooksPath:*)",
       "Bash(git worktree add ../Worktrees/*)",
       "Bash(git worktree remove ../Worktrees/*)",

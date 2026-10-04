@@ -114,10 +114,9 @@ def collect_agent_invocations():
 
 @pytest.mark.parametrize("src,cmd", collect_agent_invocations())
 def test_every_agent_run_goes_through_the_launcher_and_reviews_are_read_only(src, cmd):
-    """Release 0a review, F2: the launcher gives the limit and withholds the identity, and a
-    reviewer runs in the CLI's read-only mode, never force-allowing commands."""
+    """Release 0a review, F2: the launcher gives the limit and withholds the identity; Review B
+    keeps execution (it runs tests and reproductions) on a checkpoint restored afterwards."""
     assert cmd.startswith("python ~/.claude/cursor-bridge/bridge-run.py --limit "), "%s: not through the launcher: %r" % (src, cmd)
-    if "--mode ask" in cmd:
-        assert " -f " not in cmd and "--force" not in cmd, "%s: a read-only review with a force flag: %r" % (src, cmd)
-    if "--limit 1800" in cmd:
-        assert "--mode ask" in cmd and "--trust" in cmd, "%s: a review without the read-only mode: %r" % (src, cmd)
+    assert "--mode ask" not in cmd, "%s: the read-only mode was dropped (owner, 2026-10-04): %r" % (src, cmd)
+    if "REVIEW-" in cmd:
+        assert "--force" in cmd and "--limit 3600" in cmd, "%s: Review B runs with execution under a one-hour limit: %r" % (src, cmd)

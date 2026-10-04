@@ -347,8 +347,8 @@ that makes the reviewers argue rather than vote blind).
 2. **Each reviewer answers the other.** Invoke Review A and Review B once more, each told to
    read the file, engage the *other's* argument directly (not merely restate its own), and
    return a **reasoned vote** for one candidate answer with its decisive reason. Launch each
-   read-only with the same discipline Review B already requires: through the launcher with
-   `--trust --mode ask` (never `-f`), a directive prompt ("the material is at `<path>`; read it; do not ask for it"),
+   with the same discipline Review B already requires: through the launcher with `--force`
+   on a committed checkpoint restored afterwards, a directive prompt ("the material is at `<path>`; read it; do not ask for it"),
    and a **receipt check** — a reply that does not name something specific from the file is a
    failed launch, not a vote; re-run it. Confirm `git status` is unchanged afterward.
 3. **The supervisor decides on the record.** With both reasoned votes in hand it makes the
@@ -470,12 +470,14 @@ Two options for reaching it:
   outside `Workspace/`, which the boundary blocks), **generated only from committed state**
   (`git status --porcelain` empty, then `git diff <merge-base>...HEAD`; a working-tree diff
   omits every untracked new file, and a reviewer that receives an incomplete diff has
-  correctly refused it twice), then invoke Review B **through the launcher, read-only**:
-  `python ~/.claude/cursor-bridge/bridge-run.py --limit 1800 -- cursor-agent -p --trust --mode ask --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<nnn>.err`
-  (`--mode ask` is the CLI's own read-only mode: it reads files and answers, and cannot edit
-  or run commands; `--trust` clears the workspace-trust gate without force-allowing anything;
-  the launcher withholds the owner's GitHub identity from the process and ends it at the
-  limit, KP-032 and KP-033) with
+  correctly refused it twice), then invoke Review B **through the launcher, with execution**:
+  `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- cursor-agent -p --force --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<nnn>.err`
+  (`--force` lets it run the project's tests, write throwaway reproductions, and try a
+  temporary mutation to see whether the tests catch it — the reviewer's strongest findings
+  in the record came from exactly that, and the owner decided on 2026-10-04 to keep it
+  after a read-only mode was tried and found weaker; the launcher withholds the owner's
+  GitHub identity from the process, so a post, push or merge from inside the review fails,
+  and ends the run at the limit, KP-032 and KP-033) with
   a prompt that tells it to **read the diff from that file** — do **not** pass the diff
   inline through the shell. (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
@@ -484,8 +486,13 @@ Two options for reaching it:
   **GPT-5.6 Sol** while the builder is Grok 4.7 (full profile), or **Grok 4.7** while the builder is Composer 2.5 (native profile) — a genuine third family either way; the ids in use are always the ones in `docs/ROSTER.resolved.json`.
   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
-  nothing; run it on a clean committed checkpoint and confirm `git status` is unchanged
-  afterward, so the review stays read-only in practice. **Then check it wrote nowhere else:**
+  nothing that reaches the branch: run it on a clean committed checkpoint, **commit your
+  own work first and write nothing to the checkout while it runs**, and afterwards restore
+  the checkpoint exactly: `git status --porcelain`, and if anything shows, `git checkout -- .`
+  then `git clean -fd`, noting in the record that the reviewer left something behind. A
+  temporary file or mutation the reviewer made for a check is expected; one that survives
+  into the branch is not, and the restore makes that impossible. **Then check it wrote
+  nowhere else:**
   `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the launch time>`, where
   the launch time is the launcher's first stderr line (`bridge-run: started <time>Z`, the
   first line of the `.err` file; a time without a zone is refused). It lists every comment
@@ -504,11 +511,11 @@ Two options for reaching it:
   1. **Workspace-trust gate.** In a folder Cursor has not trusted yet (a fresh clone or
      worktree) `cursor-agent` refuses to run
      non-interactively until the folder is trusted, so Review B silently doesn't launch.
-     Invoke Review B with `--trust`, which clears that gate and nothing else. Never give a
-     reviewer `-f`/`--force`: that flag force-allows commands, which is the builder's need,
-     not a reviewer's. The read-only guarantee is `--mode ask` plus the post-run `git status`
-     check above (reject the verdict and re-run if the tree changed) plus the pull-request
-     activity check.
+     Invoke Review B with `--force` (which also clears that gate), through the launcher.
+     What keeps a reviewer with execution from doing harm: its identity is withheld (it
+     cannot post, push or merge as the owner), it runs on a committed checkpoint that is
+     restored afterwards (nothing it writes reaches the branch), the launcher's limit ends
+     a hung reproduction, and the pull-request activity check runs before the merge.
   2. **Prompt-as-preamble.** Review B has replied "please provide the diff" instead of
      reading the file, treating the instructions as chatter. Use a **directive** prompt that
      removes all ambiguity: state that the diff is *already written to `<path>`*, that it must
