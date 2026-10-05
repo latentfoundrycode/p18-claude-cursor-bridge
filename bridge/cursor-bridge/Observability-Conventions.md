@@ -9,7 +9,7 @@ running render — as **measurable checks**, not a screen for the human to eyeba
 It is a **design-time default for UI-bearing projects** (those that produced a Phase-1
 screen-and-state inventory), **not a universal law**: a CLI or library has no inventory and
 opts out. The **supervisor owns the dial** and records the choice in Phase 2
-(`DESIGN.md`/`PROJECT_STATUS.md`); it escalates to the user only where a new dependency/cost is
+(`DESIGN.md` and the Resources of `docs/INVENTORY.md`); it escalates to the user only where a new dependency/cost is
 involved (drivers — see §Escalations). This doc is the master contract; each project
 instantiates it as a **`DESIGN.md` "Observability & Verifiability" section**.
 
@@ -25,7 +25,7 @@ instantiates it as a **`DESIGN.md` "Observability & Verifiability" section**.
   *existing* mockup-fidelity judgement. **Not** a pixel diff and **not** a new reviewer.
 
 A trivial 2-screen tool takes Tier A (assertions) and skips Tier B; a data-dense product with
-many states takes both. Record which in `PROJECT_STATUS.md`.
+many states takes both. Record which in `docs/INVENTORY.md` (Resources).
 
 ---
 
@@ -142,7 +142,7 @@ backdoor.
 
 ## Resumability
 
-Record in `PROJECT_STATUS.md`: the observability **tier**, the **driver + pinned version**, the
+Record in `docs/INVENTORY.md` (Resources): the observability **tier**, the **driver + pinned version**, the
 **invariant set** in force, and the **state → reachability-mechanism map**. A resumed session
 must know what is being asserted and how each state is reached.
 

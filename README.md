@@ -1,70 +1,35 @@
-# Claude-Cursor Bridge — staging tree
+# Claude-Cursor Bridge
 
-A version-controlled **staging copy of the Claude-Cursor Bridge `~/.claude/` governance
-tree**, extended with the **design-tooling integration** (Impeccable + the Vercel Web
-Interface Guidelines + a vendored awesome-design-md seed corpus). These files are the
-build loop's *instructions* — governance, not any product. They install over the live
-`~/.claude/`.
+The Claude-Cursor Bridge is a governance layer for Claude Code: instructions, subagents and small programs under which a Claude Code session supervises a software project and delegates the implementation to the Cursor CLI. This repository holds its sources, its tests and the tool that stamps a release. It is not installed from here by copying.
 
 ## Layout
 
-- **`.claude/`** — the bridge governance tree:
-  - `commands/` — the `supervisor` command and `calibrate-bridge` (verifies an installed tree
-    against the release manifest, re-reads the governing files, applies a release's
-    adjustments by phase without reopening a gate).
-  - `agents/` — the specialist subagents (`cursor-configurator`, `spec-packager`,
-    `diff-reviewer`, `design-auditor`, `security-auditor`, `refactor-scout`, `plan-critic`,
-    `test-runner`, `secret-sentinel`).
-  - `cursor-bridge/` — the bridge references (plus the bundled scripts `scope-check.py`,
-    `shell-guard.py`, `boundary-check.py` — an advisory after-edit detector for builder
-    writes outside `Workspace/` — and the windowless pair `run-hidden.py` /
-    `windowless-check.py`, which keep hook- and tool-launched console programs from popping
-    terminal windows on the user's desktop, and `refactor-check.py`, the purity check for a
-    stage's refactoring diff; plus `bridge-check.py`, `VERSION`, `MANIFEST.json`, and
-    `CHANGELOG.md` — the release stamp; and `installer-check.ps1`, the install / upgrade /
-    uninstall lifecycle check for desktop installers; and `bench-check.py`, the benchmark floor
-    checker against budgets and a committed baseline; and `lock-check.py`, which fails a
-    dependency-manifest change that lacks its lockfile change; and `roster-check.py`, which
-    fails a model roster whose three roles do not sit on three families): `Cursor-File-Formats.md`,
-    `Delivery-Conventions.md`, `Performance-Conventions.md`, `Performance-Patterns.md`
-    (the catalogue of recurring causes of slowness and cost, maintained like
-    `Known-Pitfalls.md`),
-    `Cursor-Project-Configuration.md`, `Merge-Verification-Policy.md`, the bundled
-    `vercel-interface.snapshot.md` fallback, and `design-seeds/` (the vendored
-    awesome-design-md corpus — one `DESIGN.md` per brand, a seed to bootstrap a project's
-    own identity, never shipped as-is).
-  - `skills/` — the `design-sense` house-design-sense skill, the `explain-for-decision`
-    skill (how a technical matter is explained to the non-engineer owner when it surfaces for
-    a decision: the selection heuristic, the nine guards, the decision-brief shape), and the
-    `root-cause-first` skill (evidence-before-fix debugging: reproduce, hypothesize,
-    instrument to discriminate, read the run, fix the confirmed cause — usable by any session).
-  - `settings.json` — the bridge's permission allowlist.
+- **`bridge/`** — the governance sources, in the layout they have once installed under `~/.claude`:
+  - `commands/` — `supervisor` (the supervising architect's instructions) and `calibrate-bridge` (aligns a running project with the installed release).
+  - `agents/` — the subagents: `spec-packager`, `diff-reviewer`, `design-auditor`, `security-auditor`, `plan-critic`, `diagram-specialist`, `refactor-scout`, `test-runner`, `secret-sentinel`, `cursor-configurator`.
+  - `skills/` — `explain-for-decision`, `root-cause-first`, `design-sense`.
+  - `cursor-bridge/` — the conventions and policies (`Merge-Verification-Policy.md`, `Known-Pitfalls.md`, and the rest), the bridge's programs (`bridge-install.py`, `bridge-check.py`, `bridge-run.py`, `review-guard.py`, `scope-check.py`, `plan-check.py`, and the others), the bridge's entries for the owner's settings (`settings.bridge.json`), and the release stamp (`VERSION`, `MANIFEST.json`, `CHANGELOG.md`).
+- **`tests/`** — the test suite for the programs and for the consistency of the instructions; run in CI on Windows and Linux.
+- **`tools/make-manifest.py`** — stamps a release.
 
-Transient clones (`web-interface-guidelines/`, `impeccable/`) are **gitignored** and are
-not part of the repo — they are consumed once during setup and deleted. Their content that
-the bridge needs is already vendored (the Vercel snapshot; the design seeds).
+The sources are deliberately **not** in a folder named `.claude`: Claude Code loads agents, commands, settings and hooks from a project's `.claude` folder, so a session working here would run the half-edited bridge instead of the installed one (`Known-Pitfalls.md`, KP-037).
 
-## Release stamp (maintainer)
+## Changing the bridge
 
-Before every commit that changes `.claude/`: add a `## <version>` entry to
-`.claude/cursor-bridge/CHANGELOG.md` (with its **Running projects must** list, by phase),
-then run `python tools/make-manifest.py` — it writes `VERSION` and `MANIFEST.json`. An
-installed machine verifies the copy with `python ~/.claude/cursor-bridge/bridge-check.py`.
+`main` is protected: both CI jobs are required and every change arrives through a pull request. Before a commit that changes `bridge/`, add a `## <version>` entry to `bridge/cursor-bridge/CHANGELOG.md` (what changed; what running projects must do, by phase; what a project restores if the release is rolled back), then run:
 
-## Install
+```bash
+python tools/make-manifest.py
+```
 
-1. Copy this repo's `.claude/` over the live `~/.claude/`.
-2. Do the environment setup (Part A, step A4 of the implementation instructions): Node 24+
-   with `npx` reachable from Git Bash, and
-   `npx impeccable install --providers=claude --scope=global --no-hooks`.
-3. Restart the Claude desktop app (new files under `agents/` and `commands/` are only
-   picked up on restart), then confirm `/supervisor` and the `design-auditor` subagent
-   appear.
+It writes `VERSION` and `MANIFEST.json`. Run the tests with `python -m pytest tests -q`.
 
-## The design and its rationale
+## Installing and taking back a release
 
-- `Documents/Design-Tooling-Integration-Summary.md` — the settled design (the *why*).
-- `Documents/Design-Tooling-Bridge-Implementation-Instructions.md` — the executable edit
-  plan (the *how*).
+```bash
+python bridge/cursor-bridge/bridge-install.py
+```
 
-This README documents the repo; it is not a second copy of those design docs.
+copies the sources into `~/.claude`, merges the bridge's entries into the owner's `settings.json` without touching the owner's own keys, installs the `cursor-agent` shim, keeps the previously installed release, and verifies the result. Restart the Claude app afterwards and run `/calibrate-bridge` in each project. `python ~/.claude/cursor-bridge/bridge-install.py --rollback` puts the previous release back. The bridge is installed once per computer, so both reach every project on it at once.
+
+The owner's guides (setting up, starting a project), the Project Summary and the restructuring plan live in `Documents/` beside this repository's folder and are not part of the repository.

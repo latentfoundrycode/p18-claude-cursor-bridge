@@ -19,6 +19,6 @@ jobs:
       - run: python -m pip install pytest==9.1.1
       - run: python -m pytest tests -q
       - name: windowless check over the bridge's programs
-        run: python .claude/cursor-bridge/windowless-check.py .claude/cursor-bridge
+        run: python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge
       - name: the manifest matches the tree
-        run: python .claude/cursor-bridge/bridge-check.py --root .claude --quiet
+        run: python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet

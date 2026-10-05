@@ -12,7 +12,7 @@ import pytest
 from permission_rules import decide, rule_matches
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CLAUDE = os.path.join(HERE, os.pardir, ".claude")
+CLAUDE = os.path.join(HERE, os.pardir, "bridge")
 SETTINGS = json.load(open(os.path.join(CLAUDE, "cursor-bridge", "settings.bridge.json"), encoding="utf-8"))
 ALLOW = SETTINGS["permissions"]["allow"]
 DENY = SETTINGS["permissions"]["deny"]

@@ -528,7 +528,7 @@ rulesets. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if b
 off; native Windows support is now GA, but the floor still runs Semgrep in CI on Linux).
 
 ```yaml
-# Pinned ruleset reference — record the exact version/commit in PROJECT_STATUS.md
+# Pinned ruleset reference — record the exact version/commit in docs/INVENTORY.md (Resources)
 rules:
   - p/default
   - p/secrets
@@ -536,7 +536,7 @@ rules:
 ```
 
 - Prefer curated registry packs (`p/…`) pinned to a recorded version, or vendor a fixed
-  rule file into the repo. Pin the **Semgrep CLI version** too (`PROJECT_STATUS.md`).
+  rule file into the repo. Pin the **Semgrep CLI version** too (`docs/INVENTORY.md` (Resources)).
 - Findings above the chosen severity block in CI. Inline `# nosemgrep` suppressions are a
   **gate-integrity flag** (see `Merge-Verification-Policy.md`) unless justified as a false
   positive with a stated reason.
@@ -610,7 +610,7 @@ high-severity/primary finding turns the single `gate` check red.
 **SHA-pin rule (load-bearing — see `Merge-Verification-Policy.md` and the Trivy meta-risk):**
 pin every security tool and every CI **action** to a **full commit SHA, never a mutable
 tag**. `uses: some-action@v2` is the exact vector exploited in the March 2026 Trivy
-supply-chain compromise. Record each pinned SHA in `PROJECT_STATUS.md`. Scanners get only
+supply-chain compromise. Record each pinned SHA in `docs/INVENTORY.md` (Resources). Scanners get only
 the minimum environment — no secrets on a scanner's path beyond Socket's read-scoped token.
 
 ---
@@ -682,7 +682,7 @@ globs: **/*.ts, **/*.tsx, **/*.js, **/*.jsx, **/*.py, **/*.go, **/*.rb, **/*.jav
   for the project's chosen ASVS tier (L1/L2/L3), plus the LLM supplement for AI-bearing
   products. ASVS is **stable**, so the freeze pins `v5.0.0` and does **not** need the
   per-project live-fetch-validation the beta Vercel rules use — the bundled snapshot is the
-  source. Record the ASVS version and level in `PROJECT_STATUS.md`.
+  source. Record the ASVS version and level in `docs/INVENTORY.md` (Resources).
 
 ### `.cursor/rules/workspace-boundary.mdc` — the always-on Workspace boundary
 

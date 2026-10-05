@@ -5,7 +5,7 @@ import os
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CURSOR_BRIDGE = os.path.join(HERE, os.pardir, ".claude", "cursor-bridge")
+CURSOR_BRIDGE = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge")
 
 
 def load_program(name):

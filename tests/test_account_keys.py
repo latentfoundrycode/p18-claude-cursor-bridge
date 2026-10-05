@@ -9,7 +9,7 @@ import subprocess
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SHIM = os.path.join(HERE, os.pardir, ".claude", "cursor-bridge", "cursor-agent.shim")
+SHIM = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "cursor-agent.shim")
 
 WITHHELD = ["ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "AZURE_DI_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET",
             "HF_TOKEN", "NPM_TOKEN", "SOCKET_CLI_API_TOKEN", "SEMGREP_APP_TOKEN", "STRIPE_SECRET_KEY",

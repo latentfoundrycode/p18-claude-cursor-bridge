@@ -30,6 +30,16 @@ mismatch ("the plan assumes X; the code has Y") so it becomes a scope question o
 correction. Three times on one project the frozen plan met the as-built data and had to
 bend; catching it here costs minutes, catching it after delegation costs a round.
 
+**The two bookkeeping files a builder writes are named in Scope, each as a bare path.** The
+delegate command and the Out of scope section keep `docs/` closed except for what Scope names,
+so a brief that asks the builder to write a file there and does not list it contradicts itself
+(plan review R17: every project's builder notes were written against the command that forbade
+them). Always list `docs/BUILDER_NOTES.md`: the Constraints section asks the builder to append
+to it. List `docs/cli-reference.json` whenever the increment adds or changes a command of
+installable software: the delivery conventions require it regenerated in the same diff, and
+the reviewer rejects the diff without it. Nothing else under `docs/` or `handoff/` goes in
+Scope.
+
 ## Write to `handoff/TASK-<nnn>.md`
 
 ```markdown
@@ -45,13 +55,14 @@ Satisfies: <the requirement IDs from the build plan, e.g. R-004, R-011 — each 
 Files and directories you may create or modify:
 - path/one
 - path/two
+- docs/BUILDER_NOTES.md
 
 Do not modify anything else.
 
 ## Out of scope
 - .env and anything under secrets/
 - CI configuration
-- docs/ and handoff/
+- docs/ and handoff/, except the files the Scope section names
 - <anything else this specific task must not touch>
 
 ## Context

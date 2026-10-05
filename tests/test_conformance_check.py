@@ -10,8 +10,8 @@ import sys
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROG = os.path.join(HERE, os.pardir, ".claude", "cursor-bridge", "conformance-check.py")
-VERSION = open(os.path.join(HERE, os.pardir, ".claude", "cursor-bridge", "VERSION"), encoding="utf-8").read().strip()
+PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "conformance-check.py")
+VERSION = open(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "VERSION"), encoding="utf-8").read().strip()
 
 GATE = """name: gate
 on: [pull_request]

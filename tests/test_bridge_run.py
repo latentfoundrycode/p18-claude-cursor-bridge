@@ -10,7 +10,7 @@ import time
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROG = os.path.join(HERE, os.pardir, ".claude", "cursor-bridge", "bridge-run.py")
+PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "bridge-run.py")
 TREE = os.path.join(HERE, "helpers", "sleep_tree.py")
 
 
@@ -118,7 +118,7 @@ def test_stripped_environment_recipe(program, tmp_path, monkeypatch):
 def test_shim_and_python_apply_the_same_recipe(program):
     """cursor-agent.shim (for the Bash tool) and bridge_env (for the Python launchers) must
     withhold the same things, or one path would leak what the other withholds."""
-    shim = open(os.path.join(HERE, os.pardir, ".claude", "cursor-bridge", "cursor-agent.shim"), encoding="utf-8").read()
+    shim = open(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "cursor-agent.shim"), encoding="utf-8").read()
     be = program("bridge_env")
     for var in be.TOKEN_VARS:
         assert var in shim, "the shim does not unset " + var

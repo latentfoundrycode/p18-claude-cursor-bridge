@@ -10,7 +10,7 @@ import sys
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-RELEASE = os.path.abspath(os.path.join(HERE, os.pardir, ".claude"))
+RELEASE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
 INSTALL = os.path.join(RELEASE, "cursor-bridge", "bridge-install.py")
 CHECK = os.path.join(RELEASE, "cursor-bridge", "bridge-check.py")
 BRIDGE_SETTINGS = json.load(open(os.path.join(RELEASE, "cursor-bridge", "settings.bridge.json"), encoding="utf-8"))
@@ -108,6 +108,22 @@ def test_check_reports_missing_bridge_entry_and_ignores_owner_keys(tmp_path):
     assert rc == 1 and "STALE    settings.json" in out and "Bash(cursor-agent:*)" in out, out
 
 
+def test_check_reports_a_hook_that_runs_a_bridge_program_which_is_not_installed(tmp_path):
+    """Such a hook fails with exit status 2, which Claude Code reads as "block"."""
+    target = tmp_path / ".claude"
+    rc, out = run(INSTALL, tmp_path, "--target", str(target))
+    assert rc == 0, out
+    path = target / "settings.json"
+    settings = json.load(open(path, encoding="utf-8"))
+    settings["hooks"]["PreToolUse"].append({"matcher": "Bash", "hooks": [
+        {"type": "command", "command": 'python "$HOME/.claude/cursor-bridge/gone.py"'},
+        {"type": "command", "command": "python my-own-hook.py"}]})
+    path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    rc, out = run(CHECK, tmp_path, "--root", str(target))
+    assert rc == 1 and "STALE    settings.json" in out and "PreToolUse runs gone.py" in out, out
+    assert "my-own-hook" not in out, "the owner's own hooks are not the check's business"
+
+
 def test_dry_run_writes_nothing(tmp_path):
     target = tmp_path / ".claude"
     rc, out = run(INSTALL, tmp_path, "--target", str(target), "--dry-run")
@@ -123,3 +139,12 @@ def test_programs_survive_a_character_the_console_lacks(tmp_path):
     env = dict(os.environ, LOCALAPPDATA=str(tmp_path / "localappdata"), PYTHONIOENCODING="cp1252")
     p = subprocess.run([sys.executable, CHECK, "--root", str(target)], capture_output=True, text=True, env=env, errors="replace")
     assert "Traceback" not in p.stderr and "EXTRA" in p.stdout
+
+
+def test_the_source_tree_is_checked_against_its_manifest_only(tmp_path):
+    """Release A1a: the sources have no settings.json of their own; --sources checks the
+    files against the manifest and skips what belongs to an installed machine."""
+    rc, out = run(CHECK, tmp_path, "--root", RELEASE, "--sources", "--quiet")
+    assert rc == 0 and "RESULT: SOURCES MATCH bridge" in out, out
+    rc, out = run(CHECK, tmp_path, "--root", RELEASE, "--quiet")
+    assert rc == 1 and "MISSING  settings.json" in out, "without --sources a tree without settings.json is not an installed bridge"

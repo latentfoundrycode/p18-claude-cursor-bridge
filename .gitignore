@@ -3,3 +3,6 @@ web-interface-guidelines/
 impeccable/
 # Code-tab session worktrees, if any appear here
 .claude/worktrees/
+# The governance sources live in bridge/ (KP-037). Nothing under .claude belongs to the repository:
+# Claude Code may create local files there (approvals, worktrees) in a session opened here.
+.claude/

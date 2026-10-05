@@ -453,7 +453,7 @@ it does not un-leak a secret or un-run a deploy, hence those stay pre-merge huma
 
 ## Invocation
 
-**Review A (Claude, Anthropic family).** The `diff-reviewer` subagent with a strong model
+**Review A (Claude, Anthropic family).** Its verdict is the `diff-reviewer`'s own, in this policy's words: `APPROVE`, `REJECT` or `ESCALATE-INTENT`. The auditors that read the same diff (`security-auditor`, `design-auditor`) report PASS or FAIL as inputs to it, and an auditor's FAIL on a blocking class is a `REJECT`. The `diff-reviewer` subagent with a strong model
 pinned in its frontmatter (`model: opus` or a full strong model ID) and read-only tools.
 Already part of the loop; this policy only pins its model and adds the anti-gaming checks
 to its mandate.

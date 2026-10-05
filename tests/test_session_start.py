@@ -11,7 +11,7 @@ import sys
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CLAUDE = os.path.abspath(os.path.join(HERE, os.pardir, ".claude"))
+CLAUDE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
 PROG = os.path.join(CLAUDE, "cursor-bridge", "session-start.py")
 SV = os.path.join(CLAUDE, "commands", "supervisor.md")
 TEXT = open(SV, encoding="utf-8").read()

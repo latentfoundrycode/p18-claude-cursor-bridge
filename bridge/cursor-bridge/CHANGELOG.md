@@ -3,11 +3,42 @@
 One entry per release. `VERSION` and `MANIFEST.json` are stamped by the maintainer's
 `tools/make-manifest.py`, which refuses to stamp a version that has no entry here.
 
-Each entry has two parts. **What changed** is for the maintainer and the curious.
+Each entry has three parts. **What changed** is for the maintainer and the curious.
 **Running projects must** is the part `/calibrate-bridge` acts on: every item names the
 **phase** it belongs to, so a project that has already passed that phase does not reopen
 it, a project in it applies the item now, and a project before it applies the item when it
-arrives. An item marked *(all phases)* applies immediately.
+arrives. An item marked *(all phases)* applies immediately. **If rolled back** (since
+2026.10.05a) says what a project that calibrated to the release must restore when the
+release is taken back with `bridge-install.py --rollback`; an entry without it restores
+nothing. A release with new mechanisms also names its **field acceptance**: what the trial
+project must show before the other projects resume.
+
+---
+
+## 2026.10.05a
+
+**Release A1a of the restructuring plan: the bridge's own house.** Its sources leave the folder where a session working on the bridge loaded them half-edited; a release can be taken back; three contradictions in the bridge's own text are removed.
+
+**What changed**
+- **The governance sources moved from `.claude/` to `bridge/` in the bridge's repository** (plan review R8, KP-037). Claude Code loads agents, commands, settings and hooks from a project's `.claude` folder, prefers a project's agents over the installed ones and reloads them while a session runs, so a branch that edited a reviewer changed the reviewer of that branch. On an installed machine nothing moves: the install program still copies `commands/`, `agents/`, `skills/` and `cursor-bridge/` into `~/.claude`. **The install command's path changes** to `<the bridge's repository>/bridge/cursor-bridge/bridge-install.py`. The repository's generated `settings.json`, which existed to give sessions there the bridge's hooks, is gone.
+- **A release can be taken back** (`bridge-install.py --rollback`). An install over another version first keeps that version's own files under `~/.claude/cursor-bridge-previous/<version>/` (one previous release is kept). A rollback puts the kept release back, keeps every key of the owner's, restores the previous shim, and writes the newer release's **If rolled back** items to `cursor-bridge/ROLLED-BACK.md`, which `/calibrate-bridge` applies in a project whose recorded version is newer than the installed one. The bridge is installed once per computer, so both an install and a rollback reach every project at once; the release flow in the restructuring plan (section 15) pauses the projects for that reason.
+- **Installing and taking back are one replacement,** so every install exercises the way back. Either way the files, the allow and deny rules and the hooks that only the replaced release owned are removed (an install used to add and never remove, except the entries on the `retired` list). The order is fixed so that `settings.json` never names a hook whose program is not there, also when a run is interrupted and repeated: a hook that runs a missing program ends with exit status 2, which Claude Code reads as "block", for every matching tool call or the end of every turn, in every session on the computer. `settings.json` is written whole or not at all. A kept copy is never written twice (a repeated run after an interruption would otherwise save a mixture of two releases as "the previous one"), and a kept copy that is not complete is refused before anything changes. The install check now reports a hook that runs a `cursor-bridge` program which is not installed.
+- **Changelog entries gain a third part, "If rolled back",** stating what a project that calibrated to the release must restore when it is taken back.
+- **What a builder may write is said once** (R17). The delegate command read "do not modify … anything under docs/", while every brief told the builder to append to `docs/BUILDER_NOTES.md` and the delivery conventions required `docs/cli-reference.json` regenerated in the same change. The command now ends that clause with "unless the Scope section names the file"; every brief's Scope lists `docs/BUILDER_NOTES.md`, and `docs/cli-reference.json` when a command changes; the brief's Out of scope says the same.
+- **Review A answers in the merge policy's words** (R17). `diff-reviewer` returned PASS, PASS WITH FINDINGS or FAIL while the policy waited for APPROVE, REJECT or ESCALATE-INTENT, which left a question of intent no channel. It now returns those three; an approval may still carry findings. The auditors keep PASS and FAIL as inputs to it.
+- **Five run parameters everywhere** (R17): rule 29 and the status template named three of the five.
+- **Pinned versions and configured modes are recorded in the inventory's Resources** (R17), no longer in the status file, which is capped at 120 lines and had no place for them: 21 places in the conventions now say so.
+- Tests: the rollback and the replacement (16, among them a replacement interrupted at each of its steps in both directions), the install check's two additions, the text contradictions (6), and the whole suite from the new folder.
+
+**Running projects must**
+- *(all phases)* Install with `python <the bridge's repository>/bridge/cursor-bridge/bridge-install.py`, restart the app, run `/calibrate-bridge`. This is the first release installed under the trial rule: every project is paused before the install, one is calibrated and resumed, and the others resume on the owner's word.
+- *(building, changing)* From the next brief on, the delegate command is the one step 3 shows and every brief's Scope lists `docs/BUILDER_NOTES.md`; a brief already delegated finishes under its own command. Review A's verdict reads APPROVE, REJECT or ESCALATE-INTENT from the next review on; a verdict already recorded as PASS or FAIL stands.
+- *(all phases, record-keeping)* At the next reflection point, move the pinned versions and configured modes recorded in `docs/PROJECT_STATUS.md` (tool versions, scanner rulesets, action commits, the observability tier) to `docs/INVENTORY.md` → Resources, and remove them from the status file.
+
+**If rolled back**
+- *(all phases)* Nothing in a project's files has to be restored: this release changes no record's format. Briefs written under it stay valid, and their next delegation uses the previous release's command. Records moved to the inventory stay there. Set `Bridge version:` to the installed version. The release this one is taken back to, 2026.10.04e, has a calibration command that does not know a rollback and does not read this note: in a project that had calibrated to this release, the owner tells the supervisor "the bridge was taken back to 2026.10.04e; set the `Bridge version:` line to it".
+
+**Field acceptance on the trial project.** With every project paused: the release is installed, taken back with `--rollback`, and installed again, and the install check passes each time. Then the trial project calibrates, and one increment goes through the loop: its brief's Scope names `docs/BUILDER_NOTES.md`, the scope check passes with the builder's note written, and Review A answers with one of the three verdict words.
 
 ---
 
