@@ -8,7 +8,7 @@ import sys
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROG = os.path.join(HERE, os.pardir, ".claude", "cursor-bridge", "roster-check.py")
+PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "roster-check.py")
 
 ROSTER = {
     "other_pool": "available",

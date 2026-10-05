@@ -11,7 +11,7 @@ import sys
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CLAUDE = os.path.abspath(os.path.join(HERE, os.pardir, ".claude"))
+CLAUDE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
 PROG = os.path.join(CLAUDE, "cursor-bridge", "session-start.py")
 SV = os.path.join(CLAUDE, "commands", "supervisor.md")
 TEXT = open(SV, encoding="utf-8").read()
@@ -118,7 +118,20 @@ def test_both_parts_fit_under_the_cap_for_every_phase_on_a_realistic_status_file
     assert "BEFORE YOUR NEXT ACTION" in pointers and re.search(r"': lines \d+-\d+", pointers)
     assert "Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41)." in pointers
     assert "WAITING FOR THE OWNER" in pointers and "(read it whole in docs/PROJECT_STATUS.md)" in pointers
-    assert "**Founding rules.**" in digest and "43 Never end a turn" in digest and "bridge 2026.10.04c" in digest
+    assert "**Founding rules.**" in digest and "43 Never end a turn" in digest
+    installed = open(os.path.join(CLAUDE, "cursor-bridge", "VERSION"), encoding="utf-8").read().strip()
+    assert "(bridge %s)" % installed in digest, "the digest is the installed release's, whatever the status file records"
+    assert "the status file records 2026.10.04c, so this project is not calibrated to the installed bridge" in pointers
+
+
+def test_a_project_calibrated_to_the_installed_bridge_is_not_told_otherwise(tmp_path, home):
+    installed = open(os.path.join(CLAUDE, "cursor-bridge", "VERSION"), encoding="utf-8").read().strip()
+    root = tmp_path / "proj"
+    (root / "Workspace" / "docs").mkdir(parents=True)
+    (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text(
+        "# Project Status\n**Bridge version:** `%s` (calibrated today)\nPhase: building (Stage 2)\nAwaiting user on: nothing\n" % installed, encoding="utf-8")
+    rc, out = run_hook(root / "Workspace", home, "pointers")
+    assert rc == 0 and "(bridge %s)" % installed in out and "not calibrated" not in out, out
 
 
 def test_pointers_name_the_phase_sections_and_conventions(tmp_path, home):

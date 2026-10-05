@@ -224,11 +224,11 @@ The supervisor decides and records; `cursor-configurator` writes the files. See
    - **Freeze it.** Write the adopted content as the body of
      `.cursor/rules/vercel-interface.mdc` (frontmatter per `Cursor-File-Formats.md`), frozen
      for the project's life so reviews stay reproducible, and **record the source
-     version/date** in `docs/PROJECT_STATUS.md`.
+     version/date** in `docs/INVENTORY.md` (Resources).
    - **Optional FYI.** If the fresh fetch validates and differs from the bundled baseline,
      note "guidelines changed since your last project" as an FYI — do not block on it.
 
-3. **Impeccable version pin.** Record the pinned CLI version in `docs/PROJECT_STATUS.md`.
+3. **Impeccable version pin.** Record the pinned CLI version in `docs/INVENTORY.md` (Resources).
    Every detector invocation — hook, CI, and manual — uses `npx impeccable@<pinned> detect`
    so a resumed session never silently changes what "clean" means (the rule count drifts
    between releases; pin ≥ v3.0.2, never hard-code the count).
@@ -268,14 +268,14 @@ CI gate at Phase 1/config. Steps:
    `semgrep-bridge-rules.yml` in as `.semgrep/bridge-rules.yml` (the token-free concat-SQLi
    supplement — always added, validated per project), `osv-scanner.toml` (empty
    `[[IgnoredVulns]]`), and `socket.yml` (empty ignores). Pin and record in
-   `docs/PROJECT_STATUS.md`: the Semgrep CLI version + ruleset, the OSV-Scanner version, and
+   `docs/INVENTORY.md` (Resources): the Semgrep CLI version + ruleset, the OSV-Scanner version, and
    the Socket setup.
 
 2. **Frozen secure-coding rules.** Write `.cursor/rules/secure-coding.mdc` from the bundled
    `~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the chosen ASVS
    tier (+ the LLM supplement for AI-bearing products). ASVS is **stable**, so this pins
    `v5.0.0` and needs **no** live-fetch-validation dance — the bundled snapshot is the
-   source. Record the ASVS version and level in `docs/PROJECT_STATUS.md`.
+   source. Record the ASVS version and level in `docs/INVENTORY.md` (Resources).
 
 3. **CI floor steps (where the project has CI — the preferred setup).** Add Semgrep (on
    `ubuntu-latest`), OSV-Scanner (PR diff, explicit exit-code handling — `128`/no-packages
@@ -287,7 +287,7 @@ CI gate at Phase 1/config. Steps:
      repo secret** set in the job env — this runs the **Pro engine** (taint/interfile, the real
      SQL-injection catch and fewer false positives). When no token is configured, fall back to
      `semgrep --config <pinned packs> --config .semgrep/bridge-rules.yml` (OSS engine + the
-     bundled bridge rules). Record which mode is in force in `docs/PROJECT_STATUS.md`.
+     bundled bridge rules). Record which mode is in force in `docs/INVENTORY.md` (Resources).
    Where the project has **no** CI, the supervisor runs the three locally at the merge gate
    (token-free OSS + bridge rules for Semgrep). Record the ignore mechanisms (`nosemgrep`,
    `osv-scanner.toml` IgnoredVulns with reason+expiry, `@SocketSecurity ignore`) as the security
@@ -300,7 +300,7 @@ CI gate at Phase 1/config. Steps:
 
 5. **SHA-pin everything.** Every security tool and every CI action is pinned to a **full
    commit SHA, never a mutable tag** (`@v2` is the March-2026 Trivy-compromise vector), the
-   SHA recorded in `docs/PROJECT_STATUS.md`. Scanners get only the minimum environment — no
+   file that holds each pin recorded in `docs/INVENTORY.md` (Resources) (the file, not the 40-character value: the inventory check reads a long token as a key). Scanners get only the minimum environment — no
    secrets on a scanner's path beyond Socket's read-scoped token.
 
 6. **The shell guard (fail-closed) — OPT-IN, off by default.** *Only* wire this when the
@@ -344,7 +344,7 @@ owns the tier decision (Tier A default; Tier B opt-in) and records it. Steps:
 4. **Driver.** Web: **Playwright**, run in CI on Linux (primary), local optional. Mobile/desktop:
    a per-platform driver (Appium / WinAppDriver / Playwright-Electron). Pin and record the driver
    + version, the tier, the invariant set, and the state→reachability map in
-   `docs/PROJECT_STATUS.md`.
+   `docs/INVENTORY.md` (Resources).
 
 **Escalation:** only the **driver dependency** (a new dev/CI dependency + CI minutes) — cleared
 with the user like any dependency. The instrumentation the tests exercise is product code Cursor
@@ -361,7 +361,7 @@ builds, not configuration; add the `bench-check.py` step to the CI `gate` job af
 (fail on exit 1); pin the benchmark and profiling tools for the stack; gitignore
 `bench/results/` and `bench/profiles/`, commit `bench/baseline.json`. Where CI runners are too
 noisy for an absolute budget, CI checks the regression band and the absolute number is checked
-locally at stage close — record which in `docs/PROJECT_STATUS.md`.
+locally at stage close — record which in `docs/INVENTORY.md` (Resources).
 
 ## 6. Explicitly skipped, and why — [Skip]
 
@@ -430,18 +430,18 @@ this reliable:
 6. §5b design tooling (UI-bearing projects): write `.impeccable/config.json`; run the
    Vercel fetch-and-freeze into `.cursor/rules/vercel-interface.mdc` (validate or fall back
    to the bundled snapshot, and record source date + pinned Impeccable version in
-   `PROJECT_STATUS.md`); append the second `afterFileEdit` detect hook.
+   `docs/INVENTORY.md` (Resources)); append the second `afterFileEdit` detect hook.
 7. §5c security tooling: write `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, and the
    frozen `.cursor/rules/secure-coding.mdc` from the bundled ASVS snapshot at the chosen
    level; append the third (Semgrep, advisory) `afterFileEdit` hook; **(opt-in only, and only
    for a PowerShell-launched builder)** the fail-closed `beforeShellExecution` shell-guard hook
    (+ place `shell-guard.py`); pin and record the Semgrep/OSV/Socket versions, ASVS level, and
-   every SHA in `PROJECT_STATUS.md`. The Socket token escalates once (repo secret).
+   the file that pins each SHA in `docs/INVENTORY.md` (Resources). The Socket token escalates once (repo secret).
 8b. §5e performance floor (where budgets exist): `bench/budgets.json`, the `bench-check.py` CI step, pinned bench/profile tools, gitignores.
 8. §5d observability (UI-bearing projects): wire the supervisor-authored observability e2e
    tests into the `gate` job, set test-mode fixed clock/seed/locale, gitignore the artifacts,
    confirm log redaction; escalate the driver dependency (Playwright / per-platform). Record
-   the tier, driver + version, invariant set, and state→reachability map in `PROJECT_STATUS.md`.
+   the tier, driver + version, invariant set, and state→reachability map in `docs/INVENTORY.md` (Resources).
 9. §5b step 5 + §5c step 3 + §5d step 1 — the design, security, and observability floor steps
    added **inside the existing `gate` job** (one required check); where there is no CI, the
    supervisor runs them locally at the gate.

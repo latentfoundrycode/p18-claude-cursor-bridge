@@ -11,7 +11,7 @@ import sys
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROG = os.path.join(HERE, os.pardir, ".claude", "cursor-bridge", "review-guard.py")
+PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "review-guard.py")
 ENV = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@x", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@x",
            GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull)
 HOOK = "#!/bin/sh\necho ran > \"$(git rev-parse --show-toplevel)/HOOK-RAN\"\n"

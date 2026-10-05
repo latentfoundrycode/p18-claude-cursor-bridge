@@ -20,7 +20,7 @@ python ~/.claude/cursor-bridge/bridge-check.py
 It hashes every governance file against the release manifest and prints `OK` / `STALE` /
 `MISSING` per file and a `RESULT` line. **If the result is `NOT CALIBRATED`, stop here.**
 Report it as a **run sheet** (`explain-for-decision` skill): which files are stale or
-missing, the terminal to use (Git Bash), the one install command — `python <release folder>/cursor-bridge/bridge-install.py`, which copies the release, merges the bridge's entries into `settings.json` without touching the owner's own keys, and installs the `cursor-agent` shim — with the placeholder explained, the app restart, and
+missing, the terminal to use (Git Bash), the one install command — `python <the bridge's repository>/bridge/cursor-bridge/bridge-install.py`, which copies the release, merges the bridge's entries into `settings.json` without touching the owner's own keys, and installs the `cursor-agent` shim — with the placeholder explained, the app restart, and
 "then run `/calibrate-bridge` again". Do nothing else until the check passes — calibrating
 to a half-copied tree would leave the project on a mixture of two releases.
 
@@ -82,6 +82,8 @@ Otherwise compare with its `Bridge version:` line (absent on an existing project
 projects must** items of every entry newer than the recorded version. If the versions are
 equal, there is no delta: say so, still confirm step 2 was done, update nothing but the
 `Calibrated:` line in step 5, and report.
+
+**If the installed version is older than the recorded one, a release was taken back.** Versions sort as text (`2026.10.04e` is older than `2026.10.05a`). The bridge is installed once per computer, so a rollback reaches every project, including one that had already calibrated to the newer release. Read `~/.claude/cursor-bridge/ROLLED-BACK.md`, which the rollback wrote: it holds the **If rolled back** items of every release that was taken back, because the restored changelog no longer contains them. Apply those items by phase exactly as in step 4, newest release first; then record the installed version in step 5 with `Calibrated: <date> rolled back from <newer> to <installed>`. If the file is missing, report the two versions and what you found, and change nothing but the version line. Work done under the newer release stands: a rollback reopens no gate and undoes no merge.
 
 ## 4. Apply the delta by phase — reopen nothing
 

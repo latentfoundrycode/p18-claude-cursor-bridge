@@ -8,7 +8,7 @@ import sys
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROG = os.path.join(HERE, os.pardir, ".claude", "cursor-bridge", "permission-guard.py")
+PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "permission-guard.py")
 
 
 def run(tool, command):

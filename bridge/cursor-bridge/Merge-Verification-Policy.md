@@ -195,7 +195,7 @@ must never silently approve, any of:
 - editing the CI workflow to skip, `continue-on-error`, or drop the failing job;
 - using `git commit --no-verify` on an increment/accept commit to bypass the pre-commit lint
   gate (only the supervisor's pre-delegation checkpoint snapshots, and a parallel builder's hand-off snapshot in its worktree, may use `--no-verify`; the accept commit on top of either runs the hook);
-- **treating the builder's `Assumed, not verified` list as the review's scope.** The list is where the builder knows it guessed; reviewers check each item *and* review everything else. A list reading `none` on a diff that relies on an unverified external fact, or one that omits an assumption the code plainly depends on, is a finding (`FAIL` for an external-service fact, KP-020). "I listed it" never excuses a defect;
+- **treating the builder's `Assumed, not verified` list as the review's scope.** The list is where the builder knows it guessed; reviewers check each item *and* review everything else. A list reading `none` on a diff that relies on an unverified external fact, or one that omits an assumption the code plainly depends on, is a finding (`REJECT` for an external-service fact, KP-020). "I listed it" never excuses a defect;
 - **compressing, truncating, slicing, or summarizing a gate-critical stream before a
   reviewer reads it** — the diff, scanner output, test results, or the file Review B reads.
   These reach the reviewer **whole**: a reviewer that saw a trimmed diff can emit an
@@ -453,7 +453,7 @@ it does not un-leak a secret or un-run a deploy, hence those stay pre-merge huma
 
 ## Invocation
 
-**Review A (Claude, Anthropic family).** The `diff-reviewer` subagent with a strong model
+**Review A (Claude, Anthropic family).** Its verdict is the `diff-reviewer`'s own, in this policy's words: `APPROVE`, `REJECT` or `ESCALATE-INTENT`. The auditors that read the same diff (`security-auditor`, `design-auditor`) report PASS or FAIL as inputs to it, and an auditor's FAIL on a blocking class is a `REJECT`. The `diff-reviewer` subagent with a strong model
 pinned in its frontmatter (`model: opus` or a full strong model ID) and read-only tools.
 Already part of the loop; this policy only pins its model and adds the anti-gaming checks
 to its mandate.

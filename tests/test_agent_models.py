@@ -6,7 +6,7 @@ import re
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CLAUDE = os.path.join(HERE, os.pardir, ".claude")
+CLAUDE = os.path.join(HERE, os.pardir, "bridge")
 AGENTS = os.path.join(CLAUDE, "agents")
 
 CURRENT = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-haiku-4-5"}

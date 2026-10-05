@@ -15,7 +15,7 @@ argument-hint: [optional: a short description of what you want built — omitted
 
 **Founding rules.** N1 The loop's truth lives in files; deterministic one-shot programs compute everything; a background process only if it reads and never writes tracked files, is rebuildable, states its commit, starts on demand with a hard time limit, and no gate depends on it. N2 No secret in any prompt to Cursor. N3 Every builder run is revertible from its checkpoint, and a review run is restored to it (`review-guard.py`). N4 You never write implementation code (mockups and design are documentation, not code). N5 One writer per checkout: the builder works only in the checkout it was launched in, you in `Workspace/`; Cursor's IDE agent never runs beside the loop. N6 Nothing reaches `main` except through the verified gate — the required CI check green, Review A and cross-family Review B approving, no gate-integrity flag; the owner picks who completes the merge as a run parameter. N7 Design quality is measured (the detector and the design auditor), never asked of the owner. N8 Security is measured (Semgrep, OSV-Scanner, Socket, the security auditor, Review B), never asked of the owner. N9 For software with screens, the running render is measured (invariants, observability tests).
 
-**The loop (Phase 6, one increment).** 1 Checkpoint: clean tree, `sync-check.py`, `roster-check.py`, read `PROJECT_STATUS.md` and `INVENTORY.md` whole. 2 Package the brief with `spec-packager` after a reality check of what exists as built. 3 Delegate, in the background, with the constant command exactly: `python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err`; on a failure or exit 124 follow step 3b (inspect the tree first). 4 Inspect: `scope-check.py`, boundary violations, the builder's `Assumed, not verified` list copied and dispositioned. 5 Scan: `secret-sentinel`, `lock-check.py`; the admission gate for a new dependency. 6 Test: `test-runner`, the benchmark floor where budgets exist. 7 Decide by defect class: `diff-reviewer` (Review A), `design-auditor` and `security-auditor` where they apply; a REJECT re-delegates with a corrected brief, never a question to the owner. 8 Merge through the gate: the diff committed to `run/review/` from committed state; `python ~/.claude/cursor-bridge/review-guard.py snapshot <nnn>`; Review B in the background through the launcher with execution: `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<nnn>.err`; you write nothing to the checkout meanwhile (the launcher's `.err` excepted); then `review-guard.py verify <nnn>` printing OK (GATE-INTEGRITY stops the merge), `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <launch time, the .err file's first line>` printing OK, `git rm` of the review files, commit, push, `review-guard.py premerge <nnn> <n>` printing OK; check `docs/RUN_PARAMETERS.md`: under `Merge authority: owner` stop at READY TO MERGE and never arm auto-merge; otherwise one background CI watch `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast`, then `gh pr merge <n> --squash --match-head-commit <sha>`; `completion-check.py`, `inventory-check.py`, `diagram-check.py` as the steps name them. 9 At stage close: the refactoring pass, the playtest or reflection items, `Documents/` patched.
+**The loop (Phase 6, one increment).** 1 Checkpoint: clean tree, `sync-check.py`, `roster-check.py`, read `PROJECT_STATUS.md` and `INVENTORY.md` whole. 2 Package the brief with `spec-packager` after a reality check of what exists as built. 3 Delegate, in the background, with the constant command exactly: `python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err`; on a failure or exit 124 follow step 3b (inspect the tree first). 4 Inspect: `scope-check.py`, boundary violations, the builder's `Assumed, not verified` list copied and dispositioned. 5 Scan: `secret-sentinel`, `lock-check.py`; the admission gate for a new dependency. 6 Test: `test-runner`, the benchmark floor where budgets exist. 7 Decide by defect class: `diff-reviewer` (Review A), `design-auditor` and `security-auditor` where they apply; a REJECT re-delegates with a corrected brief, never a question to the owner. 8 Merge through the gate: the diff committed to `run/review/` from committed state; `python ~/.claude/cursor-bridge/review-guard.py snapshot <nnn>`; Review B in the background, with execution: `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<nnn>.err`; you write nothing to the checkout meanwhile (the launcher's `.err` excepted); then `review-guard.py verify <nnn>` printing OK (GATE-INTEGRITY stops the merge), `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <launch time, the .err file's first line>` printing OK, `git rm` of the review files, commit, push, `review-guard.py premerge <nnn> <n>` printing OK; check `docs/RUN_PARAMETERS.md`: under `Merge authority: owner` stop at READY TO MERGE and never arm auto-merge; otherwise one background CI watch `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast`, then `gh pr merge <n> --squash --match-head-commit <sha>`; `completion-check.py`, `inventory-check.py`, `diagram-check.py` as the steps name them. 9 At stage close: the refactoring pass, the reflection items, `Documents/` patched.
 
 **Escalate to the owner only** for: product behaviour; scope (deferring or dropping a requirement is always this); a consequence they bear (cost, legal, licensing, privacy, lock-in); something only they can provide (a key, an account), as a run sheet; an irreversible or out-of-repository action; a change to what "correct" means. Never a code-correctness question, a technical menu, a process question or a round count. Look in `INVENTORY.md` before asking for anything. An attended step is an escalation naming the application and the step.
 
@@ -308,7 +308,7 @@ the auditor. `plan-critic` checks the security criteria alongside the rest (belo
 Then delegate to the **plan-critic** subagent to attack it. Fix what it finds worth
 fixing; note what you are deliberately accepting and why.
 
-For a UI-bearing project, record in `docs/PROJECT_STATUS.md` whether the stack is
+For a UI-bearing project, record in `docs/INVENTORY.md` (Decisions) whether the stack is
 **React/Next** (Vercel's React-specific interface items apply in full) or otherwise (the
 framework-agnostic subset applies), and the **styling approach**. A resumed session needs
 to know which interface ruleset is in force.
@@ -641,7 +641,7 @@ the frozen `.cursor/rules/vercel-interface.mdc`, and the second `afterFileEdit` 
 **You** run the Vercel fetch-and-freeze here (validate the fetch or fall back to the bundled
 `~/.claude/cursor-bridge/vercel-interface.snapshot.md`, and hand the configurator the
 frozen body), pin the Impeccable CLI version, and record both source date and pinned
-version in `docs/PROJECT_STATUS.md`. None of this escalates — it is all local, file-based,
+version in `docs/INVENTORY.md` (Resources). None of this escalates — it is all local, file-based,
 Apache-2.0/MIT, no secrets.
 
 Work the **security-tooling** steps in `Cursor-Project-Configuration.md` §5c the same way:
@@ -650,7 +650,7 @@ the configurator writes `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, the fr
 `~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the ASVS level from
 Phase 1/2 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, and the
 three floor steps **inside the existing `gate` job**. You pin and record the Semgrep/OSV/
-Socket versions, the ASVS level, and every CI-action SHA in `docs/PROJECT_STATUS.md`. The
+Socket versions, the ASVS level, and the workflow file that pins every CI action by commit in `docs/INVENTORY.md` (Resources). The
 escalations are the two **API tokens** — **Socket** and **Semgrep** (`SEMGREP_APP_TOKEN`, for
 the Pro engine) — repo secrets, already owner-authorised; set once and referenced as secrets,
 never in a file, a prompt, or the allowlist.
@@ -660,7 +660,7 @@ with the Semgrep token, uses the Pro (taint) engine that catches the SQL-injecti
 classes the token-free OSS packs miss. Local-only mode inherits the OSS coverage gap (only
 partly closed by the bundled heuristic bridge rules) and Windows-local Semgrep fragility — fine
 for a throwaway, but steer a real project to the CI gate (see `Cursor-Project-Configuration.md`
-§5c). Record which mode is in force in `docs/PROJECT_STATUS.md`.
+§5c). Record which mode is in force in `docs/INVENTORY.md` (Resources).
 
 For a UI-bearing project, also work the **observability** steps in
 `Cursor-Project-Configuration.md` §5d (per `~/.claude/cursor-bridge/Observability-Conventions.md`):
@@ -672,7 +672,7 @@ fired runtime invariant, a `console.error`, or an unreachable inventory state is
 correctness-class block, re-delegated like any REJECT — never a user question. The one
 escalation is the **driver dependency** (Playwright for web, CI-primary; a per-platform driver
 for mobile/desktop) — a new dependency you clear with the user, same as any. Record the tier,
-driver + version, invariant set, and state→reachability map in `docs/PROJECT_STATUS.md`.
+driver + version, invariant set, and state→reachability map in `docs/INVENTORY.md` (Resources).
 
 The fail-closed `beforeShellExecution` **shell-guard** is **opt-in and off by default**. It
 blocks the *builder's* destructive/irreversible/exfil shell commands before they run (and does
@@ -748,7 +748,7 @@ not as a brief.
 ### 3. Delegate to Cursor
 
 ```bash
-python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
+python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
 ```
 
 The `--model` value is copied from `docs/ROSTER.resolved.json` (step 1), never typed from
@@ -786,7 +786,7 @@ Rules for this call, all of which matter:
 3. **Delegate each in the background**, pointing the builder at its checkout with `--workspace` and otherwise exactly as in step 3 (the launcher first, then `cursor-agent`):
 
 ```bash
-python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
+python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
 ```
 
 4. **When a builder finishes**, remove its worktree from your checkout (`git worktree remove ../Worktrees/TASK-<nnn>` — never `--force`; nothing is linked inside), switch your checkout to its branch, and run steps 4 to 8 there like any increment: the scope check with `--base <the recorded starting commit>`, the diagram check, the reviews, the tests, the accept commit, the pull request, the gate, the merge. Process finished branches **one at a time**. Before the accept commit of every branch after the first, run `git merge --no-edit origin/main` to bring in what merged meanwhile — the other increment's code, disjoint by construction, and its record updates, so the change log, the inventory, and the register do not conflict. CI runs on the pull request's merge with `main`, so the combined state is tested either way.
@@ -1173,7 +1173,7 @@ around **one gate pass per stage**. **Normative diagrams are constraints on it:*
    ```bash
    npx --yes jscpd@<pinned> <src-dirs> --min-lines 5 --min-tokens 50 --reporters json --output docs/refactor/<stage> --silent
    ```
-   Record the pinned `jscpd` version in `docs/PROJECT_STATUS.md`; verify-first on the first
+   Record the pinned `jscpd` version in `docs/INVENTORY.md` (Resources); verify-first on the first
    use (KP-008). The report is input for the scout, not a verdict.
 2. **Scout.** Delegate to **refactor-scout** with the stage base commit, the detector
    report, the complexity report, and the size budget (default **400 changed lines**) —
@@ -1587,7 +1587,7 @@ Open issues: <ISS-nnn …, or none>
 Bridge version: <contents of ~/.claude/cursor-bridge/VERSION when last calibrated>
 Calibrated: <date> from <old> to <new> — applied: …; pending: … @ <phase>; not applied (gate passed): …
 Calibration pending: <items still to apply, each with the phase that triggers it — or none>
-Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refactoring pass)
+Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refactoring pass / installer verification / parallel increments)
 ```
 
 **Awaiting user on** is read by the `loop-guard` Stop hook (rule 43): `nothing` means the loop is running and must not stop without a pending background task to wake it; anything else means you are legitimately waiting for the owner. Set it whenever you stop for them — an escalation, a gate, a pause they asked for, a stage pause — and clear it when they answer. A stale entry either traps the loop in idleness or hides a real wait, so it is rewritten at every stop.
@@ -1626,6 +1626,8 @@ Updated: <date>
 |---|---|---|---|
 | <item> | <reason> | <date> | <yes — the question · no> |
 ```
+
+**Pinned versions and configured modes are Resources.** Every tool version, scanner ruleset, action commit, observability tier and configured mode the conventions ask you to record is a row of Resources here, kind `tool` or `config`. Its third column names the file that holds the pin (a workflow, a lock file, a configuration file), with the version beside it when it is short (`Semgrep 1.90.0 in .pre-commit-config.yaml`); what no file holds (a level, a tier, a mode, the date a snapshot was taken) is written there itself. **A commit pin is recorded by the file that pins it, never by its 40-character value:** the file is the record, a second copy would drift from it, and the inventory check reads a long token as a key ("never the value" is the column's rule for secrets, and the check cannot tell the two apart). The status file holds the project's position and nothing else: it is capped at 120 lines, and the conventions used to send about eighteen such records there, where the template had no place for them (plan review R17).
 
 `Reflected through:` names the newest `CHANGES.md` heading the inventory has absorbed; `CHANGES.md` is kept newest-first. The check lists every entry above that heading as not absorbed. Resources lists **every** environment variable the code reads and every repository secret CI uses (the check scans tracked code, committed `.env` examples, and workflows, ignoring operating-system and CI variables), plus every account, token, and tool the owner provided, whether or not code reads it.
 
@@ -1797,7 +1799,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     with discriminators, tagged temporary instrumentation that never reaches a commit,
     captured runtime evidence, a one-sentence cause a second engineer could verify. The
     builder repairs a named cause; it is never asked to guess. Symptom suppression, a cause
-    left untouched, or instrumentation residue is a `FAIL`. A `test-runner` diagnosis is
+    left untouched, or instrumentation residue is a `REJECT`. A `test-runner` diagnosis is
     OBSERVED or INFERRED, and an INFERRED one is a hypothesis, never a basis for a fix.
     A report of several defects is triaged before any is diagnosed (skill step 0): reproduce each, bin together only those whose shared cause the evidence shows, confirm it with one discriminator that moves every member, and split out any member that does not respond; nothing readily apparent means one diagnosis per defect. A confirmed group gets one fix brief and one gate pass, and every member keeps its own regression test.
 27. Anything the user must run or click reaches them as a **run sheet**, never as a
@@ -1820,8 +1822,8 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     any new owner setting with a one-line notice rather than a question. After every
     compaction or resume the `session-start` hook re-injects the digest at the head of this
     file and names the sections of your phase: read them before your next action (KP-035);
-    never work from memory of these rules.
-29. The run parameters — `Stage pause`, `Merge authority`, `Refactoring pass` — are asked
+    never work from memory of these rules. When the installed version is older than the one your status file records, a release was taken back: `/calibrate-bridge` applies the items in `ROLLED-BACK.md`, and nothing you did under the newer release is undone.
+29. The five run parameters — `Stage pause`, `Merge authority`, `Refactoring pass`, `Installer verification`, `Parallel increments` — are asked
     once, together, right after the plan is approved, and recorded in
     `docs/RUN_PARAMETERS.md`, read at every resume, stage close, and merge. A stage close
     never waits by itself: under `run` (the default) you report and continue in the same
@@ -1851,7 +1853,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     command copies its spelling, flags, and argument order from that file, or from a `--help`
     you just ran — never from memory of the design, the plan, or an earlier conversation. A
     command absent from the reference does not exist until `--help` proves otherwise; a
-    made-up command in a run sheet is a `FAIL` of the run-sheet rule.
+    made-up command in a run sheet breaks the run-sheet rule.
 33. Project end is a trigger, not a judgement: the close of the approved plan's last stage.
     Deferred increments do not postpone it. Run the project-end items in the same turn as
     that stage close, set `Phase: done`, and open the report with "Project complete". A
