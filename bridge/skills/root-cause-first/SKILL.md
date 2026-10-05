@@ -136,7 +136,7 @@ root cause** in one sentence, the **evidence lines**, the **reproduction test** 
 from red to green, and two constraints — *fix that cause and nothing else*, and *if you
 believe the cause is different, stop and report instead of fixing*. The builder is not
 asked to diagnose; it is asked to repair a named defect. A fix that makes the test pass
-without touching the named cause is a `FAIL` at review, however green it is. For a **group**, the brief states the cause once and lists every member's reproduction test; all of them must go from red to green.
+without touching the named cause is a `REJECT` at review, however green it is. For a **group**, the brief states the cause once and lists every member's reproduction test; all of them must go from red to green.
 
 ### 7. Verify like the bug was reproduced
 
@@ -156,7 +156,7 @@ only honest once the cause is known — which is the point of the whole procedur
 
 - **Symptom suppression:** a retry, a broad `try/except`, a widened tolerance, a null
   check that hides a wrong value, a `sleep` — any of these where the brief named a cause
-  elsewhere. A `FAIL`, and under the merge policy a gate-integrity flag.
+  elsewhere. A `REJECT`, and under the merge policy a gate-integrity flag.
 - **Cause not addressed:** the diff does not touch the mechanism the brief named.
 - **Instrumentation residue:** a `DEBUG-BUG-` tag, a stray print, a changed log level.
 - **Group partly fixed:** for a group brief, any member's reproduction test still red, or green only through a change away from the named mechanism.

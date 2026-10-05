@@ -308,7 +308,7 @@ the auditor. `plan-critic` checks the security criteria alongside the rest (belo
 Then delegate to the **plan-critic** subagent to attack it. Fix what it finds worth
 fixing; note what you are deliberately accepting and why.
 
-For a UI-bearing project, record in `docs/PROJECT_STATUS.md` whether the stack is
+For a UI-bearing project, record in `docs/INVENTORY.md` (Decisions) whether the stack is
 **React/Next** (Vercel's React-specific interface items apply in full) or otherwise (the
 framework-agnostic subset applies), and the **styling approach**. A resumed session needs
 to know which interface ruleset is in force.
@@ -641,7 +641,7 @@ the frozen `.cursor/rules/vercel-interface.mdc`, and the second `afterFileEdit` 
 **You** run the Vercel fetch-and-freeze here (validate the fetch or fall back to the bundled
 `~/.claude/cursor-bridge/vercel-interface.snapshot.md`, and hand the configurator the
 frozen body), pin the Impeccable CLI version, and record both source date and pinned
-version in `docs/PROJECT_STATUS.md`. None of this escalates — it is all local, file-based,
+version in `docs/INVENTORY.md` (Resources). None of this escalates — it is all local, file-based,
 Apache-2.0/MIT, no secrets.
 
 Work the **security-tooling** steps in `Cursor-Project-Configuration.md` §5c the same way:
@@ -650,7 +650,7 @@ the configurator writes `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, the fr
 `~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the ASVS level from
 Phase 1/2 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, and the
 three floor steps **inside the existing `gate` job**. You pin and record the Semgrep/OSV/
-Socket versions, the ASVS level, and every CI-action SHA in `docs/PROJECT_STATUS.md`. The
+Socket versions, the ASVS level, and the workflow file that pins every CI action by commit in `docs/INVENTORY.md` (Resources). The
 escalations are the two **API tokens** — **Socket** and **Semgrep** (`SEMGREP_APP_TOKEN`, for
 the Pro engine) — repo secrets, already owner-authorised; set once and referenced as secrets,
 never in a file, a prompt, or the allowlist.
@@ -660,7 +660,7 @@ with the Semgrep token, uses the Pro (taint) engine that catches the SQL-injecti
 classes the token-free OSS packs miss. Local-only mode inherits the OSS coverage gap (only
 partly closed by the bundled heuristic bridge rules) and Windows-local Semgrep fragility — fine
 for a throwaway, but steer a real project to the CI gate (see `Cursor-Project-Configuration.md`
-§5c). Record which mode is in force in `docs/PROJECT_STATUS.md`.
+§5c). Record which mode is in force in `docs/INVENTORY.md` (Resources).
 
 For a UI-bearing project, also work the **observability** steps in
 `Cursor-Project-Configuration.md` §5d (per `~/.claude/cursor-bridge/Observability-Conventions.md`):
@@ -672,7 +672,7 @@ fired runtime invariant, a `console.error`, or an unreachable inventory state is
 correctness-class block, re-delegated like any REJECT — never a user question. The one
 escalation is the **driver dependency** (Playwright for web, CI-primary; a per-platform driver
 for mobile/desktop) — a new dependency you clear with the user, same as any. Record the tier,
-driver + version, invariant set, and state→reachability map in `docs/PROJECT_STATUS.md`.
+driver + version, invariant set, and state→reachability map in `docs/INVENTORY.md` (Resources).
 
 The fail-closed `beforeShellExecution` **shell-guard** is **opt-in and off by default**. It
 blocks the *builder's* destructive/irreversible/exfil shell commands before they run (and does
@@ -1173,7 +1173,7 @@ around **one gate pass per stage**. **Normative diagrams are constraints on it:*
    ```bash
    npx --yes jscpd@<pinned> <src-dirs> --min-lines 5 --min-tokens 50 --reporters json --output docs/refactor/<stage> --silent
    ```
-   Record the pinned `jscpd` version in `docs/PROJECT_STATUS.md`; verify-first on the first
+   Record the pinned `jscpd` version in `docs/INVENTORY.md` (Resources); verify-first on the first
    use (KP-008). The report is input for the scout, not a verdict.
 2. **Scout.** Delegate to **refactor-scout** with the stage base commit, the detector
    report, the complexity report, and the size budget (default **400 changed lines**) —
@@ -1627,7 +1627,7 @@ Updated: <date>
 | <item> | <reason> | <date> | <yes — the question · no> |
 ```
 
-**Pinned versions and configured modes are Resources.** Every tool version, scanner ruleset, action commit, observability tier and configured mode the conventions ask you to record is a row of Resources here (kind `tool` or `config`, the version or mode in the third column). The status file holds the project's position and nothing else: it is capped at 120 lines, and the conventions used to send about eighteen such records there, where the template had no place for them (plan review R17).
+**Pinned versions and configured modes are Resources.** Every tool version, scanner ruleset, action commit, observability tier and configured mode the conventions ask you to record is a row of Resources here, kind `tool` or `config`. Its third column names the file that holds the pin (a workflow, a lock file, a configuration file), with the version beside it when it is short (`Semgrep 1.90.0 in .pre-commit-config.yaml`); what no file holds (a level, a tier, a mode, the date a snapshot was taken) is written there itself. **A commit pin is recorded by the file that pins it, never by its 40-character value:** the file is the record, a second copy would drift from it, and the inventory check reads a long token as a key ("never the value" is the column's rule for secrets, and the check cannot tell the two apart). The status file holds the project's position and nothing else: it is capped at 120 lines, and the conventions used to send about eighteen such records there, where the template had no place for them (plan review R17).
 
 `Reflected through:` names the newest `CHANGES.md` heading the inventory has absorbed; `CHANGES.md` is kept newest-first. The check lists every entry above that heading as not absorbed. Resources lists **every** environment variable the code reads and every repository secret CI uses (the check scans tracked code, committed `.env` examples, and workflows, ignoring operating-system and CI variables), plus every account, token, and tool the owner provided, whether or not code reads it.
 
@@ -1799,7 +1799,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     with discriminators, tagged temporary instrumentation that never reaches a commit,
     captured runtime evidence, a one-sentence cause a second engineer could verify. The
     builder repairs a named cause; it is never asked to guess. Symptom suppression, a cause
-    left untouched, or instrumentation residue is a `FAIL`. A `test-runner` diagnosis is
+    left untouched, or instrumentation residue is a `REJECT`. A `test-runner` diagnosis is
     OBSERVED or INFERRED, and an INFERRED one is a hypothesis, never a basis for a fix.
     A report of several defects is triaged before any is diagnosed (skill step 0): reproduce each, bin together only those whose shared cause the evidence shows, confirm it with one discriminator that moves every member, and split out any member that does not respond; nothing readily apparent means one diagnosis per defect. A confirmed group gets one fix brief and one gate pass, and every member keeps its own regression test.
 27. Anything the user must run or click reaches them as a **run sheet**, never as a
@@ -1853,7 +1853,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     command copies its spelling, flags, and argument order from that file, or from a `--help`
     you just ran — never from memory of the design, the plan, or an earlier conversation. A
     command absent from the reference does not exist until `--help` proves otherwise; a
-    made-up command in a run sheet is a `FAIL` of the run-sheet rule.
+    made-up command in a run sheet breaks the run-sheet rule.
 33. Project end is a trigger, not a judgement: the close of the approved plan's last stage.
     Deferred increments do not postpone it. Run the project-end items in the same turn as
     that stage close, set `Phase: done`, and open the report with "Project complete". A

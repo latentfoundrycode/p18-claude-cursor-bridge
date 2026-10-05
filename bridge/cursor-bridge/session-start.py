@@ -100,6 +100,17 @@ def field(text, name):
     return m.group(1).strip().strip("*_`").strip() if m else None
 
 
+def installed_version():
+    """The release this program belongs to: the digest it sends is that release's, whatever
+    the project's status file records (the two differ between an install or a rollback and
+    the project's next calibration)."""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8-sig") as f:
+            return f.read().strip().split()[0]
+    except (OSError, IndexError):
+        return "?"
+
+
 def supervisor_path():
     home = os.path.expanduser("~")
     return os.path.join(home, ".claude", "commands", "supervisor.md")
@@ -141,7 +152,11 @@ def pointers_part(status, sections, source):
     awaiting = (field(status, "Awaiting user on") or "nothing").strip()
     if len(awaiting) > AWAITING_MAX:
         awaiting = awaiting[:AWAITING_MAX] + "... (read it whole in docs/PROJECT_STATUS.md)"
-    version = field(status, "Bridge version") or "?"
+    version = installed_version()
+    recorded = re.search(r"[0-9]{4}\.[0-9]{2}\.[0-9]{2}[a-z]?", field(status, "Bridge version") or "")
+    recorded = recorded.group(0) if recorded else ""
+    if recorded and version != "?" and recorded != version:
+        version += "; the status file records %s, so this project is not calibrated to the installed bridge: say so in your next report, /calibrate-bridge is the owner's to start" % recorded
     waiting = awaiting.lower() not in ("nothing", "none", "", "-")
     out = ["CLAUDE-CURSOR BRIDGE: this folder belongs to a bridge project (bridge %s) and this message is for its supervisor session. "
            "If you are not the project's supervisor (you were not asked to act as supervisor here), ignore this message and the digest. "
@@ -197,7 +212,7 @@ def main():
         return 0
     source = {"compact": "compacted", "resume": "resumed", "fork": "forked from another session"}.get(data.get("source"), "compacted or resumed")
     digest, sections = digest_and_sections(sv)
-    version = field(status, "Bridge version") or "?"
+    version = installed_version()
     parts = []
     if part in ("pointers", "all"):
         parts.append(cap(pointers_part(status, sections, source), MAX_OUTPUT, "the section pointers"))

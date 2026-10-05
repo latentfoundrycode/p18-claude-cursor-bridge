@@ -96,6 +96,15 @@ def looks_secret(cell):
     return False
 
 
+FINGERPRINT_HINT = (" If this is a commit fingerprint (a pinned action or tool): record the file that pins it, "
+                    "not the value; the file is the record, and a long token here reads as a key.")
+
+
+def fingerprint_like(cell):
+    """A 40- or 64-character hexadecimal token: a commit or a digest, or a key of that shape."""
+    return bool(re.search(r"(?<![0-9a-f])(?:[0-9a-f]{40}|[0-9a-f]{64})(?![0-9a-f])", cell))
+
+
 def parse_tables(text):
     """Return {section: (header_cells or None, [row_cells...])} for the four sections."""
     out = {}
@@ -244,7 +253,7 @@ def main():
             for c in r:
                 if looks_secret(c):
                     fails.append("SECRET VALUE: a Resources cell looks like a secret value (row '%s'). "
-                                 "Name the secret and where it lives; never the value." % r[0][:40])
+                                 "Name the secret and where it lives; never the value.%s" % (r[0][:40], FINGERPRINT_HINT if fingerprint_like(c) else ""))
                     break
     files = tracked_files()
     if files is None:

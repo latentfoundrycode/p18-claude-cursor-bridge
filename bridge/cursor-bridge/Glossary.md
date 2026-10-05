@@ -31,7 +31,7 @@ One term per thing. The supervisor, the subagents, and every brief use these ter
 | **Diagram-based planning** | Designing through the diagram catalogue: top-down, level by level; implementation detail only where it is load-bearing; every normative diagram enforced. |
 | **Load-bearing** | An implementation detail that must be decided at planning because getting it wrong breaks correctness under concurrency, a security mechanism, data integrity, a budgeted hot path, an external protocol, or a place where the builder has already failed. Only load-bearing detail is diagrammed at Levels 4 and 5. |
 | **Free implementation space** | Everything the brief and the normative diagrams leave to the builder. Reviewers do not fail a choice made inside it. |
-| **Design regression** | Code drifting from a normative diagram without an objection. A review `FAIL`. |
+| **Design regression** | Code drifting from a normative diagram without an objection. A review `REJECT`. |
 | **Repo ignorance** | The builder's partial view of the project. Answered by the brief and its diagram slices, never by giving the builder control of the plan. |
 | **Parallel increments** | Ready increments marked `Parallel: yes` with disjoint scopes whose **builders** run at the same time (run parameter `Parallel increments: on`), each builder in its own worktree. The supervisor never works inside a worktree: it processes each finished branch in its own checkout, one at a time, through the same gate. One writer per checkout. |
 

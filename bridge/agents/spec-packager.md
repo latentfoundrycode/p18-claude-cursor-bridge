@@ -35,10 +35,11 @@ delegate command and the Out of scope section keep `docs/` closed except for wha
 so a brief that asks the builder to write a file there and does not list it contradicts itself
 (plan review R17: every project's builder notes were written against the command that forbade
 them). Always list `docs/BUILDER_NOTES.md`: the Constraints section asks the builder to append
-to it. List `docs/cli-reference.json` whenever the increment adds or changes a command of
-installable software: the delivery conventions require it regenerated in the same diff, and
-the reviewer rejects the diff without it. Nothing else under `docs/` or `handoff/` goes in
-Scope.
+to it; this holds for the fix and the refactoring variants below as well. List
+`docs/cli-reference.json` and `docs/CLI_REFERENCE.md` whenever the increment adds or changes a
+command of installable software: the delivery conventions require the first regenerated in
+the same diff, the builder's generator renders the second from it, and the reviewer rejects
+the diff without them. Nothing else under `docs/` or `handoff/` goes in Scope.
 
 ## Write to `handoff/TASK-<nnn>.md`
 
@@ -127,7 +128,7 @@ differences, stated verbatim in the brief:
 - **Objective** opens with: "Refactoring — remove duplication / simplify **without any
   change in behaviour**." Then the candidate's sites (file:lines), its proposed shape, and
   every caller to update.
-- **Scope** names the sites and the callers, nothing else.
+- **Scope** names the sites and the callers, and `docs/BUILDER_NOTES.md` as in every brief. Nothing else.
 - **Acceptance criteria** are: the full test suite passes with the **same** test set; every
   listed caller now uses the single implementation; no public signature outside the listed
   sites changed; the duplicate/dead code is gone.
@@ -165,7 +166,7 @@ Same file shape, with these differences, stated verbatim:
   nothing else." Then the **root cause in one sentence**, the **evidence lines** copied
   from the debug file, and the **reproduction test** (path and name) that currently fails
   and must pass.
-- **Scope** names the file(s) the cause lives in and the reproduction test. Nothing else.
+- **Scope** names the file(s) the cause lives in, the reproduction test, and `docs/BUILDER_NOTES.md` as in every brief (a cause the builder found on the way belongs there). Nothing else.
 - **Acceptance criteria**: the reproduction test passes; the full suite passes with no
   other change in results; the named cause is addressed at the mechanism the evidence
   points at (state the mechanism).

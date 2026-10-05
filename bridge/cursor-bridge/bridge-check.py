@@ -20,7 +20,8 @@ Usage:  python ~/.claude/cursor-bridge/bridge-check.py [--root <path-to-.claude>
 
 --sources checks a source tree (the `bridge/` folder of the bridge's repository) against its
 own manifest and nothing more: a source tree has no settings.json, since the owner's file is
-not part of it, and the shim is a matter of the machine a release is installed on.
+not part of it, and the shim is a matter of the machine a release is installed on. In a
+source tree a file the manifest does not list (EXTRA) fails the check as well.
 Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;
         2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).
 """
@@ -85,9 +86,9 @@ def check_settings(root):
     orphans = []
     for event, groups in sorted(have_hooks.items()):
         for cmd in hook_commands(groups):
-            m = re.search(r"\.claude/cursor-bridge/([\w.-]+\.py)", cmd)
-            if m and not os.path.isfile(os.path.join(root, "cursor-bridge", m.group(1))):
-                orphans.append("%s runs %s" % (event, m.group(1)))
+            for name in re.findall(r"cursor-bridge[/\\]([\w.-]+\.py)", cmd):
+                if not os.path.isfile(os.path.join(root, "cursor-bridge", name)):
+                    orphans.append("%s runs %s" % (event, name))
     if missing or orphans:
         return "STALE", "; ".join((["missing bridge entries: " + "; ".join(missing)] if missing else [])
                                   + (["hooks that run a bridge program which is not installed (remove the hook or install the bridge again): " + "; ".join(orphans)] if orphans else []))
@@ -179,10 +180,15 @@ def main():
         manifest.get("version", "?"), manifest.get("generated", "?"), root))
     for kind, rel in problems:
         print("  %-8s %s" % (kind, rel))
-    if extras and not quiet:
+    if extras and (sources or not quiet):
         for rel in sorted(extras):
-            print("  EXTRA    %s  (not in manifest; a local addition or a leftover)" % rel)
+            print("  EXTRA    %s  (not in manifest; %s)" % (rel, "stamp the release again, or remove the file" if sources else "a local addition or a leftover"))
     print("bridge-check: %d OK, %d STALE, %d MISSING, %d EXTRA" % (ok, stale, missing, len(extras)))
+    if sources and (stale or missing or extras):
+        # An unlisted file in a release folder would be installed, never kept as part of a
+        # previous release and never removed by a later one.
+        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run.")
+        return 1
     if stale or missing:
         print("RESULT: NOT CALIBRATED - run the release's bridge-install.py (it copies the files, merges settings.json and installs the shim), then re-run.")
         return 1

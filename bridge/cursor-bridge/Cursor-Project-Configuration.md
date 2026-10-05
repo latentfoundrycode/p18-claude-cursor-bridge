@@ -300,7 +300,7 @@ CI gate at Phase 1/config. Steps:
 
 5. **SHA-pin everything.** Every security tool and every CI action is pinned to a **full
    commit SHA, never a mutable tag** (`@v2` is the March-2026 Trivy-compromise vector), the
-   SHA recorded in `docs/INVENTORY.md` (Resources). Scanners get only the minimum environment — no
+   file that holds each pin recorded in `docs/INVENTORY.md` (Resources) (the file, not the 40-character value: the inventory check reads a long token as a key). Scanners get only the minimum environment — no
    secrets on a scanner's path beyond Socket's read-scoped token.
 
 6. **The shell guard (fail-closed) — OPT-IN, off by default.** *Only* wire this when the
@@ -436,7 +436,7 @@ this reliable:
    level; append the third (Semgrep, advisory) `afterFileEdit` hook; **(opt-in only, and only
    for a PowerShell-launched builder)** the fail-closed `beforeShellExecution` shell-guard hook
    (+ place `shell-guard.py`); pin and record the Semgrep/OSV/Socket versions, ASVS level, and
-   every SHA in `docs/INVENTORY.md` (Resources). The Socket token escalates once (repo secret).
+   the file that pins each SHA in `docs/INVENTORY.md` (Resources). The Socket token escalates once (repo secret).
 8b. §5e performance floor (where budgets exist): `bench/budgets.json`, the `bench-check.py` CI step, pinned bench/profile tools, gitignores.
 8. §5d observability (UI-bearing projects): wire the supervisor-authored observability e2e
    tests into the `gate` job, set test-mode fixed clock/seed/locale, gitignore the artifacts,
@@ -446,5 +446,5 @@ this reliable:
    added **inside the existing `gate` job** (one required check); where there is no CI, the
    supervisor runs them locally at the gate.
 10. Commit the configuration changes as their own checkpoint before `TASK-001`.
-11. Record in `docs/INVENTORY.md` (Resources) what was configured, so a resuming session
+11. Record in `docs/PROJECT_STATUS.md` what was configured, so a resuming session
     doesn't redo it.

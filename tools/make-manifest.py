@@ -68,7 +68,10 @@ def read_version():
 
 def main():
     argv = sys.argv[1:]
-    explicit = argv[argv.index("--version") + 1] if "--version" in argv else ""
+    if argv and not (len(argv) == 2 and argv[0] == "--version"):
+        print("usage: python tools/make-manifest.py [--version <YYYY.MM.DD[letter]>]   (stamps bridge/: writes VERSION and MANIFEST.json; nothing was written)")
+        return 2
+    explicit = argv[1] if argv else ""
     version = pick_version(explicit)
     if version not in changelog_versions():
         print("make-manifest: CHANGELOG.md has no '## %s' entry - write the release note first." % version)

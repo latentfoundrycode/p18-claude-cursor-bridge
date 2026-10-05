@@ -610,7 +610,7 @@ high-severity/primary finding turns the single `gate` check red.
 **SHA-pin rule (load-bearing — see `Merge-Verification-Policy.md` and the Trivy meta-risk):**
 pin every security tool and every CI **action** to a **full commit SHA, never a mutable
 tag**. `uses: some-action@v2` is the exact vector exploited in the March 2026 Trivy
-supply-chain compromise. Record each pinned SHA in `docs/INVENTORY.md` (Resources). Scanners get only
+supply-chain compromise. Record the file that holds each pinned SHA in `docs/INVENTORY.md` (Resources) (the file, not the value). Scanners get only
 the minimum environment — no secrets on a scanner's path beyond Socket's read-scoped token.
 
 ---

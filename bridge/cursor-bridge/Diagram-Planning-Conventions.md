@@ -123,7 +123,7 @@ Order: the object diagram, then the three parallel kinds.
 
 - Every build-plan increment names the diagrams it touches (`Diagrams:`), and its brief carries those **slices**: the diagram files and the element identifiers the increment implements, with the constraint to conform and to raise an objection rather than deviate.
 - `diagram-check.py --mode code` runs at step 4 of the loop on every increment (component and schema conformance) and at every stage close; `--mode done` at project end also requires every enforcing test file to exist.
-- Reviewers check the diff against the diagrams its brief names. A deviation without an objection is **design regression** and a `FAIL`; a choice inside the free implementation space is not a finding.
+- Reviewers check the diff against the diagrams its brief names. A deviation without an objection is **design regression** and a `REJECT`; a choice inside the free implementation space is not a finding.
 - The stage-close refactoring pass treats normative diagrams as constraints. A candidate that would change one is a design change: it goes through §7, never in as a quiet edit.
 
 ## 7. Objections and bottom-up escalation
