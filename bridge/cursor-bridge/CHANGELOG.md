@@ -17,7 +17,7 @@ project must show before the other projects resume.
 
 ## 2026.10.05a
 
-**Release A1a of the restructuring plan: the bridge's own house.** Its sources leave the folder where a session working on the bridge loaded them half-edited; a release can be taken back; three contradictions in the bridge's own text are removed.
+**Release A1a of the restructuring plan: the bridge's own house.** Its sources leave the folder where a session working on the bridge loaded them half-edited; a release can be taken back; four contradictions in the bridge's own text are removed.
 
 **What changed**
 - **The governance sources moved from `.claude/` to `bridge/` in the bridge's repository** (plan review R8, KP-037). Claude Code loads agents, commands, settings and hooks from a project's `.claude` folder, prefers a project's agents over the installed ones and reloads them while a session runs, so a branch that edited a reviewer changed the reviewer of that branch. On an installed machine nothing moves: the install program still copies `commands/`, `agents/`, `skills/` and `cursor-bridge/` into `~/.claude`. **The install command's path changes** to `<the bridge's repository>/bridge/cursor-bridge/bridge-install.py`. The repository's generated `settings.json`, which existed to give sessions there the bridge's hooks, is gone.
