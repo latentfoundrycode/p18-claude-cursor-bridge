@@ -18,6 +18,9 @@ stage heading (`## ...`), followed by field lines (`Key: value`, optionally as `
   Scope:       path/, path/file.py, ...           (required for increments, absent for groups)
   Deferred:    owner YYYY-MM-DD                   (optional; skipped when computing readiness)
 
+A stage heading is followed by a line `Demonstration: <what is shown live, on the product as
+built, when the stage closes>` (release A1b); a stage with increments and no such line is noted.
+
 Status is not written in the plan; it is derived from git. An increment counts as merged
 when a commit on <base> names its ID in the subject (PR titles and squash commits start with
 the increment ID). A group is merged when all its children are.
@@ -107,6 +110,33 @@ def parse(paths):
     return items, order, fails
 
 
+STAGE_RX = re.compile(r"^##\s+(\S.*?)\s*$")
+DEMO_RX = re.compile(r"^(?:[-*]\s+)?\**Demonstration\**\s*:\s*(\S.*)$", re.I)
+
+
+def stages_without_demonstration(paths):
+    """Stage headings (`## ...`) that hold increments and no `Demonstration:` line (release A1b)."""
+    missing = []
+    for path in paths:
+        stage, seen, items = None, False, False
+        for line in read(path).splitlines():
+            m = STAGE_RX.match(line)
+            if m:
+                if stage is not None and items and not seen:
+                    missing.append(stage)
+                stage, seen, items = m.group(1).strip(), False, False
+                continue
+            if stage is None:
+                continue
+            if HEAD_RX.match(line):
+                items = True
+            elif DEMO_RX.match(line.strip()):
+                seen = True
+        if stage is not None and items and not seen:
+            missing.append(stage)
+    return missing
+
+
 def merged_ids(base):
     p = subprocess.run(["git", "log", base, "--format=%s"], capture_output=True, text=True,
                        encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
@@ -127,6 +157,8 @@ def main():
         return 1
     items, order, fails = parse(paths)
     notes = []
+    for s in stages_without_demonstration(paths):
+        notes.append("stage '%s' names no Demonstration: line; the stage close runs it live (release A1b), add one from the stage's increments" % s[:60])
 
     kinds = {}
     for tid in order:

@@ -116,8 +116,14 @@ def assistant_transcript(tmp_path, text):
 @pytest.mark.parametrize("text, sent_back", [
     ("Run this:\n\n```bash\npython tools/x.py\n```\n\nThen tell me.", True),
     ("Terminal: Git Bash (Start menu, type Git Bash)\n\n```bash\npython tools/x.py\n```\n\nReport back the last line.", False),
-    ("Open PowerShell and run:\n\n```powershell\nGet-Content x\n```", False),
-    ("FYI: I ran this in this chat:\n\n```bash\npytest -q\n```\n\n2 passed.", False),
+    ("**Terminal:** PowerShell (Start menu, type PowerShell)\n\n```powershell\nGet-Content x\n```", False),
+    ("- **Terminal**: this chat\n\n```bash\n/supervisor\n```", False),
+    ("Open PowerShell and run:\n\n```powershell\nGet-Content x\n```", True),
+    ("1. Run:\n\n   ```bash\n   python tools/x.py\n   ```\n", True),
+    ("Run:\n\n~~~ps1\nGet-Content x\n~~~\n", True),
+    ("Run:\n\n```batch\ndir\n```\n", True),
+    ("FYI: I ran this myself:\n\n```\npytest -q\n```\n\n2 passed.", False),
+    ("FYI, in this chat I ran `pytest -q`: 2 passed.", False),
     ("Nothing needed — proceeding. Tests: 12 passed.", False),
     ("Here is the file:\n\n```python\nprint(1)\n```", False),
 ])
@@ -146,3 +152,9 @@ def test_the_run_sheet_check_applies_in_every_phase_and_blocks_the_stop(lg, tmp_
     with pytest.raises(SystemExit) as e:
         lg.main()
     assert e.value.code == 0, "configuration is not an active phase for the loop guard, and the run sheet is complete"
+    # the hook's own copy of the final message is read first; the transcript (which may lag) is the fallback
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": tp, "hook_event_name": "Stop",
+                                                                           "last_assistant_message": "Please run:\n\n```bash\npython setup.py\n```"})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 2, "the hook's own copy of the final message wins over the transcript"

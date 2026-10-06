@@ -418,6 +418,16 @@ def cmd_premerge(nnn, cwd, pr=None):
             return 1
     print("review-guard: OK - %s descends from the reviewed %s and differs only under run/review/ (%d file(s))%s" % (
         head[:12], snap["head"][:12], len(changed), "; the pull request's head matches" if pr else ""))
+    # The record the permission guard reads before it lets a merge through (release A1b): a
+    # merge that skipped this check has no record and is refused; the sha alone proves nothing.
+    folder = os.path.join(common, "bridge", "premerge")
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, head), "w", encoding="utf-8") as f:
+            json.dump({"pr": pr, "review": nnn, "snapshot": snap_hash, "written": time.strftime("%Y-%m-%dT%H:%M:%S")}, f)
+    except OSError as e:
+        print("review-guard: CANNOT CHECK - the pre-merge record could not be written (%s)" % e)
+        return 2
     print("review-guard: merge with  gh pr merge %s--squash --match-head-commit %s" % ((str(pr) + " ") if pr else "", head))
     return 0
 

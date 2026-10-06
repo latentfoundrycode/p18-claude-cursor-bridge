@@ -29,6 +29,10 @@ What it checks, with the file it reads (the 0b review corrected several of these
     ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and
     docs/diagrams/INDEX.md (missing = a diagram retrofit item);
   - with --screens (or a docs/mockups folder): the design detector in the gate;
+  - release A1b: a spending limit recorded for every key, account or provider that can charge
+    (the inventory's Resources rows); the inventory's `Development data:` decision; every
+    adapter of an external service tested against recorded replies (the project's own tracked
+    files, judged per adapter); `run/` ignored (a NOTE);
   - with --installable (or docs/cli-reference.json present): the CLI reference and a check
     of it, in CI or in the test suite;
   - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the
@@ -139,6 +143,27 @@ def git_ignored(ws, rel):
     except (OSError, subprocess.TimeoutExpired):
         return False
     return p.returncode == 0
+
+
+def tracked_files(ws):
+    """The project's own files (git ls-files), or a walk that skips environments and build output."""
+    try:
+        p = subprocess.run(["git", "-C", ws, "-c", "core.fsmonitor=false", "ls-files", "-z"], capture_output=True, timeout=60, creationflags=NO_WINDOW)
+        if p.returncode == 0:
+            return [x.decode("utf-8", "replace") for x in p.stdout.split(b"\0") if x]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    out = []
+    for dirpath, dirs, names in os.walk(ws):
+        dirs[:] = [d for d in dirs if d not in (".git", "node_modules", ".venv", "venv", "venvs", "env", "site-packages", "__pycache__", "dist", "build", "run", "Worktrees")
+                   and not os.path.isfile(os.path.join(dirpath, d, "pyvenv.cfg"))]
+        for n in names:
+            out.append(os.path.relpath(os.path.join(dirpath, n), ws).replace("\\", "/"))
+    return out
+
+
+LIMIT_RECORDED = re.compile(r"spend(ing)?\s+limit|\blimit\s*[:=]?\s*(of\s*)?([$\u20ac\u00a3]\s*\d|\d+(\.\d+)?\s*(USD|EUR|GBP|CHF)\b)|no spend possible", re.I)
+CANNOT_CHARGE = re.compile(r"\blocal (service|development)\b|throwaway|the product's own|own (per-instance )?token|per-instance", re.I)
 
 
 def project_words(ws):
@@ -419,49 +444,71 @@ def main():
             if cells and not set("".join(cells)) <= set("-: ") and not (cells[0].lower() in ("name", "decision", "feature", "item")):
                 sections.setdefault(current, []).append(cells)
     if inv:
-        # a spending limit at every paid provider: a row of kind secret or account says what it is
+        # a spending limit at every provider, API or account that can charge: its Resources row says so
         unlimited = []
         for cells in sections.get("Resources", []):
-            if len(cells) >= 2 and re.search(r"\b(secret|account)\b", cells[1], re.I) and not re.search(r"\blimit\b|no spend", " ".join(cells), re.I) \
-                    and not re.search(r"test-only|repo secret", cells[1], re.I):
-                unlimited.append(cells[0][:40])
+            if len(cells) < 2 or not re.search(r"secret|account|api|provider|external|key|token", cells[1], re.I) or re.search(r"test-only", cells[1], re.I):
+                continue
+            name = cells[0].strip("`* ")
+            first = re.match(r"[A-Za-z_][A-Za-z0-9_]*", name)
+            ident = first.group(0) if first else ""
+            row = " ".join(cells)
+            if LOCAL_SERVICE.match(ident) or (ident and ident.split("_")[0].lower() in words) or CANNOT_CHARGE.search(row):
+                continue                                   # a local service's password or the product's own token cannot charge
+            if LIMIT_RECORDED.search(row):
+                continue
+            unlimited.append(name[:40])
         if unlimited:
-            add("MISSING", "Spending limit recorded", "a key or account without a spending limit recorded in its Resources row (`limit $X/month, set <date>`, or `no spend possible`): %s; configuration asks the owner to set one at the provider (rule 56)" % ", ".join(unlimited[:6]))
+            add("MISSING", "Spending limit recorded", "%d key(s) or account(s) without a spending limit in the Resources row (`limit $20/month, set <date>`, or `no spend possible`): %s%s; the configuration phase asks the owner to set one at each provider (supervisor Phase 5)" % (
+                len(unlimited), ", ".join(unlimited[:6]), " and %d more" % (len(unlimited) - 6) if len(unlimited) > 6 else ""))
         else:
             add("OK", "Spending limit recorded")
         # development data kept apart from live data: a Decisions row says how
-        if any(cells and re.match(r"^\**development data", cells[0], re.I) for cells in sections.get("Decisions", [])):
+        if any(cells and re.match(r"^[\s*_`]*development data", cells[0], re.I) for cells in sections.get("Decisions", [])):
             add("OK", "Development data kept apart")
         else:
             add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
 
-    # --- every adapter of an external service is tested against recorded replies (rule 55 family, A1b)
-    adapters, tests_text, recorded = [], "", False
-    client_rx = re.compile(r"^\s*(?:from|import)\s+(requests|httpx|aiohttp|urllib3|openai|anthropic|modal|replicate|stripe|boto3|botocore|google\.cloud|azure|huggingface_hub|supabase|twilio|sendgrid|slack_sdk)\b", re.M)
-    for dirpath, dirs, names in os.walk(ws):
-        rel = os.path.relpath(dirpath, ws).replace("\\", "/")
-        dirs[:] = [d for d in dirs if d not in (".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", "run", "Worktrees")]
-        if re.search(r"(^|/)(cassettes|recorded|recordings|contracts|contract_fixtures|vcr)(/|$)", rel, re.I):
-            recorded = True
-        for n in names:
-            if not n.endswith(".py"):
-                continue
-            p = os.path.join(dirpath, n)
-            text = read(p) or ""
-            if re.search(r"(^|/)tests?(/|$)", rel) or n.startswith("test_") or n.endswith("_test.py"):
-                tests_text += "\n" + text
-                if re.search(r"recorded|cassette|vcr|respx|responses\.activate|contract", text, re.I):
-                    recorded = True
+    # --- every adapter of an external service is tested against recorded replies (rule 37; A1b item 5):
+    #     the project's own tracked files only, judged per adapter
+    files = tracked_files(ws)
+    client_rx = re.compile(r"^\s*(?:from|import)\s+(requests|httpx2?|aiohttp|urllib3|urllib\.request|http\.client|openai|anthropic|modal|replicate|stripe|boto3|botocore|google\.cloud|azure|huggingface_hub|supabase|twilio|sendgrid|slack_sdk)\b", re.M)
+    js_client_rx = re.compile(r"\bfetch\(|\baxios\b")
+    adapters, tests = {}, []
+    for rel in files:
+        n = os.path.basename(rel)
+        is_test = bool(re.search(r"(^|/)(tests?|__tests__|spec)(/|$)", rel)) or n.startswith("test_") or bool(re.search(r"[._](test|spec)\.(py|js|ts|mjs|tsx)$", n))
+        if n.endswith(".py"):
+            text = read(os.path.join(ws, rel)) or ""
+            if is_test:
+                tests.append(text)
             elif client_rx.search(text):
-                adapters.append(os.path.splitext(n)[0])
+                adapters[os.path.splitext(n)[0]] = rel
+        elif n.endswith((".js", ".ts", ".mjs", ".tsx")) and not n.endswith(".d.ts"):
+            text = read(os.path.join(ws, rel)) or ""
+            if is_test:
+                tests.append(text)
+            elif js_client_rx.search(text):
+                adapters[re.sub(r"\.(js|ts|mjs|tsx)$", "", n)] = rel
     if adapters:
-        untested = sorted(a for a in set(adapters) if not re.search(r"\b%s\b" % re.escape(a), tests_text))
-        if not recorded:
-            add("MISSING", "Adapters tested against recorded replies", "%d module(s) talk to an external service (%s) and no test replays recorded replies (no cassettes/recorded/contracts folder, no test naming recorded replies); the brief's rule for external services (rule 55)" % (len(set(adapters)), ", ".join(sorted(set(adapters))[:6])))
-        elif untested:
-            add("NOTE", "Adapters tested against recorded replies", "no test names %s; the rest replay recorded replies" % ", ".join(untested[:6]))
+        cassettes = any(re.search(r"(^|/)(cassettes|recorded|recordings|contracts|contract_fixtures|vcr|__snapshots__)(/|$)", rel, re.I) for rel in files)
+        evidence_rx = re.compile(r"recorded|cassette|vcr|respx|responses|contract|replay|nock|msw", re.I)
+        without = []
+        for name in sorted(adapters):
+            name_rx = re.compile(r"\b%s\b" % re.escape(name))
+            naming = [t for t in tests if name_rx.search(t)]
+            if not naming or not (cassettes or any(evidence_rx.search(t) for t in naming)):
+                without.append(name)
+        if without:
+            add("MISSING", "Adapters tested against recorded replies", "%d adapter(s) of an external service without a test that names them and replays recorded replies (rule 37; A1b item 5): %s%s" % (
+                len(without), ", ".join(without[:6]), " and %d more" % (len(without) - 6) if len(without) > 6 else ""))
         else:
             add("OK", "Adapters tested against recorded replies")
+
+    # --- the supervisor's working files and the review files live under run/, which must be ignored (rule 54)
+    gi = read(os.path.join(ws, ".gitignore")) or ""
+    if not any(re.match(r"^/?run/?(\s|$)", line.strip()) for line in gi.splitlines()):
+        add("NOTE", "run/ ignored", "no `run/` line in .gitignore: the supervisor's working files (`run/supervisor/`, rule 54) and the review files would count as changes, and `review-guard.py verify` cleans untracked files")
 
     # --- no secret through an environment variable the owner sets (the inventory says how each arrives)
     by_env = []

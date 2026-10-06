@@ -59,7 +59,7 @@ possible typosquat) and report the name and version. Do **not** adjudicate the p
 *reputation* — whether it is known-vulnerable or known-malicious is now decided by the
 security floor (OSV-Scanner + Socket) and the supervisor's dependency-admission gate, so
 two voices do not disagree on the same package. Your job here is the shape (pinned? plausibly
-named?) and surfacing it for the licence question and the admission gate; the floor owns
+named?) and surfacing it for the admission gate (supervisor rule 56; a licence is never put to the owner); the floor owns
 "is it bad."
 
 **The lockfile is part of the dependency — check for what is missing.** If the diff changes

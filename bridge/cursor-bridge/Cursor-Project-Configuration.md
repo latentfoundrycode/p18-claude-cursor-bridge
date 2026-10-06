@@ -45,6 +45,9 @@ the brief.
   is best-effort, not a security boundary — terminal commands and MCP tools are not
   blocked by it, which is exactly why secret handling still rests on the brief and
   `secret-sentinel`.
+- **`.gitignore`** carries `run/`: the launcher's output, the review files and the supervisor's
+  working files (`run/supervisor/`, rule 54) live there and are never tracked; `review-guard.py
+  verify` cleans untracked files, so an unignored `run/` would lose them (the conformance check notes it).
 - **`.worktreeinclude`** (bridge-specific, not in the Cursor checklist) listing any
   gitignored file the tests need — normally `.env` — so it reaches the session worktree.
 - **The Workspace boundary** (bridge-specific). The builder must never read or write outside
@@ -80,8 +83,10 @@ guard hook refuses the forced form outright:
    from PowerShell removes only the link, never the target; never `rm -rf` or `Remove-Item -Recurse`
    a junction — verify with `Test-Path "<main>\node_modules"` → `True`, then run the program again.
 
-Treat `git worktree remove --force` on a worktree you have not link-checked as forbidden. (The
-opt-in shell-guard denies it for the builder too.)
+`git worktree remove` is never run by hand, forced or not: Git for Windows follows a gitignored
+junction in an ordinary removal as in a forced one (verified 2026-10-06 on Git 2.53), so only
+`worktree-teardown.py` removes a worktree, and the `permission-guard` hook refuses the command.
+(The opt-in shell-guard denies the forced form for the builder too.)
 
 **The other teardown failure — a real environment that is briefly locked.** A worktree that
 built its *own* `.venv` or `node_modules` (no link) can fail `git worktree remove` with
@@ -89,7 +94,7 @@ built its *own* `.venv` or `node_modules` (no link) can fail `git worktree remov
 is not the junction hazard: git's metadata is clean and nothing outside the worktree is at
 risk. Do not answer a lock with `--force`, which does not unlock anything. Wait and retry
 (three attempts, ~5 s apart); if it still fails, leave the directory and remove it at the
-next checkpoint with a plain recursive delete once step 2 has confirmed it contains no link.
+next checkpoint with a plain recursive delete once `worktree-teardown.py` has confirmed it contains no link (its refusal lists any).
 Record which case it was in `PROJECT_STATUS.md` so the two are never confused (KP-023).
 
 **Warm environment (performance):** rebuilding a from-source toolchain (a mypy build, a large
@@ -100,7 +105,7 @@ not a package tree, so plan the reuse explicitly and record it in `docs/PROJECT_
 
 ---
 
-## 2. The feedback loop — highest value — [Claude], with [Escalate] for new deps
+## 2. The feedback loop — highest value — [Claude]; a new dependency follows rule 56
 
 This is the single most valuable thing configuration does: make the builder able to see
 and fix its own lint/type errors without a human in the loop.
@@ -193,9 +198,10 @@ persistent rule is a second voice in every build that can drift from the brief.
   voice. **[Claude]**
 - Do **not** port skills or subagents into Cursor. The bridge's specialists live on the
   Claude side; duplicating them in Cursor splits the source of truth. **[Skip]**
-- If a pre-existing repo already ships `.cursor/rules`, `AGENTS.md`, or `CLAUDE.md`,
-  surface them to the human — they will apply on every run and may conflict with the
-  brief. Deciding to keep or retire them is a design call: **[Escalate]**.
+- If a pre-existing repo already ships `.cursor/rules`, `AGENTS.md`, or `CLAUDE.md`, they
+  will apply on every run and may conflict with the brief. Keeping or retiring each is the
+  supervisor's call (how, never what), recorded in the inventory's Decisions with the reason;
+  it is never a question to the owner.
 
 ---
 
@@ -326,7 +332,7 @@ Everything else here the supervisor decides and records; it does not escalate.
 
 ---
 
-## 5d. Observability tooling — [Claude], with [Escalate] only for the driver dependency
+## 5d. Observability tooling — [Claude]; the driver dependency follows rule 56
 
 For **UI-bearing** projects only (those with a Phase-1 screen-and-state inventory). Per
 `Observability-Conventions.md` — gives the gate a view of the *running render*. The supervisor
@@ -347,8 +353,9 @@ owns the tier decision (Tier A default; Tier B opt-in) and records it. Steps:
    + version, the tier, the invariant set, and the state→reachability map in
    `docs/INVENTORY.md` (Resources).
 
-**Escalation:** only the **driver dependency** (a new dev/CI dependency + CI minutes) — cleared
-with the user like any dependency. The instrumentation the tests exercise is product code Cursor
+**The driver dependency** (a new dev/CI dependency + CI minutes) is admitted and recorded under
+the one dependency rule (supervisor rule 56) and put to the owner only for the CI minutes it
+costs, as a consequence they bear. The instrumentation the tests exercise is product code Cursor
 builds from the brief; the tests are the supervisor's. Assertions are hand-rolled (no new dep).
 
 ---
@@ -395,7 +402,7 @@ Stop and ask the human, leading with the decision and a recommendation, whenever
 configuration would require:
 
 - a secret, key, or token (Context7 paid key, MCP server credentials, any auth);
-- a new project dependency (linters included — name it, licence, reason);
+- a dependency only for a consequence the owner bears — money, privacy, lock-in — under the one dependency rule (supervisor rule 56); never its technical merit, never a licence;
 - an action only reachable in Cursor's GUI or the cloud dashboard;
 - a decision about pre-existing Cursor config in an adopted repo;
 - anything the design document does not already settle.
@@ -422,7 +429,7 @@ this reliable:
 
 1. §1 repo hygiene (`.gitattributes` → renormalise, `.cursorignore`, `.worktreeinclude`,
    `.cursor/rules/workspace-boundary.mdc` + the `boundary-check` hook entry).
-2. §2 feedback loop: escalate any new linter deps, commit configs, fix command strings, wire the edit hook **windowless** (idiom in every hook script; `run-hidden.py` on every direct-command entry), handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` running the lint command + `windowless-check.py`; `git config core.hooksPath .githooks`).
+2. §2 feedback loop: admit linter deps under rule 56, commit configs, fix command strings, wire the edit hook **windowless** (idiom in every hook script; `run-hidden.py` on every direct-command entry), handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` running the lint command + `windowless-check.py`; `git config core.hooksPath .githooks`).
 3. §3 Context7 in `~/.cursor/mcp.json` if the project uses third-party libraries.
 4. §4 any other MCP tools the build needs (escalate secrets).
 5. §5 at most one *project-specific* cross-cutting rule, only if warranted; write the
@@ -441,7 +448,7 @@ this reliable:
 8b. §5e performance floor (where budgets exist): `bench/budgets.json`, the `bench-check.py` CI step, pinned bench/profile tools, gitignores.
 8. §5d observability (UI-bearing projects): wire the supervisor-authored observability e2e
    tests into the `gate` job, set test-mode fixed clock/seed/locale, gitignore the artifacts,
-   confirm log redaction; escalate the driver dependency (Playwright / per-platform). Record
+   confirm log redaction; admit the driver dependency under rule 56 (Playwright / per-platform). Record
    the tier, driver + version, invariant set, and state→reachability map in `docs/INVENTORY.md` (Resources).
 9. §5b step 5 + §5c step 3 + §5d step 1 — the design, security, and observability floor steps
    added **inside the existing `gate` job** (one required check); where there is no CI, the

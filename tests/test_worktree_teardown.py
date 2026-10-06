@@ -22,6 +22,13 @@ def run(repo, *args):
     return p.returncode, p.stdout + p.stderr
 
 
+def remove_link(path):
+    if os.path.islink(path):
+        os.unlink(path)
+    else:
+        os.rmdir(path)                                 # a junction
+
+
 def link(path, target):
     if os.name == "nt":
         subprocess.run(["cmd", "/c", "mklink", "/J", str(path), str(target)], capture_output=True)
@@ -60,9 +67,36 @@ def test_a_link_inside_refuses_the_teardown_and_the_target_survives(repo, tmp_pa
     rc, out = run(repo, str(wt))
     assert rc == 2 and "link(s) inside" in out and "node_modules" in out and "never through it" in out, out
     assert wt.is_dir() and (target / "keep.txt").is_file(), "nothing was removed, nothing was followed"
-    os.rmdir(wt / "node_modules")                      # the link itself
+    remove_link(wt / "node_modules")                      # the link itself
     rc, out = run(repo, str(wt))
     assert rc == 0 and not wt.exists() and (target / "keep.txt").is_file(), out
+
+
+@pytest.mark.skipif(os.name != "nt", reason="the hazard is Git for Windows following a junction")
+def test_why_the_plain_removal_is_refused_by_the_guard(repo, tmp_path):
+    """Review of 2026.10.06b, finding 1: an ordinary `git worktree remove` deletes what a
+    gitignored junction points to, exactly as --force does. This test keeps the reason on
+    record; the guard refuses the command and the program refuses the link."""
+    wt = tmp_path / "Worktrees" / "TASK-001"
+    target = tmp_path / "elsewhere"
+    target.mkdir()
+    (target / "keep.txt").write_text("keep\n", encoding="utf-8")
+    (wt / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+    git(wt, "add", ".gitignore")
+    git(wt, "commit", "-q", "-m", "ignore")
+    link(wt / "node_modules", target)
+    rc, out = run(repo, str(wt))
+    assert rc == 2 and (target / "keep.txt").is_file(), "the program refuses and touches nothing: " + out
+    p = subprocess.run(["git", "-C", str(repo), "worktree", "remove", str(wt)], capture_output=True, text=True)
+    assert p.returncode == 0 and not wt.exists(), p.stdout + p.stderr
+    assert not (target / "keep.txt").exists(), "git followed the gitignored junction in a plain removal; this is why only the program removes worktrees"
+
+
+def test_a_locked_worktree_is_named_as_such(repo, tmp_path):
+    wt = tmp_path / "Worktrees" / "TASK-001"
+    git(repo, "worktree", "lock", str(wt))
+    rc, out = run(repo, str(wt))
+    assert rc == 1 and "git worktree unlock" in out and wt.is_dir(), out
 
 
 def test_a_dirty_worktree_is_left_to_git_and_never_forced(repo, tmp_path):

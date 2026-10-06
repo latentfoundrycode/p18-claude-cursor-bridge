@@ -42,7 +42,7 @@ to a half-copied tree would leave the project on a mixture of two releases.
 python ~/.claude/cursor-bridge/conformance-check.py
 ```
 
-Run it from the project root or from `Workspace/` (it resolves either). It compares this project's configuration with what the installed bridge requires (the scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where the software is installable, and whether keys sit in `Workspace/.env` within the builder's reach) and prints `OK` / `MISSING` / `NOTE` per floor. A project configured before a floor existed never received it otherwise. **Every `MISSING` becomes a calibration item** of this calibration, applied as configuration work in the next stage (a missing diagram index is the diagram retrofit, scheduled at the next natural pause); a `NOTE` is recorded in `PROJECT_STATUS.md`. Nothing here reopens a gate. Pass `--screens` or `--installable` when the project has screens or is installable and the check cannot tell from the files.
+Run it from the project root or from `Workspace/` (it resolves either). It compares this project's configuration with what the installed bridge requires (the scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where the software is installable, whether keys sit in `Workspace/.env` within the builder's reach, and since release A1b: a spending limit recorded for every key or account that can charge, the inventory's `Development data:` decision, every adapter of an external service tested against recorded replies, and `run/` ignored) and prints `OK` / `MISSING` / `NOTE` per floor. A project configured before a floor existed never received it otherwise. **Every `MISSING` becomes a calibration item** of this calibration, applied as configuration work in the next stage (a missing diagram index is the diagram retrofit, scheduled at the next natural pause); a `NOTE` is recorded in `PROJECT_STATUS.md`. Nothing here reopens a gate. Pass `--screens` or `--installable` when the project has screens or is installable and the check cannot tell from the files.
 
 ## 2. Re-read the governing files — they supersede what you hold in context
 
@@ -113,6 +113,12 @@ item into exactly one of:
   a test is not a gate, and it is applied now, in whatever phase the project is (release A1b).
 
 Rules while applying **Now** items:
+
+- The inventory's `Development data:` decision (release A1b) is added before the next brief is
+  packaged: from the design where it states it, or as `Development data: none, the product keeps
+  no data of the owner's` where that is true. A brief packaged without it stops the builder.
+- A stage whose plan names no `Demonstration:` line (release A1b) gets one now, from the
+  stage's increments, for every stage not yet closed.
 
 - Configuration goes through `cursor-configurator` and is **append-only**: add the missing
   file, the missing hook entry, the missing pre-commit line; never rewrite an existing

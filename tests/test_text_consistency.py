@@ -115,6 +115,23 @@ def test_a_commit_pin_is_recorded_by_its_file_and_the_inventory_check_accepts_wh
                 assert "file" in line, "%s still asks for the value: %s" % (name, line.strip()[:120])
 
 
+def test_no_text_puts_a_dependency_or_a_licence_question_to_the_owner():
+    """Review of 2026.10.06b, finding 4: one dependency rule (56); a licence is never the owner's
+    question (the owner's instruction of 2026-10-01)."""
+    offenders = []
+    for parts in (("commands", "supervisor.md"), ("agents", "secret-sentinel.md"), ("agents", "spec-packager.md"),
+                  ("cursor-bridge", "Cursor-Project-Configuration.md"), ("cursor-bridge", "Observability-Conventions.md"),
+                  ("cursor-bridge", "Delivery-Conventions.md"), ("cursor-bridge", "Merge-Verification-Policy.md")):
+        for i, line in enumerate(text(*parts).split("\n")):
+            low = line.lower()
+            if re.search(r"licen[cs]e", low) and re.search(r"\bask|escalat|question|the owner's call|clear(ed)? with the user", low) \
+                    and not re.search(r"\bnever\b|no licence|out of scope", low):
+                offenders.append("%s:%d %s" % (parts[-1], i + 1, line.strip()[:110]))
+            if re.search(r"dependenc", low) and re.search(r"\[escalate\]|escalate (any|the) [^.]*dep|clear(ed)? with the user", low) and "rule 56" not in low:
+                offenders.append("%s:%d %s" % (parts[-1], i + 1, line.strip()[:110]))
+    assert not offenders, offenders
+
+
 def test_no_text_calls_a_review_outcome_a_fail():
     """Review A and Review B answer APPROVE, REJECT or ESCALATE-INTENT; only the auditors and
     the test runner keep PASS and FAIL."""

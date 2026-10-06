@@ -3,10 +3,11 @@
 
   python ~/.claude/cursor-bridge/worktree-teardown.py <worktree path> [--dry-run]
 
-`git worktree remove --force` follows a live junction or symbolic link inside the worktree
-(a per-worktree venv, a linked node_modules) and deletes the real target; one project lost
+`git worktree remove` follows a gitignored junction or symbolic link inside the worktree
+(a per-worktree venv, a linked node_modules) and deletes the real target, in an ordinary
+removal as in a forced one (Git for Windows 2.53, verified 2026-10-06); one project lost
 its main checkout's installed packages that way, and forced the removal fourteen times in
-four days. This program never forces:
+four days. The permission guard refuses the git command; this program is the one way:
 
   1. the path must be a worktree of the repository the current folder belongs to;
   2. every entry inside it is looked at without following links; a junction or a symbolic
@@ -48,7 +49,7 @@ def link_target(path):
 
 
 def worktrees():
-    """{normalised path: branch} of the repository's worktrees."""
+    """{normalised path: branch} of the repository's worktrees, the main checkout first."""
     rc, out, _ = git("worktree", "list", "--porcelain")
     if rc != 0:
         return None
@@ -89,8 +90,8 @@ def main(argv):
     if key not in known:
         print("worktree-teardown: refused - %s is not a worktree of this repository (git worktree list shows: %s)" % (path, ", ".join(sorted(known)) or "none"))
         return 2
-    main_tree = sorted(known)[0]
-    if key == os.path.normcase(os.path.abspath(git("rev-parse", "--show-toplevel")[1].strip() or main_tree)):
+    main_tree = next(iter(known))                      # git lists the main checkout first
+    if key == main_tree:
         print("worktree-teardown: refused - %s is the main checkout, not a worktree" % path)
         return 2
     links = links_inside(path)
@@ -104,8 +105,12 @@ def main(argv):
         return 0
     rc, out, err = git("worktree", "remove", path)
     if rc != 0:
-        print("worktree-teardown: git refused to remove %s: %s" % (path, (err or out).strip()))
-        print("  commit or clean the worktree (git -C <path> status), then run again; never --force")
+        reason = (err or out).strip()
+        print("worktree-teardown: git refused to remove %s: %s" % (path, reason))
+        if "locked" in reason.lower():
+            print("  the worktree is locked: git worktree unlock <path> once nothing needs it any more, then run again; never --force")
+        else:
+            print("  commit or clean the worktree (git -C <path> status), then run again; never --force")
         return 1
     git("worktree", "prune")
     if os.path.exists(path):

@@ -130,12 +130,13 @@ it applies.**
   `rmdir` issued through Git Bash had silently failed on a mangled path and left the junction
   alive.
 - **Surfaced:** field use — the main checkout's `tools/…/node_modules` was destroyed.
-- **Correction:** the safe primitive (`Cursor-Project-Configuration.md` §1): remove the link
-  first with a **native Windows path** from PowerShell (`cmd /c rmdir` — on a junction it
-  removes only the link), `Test-Path`-verify the link is gone **and** the target survives,
-  *then* `git worktree remove` — `--force` only after that check. Never `rm -rf` /
-  `Remove-Item -Recurse` a junction. The shell-guard now also denies
-  `git worktree remove --force` for the builder.
+- **Correction (restated for release A1b):** `git worktree remove` is never run by hand, forced
+  or not — Git for Windows follows a gitignored junction in an ordinary removal as well
+  (verified 2026-10-06 on Git 2.53). `worktree-teardown.py` removes a worktree: it refuses
+  while any link is inside, listing each with its target; the link is then removed by itself
+  (`cmd /c rmdir` on the link from PowerShell; never `rm -rf` / `Remove-Item -Recurse`), the
+  target verified intact with `Test-Path`, and the program run again. The `permission-guard`
+  hook refuses the git command; the shell-guard denies the forced form for the builder.
 - **Applies:** every worktree teardown on Windows, especially with linked environments.
 
 ### KP-012 — Gate-critical streams must reach a reviewer whole; never trim the diff to save tokens
@@ -288,7 +289,7 @@ it applies.**
   leaving an orphaned directory that a later delete removed cleanly.
 - **Correction:** distinguish the two cases. A linked environment → the junction primitive
   (KP-011). A real, locked environment → wait and retry, else defer the delete to the next
-  checkpoint; `--force` unlocks nothing and is still forbidden without a link check.
+  checkpoint; `--force` unlocks nothing, and `git worktree remove` is never run by hand at all (KP-011, release A1b).
   `Cursor-Project-Configuration.md` §1.
 - **Applies:** every Windows worktree teardown with a real environment inside.
 

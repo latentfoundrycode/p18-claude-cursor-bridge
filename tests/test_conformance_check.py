@@ -337,18 +337,44 @@ def test_the_three_floors_of_release_a1b(tmp_path):
     assert verdict(out, "Spending limit recorded")[0] == "OK" and verdict(out, "Development data kept apart")[0] == "OK", out
     assert verdict(out, "Adapters tested against recorded replies")[0] is None, "no adapter, nothing to say"
     inv = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8")
-    (tmp_path / "docs" / "INVENTORY.md").write_text(inv.replace("; limit $20/month, set 2026-10-06", "").replace("Development data: a development build", "Data: a development build"), encoding="utf-8")
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv.replace("; limit $20/month, set 2026-10-06", "; a rate limit of 60/min").replace("Development data: a development build", "Data: a development build")
+                                                     .replace("| CI | 2026-09-01 |\n", "| CI | 2026-09-01 |\n"
+                                                              + "| POSTGRES_PASSWORD | secret | .env, a local development service | tests | n/a |\n"
+                                                              + "| THING_API_TOKEN | secret | the product's own per-instance token | app | n/a |\n"
+                                                              + "| OpenRouter (rule judge) | external API | key file; limit $10/month, set 2026-10-06 | app | 2026-10-01 |\n"
+                                                              + "| HF_TOKEN | repo secret | GitHub secret | CI | 2026-10-01 |\n"), encoding="utf-8")
     rc, out = run(tmp_path)
-    assert verdict(out, "Spending limit recorded")[0] == "MISSING" and "OPENROUTER_API_KEY" in out and "Socket" not in verdict(out, "Spending limit recorded")[1], out
+    kind, detail = verdict(out, "Spending limit recorded")
+    assert kind == "MISSING" and "OPENROUTER_API_KEY" in detail and "HF_TOKEN" in detail and "2 key" in detail, out
+    assert "POSTGRES" not in detail and "THING_API_TOKEN" not in detail and "Socket" not in detail and "OpenRouter (rule judge)" not in detail, "local services, the product's own tokens, no-spend accounts and limited rows are not reported: " + detail
     assert verdict(out, "Development data kept apart")[0] == "MISSING", out
-    (tmp_path / "app").mkdir()
-    (tmp_path / "app" / "llm.py").write_text("import httpx\n\ndef ask(q):\n    return httpx.get(q)\n", encoding="utf-8")
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv.replace("| Development data: a development build", "| **`Development data:`** a development build"), encoding="utf-8")
     rc, out = run(tmp_path)
-    assert verdict(out, "Adapters tested against recorded replies")[0] == "MISSING" and "llm" in out, out
+    assert verdict(out, "Development data kept apart")[0] == "OK", "a bold or backticked row counts: " + out
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv, encoding="utf-8")
+    (tmp_path / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "run/ ignored")[0] == "NOTE", out
+    (tmp_path / ".gitignore").write_text("node_modules/\nrun/\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "run/ ignored")[0] is None, out
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "llm.py").write_text("import httpx2\n\ndef ask(q):\n    return httpx2.get(q)\n", encoding="utf-8")
+    (tmp_path / "venvs" / "x" / "Lib" / "site-packages" / "aiohttp").mkdir(parents=True)
+    (tmp_path / "venvs" / "x" / "Lib" / "site-packages" / "aiohttp" / "client.py").write_text("import aiohttp\n", encoding="utf-8")
+    (tmp_path / "venvs" / "x" / "pyvenv.cfg").write_text("home = x\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    kind, detail = verdict(out, "Adapters tested against recorded replies")
+    assert kind == "MISSING" and "llm" in detail and "client" not in detail, "library code in an environment is not the product's adapter: " + out
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_other.py").write_text("def test_x():\n    assert True  # replays recorded replies\n", encoding="utf-8")
     rc, out = run(tmp_path)
-    assert verdict(out, "Adapters tested against recorded replies")[0] == "NOTE" and "llm" in out, out
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "MISSING", "a recorded word in an unrelated test proves nothing for llm: " + out
     (tmp_path / "tests" / "test_llm.py").write_text("from app import llm  # recorded replies in cassettes\n", encoding="utf-8")
     rc, out = run(tmp_path)
     assert verdict(out, "Adapters tested against recorded replies")[0] == "OK", out
+    (tmp_path / "web").mkdir()
+    (tmp_path / "web" / "api.ts").write_text("export const get = (u: string) => fetch(u);\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    kind, detail = verdict(out, "Adapters tested against recorded replies")
+    assert kind == "MISSING" and "api" in detail, "a JavaScript adapter counts too: " + out

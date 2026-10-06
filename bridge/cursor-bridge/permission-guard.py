@@ -6,11 +6,19 @@ refuses the two actions the loop must never take, in every permission mode (KP-0
     REST route `gh api … /pulls/<n>/merge` with a method that writes;
   - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,
     `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;
-  - a forced worktree removal (`git worktree remove --force`, `-f`), which follows a live
-    junction or symbolic link inside the worktree into its target (rule 19, release A1b);
-    `worktree-teardown.py` removes a worktree without forcing;
-  - a merge that does not carry the confirmation only the pre-merge check prints:
-    `gh pr merge` without `--match-head-commit <sha>` (release A1b), except `--disable-auto`;
+  - any `git worktree remove` (rule 19, release A1b): Git for Windows follows a gitignored
+    junction or symbolic link inside the worktree into its target in an ordinary removal
+    as in a forced one; `worktree-teardown.py` removes a worktree and refuses while a link
+    is inside (it runs git as its own child, which this hook never sees);
+  - a merge without the pre-merge check's record (release A1b): `gh pr merge` must carry
+    `--match-head-commit <sha>`, and `review-guard.py premerge` must have written the record
+    `<git common dir>/bridge/premerge/<sha>` for that sha when it printed OK; `--disable-auto`
+    and `--help` pass; a `gh api graphql` call carrying a merge mutation is refused.
+
+A command wrapped in `bash -c "..."`, `sh -c`, `cmd /c` or `powershell -Command "..."` is
+checked inside the quotes as well; a leading PowerShell call operator `&` is dropped; a
+`git -c alias.<x>=...` that defines a refused command is refused; an abbreviated `--forc`
+counts as `--force`, as it does for git.
   - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,
     `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or
     `powershell`), which would run it with the owner's real home and identity (KP-038): the
@@ -27,14 +35,20 @@ the call (documented), exit 0 lets it through. Fails open on anything unexpected
 that cannot read its input never blocks the loop. ASCII-only on purpose. Never writes.
 """
 import json
+import os
 import re
 import shlex
+import subprocess
 import sys
 
 WRITE_METHODS = ("PUT", "POST", "PATCH", "DELETE")
 AROUND_THE_SHIM = ("agent", "agent.cmd", "agent.ps1", "cursor-agent.cmd", "cursor-agent.ps1", "cursor-agent.exe")
 SHELLS = ("cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe")
 PROGRAM_AFTER = ("/c", "/k", "-c", "-command", "-file")
+WRAPPER_SHELLS = SHELLS + ("bash", "bash.exe", "sh", "sh.exe", "zsh", "dash")
+MERGE_MUTATIONS = ("mergePullRequest", "enablePullRequestAutoMerge")
+PREMERGE_DIR = os.path.join("bridge", "premerge")
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
 def base(tok):
@@ -95,10 +109,14 @@ def words(command):
 
 
 def strip_prefix(w):
-    """Drop leading assignments and wrappers (timeout 5, env X=1, nice, nohup, sudo …)."""
+    """Drop leading assignments and wrappers (timeout 5, env X=1, nice, nohup, sudo …) and
+    PowerShell's call operator `&`."""
     i = 0
     while i < len(w):
         tok = w[i]
+        if tok == "&":
+            i += 1
+            continue
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tok):
             i += 1
             continue
@@ -140,6 +158,8 @@ def force_push_reason(args):
     for a in args:
         if a in ("--force", "--force-with-lease", "--force-if-includes", "--mirror") or a.startswith("--force-with-lease=") or a.startswith("--force-if-includes="):
             return "git push with %s" % a
+        if len(a) >= 4 and "--force".startswith(a):      # git accepts an unambiguous abbreviation
+            return "git push with %s (an abbreviation of --force)" % a
         if re.match(r"^-[A-Za-z]*f[A-Za-z]*$", a):
             return "git push with the short flag %s" % a
         if a.startswith("+") and len(a) > 1:
@@ -147,32 +167,84 @@ def force_push_reason(args):
     return None
 
 
-def check(command):
+def premerge_recorded(sha, cwd):
+    """True when review-guard.py premerge wrote its record for this head in the repository the
+    hook's cwd belongs to (release A1b): the sha alone proves nothing, the record does."""
+    if not re.fullmatch(r"[0-9a-fA-F]{7,64}", sha or ""):
+        return False
+    try:
+        p = subprocess.run(["git", "-C", cwd or ".", "-c", "core.fsmonitor=false", "rev-parse", "--git-common-dir"],
+                           capture_output=True, text=True, timeout=20, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if p.returncode != 0:
+        return False
+    common = p.stdout.strip()
+    if not os.path.isabs(common):
+        common = os.path.join(cwd or ".", common)
+    try:
+        names = os.listdir(os.path.join(common, PREMERGE_DIR))
+    except OSError:
+        return False
+    return any(n.lower().startswith(sha.lower()) for n in names)
+
+
+def merge_reason(w, cwd):
+    """The reason to refuse a gh pr merge, or None."""
+    if any(a == "--admin" or a.startswith("--admin=") for a in w):
+        return "gh pr merge --admin (merging past the repository's rules)"
+    if "--disable-auto" in w or "--help" in w or "-h" in w:
+        return None
+    sha = None
+    for i, a in enumerate(w):
+        if a == "--match-head-commit":
+            sha = w[i + 1] if i + 1 < len(w) else ""
+        elif a.startswith("--match-head-commit="):
+            sha = a.split("=", 1)[1]
+    if sha is None:
+        return "gh pr merge without --match-head-commit <sha>: the sha, and the record review-guard.py premerge writes when it prints OK, are the gate's confirmation"
+    if not re.fullmatch(r"[0-9a-fA-F]{7,64}", sha):
+        return "gh pr merge with an empty or malformed --match-head-commit value"
+    if not premerge_recorded(sha, cwd):
+        return "gh pr merge for %s without the pre-merge check's record: run python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> <n> in the checkout first (it writes the record when it prints OK)" % sha[:12]
+    return None
+
+
+def check(command, cwd=None):
     """Return the reason to refuse, or None."""
     for simple in split_commands(command):
         w = strip_prefix(words(simple))
         if not w:
             continue
         head = base(w[0])
+        if head in WRAPPER_SHELLS:
+            inner = program_behind(w)
+            if inner and " " in inner:                   # the wrapped command came as one quoted string
+                r = check(inner, cwd)
+                if r:
+                    return r
         started = w[0] if around_the_shim(w[0]) else (program_behind(w) if head in SHELLS else None)
         if started and around_the_shim(started):
             return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % started
+        helpful = "--help" in w[1:] or "-h" in w[1:]
         if is_git(w):
+            for a in w:
+                if a.lower().startswith("alias.") and re.search(r"worktree\s+remove|pr\s+merge|push\b.*(--force|--forc|-f\b|\+)", a, re.I):
+                    return "a git alias that defines a refused command (%s)" % a[:60]
             sub, args = git_subcommand(w)
-            if sub == "push":
+            if sub == "push" and not helpful:
                 r = force_push_reason(args)
                 if r:
                     return r
-            if sub == "worktree" and args and args[0] == "remove":
-                for a in args[1:]:
-                    if a == "--force" or re.match(r"^-[A-Za-z]*f[A-Za-z]*$", a):
-                        return "git worktree remove with %s (a forced removal follows a live link inside the worktree into its target; use worktree-teardown.py)" % a
+            if sub == "worktree" and args and args[0] == "remove" and not helpful:
+                return "git worktree remove (git follows a gitignored junction or link inside the worktree into its target, forced or not): tear a worktree down with python ~/.claude/cursor-bridge/worktree-teardown.py <path>, which refuses while a link is inside"
         elif head in ("gh", "gh.exe"):
-            if len(w) >= 3 and w[1] == "pr" and w[2] == "merge" and any(a == "--admin" or a.startswith("--admin=") for a in w):
-                return "gh pr merge --admin (merging past the repository's rules)"
-            if len(w) >= 3 and w[1] == "pr" and w[2] == "merge" and "--disable-auto" not in w \
-                    and not any(a == "--match-head-commit" or a.startswith("--match-head-commit=") for a in w):
-                return "gh pr merge without --match-head-commit <sha>, the confirmation only review-guard.py premerge prints (a merge that skipped the gate is not refused by anything else)"
+            if len(w) >= 3 and w[1] == "pr" and w[2] == "merge":
+                r = merge_reason(w, cwd)
+                if r:
+                    return r
+            if len(w) >= 2 and w[1] == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
+                return "gh api with a merge mutation (merging outside the gate)"
             if len(w) >= 2 and w[1] == "api":
                 method = "GET"
                 for i, a in enumerate(w):
@@ -200,7 +272,7 @@ def main():
     command = ((data.get("tool_input") or {}).get("command") or "")
     if not isinstance(command, str) or not command.strip():
         return 0
-    reason = check(command)
+    reason = check(command, data.get("cwd") or os.getcwd())
     if reason:
         sys.stderr.write("permission-guard (Claude-Cursor Bridge): refused - %s. The loop merges only through the "
                          "verified gate and never force-pushes; if the branch rules refuse a merge, fix the cause, "

@@ -15,13 +15,13 @@
       "Bash(git push:*)",
       "Bash(git fetch:*)",
       "Bash(git switch:*)",
+      "Bash(git branch -D stage/*)",
       "Bash(git rm:*)",
       "Bash(git revert:*)",
       "Bash(git reset --hard:*)",
       "Bash(git clean -fd:*)",
       "Bash(git config core.hooksPath:*)",
       "Bash(git worktree add ../Worktrees/*)",
-      "Bash(git worktree remove ../Worktrees/*)",
       "Bash(git worktree prune:*)",
       "Bash(git worktree list:*)",
       "Bash(git merge --no-edit origin/main:*)",
@@ -74,7 +74,8 @@
     "Bash(git worktree remove ../Worktrees/:*)",
     "Bash(npx --yes impeccable:*)",
     "Bash(npx --yes jscpd:*)",
-    "Bash(python ~/.claude/cursor-bridge/bridge-run.py:*)"
+    "Bash(python ~/.claude/cursor-bridge/bridge-run.py:*)",
+    "Bash(git worktree remove ../Worktrees/*)"
   ],
   "hooks": {
     "Stop": [

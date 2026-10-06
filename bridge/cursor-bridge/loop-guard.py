@@ -61,14 +61,15 @@ REASON = (
 )
 
 
-SHELL_FENCE = re.compile(r"^```[ \t]*(bash|sh|shell|powershell|pwsh|cmd|bat|console)\b", re.M | re.I)
-TERMINAL_NAMED = re.compile(r"Terminal:|Git Bash|PowerShell|Command Prompt|this chat", re.I)
+SHELL_FENCE = re.compile(r"^[ \t]{0,3}(?:```|~~~)[ \t]*(bash|sh|shell|zsh|powershell|pwsh|ps1|cmd|bat|batch|console)\b", re.M | re.I)
+TERMINAL_LINE = re.compile(r"^[ \t]{0,3}[*_`#>\- \t]*Terminal[*_`]*[ \t]*:", re.M | re.I)
 RUN_SHEET_REASON = (
-    "Run-sheet rule (Claude-Cursor Bridge, rule 27): your last message holds a shell block but "
-    "names no terminal. A run sheet opens with `Terminal: <PowerShell | Git Bash | Command Prompt | "
-    "this chat | the <name> page>` and how to open it, then the folder, the commands one per block, "
-    "what to expect under each, and one report-back line. If the block was not for the owner to "
-    "run, say so in the text (it was run by you, in <terminal>) or put it in a plain block."
+    "Run-sheet rule (Claude-Cursor Bridge, rule 27): your last message holds a shell block and "
+    "names no terminal (no line begins `Terminal:`). A run sheet follows the one template: a line "
+    "`Purpose:`, a line `End state:`, a line `Terminal: <PowerShell | Git Bash | Command Prompt | "
+    "this chat | the <name> page>` with how to open it, the folder as a step, the commands numbered "
+    "one per block, what to expect under each, and one report-back line. A command you ran "
+    "yourself is not a run sheet: quote it in a plain block (no language tag) or inline."
 )
 
 
@@ -103,8 +104,8 @@ def last_assistant_text(transcript_path):
 
 
 def run_sheet_without_terminal(text):
-    """True when the message holds a shell block and names no terminal (release A1b)."""
-    return bool(text) and bool(SHELL_FENCE.search(text)) and not TERMINAL_NAMED.search(text)
+    """True when the message holds a shell block and no line begins `Terminal:` (release A1b)."""
+    return bool(text) and bool(SHELL_FENCE.search(text)) and not TERMINAL_LINE.search(text)
 
 
 def status_candidates(cwd):
@@ -264,7 +265,10 @@ def main():
         allow()
     phase = (field(status, "Phase") or "").strip()
     tp = data.get("transcript_path")
-    if tp and os.path.isfile(tp) and run_sheet_without_terminal(last_assistant_text(tp)):
+    final = data.get("last_assistant_message")           # the hook's own copy; the transcript lags
+    if not isinstance(final, str) or not final.strip():
+        final = last_assistant_text(tp) if tp and os.path.isfile(tp) else None
+    if run_sheet_without_terminal(final):
         sys.stderr.write(RUN_SHEET_REASON + chr(10))
         sys.exit(2)
     if not phase.lower().startswith(ACTIVE_PHASES):

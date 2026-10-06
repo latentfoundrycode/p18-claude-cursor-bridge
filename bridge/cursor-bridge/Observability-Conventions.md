@@ -127,7 +127,7 @@ backdoor.
 
 ---
 
-## Drivers & escalations (the user's calls)
+## Drivers (dependencies under rule 56)
 
 - **Web:** a browser driver (**Playwright** recommended), **run in CI on Linux** (primary),
   local optional — mirrors the Semgrep-in-CI posture. New dependency + CI minutes.
@@ -135,8 +135,9 @@ backdoor.
   heavier deps + CI runners. Adopt per-platform; for a first cut, gate the web path fully and
   treat mobile/desktop reachability as Tier-A-where-a-driver-exists.
 - **Assertions:** hand-rolled predicates (no new dependency) — the invariants are simple.
-- These are dependency/cost decisions → the supervisor escalates them to the user like any
-  dependency, at Phase 2/Configure; everything else here it decides and records.
+- These are dependencies: admitted by the gate and recorded by the supervisor under the one
+  dependency rule (supervisor rule 56), put to the owner only for the CI minutes they cost;
+  everything else here the supervisor decides and records.
 
 ---
 

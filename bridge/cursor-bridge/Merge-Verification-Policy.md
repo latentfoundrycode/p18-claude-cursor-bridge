@@ -423,7 +423,7 @@ Escalate to the owner only for questions answerable without reading code:
 
 - **Product behaviour** — should the software do something different from what was agreed?
 - **Scope** — this diverges from `DESIGN.md`/`BUILD_PLAN.md`; is the new direction wanted?
-- **Dependencies** — a new dependency, its licence, and whether it is acceptable.
+- **Dependencies** — only a consequence the owner bears (money, privacy, lock-in), under the one dependency rule (supervisor rule 56); never the technical merit, never a licence.
 - **Cost / effort** — a materially more expensive or slower path; is it worth it?
 - **Irreversibility** — anything the revert net does *not* cover: a deploy, a data
   migration, a secret, a history rewrite, an action outside the repo. These get a human
@@ -493,7 +493,7 @@ Two options for reaching it:
   The checkpoint is guarded by `review-guard.py`: `snapshot <nnn>` before the launch (it
   refuses a dirty tree and records HEAD, the branch, the refs, the stashes, `.git/config`,
   the hooks folder and the ignored entries), `verify <nnn>` after the run, and
-  `premerge <nnn>` before `gh pr merge`; since release A1b the `permission-guard` hook refuses a `gh pr merge` that does not carry the `--match-head-commit <sha>` the pre-merge check printed, so a merge that skipped the gate is refused by the computer, not only by the rule. **What the restore covers and what it does not:**
+  `premerge <nnn>` before `gh pr merge`; since release A1b `premerge` writes a record of the head it approved (`<git common dir>/bridge/premerge/<sha>`), and the `permission-guard` hook refuses a `gh pr merge` whose `--match-head-commit <sha>` has no such record, so a merge that skipped the pre-merge check is refused by the computer, not only by the rule (the sha alone proves nothing; the record does). **What the restore covers and what it does not:**
   `verify` puts tracked and untracked files back with `git reset --hard` and `git clean -fd`
   (keeping the launcher's own `run/review/REVIEW-<nnn>.err`, whose first line it prints) and
   lists what it removed — a temporary file or mutation the reviewer made for a check is

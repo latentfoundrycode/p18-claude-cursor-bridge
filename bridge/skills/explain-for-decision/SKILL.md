@@ -253,17 +253,18 @@ open, what the flag is called, or what a variable is. Every such hand-off is wri
 **run sheet**, and the brevity rules do not apply to it — a run sheet is as long as it
 needs to be to be followed without guessing.
 
-**1. Purpose and end state — two sentences.** What this achieves, and how the user will
-know it worked at the end ("when this is done, the CI job will show a green Socket step").
+**1. Purpose and end state — two lines.** `Purpose:` what this achieves; `End state:` how the
+user will know it worked ("when this is done, the CI job will show a green Socket step").
 
-**2. The terminal — named, with how to open it.** Exactly one of:
+**2. The terminal — a line that begins `Terminal:`, with how to open it.** The loop guard sends
+back a message that holds a shell block and no such line (supervisor rule 27). Exactly one of:
 
 | Name it as | How to open it | Use it for |
 |---|---|---|
 | **PowerShell** | Start menu → type `PowerShell` → open *Windows PowerShell* | Windows installers, `winget`, `irm … \| iex`, Windows paths, Test-Path |
 | **Git Bash** | Start menu → type `Git Bash` → open it | `git`, `gh`, `cursor-agent`, `npx`, `python` scripts, anything the supervisor itself runs |
 | **Command Prompt** | Start menu → type `cmd` → open *Command Prompt* | only when a tool's own instructions require it |
-| **The Claude Code chat** | this conversation | slash commands (`/supervisor …`) |
+| **this chat** | this conversation | slash commands (`/supervisor …`), a message to paste |
 | **A browser / an app window** | say which site or app, and the exact page | GitHub settings, account sign-ins, dashboards |
 
 Never mix terminals inside one numbered sequence. If the work needs two, finish one
