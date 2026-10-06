@@ -53,11 +53,12 @@ KNOWN_PROSE = (
     "gh pr merge --admin",              # named as the thing the deny rules forbid
     "python ~/.claude/" + chr(0x2026),  # the permissions paragraph's "every python ~/.claude/... command"
 )
+PROSE_EXACT = ("git worktree remove", "gh pr merge")   # a command family named bare, never a runnable form
 
 
 @pytest.mark.parametrize("src,cmd", collect_commands())
 def test_instructed_command_is_allowed(src, cmd):
-    if any(cmd.startswith(k) for k in KNOWN_PROSE):
+    if any(cmd.startswith(k) for k in KNOWN_PROSE) or cmd in PROSE_EXACT:
         pytest.skip("prose, not a runnable command")
     verdict, part = decide(cmd, ALLOW, DENY)
     if verdict == "ask":
@@ -82,13 +83,25 @@ def test_deny_rules_catch_the_override_and_force_push(cmd):
 @pytest.mark.parametrize("cmd", [
     "cursor-agent -p --force --model grok-4.7-high \"Read handoff/TASK-012.md and implement exactly what it specifies.\"",
     "git push -u origin task-012",
-    "gh pr merge 12 --squash --auto",
+    "gh pr merge 12 --squash --auto --match-head-commit 0123456789abcdef0123456789abcdef01234567",
     "git worktree add ../Worktrees/TASK-012 task-012",
     "npx --yes jscpd@4.0.5 src --min-lines 5",
 ])
 def test_ordinary_commands_are_not_denied(cmd):
     verdict, _ = decide(cmd, ALLOW, DENY)
     assert verdict == "allow", cmd
+
+
+@pytest.mark.parametrize("src,cmd", collect_commands())
+def test_no_instructed_command_is_refused_by_the_guard(src, cmd, program, monkeypatch):
+    """Review of 2026.10.06b, finding 8: the bridge's own texts never instruct a command its
+    hook refuses. A placeholder sha stands for a recorded one."""
+    if any(cmd.startswith(k) for k in KNOWN_PROSE) or cmd in PROSE_EXACT:
+        pytest.skip("prose, not a runnable command")
+    guard = program("permission-guard")
+    monkeypatch.setattr(guard, "premerge_recorded", lambda sha, cwd: True)
+    reason = guard.check(cmd.replace("<sha>", "0123456789abcdef0123456789abcdef01234567"), None)
+    assert reason is None, "%s instructs %r, which the guard refuses: %s" % (src, cmd, reason)
 
 
 def test_documented_matching_examples():
@@ -127,4 +140,4 @@ def test_the_digest_and_the_merge_step_show_the_same_review_b_form():
     activity check reads the launch time from, so the consistency check covers it too."""
     forms = [cmd for src, cmd in collect_agent_invocations() if "REVIEW-" in cmd]
     assert len(forms) >= 2, forms
-    assert all("2> run/review/REVIEW-<nnn>.err" in f and "--force" in f and "--limit 3600" in f for f in forms), forms
+    assert all(re.search(r"2> run/review/REVIEW-(<nnn>|STAGE-<name>)\.err", f) and "--force" in f and "--limit 3600" in f for f in forms), forms

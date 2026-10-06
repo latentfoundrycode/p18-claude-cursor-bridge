@@ -31,6 +31,33 @@ jobs:
 """
 
 
+INVENTORY = """# Inventory — Thing
+Reflected through: none
+Updated: 2026-10-06
+
+## Features
+| Feature | What it does | Where | Tests | Since |
+|---|---|---|---|---|
+| Search | finds things | app/search.py | tests/test_search.py | TASK-001 |
+
+## Resources
+| Name | Kind | Where it lives | Used by | Provided |
+|---|---|---|---|---|
+| OPENROUTER_API_KEY | secret | key file outside the Workspace; limit $20/month, set 2026-10-06 | app/llm.py | 2026-10-01 |
+| BFL_API_KEY | secret | key file outside the Workspace; limit $5/month, set 2026-10-06 | app/bfl.py | 2026-10-01 |
+| Socket account | account | the owner's Socket login; no spend possible | CI | 2026-09-01 |
+
+## Decisions
+| Decision | Reason | Settled | Revisit only if |
+|---|---|---|---|
+| Development data: a development build reads `data/dev.sqlite`, chosen by the `APP_ENV=dev` marker, and refuses the installed product's store | two live databases were upgraded by development builds | 2026-10-06, owner | the product gains a second store |
+
+## Deferred
+| Item | Why deferred | Since | Owner decision needed |
+|---|---|---|---|
+"""
+
+
 def make_workspace(root, conformant=True):
     (root / "docs" / "diagrams").mkdir(parents=True)
     (root / "docs" / "mockups").mkdir()
@@ -38,6 +65,7 @@ def make_workspace(root, conformant=True):
     (root / ".github" / "workflows").mkdir(parents=True)
     for name in ("PROJECT_STATUS.md", "INVENTORY.md", "REQUIREMENTS.md", "RUN_PARAMETERS.md", "ROSTER.json", "DESIGN.md"):
         (root / "docs" / name).write_text("x\n", encoding="utf-8")
+    (root / "docs" / "INVENTORY.md").write_text(INVENTORY, encoding="utf-8")
     (root / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nBridge version: %s\nPhase: building\n" % VERSION, encoding="utf-8")
     (root / "docs" / "diagrams" / "INDEX.md").write_text("# Diagrams\n", encoding="utf-8")
     (root / ".cursor" / "rules" / "workspace-boundary.mdc").write_text("rule\n", encoding="utf-8")
@@ -300,3 +328,87 @@ def test_claude_code_hooks_in_the_projects_settings_are_a_missing_floor(tmp_path
     (root / ".claude" / "settings.json").write_text('{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "x"}]}]}}', encoding="utf-8")
     rc, out = run(root / "Workspace")
     assert verdict(out, "No Claude Code hooks in the project's .claude")[0] == "NOTE" and "../.claude/settings.json (hooks)" in out, "the root's .claude is read only when a builder's workspace is the root: " + out
+
+
+def test_the_three_floors_of_release_a1b(tmp_path):
+    """A paid provider without a recorded limit, no development-data decision, and an
+    adapter of an external service without recorded replies are each reported."""
+    make_workspace(tmp_path)
+    rc, out = run(tmp_path)
+    assert verdict(out, "Spending limit recorded")[0] == "OK" and verdict(out, "Development data kept apart")[0] == "OK", out
+    assert verdict(out, "Adapters tested against recorded replies")[0] is None, "no adapter, nothing to say"
+    inv = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8")
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv.replace("; limit $20/month, set 2026-10-06", "; a rate limit of 60/min").replace("Development data: a development build", "Data: a development build")
+                                                     .replace("| CI | 2026-09-01 |\n", "| CI | 2026-09-01 |\n"
+                                                              + "| POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD | secret | generated per instance for the local Postgres | tests | n/a |\n"
+                                                              + "| AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY | secret | the MinIO login, generated per instance | app | n/a |\n"
+                                                              + "| THING_API_TOKEN | secret | the product's own per-instance token | app | n/a |\n"
+                                                              + "| OpenRouter (rule judge) | external API | key file; limit $10/month, set 2026-10-06 | app | 2026-10-01 |\n"
+                                                              + "| HF_TOKEN | repo secret | GitHub secret | CI | 2026-10-01 |\n"
+                                                              + "| ANTHROPIC_API_KEY | secret | key file; spending limit not set yet | app | 2026-10-01 |\n"
+                                                              + "| MISTRAL_API_KEY | secret | key file; spending limit set to $20/month on 2026-10-06 | app | 2026-10-01 |\n"
+                                                              + "| Modal workspace spending limit | account setting | $50/month, set 2026-09-20 | app | 2026-09-20 |\n"
+                                                              + "| SMPL-X model files (MPI account) | account | downloaded once with the MPI login | assets | 2026-09-01 |\n"
+                                                              + "| Claude Code MCP registration | registration | the owner's Claude Code settings | tooling | 2026-09-01 |\n"), encoding="utf-8")
+    rc, out = run(tmp_path)
+    kind, detail = verdict(out, "Spending limit recorded")
+    assert kind == "MISSING" and "OPENROUTER_API_KEY" in detail and "HF_TOKEN" in detail and "ANTHROPIC_API_KEY" in detail and "3 key" in detail, out
+    assert "Modal workspace spending limit" not in detail, "the record of a limit is not a key: " + detail
+    for name in ("POSTGRES", "AWS_", "THING_API_TOKEN", "Socket", "OpenRouter (rule judge)", "SMPL", "MCP", "BFL"):
+        assert name not in detail, "local logins (every name in the cell), per-instance values, the product's own tokens, no-spend accounts, limited rows, model files and registrations are not reported: " + detail
+    assert verdict(out, "Development data kept apart")[0] == "MISSING", out
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv.replace("| Development data: a development build", "| **`Development data:`** a development build"), encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Development data kept apart")[0] == "OK", "a bold or backticked row counts: " + out
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv, encoding="utf-8")
+    (tmp_path / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "run/ ignored")[0] == "NOTE", out
+    (tmp_path / ".gitignore").write_text("node_modules/\nrun/\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "run/ ignored")[0] is None, out
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "llm.py").write_text('import httpx2\nURL = "https://openrouter.ai/api/v1"\n\ndef ask(q):\n    return httpx2.get(URL)\n', encoding="utf-8")
+    (tmp_path / "app" / "store.py").write_text('import boto3\n\nclient = boto3.client("s3", endpoint_url="http://localhost:9000")  # the local MinIO store\n', encoding="utf-8")
+    (tmp_path / "venvs" / "x" / "Lib" / "site-packages" / "aiohttp").mkdir(parents=True)
+    (tmp_path / "venvs" / "x" / "Lib" / "site-packages" / "aiohttp" / "client.py").write_text('import aiohttp\nURL = "https://openrouter.ai"\n', encoding="utf-8")
+    (tmp_path / "venvs" / "x" / "pyvenv.cfg").write_text("home = x\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    kind, detail = verdict(out, "Adapters tested against recorded replies")
+    assert kind == "MISSING" and "llm" in detail and "client" not in detail and "store" not in detail, "library code in an environment and a local store's client are not adapters of a listed provider: " + out
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_other.py").write_text("def test_x():\n    assert True  # replays recorded replies\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "MISSING", "a recorded word in an unrelated test proves nothing for llm: " + out
+    (tmp_path / "tests" / "test_llm.py").write_text('import httpx2\nfrom app import llm\n\n\ndef test_frozen_contract():\n    transport = httpx2.MockTransport(lambda r: httpx2.Response(200, json={"id": 1}))  # recorded replies, cassette, contract\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "MISSING", "the video factory's shape: a mock transport fed by hand, with the words, is not evidence: " + out
+    (tmp_path / "tests" / "test_llm.py").write_text('import json\nfrom app import llm\n\nREPLY = json.load(open("tests/cassettes/openrouter.json"))\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "OK", "a cassette file the adapter's test loads is evidence: " + out
+    # third pass, T1: the TDP's shape, recordings loaded by a helper, in a repository that tracks a cassettes folder
+    (tmp_path / "tests" / "cassettes").mkdir()
+    (tmp_path / "tests" / "cassettes" / "small.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "tests" / "test_llm.py").write_text('from app import llm\nfrom helpers import load_cassette\n\nREPLY = load_cassette("small")\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "OK", "recordings loaded by a helper count when the repository tracks them: " + out
+    # third pass, T1: reAngle's and the TDP's shapes of a false adapter: a limit row and a setting are not providers, a
+    # key's later segments and a docstring never name a provider, a local store's client is not an adapter
+    inv2 = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8").replace("| CI | 2026-09-01 |\n", "| CI | 2026-09-01 |\n"
+            + "| Modal workspace spending limit | account setting | $50/month, set 2026-09-20 | app | 2026-09-20 |\n"
+            + "| SOCKET_CLI_API_TOKEN | repo secret | GitHub secret; no spend possible | CI | 2026-09-01 |\n"
+            + "| AZURE_DI_API_KEY | secret | key file; limit $10/month, set 2026-10-06 | app/azure_di.py | 2026-10-01 |\n")
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv2, encoding="utf-8")
+    (tmp_path / "app" / "worker_s3.py").write_text('"""Uploads to the store with limited retries, the workspace of the spending guard."""\nimport boto3\n\nclient = boto3.client("s3", endpoint_url="http://minio:9000")\n', encoding="utf-8")
+    (tmp_path / "app" / "connect.py").write_text('"""The CLI client of the product\'s own server."""\nimport httpx2\n\nURL = "http://127.0.0.1:8080"  # disabled when the socket is closed\n', encoding="utf-8")
+    (tmp_path / "app" / "azure_di.py").write_text('import httpx2\n\nHOST = "https://eastus.api.cognitive.microsoft.com"\nKEY_NAME = "AZURE_DI_API_KEY"\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    kind, detail = verdict(out, "Adapters tested against recorded replies")
+    assert kind == "MISSING" and "azure_di" in detail and "worker_s3" not in detail and "connect" not in detail, "only the Azure adapter is one of a listed provider: " + out
+    (tmp_path / "app" / "bfl.py").write_text('import httpx2\nBASE = "https://api.bfl.ml/v1"\n', encoding="utf-8")
+    (tmp_path / "web").mkdir()
+    (tmp_path / "web" / "api.ts").write_text('export const models = () => fetch("https://openrouter.ai/api/v1/models");\n', encoding="utf-8")
+    (tmp_path / "web" / "health.ts").write_text('export const health = () => fetch("/api/health");\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    kind, detail = verdict(out, "Adapters tested against recorded replies")
+    assert kind == "MISSING" and "api" in detail and "bfl" in detail and "health" not in detail, "a JavaScript call to a provider counts, a call to the product's own API does not: " + out

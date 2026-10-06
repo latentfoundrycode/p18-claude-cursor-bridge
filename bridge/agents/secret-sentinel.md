@@ -35,6 +35,12 @@ assigned to a variable, and JWT-shaped strings. Judge each hit: a variable *name
 `apiKey` reading from the environment is fine; a variable assigned a literal value is
 not.
 
+**Paths of this computer.** A path that names the owner's profile or a session's temporary
+folder (`C:\Users\<name>\...`, `/c/Users/<name>/...`, `/home/<name>/...`,
+`...\AppData\Local\Temp\...`) is reported under `BLOCK` like a key: it carries the owner's
+user name into a history that may be published, and it points at folders that exist on one
+computer only (rule 54). A path in an example or a comment counts.
+
 **Protected paths.** Report any change to: `.env` or `.env.*`, `secrets/`,
 `*.pem`, `*.key`, `*.p12`, `*.pfx`, `id_rsa`, `.npmrc`, `.pypirc`, `.aws/`,
 `.ssh/`, `.git/`, `.github/workflows/`, `.gitignore`, and anything the task brief
@@ -53,7 +59,7 @@ possible typosquat) and report the name and version. Do **not** adjudicate the p
 *reputation* — whether it is known-vulnerable or known-malicious is now decided by the
 security floor (OSV-Scanner + Socket) and the supervisor's dependency-admission gate, so
 two voices do not disagree on the same package. Your job here is the shape (pinned? plausibly
-named?) and surfacing it for the licence question and the admission gate; the floor owns
+named?) and surfacing it for the admission gate (supervisor rule 56; a licence is never put to the owner); the floor owns
 "is it bad."
 
 **The lockfile is part of the dependency — check for what is missing.** If the diff changes
@@ -95,6 +101,9 @@ NEW DEPENDENCIES
 
 PROTECTED PATHS TOUCHED
 - <path> — <what changed>
+
+PATHS OF THIS COMPUTER
+- <file:line> — <a profile or temporary-folder path; the user name is not reproduced>
 
 UNTRACKED FILES PRESENT
 - <path>

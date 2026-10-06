@@ -134,7 +134,7 @@ A builder, reviewer, auditor, or specialist that finds a normative diagram unwor
 |---|---|---|
 | A choice inside the free implementation space | the builder itself | autonomous resolution; not an objection |
 | A brief detail or a Level 4 or 5 diagram | the supervisor | revise the diagram, re-run `diagram-check.py`, record the revision as a Decisions row in the inventory, re-brief |
-| A Level 2 or 3 diagram | the supervisor with the design critique | specialists redraw the affected diagrams, `plan-critic` re-reviews them, `diagram-check.py`, a Decisions row; an escalation to the owner only if the change carries a user-level consequence (cost, privacy, licensing, lock-in, delivery) |
+| A Level 2 or 3 diagram | the supervisor with the design critique | specialists redraw the affected diagrams, `plan-critic` re-reviews them, `diagram-check.py`, a Decisions row; an escalation to the owner only if the change carries a user-level consequence (cost, privacy, lock-in, delivery) |
 | A Level 1 diagram or a requirement | the owner | the design gate: it changes what the software does |
 
 Every revision lands in the change record: the diagram's own git history, the dated Change section of `DESIGN.md`, and the version.

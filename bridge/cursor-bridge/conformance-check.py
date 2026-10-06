@@ -29,6 +29,13 @@ What it checks, with the file it reads (the 0b review corrected several of these
     ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and
     docs/diagrams/INDEX.md (missing = a diagram retrofit item);
   - with --screens (or a docs/mockups folder): the design detector in the gate;
+  - release A1b: a spending limit recorded for every key, account or provider that can charge
+    (the inventory's Resources rows); the inventory's `Development data:` decision; every
+    adapter of a listed provider tested against recorded replies (the providers from the
+    inventory's chargeable rows, one word each; the adapters among the project's own tracked
+    files, naming the provider in a string of code, not a comment; the evidence a cassette or
+    fixture file the adapter's test loads, a recording library, or a test that names cassettes
+    in a repository that tracks a cassettes folder); `run/` ignored (a NOTE);
   - with --installable (or docs/cli-reference.json present): the CLI reference and a check
     of it, in CI or in the test suite;
   - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the
@@ -139,6 +146,92 @@ def git_ignored(ws, rel):
     except (OSError, subprocess.TimeoutExpired):
         return False
     return p.returncode == 0
+
+
+def tracked_files(ws):
+    """The project's own files (git ls-files), or a walk that skips environments and build output."""
+    try:
+        p = subprocess.run(["git", "-C", ws, "-c", "core.fsmonitor=false", "ls-files", "-z"], capture_output=True, timeout=60, creationflags=NO_WINDOW)
+        if p.returncode == 0:
+            return [x.decode("utf-8", "replace") for x in p.stdout.split(b"\0") if x]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    out = []
+    for dirpath, dirs, names in os.walk(ws):
+        dirs[:] = [d for d in dirs if d not in (".git", "node_modules", ".venv", "venv", "venvs", "env", "site-packages", "__pycache__", "dist", "build", "run", "Worktrees")
+                   and not os.path.isfile(os.path.join(dirpath, d, "pyvenv.cfg"))]
+        for n in names:
+            out.append(os.path.relpath(os.path.join(dirpath, n), ws).replace("\\", "/"))
+    return out
+
+
+LIMIT_RECORDED = re.compile(r"\blimit\b[^$\u20ac\u00a3\d\n|]{0,25}([$\u20ac\u00a3]\s*\d|\d+(\.\d+)?\s*(USD|EUR|GBP|CHF)\b)|no spend possible", re.I)   # an amount near "limit", or the words; "not set yet" is not recorded
+CANNOT_CHARGE = re.compile(r"\blocal (service|development|postgres|minio|store)\b|throwaway|the product's own|own (per[- ]instance )?token|per[- ]instance|generated per", re.I)
+KIND_CANNOT_CHARGE = re.compile(r"\b(store|files?|registration|mcp)\b", re.I)   # a store, model files, a registration: nothing to charge
+GENERIC_WORDS = {"api", "key", "keys", "token", "tokens", "secret", "secrets", "account", "access", "id", "user", "password", "pass", "file",
+                 "store", "the", "and", "of", "for", "rule", "judge", "repo", "github", "provider", "app", "dev", "test", "local", "root",
+                 "url", "host", "endpoint", "login", "credential", "credentials", "model", "models", "files"}
+SYNONYMS = {"hf": ("hf", "huggingface"), "gh": ("gh", "github"), "oai": ("oai", "openai"), "gcp": ("gcp", "google")}
+EVIDENCE_RX = re.compile(r"\bvcr\b|\brespx\b|responses\.activate|\bnock\b|\bmsw\b|(cassettes?|fixtures?|recorded|recordings|replies|contracts?)[/\\][\w.-]+\.(json|ya?ml|har|txt)\b", re.I)
+
+
+def chargeable_rows(sections, words):
+    """The inventory's Resources rows that can charge the owner: a key, account, provider or API
+    that is not a local service's login, the product's own token, a test-only value, a store,
+    model files, a registration, a setting or the record of a limit. [(cells, name)]"""
+    rows = []
+    for cells in sections.get("Resources", []):
+        if len(cells) < 2 or not re.search(r"secret|account|api|provider|external|key|token", cells[1], re.I) or re.search(r"test-only|setting", cells[1], re.I):
+            continue
+        name = cells[0].strip("`* ")
+        if re.search(r"\blimit\b", name, re.I):
+            continue                                       # the row IS the limit, not a key
+        idents = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", name)
+        if any(LOCAL_SERVICE.match(i) or i.split("_")[0].lower() in words for i in idents):
+            continue                                       # every name in the cell is looked at
+        if KIND_CANNOT_CHARGE.search(name + " " + cells[1]) or CANNOT_CHARGE.search(" ".join(cells)):
+            continue
+        rows.append((cells, name))
+    return rows
+
+
+def provider_words(rows):
+    """{word: row name}: one word per chargeable row, the one that identifies its adapter: the
+    first segment of a key's name (SOCKET of SOCKET_CLI_API_TOKEN), else the provider's own
+    name (OpenRouter of "OpenRouter (rule judge)")."""
+    found = {}
+    for cells, name in rows:
+        key = re.match(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+", name)
+        if key:
+            w = key.group(0).split("_")[0].lower()
+        else:
+            ws = [x.lower() for x in re.findall(r"[A-Za-z][A-Za-z0-9]*", name) if x.lower() not in GENERIC_WORDS]
+            w = ws[0] if ws else ""
+        if len(w) >= 2 and w not in GENERIC_WORDS:
+            found.setdefault(w, name[:40])
+    return found
+
+
+def code_strings(text):
+    """The source without its docstrings and comments, lowercased: where a host or a key name
+    would be written."""
+    text = re.sub(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'', "", text)
+    text = re.sub(r"/\*[\s\S]*?\*/", "", text)
+    text = re.sub(r"(^|[ \t])(#|//)[^\n]*", "", text, flags=re.M)
+    return text.lower()
+
+
+def names_provider(text, providers):
+    """The providers a source file names, as a whole word, in a string literal of its code (a
+    host, a key name, a service name); never in a docstring or a comment."""
+    low = code_strings(text)
+    hits = []
+    for w in providers:
+        for alt in SYNONYMS.get(w, (w,)):
+            if re.search(r"""["'`][^"'`\n]*(?<![a-z0-9])%s(?![a-z0-9])""" % re.escape(alt), low):
+                hits.append(w)
+                break
+    return hits
 
 
 def project_words(ws):
@@ -406,8 +499,80 @@ def main():
         if own:
             add("NOTE", "The product's own tokens in .env", "%s: named after the project, so taken as the product's own per-instance tokens, not an external account; say so in the inventory if that is wrong" % ", ".join(own))
 
-    # --- no secret through an environment variable the owner sets (the inventory says how each arrives)
+    # --- the inventory's tables, by section (release A1b floors)
     inv = read(os.path.join(ws, "docs", "INVENTORY.md")) or ""
+    sections, current = {}, None
+    for line in inv.splitlines():
+        m = re.match(r"^##\s+(\w+)", line)
+        if m:
+            current = m.group(1)
+            continue
+        if current and line.lstrip().startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if cells and not set("".join(cells)) <= set("-: ") and not (cells[0].lower() in ("name", "decision", "feature", "item")):
+                sections.setdefault(current, []).append(cells)
+    if inv:
+        # a spending limit at every provider, API or account that can charge: its Resources row says so
+        unlimited = []
+        for cells, name in chargeable_rows(sections, words):
+            if LIMIT_RECORDED.search(" ".join(cells)):
+                continue
+            unlimited.append(name[:40])
+        if unlimited:
+            add("MISSING", "Spending limit recorded", "%d key(s) or account(s) without a spending limit in the Resources row (`limit $20/month, set <date>`, or `no spend possible`): %s%s; the configuration phase asks the owner to set one at each provider (supervisor Phase 5)" % (
+                len(unlimited), ", ".join(unlimited[:6]), " and %d more" % (len(unlimited) - 6) if len(unlimited) > 6 else ""))
+        else:
+            add("OK", "Spending limit recorded")
+        # development data kept apart from live data: a Decisions row says how
+        if any(cells and re.match(r"^[\s*_`]*development data", cells[0], re.I) for cells in sections.get("Decisions", [])):
+            add("OK", "Development data kept apart")
+        else:
+            add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
+
+    # --- every adapter of a listed provider is tested against recorded replies (rule 37; A1b item 5):
+    #     the providers come from the inventory's chargeable rows, the adapters from the project's own
+    #     tracked files that name one in a string (a host, a key name), the evidence from each
+    #     adapter's own tests: a cassette or fixture file loaded, or vcr/respx/responses.activate/nock/msw
+    providers = provider_words(chargeable_rows(sections, words))
+    files = tracked_files(ws) if providers else []
+    client_rx = re.compile(r"^\s*(?:from|import)\s+(requests|httpx2?|aiohttp|urllib3|urllib\.request|http\.client|openai|anthropic|modal|replicate|stripe|boto3|botocore|google\.cloud|azure|huggingface_hub|supabase|twilio|sendgrid|slack_sdk)\b", re.M)
+    js_client_rx = re.compile(r"""\bfetch\(\s*[`"'](?:https?:)?//(?!localhost|127\.0\.0\.1|0\.0\.0\.0)|\baxios\b""")
+    adapters, tests = {}, []
+    for rel in files:
+        n = os.path.basename(rel)
+        is_test = bool(re.search(r"(^|/)(tests?|__tests__|spec)(/|$)", rel)) or n.startswith("test_") or bool(re.search(r"[._](test|spec)\.(py|js|ts|mjs|tsx)$", n))
+        if n.endswith(".py"):
+            text = read(os.path.join(ws, rel)) or ""
+            if is_test:
+                tests.append(text)
+            elif client_rx.search(text) and names_provider(text, providers):
+                adapters[os.path.splitext(n)[0]] = rel
+        elif n.endswith((".js", ".ts", ".mjs", ".tsx")) and not n.endswith(".d.ts"):
+            text = read(os.path.join(ws, rel)) or ""
+            if is_test:
+                tests.append(text)
+            elif js_client_rx.search(text) and names_provider(text, providers):
+                adapters[re.sub(r"\.(js|ts|mjs|tsx)$", "", n)] = rel
+    if adapters:
+        recordings = any(re.search(r"(^|/)(cassettes?|recorded|recordings)/", rel, re.I) for rel in files)
+        loose_rx = re.compile(r"cassette|recorded|replay", re.I)   # enough when the repository tracks recordings
+        without = []
+        for name in sorted(adapters):
+            name_rx = re.compile(r"\b%s\b" % re.escape(name))
+            if not any(name_rx.search(t) and (EVIDENCE_RX.search(t) or (recordings and loose_rx.search(t))) for t in tests):
+                without.append(name)
+        if without:
+            add("MISSING", "Adapters tested against recorded replies", "%d adapter(s) of a listed provider without a test that names them and replays recorded replies, that is a cassette or fixture file the test loads, or vcr, respx, responses.activate, nock or msw in that test; a mock transport fed by hand is an invented reply (rule 37; A1b item 5): %s%s" % (
+                len(without), ", ".join(without[:6]), " and %d more" % (len(without) - 6) if len(without) > 6 else ""))
+        else:
+            add("OK", "Adapters tested against recorded replies")
+
+    # --- the supervisor's working files and the review files live under run/, which must be ignored (rule 54)
+    gi = read(os.path.join(ws, ".gitignore")) or ""
+    if not any(re.match(r"^/?run/?(\s|$)", line.strip()) for line in gi.splitlines()):
+        add("NOTE", "run/ ignored", "no `run/` line in .gitignore: the supervisor's working files (`run/supervisor/`, rule 54) and the review files would count as changes, and `review-guard.py verify` cleans untracked files")
+
+    # --- no secret through an environment variable the owner sets (the inventory says how each arrives)
     by_env = []
     for line in inv.splitlines():
         if not line.lstrip().startswith("|") or not re.search(r"env(ironment)? var", line, re.I) or re.search(r"test-only", line, re.I):

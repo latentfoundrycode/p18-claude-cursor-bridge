@@ -18,6 +18,9 @@ stage heading (`## ...`), followed by field lines (`Key: value`, optionally as `
   Scope:       path/, path/file.py, ...           (required for increments, absent for groups)
   Deferred:    owner YYYY-MM-DD                   (optional; skipped when computing readiness)
 
+A stage heading is followed by a line `Demonstration: <what is shown live, on the product as
+built, when the stage closes>` (release A1b); a stage with increments and no such line is noted.
+
 Status is not written in the plan; it is derived from git. An increment counts as merged
 when a commit on <base> names its ID in the subject (PR titles and squash commits start with
 the increment ID). A group is merged when all its children are.
@@ -105,6 +108,35 @@ def parse(paths):
                 if f:
                     cur["fields"][f.group(1).lower()] = f.group(2)
     return items, order, fails
+
+
+STAGE_RX = re.compile(r"^##\s+(\S.*?)\s*$")
+DEMO_RX = re.compile(r"^(?:[-*]\s+)?\**Demonstration\**\s*:\s*(\S.*)$", re.I)
+
+
+def stages_without_demonstration(paths):
+    """[(stage, its increment IDs)] for the stage headings (`## ...`) that hold increments and
+    no `Demonstration:` line (release A1b)."""
+    missing = []
+    for path in paths:
+        stage, seen, ids = None, False, []
+        for line in read(path).splitlines():
+            m = STAGE_RX.match(line)
+            if m:
+                if stage is not None and ids and not seen:
+                    missing.append((stage, ids))
+                stage, seen, ids = m.group(1).strip(), False, []
+                continue
+            if stage is None:
+                continue
+            h = HEAD_RX.match(line)
+            if h:
+                ids.append(h.group(1))
+            elif DEMO_RX.match(line.strip()):
+                seen = True
+        if stage is not None and ids and not seen:
+            missing.append((stage, ids))
+    return missing
 
 
 def merged_ids(base):
@@ -251,6 +283,9 @@ def main():
             merged = m
     inc = [t for t in order if kinds[t] == "increment"]
     done = {t for t in inc if t in merged}
+    for s, ids in stages_without_demonstration(paths):
+        if any(t not in merged for t in ids):                 # a closed stage is not noted
+            notes.append("stage '%s' names no Demonstration: line; the stage close runs it live (release A1b), add one from the stage's increments" % s[:60])
     ready = [t for t in inc if t not in done and not items[t]["deferred"] and deps[t] <= done]
     notes.insert(0, "%d increments in %d file(s); %d merged, %d deferred" % (
         len(inc), len(paths), len(done), sum(1 for t in inc if items[t]["deferred"])))

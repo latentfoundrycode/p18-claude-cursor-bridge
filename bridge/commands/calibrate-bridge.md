@@ -11,6 +11,16 @@ project in flight with the new rules **without disturbing its order** — nothin
 re-presented, nothing in progress is restarted, and only the adjustments the new release
 lists for the project's current or future phases are applied.
 
+## 0. Write your position down — before anything else
+
+The re-reading below pushes working detail out of your memory, and the restart that preceded
+this command gave the session a new temporary folder. So first make sure a fresh session with
+no memory of this conversation could continue from the project's files alone: update
+`docs/PROJECT_STATUS.md` (`In flight:`, `Next:` with the exact next action, `Awaiting user on:`,
+`Working files:`), and move every script or note you need that exists only in this
+conversation or in a session's temporary folder into `run/supervisor/` (gitignored), naming
+it on the `Working files:` line (rule 54). Then go on.
+
 ## 1. Verify the install — deterministically
 
 ```bash
@@ -32,7 +42,7 @@ to a half-copied tree would leave the project on a mixture of two releases.
 python ~/.claude/cursor-bridge/conformance-check.py
 ```
 
-Run it from the project root or from `Workspace/` (it resolves either). It compares this project's configuration with what the installed bridge requires (the scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where the software is installable, and whether keys sit in `Workspace/.env` within the builder's reach) and prints `OK` / `MISSING` / `NOTE` per floor. A project configured before a floor existed never received it otherwise. **Every `MISSING` becomes a calibration item** of this calibration, applied as configuration work in the next stage (a missing diagram index is the diagram retrofit, scheduled at the next natural pause); a `NOTE` is recorded in `PROJECT_STATUS.md`. Nothing here reopens a gate. Pass `--screens` or `--installable` when the project has screens or is installable and the check cannot tell from the files.
+Run it from the project root or from `Workspace/` (it resolves either). It compares this project's configuration with what the installed bridge requires (the scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where the software is installable, whether keys sit in `Workspace/.env` within the builder's reach, and since release A1b: a spending limit recorded for every key or account that can charge, the inventory's `Development data:` decision, every adapter of an external service tested against recorded replies, and `run/` ignored) and prints `OK` / `MISSING` / `NOTE` per floor. A project configured before a floor existed never received it otherwise. **Every `MISSING` becomes a calibration item** of this calibration, applied as configuration work in the next stage (a missing diagram index is the diagram retrofit, scheduled at the next natural pause); a `NOTE` is recorded in `PROJECT_STATUS.md`. Nothing here reopens a gate. Pass `--screens` or `--installable` when the project has screens or is installable and the check cannot tell from the files.
 
 ## 2. Re-read the governing files — they supersede what you hold in context
 
@@ -99,10 +109,16 @@ item into exactly one of:
 - **Passed** — marked for a phase already completed and requiring a *decision or gate* (a
   re-presented plan, a re-approved design). These are **not** applied. A gate the owner
   approved stays approved. Record them as "not applied — gate passed" so the omission is
-  visible, not silent.
+  visible, not silent. **An item that adds a test or a recorded reply is never one of these:**
+  a test is not a gate, and it is applied now, in whatever phase the project is (release A1b).
 
 Rules while applying **Now** items:
 
+- The inventory's `Development data:` decision (release A1b) is added before the next brief is
+  packaged: from the design where it states it, or as `Development data: none, the product keeps
+  no data of the owner's` where that is true. A brief packaged without it stops the builder.
+- A stage whose plan names no `Demonstration:` line (release A1b) gets one now, from the
+  stage's increments, for every stage not yet closed.
 - Configuration goes through `cursor-configurator` and is **append-only**: add the missing
   file, the missing hook entry, the missing pre-commit line; never rewrite an existing
   config. Commit the configuration change as its own checkpoint, exactly like Phase 5.
@@ -137,6 +153,7 @@ Delta: <old> → <new>
 Defaults set for you: <e.g. refactoring pass ON for remaining stages — say "off" to change>
 Session model for this phase: <Fable 5.1 | Opus 5.5> — set it in the model menu if the status bar shows another (rule 48)
 Project position unchanged: <phase / increment / stage>
+Next action: <the one thing you do next, as the status file's Next: line says>
 ```
 
 The test of a good calibration: the owner can read the first line and know whether they

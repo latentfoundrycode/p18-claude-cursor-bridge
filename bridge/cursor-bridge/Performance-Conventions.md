@@ -53,7 +53,7 @@ For every budget, `docs/DESIGN.md` names the **mechanism** that meets it and the
 
 ## 4. Anti-gaming — a budget passes by getting faster, never by getting looser
 
-Both reviewers treat as a gate-integrity flag: raising a `max` (or lowering a `min`) or widening a `tolerance_pct` in `budgets.json` without an owner decision recorded in `CHANGES.md`; updating `baseline.json` in a commit that is not an optimization with its numbers in the message; deleting or skipping a benchmark; shrinking the fixed dataset or changing the seed to make a number pass; measuring a warm cache where the budget stated a cold one. A budget the owner genuinely wants relaxed is a product decision — it goes through the change cycle's intake, not through an edit.
+Both reviewers treat as a gate-integrity flag: raising a `max` (or lowering a `min`) in `budgets.json` without an owner decision recorded in `CHANGES.md` (the budget is a requirement, the owner's), or widening a `tolerance_pct` without the measurement that justifies it recorded in the same commit (the tolerance is technical: the supervisor's to set, never the owner's question); updating `baseline.json` in a commit that is not an optimization with its numbers in the message; deleting or skipping a benchmark; shrinking the fixed dataset or changing the seed to make a number pass; measuring a warm cache where the budget stated a cold one. A budget the owner genuinely wants relaxed is a product decision — it goes through the change cycle's intake, not through an edit.
 
 ## 5. Optimization at stage close — the performance lens of the same pass
 

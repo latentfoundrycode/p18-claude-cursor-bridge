@@ -47,6 +47,10 @@ def test_digest_carries_the_literal_commands_and_the_merge_authority_check():
     assert "2> run/review/REVIEW-<nnn>.err" in digest
     assert "review-guard.py snapshot <nnn>" in digest and "review-guard.py verify <nnn>" in digest and "review-guard.py premerge <nnn>" in digest
     assert "Merge authority: owner" in digest and "READY TO MERGE" in digest
+    # the 2026.10.06b review, finding 7: the full paths and the CI watch stay literal in the digest
+    assert "python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since" in digest
+    assert "gh pr checks <n> --watch --required --fail-fast" in digest
+    assert "gh pr merge <n> --squash --match-head-commit <sha>" in digest
 
 
 def test_every_template_phase_value_is_mapped():

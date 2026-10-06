@@ -102,3 +102,64 @@ def test_stop_hook_active_allows(lg, monkeypatch, capsys):
     with pytest.raises(SystemExit) as e:
         lg.main()
     assert e.value.code == 0
+
+
+def assistant_transcript(tmp_path, text):
+    lines = [{"timestamp": ts(-30), "message": {"role": "assistant", "content": [{"type": "text", "text": "an earlier message with ```bash\nls\n```"}]}},
+             {"timestamp": ts(-20), "message": {"role": "user", "content": [{"type": "text", "text": "ok"}]}},
+             {"timestamp": ts(-10), "message": {"role": "assistant", "content": [{"type": "text", "text": text}]}}]
+    f = tmp_path / "t.jsonl"
+    f.write_text("\n".join(json.dumps(o) for o in lines) + "\n", encoding="utf-8")
+    return str(f)
+
+
+@pytest.mark.parametrize("text, sent_back", [
+    ("Run this:\n\n```bash\npython tools/x.py\n```\n\nThen tell me.", True),
+    ("Terminal: Git Bash (Start menu, type Git Bash)\n\n```bash\npython tools/x.py\n```\n\nReport back the last line.", False),
+    ("**Terminal:** PowerShell (Start menu, type PowerShell)\n\n```powershell\nGet-Content x\n```", False),
+    ("- **Terminal**: this chat\n\n```bash\n/supervisor\n```", False),
+    ("1. Terminal: Git Bash (Start menu)\n2. Run:\n\n```bash\npython tools/x.py\n```", False),
+    ("**2. Terminal:** PowerShell\n\n```powershell\nGet-Content x\n```", False),
+    ("Terminal (Git Bash): open it from the Start menu\n\n```bash\nls\n```", False),
+    ("10. Run:\n\n    ```bash\n    python tools/x.py\n    ```\n", True),
+    ("Terminal output: all clean.\n\n```bash\npython tools/x.py\n```", True),
+    ("Open PowerShell and run:\n\n```powershell\nGet-Content x\n```", True),
+    ("1. Run:\n\n   ```bash\n   python tools/x.py\n   ```\n", True),
+    ("Run:\n\n~~~ps1\nGet-Content x\n~~~\n", True),
+    ("Run:\n\n```batch\ndir\n```\n", True),
+    ("FYI: I ran this myself:\n\n```\npytest -q\n```\n\n2 passed.", False),
+    ("FYI, in this chat I ran `pytest -q`: 2 passed.", False),
+    ("Nothing needed — proceeding. Tests: 12 passed.", False),
+    ("Here is the file:\n\n```python\nprint(1)\n```", False),
+])
+def test_a_run_sheet_without_its_terminal_is_sent_back(lg, tmp_path, text, sent_back):
+    """Release A1b, rule 27: the last message holds a shell block and names no terminal."""
+    assert lg.run_sheet_without_terminal(lg.last_assistant_text(assistant_transcript(tmp_path, text))) is sent_back
+
+
+def test_the_run_sheet_check_reads_the_last_assistant_message_only(lg, tmp_path):
+    tp = assistant_transcript(tmp_path, "Done. Nothing to run.")
+    assert lg.last_assistant_text(tp) == "Done. Nothing to run."
+    assert not lg.run_sheet_without_terminal(lg.last_assistant_text(tp)), "the earlier message's block does not count"
+
+
+def test_the_run_sheet_check_applies_in_every_phase_and_blocks_the_stop(lg, tmp_path, monkeypatch, capsys):
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: configuration\nAwaiting user on: the owner's key\n", encoding="utf-8")
+    tp = assistant_transcript(tmp_path, "Please run:\n\n```bash\npython setup.py\n```")
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": tp, "hook_event_name": "Stop"})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 2 and "names no terminal" in capsys.readouterr().err
+    tp = assistant_transcript(tmp_path, "Terminal: PowerShell.\n\n```powershell\npython setup.py\n```")
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": tp, "hook_event_name": "Stop"})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 0, "configuration is not an active phase for the loop guard, and the run sheet is complete"
+    # the hook's own copy of the final message is read first; the transcript (which may lag) is the fallback
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": tp, "hook_event_name": "Stop",
+                                                                           "last_assistant_message": "Please run:\n\n```bash\npython setup.py\n```"})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 2, "the hook's own copy of the final message wins over the transcript"

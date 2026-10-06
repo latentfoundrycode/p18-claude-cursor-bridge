@@ -9,8 +9,8 @@ running render — as **measurable checks**, not a screen for the human to eyeba
 It is a **design-time default for UI-bearing projects** (those that produced a Phase-1
 screen-and-state inventory), **not a universal law**: a CLI or library has no inventory and
 opts out. The **supervisor owns the dial** and records the choice in Phase 2
-(`DESIGN.md` and the Resources of `docs/INVENTORY.md`); it escalates to the user only where a new dependency/cost is
-involved (drivers — see §Escalations). This doc is the master contract; each project
+(`DESIGN.md` and the Resources of `docs/INVENTORY.md`); a driver dependency follows the one
+dependency rule (supervisor rule 56; see §Drivers). This doc is the master contract; each project
 instantiates it as a **`DESIGN.md` "Observability & Verifiability" section**.
 
 ---
@@ -127,7 +127,7 @@ backdoor.
 
 ---
 
-## Drivers & escalations (the user's calls)
+## Drivers (dependencies under rule 56)
 
 - **Web:** a browser driver (**Playwright** recommended), **run in CI on Linux** (primary),
   local optional — mirrors the Semgrep-in-CI posture. New dependency + CI minutes.
@@ -135,8 +135,9 @@ backdoor.
   heavier deps + CI runners. Adopt per-platform; for a first cut, gate the web path fully and
   treat mobile/desktop reachability as Tier-A-where-a-driver-exists.
 - **Assertions:** hand-rolled predicates (no new dependency) — the invariants are simple.
-- These are dependency/cost decisions → the supervisor escalates them to the user like any
-  dependency, at Phase 2/Configure; everything else here it decides and records.
+- These are dependencies: admitted by the gate and recorded by the supervisor under the one
+  dependency rule (supervisor rule 56), put to the owner only for the CI minutes they cost;
+  everything else here the supervisor decides and records.
 
 ---
 

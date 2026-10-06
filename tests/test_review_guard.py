@@ -191,8 +191,100 @@ def test_cache_folders_are_skipped(repo):
     assert rc == 0 and "big.py" not in out
 
 
-def test_premerge_accepts_only_the_review_files_removal(repo):
+GUARD = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "permission-guard.py")
+
+
+def launched(repo, nnn="001", offset=1, exit_code=0):
+    """The launcher's stderr as a Review B run leaves it: the launch line, offset seconds from
+    now, and the exit line (None: the run has not ended)."""
+    import time
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() + offset))
+    text = "bridge-run: started %sZ\nsome output of the reviewer\n" % stamp
+    if exit_code is not None:
+        text += "bridge-run: exit %d\n" % exit_code
+    (repo / "run" / "review").mkdir(parents=True, exist_ok=True)
+    (repo / "run" / "review" / ("REVIEW-%s.err" % nnn)).write_text(text, encoding="utf-8")
+
+
+def reviewed(repo, nnn="001"):
+    """snapshot, a Review B launch after it, verify OK: what every merge needs first."""
+    rc, out = guard(repo, "snapshot", nnn)
+    assert rc == 0, out
+    launched(repo, nnn)
+    rc, out = guard(repo, "verify", nnn)
+    assert rc == 0 and "verified mark written" in out, out
+
+
+def test_premerge_refuses_a_snapshot_without_its_verified_mark(repo):
+    """Second pass of the 2026.10.06b review, S2: snapshot then premerge, no Review B between."""
     guard(repo, "snapshot", "001")
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "no verified mark" in out, out
+    assert not (repo / ".git" / "bridge" / "premerge").exists(), "no record was written"
+    launched(repo, "001", offset=-120)                   # a launch BEFORE the snapshot is not a review of it
+    rc, out = guard(repo, "verify", "001")
+    assert rc == 0 and "verified mark written" in out, out
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "before the snapshot" in out, out
+    launched(repo, "001")
+    rc, out = guard(repo, "verify", "001")
+    assert rc == 0, out
+    git(repo, "rm", "-q", "run/review/REVIEW-001.diff")
+    git(repo, "commit", "-q", "-m", "remove review files")
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 0 and "verified mark for 001" in out, out
+    rc, out = guard(repo, "snapshot", "001")              # a new snapshot needs a new review round
+    assert rc == 0, out
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "no verified mark" in out, "the snapshot removed the older mark: " + out
+
+
+def test_a_failed_review_run_or_a_flagged_verify_leaves_no_usable_mark(repo):
+    """Third pass of the 2026.10.06b review, T2: the mark proves a Review B that ended with exit
+    0 and a clean verify; a failed run, a run still going, or a later GATE-INTEGRITY withdraws it."""
+    guard(repo, "snapshot", "001")
+    launched(repo, "001", exit_code=3)                     # a usage limit: no verdict
+    rc, out = guard(repo, "verify", "001")
+    assert rc == 0 and "exit 3" in out, out
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "exit 3" in out, out
+    launched(repo, "001", exit_code=None)                  # still running
+    guard(repo, "verify", "001")
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "exit None" in out, out
+    launched(repo, "001")
+    rc, out = guard(repo, "verify", "001")
+    assert rc == 0, out
+    git(repo, "branch", "left-by-the-reviewer")            # a second run leaves a ref behind
+    rc, out = guard(repo, "verify", "001")
+    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "no verified mark" in out, "the flagged verify withdrew the mark: " + out
+
+
+def test_premerge_and_the_permission_guard_agree_end_to_end(repo, tmp_path):
+    """Second pass, S9: the record premerge writes is the one the guard reads, from the checkout,
+    a subfolder and a linked worktree; not from a folder outside the repository."""
+    import json
+    reviewed(repo)
+    git(repo, "rm", "-q", "run/review/REVIEW-001.diff")
+    git(repo, "commit", "-q", "-m", "remove review files")
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 0, out
+    sha = re.search(r"--match-head-commit ([0-9a-f]{40})", out).group(1)
+    wt = tmp_path / "Worktrees" / "TASK-002"
+    git(repo, "worktree", "add", "-q", "-b", "task-002", str(wt))
+
+    def allowed(cwd):
+        payload = {"tool_name": "Bash", "tool_input": {"command": "gh pr merge 12 --squash --match-head-commit " + sha}, "cwd": str(cwd)}
+        p = subprocess.run([sys.executable, GUARD], input=json.dumps(payload), capture_output=True, text=True)
+        return p.returncode == 0
+    assert allowed(repo) and allowed(repo / "docs") and allowed(wt)
+    assert not allowed(tmp_path), "outside the repository there is no record"
+
+
+def test_premerge_accepts_only_the_review_files_removal(repo):
+    reviewed(repo)
     git(repo, "rm", "-q", "run/review/REVIEW-001.diff")
     rc, out = guard(repo, "premerge", "001")
     assert rc == 2 and "not clean" in out, "an uncommitted git rm must not pass"
@@ -207,7 +299,7 @@ def test_premerge_accepts_only_the_review_files_removal(repo):
 
 
 def test_premerge_rejects_a_head_that_does_not_descend_from_the_reviewed_one(repo):
-    guard(repo, "snapshot", "001")
+    reviewed(repo)
     git(repo, "reset", "-q", "--hard", "HEAD~1")
     (repo / "b.py").write_text("y\n", encoding="utf-8")
     git(repo, "add", "b.py")

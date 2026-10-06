@@ -21,7 +21,8 @@ BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers through it.
 
 - stdout and stderr are inherited, so `2> run/agent/TASK-nnn.err` works unchanged.
 - The first line on stderr is `bridge-run: started <UTC time>Z`, which is what
-  pr-activity-check.py's --since needs.
+  pr-activity-check.py's --since needs; the last is `bridge-run: exit <code>`, which
+  review-guard.py reads to tell a review that reached a verdict from one that failed.
 - The exit code is the command's own; 124 = the limit was hit; 125 = refused or could not
   start.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
@@ -190,7 +191,7 @@ def main():
     try:
         rc = proc.wait(timeout=limit)
     except subprocess.TimeoutExpired:
-        sys.stderr.write("bridge-run: LIMIT %ds reached after %ds; terminating the whole process tree\n"
+        sys.stderr.write("bridge-run: LIMIT %ds reached after %ds; terminating the whole process tree\nbridge-run: exit 124\n"
                          % (int(limit), int(time.time() - started)))
         sys.stderr.flush()
         try:
@@ -202,6 +203,9 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
         rc = 124
+    if rc != 124:
+        sys.stderr.write("bridge-run: exit %d\n" % rc)
+        sys.stderr.flush()
     # The job handle is deliberately not closed here: it closes when this process exits,
     # after the exit code is set, and "kill on close" then ends any orphan the command left.
     return rc

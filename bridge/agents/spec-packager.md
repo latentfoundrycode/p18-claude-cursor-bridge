@@ -34,7 +34,10 @@ bend; catching it here costs minutes, catching it after delegation costs a round
 delegate command and the Out of scope section keep `docs/` closed except for what Scope names,
 so a brief that asks the builder to write a file there and does not list it contradicts itself
 (plan review R17: every project's builder notes were written against the command that forbade
-them). Always list `docs/BUILDER_NOTES.md`: the Constraints section asks the builder to append
+them). Copy the inventory's `Development data:` decision into the Context section whenever the
+increment runs the product, a migration, a seed or a test against data, so the constraint below
+has something to point at; an inventory without that row is the supervisor's gap to close before
+packaging (rule 55). Always list `docs/BUILDER_NOTES.md`: the Constraints section asks the builder to append
 to it; this holds for the fix and the refactoring variants below as well. List
 `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` whenever the increment adds or changes a
 command of installable software: the delivery conventions require the first regenerated in
@@ -106,6 +109,13 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a
   process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path.
 - Do not refactor code outside the scope, even if it looks wrong.
+- Never run the product, a migration, a seed or a test against the owner's live data. A
+  development build uses the development data the design names (the inventory's
+  `Development data` decision) and refuses the installed product's data; if the brief does
+  not say where the development data is, stop and report it (rule 55).
+- A value the brief marks as **the owner's** (a threshold, a price, a limit, a default, a
+  wording) is fixed: the Context section names the test that pins it; do not change the
+  value or that test, and report it if the work seems to need a change (rule 52).
 - Follow existing conventions in the files you touch.
 - Prefer reuse over new code — existing helpers, the standard library, native platform
   features, already-installed dependencies — and write the minimum that meets the

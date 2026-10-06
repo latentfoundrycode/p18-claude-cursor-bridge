@@ -25,8 +25,9 @@ the brief.
 
 - **[Claude]** — file-based; Claude can create or edit it directly and commit it.
 - **[Escalate]** — needs a secret, a dashboard/Customize-UI action Claude cannot reach,
-  a new dependency, or a design decision. Route through the human gate; never silently
-  do or skip it.
+  or a design decision (what the software does). A new dependency is not one: it follows
+  supervisor rule 56 (the gate admits, the supervisor records, the owner is asked only for a
+  consequence they bear). Route the rest through the human gate; never silently do or skip it.
 - **[Skip]** — interactive- or cloud-only, or neutralised by `--force`. Not applicable
   to the headless bridge. Listed so the reason is on record.
 
@@ -45,6 +46,9 @@ the brief.
   is best-effort, not a security boundary — terminal commands and MCP tools are not
   blocked by it, which is exactly why secret handling still rests on the brief and
   `secret-sentinel`.
+- **`.gitignore`** carries `run/`: the launcher's output, the review files and the supervisor's
+  working files (`run/supervisor/`, rule 54) live there and are never tracked; `review-guard.py
+  verify` cleans untracked files, so an unignored `run/` would lose them (the conformance check notes it).
 - **`.worktreeinclude`** (bridge-specific, not in the Cursor checklist) listing any
   gitignored file the tests need — normally `.env` — so it reaches the session worktree.
 - **The Workspace boundary** (bridge-specific). The builder must never read or write outside
@@ -69,19 +73,22 @@ A worktree (under `<project-root>/Worktrees/`, supervisor rule 39) that contains
 `git worktree remove --force` **follows a live junction and deletes the real target**, and a
 `rmdir` issued *through Git Bash* can silently fail on a mangled path — leaving the junction
 alive for `--force` to follow. This has destroyed a main checkout's `node_modules` in
-practice. Never hand-roll teardown; use this order every time:
+practice, and an ordinary `git worktree remove` follows the junction as the forced form does.
+Never hand-roll teardown; since release A1b the bridge's program does it, and the guard hook
+refuses the git command outright:
 
-1. **Remove the link first, with a native Windows path, not through Git Bash** — from
-   PowerShell: `cmd /c rmdir "<worktree>\node_modules"`. `rmdir` on a junction removes
-   **only the link**, never the target. Never `rm -rf` or `Remove-Item -Recurse` a junction —
-   those follow it into the real directory.
-2. **Verify both halves:** `Test-Path "<worktree>\node_modules"` → `False` (link gone) **and**
-   `Test-Path "<main>\node_modules"` → `True` (target survived).
-3. **Only then** `git worktree remove <worktree>` — without `--force`. Use `--force` only after
-   step 2 has confirmed no live link remains inside the worktree.
+1. `python ~/.claude/cursor-bridge/worktree-teardown.py <worktree>` — it looks at every entry
+   inside without following links, **refuses while any junction or symbolic link is inside**
+   (listing each with its target), runs `git worktree remove` without `--force`, prints git's
+   own refusal if the worktree is dirty or locked (commit or clean it; never force), and prunes.
+2. When it refuses for a link: remove the link **by itself** — `cmd /c rmdir "<worktree>\node_modules"`
+   from PowerShell removes only the link, never the target; never `rm -rf` or `Remove-Item -Recurse`
+   a junction — verify with `Test-Path "<main>\node_modules"` → `True`, then run the program again.
 
-Treat `git worktree remove --force` on a worktree you have not link-checked as forbidden. (The
-opt-in shell-guard denies it for the builder too.)
+`git worktree remove` is never run by hand, forced or not: Git for Windows follows a gitignored
+junction in an ordinary removal as in a forced one (verified 2026-10-06 on Git 2.53), so only
+`worktree-teardown.py` removes a worktree, and the `permission-guard` hook refuses the command.
+(The opt-in shell-guard denies the forced form for the builder too.)
 
 **The other teardown failure — a real environment that is briefly locked.** A worktree that
 built its *own* `.venv` or `node_modules` (no link) can fail `git worktree remove` with
@@ -89,7 +96,7 @@ built its *own* `.venv` or `node_modules` (no link) can fail `git worktree remov
 is not the junction hazard: git's metadata is clean and nothing outside the worktree is at
 risk. Do not answer a lock with `--force`, which does not unlock anything. Wait and retry
 (three attempts, ~5 s apart); if it still fails, leave the directory and remove it at the
-next checkpoint with a plain recursive delete once step 2 has confirmed it contains no link.
+next checkpoint with a plain recursive delete once `worktree-teardown.py`, run on that folder, has said it holds no link (it looks for links in any folder it is given, a leftover that git no longer lists included, and refuses with the list when it finds one).
 Record which case it was in `PROJECT_STATUS.md` so the two are never confused (KP-023).
 
 **Warm environment (performance):** rebuilding a from-source toolchain (a mypy build, a large
@@ -100,15 +107,16 @@ not a package tree, so plan the reuse explicitly and record it in `docs/PROJECT_
 
 ---
 
-## 2. The feedback loop — highest value — [Claude], with [Escalate] for new deps
+## 2. The feedback loop — highest value — [Claude]; a new dependency follows rule 56
 
 This is the single most valuable thing configuration does: make the builder able to see
 and fix its own lint/type errors without a human in the loop.
 
 - **Install linters/formatters/type-checkers as project dev dependencies**, not editor
-  extensions. A terminal-run agent can only invoke what's in the manifest. Adding a new
-  dependency is **[Escalate]** — name it, its licence, and why — per the bridge's
-  dependency gate.
+  extensions. A terminal-run agent can only invoke what's in the manifest. A new
+  dependency follows the one dependency rule (supervisor rule 56): the admission gate
+  (`socket package score` + OSV) decides, the supervisor adds and records it, and the owner
+  is asked only when it carries a consequence they bear (money, privacy, lock-in).
 - **Commit a config file per tool** to the repo root so CLI, hook, and CI agree.
 - **Make every command activation-independent.** Agents and hooks spawn a fresh shell
   that never ran your venv `activate`. Invoke tools by explicit interpreter path
@@ -192,9 +200,10 @@ persistent rule is a second voice in every build that can drift from the brief.
   voice. **[Claude]**
 - Do **not** port skills or subagents into Cursor. The bridge's specialists live on the
   Claude side; duplicating them in Cursor splits the source of truth. **[Skip]**
-- If a pre-existing repo already ships `.cursor/rules`, `AGENTS.md`, or `CLAUDE.md`,
-  surface them to the human — they will apply on every run and may conflict with the
-  brief. Deciding to keep or retire them is a design call: **[Escalate]**.
+- If a pre-existing repo already ships `.cursor/rules`, `AGENTS.md`, or `CLAUDE.md`, they
+  will apply on every run and may conflict with the brief. Keeping or retiring each is the
+  supervisor's call (how, never what), recorded in the inventory's Decisions with the reason;
+  it is never a question to the owner.
 
 ---
 
@@ -325,7 +334,7 @@ Everything else here the supervisor decides and records; it does not escalate.
 
 ---
 
-## 5d. Observability tooling — [Claude], with [Escalate] only for the driver dependency
+## 5d. Observability tooling — [Claude]; the driver dependency follows rule 56
 
 For **UI-bearing** projects only (those with a Phase-1 screen-and-state inventory). Per
 `Observability-Conventions.md` — gives the gate a view of the *running render*. The supervisor
@@ -346,8 +355,9 @@ owns the tier decision (Tier A default; Tier B opt-in) and records it. Steps:
    + version, the tier, the invariant set, and the state→reachability map in
    `docs/INVENTORY.md` (Resources).
 
-**Escalation:** only the **driver dependency** (a new dev/CI dependency + CI minutes) — cleared
-with the user like any dependency. The instrumentation the tests exercise is product code Cursor
+**The driver dependency** (a new dev/CI dependency + CI minutes) is admitted and recorded under
+the one dependency rule (supervisor rule 56) and put to the owner only for the CI minutes it
+costs, as a consequence they bear. The instrumentation the tests exercise is product code Cursor
 builds from the brief; the tests are the supervisor's. Assertions are hand-rolled (no new dep).
 
 ---
@@ -394,7 +404,7 @@ Stop and ask the human, leading with the decision and a recommendation, whenever
 configuration would require:
 
 - a secret, key, or token (Context7 paid key, MCP server credentials, any auth);
-- a new project dependency (linters included — name it, licence, reason);
+- a dependency only for a consequence the owner bears — money, privacy, lock-in — under the one dependency rule (supervisor rule 56); never its technical merit, never a licence;
 - an action only reachable in Cursor's GUI or the cloud dashboard;
 - a decision about pre-existing Cursor config in an adopted repo;
 - anything the design document does not already settle.
@@ -421,7 +431,7 @@ this reliable:
 
 1. §1 repo hygiene (`.gitattributes` → renormalise, `.cursorignore`, `.worktreeinclude`,
    `.cursor/rules/workspace-boundary.mdc` + the `boundary-check` hook entry).
-2. §2 feedback loop: escalate any new linter deps, commit configs, fix command strings, wire the edit hook **windowless** (idiom in every hook script; `run-hidden.py` on every direct-command entry), handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` running the lint command + `windowless-check.py`; `git config core.hooksPath .githooks`).
+2. §2 feedback loop: admit linter deps under rule 56, commit configs, fix command strings, wire the edit hook **windowless** (idiom in every hook script; `run-hidden.py` on every direct-command entry), handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` running the lint command + `windowless-check.py`; `git config core.hooksPath .githooks`).
 3. §3 Context7 in `~/.cursor/mcp.json` if the project uses third-party libraries.
 4. §4 any other MCP tools the build needs (escalate secrets).
 5. §5 at most one *project-specific* cross-cutting rule, only if warranted; write the
@@ -440,7 +450,7 @@ this reliable:
 8b. §5e performance floor (where budgets exist): `bench/budgets.json`, the `bench-check.py` CI step, pinned bench/profile tools, gitignores.
 8. §5d observability (UI-bearing projects): wire the supervisor-authored observability e2e
    tests into the `gate` job, set test-mode fixed clock/seed/locale, gitignore the artifacts,
-   confirm log redaction; escalate the driver dependency (Playwright / per-platform). Record
+   confirm log redaction; admit the driver dependency under rule 56 (Playwright / per-platform). Record
    the tier, driver + version, invariant set, and state→reachability map in `docs/INVENTORY.md` (Resources).
 9. §5b step 5 + §5c step 3 + §5d step 1 — the design, security, and observability floor steps
    added **inside the existing `gate` job** (one required check); where there is no CI, the

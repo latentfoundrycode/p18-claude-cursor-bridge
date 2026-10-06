@@ -33,11 +33,16 @@ What each step does:
             GATE-INTEGRITY, any other is LEFT BEHIND. A moved remote-tracking ref (a fetch)
             is a note. It prints the snapshot file's hash again: compare it with the one
             `snapshot` printed, since the reviewer could rewrite the snapshot.
-  premerge  refuses a dirty tree; the head about to merge must descend from the reviewed
-            head and differ from it only under run/review/ (the review files removed with
-            `git rm`); with <pr>, the pull request's head on GitHub must equal the local
-            HEAD (push first; a branch updated from main needs the reviews again). It prints
-            the merge command with `--match-head-commit`.
+  premerge  needs the verified mark `verify` wrote for this snapshot (release A1b, second and
+            third passes: Review B launched after the snapshot through the launcher and ended
+            with exit 0, the last `verify` OK; `snapshot` and `verify` remove an older mark), so a
+            merge that skipped the cross-family review has no way through; refuses a dirty
+            tree; the head about to merge must descend from the reviewed head and differ from
+            it only under run/review/ (the review files removed with `git rm`); with <pr>, the
+            pull request's head on GitHub must equal the local HEAD (push first; a branch
+            updated from main needs the reviews again). It writes the record the permission
+            guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command
+            with `--match-head-commit`.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
 2 = cannot verify (no snapshot, dirty tree, git or gh failure). Never prints a value of
@@ -218,6 +223,36 @@ def snapshot_path(common, nnn):
     return os.path.join(common, "bridge", "review-%s.json" % nnn)
 
 
+def mark_path(common, nnn):
+    return os.path.join(common, "bridge", "verified-%s.json" % nnn)
+
+
+def launch_info(err_path):
+    """(launch time, exit code) from run/review/REVIEW-<nnn>.err: the launcher's first line
+    `bridge-run: started <UTC>Z` and its last `bridge-run: exit <code>` (None while it runs)."""
+    try:
+        with open(err_path, encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None, None
+    m = re.search(r"started\s+(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", lines[0] if lines else "")
+    code = None
+    for line in reversed(lines):
+        e = re.match(r"bridge-run: exit (\d+)", line.strip())
+        if e:
+            code = int(e.group(1))
+            break
+    return (m.group(1) if m else None), code
+
+
+def remove_mark(common, nnn):
+    """Only the last verify of the last snapshot counts: the mark goes before either runs."""
+    try:
+        os.remove(mark_path(common, nnn))
+    except OSError:
+        pass
+
+
 def cmd_snapshot(nnn, cwd):
     root, git_dir, common = find_git_dirs(cwd)
     if not root:
@@ -238,6 +273,7 @@ def cmd_snapshot(nnn, cwd):
         "git": config_state(common, root), "ignored": ignored_entries(root, common),
     }
     os.makedirs(os.path.join(common, "bridge"), exist_ok=True)
+    remove_mark(common, nnn)
     path = snapshot_path(common, nnn)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(snap, f, indent=1, sort_keys=True)
@@ -271,6 +307,7 @@ def cmd_verify(nnn, cwd):
     snap, root, common, snap_hash = load_snapshot(nnn, cwd)
     if snap is None:
         return 2
+    remove_mark(common, nnn)                           # a failed verify leaves no mark behind
     flags, notes = [], []
     # 1. the repository's configuration and hooks, read as files, before any git command runs
     now = config_state(common, root)
@@ -376,8 +413,20 @@ def cmd_verify(nnn, cwd):
     if flags:
         print("review-guard: GATE-INTEGRITY - the tree is back at %s on %s and the refs are repaired, but the review left the marks above: open the flag (condition 4) and an issue; do not merge" % (snap["head"][:12], snap["branch"] or "detached HEAD"))
         return 1
-    print("review-guard: OK - checkout restored to %s on %s (%d item(s) restored or removed, %d ignored entr%s left behind)" % (
-        snap["head"][:12], snap["branch"] or "detached HEAD", len(dirty) + len(cleaned), left, "y" if left == 1 else "ies"))
+    # The verified mark premerge needs (second pass of the A1b review, S2): this snapshot's hash
+    # and the launch time of the Review B run, so a merge that skipped the review has no mark.
+    launched_at, exit_code = launch_info(err_path)
+    mark = {"nnn": str(nnn), "snapshot": snap_hash, "head": snap["head"], "taken": snap["taken"],
+            "launched": launched_at, "exit": exit_code, "verified": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    try:
+        with open(mark_path(common, nnn), "w", encoding="utf-8") as f:
+            json.dump(mark, f, indent=1, sort_keys=True)
+    except OSError as e:
+        print("review-guard: CANNOT VERIFY - the verified mark could not be written (%s)" % e)
+        return 2
+    print("review-guard: OK - checkout restored to %s on %s (%d item(s) restored or removed, %d ignored entr%s left behind); verified mark written%s" % (
+        snap["head"][:12], snap["branch"] or "detached HEAD", len(dirty) + len(cleaned), left, "y" if left == 1 else "ies",
+        " (Review B launched %s, exit %s)" % (mark["launched"], mark["exit"]) if mark["launched"] else " (no launch time: run/review/REVIEW-%s.err missing, premerge will refuse)" % nnn))
     return 0
 
 
@@ -385,6 +434,25 @@ def cmd_premerge(nnn, cwd, pr=None):
     snap, root, common, snap_hash = load_snapshot(nnn, cwd)
     if snap is None:
         return 2
+    try:
+        with open(mark_path(common, nnn), encoding="utf-8") as f:
+            mark = json.load(f)
+    except (OSError, ValueError):
+        mark = None
+    if not isinstance(mark, dict):
+        print("review-guard: CANNOT CHECK - no verified mark for %s: Review B runs after the snapshot (through the launcher, `2> run/review/REVIEW-%s.err`) and `review-guard.py verify %s` must print OK before any merge, a records-only change included" % (nnn, nnn, nnn))
+        return 2
+    if mark.get("snapshot") != snap_hash:
+        print("review-guard: CANNOT CHECK - the verified mark for %s belongs to another snapshot (%s, now %s): run Review B and `verify` again on this snapshot" % (nnn, mark.get("snapshot"), snap_hash))
+        return 2
+    launched = (mark.get("launched") or "").rstrip("Z")
+    if not launched or launched < (snap.get("taken") or "").rstrip("Z"):
+        print("review-guard: CANNOT CHECK - no Review B launch after the snapshot of %s (run/review/REVIEW-%s.err missing, or its launch time %s is before the snapshot %s)" % (nnn, nnn, launched or "unknown", snap.get("taken")))
+        return 2
+    if mark.get("exit") != 0:
+        print("review-guard: CANNOT CHECK - the Review B run of %s ended with exit %s (no verdict; a run that failed at once, or one still running): run it again, then `verify`" % (nnn, mark.get("exit")))
+        return 2
+    print("review-guard: verified mark for %s: snapshot %s, Review B launched %sZ and ended with exit 0, verified %s" % (nnn, snap_hash, launched, mark.get("verified")))
     if run_git(["status", "--porcelain"], root, common).strip():
         print("review-guard: CANNOT CHECK - the tree is not clean; commit the removal of the review files first")
         return 2
@@ -418,6 +486,16 @@ def cmd_premerge(nnn, cwd, pr=None):
             return 1
     print("review-guard: OK - %s descends from the reviewed %s and differs only under run/review/ (%d file(s))%s" % (
         head[:12], snap["head"][:12], len(changed), "; the pull request's head matches" if pr else ""))
+    # The record the permission guard reads before it lets a merge through (release A1b): a
+    # merge that skipped this check has no record and is refused; the sha alone proves nothing.
+    folder = os.path.join(common, "bridge", "premerge")
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, head), "w", encoding="utf-8") as f:
+            json.dump({"pr": pr, "review": nnn, "snapshot": snap_hash, "written": time.strftime("%Y-%m-%dT%H:%M:%S")}, f)
+    except OSError as e:
+        print("review-guard: CANNOT CHECK - the pre-merge record could not be written (%s)" % e)
+        return 2
     print("review-guard: merge with  gh pr merge %s--squash --match-head-commit %s" % ((str(pr) + " ") if pr else "", head))
     return 0
 
