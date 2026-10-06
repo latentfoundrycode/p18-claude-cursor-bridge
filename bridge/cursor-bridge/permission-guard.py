@@ -6,6 +6,11 @@ refuses the two actions the loop must never take, in every permission mode (KP-0
     REST route `gh api … /pulls/<n>/merge` with a method that writes;
   - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,
     `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;
+  - a forced worktree removal (`git worktree remove --force`, `-f`), which follows a live
+    junction or symbolic link inside the worktree into its target (rule 19, release A1b);
+    `worktree-teardown.py` removes a worktree without forcing;
+  - a merge that does not carry the confirmation only the pre-merge check prints:
+    `gh pr merge` without `--match-head-commit <sha>` (release A1b), except `--disable-auto`;
   - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,
     `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or
     `powershell`), which would run it with the owner's real home and identity (KP-038): the
@@ -158,9 +163,16 @@ def check(command):
                 r = force_push_reason(args)
                 if r:
                     return r
+            if sub == "worktree" and args and args[0] == "remove":
+                for a in args[1:]:
+                    if a == "--force" or re.match(r"^-[A-Za-z]*f[A-Za-z]*$", a):
+                        return "git worktree remove with %s (a forced removal follows a live link inside the worktree into its target; use worktree-teardown.py)" % a
         elif head in ("gh", "gh.exe"):
             if len(w) >= 3 and w[1] == "pr" and w[2] == "merge" and any(a == "--admin" or a.startswith("--admin=") for a in w):
                 return "gh pr merge --admin (merging past the repository's rules)"
+            if len(w) >= 3 and w[1] == "pr" and w[2] == "merge" and "--disable-auto" not in w \
+                    and not any(a == "--match-head-commit" or a.startswith("--match-head-commit=") for a in w):
+                return "gh pr merge without --match-head-commit <sha>, the confirmation only review-guard.py premerge prints (a merge that skipped the gate is not refused by anything else)"
             if len(w) >= 2 and w[1] == "api":
                 method = "GET"
                 for i, a in enumerate(w):

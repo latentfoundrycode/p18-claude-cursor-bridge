@@ -106,6 +106,13 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a
   process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path.
 - Do not refactor code outside the scope, even if it looks wrong.
+- Never run the product, a migration, a seed or a test against the owner's live data. A
+  development build uses the development data the design names (the inventory's
+  `Development data` decision) and refuses the installed product's data; if the brief does
+  not say where the development data is, stop and report it (rule 55).
+- A value the brief marks as **the owner's** (a threshold, a price, a limit, a default, a
+  wording) is fixed: the test that pins it is in Scope and stays as it is; do not change the
+  value or the test, and report it if the work seems to need a change (rule 52).
 - Follow existing conventions in the files you touch.
 - Prefer reuse over new code — existing helpers, the standard library, native platform
   features, already-installed dependencies — and write the minimum that meets the

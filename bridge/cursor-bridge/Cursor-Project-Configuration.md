@@ -69,16 +69,16 @@ A worktree (under `<project-root>/Worktrees/`, supervisor rule 39) that contains
 `git worktree remove --force` **follows a live junction and deletes the real target**, and a
 `rmdir` issued *through Git Bash* can silently fail on a mangled path — leaving the junction
 alive for `--force` to follow. This has destroyed a main checkout's `node_modules` in
-practice. Never hand-roll teardown; use this order every time:
+practice. Never hand-roll teardown; since release A1b the bridge's program does it, and the
+guard hook refuses the forced form outright:
 
-1. **Remove the link first, with a native Windows path, not through Git Bash** — from
-   PowerShell: `cmd /c rmdir "<worktree>\node_modules"`. `rmdir` on a junction removes
-   **only the link**, never the target. Never `rm -rf` or `Remove-Item -Recurse` a junction —
-   those follow it into the real directory.
-2. **Verify both halves:** `Test-Path "<worktree>\node_modules"` → `False` (link gone) **and**
-   `Test-Path "<main>\node_modules"` → `True` (target survived).
-3. **Only then** `git worktree remove <worktree>` — without `--force`. Use `--force` only after
-   step 2 has confirmed no live link remains inside the worktree.
+1. `python ~/.claude/cursor-bridge/worktree-teardown.py <worktree>` — it looks at every entry
+   inside without following links, **refuses while any junction or symbolic link is inside**
+   (listing each with its target), runs `git worktree remove` without `--force`, prints git's
+   own refusal if the worktree is dirty or locked (commit or clean it; never force), and prunes.
+2. When it refuses for a link: remove the link **by itself** — `cmd /c rmdir "<worktree>\node_modules"`
+   from PowerShell removes only the link, never the target; never `rm -rf` or `Remove-Item -Recurse`
+   a junction — verify with `Test-Path "<main>\node_modules"` → `True`, then run the program again.
 
 Treat `git worktree remove --force` on a worktree you have not link-checked as forbidden. (The
 opt-in shell-guard denies it for the builder too.)
@@ -106,9 +106,10 @@ This is the single most valuable thing configuration does: make the builder able
 and fix its own lint/type errors without a human in the loop.
 
 - **Install linters/formatters/type-checkers as project dev dependencies**, not editor
-  extensions. A terminal-run agent can only invoke what's in the manifest. Adding a new
-  dependency is **[Escalate]** — name it, its licence, and why — per the bridge's
-  dependency gate.
+  extensions. A terminal-run agent can only invoke what's in the manifest. A new
+  dependency follows the one dependency rule (supervisor rule 56): the admission gate
+  (`socket package score` + OSV) decides, the supervisor adds and records it, and the owner
+  is asked only when it carries a consequence they bear (money, privacy, lock-in).
 - **Commit a config file per tool** to the repo root so CLI, hook, and CI agree.
 - **Make every command activation-independent.** Agents and hooks spawn a fresh shell
   that never ran your venv `activate`. Invoke tools by explicit interpreter path

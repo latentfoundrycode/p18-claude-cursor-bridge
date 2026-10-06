@@ -9,6 +9,8 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
   1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;
   2. its `Phase:` is building or changing;
   3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner);
+  (and, in every phase: a turn whose last message holds a shell block and names no terminal
+  is sent back once, because a run sheet without its terminal cannot be followed, rule 27);
   4. nothing is pending that will wake the session: no background agent or scheduled
      wake-up, and no background command *of a kind that finishes* - a builder run
      (cursor-agent), a CI watch (gh pr checks --watch), or any command the supervisor marked
@@ -59,8 +61,50 @@ REASON = (
 )
 
 
+SHELL_FENCE = re.compile(r"^```[ \t]*(bash|sh|shell|powershell|pwsh|cmd|bat|console)\b", re.M | re.I)
+TERMINAL_NAMED = re.compile(r"Terminal:|Git Bash|PowerShell|Command Prompt|this chat", re.I)
+RUN_SHEET_REASON = (
+    "Run-sheet rule (Claude-Cursor Bridge, rule 27): your last message holds a shell block but "
+    "names no terminal. A run sheet opens with `Terminal: <PowerShell | Git Bash | Command Prompt | "
+    "this chat | the <name> page>` and how to open it, then the folder, the commands one per block, "
+    "what to expect under each, and one report-back line. If the block was not for the owner to "
+    "run, say so in the text (it was run by you, in <terminal>) or put it in a plain block."
+)
+
+
 def allow():
     sys.exit(0)
+
+
+def last_assistant_text(transcript_path):
+    """The text of the last assistant message in the transcript, or None."""
+    try:
+        size = os.path.getsize(transcript_path)
+        with open(transcript_path, "rb") as f:
+            if size > TAIL_BYTES:
+                f.seek(size - TAIL_BYTES)
+                f.readline()
+            raw = f.read().decode("utf-8", "replace")
+    except OSError:
+        return None
+    last = None
+    for line in raw.splitlines():
+        try:
+            o = json.loads(line)
+        except ValueError:
+            continue
+        msg = o.get("message") or {}
+        if msg.get("role") != "assistant" or not isinstance(msg.get("content"), list):
+            continue
+        texts = [x.get("text") or "" for x in msg["content"] if isinstance(x, dict) and x.get("type") == "text"]
+        if texts:
+            last = "\n".join(texts)
+    return last
+
+
+def run_sheet_without_terminal(text):
+    """True when the message holds a shell block and names no terminal (release A1b)."""
+    return bool(text) and bool(SHELL_FENCE.search(text)) and not TERMINAL_NAMED.search(text)
 
 
 def status_candidates(cwd):
@@ -219,6 +263,10 @@ def main():
     if status is None:
         allow()
     phase = (field(status, "Phase") or "").strip()
+    tp = data.get("transcript_path")
+    if tp and os.path.isfile(tp) and run_sheet_without_terminal(last_assistant_text(tp)):
+        sys.stderr.write(RUN_SHEET_REASON + chr(10))
+        sys.exit(2)
     if not phase.lower().startswith(ACTIVE_PHASES):
         allow()
     awaiting = (field(status, "Awaiting user on") or "").strip().strip("<>").strip()

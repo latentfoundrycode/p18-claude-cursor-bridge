@@ -48,7 +48,8 @@ def assert_own_home(out, tmp_path):
     agent_home = tmp_path / "home" / ".cursor-bridge" / "agent-home"
     assert same_path(out["HOME"], str(agent_home)) and same_path(out["USERPROFILE"], str(agent_home)), (out["HOME"], out["USERPROFILE"])
     assert os.path.lexists(agent_home / ".cursor") and os.path.samefile(agent_home / ".cursor", tmp_path / "home" / ".cursor")
-    assert sorted(os.listdir(agent_home)) == [".cursor"], "nothing but the link"
+    assert sorted(os.listdir(agent_home)) == [".cursor", "AppData", "Desktop", "Documents", "Downloads"], "the link and the empty skeleton of a profile (KP-038)"
+    assert sorted(os.listdir(agent_home / "AppData")) == ["Local", "LocalLow", "Roaming"]
     assert same_path(out["GIT_CONFIG_GLOBAL"], str(tmp_path / "home" / ".gitconfig"))
     if os.name == "nt":
         assert out["HOMEDRIVE"] + out["HOMEPATH"] == out["USERPROFILE"]

@@ -53,6 +53,7 @@
       "Bash(python ~/.claude/cursor-bridge/diagram-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/pr-activity-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/review-guard.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/worktree-teardown.py:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
     ],
     "deny": [

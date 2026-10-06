@@ -387,7 +387,7 @@ The composition that keeps the gate intact:
 
 1. The supervisor opens the PR and runs Review A and Review B on the PR's diff.
 2. **Only if both APPROVE and no gate-integrity flag is open** does the supervisor arm the
-   merge — `gh pr merge --squash --auto` — and then watch the required `gate` check with **one background command** (`gh pr checks <n> --watch --required --fail-fast`, run in the background). Its completion is what wakes the supervisor; the desktop app's CI monitor reports failures and review comments only, never a green gate, so it cannot be the wake-up (KP-028).
+   merge — `gh pr merge <n> --squash --auto --match-head-commit <sha>`, the sha that `review-guard.py premerge` printed — and then watch the required `gate` check with **one background command** (`gh pr checks <n> --watch --required --fail-fast`, run in the background). Its completion is what wakes the supervisor; the desktop app's CI monitor reports failures and review comments only, never a green gate, so it cannot be the wake-up (KP-028).
 3. The merge lands only when the required CI check is green — which, thanks to branch
    protection on the Team plan, is a *required* check, so a red or missing CI run blocks
    the merge at the repo level as a hard backstop.
@@ -396,10 +396,10 @@ The composition that keeps the gate intact:
 queue frequently lags by minutes after the check goes green; that is a known GitHub-side
 delay with no reliable fix. Do not sit polling it. Once the merge is **authorised** — both
 reviews APPROVE, no gate-integrity flag, the required `gate` check green, and the PR
-mergeable/`CLEAN` — the supervisor may **complete the squash directly** (`gh pr merge
---squash`). This is safe and equivalent to the queue landing it: branch protection enforces
+mergeable/`CLEAN` — the supervisor may **complete the squash directly** (`gh pr merge <n>
+--squash --match-head-commit <sha>`). This is safe and equivalent to the queue landing it: branch protection enforces
 the required check regardless of *who* triggers the merge, so a direct `gh pr merge` cannot
-bypass CI any more than auto-merge can. `gh pr merge --squash --auto` is still armed first,
+bypass CI any more than auto-merge can. The armed `--auto` form (with the same `--match-head-commit`) is still set first,
 as a **safety net** in case the session ends before the check is green; it is not the
 mechanism to wait on. Never complete a merge before the required check is green or before
 both reviews have APPROVED — the direct path is a convenience over the queue, never a
@@ -493,7 +493,7 @@ Two options for reaching it:
   The checkpoint is guarded by `review-guard.py`: `snapshot <nnn>` before the launch (it
   refuses a dirty tree and records HEAD, the branch, the refs, the stashes, `.git/config`,
   the hooks folder and the ignored entries), `verify <nnn>` after the run, and
-  `premerge <nnn>` before `gh pr merge`. **What the restore covers and what it does not:**
+  `premerge <nnn>` before `gh pr merge`; since release A1b the `permission-guard` hook refuses a `gh pr merge` that does not carry the `--match-head-commit <sha>` the pre-merge check printed, so a merge that skipped the gate is refused by the computer, not only by the rule. **What the restore covers and what it does not:**
   `verify` puts tracked and untracked files back with `git reset --hard` and `git clean -fd`
   (keeping the launcher's own `run/review/REVIEW-<nnn>.err`, whose first line it prints) and
   lists what it removed — a temporary file or mutation the reviewer made for a check is

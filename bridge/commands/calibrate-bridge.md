@@ -11,6 +11,16 @@ project in flight with the new rules **without disturbing its order** — nothin
 re-presented, nothing in progress is restarted, and only the adjustments the new release
 lists for the project's current or future phases are applied.
 
+## 0. Write your position down — before anything else
+
+The re-reading below pushes working detail out of your memory, and the restart that preceded
+this command gave the session a new temporary folder. So first make sure a fresh session with
+no memory of this conversation could continue from the project's files alone: update
+`docs/PROJECT_STATUS.md` (`In flight:`, `Next:` with the exact next action, `Awaiting user on:`,
+`Working files:`), and move every script or note you need that exists only in this
+conversation or in a session's temporary folder into `run/supervisor/` (gitignored), naming
+it on the `Working files:` line (rule 54). Then go on.
+
 ## 1. Verify the install — deterministically
 
 ```bash
@@ -99,7 +109,8 @@ item into exactly one of:
 - **Passed** — marked for a phase already completed and requiring a *decision or gate* (a
   re-presented plan, a re-approved design). These are **not** applied. A gate the owner
   approved stays approved. Record them as "not applied — gate passed" so the omission is
-  visible, not silent.
+  visible, not silent. **An item that adds a test or a recorded reply is never one of these:**
+  a test is not a gate, and it is applied now, in whatever phase the project is (release A1b).
 
 Rules while applying **Now** items:
 
@@ -137,6 +148,7 @@ Delta: <old> → <new>
 Defaults set for you: <e.g. refactoring pass ON for remaining stages — say "off" to change>
 Session model for this phase: <Fable 5.1 | Opus 5.5> — set it in the model menu if the status bar shows another (rule 48)
 Project position unchanged: <phase / increment / stage>
+Next action: <the one thing you do next, as the status file's Next: line says>
 ```
 
 The test of a good calibration: the owner can read the first line and know whether they

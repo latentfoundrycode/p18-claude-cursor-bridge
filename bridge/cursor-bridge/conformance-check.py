@@ -406,8 +406,64 @@ def main():
         if own:
             add("NOTE", "The product's own tokens in .env", "%s: named after the project, so taken as the product's own per-instance tokens, not an external account; say so in the inventory if that is wrong" % ", ".join(own))
 
-    # --- no secret through an environment variable the owner sets (the inventory says how each arrives)
+    # --- the inventory's tables, by section (release A1b floors)
     inv = read(os.path.join(ws, "docs", "INVENTORY.md")) or ""
+    sections, current = {}, None
+    for line in inv.splitlines():
+        m = re.match(r"^##\s+(\w+)", line)
+        if m:
+            current = m.group(1)
+            continue
+        if current and line.lstrip().startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if cells and not set("".join(cells)) <= set("-: ") and not (cells[0].lower() in ("name", "decision", "feature", "item")):
+                sections.setdefault(current, []).append(cells)
+    if inv:
+        # a spending limit at every paid provider: a row of kind secret or account says what it is
+        unlimited = []
+        for cells in sections.get("Resources", []):
+            if len(cells) >= 2 and re.search(r"\b(secret|account)\b", cells[1], re.I) and not re.search(r"\blimit\b|no spend", " ".join(cells), re.I) \
+                    and not re.search(r"test-only|repo secret", cells[1], re.I):
+                unlimited.append(cells[0][:40])
+        if unlimited:
+            add("MISSING", "Spending limit recorded", "a key or account without a spending limit recorded in its Resources row (`limit $X/month, set <date>`, or `no spend possible`): %s; configuration asks the owner to set one at the provider (rule 56)" % ", ".join(unlimited[:6]))
+        else:
+            add("OK", "Spending limit recorded")
+        # development data kept apart from live data: a Decisions row says how
+        if any(cells and re.match(r"^\**development data", cells[0], re.I) for cells in sections.get("Decisions", [])):
+            add("OK", "Development data kept apart")
+        else:
+            add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
+
+    # --- every adapter of an external service is tested against recorded replies (rule 55 family, A1b)
+    adapters, tests_text, recorded = [], "", False
+    client_rx = re.compile(r"^\s*(?:from|import)\s+(requests|httpx|aiohttp|urllib3|openai|anthropic|modal|replicate|stripe|boto3|botocore|google\.cloud|azure|huggingface_hub|supabase|twilio|sendgrid|slack_sdk)\b", re.M)
+    for dirpath, dirs, names in os.walk(ws):
+        rel = os.path.relpath(dirpath, ws).replace("\\", "/")
+        dirs[:] = [d for d in dirs if d not in (".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", "run", "Worktrees")]
+        if re.search(r"(^|/)(cassettes|recorded|recordings|contracts|contract_fixtures|vcr)(/|$)", rel, re.I):
+            recorded = True
+        for n in names:
+            if not n.endswith(".py"):
+                continue
+            p = os.path.join(dirpath, n)
+            text = read(p) or ""
+            if re.search(r"(^|/)tests?(/|$)", rel) or n.startswith("test_") or n.endswith("_test.py"):
+                tests_text += "\n" + text
+                if re.search(r"recorded|cassette|vcr|respx|responses\.activate|contract", text, re.I):
+                    recorded = True
+            elif client_rx.search(text):
+                adapters.append(os.path.splitext(n)[0])
+    if adapters:
+        untested = sorted(a for a in set(adapters) if not re.search(r"\b%s\b" % re.escape(a), tests_text))
+        if not recorded:
+            add("MISSING", "Adapters tested against recorded replies", "%d module(s) talk to an external service (%s) and no test replays recorded replies (no cassettes/recorded/contracts folder, no test naming recorded replies); the brief's rule for external services (rule 55)" % (len(set(adapters)), ", ".join(sorted(set(adapters))[:6])))
+        elif untested:
+            add("NOTE", "Adapters tested against recorded replies", "no test names %s; the rest replay recorded replies" % ", ".join(untested[:6]))
+        else:
+            add("OK", "Adapters tested against recorded replies")
+
+    # --- no secret through an environment variable the owner sets (the inventory says how each arrives)
     by_env = []
     for line in inv.splitlines():
         if not line.lstrip().startswith("|") or not re.search(r"env(ironment)? var", line, re.I) or re.search(r"test-only", line, re.I):

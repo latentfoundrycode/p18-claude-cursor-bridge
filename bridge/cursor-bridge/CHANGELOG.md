@@ -15,6 +15,34 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.06b
+
+**Release A1b of the restructuring plan: the owner's authority, money and data.** The rules that keep what is the owner's in the owner's hands: what they are told and asked, which gates are theirs, how their money and their data are protected; a worktree teardown that never forces; and the pause that writes the project's place down.
+
+**What changed**
+- **What the owner is told and asked** (plan 8.8). A summary of any verification states its counts (rule 49). Every run sheet comes from one template that opens with `Purpose:`, `End state:` and `Terminal:` with how to open it; the loop guard sends back a turn whose last message holds a shell block and names no terminal (rule 27). Each run parameter is asked as a question of its own in the app's question form (rule 29). The design gate presents its decisions separately: the behaviour, the requirements register, the Level 1 diagrams, and each item that costs money or needs an account (Phase 2). The technical escalations left the conventions: a benchmark's tolerance is the supervisor's to set with its measurement, and one dependency rule (rule 56) replaces three: the gate admits, the supervisor adds and records, the owner is asked only for a consequence they bear.
+- **The owner's authority** (plan 13.1). Gates are the owner's and may be handed to the supervisor per named change, in the owner's recorded words, never for money, scope, keys or an irreversible step; each decision taken under them leads the next report (rule 50; the status file's `Delegated gates:` line). A product records who decided, never an agent as a person, and a per-item approval goes to a judge of another model family (rule 51). At every stage close both reviewers read the stage's whole change once, and the stage's demonstration runs live; from the first increment that makes the product startable, every stage close starts it. The `permission-guard` hook refuses a `gh pr merge` that does not carry the `--match-head-commit <sha>` only the pre-merge check prints (the policy's armed form carries it too). A value the owner chose is fixed in a test (rule 52; a constraint in every brief).
+- **The owner's money.** Configuration asks the owner for a spending limit at every provider that can spend, recorded in the inventory's Resources row (`limit $20/month, set <date>`, or `no spend possible`); the conformance check reports a key or account row without one. A key seen in the chat is exposed: the next report's first line asks for its replacement, with a run sheet (rule 53).
+- **The owner's data.** N1 gains its conditions 6 to 8 (plan 8.1): starting a background process changes no data it does not own and migrates no live data outside a release; it never runs unreleased code against live data; it spends nothing unless asked. Development data stays apart from live data (rule 55): a design rule, a constraint in every brief, and two conformance floors, `Development data kept apart` (the inventory's `Development data:` decision) and `Adapters tested against recorded replies`.
+- **Nothing skipped as "gate passed" that is a test:** a calibration item that adds a test or a recorded reply is applied in every phase.
+- **The safety of worktrees** (plan 8.5). `worktree-teardown.py` removes a worktree without forcing and refuses while a junction or symbolic link is inside, listing each; the guard hook refuses `git worktree remove --force` and `-f` outright (rule 19).
+- **A pause and a calibration keep the project's place** (the owner's proposal of 2026-10-05, rule 54). A pause on the owner's word begins by writing the position down; the supervisor's working files live in `run/supervisor/`, listed on the status file's `Working files:` line, never in a session's temporary folder, which changes with every restart; `/calibrate-bridge` checks that first (its step 0) and ends by naming the next action; no path of this computer enters a commit, the secret scan reports one as it reports a key.
+- The agent's home folder (KP-038) gets the empty skeleton of a profile, so a Windows program handed a known folder that does not exist no longer falls back to the builder's checkout.
+- Tests: the guard's new refusals and what stays allowed; the loop guard's run-sheet check in every phase; the teardown program on clean, linked and dirty worktrees; the three conformance floors; the profile skeleton; the digest names every rule.
+
+**Running projects must**
+- *(all phases)* Install with the setup guide's three steps, restart the app, run `/calibrate-bridge`; its step 0 has the supervisor write its position down first.
+- *(all phases, record-keeping)* Add `Working files:` and `Delegated gates:` to the status file. In the inventory, give every key or account row its spending limit (asked of the owner as a run sheet at the next reflection point; `no spend possible` where the account cannot be charged) and add a `Development data:` Decisions row from the design, or `Development data: none, the product keeps no data of the owner's`. Run the conformance check; each new `MISSING` floor is a configuration item of the next stage.
+- *(building, changing)* From the next brief on, the brief carries the development-data constraint and marks the owner's values; from the next stage close on, both reviewers read the stage's whole change and the demonstration runs live; worktrees are torn down with `worktree-teardown.py`; every merge carries `--match-head-commit`.
+- *(design)* A project at the design gate presents it as separate decisions and writes the development-data and who-decided rules into the design.
+
+**If rolled back**
+- *(all phases)* The status file's two new lines and the inventory's additions may stay; nothing else to restore. Set `Bridge version:` to the installed version.
+
+**Field acceptance on the trial project.** The loop guard sends back one run sheet that names no terminal (the supervisor corrects it in the same turn); a `gh pr merge` without the sha is refused and the merge goes through with it; `/calibrate-bridge` writes the position down before re-reading; the conformance check reports the new floors on the project and the supervisor schedules them as configuration items.
+
+---
+
 ## 2026.10.06a
 
 **Urgent fix from release A1a's trial (reAngle ISS-013): the builder and Review B get their shell back.** Since 2026-10-04 cursor-agent on the owner's computer imported the bridge's own Claude Code hook from `~/.claude/settings.json` and, under Git Bash, ran it in a way that denied every tool call while reporting success; builders delivered code they had never run (KP-038).

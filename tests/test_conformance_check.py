@@ -31,6 +31,32 @@ jobs:
 """
 
 
+INVENTORY = """# Inventory — Thing
+Reflected through: none
+Updated: 2026-10-06
+
+## Features
+| Feature | What it does | Where | Tests | Since |
+|---|---|---|---|---|
+| Search | finds things | app/search.py | tests/test_search.py | TASK-001 |
+
+## Resources
+| Name | Kind | Where it lives | Used by | Provided |
+|---|---|---|---|---|
+| OPENROUTER_API_KEY | secret | key file outside the Workspace; limit $20/month, set 2026-10-06 | app/llm.py | 2026-10-01 |
+| Socket account | account | the owner's Socket login; no spend possible | CI | 2026-09-01 |
+
+## Decisions
+| Decision | Reason | Settled | Revisit only if |
+|---|---|---|---|
+| Development data: a development build reads `data/dev.sqlite`, chosen by the `APP_ENV=dev` marker, and refuses the installed product's store | two live databases were upgraded by development builds | 2026-10-06, owner | the product gains a second store |
+
+## Deferred
+| Item | Why deferred | Since | Owner decision needed |
+|---|---|---|---|
+"""
+
+
 def make_workspace(root, conformant=True):
     (root / "docs" / "diagrams").mkdir(parents=True)
     (root / "docs" / "mockups").mkdir()
@@ -38,6 +64,7 @@ def make_workspace(root, conformant=True):
     (root / ".github" / "workflows").mkdir(parents=True)
     for name in ("PROJECT_STATUS.md", "INVENTORY.md", "REQUIREMENTS.md", "RUN_PARAMETERS.md", "ROSTER.json", "DESIGN.md"):
         (root / "docs" / name).write_text("x\n", encoding="utf-8")
+    (root / "docs" / "INVENTORY.md").write_text(INVENTORY, encoding="utf-8")
     (root / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nBridge version: %s\nPhase: building\n" % VERSION, encoding="utf-8")
     (root / "docs" / "diagrams" / "INDEX.md").write_text("# Diagrams\n", encoding="utf-8")
     (root / ".cursor" / "rules" / "workspace-boundary.mdc").write_text("rule\n", encoding="utf-8")
@@ -300,3 +327,28 @@ def test_claude_code_hooks_in_the_projects_settings_are_a_missing_floor(tmp_path
     (root / ".claude" / "settings.json").write_text('{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "x"}]}]}}', encoding="utf-8")
     rc, out = run(root / "Workspace")
     assert verdict(out, "No Claude Code hooks in the project's .claude")[0] == "NOTE" and "../.claude/settings.json (hooks)" in out, "the root's .claude is read only when a builder's workspace is the root: " + out
+
+
+def test_the_three_floors_of_release_a1b(tmp_path):
+    """A paid provider without a recorded limit, no development-data decision, and an
+    adapter of an external service without recorded replies are each reported."""
+    make_workspace(tmp_path)
+    rc, out = run(tmp_path)
+    assert verdict(out, "Spending limit recorded")[0] == "OK" and verdict(out, "Development data kept apart")[0] == "OK", out
+    assert verdict(out, "Adapters tested against recorded replies")[0] is None, "no adapter, nothing to say"
+    inv = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8")
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv.replace("; limit $20/month, set 2026-10-06", "").replace("Development data: a development build", "Data: a development build"), encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Spending limit recorded")[0] == "MISSING" and "OPENROUTER_API_KEY" in out and "Socket" not in verdict(out, "Spending limit recorded")[1], out
+    assert verdict(out, "Development data kept apart")[0] == "MISSING", out
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "llm.py").write_text("import httpx\n\ndef ask(q):\n    return httpx.get(q)\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "MISSING" and "llm" in out, out
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_other.py").write_text("def test_x():\n    assert True  # replays recorded replies\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "NOTE" and "llm" in out, out
+    (tmp_path / "tests" / "test_llm.py").write_text("from app import llm  # recorded replies in cassettes\n", encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "OK", out

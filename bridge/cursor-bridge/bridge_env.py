@@ -96,6 +96,13 @@ def make_link(link, target):
     return None
 
 
+# Windows resolves its known folders (Local AppData, Documents, Desktop, ...) from USERPROFILE,
+# and a program handed one that does not exist falls back to the current directory, the
+# builder's checkout (reAngle's Workspace got a PowerShell cache folder that way, 2026-10-06).
+SKELETON = (os.path.join("AppData", "Local"), os.path.join("AppData", "LocalLow"), os.path.join("AppData", "Roaming"),
+            "Documents", "Desktop", "Downloads")
+
+
 def agent_home(env=None, create=True, repair=False):
     """(path, problem) of the home folder a builder or reviewer run gets instead of the
     owner's (KP-038). It holds one thing: a link `.cursor` to the owner's real `~/.cursor`,
@@ -121,6 +128,12 @@ def agent_home(env=None, create=True, repair=False):
         if not is_link(link):
             return home, "%s is a plain folder, not a link to %s" % (link, target)
         if leads_to(link, target):
+            if create:
+                for rel in SKELETON:
+                    try:
+                        os.makedirs(os.path.join(home, rel), exist_ok=True)
+                    except OSError:
+                        pass
             return home, None
         if not repair:
             return home, "%s is a link that does not lead to %s" % (link, target)
@@ -133,6 +146,8 @@ def agent_home(env=None, create=True, repair=False):
     try:
         os.makedirs(home, exist_ok=True)
         os.makedirs(target, exist_ok=True)
+        for rel in SKELETON:
+            os.makedirs(os.path.join(home, rel), exist_ok=True)
     except OSError as e:
         return home, "cannot prepare %s (%s)" % (home, e)
     err = make_link(link, target)
