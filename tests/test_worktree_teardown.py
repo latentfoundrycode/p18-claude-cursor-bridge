@@ -88,8 +88,29 @@ def test_why_the_plain_removal_is_refused_by_the_guard(repo, tmp_path):
     rc, out = run(repo, str(wt))
     assert rc == 2 and (target / "keep.txt").is_file(), "the program refuses and touches nothing: " + out
     p = subprocess.run(["git", "-C", str(repo), "worktree", "remove", str(wt)], capture_output=True, text=True)
-    assert p.returncode == 0 and not wt.exists(), p.stdout + p.stderr
-    assert not (target / "keep.txt").exists(), "git followed the gitignored junction in a plain removal; this is why only the program removes worktrees"
+    version = subprocess.run(["git", "--version"], capture_output=True, text=True).stdout.strip()
+    if (target / "keep.txt").exists():
+        # Observed on Git for Windows 2.53: the target is emptied. The CI runner's 2.55 exited 0 and
+        # left the folder (second pass, S1). The guard and the program do not depend on either.
+        pytest.skip("%s: plain removal exit %d, worktree %s, target intact; the premise is not shown on this git" % (
+            version, p.returncode, "gone" if not wt.exists() else "left behind"))
+    assert p.returncode == 0 and not wt.exists(), "git followed the gitignored junction in a plain removal (%s); this is why only the program removes worktrees: %s" % (version, p.stdout + p.stderr)
+
+
+def test_a_leftover_folder_is_checked_for_links_whether_git_lists_it_or_not(repo, tmp_path):
+    """Second pass, S7: after a failed removal git drops the registration but leaves the folder;
+    the program still refuses with the list when a link is inside, and says so when none is."""
+    leftover = tmp_path / "Worktrees" / "LEFTOVER"
+    leftover.mkdir()
+    (leftover / "a.txt").write_text("a\n", encoding="utf-8")
+    target = tmp_path / "elsewhere"
+    target.mkdir()
+    link(leftover / "node_modules", target)
+    rc, out = run(repo, str(leftover))
+    assert rc == 2 and "link(s) inside" in out and "node_modules" in out and target.is_dir(), out
+    remove_link(leftover / "node_modules")
+    rc, out = run(repo, str(leftover))
+    assert rc == 2 and "not a worktree of this repository" in out and "holds no link" in out and leftover.is_dir(), out
 
 
 def test_a_locked_worktree_is_named_as_such(repo, tmp_path):

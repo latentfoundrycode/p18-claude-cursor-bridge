@@ -44,6 +44,7 @@ Updated: 2026-10-06
 | Name | Kind | Where it lives | Used by | Provided |
 |---|---|---|---|---|
 | OPENROUTER_API_KEY | secret | key file outside the Workspace; limit $20/month, set 2026-10-06 | app/llm.py | 2026-10-01 |
+| BFL_API_KEY | secret | key file outside the Workspace; limit $5/month, set 2026-10-06 | app/bfl.py | 2026-10-01 |
 | Socket account | account | the owner's Socket login; no spend possible | CI | 2026-09-01 |
 
 ## Decisions
@@ -339,14 +340,19 @@ def test_the_three_floors_of_release_a1b(tmp_path):
     inv = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8")
     (tmp_path / "docs" / "INVENTORY.md").write_text(inv.replace("; limit $20/month, set 2026-10-06", "; a rate limit of 60/min").replace("Development data: a development build", "Data: a development build")
                                                      .replace("| CI | 2026-09-01 |\n", "| CI | 2026-09-01 |\n"
-                                                              + "| POSTGRES_PASSWORD | secret | .env, a local development service | tests | n/a |\n"
+                                                              + "| POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD | secret | generated per instance for the local Postgres | tests | n/a |\n"
+                                                              + "| AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY | secret | the MinIO login, generated per instance | app | n/a |\n"
                                                               + "| THING_API_TOKEN | secret | the product's own per-instance token | app | n/a |\n"
                                                               + "| OpenRouter (rule judge) | external API | key file; limit $10/month, set 2026-10-06 | app | 2026-10-01 |\n"
-                                                              + "| HF_TOKEN | repo secret | GitHub secret | CI | 2026-10-01 |\n"), encoding="utf-8")
+                                                              + "| HF_TOKEN | repo secret | GitHub secret | CI | 2026-10-01 |\n"
+                                                              + "| ANTHROPIC_API_KEY | secret | key file; spending limit not set yet | app | 2026-10-01 |\n"
+                                                              + "| SMPL-X model files (MPI account) | account | downloaded once with the MPI login | assets | 2026-09-01 |\n"
+                                                              + "| Claude Code MCP registration | registration | the owner's Claude Code settings | tooling | 2026-09-01 |\n"), encoding="utf-8")
     rc, out = run(tmp_path)
     kind, detail = verdict(out, "Spending limit recorded")
-    assert kind == "MISSING" and "OPENROUTER_API_KEY" in detail and "HF_TOKEN" in detail and "2 key" in detail, out
-    assert "POSTGRES" not in detail and "THING_API_TOKEN" not in detail and "Socket" not in detail and "OpenRouter (rule judge)" not in detail, "local services, the product's own tokens, no-spend accounts and limited rows are not reported: " + detail
+    assert kind == "MISSING" and "OPENROUTER_API_KEY" in detail and "HF_TOKEN" in detail and "ANTHROPIC_API_KEY" in detail and "3 key" in detail, out
+    for name in ("POSTGRES", "AWS_", "THING_API_TOKEN", "Socket", "OpenRouter (rule judge)", "SMPL", "MCP", "BFL"):
+        assert name not in detail, "local logins (every name in the cell), per-instance values, the product's own tokens, no-spend accounts, limited rows, model files and registrations are not reported: " + detail
     assert verdict(out, "Development data kept apart")[0] == "MISSING", out
     (tmp_path / "docs" / "INVENTORY.md").write_text(inv.replace("| Development data: a development build", "| **`Development data:`** a development build"), encoding="utf-8")
     rc, out = run(tmp_path)
@@ -359,22 +365,28 @@ def test_the_three_floors_of_release_a1b(tmp_path):
     rc, out = run(tmp_path)
     assert verdict(out, "run/ ignored")[0] is None, out
     (tmp_path / "app").mkdir()
-    (tmp_path / "app" / "llm.py").write_text("import httpx2\n\ndef ask(q):\n    return httpx2.get(q)\n", encoding="utf-8")
+    (tmp_path / "app" / "llm.py").write_text('import httpx2\nURL = "https://openrouter.ai/api/v1"\n\ndef ask(q):\n    return httpx2.get(URL)\n', encoding="utf-8")
+    (tmp_path / "app" / "store.py").write_text('import boto3\n\nclient = boto3.client("s3", endpoint_url="http://localhost:9000")  # the local MinIO store\n', encoding="utf-8")
     (tmp_path / "venvs" / "x" / "Lib" / "site-packages" / "aiohttp").mkdir(parents=True)
-    (tmp_path / "venvs" / "x" / "Lib" / "site-packages" / "aiohttp" / "client.py").write_text("import aiohttp\n", encoding="utf-8")
+    (tmp_path / "venvs" / "x" / "Lib" / "site-packages" / "aiohttp" / "client.py").write_text('import aiohttp\nURL = "https://openrouter.ai"\n', encoding="utf-8")
     (tmp_path / "venvs" / "x" / "pyvenv.cfg").write_text("home = x\n", encoding="utf-8")
     rc, out = run(tmp_path)
     kind, detail = verdict(out, "Adapters tested against recorded replies")
-    assert kind == "MISSING" and "llm" in detail and "client" not in detail, "library code in an environment is not the product's adapter: " + out
+    assert kind == "MISSING" and "llm" in detail and "client" not in detail and "store" not in detail, "library code in an environment and a local store's client are not adapters of a listed provider: " + out
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_other.py").write_text("def test_x():\n    assert True  # replays recorded replies\n", encoding="utf-8")
     rc, out = run(tmp_path)
     assert verdict(out, "Adapters tested against recorded replies")[0] == "MISSING", "a recorded word in an unrelated test proves nothing for llm: " + out
-    (tmp_path / "tests" / "test_llm.py").write_text("from app import llm  # recorded replies in cassettes\n", encoding="utf-8")
+    (tmp_path / "tests" / "test_llm.py").write_text('import httpx2\nfrom app import llm\n\n\ndef test_frozen_contract():\n    transport = httpx2.MockTransport(lambda r: httpx2.Response(200, json={"id": 1}))  # recorded replies, cassette, contract\n', encoding="utf-8")
     rc, out = run(tmp_path)
-    assert verdict(out, "Adapters tested against recorded replies")[0] == "OK", out
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "MISSING", "the video factory's shape: a mock transport fed by hand, with the words, is not evidence: " + out
+    (tmp_path / "tests" / "test_llm.py").write_text('import json\nfrom app import llm\n\nREPLY = json.load(open("tests/cassettes/openrouter.json"))\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "OK", "a cassette file the adapter's test loads is evidence: " + out
+    (tmp_path / "app" / "bfl.py").write_text('import httpx2\nBASE = "https://api.bfl.ml/v1"\n', encoding="utf-8")
     (tmp_path / "web").mkdir()
-    (tmp_path / "web" / "api.ts").write_text("export const get = (u: string) => fetch(u);\n", encoding="utf-8")
+    (tmp_path / "web" / "api.ts").write_text('export const models = () => fetch("https://openrouter.ai/api/v1/models");\n', encoding="utf-8")
+    (tmp_path / "web" / "health.ts").write_text('export const health = () => fetch("/api/health");\n', encoding="utf-8")
     rc, out = run(tmp_path)
     kind, detail = verdict(out, "Adapters tested against recorded replies")
-    assert kind == "MISSING" and "api" in detail, "a JavaScript adapter counts too: " + out
+    assert kind == "MISSING" and "api" in detail and "bfl" in detail and "health" not in detail, "a JavaScript call to a provider counts, a call to the product's own API does not: " + out

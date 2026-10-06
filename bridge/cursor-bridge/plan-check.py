@@ -115,25 +115,27 @@ DEMO_RX = re.compile(r"^(?:[-*]\s+)?\**Demonstration\**\s*:\s*(\S.*)$", re.I)
 
 
 def stages_without_demonstration(paths):
-    """Stage headings (`## ...`) that hold increments and no `Demonstration:` line (release A1b)."""
+    """[(stage, its increment IDs)] for the stage headings (`## ...`) that hold increments and
+    no `Demonstration:` line (release A1b)."""
     missing = []
     for path in paths:
-        stage, seen, items = None, False, False
+        stage, seen, ids = None, False, []
         for line in read(path).splitlines():
             m = STAGE_RX.match(line)
             if m:
-                if stage is not None and items and not seen:
-                    missing.append(stage)
-                stage, seen, items = m.group(1).strip(), False, False
+                if stage is not None and ids and not seen:
+                    missing.append((stage, ids))
+                stage, seen, ids = m.group(1).strip(), False, []
                 continue
             if stage is None:
                 continue
-            if HEAD_RX.match(line):
-                items = True
+            h = HEAD_RX.match(line)
+            if h:
+                ids.append(h.group(1))
             elif DEMO_RX.match(line.strip()):
                 seen = True
-        if stage is not None and items and not seen:
-            missing.append(stage)
+        if stage is not None and ids and not seen:
+            missing.append((stage, ids))
     return missing
 
 
@@ -157,8 +159,6 @@ def main():
         return 1
     items, order, fails = parse(paths)
     notes = []
-    for s in stages_without_demonstration(paths):
-        notes.append("stage '%s' names no Demonstration: line; the stage close runs it live (release A1b), add one from the stage's increments" % s[:60])
 
     kinds = {}
     for tid in order:
@@ -283,6 +283,9 @@ def main():
             merged = m
     inc = [t for t in order if kinds[t] == "increment"]
     done = {t for t in inc if t in merged}
+    for s, ids in stages_without_demonstration(paths):
+        if any(t not in merged for t in ids):                 # a closed stage is not noted
+            notes.append("stage '%s' names no Demonstration: line; the stage close runs it live (release A1b), add one from the stage's increments" % s[:60])
     ready = [t for t in inc if t not in done and not items[t]["deferred"] and deps[t] <= done]
     notes.insert(0, "%d increments in %d file(s); %d merged, %d deferred" % (
         len(inc), len(paths), len(done), sum(1 for t in inc if items[t]["deferred"])))

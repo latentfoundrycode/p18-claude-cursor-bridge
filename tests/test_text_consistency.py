@@ -119,16 +119,19 @@ def test_no_text_puts_a_dependency_or_a_licence_question_to_the_owner():
     """Review of 2026.10.06b, finding 4: one dependency rule (56); a licence is never the owner's
     question (the owner's instruction of 2026-10-01)."""
     offenders = []
-    for parts in (("commands", "supervisor.md"), ("agents", "secret-sentinel.md"), ("agents", "spec-packager.md"),
-                  ("cursor-bridge", "Cursor-Project-Configuration.md"), ("cursor-bridge", "Observability-Conventions.md"),
-                  ("cursor-bridge", "Delivery-Conventions.md"), ("cursor-bridge", "Merge-Verification-Policy.md")):
-        for i, line in enumerate(text(*parts).split("\n")):
-            low = line.lower()
-            if re.search(r"licen[cs]e", low) and re.search(r"\bask|escalat|question|the owner's call|clear(ed)? with the user", low) \
-                    and not re.search(r"\bnever\b|no licence|out of scope", low):
-                offenders.append("%s:%d %s" % (parts[-1], i + 1, line.strip()[:110]))
-            if re.search(r"dependenc", low) and re.search(r"\[escalate\]|escalate (any|the) [^.]*dep|clear(ed)? with the user", low) and "rule 56" not in low:
-                offenders.append("%s:%d %s" % (parts[-1], i + 1, line.strip()[:110]))
+    for root, dirs, files in os.walk(BRIDGE):
+        dirs[:] = [d for d in dirs if d != "design-seeds"]           # a seed's text about a brand's typefaces is not the bridge's rule
+        for name in sorted(files):
+            if not name.endswith(".md") or name.endswith(".snapshot.md") or name == "CHANGELOG.md":
+                continue
+            body = open(os.path.join(root, name), encoding="utf-8").read()
+            for i, line in enumerate(body.split("\n")):
+                low = line.lower()
+                if re.search(r"licen[cs]", low) and re.search(r"\bask|escalat|question|the owner's call|clear(ed)? with the user|reaches the owner|to the owner", low) \
+                        and not re.search(r"\bnever\b|no licence|out of scope", low):
+                    offenders.append("%s:%d %s" % (name, i + 1, line.strip()[:110]))
+                if re.search(r"dependenc", low) and re.search(r"\[escalate\]|escalate[sd]? (any|the|to the user)[^.]*dep|clear(ed)? with the user|new dependency/cost", low) and "rule 56" not in low:
+                    offenders.append("%s:%d %s" % (name, i + 1, line.strip()[:110]))
     assert not offenders, offenders
 
 

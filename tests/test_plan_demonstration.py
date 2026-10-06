@@ -35,9 +35,29 @@ Demonstration: the app starts from a cold start and shows an empty list.
 """
 
 
-def run(cwd, plan):
-    p = subprocess.run([sys.executable, PROG, "--no-git", "--plan", plan], capture_output=True, text=True, cwd=str(cwd))
+def run(cwd, plan, *extra):
+    p = subprocess.run([sys.executable, PROG, "--plan", plan] + (list(extra) or ["--no-git"]), capture_output=True, text=True, cwd=str(cwd))
     return p.returncode, p.stdout + p.stderr
+
+
+def git(repo, *args):
+    p = subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.invalid"] + list(args), capture_output=True, text=True)
+    assert p.returncode == 0, p.stdout + p.stderr
+
+
+def test_a_closed_stage_is_not_noted(tmp_path):
+    """Second pass of the 2026.10.06b review, S9: only a stage with an unmerged increment is noted."""
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "BUILD_PLAN.md").write_text(PLAN.replace("Demonstration: the app starts from a cold start and shows an empty list.\n", ""), encoding="utf-8")
+    git(tmp_path, "init", "-q", "-b", "main")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "TASK-001 - first")
+    rc, out = run(tmp_path, "docs/BUILD_PLAN.md", "--base", "main")
+    notes = [l for l in out.splitlines() if "names no Demonstration" in l]
+    assert len(notes) == 1 and "Stage 2 - search" in notes[0], "Stage 1 is closed (its increment merged): " + out
+    git(tmp_path, "commit", "-q", "--allow-empty", "-m", "TASK-002 - second")
+    rc, out = run(tmp_path, "docs/BUILD_PLAN.md", "--base", "main")
+    assert "names no Demonstration" not in out, out
 
 
 def test_a_stage_without_a_demonstration_line_is_noted_and_the_others_are_not(tmp_path):

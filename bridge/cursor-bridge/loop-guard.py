@@ -61,8 +61,8 @@ REASON = (
 )
 
 
-SHELL_FENCE = re.compile(r"^[ \t]{0,3}(?:```|~~~)[ \t]*(bash|sh|shell|zsh|powershell|pwsh|ps1|cmd|bat|batch|console)\b", re.M | re.I)
-TERMINAL_LINE = re.compile(r"^[ \t]{0,3}[*_`#>\- \t]*Terminal[*_`]*[ \t]*:", re.M | re.I)
+SHELL_FENCE = re.compile(r"^[ \t]*(?:```|~~~)[ \t]*(bash|sh|shell|zsh|powershell|pwsh|ps1|cmd|bat|batch|console)\b", re.M | re.I)
+TERMINAL_LINE = re.compile(r"^[ \t]*[*_`#>]*[ \t]*(?:[-*+]|\d+[.)])?[ \t]*[*_`#>]*[ \t]*Terminal\b[^:\n]{0,40}:", re.M | re.I)
 RUN_SHEET_REASON = (
     "Run-sheet rule (Claude-Cursor Bridge, rule 27): your last message holds a shell block and "
     "names no terminal (no line begins `Terminal:`). A run sheet follows the one template: a line "

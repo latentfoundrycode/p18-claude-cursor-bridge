@@ -119,7 +119,6 @@ Rules while applying **Now** items:
   no data of the owner's` where that is true. A brief packaged without it stops the builder.
 - A stage whose plan names no `Demonstration:` line (release A1b) gets one now, from the
   stage's increments, for every stage not yet closed.
-
 - Configuration goes through `cursor-configurator` and is **append-only**: add the missing
   file, the missing hook entry, the missing pre-commit line; never rewrite an existing
   config. Commit the configuration change as its own checkpoint, exactly like Phase 5.

@@ -82,23 +82,24 @@ def main(argv):
         print("usage: python worktree-teardown.py <worktree path> [--dry-run]")
         return 2
     path = os.path.abspath(args[0])
+    links = links_inside(path) if os.path.isdir(path) else []      # any folder: a leftover too
+    if links:
+        print("worktree-teardown: refused - %d link(s) inside %s; git would follow them into their targets, forced or not. Remove each link by itself first (rmdir on the link, never through it), then run again:" % (len(links), path))
+        for p, t in links[:20]:
+            print("  %s -> %s" % (p, t))
+        return 2
     known = worktrees()
     if known is None:
         print("worktree-teardown: not inside a git repository")
         return 2
     key = os.path.normcase(path)
     if key not in known:
-        print("worktree-teardown: refused - %s is not a worktree of this repository (git worktree list shows: %s)" % (path, ", ".join(sorted(known)) or "none"))
+        print("worktree-teardown: refused - %s is not a worktree of this repository (git worktree list shows: %s)%s" % (
+            path, ", ".join(sorted(known)) or "none", "; it holds no link, so a leftover folder may go with a plain recursive delete" if os.path.isdir(path) else ""))
         return 2
     main_tree = next(iter(known))                      # git lists the main checkout first
     if key == main_tree:
         print("worktree-teardown: refused - %s is the main checkout, not a worktree" % path)
-        return 2
-    links = links_inside(path)
-    if links:
-        print("worktree-teardown: refused - %d link(s) inside %s; a forced removal would follow them into their targets. Remove each link by itself first (rmdir on the link, never through it), then run again:" % (len(links), path))
-        for p, t in links[:20]:
-            print("  %s -> %s" % (p, t))
         return 2
     if dry:
         print("worktree-teardown: %s holds no link; would run git worktree remove (without --force) and git worktree prune (dry run)" % path)

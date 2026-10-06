@@ -162,8 +162,55 @@ def tracked_files(ws):
     return out
 
 
-LIMIT_RECORDED = re.compile(r"spend(ing)?\s+limit|\blimit\s*[:=]?\s*(of\s*)?([$\u20ac\u00a3]\s*\d|\d+(\.\d+)?\s*(USD|EUR|GBP|CHF)\b)|no spend possible", re.I)
-CANNOT_CHARGE = re.compile(r"\blocal (service|development)\b|throwaway|the product's own|own (per-instance )?token|per-instance", re.I)
+LIMIT_RECORDED = re.compile(r"\blimit\s*[:=]?\s*(of\s*)?([$\u20ac\u00a3]\s*\d|\d+(\.\d+)?\s*(USD|EUR|GBP|CHF)\b)|no spend possible", re.I)   # an amount, or the words; "not set yet" is not recorded
+CANNOT_CHARGE = re.compile(r"\blocal (service|development|postgres|minio|store)\b|throwaway|the product's own|own (per[- ]instance )?token|per[- ]instance|generated per", re.I)
+KIND_CANNOT_CHARGE = re.compile(r"\b(store|files?|registration|mcp)\b", re.I)   # a store, model files, a registration: nothing to charge
+GENERIC_WORDS = {"api", "key", "keys", "token", "tokens", "secret", "secrets", "account", "access", "id", "user", "password", "pass", "file",
+                 "store", "the", "and", "of", "for", "rule", "judge", "repo", "github", "provider", "app", "dev", "test", "local", "root",
+                 "url", "host", "endpoint", "login", "credential", "credentials", "model", "models", "files"}
+SYNONYMS = {"hf": ("hf", "huggingface"), "gh": ("gh", "github"), "oai": ("oai", "openai"), "gcp": ("gcp", "google")}
+EVIDENCE_RX = re.compile(r"\bvcr\b|\brespx\b|responses\.activate|\bnock\b|\bmsw\b|(cassettes?|fixtures?|recorded|recordings|replies|contracts?)[/\\][\w.-]+\.(json|ya?ml|har|txt)\b", re.I)
+
+
+def chargeable_rows(sections, words):
+    """The inventory's Resources rows that can charge the owner: a key, account, provider or API
+    that is not a local service's login, the product's own token, a test-only value, a store,
+    model files or a registration. [(cells, name)]"""
+    rows = []
+    for cells in sections.get("Resources", []):
+        if len(cells) < 2 or not re.search(r"secret|account|api|provider|external|key|token", cells[1], re.I) or re.search(r"test-only", cells[1], re.I):
+            continue
+        name = cells[0].strip("`* ")
+        idents = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", name)
+        if any(LOCAL_SERVICE.match(i) or i.split("_")[0].lower() in words for i in idents):
+            continue                                       # every name in the cell is looked at
+        if KIND_CANNOT_CHARGE.search(name + " " + cells[1]) or CANNOT_CHARGE.search(" ".join(cells)):
+            continue
+        rows.append((cells, name))
+    return rows
+
+
+def provider_words(rows):
+    """{word: row name}: the words of each chargeable row's name that can identify its adapter."""
+    found = {}
+    for cells, name in rows:
+        for n in re.findall(r"[A-Za-z][A-Za-z0-9]*", name):
+            w = n.lower()
+            if len(w) >= 2 and w not in GENERIC_WORDS:
+                found.setdefault(w, name[:40])
+    return found
+
+
+def names_provider(text, providers):
+    """The providers a source file names in a string literal (a host, a key name, a service)."""
+    low = text.lower()
+    hits = []
+    for w in providers:
+        for alt in SYNONYMS.get(w, (w,)):
+            if re.search(r"""["'`][^"'`\n]*(?<![a-z0-9])%s""" % re.escape(alt), low):
+                hits.append(w)
+                break
+    return hits
 
 
 def project_words(ws):
@@ -446,16 +493,8 @@ def main():
     if inv:
         # a spending limit at every provider, API or account that can charge: its Resources row says so
         unlimited = []
-        for cells in sections.get("Resources", []):
-            if len(cells) < 2 or not re.search(r"secret|account|api|provider|external|key|token", cells[1], re.I) or re.search(r"test-only", cells[1], re.I):
-                continue
-            name = cells[0].strip("`* ")
-            first = re.match(r"[A-Za-z_][A-Za-z0-9_]*", name)
-            ident = first.group(0) if first else ""
-            row = " ".join(cells)
-            if LOCAL_SERVICE.match(ident) or (ident and ident.split("_")[0].lower() in words) or CANNOT_CHARGE.search(row):
-                continue                                   # a local service's password or the product's own token cannot charge
-            if LIMIT_RECORDED.search(row):
+        for cells, name in chargeable_rows(sections, words):
+            if LIMIT_RECORDED.search(" ".join(cells)):
                 continue
             unlimited.append(name[:40])
         if unlimited:
@@ -469,11 +508,14 @@ def main():
         else:
             add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
 
-    # --- every adapter of an external service is tested against recorded replies (rule 37; A1b item 5):
-    #     the project's own tracked files only, judged per adapter
-    files = tracked_files(ws)
+    # --- every adapter of a listed provider is tested against recorded replies (rule 37; A1b item 5):
+    #     the providers come from the inventory's chargeable rows, the adapters from the project's own
+    #     tracked files that name one in a string (a host, a key name), the evidence from each
+    #     adapter's own tests: a cassette or fixture file loaded, or vcr/respx/responses.activate/nock/msw
+    providers = provider_words(chargeable_rows(sections, words))
+    files = tracked_files(ws) if providers else []
     client_rx = re.compile(r"^\s*(?:from|import)\s+(requests|httpx2?|aiohttp|urllib3|urllib\.request|http\.client|openai|anthropic|modal|replicate|stripe|boto3|botocore|google\.cloud|azure|huggingface_hub|supabase|twilio|sendgrid|slack_sdk)\b", re.M)
-    js_client_rx = re.compile(r"\bfetch\(|\baxios\b")
+    js_client_rx = re.compile(r"""\bfetch\(\s*[`"'](?:https?:)?//(?!localhost|127\.0\.0\.1|0\.0\.0\.0)|\baxios\b""")
     adapters, tests = {}, []
     for rel in files:
         n = os.path.basename(rel)
@@ -482,25 +524,22 @@ def main():
             text = read(os.path.join(ws, rel)) or ""
             if is_test:
                 tests.append(text)
-            elif client_rx.search(text):
+            elif client_rx.search(text) and names_provider(text, providers):
                 adapters[os.path.splitext(n)[0]] = rel
         elif n.endswith((".js", ".ts", ".mjs", ".tsx")) and not n.endswith(".d.ts"):
             text = read(os.path.join(ws, rel)) or ""
             if is_test:
                 tests.append(text)
-            elif js_client_rx.search(text):
+            elif js_client_rx.search(text) and names_provider(text, providers):
                 adapters[re.sub(r"\.(js|ts|mjs|tsx)$", "", n)] = rel
     if adapters:
-        cassettes = any(re.search(r"(^|/)(cassettes|recorded|recordings|contracts|contract_fixtures|vcr|__snapshots__)(/|$)", rel, re.I) for rel in files)
-        evidence_rx = re.compile(r"recorded|cassette|vcr|respx|responses|contract|replay|nock|msw", re.I)
         without = []
         for name in sorted(adapters):
             name_rx = re.compile(r"\b%s\b" % re.escape(name))
-            naming = [t for t in tests if name_rx.search(t)]
-            if not naming or not (cassettes or any(evidence_rx.search(t) for t in naming)):
+            if not any(name_rx.search(t) and EVIDENCE_RX.search(t) for t in tests):
                 without.append(name)
         if without:
-            add("MISSING", "Adapters tested against recorded replies", "%d adapter(s) of an external service without a test that names them and replays recorded replies (rule 37; A1b item 5): %s%s" % (
+            add("MISSING", "Adapters tested against recorded replies", "%d adapter(s) of a listed provider without a test that names them and replays recorded replies, that is a cassette or fixture file the test loads, or vcr, respx, responses.activate, nock or msw in that test; a mock transport fed by hand is an invented reply (rule 37; A1b item 5): %s%s" % (
                 len(without), ", ".join(without[:6]), " and %d more" % (len(without) - 6) if len(without) > 6 else ""))
         else:
             add("OK", "Adapters tested against recorded replies")

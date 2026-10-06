@@ -257,7 +257,8 @@ needs to be to be followed without guessing.
 user will know it worked ("when this is done, the CI job will show a green Socket step").
 
 **2. The terminal — a line that begins `Terminal:`, with how to open it.** The loop guard sends
-back a message that holds a shell block and no such line (supervisor rule 27). Exactly one of:
+back a message that holds a shell block and no such line (supervisor rule 27); a command you ran
+yourself is not a run sheet and goes in a plain block (no language tag) or inline. Exactly one of:
 
 | Name it as | How to open it | Use it for |
 |---|---|---|

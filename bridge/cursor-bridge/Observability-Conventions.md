@@ -9,8 +9,8 @@ running render — as **measurable checks**, not a screen for the human to eyeba
 It is a **design-time default for UI-bearing projects** (those that produced a Phase-1
 screen-and-state inventory), **not a universal law**: a CLI or library has no inventory and
 opts out. The **supervisor owns the dial** and records the choice in Phase 2
-(`DESIGN.md` and the Resources of `docs/INVENTORY.md`); it escalates to the user only where a new dependency/cost is
-involved (drivers — see §Escalations). This doc is the master contract; each project
+(`DESIGN.md` and the Resources of `docs/INVENTORY.md`); a driver dependency follows the one
+dependency rule (supervisor rule 56; see §Drivers). This doc is the master contract; each project
 instantiates it as a **`DESIGN.md` "Observability & Verifiability" section**.
 
 ---

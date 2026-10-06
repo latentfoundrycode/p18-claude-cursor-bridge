@@ -25,8 +25,9 @@ the brief.
 
 - **[Claude]** — file-based; Claude can create or edit it directly and commit it.
 - **[Escalate]** — needs a secret, a dashboard/Customize-UI action Claude cannot reach,
-  a new dependency, or a design decision. Route through the human gate; never silently
-  do or skip it.
+  or a design decision (what the software does). A new dependency is not one: it follows
+  supervisor rule 56 (the gate admits, the supervisor records, the owner is asked only for a
+  consequence they bear). Route the rest through the human gate; never silently do or skip it.
 - **[Skip]** — interactive- or cloud-only, or neutralised by `--force`. Not applicable
   to the headless bridge. Listed so the reason is on record.
 
@@ -72,8 +73,9 @@ A worktree (under `<project-root>/Worktrees/`, supervisor rule 39) that contains
 `git worktree remove --force` **follows a live junction and deletes the real target**, and a
 `rmdir` issued *through Git Bash* can silently fail on a mangled path — leaving the junction
 alive for `--force` to follow. This has destroyed a main checkout's `node_modules` in
-practice. Never hand-roll teardown; since release A1b the bridge's program does it, and the
-guard hook refuses the forced form outright:
+practice, and an ordinary `git worktree remove` follows the junction as the forced form does.
+Never hand-roll teardown; since release A1b the bridge's program does it, and the guard hook
+refuses the git command outright:
 
 1. `python ~/.claude/cursor-bridge/worktree-teardown.py <worktree>` — it looks at every entry
    inside without following links, **refuses while any junction or symbolic link is inside**
@@ -94,7 +96,7 @@ built its *own* `.venv` or `node_modules` (no link) can fail `git worktree remov
 is not the junction hazard: git's metadata is clean and nothing outside the worktree is at
 risk. Do not answer a lock with `--force`, which does not unlock anything. Wait and retry
 (three attempts, ~5 s apart); if it still fails, leave the directory and remove it at the
-next checkpoint with a plain recursive delete once `worktree-teardown.py` has confirmed it contains no link (its refusal lists any).
+next checkpoint with a plain recursive delete once `worktree-teardown.py`, run on that folder, has said it holds no link (it looks for links in any folder it is given, a leftover that git no longer lists included, and refuses with the list when it finds one).
 Record which case it was in `PROJECT_STATUS.md` so the two are never confused (KP-023).
 
 **Warm environment (performance):** rebuilding a from-source toolchain (a mypy build, a large
