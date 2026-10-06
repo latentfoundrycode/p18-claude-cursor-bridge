@@ -20,3 +20,14 @@ def load_program(name):
 @pytest.fixture
 def program():
     return load_program
+
+
+@pytest.fixture(autouse=True)
+def home_of_the_tests(tmp_path_factory, monkeypatch):
+    """No test touches the owner's home: ~ is a temporary folder with an empty .cursor, so the
+    agent's home folder (KP-038) links to that and never to the owner's real ~/.cursor."""
+    home = tmp_path_factory.mktemp("home")
+    (home / ".cursor").mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    return home

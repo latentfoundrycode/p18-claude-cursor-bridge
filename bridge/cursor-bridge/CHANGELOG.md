@@ -15,6 +15,28 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.06a
+
+**Urgent fix from release A1a's trial (reAngle ISS-013): the builder and Review B get their shell back.** Since 2026-10-04 cursor-agent on the owner's computer imported the bridge's own Claude Code hook from `~/.claude/settings.json` and, under Git Bash, ran it in a way that denied every tool call while reporting success; builders delivered code they had never run (KP-038).
+
+**What changed**
+- **Every builder and reviewer run gets a home folder of its own** (`%USERPROFILE%\.cursor-bridge\agent-home\`), holding a link `.cursor` to the owner's real `~/.cursor` and nothing else. cursor-agent finds no `~/.claude/settings.json` to import hooks from (Cursor's documented default, with no switch in the CLI), and the owner's `.ssh`, `.aws`, `.docker` and other stores are no longer found by default (not out of reach: the run is the owner's account, and the real controls stay the withheld tokens, the empty `gh` folder and git without a credential helper). git keeps the owner's global configuration through `GIT_CONFIG_GLOBAL`, and the caches the builders' tools read by default are passed through by their own variables (`HF_HUB_CACHE`, `TORCH_HOME`, `PUPPETEER_CACHE_DIR`; never `HF_HOME` or `XDG_CACHE_HOME`, which would show the owner's token file again), so a test that loads a model finds the 311 GB of models already on the computer and does not download them anew; a gated model still needs the project's own key handling, as 2026.10.04e intended. The shim (`cursor-agent.shim`) and the Python recipe (`bridge_env.stripped_env`) apply one rule alike: the link exists, is a link and leads to the real `~/.cursor`, or the run is refused with exit 125 instead of started into silent denial. `bridge-install.py` prepares the folder, repairs a link that leads nowhere or elsewhere (by removing the link itself, never through it; a plain folder in its place is never removed), and runs a write-and-rename through a scratch link beside it, the operation cursor-agent's state writes need and that fails under some folders on the owner's computer; `bridge-check.py` verifies both.
+- **The guard hook refuses the agent started around the shim** (`agent.cmd`, `agent.ps1`, `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, and a bare `agent` without a path or from the CLI's own folder; also as the program a shell wrapper names after `/c`, `-c`, `-Command` or `-File`, though not inside a quoted string, which the guard has never read), which would run it with the owner's real home and identity. The agent is started as `cursor-agent`, or through `bridge-run.py`. A project's own `./agent` is not refused.
+- **The conformance check reports Claude Code hooks or plugins in a project's own `.claude/settings*.json`** (the root and `Workspace/`): the relocation does not cover them, and cursor-agent imports them the same way.
+- Tests: the two recipes agree on the home folder and the caches as on everything else, and refuse alike a plain folder, a link that leads nowhere and one that leads elsewhere; the installer repairs the last two and never the first; the launcher's child runs in the home; the check reports a missing or damaged link; the guard's refusals; the conformance floor; no test touches the owner's real home.
+
+**Running projects must**
+- *(all phases)* Install with the three steps of the setup guide's Step 3, restart the app, run `/calibrate-bridge`. Nothing in the project's files changes.
+- *(building, changing)* Every builder run and every Review B since 2026-10-04 ran without a working shell: builders delivered unrun code and the supervisor ran the checks (reAngle's record). From the next delegation on, the builder runs its own tests again, and the acceptance criteria the supervisor had been verifying by hand go back to the builder; Review B executes again where its mandate says so. A builder's first test run that needs a tool's cache other than the three passed through (for instance `~/.cache/hyperframes`) downloads it again, once.
+- *(all phases, record-keeping)* At the next reflection point, mark every Review B verdict given between 2026-10-04 and the install of this release as "without execution" in the project's records (`CHANGES.md` or the status file's notes): CI gated every merge, so nothing unchecked reached `main`, but the record must not claim an execution that did not happen.
+
+**If rolled back**
+- *(all phases)* Nothing to restore in a project's files. The builder's shell is blocked again from the next delegation on (KP-038).
+
+**Field acceptance on the trial project.** The next builder run's note shows that it ran its commands (tests, lint, the mutation driver), the next Review B output holds no `Hook blocked`, and the supervisor's probe of 2026-10-06 (`PROBE-059b`) passes when run again.
+
+---
+
 ## 2026.10.05a
 
 **Release A1a of the restructuring plan: the bridge's own house.** Its sources leave the folder where a session working on the bridge loaded them half-edited; a release can be taken back; four contradictions in the bridge's own text are removed.

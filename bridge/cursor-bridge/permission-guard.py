@@ -5,7 +5,11 @@ refuses the two actions the loop must never take, in every permission mode (KP-0
   - merging a pull request past the repository's rules: `gh pr merge … --admin`, and the
     REST route `gh api … /pulls/<n>/merge` with a method that writes;
   - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,
-    `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec.
+    `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;
+  - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,
+    `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or
+    `powershell`), which would run it with the owner's real home and identity (KP-038): the
+    agent is started as `cursor-agent`, or through bridge-run.py.
 
 It parses the command rather than matching a pattern, so chains, wrappers and quoting do
 not hide the action, and `git commit -m "never use --force"` is not refused. Deny rules in
@@ -23,6 +27,33 @@ import shlex
 import sys
 
 WRITE_METHODS = ("PUT", "POST", "PATCH", "DELETE")
+AROUND_THE_SHIM = ("agent", "agent.cmd", "agent.ps1", "cursor-agent.cmd", "cursor-agent.ps1", "cursor-agent.exe")
+SHELLS = ("cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe")
+PROGRAM_AFTER = ("/c", "/k", "-c", "-command", "-file")
+
+
+def base(tok):
+    return tok.lower().split("/")[-1].split("\\")[-1]
+
+
+def around_the_shim(tok):
+    """The Cursor agent started by a name other than `cursor-agent` (KP-038): one of the CLI's
+    own launcher names, or a bare `agent` without a path or from the CLI's own folder; a
+    project's own `./agent` or `dist/agent.exe` is not it."""
+    name = base(tok)
+    if name not in AROUND_THE_SHIM:
+        return False
+    if name == "agent" and ("/" in tok or "\\" in tok) and "cursor-agent" not in tok.lower():
+        return False
+    return True
+
+
+def program_behind(w):
+    """The program a shell wrapper runs: the token after /c, /k, -c, -Command or -File."""
+    for i, tok in enumerate(w[1:-1], 1):
+        if tok.lower() in PROGRAM_AFTER:
+            return w[i + 1]
+    return None
 
 
 def split_commands(text):
@@ -117,7 +148,10 @@ def check(command):
         w = strip_prefix(words(simple))
         if not w:
             continue
-        head = w[0].lower().split("/")[-1].split("\\")[-1]
+        head = base(w[0])
+        started = w[0] if around_the_shim(w[0]) else (program_behind(w) if head in SHELLS else None)
+        if started and around_the_shim(started):
+            return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % started
         if is_git(w):
             sub, args = git_subcommand(w)
             if sub == "push":

@@ -134,9 +134,13 @@ def probe(model_id):
     if launcher is None:
         return False, "cursor-agent not found (PATH or %LOCALAPPDATA%/cursor-agent)"
     try:
+        env = bridge_env.stripped_env()
+    except bridge_env.AgentHomeError as e:
+        return False, str(e)
+    try:
         p = subprocess.run(launcher + ["-p", "-f", "--model", model_id, PROBE_PROMPT],
                            capture_output=True, text=True, timeout=PROBE_TIMEOUT, creationflags=NO_WINDOW,
-                           env=bridge_env.stripped_env())
+                           env=env)
     except subprocess.TimeoutExpired:
         return False, "timeout after %ds" % PROBE_TIMEOUT
     except FileNotFoundError:

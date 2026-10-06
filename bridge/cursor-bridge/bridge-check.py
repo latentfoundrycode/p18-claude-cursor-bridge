@@ -13,7 +13,9 @@ Two files are not fingerprinted but compared by content (KP-030, KP-032):
   everything else in it is the owner's and is ignored, except a hook that runs a
   cursor-bridge program which is not installed: that is reported, because it blocks;
 - the cursor-agent shim at %LOCALAPPDATA%/cursor-agent/cursor-agent must equal
-  cursor-bridge/cursor-agent.shim (Windows only).
+  cursor-bridge/cursor-agent.shim (Windows only);
+- the agent's home folder %USERPROFILE%/.cursor-bridge/agent-home must hold its .cursor
+  link (KP-038; Windows only).
 
 Usage:  python ~/.claude/cursor-bridge/bridge-check.py [--root <path-to-.claude>] [--quiet]
         python bridge/cursor-bridge/bridge-check.py --root bridge --sources [--quiet]
@@ -114,6 +116,24 @@ def check_shim():
     return "OK", dst
 
 
+def check_agent_home():
+    """Return (verdict, detail) for the home folder builder and reviewer runs get (KP-038)."""
+    if sys.platform != "win32":
+        return "SKIP", "not Windows"
+    sys.path.insert(0, HERE)
+    try:
+        import bridge_env
+    except ImportError as e:
+        return "STALE", "bridge_env.py cannot be imported (%s)" % e
+    home, problem = bridge_env.agent_home(create=False)
+    if problem is None:
+        problem = bridge_env.rename_probe()
+        if problem is None:
+            return "OK", home
+        return "STALE", problem
+    return ("MISSING" if "does not exist" in problem else "STALE"), problem
+
+
 def main():
     argv = sys.argv[1:]
     root = os.path.abspath(os.path.join(HERE, os.pardir))
@@ -166,6 +186,14 @@ def main():
         missing += 1; problems.append(("MISSING", "cursor-agent shim (%s)" % detail))
     elif verdict == "STALE":
         stale += 1; problems.append(("STALE", "cursor-agent shim (%s)" % detail))
+    # the agent's home folder (Windows): its .cursor link must be there (KP-038)
+    verdict, detail = ("SKIP", "") if sources else check_agent_home()
+    if verdict == "OK":
+        ok += 1
+    elif verdict == "MISSING":
+        missing += 1; problems.append(("MISSING", "agent home (%s)" % detail))
+    elif verdict == "STALE":
+        stale += 1; problems.append(("STALE", "agent home (%s)" % detail))
 
     extras = []
     for sub in ("commands", "agents", "skills", "cursor-bridge"):

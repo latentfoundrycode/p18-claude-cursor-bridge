@@ -71,6 +71,35 @@ def test_install_into_a_fresh_target_passes_the_check(tmp_path):
     settings = json.load(open(target / "settings.json", encoding="utf-8"))
     assert settings["permissions"]["deny"] == BRIDGE_SETTINGS["permissions"]["deny"]
     assert not (tmp_path / "localappdata" / "cursor-agent").exists(), "no Cursor CLI folder, so no shim is written"
+    agent_home = os.path.join(os.environ["USERPROFILE"], ".cursor-bridge", "agent-home")
+    assert "agent home: " + agent_home in out and os.path.lexists(os.path.join(agent_home, ".cursor")), out
+
+
+def test_the_check_reports_a_missing_or_damaged_agent_home(tmp_path):
+    """KP-038: the home folder builder and reviewer runs get must hold its .cursor link."""
+    target = tmp_path / ".claude"
+    assert run(INSTALL, tmp_path, "--target", str(target))[0] == 0
+    link = __import__("pathlib").Path(os.environ["USERPROFILE"]) / ".cursor-bridge" / "agent-home" / ".cursor"
+    rc, out = run(CHECK, tmp_path, "--root", str(target))
+    assert rc == 0, out
+    if sys.platform != "win32":
+        pytest.skip("the check verifies the agent's home on Windows only")
+    os.rmdir(link)                                              # a link, not the folder it points at
+    rc, out = run(CHECK, tmp_path, "--root", str(target))
+    assert rc == 1 and "MISSING  agent home" in out, out
+    link.mkdir()
+    rc, out = run(CHECK, tmp_path, "--root", str(target))
+    assert rc == 1 and "STALE    agent home" in out and "plain folder" in out, out
+    rc, out = run(INSTALL, tmp_path, "--target", str(target))
+    assert rc == 1 and "agent home: NOT prepared - " in out and "plain folder" in out, "a plain folder is never removed, and the install says so: " + out
+    link.rmdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(elsewhere)], capture_output=True)
+    rc, out = run(CHECK, tmp_path, "--root", str(target))
+    assert rc == 1 and "STALE    agent home" in out and "does not lead to" in out, out
+    rc, out = run(INSTALL, tmp_path, "--target", str(target))
+    assert rc == 0 and os.path.samefile(link, os.path.join(os.environ["USERPROFILE"], ".cursor")), "the install repairs a link that leads elsewhere: " + out
 
 
 def test_install_over_owner_settings_keeps_them_and_backs_up(tmp_path):

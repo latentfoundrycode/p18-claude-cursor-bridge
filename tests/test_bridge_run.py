@@ -104,6 +104,12 @@ def test_stripped_environment_reaches_the_child(tmp_path):
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--", sys.executable, "-c", code],
                        capture_output=True, text=True, env=env_for(tmp_path, GH_TOKEN="secret"))
     assert p.stdout.split()[0] == "secret", "without --strip (and not cursor-agent) the environment is untouched"
+    code = "import os; print(os.environ['HOME']); print(os.environ.get('USERPROFILE', ''))"
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--strip", "--", sys.executable, "-c", code],
+                       capture_output=True, text=True, env=env_for(tmp_path))
+    home = os.path.join(os.environ["USERPROFILE"], ".cursor-bridge", "agent-home")
+    assert p.returncode == 0 and os.path.normcase(p.stdout.splitlines()[0].strip()) == os.path.normcase(home), "the child runs in the agent's own home (KP-038): " + p.stdout + p.stderr
+    assert os.path.lexists(os.path.join(home, ".cursor"))
 
 
 def test_stripped_environment_recipe(program, tmp_path, monkeypatch):
