@@ -94,7 +94,8 @@ def test_why_the_plain_removal_is_refused_by_the_guard(repo, tmp_path):
         # left the folder (second pass, S1). The guard and the program do not depend on either.
         pytest.skip("%s: plain removal exit %d, worktree %s, target intact; the premise is not shown on this git" % (
             version, p.returncode, "gone" if not wt.exists() else "left behind"))
-    assert p.returncode == 0 and not wt.exists(), "git followed the gitignored junction in a plain removal (%s); this is why only the program removes worktrees: %s" % (version, p.stdout + p.stderr)
+    print("%s: plain removal exit %d, worktree %s, target emptied; this is why only the program removes worktrees" % (
+        version, p.returncode, "gone" if not wt.exists() else "left behind"))
 
 
 def test_a_leftover_folder_is_checked_for_links_whether_git_lists_it_or_not(repo, tmp_path):
@@ -110,7 +111,12 @@ def test_a_leftover_folder_is_checked_for_links_whether_git_lists_it_or_not(repo
     assert rc == 2 and "link(s) inside" in out and "node_modules" in out and target.is_dir(), out
     remove_link(leftover / "node_modules")
     rc, out = run(repo, str(leftover))
-    assert rc == 2 and "not a worktree of this repository" in out and "holds no link" in out and leftover.is_dir(), out
+    assert rc == 2 and "not a worktree of this repository" in out and "this leftover may go" in out and leftover.is_dir(), out
+    # third pass, T4: the advice is for leftovers only, never for a folder that holds a live worktree or any other folder
+    rc, out = run(repo, str(tmp_path / "Worktrees"))
+    assert rc == 2 and "holds a registered worktree" in out and "may go" not in out, out
+    rc, out = run(repo, str(repo / "docs")) if (repo / "docs").is_dir() else run(repo, str(tmp_path))
+    assert rc == 2 and "may go" not in out, out
 
 
 def test_a_locked_worktree_is_named_as_such(repo, tmp_path):

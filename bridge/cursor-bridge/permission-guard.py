@@ -20,9 +20,14 @@ A command behind a wrapper shell (`bash -c`, `bash -lc`, `sh -c`, `cmd /c`, `cmd
 PowerShell call operator `&`, joined or not, separate commands; `{`, `if`, `then`, `xargs` and
 its options are dropped like `env` and `timeout`; a here-document's body is data (a commit
 message that quotes a forbidden command is not a command); a `git -c alias.<x>=...` whose
-value starts with `worktree`, `pr`, `push`, `api` or `!` is refused; an abbreviated `--forc`
-counts as `--force`, as it does for git; `--help` exempts a `gh pr merge` only when it is not
-the value of a flag such as `--subject`.
+value starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`
+for a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a
+`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document
+read by a shell (`bash <<EOF`) is that shell's script and is checked; one read by any other
+program (a commit message) is data. `powershell` without `-Command` runs the rest of its line,
+`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
+and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
+GraphQL query built by a command substitution are refused unread.
   - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,
     `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or
     `powershell`), which would run it with the owner's real home and identity (KP-038): the
@@ -54,6 +59,12 @@ MERGE_MUTATIONS = ("mergePullRequest", "enablePullRequestAutoMerge", "enqueuePul
 GH_VALUE_FLAGS = ("-t", "--subject", "-b", "--body", "-F", "--body-file", "-A", "--author-email", "-R", "--repo", "--match-head-commit", "--hostname")
 ALIAS_RX = re.compile(r"^alias\.[\w-]+=\s*['\"]?\s*(!|worktree\b|pr\b|push\b|api\b)", re.I)
 HEREDOC_RX = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n.*?^\2[ \t]*$", re.S | re.M)
+VALUE_OPTIONS = {"xargs": ("-I", "-n", "-L", "-s", "-d", "-P", "-E", "-a", "--max-args", "--max-lines", "--delimiter", "--max-procs", "--arg-file", "--replace"),
+                 "nice": ("-n", "--adjustment"), "timeout": ("-s", "--signal", "-k", "--kill-after"), "sudo": ("-u", "-g", "--user", "--group"),
+                 "env": ("-u", "--unset", "-C", "--chdir", "-S", "--split-string")}
+PS_VALUE_SWITCHES = ("-executionpolicy", "-ep", "-ex", "-version", "-v", "-windowstyle", "-w", "-workingdirectory", "-wd", "-inputformat", "-if",
+                     "-outputformat", "-of", "-psconsolefile", "-psc", "-configurationname", "-config", "-settingsfile", "-settings")
+ENCODED = object()
 PREMERGE_DIR = os.path.join("bridge", "premerge")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -109,8 +120,16 @@ def split_commands(text):
 
 
 def strip_heredocs(text):
-    """A here-document's body is data (a commit message), not commands."""
-    return HEREDOC_RX.sub(lambda m: m.group(0).split("\n", 1)[0], text)
+    """A here-document's body is data (a commit message) unless a shell reads it: then it is
+    that shell's script, and its lines are checked as commands."""
+    def repl(m):
+        first, body = m.group(0).split("\n", 1)
+        line = text[:m.start()].rsplit("\n", 1)[-1] + first
+        head = strip_prefix(words(line.split("<<", 1)[0]))
+        if head and base(head[0]) in WRAPPER_SHELLS:
+            return "\n" + body
+        return first
+    return HEREDOC_RX.sub(repl, text)
 
 
 def words(command):
@@ -121,13 +140,26 @@ def words(command):
 
 
 def shell_inner(w):
-    """The command a wrapper shell runs, as one string: everything after /c, /k, -c, -Command,
-    -File or a combined short flag ending in c (bash -lc), quoted or not; None without one."""
-    for i, tok in enumerate(w[1:], 1):
-        t = tok.lower()
-        if t in PROGRAM_AFTER or re.match(r"^-[a-z]*c$", t):
-            rest = w[i + 1:]
-            return " ".join(rest) if rest else None
+    """The command a wrapper shell runs, as one string, quoted or not: for cmd and the Bourne
+    shells everything after /c, /k, -c or a combined short flag holding c (bash -lc, -ce); for
+    PowerShell everything after -Command (any abbreviation) or -File, or, without either, the
+    rest of the line after its switches; ENCODED for an encoded command; None for nothing."""
+    ps = base(w[0]).replace(".exe", "") in ("powershell", "pwsh")
+    i = 1
+    while i < len(w):
+        t = w[i].lower()
+        if ps:
+            if t in ("-encodedcommand", "-ec", "-enc", "-e"):
+                return ENCODED
+            if (len(t) >= 2 and "-command".startswith(t)) or t.startswith("-file") or t == "-f":
+                return " ".join(w[i + 1:]) or None
+            if t.startswith("-"):
+                i += 2 if t in PS_VALUE_SWITCHES else 1
+                continue
+            return " ".join(w[i:]) or None
+        if t in PROGRAM_AFTER or re.match(r"^-[a-z]*c[a-z]*$", t):
+            return " ".join(w[i + 1:]) or None
+        i += 1
     return None
 
 
@@ -158,27 +190,23 @@ def strip_prefix(w):
     i = 0
     while i < len(w):
         tok = w[i]
-        if tok in ("&", "{", "}", "then", "do", "else", "elif", "if", "while", "until", "!"):
+        if tok in ("&", ".", "{", "}", "then", "do", "else", "elif", "if", "while", "until", "!"):
             i += 1
-            continue
-        if tok in ("xargs", "xargs.exe"):
-            i += 1
-            while i < len(w) and (w[i].startswith("-") or w[i].isdigit() or w[i] == "{}"):
-                i += 1
             continue
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tok):
             i += 1
             continue
-        if tok in ("env", "nice", "nohup", "stdbuf", "time", "sudo", "command", "builtin", "exec"):
+        name = tok.replace(".exe", "")
+        if name in ("xargs", "env", "nice", "nohup", "stdbuf", "time", "sudo", "command", "builtin", "exec", "timeout"):
+            vals = VALUE_OPTIONS.get(name, ())
             i += 1
-            while i < len(w) and w[i].startswith("-"):
+            while i < len(w) and (w[i].startswith("-") or (name == "xargs" and (w[i].isdigit() or w[i] == "{}"))):
+                opt = w[i]
                 i += 1
-            continue
-        if tok == "timeout":
-            i += 1
-            while i < len(w) and w[i].startswith("-"):
-                i += 1
-            i += 1                                   # the duration
+                if opt in vals and i < len(w):
+                    i += 1                           # the option's value (xargs -I %, nice -n 10, timeout -s KILL)
+            if name == "timeout" and i < len(w):
+                i += 1                               # the duration
             continue
         break
     return w[i:]
@@ -264,6 +292,8 @@ def merge_reason(args, cwd):
 
 def check(command, cwd=None):
     """Return the reason to refuse, or None."""
+    if re.search(r"\bgh\s+api\s+graphql\b[^\n]*(\$\(|`)", command):
+        return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
     for simple in split_commands(strip_heredocs(command)):
         w = strip_prefix(words(simple))
         if not w:
@@ -271,10 +301,18 @@ def check(command, cwd=None):
         head = base(w[0])
         if head in WRAPPER_SHELLS:
             inner = shell_inner(w)
+            if inner is ENCODED:
+                return "an encoded PowerShell command, which the guard cannot read"
             if inner:
                 r = check(inner, cwd)
                 if r:
                     return r
+        if head in ("find", "find.exe") and any(t in ("-exec", "-execdir", "-ok") for t in w):
+            j = next(k for k, t in enumerate(w) if t in ("-exec", "-execdir", "-ok"))
+            inner = " ".join(t for t in w[j + 1:] if t not in (";", "+", "{}"))
+            r = check(inner, cwd) if inner else None
+            if r:
+                return r
         started = w[0] if around_the_shim(w[0]) else (program_behind(w) if head in SHELLS else None)
         if started and around_the_shim(started):
             return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % started
@@ -300,13 +338,17 @@ def check(command, cwd=None):
                 return "gh api with a merge mutation (merging outside the gate)"
             if group == "api" and sub == "graphql" and any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in args):
                 return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
+            if group == "alias" and sub in ("set", "import"):
+                expansion = (args[-1] if args else "").strip("'\"").lstrip("!").strip()   # the last word is the expansion
+                if sub == "import" or re.match(r"^(pr\s+merge|api)\b", expansion) or "worktree" in expansion:
+                    return "a gh alias for a merge or an api call (%s)" % " ".join(args)[:60]
             if group == "api":
                 method = "GET"
                 for i, a in enumerate(w):
                     if a in ("-X", "--method") and i + 1 < len(w):
                         method = w[i + 1].upper()
-                    elif a.startswith("--method="):
-                        method = a.split("=", 1)[1].upper()
+                    elif a.startswith("--method=") or (a.startswith("-X") and len(a) > 2):
+                        method = a.split("=", 1)[1].upper() if "=" in a else a[2:].upper()   # -XPUT, -X=PUT
                     elif a in ("-f", "--raw-field", "-F", "--field", "--input"):
                         method = method if method != "GET" else "POST"   # gh switches to POST with fields
                 if method in WRITE_METHODS and any(re.search(r"/pulls/\d+/merge\b", a) for a in w):

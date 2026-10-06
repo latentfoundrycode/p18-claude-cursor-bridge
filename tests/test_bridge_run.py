@@ -41,7 +41,7 @@ def test_limit_kills_parent_and_child(tmp_path):
     assert p.returncode == 124, p.stderr
     assert time.time() - t0 < 20
     assert p.stderr.startswith("bridge-run: started 20") and "Z\n" in p.stderr.splitlines()[0] + "\n"
-    assert "LIMIT 3s reached" in p.stderr
+    assert "LIMIT 3s reached" in p.stderr and "bridge-run: exit 124" in p.stderr
     time.sleep(1)
     pids = [int(x) for x in pidfile.read_text().split()]
     assert len(pids) == 2, "parent and child both recorded their pid"
@@ -72,6 +72,7 @@ def test_exit_code_and_output_pass_through(tmp_path):
                        capture_output=True, text=True, env=env_for(tmp_path))
     assert p.returncode == 7
     assert "out line" in p.stdout and "err line" in p.stderr
+    assert p.stderr.rstrip().endswith("bridge-run: exit 7"), "the last line is the exit code, which review-guard.py reads"
 
 
 def test_only_the_loops_commands_are_accepted(tmp_path):

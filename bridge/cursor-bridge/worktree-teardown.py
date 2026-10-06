@@ -9,10 +9,13 @@ removal as in a forced one (Git for Windows 2.53, verified 2026-10-06); one proj
 its main checkout's installed packages that way, and forced the removal fourteen times in
 four days. The permission guard refuses the git command; this program is the one way:
 
-  1. the path must be a worktree of the repository the current folder belongs to;
-  2. every entry inside it is looked at without following links; a junction or a symbolic
-     link anywhere inside refuses the teardown and is listed with its target, so the link
-     can be removed by itself first (rmdir on the link, never through it);
+  1. every entry inside the folder is looked at without following links, whether git still
+     lists it or not (a leftover of a failed removal too); a junction or a symbolic link
+     anywhere inside refuses the teardown and is listed with its target, so the link can be
+     removed by itself first (rmdir on the link, never through it);
+  2. the path must be a worktree of the repository the current folder belongs to: a leftover
+     (a folder whose .git file points to a git folder that is gone, or under Worktrees/) is
+     named as such, and a folder that holds a registered worktree is refused;
   3. `git worktree remove <path>` without --force; git's own refusal (a dirty or locked
      worktree) is printed and ends the program, because forcing is what destroys data;
   4. `git worktree prune`, and the path must be gone.
@@ -75,6 +78,21 @@ def links_inside(root):
     return out
 
 
+def leftover(path):
+    """A folder that was a worktree and that git no longer lists: its .git file points to a git
+    folder that is gone, or it lies under a Worktrees folder."""
+    dot = os.path.join(path, ".git")
+    if os.path.isfile(dot):
+        try:
+            with open(dot, encoding="utf-8", errors="replace") as f:
+                first = f.read().strip()
+        except OSError:
+            first = ""
+        if first.startswith("gitdir:"):
+            return not os.path.isdir(first[7:].strip())
+    return os.path.basename(os.path.dirname(path)).lower() == "worktrees"
+
+
 def main(argv):
     dry = "--dry-run" in argv
     args = [a for a in argv if a != "--dry-run"]
@@ -94,8 +112,13 @@ def main(argv):
         return 2
     key = os.path.normcase(path)
     if key not in known:
-        print("worktree-teardown: refused - %s is not a worktree of this repository (git worktree list shows: %s)%s" % (
-            path, ", ".join(sorted(known)) or "none", "; it holds no link, so a leftover folder may go with a plain recursive delete" if os.path.isdir(path) else ""))
+        inside = [k for k in known if k.startswith(key.rstrip(os.sep) + os.sep)]
+        if inside:
+            print("worktree-teardown: refused - %s holds a registered worktree (%s); name the worktree itself" % (path, ", ".join(inside)))
+        elif os.path.isdir(path) and leftover(path):
+            print("worktree-teardown: refused - %s is not a worktree of this repository any more (git worktree list shows: %s); it holds no link, so this leftover may go with a plain recursive delete" % (path, ", ".join(sorted(known)) or "none"))
+        else:
+            print("worktree-teardown: refused - %s is not a worktree of this repository (git worktree list shows: %s), nor a leftover of one; nothing here to remove" % (path, ", ".join(sorted(known)) or "none"))
         return 2
     main_tree = next(iter(known))                      # git lists the main checkout first
     if key == main_tree:

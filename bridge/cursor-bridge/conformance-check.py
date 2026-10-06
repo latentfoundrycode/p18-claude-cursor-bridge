@@ -31,8 +31,11 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - with --screens (or a docs/mockups folder): the design detector in the gate;
   - release A1b: a spending limit recorded for every key, account or provider that can charge
     (the inventory's Resources rows); the inventory's `Development data:` decision; every
-    adapter of an external service tested against recorded replies (the project's own tracked
-    files, judged per adapter); `run/` ignored (a NOTE);
+    adapter of a listed provider tested against recorded replies (the providers from the
+    inventory's chargeable rows, one word each; the adapters among the project's own tracked
+    files, naming the provider in a string of code, not a comment; the evidence a cassette or
+    fixture file the adapter's test loads, a recording library, or a test that names cassettes
+    in a repository that tracks a cassettes folder); `run/` ignored (a NOTE);
   - with --installable (or docs/cli-reference.json present): the CLI reference and a check
     of it, in CI or in the test suite;
   - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the
@@ -162,7 +165,7 @@ def tracked_files(ws):
     return out
 
 
-LIMIT_RECORDED = re.compile(r"\blimit\s*[:=]?\s*(of\s*)?([$\u20ac\u00a3]\s*\d|\d+(\.\d+)?\s*(USD|EUR|GBP|CHF)\b)|no spend possible", re.I)   # an amount, or the words; "not set yet" is not recorded
+LIMIT_RECORDED = re.compile(r"\blimit\b[^$\u20ac\u00a3\d\n|]{0,25}([$\u20ac\u00a3]\s*\d|\d+(\.\d+)?\s*(USD|EUR|GBP|CHF)\b)|no spend possible", re.I)   # an amount near "limit", or the words; "not set yet" is not recorded
 CANNOT_CHARGE = re.compile(r"\blocal (service|development|postgres|minio|store)\b|throwaway|the product's own|own (per[- ]instance )?token|per[- ]instance|generated per", re.I)
 KIND_CANNOT_CHARGE = re.compile(r"\b(store|files?|registration|mcp)\b", re.I)   # a store, model files, a registration: nothing to charge
 GENERIC_WORDS = {"api", "key", "keys", "token", "tokens", "secret", "secrets", "account", "access", "id", "user", "password", "pass", "file",
@@ -175,12 +178,14 @@ EVIDENCE_RX = re.compile(r"\bvcr\b|\brespx\b|responses\.activate|\bnock\b|\bmsw\
 def chargeable_rows(sections, words):
     """The inventory's Resources rows that can charge the owner: a key, account, provider or API
     that is not a local service's login, the product's own token, a test-only value, a store,
-    model files or a registration. [(cells, name)]"""
+    model files, a registration, a setting or the record of a limit. [(cells, name)]"""
     rows = []
     for cells in sections.get("Resources", []):
-        if len(cells) < 2 or not re.search(r"secret|account|api|provider|external|key|token", cells[1], re.I) or re.search(r"test-only", cells[1], re.I):
+        if len(cells) < 2 or not re.search(r"secret|account|api|provider|external|key|token", cells[1], re.I) or re.search(r"test-only|setting", cells[1], re.I):
             continue
         name = cells[0].strip("`* ")
+        if re.search(r"\blimit\b", name, re.I):
+            continue                                       # the row IS the limit, not a key
         idents = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", name)
         if any(LOCAL_SERVICE.match(i) or i.split("_")[0].lower() in words for i in idents):
             continue                                       # every name in the cell is looked at
@@ -191,23 +196,39 @@ def chargeable_rows(sections, words):
 
 
 def provider_words(rows):
-    """{word: row name}: the words of each chargeable row's name that can identify its adapter."""
+    """{word: row name}: one word per chargeable row, the one that identifies its adapter: the
+    first segment of a key's name (SOCKET of SOCKET_CLI_API_TOKEN), else the provider's own
+    name (OpenRouter of "OpenRouter (rule judge)")."""
     found = {}
     for cells, name in rows:
-        for n in re.findall(r"[A-Za-z][A-Za-z0-9]*", name):
-            w = n.lower()
-            if len(w) >= 2 and w not in GENERIC_WORDS:
-                found.setdefault(w, name[:40])
+        key = re.match(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+", name)
+        if key:
+            w = key.group(0).split("_")[0].lower()
+        else:
+            ws = [x.lower() for x in re.findall(r"[A-Za-z][A-Za-z0-9]*", name) if x.lower() not in GENERIC_WORDS]
+            w = ws[0] if ws else ""
+        if len(w) >= 2 and w not in GENERIC_WORDS:
+            found.setdefault(w, name[:40])
     return found
 
 
+def code_strings(text):
+    """The source without its docstrings and comments, lowercased: where a host or a key name
+    would be written."""
+    text = re.sub(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'', "", text)
+    text = re.sub(r"/\*[\s\S]*?\*/", "", text)
+    text = re.sub(r"(^|[ \t])(#|//)[^\n]*", "", text, flags=re.M)
+    return text.lower()
+
+
 def names_provider(text, providers):
-    """The providers a source file names in a string literal (a host, a key name, a service)."""
-    low = text.lower()
+    """The providers a source file names, as a whole word, in a string literal of its code (a
+    host, a key name, a service name); never in a docstring or a comment."""
+    low = code_strings(text)
     hits = []
     for w in providers:
         for alt in SYNONYMS.get(w, (w,)):
-            if re.search(r"""["'`][^"'`\n]*(?<![a-z0-9])%s""" % re.escape(alt), low):
+            if re.search(r"""["'`][^"'`\n]*(?<![a-z0-9])%s(?![a-z0-9])""" % re.escape(alt), low):
                 hits.append(w)
                 break
     return hits
@@ -533,10 +554,12 @@ def main():
             elif js_client_rx.search(text) and names_provider(text, providers):
                 adapters[re.sub(r"\.(js|ts|mjs|tsx)$", "", n)] = rel
     if adapters:
+        recordings = any(re.search(r"(^|/)(cassettes?|recorded|recordings)/", rel, re.I) for rel in files)
+        loose_rx = re.compile(r"cassette|recorded|replay", re.I)   # enough when the repository tracks recordings
         without = []
         for name in sorted(adapters):
             name_rx = re.compile(r"\b%s\b" % re.escape(name))
-            if not any(name_rx.search(t) and EVIDENCE_RX.search(t) for t in tests):
+            if not any(name_rx.search(t) and (EVIDENCE_RX.search(t) or (recordings and loose_rx.search(t))) for t in tests):
                 without.append(name)
         if without:
             add("MISSING", "Adapters tested against recorded replies", "%d adapter(s) of a listed provider without a test that names them and replays recorded replies, that is a cassette or fixture file the test loads, or vcr, respx, responses.activate, nock or msw in that test; a mock transport fed by hand is an invented reply (rule 37; A1b item 5): %s%s" % (

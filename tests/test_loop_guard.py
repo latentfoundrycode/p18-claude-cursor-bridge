@@ -122,6 +122,7 @@ def assistant_transcript(tmp_path, text):
     ("**2. Terminal:** PowerShell\n\n```powershell\nGet-Content x\n```", False),
     ("Terminal (Git Bash): open it from the Start menu\n\n```bash\nls\n```", False),
     ("10. Run:\n\n    ```bash\n    python tools/x.py\n    ```\n", True),
+    ("Terminal output: all clean.\n\n```bash\npython tools/x.py\n```", True),
     ("Open PowerShell and run:\n\n```powershell\nGet-Content x\n```", True),
     ("1. Run:\n\n   ```bash\n   python tools/x.py\n   ```\n", True),
     ("Run:\n\n~~~ps1\nGet-Content x\n~~~\n", True),

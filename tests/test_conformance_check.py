@@ -346,11 +346,14 @@ def test_the_three_floors_of_release_a1b(tmp_path):
                                                               + "| OpenRouter (rule judge) | external API | key file; limit $10/month, set 2026-10-06 | app | 2026-10-01 |\n"
                                                               + "| HF_TOKEN | repo secret | GitHub secret | CI | 2026-10-01 |\n"
                                                               + "| ANTHROPIC_API_KEY | secret | key file; spending limit not set yet | app | 2026-10-01 |\n"
+                                                              + "| MISTRAL_API_KEY | secret | key file; spending limit set to $20/month on 2026-10-06 | app | 2026-10-01 |\n"
+                                                              + "| Modal workspace spending limit | account setting | $50/month, set 2026-09-20 | app | 2026-09-20 |\n"
                                                               + "| SMPL-X model files (MPI account) | account | downloaded once with the MPI login | assets | 2026-09-01 |\n"
                                                               + "| Claude Code MCP registration | registration | the owner's Claude Code settings | tooling | 2026-09-01 |\n"), encoding="utf-8")
     rc, out = run(tmp_path)
     kind, detail = verdict(out, "Spending limit recorded")
     assert kind == "MISSING" and "OPENROUTER_API_KEY" in detail and "HF_TOKEN" in detail and "ANTHROPIC_API_KEY" in detail and "3 key" in detail, out
+    assert "Modal workspace spending limit" not in detail, "the record of a limit is not a key: " + detail
     for name in ("POSTGRES", "AWS_", "THING_API_TOKEN", "Socket", "OpenRouter (rule judge)", "SMPL", "MCP", "BFL"):
         assert name not in detail, "local logins (every name in the cell), per-instance values, the product's own tokens, no-spend accounts, limited rows, model files and registrations are not reported: " + detail
     assert verdict(out, "Development data kept apart")[0] == "MISSING", out
@@ -383,6 +386,25 @@ def test_the_three_floors_of_release_a1b(tmp_path):
     (tmp_path / "tests" / "test_llm.py").write_text('import json\nfrom app import llm\n\nREPLY = json.load(open("tests/cassettes/openrouter.json"))\n', encoding="utf-8")
     rc, out = run(tmp_path)
     assert verdict(out, "Adapters tested against recorded replies")[0] == "OK", "a cassette file the adapter's test loads is evidence: " + out
+    # third pass, T1: the TDP's shape, recordings loaded by a helper, in a repository that tracks a cassettes folder
+    (tmp_path / "tests" / "cassettes").mkdir()
+    (tmp_path / "tests" / "cassettes" / "small.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "tests" / "test_llm.py").write_text('from app import llm\nfrom helpers import load_cassette\n\nREPLY = load_cassette("small")\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "Adapters tested against recorded replies")[0] == "OK", "recordings loaded by a helper count when the repository tracks them: " + out
+    # third pass, T1: reAngle's and the TDP's shapes of a false adapter: a limit row and a setting are not providers, a
+    # key's later segments and a docstring never name a provider, a local store's client is not an adapter
+    inv2 = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8").replace("| CI | 2026-09-01 |\n", "| CI | 2026-09-01 |\n"
+            + "| Modal workspace spending limit | account setting | $50/month, set 2026-09-20 | app | 2026-09-20 |\n"
+            + "| SOCKET_CLI_API_TOKEN | repo secret | GitHub secret; no spend possible | CI | 2026-09-01 |\n"
+            + "| AZURE_DI_API_KEY | secret | key file; limit $10/month, set 2026-10-06 | app/azure_di.py | 2026-10-01 |\n")
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv2, encoding="utf-8")
+    (tmp_path / "app" / "worker_s3.py").write_text('"""Uploads to the store with limited retries, the workspace of the spending guard."""\nimport boto3\n\nclient = boto3.client("s3", endpoint_url="http://minio:9000")\n', encoding="utf-8")
+    (tmp_path / "app" / "connect.py").write_text('"""The CLI client of the product\'s own server."""\nimport httpx2\n\nURL = "http://127.0.0.1:8080"  # disabled when the socket is closed\n', encoding="utf-8")
+    (tmp_path / "app" / "azure_di.py").write_text('import httpx2\n\nHOST = "https://eastus.api.cognitive.microsoft.com"\nKEY_NAME = "AZURE_DI_API_KEY"\n', encoding="utf-8")
+    rc, out = run(tmp_path)
+    kind, detail = verdict(out, "Adapters tested against recorded replies")
+    assert kind == "MISSING" and "azure_di" in detail and "worker_s3" not in detail and "connect" not in detail, "only the Azure adapter is one of a listed provider: " + out
     (tmp_path / "app" / "bfl.py").write_text('import httpx2\nBASE = "https://api.bfl.ml/v1"\n', encoding="utf-8")
     (tmp_path / "web").mkdir()
     (tmp_path / "web" / "api.ts").write_text('export const models = () => fetch("https://openrouter.ai/api/v1/models");\n', encoding="utf-8")

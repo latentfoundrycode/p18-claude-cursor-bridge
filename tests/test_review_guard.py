@@ -194,11 +194,16 @@ def test_cache_folders_are_skipped(repo):
 GUARD = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "permission-guard.py")
 
 
-def launched(repo, nnn="001", offset=1):
-    """The launcher's first stderr line, as a Review B run leaves it, offset seconds from now."""
+def launched(repo, nnn="001", offset=1, exit_code=0):
+    """The launcher's stderr as a Review B run leaves it: the launch line, offset seconds from
+    now, and the exit line (None: the run has not ended)."""
     import time
     stamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() + offset))
-    (repo / "run" / "review" / ("REVIEW-%s.err" % nnn)).write_text("bridge-run: started %sZ\n" % stamp, encoding="utf-8")
+    text = "bridge-run: started %sZ\nsome output of the reviewer\n" % stamp
+    if exit_code is not None:
+        text += "bridge-run: exit %d\n" % exit_code
+    (repo / "run" / "review").mkdir(parents=True, exist_ok=True)
+    (repo / "run" / "review" / ("REVIEW-%s.err" % nnn)).write_text(text, encoding="utf-8")
 
 
 def reviewed(repo, nnn="001"):
@@ -231,7 +236,30 @@ def test_premerge_refuses_a_snapshot_without_its_verified_mark(repo):
     rc, out = guard(repo, "snapshot", "001")              # a new snapshot needs a new review round
     assert rc == 0, out
     rc, out = guard(repo, "premerge", "001")
-    assert rc == 2 and "another snapshot" in out, out
+    assert rc == 2 and "no verified mark" in out, "the snapshot removed the older mark: " + out
+
+
+def test_a_failed_review_run_or_a_flagged_verify_leaves_no_usable_mark(repo):
+    """Third pass of the 2026.10.06b review, T2: the mark proves a Review B that ended with exit
+    0 and a clean verify; a failed run, a run still going, or a later GATE-INTEGRITY withdraws it."""
+    guard(repo, "snapshot", "001")
+    launched(repo, "001", exit_code=3)                     # a usage limit: no verdict
+    rc, out = guard(repo, "verify", "001")
+    assert rc == 0 and "exit 3" in out, out
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "exit 3" in out, out
+    launched(repo, "001", exit_code=None)                  # still running
+    guard(repo, "verify", "001")
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "exit None" in out, out
+    launched(repo, "001")
+    rc, out = guard(repo, "verify", "001")
+    assert rc == 0, out
+    git(repo, "branch", "left-by-the-reviewer")            # a second run leaves a ref behind
+    rc, out = guard(repo, "verify", "001")
+    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    rc, out = guard(repo, "premerge", "001")
+    assert rc == 2 and "no verified mark" in out, "the flagged verify withdrew the mark: " + out
 
 
 def test_premerge_and_the_permission_guard_agree_end_to_end(repo, tmp_path):
