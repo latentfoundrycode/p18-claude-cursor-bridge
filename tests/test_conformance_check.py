@@ -269,3 +269,21 @@ def test_a_secret_supplied_through_an_environment_variable_is_a_missing_floor(tm
         "| OPENROUTER_API_KEY | secret | key file outside the Workspace | workflows | 2026-10-04 |\n", encoding="utf-8")
     rc, out = run(tmp_path)
     assert verdict(out, "No secret through an environment variable")[0] == "OK"
+
+
+def test_claude_code_hooks_in_the_projects_settings_are_a_missing_floor(tmp_path):
+    """Review of 2026.10.06a, finding 6: cursor-agent imports a project's .claude hooks and
+    plugins as it imports the user's (KP-038)."""
+    make_workspace(tmp_path)
+    rc, out = run(tmp_path)
+    assert "No Claude Code hooks in the project's .claude" not in out
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "settings.local.json").write_text('{"permissions": {"allow": ["Bash(ls:*)"]}}', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert "No Claude Code hooks in the project's .claude" not in out, "permissions alone are not imported as hooks"
+    (tmp_path / ".claude" / "settings.json").write_text('{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "python guard.py"}]}]}}', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "No Claude Code hooks in the project's .claude")[0] == "MISSING" and ".claude/settings.json (hooks)" in out, out
+    (tmp_path / ".claude" / "settings.json").write_text('{"enabledPlugins": {"x@y": true}}', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "No Claude Code hooks in the project's .claude")[0] == "MISSING" and "(enabledPlugins)" in out, out

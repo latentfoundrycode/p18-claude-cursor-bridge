@@ -345,6 +345,28 @@ def main():
             add("MISSING", "CLI reference checked", "nothing keeps docs/cli-reference.json current: no CI step and no test names it (rule 32)")
 
     # --- secrets within the builder's reach (names only)
+    # Claude Code settings of the project: cursor-agent imports their hooks and plugins, and
+    # under Git Bash every builder command is then refused (KP-038)
+    claude_dirs = [os.path.join(ws, ".claude")]
+    if os.path.basename(os.path.normpath(ws)).lower() == "workspace":
+        claude_dirs.append(os.path.join(os.path.dirname(os.path.normpath(ws)), ".claude"))
+    imported = []
+    for d in claude_dirs:
+        for name in ("settings.json", "settings.local.json"):
+            path = os.path.join(d, name)
+            if not os.path.isfile(path):
+                continue
+            try:
+                data = json.loads(read(path))
+            except ValueError:
+                imported.append("%s (not valid JSON)" % os.path.relpath(path, ws).replace("\\", "/"))
+                continue
+            keys = [k for k in ("hooks", "enabledPlugins") if isinstance(data, dict) and data.get(k)]
+            if keys:
+                imported.append("%s (%s)" % (os.path.relpath(path, ws).replace("\\", "/"), ", ".join(keys)))
+    if imported:
+        add("MISSING", "No Claude Code hooks in the project's .claude", "cursor-agent imports them, and under Git Bash every builder and reviewer command is then refused while the run reports success (KP-038): " + "; ".join(imported))
+
     env_files = [os.path.join(ws, ".env")]
     env_files += [p for p in glob.glob(os.path.join(ws, ".env.*")) if not re.search(r"\.(example|template|sample|dist)$", p, re.I)]
     env_files += [os.path.join(ws, d, ".env") for d in subdirs]

@@ -127,8 +127,11 @@ def check_agent_home():
         return "STALE", "bridge_env.py cannot be imported (%s)" % e
     home, problem = bridge_env.agent_home(create=False)
     if problem is None:
-        return "OK", home
-    return ("STALE" if "plain folder" in problem else "MISSING"), problem
+        problem = bridge_env.rename_probe()
+        if problem is None:
+            return "OK", home
+        return "STALE", problem
+    return ("MISSING" if "does not exist" in problem else "STALE"), problem
 
 
 def main():

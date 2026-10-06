@@ -5,7 +5,11 @@ refuses the two actions the loop must never take, in every permission mode (KP-0
   - merging a pull request past the repository's rules: `gh pr merge … --admin`, and the
     REST route `gh api … /pulls/<n>/merge` with a method that writes;
   - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,
-    `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec.
+    `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;
+  - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,
+    `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or
+    `powershell`), which would run it with the owner's real home and identity (KP-038): the
+    agent is started as `cursor-agent`, or through bridge-run.py.
 
 It parses the command rather than matching a pattern, so chains, wrappers and quoting do
 not hide the action, and `git commit -m "never use --force"` is not refused. Deny rules in
@@ -23,6 +27,12 @@ import shlex
 import sys
 
 WRITE_METHODS = ("PUT", "POST", "PATCH", "DELETE")
+AROUND_THE_SHIM = ("agent", "agent.cmd", "agent.ps1", "cursor-agent.cmd", "cursor-agent.ps1", "cursor-agent.exe")
+SHELLS = ("cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe")
+
+
+def base(tok):
+    return tok.lower().split("/")[-1].split("\\")[-1]
 
 
 def split_commands(text):
@@ -117,7 +127,9 @@ def check(command):
         w = strip_prefix(words(simple))
         if not w:
             continue
-        head = w[0].lower().split("/")[-1].split("\\")[-1]
+        head = base(w[0])
+        if head in AROUND_THE_SHIM or (head in SHELLS and any(base(t) in AROUND_THE_SHIM for t in w[1:])):
+            return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % w[0]
         if is_git(w):
             sub, args = git_subcommand(w)
             if sub == "push":

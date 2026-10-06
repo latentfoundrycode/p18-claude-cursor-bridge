@@ -398,7 +398,9 @@ def prepare_agent_home(source_dir, dry):
         spec.loader.exec_module(mod)
         if not hasattr(mod, "agent_home"):
             return "agent home: not part of this release"
-        home, problem = mod.agent_home()
+        home, problem = mod.agent_home(create=True, repair=True)
+        if problem is None and hasattr(mod, "rename_probe"):
+            problem = mod.rename_probe()
     except Exception as e:
         return "agent home: NOT prepared (%s)" % e
     return "agent home: %s" % (home if problem is None else "NOT prepared - " + problem)

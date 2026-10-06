@@ -38,6 +38,13 @@ def run(tool, command):
     "cd x && gh pr merge 5 --squash --admin",
     "gh api -X PUT repos/o/r/pulls/12/merge -f merge_method=squash",
     "gh api --method PUT /repos/o/r/pulls/12/merge",
+    'agent -p "do the task"',
+    "agent.cmd -p x",
+    "cursor-agent.cmd -p --force x",
+    "C:/Users/o/AppData/Local/cursor-agent/cursor-agent.ps1 -p x",
+    "cmd /c cursor-agent.cmd -p x",
+    "powershell -NoProfile -Command agent -p x",
+    "cd Workspace && agent -p x",
     "gh api repos/o/r/pulls/12/merge -f merge_method=squash",
 ])
 @pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
@@ -47,6 +54,10 @@ def test_refused(tool, cmd):
 
 
 @pytest.mark.parametrize("cmd", [
+    'cursor-agent -p --force "Read handoff/TASK-001.md"',
+    "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x",
+    "ssh-agent -s",
+    "git commit -m \"start the agent as agent.cmd\"",
     "git push -u origin task-012",
     "git push origin fix-123",
     "git push --follow-tags origin main",
