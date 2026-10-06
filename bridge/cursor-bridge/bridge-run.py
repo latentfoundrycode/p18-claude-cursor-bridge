@@ -151,7 +151,11 @@ def main():
         sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent and gh pr checks (got %r)\n" % cmd[0])
         return 125
     cmd, is_agent = resolve(cmd)
-    env = bridge_env.stripped_env() if (is_agent or strip) else dict(os.environ)
+    try:
+        env = bridge_env.stripped_env() if (is_agent or strip) else dict(os.environ)
+    except bridge_env.AgentHomeError as e:
+        sys.stderr.write("bridge-run: refused - %s\n" % e)
+        return 125
     sys.stderr.write("bridge-run: started %sZ\n" % datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"))
     sys.stderr.flush()
 

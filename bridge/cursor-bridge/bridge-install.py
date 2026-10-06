@@ -38,7 +38,8 @@ Installing:
   3. installs the cursor-agent shim (cursor-bridge/cursor-agent.shim) at
      %LOCALAPPDATA%/cursor-agent/cursor-agent, the file Claude Code's Bash tool runs for
      `cursor-agent` on Windows (KP-032), when that folder exists, keeping a different
-     previous file as cursor-agent.bak-<date>-<time>;
+     previous file as cursor-agent.bak-<date>-<time>, and prepares the home folder builder
+     and reviewer runs get, %USERPROFILE%/.cursor-bridge/agent-home (KP-038);
   4. runs bridge-check.py on the result and prints its verdict.
 
 Taking a release back (--rollback) is the same replacement with the kept release as its
@@ -60,6 +61,7 @@ or nothing to roll back to. ASCII-only on purpose (cp1252 consoles).
 """
 import datetime
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -384,6 +386,24 @@ def install_shim(source_dir, dry):
     return "shim: installed at %s" % dst
 
 
+def prepare_agent_home(source_dir, dry):
+    """The home folder builder and reviewer runs get (KP-038), made with the source
+    release's own recipe; a release before 2026.10.06a has none."""
+    path = os.path.join(source_dir, "bridge_env.py")
+    if dry or not os.path.isfile(path):
+        return "agent home: " + ("not prepared (dry run)" if dry else "not part of this release")
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_env_of_the_release", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        if not hasattr(mod, "agent_home"):
+            return "agent home: not part of this release"
+        home, problem = mod.agent_home()
+    except Exception as e:
+        return "agent home: NOT prepared (%s)" % e
+    return "agent home: %s" % (home if problem is None else "NOT prepared - " + problem)
+
+
 def backup_settings(settings_path, dry):
     if dry or not os.path.isfile(settings_path):
         return
@@ -495,6 +515,7 @@ def replace_release(target, source, existing, new_settings, dry):
     for c in changes:
         print("    " + ("- " if " -= " in c else "+ ") + c)
     print("  " + install_shim(os.path.join(source, "cursor-bridge"), dry))
+    print("  " + prepare_agent_home(os.path.join(source, "cursor-bridge"), dry))
 
 
 def run_check(target):

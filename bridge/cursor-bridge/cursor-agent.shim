@@ -26,4 +26,43 @@ for BRIDGE_V in $(env | awk -F= '$1 ~ /^[A-Za-z_][A-Za-z0-9_]*$/ { u = toupper($
   unset "$BRIDGE_V"
 done
 unset BRIDGE_V
+# The run gets a home folder of its own (2026.10.06a, KP-038): cursor-agent imports the
+# hooks of ~/.claude/settings.json and, under Git Bash, runs them in a way that denies every
+# tool call; and the owner's .ssh, .aws, .docker and other stores are nobody's business in a
+# builder run. The folder holds a link `.cursor` to the owner's real ~/.cursor (the CLI's
+# account and state) and nothing else; git keeps the owner's global configuration through
+# GIT_CONFIG_GLOBAL. The same recipe as bridge_env.agent_home; a run whose home cannot be
+# prepared is refused rather than started into silent denial. The folder sits in the
+# profile root: under AppData/Local a rename into such a link fails on the owner's computer.
+BRIDGE_REAL_HOME="${USERPROFILE:-$HOME}"
+BRIDGE_AGENT_HOME="$BRIDGE_REAL_HOME/.cursor-bridge/agent-home"
+mkdir -p "$BRIDGE_AGENT_HOME" "$BRIDGE_REAL_HOME/.cursor" 2>/dev/null
+if command -v cygpath >/dev/null 2>&1; then
+  BRIDGE_AGENT_HOME_W="$(cygpath -w "$BRIDGE_AGENT_HOME")"
+  BRIDGE_REAL_HOME_W="$(cygpath -w "$BRIDGE_REAL_HOME")"
+else
+  BRIDGE_AGENT_HOME_W="$BRIDGE_AGENT_HOME"
+  BRIDGE_REAL_HOME_W="$BRIDGE_REAL_HOME"
+fi
+if [ ! -e "$BRIDGE_AGENT_HOME/.cursor" ]; then
+  if command -v cmd >/dev/null 2>&1; then
+    cmd //d //c mklink //J "$BRIDGE_AGENT_HOME_W\\.cursor" "$BRIDGE_REAL_HOME_W\\.cursor" >/dev/null 2>&1
+  else
+    ln -s "$BRIDGE_REAL_HOME/.cursor" "$BRIDGE_AGENT_HOME/.cursor" 2>/dev/null
+  fi
+fi
+if [ ! -e "$BRIDGE_AGENT_HOME/.cursor" ]; then
+  echo "cursor-agent shim (Claude-Cursor Bridge): refused - the agent's home folder $BRIDGE_AGENT_HOME_W could not be prepared (KP-038)" >&2
+  exit 125
+fi
+if [ -f "$BRIDGE_REAL_HOME/.gitconfig" ]; then
+  export GIT_CONFIG_GLOBAL="$BRIDGE_REAL_HOME_W/.gitconfig"
+else
+  unset GIT_CONFIG_GLOBAL
+fi
+export HOME="$BRIDGE_AGENT_HOME_W" USERPROFILE="$BRIDGE_AGENT_HOME_W"
+case "$BRIDGE_AGENT_HOME_W" in
+  [A-Za-z]:*) export HOMEDRIVE="${BRIDGE_AGENT_HOME_W%%:*}:" HOMEPATH="${BRIDGE_AGENT_HOME_W#?:}" ;;
+esac
+unset BRIDGE_REAL_HOME BRIDGE_AGENT_HOME BRIDGE_REAL_HOME_W BRIDGE_AGENT_HOME_W
 exec cursor-agent.cmd "$@"

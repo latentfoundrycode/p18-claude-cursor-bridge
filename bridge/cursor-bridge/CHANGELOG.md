@@ -15,6 +15,25 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.06a
+
+**Urgent fix from release A1a's trial (reAngle ISS-013): the builder and Review B get their shell back.** Since 2026-10-04 cursor-agent on the owner's computer imported the bridge's own Claude Code hook from `~/.claude/settings.json` and, under Git Bash, ran it in a way that denied every tool call while reporting success; builders delivered code they had never run (KP-038).
+
+**What changed**
+- **Every builder and reviewer run gets a home folder of its own** (`%USERPROFILE%\.cursor-bridge\agent-home\`), holding a link `.cursor` to the owner's real `~/.cursor` and nothing else. cursor-agent finds no `~/.claude/settings.json` to import hooks from (Cursor's documented default, with no switch in the CLI), and the owner's `.ssh`, `.aws`, `.docker` and other stores are out of the run's reach as well (KP-032). git keeps the owner's global configuration through `GIT_CONFIG_GLOBAL`. The shim (`cursor-agent.shim`) and the Python recipe (`bridge_env.stripped_env`) apply it alike; a run whose home folder cannot be prepared is refused with exit 125 instead of started into silent denial. `bridge-install.py` prepares the folder; `bridge-check.py` verifies it.
+- Tests: the two recipes agree on the home folder as on everything else, and refuse alike; the launcher's child runs in it; the install prepares it and the check reports a missing or damaged one; no test touches the owner's real home.
+
+**Running projects must**
+- *(all phases)* Install with the three steps of the setup guide's Step 3, restart the app, run `/calibrate-bridge`. Nothing in the project's files changes.
+- *(building, changing)* Every builder run and every Review B since 2026-10-04 ran without a working shell: builders delivered unrun code and the supervisor ran the checks (reAngle's record). From the next delegation on, the builder runs its own tests again, and the acceptance criteria the supervisor had been verifying by hand go back to the builder; Review B executes again where its mandate says so.
+
+**If rolled back**
+- *(all phases)* Nothing to restore in a project's files. The builder's shell is blocked again from the next delegation on (KP-038).
+
+**Field acceptance on the trial project.** The next builder run's note shows that it ran its commands (tests, lint, the mutation driver), the next Review B output holds no `Hook blocked`, and the supervisor's probe of 2026-10-06 (`PROBE-059b`) passes when run again.
+
+---
+
 ## 2026.10.05a
 
 **Release A1a of the restructuring plan: the bridge's own house.** Its sources leave the folder where a session working on the bridge loaded them half-edited; a release can be taken back; four contradictions in the bridge's own text are removed.
