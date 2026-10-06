@@ -347,25 +347,32 @@ def main():
     # --- secrets within the builder's reach (names only)
     # Claude Code settings of the project: cursor-agent imports their hooks and plugins, and
     # under Git Bash every builder command is then refused (KP-038)
-    claude_dirs = [os.path.join(ws, ".claude")]
+    claude_dirs = [("MISSING", os.path.join(ws, ".claude"))]
     if os.path.basename(os.path.normpath(ws)).lower() == "workspace":
-        claude_dirs.append(os.path.join(os.path.dirname(os.path.normpath(ws)), ".claude"))
-    imported = []
-    for d in claude_dirs:
+        claude_dirs.append(("NOTE", os.path.join(os.path.dirname(os.path.normpath(ws)), ".claude")))   # read only when a builder's workspace is the root
+    for verdict, d in claude_dirs:
+        imported = []
         for name in ("settings.json", "settings.local.json"):
             path = os.path.join(d, name)
             if not os.path.isfile(path):
                 continue
+            rel = os.path.relpath(path, ws).replace("\\", "/")
             try:
                 data = json.loads(read(path))
             except ValueError:
-                imported.append("%s (not valid JSON)" % os.path.relpath(path, ws).replace("\\", "/"))
+                imported.append("%s (not valid JSON)" % rel)
                 continue
-            keys = [k for k in ("hooks", "enabledPlugins") if isinstance(data, dict) and data.get(k)]
+            keys = []
+            if isinstance(data, dict):
+                if data.get("hooks"):
+                    keys.append("hooks")
+                plugins = data.get("enabledPlugins")
+                if isinstance(plugins, dict) and any(plugins.values()):
+                    keys.append("enabledPlugins")
             if keys:
-                imported.append("%s (%s)" % (os.path.relpath(path, ws).replace("\\", "/"), ", ".join(keys)))
-    if imported:
-        add("MISSING", "No Claude Code hooks in the project's .claude", "cursor-agent imports them, and under Git Bash every builder and reviewer command is then refused while the run reports success (KP-038): " + "; ".join(imported))
+                imported.append("%s (%s)" % (rel, ", ".join(keys)))
+        if imported:
+            add(verdict, "No Claude Code hooks in the project's .claude", "cursor-agent imports them, and under Git Bash every builder and reviewer command is then refused while the run reports success (KP-038): " + "; ".join(imported))
 
     env_files = [os.path.join(ws, ".env")]
     env_files += [p for p in glob.glob(os.path.join(ws, ".env.*")) if not re.search(r"\.(example|template|sample|dist)$", p, re.I)]

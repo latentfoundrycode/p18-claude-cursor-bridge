@@ -29,10 +29,31 @@ import sys
 WRITE_METHODS = ("PUT", "POST", "PATCH", "DELETE")
 AROUND_THE_SHIM = ("agent", "agent.cmd", "agent.ps1", "cursor-agent.cmd", "cursor-agent.ps1", "cursor-agent.exe")
 SHELLS = ("cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe")
+PROGRAM_AFTER = ("/c", "/k", "-c", "-command", "-file")
 
 
 def base(tok):
     return tok.lower().split("/")[-1].split("\\")[-1]
+
+
+def around_the_shim(tok):
+    """The Cursor agent started by a name other than `cursor-agent` (KP-038): one of the CLI's
+    own launcher names, or a bare `agent` without a path or from the CLI's own folder; a
+    project's own `./agent` or `dist/agent.exe` is not it."""
+    name = base(tok)
+    if name not in AROUND_THE_SHIM:
+        return False
+    if name == "agent" and ("/" in tok or "\\" in tok) and "cursor-agent" not in tok.lower():
+        return False
+    return True
+
+
+def program_behind(w):
+    """The program a shell wrapper runs: the token after /c, /k, -c, -Command or -File."""
+    for i, tok in enumerate(w[1:-1], 1):
+        if tok.lower() in PROGRAM_AFTER:
+            return w[i + 1]
+    return None
 
 
 def split_commands(text):
@@ -128,8 +149,9 @@ def check(command):
         if not w:
             continue
         head = base(w[0])
-        if head in AROUND_THE_SHIM or (head in SHELLS and any(base(t) in AROUND_THE_SHIM for t in w[1:])):
-            return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % w[0]
+        started = w[0] if around_the_shim(w[0]) else (program_behind(w) if head in SHELLS else None)
+        if started and around_the_shim(started):
+            return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % started
         if is_git(w):
             sub, args = git_subcommand(w)
             if sub == "push":

@@ -287,3 +287,16 @@ def test_claude_code_hooks_in_the_projects_settings_are_a_missing_floor(tmp_path
     (tmp_path / ".claude" / "settings.json").write_text('{"enabledPlugins": {"x@y": true}}', encoding="utf-8")
     rc, out = run(tmp_path)
     assert verdict(out, "No Claude Code hooks in the project's .claude")[0] == "MISSING" and "(enabledPlugins)" in out, out
+    (tmp_path / ".claude" / "settings.json").write_text('{"enabledPlugins": {"x@y": false}}', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert "No Claude Code hooks in the project's .claude" not in out, "a plugin listed as disabled is not imported"
+    (tmp_path / ".claude" / "settings.json").unlink()
+    root = tmp_path.parent / (tmp_path.name + "-project")
+    (root / "Workspace").mkdir(parents=True)
+    import shutil
+    for item in tmp_path.iterdir():
+        shutil.move(str(item), str(root / "Workspace" / item.name))
+    (root / ".claude").mkdir()
+    (root / ".claude" / "settings.json").write_text('{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "x"}]}]}}', encoding="utf-8")
+    rc, out = run(root / "Workspace")
+    assert verdict(out, "No Claude Code hooks in the project's .claude")[0] == "NOTE" and "../.claude/settings.json (hooks)" in out, "the root's .claude is read only when a builder's workspace is the root: " + out

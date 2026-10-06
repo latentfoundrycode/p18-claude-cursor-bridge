@@ -45,6 +45,8 @@ def run(tool, command):
     "cmd /c cursor-agent.cmd -p x",
     "powershell -NoProfile -Command agent -p x",
     "cd Workspace && agent -p x",
+    "C:/Users/o/AppData/Local/cursor-agent/agent -p x",
+    "pwsh -File C:/Users/o/AppData/Local/cursor-agent/cursor-agent.ps1 -p x",
     "gh api repos/o/r/pulls/12/merge -f merge_method=squash",
 ])
 @pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
@@ -58,6 +60,11 @@ def test_refused(tool, cmd):
     "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x",
     "ssh-agent -s",
     "git commit -m \"start the agent as agent.cmd\"",
+    "./agent --help",
+    "dist/agent.exe --version",
+    "cmd /c dir agent",
+    "pwsh -File build.ps1 agent",
+    "echo agent",
     "git push -u origin task-012",
     "git push origin fix-123",
     "git push --follow-tags origin main",

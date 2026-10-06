@@ -72,6 +72,16 @@ def leads_to(link, target):
         return False
 
 
+def remove_link(link):
+    """Remove `link` itself, never what it points at: a symbolic link (POSIX, or a Windows
+    symbolic link) by unlink, a Windows junction by rmdir, which cannot remove a folder
+    that has content."""
+    if os.path.islink(link):
+        os.unlink(link)
+    else:
+        os.rmdir(link)
+
+
 def make_link(link, target):
     """A directory junction (Windows) or a symbolic link to `target`; the error text, or None."""
     if os.name == "nt":
@@ -115,7 +125,7 @@ def agent_home(env=None, create=True, repair=False):
         if not repair:
             return home, "%s is a link that does not lead to %s" % (link, target)
         try:
-            os.rmdir(link)                        # the link itself, never what it points at
+            remove_link(link)
         except OSError as e:
             return home, "cannot remove the link %s (%s)" % (link, e)
     if not create:
@@ -146,7 +156,7 @@ def rename_probe(env=None):
     try:
         os.makedirs(target, exist_ok=True)
         if os.path.lexists(link):
-            os.rmdir(link)
+            remove_link(link)
         err = make_link(link, target)
         if err:
             return "cannot make the probe link (%s)" % err
@@ -161,11 +171,14 @@ def rename_probe(env=None):
             os.remove(os.path.join(target, name))
         except OSError:
             pass
-    for p in (link, target):
-        try:
-            os.rmdir(p)
-        except OSError:
-            pass
+    try:
+        remove_link(link)
+    except OSError:
+        pass
+    try:
+        os.rmdir(target)
+    except OSError:
+        pass
     return problem
 
 
