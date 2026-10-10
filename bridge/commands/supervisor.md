@@ -1406,7 +1406,10 @@ At every reflection point, run `python ~/.claude/cursor-bridge/conformance-check
    ambiguities in the governance, a rule that made something harder, a check that fired
    wrongly, a suggestion — and the builder's tooling complaints (the builder cannot write
    to `Documents/`). Mark each with the stage and who raised it (supervisor or builder), with
-   enough context that the maintainer can evaluate it months later. **Never act on it.** The
+   enough context that the maintainer can evaluate it months later, and give each entry an
+   ID `FB-nnn` in its heading (`### FB-012 — <title>`; the numbers never reused), as the
+   Issues file gives `ISS-nnn`: the bridge's report cycle reads both documents in place and
+   tracks every entry by its ID (release A3, plan 12). **Never act on it.** The
    bridge is the maintainer's to change; your job is to record.
 2b. **Least confident** (stage close and project end). Name the three parts of the stage — at project end, of the whole build — you are least sure of, each with the concrete check that would settle it, and write them to `docs/HARDENING.md` under the stage name. Be specific: a module, a behaviour, an interaction — never "error handling". Each one a test can settle becomes a test you write before the next stage's first delegation (a failing one enters `root-cause-first`); an external-service doubt becomes a contract capture or a live smoke; the rest stay in `HARDENING.md` as leads the next stage's `refactor-scout` reads. None of it escalates.
 3. **Project Summary and the rest of `Documents/`.** Patch the Project Summary — and any other
