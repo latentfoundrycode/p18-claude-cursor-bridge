@@ -233,6 +233,10 @@ def test_the_project_file_is_a_floor_and_a_stale_one_is_noted(tmp_path):
     (tmp_path / "project.json").write_text('{"name": "Thing", "purpose": "x", "kind": "public", "version": "1.0.0", "state": {"phase": "design"}}', encoding="utf-8")
     rc, out = run(tmp_path)
     assert verdict(out, "project.json kind")[0] == "NOTE", out
+    (tmp_path / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nBridge version: %s\nPhase: building\nStage: 3b (last reflection 2026-10-10)\n" % VERSION, encoding="utf-8")
+    (tmp_path / "project.json").write_text('{"name": "Thing", "purpose": "x", "kind": "private", "version": "0.0.0", "state": {"phase": "building", "stage": "3b", "bridge": "%s", "updated": "2026-10-10"}}' % VERSION, encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "project.json state")[0] is None, "the stage's name is compared, not the rest of the line (reAngle, 2026-10-10): " + out
     (tmp_path / "project.json").write_text('{"name": "Thing", "purpose": "x", "kind": "commercial", "version": "1.0.0", "state": {"phase": "design"}}', encoding="utf-8")
     rc, out = run(tmp_path)
     kind, detail = verdict(out, "project.json state")

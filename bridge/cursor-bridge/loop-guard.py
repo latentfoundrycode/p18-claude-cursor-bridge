@@ -33,7 +33,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source (transcript fallback)
 AGENT_CEILING = 3600       # a background agent older than this no longer counts (release A2; `Agent ceiling:` in RUN_PARAMETERS overrides)
@@ -162,10 +162,81 @@ def field(text, name):
 
 
 def parse_ts(s):
+    """ISO 8601 (with or without Z), or epoch seconds or milliseconds, as a unix time; None otherwise.
+    (reAngle, 2026-10-10: every task's start read as 'now' because the hook's form was not the one expected.)"""
+    if s is None:
+        return None
+    if isinstance(s, (int, float)):
+        return float(s) / 1000 if float(s) > 1e11 else float(s)
+    t = str(s).strip()
+    if re.fullmatch(r"\d{10,13}(\.\d+)?", t):
+        v = float(t)
+        return v / 1000 if v > 1e11 else v
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+        return datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp()
     except Exception:
         return None
+
+
+def cron_field(field, value):
+    """Does a 5-field cron field (`*`, n, a-b, a,b, */n) match a value?"""
+    for part in field.split(","):
+        part = part.strip()
+        step = 1
+        if "/" in part:
+            part, step = part.split("/", 1)
+            step = int(step) if step.isdigit() else 1
+        if part == "*":
+            if (value % step) == 0:
+                return True
+            continue
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            if lo.isdigit() and hi.isdigit() and int(lo) <= value <= int(hi) and (value - int(lo)) % step == 0:
+                return True
+            continue
+        if part.isdigit() and int(part) == value:
+            return True
+    return False
+
+
+def cron_next(expr, now):
+    """The next fire time (local wall clock, as a unix time) of a 5-field cron expression, within
+    eight days; None when the expression does not parse. Claude Code's session crons are local time."""
+    fields = (expr or "").split()
+    if len(fields) != 5:
+        return None
+    t = datetime.fromtimestamp(now).replace(second=0, microsecond=0) + timedelta(minutes=1)
+    for _ in range(8 * 24 * 60):
+        if cron_field(fields[0], t.minute) and cron_field(fields[1], t.hour) and cron_field(fields[2], t.day) \
+                and cron_field(fields[3], t.month) and cron_field(fields[4], t.weekday() + 1 if t.weekday() < 6 else 0):
+            return t.timestamp()
+        t += timedelta(minutes=1)
+    return None
+
+
+def workspace_of(cwd):
+    """The folder holding docs/PROJECT_STATUS.md, or None."""
+    for status in status_candidates(cwd):
+        if os.path.isfile(status):
+            return os.path.dirname(os.path.dirname(status))
+    return None
+
+
+def record_input(data, cwd):
+    """The hook's last input, for the record (run/supervisor/loop-guard-input.json beside the project's
+    status file; never the transcript): what the guard decided from can then be read (release A3)."""
+    ws = workspace_of(cwd)
+    if not ws or not os.path.isdir(os.path.join(ws, "run")):
+        return
+    try:
+        os.makedirs(os.path.join(ws, "run", "supervisor"), exist_ok=True)
+        keep = {k: v for k, v in data.items() if k in ("hook_event_name", "background_tasks", "session_crons", "stop_hook_active", "cwd")}
+        keep["recorded_at"] = datetime.now().isoformat(timespec="seconds")
+        with open(os.path.join(ws, "run", "supervisor", "loop-guard-input.json"), "w", encoding="utf-8") as f:
+            json.dump(keep, f, indent=1, default=str)
+    except OSError:
+        pass
 
 
 def wakes(tur, content, uses):
@@ -237,20 +308,23 @@ def pending_from_hook(data, now, cwd):
     if not isinstance(tasks, list) and not isinstance(crons, list):
         return None, []
     pending, unscheduled = [], []
-    dues = []
+    dues, unknown_crons = [], 0
     for c in crons if isinstance(crons, list) else []:
         if isinstance(c, dict):
-            due = parse_ts(str(c.get("next_run_at") or ""))
+            due = parse_ts(c.get("next_run_at")) or (cron_next(str(c.get("schedule") or ""), now) if c.get("schedule") else None)
             if due is not None:
                 dues.append(due)
-                pending.append("scheduled wake-up %s" % c.get("id"))   # one past due fires as soon as the session is idle
+            else:
+                unknown_crons += 1                         # listed, its time unreadable: it still fires
+            pending.append("scheduled wake-up %s" % c.get("id"))   # one past due fires as soon as the session is idle
     for t in tasks if isinstance(tasks, list) else []:
         if not isinstance(t, dict) or str(t.get("status") or "").lower() != "running":
             continue
-        start = parse_ts(str(t.get("started_at") or "")) or now
+        start = parse_ts(t.get("started_at") if t.get("started_at") is not None else t.get("startedAt")) or now
         age = now - start
-        kind, cmd = str(t.get("type") or ""), str(t.get("command") or "")
-        if kind == "command":
+        kind, cmd = str(t.get("type") or "").lower(), str(t.get("command") or "")
+        is_agent = kind in ("background_subagent", "subagent", "agent", "agent sdk tool") or (not cmd and kind != "command")
+        if not is_agent:                                   # a command: whatever the hook calls its type
             if not any(pat.search(cmd) for pat in WAKE_PATTERNS):
                 continue                                   # a server never finishes, so it never wakes you
             if age <= command_ceiling(cmd, cwd) + GRACE_SECONDS:
@@ -259,7 +333,7 @@ def pending_from_hook(data, now, cwd):
             ceiling = agent_ceiling(cwd)
             if age > ceiling:
                 continue                                   # past its ceiling: stop it and re-run its task in the foreground
-            if any(due <= start + ceiling + 60 for due in dues):
+            if any(due <= start + ceiling + 60 for due in dues) or unknown_crons:
                 pending.append("background agent %s" % t.get("id"))
             else:
                 unscheduled.append("%s (started %ds ago, ceiling %ds)" % (t.get("id"), int(age), ceiling))
@@ -348,6 +422,7 @@ def main():
     status = read_status(cwd)
     if status is None:
         allow()
+    record_input(data, cwd)
     phase = (field(status, "Phase") or "").strip()
     tp = data.get("transcript_path")
     final = data.get("last_assistant_message")           # the hook's own copy; the transcript lags

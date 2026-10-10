@@ -98,8 +98,9 @@ def test_test_suites_are_accepted_by_name_and_their_kind_is_inferred(program):
     for cmd in (["go", "test", "-exec", "evil", "./..."], ["pytest", "-p", "evil"], ["pytest", "-pevil"], ["pytest", "--basetemp=../.."], ["cargo", "test", "--config", "x"], ["pytest", "-c", "x.ini"],
                 ["go", "test", "-toolexec", "evil"], ["node", "--test", "--require", "evil.js"], ["./tools/pytest", "-q"], ["C:/x/pytest.exe"]):
         assert not br.test_suite(cmd), cmd
-    for cmd in (["pytest", "-p", "no:cacheprovider", "-q"], ["pytest", "-pno:cacheprovider"], ["dotnet", "test", "-c", "Release"]):
-        assert br.test_suite(cmd), cmd                     # second pass, S2: ordinary options stay allowed
+    for cmd in (["pytest", "-p", "no:cacheprovider", "-q"], ["pytest", "-pno:cacheprovider"], ["dotnet", "test", "-c", "Release"],
+                ["uv", "run", "--project", "backend", "pytest", "-q"], ["C:/proj/backend/.venv/Scripts/python.exe", "-m", "pytest", "-q"]):
+        assert br.test_suite(cmd), cmd                     # second pass, S2, and reAngle's forms: ordinary options and a venv's python stay allowed
     assert br.head_text(["pytest", "login", "-q"]) == "pytest" and br.head_text(["gh", "pr", "checks", "12"]) == "gh pr checks" and br.head_text(["npm", "run", "test:e2e"]) == "npm run test:e2e"
     assert not br.test_suite(["npx", "vitest"], folder=os.getcwd()) or os.path.isfile(os.path.join(os.getcwd(), "node_modules", ".bin", "vitest"))
     for cmd in (["npm", "run", "test:e2e"], ["pnpm", "test"], ["yarn", "test"], ["node", "--test"], ["python", "-m", "unittest"]):

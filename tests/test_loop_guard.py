@@ -241,3 +241,35 @@ def test_the_run_sheet_check_applies_in_every_phase_and_blocks_the_stop(lg, tmp_
     with pytest.raises(SystemExit) as e:
         lg.main()
     assert e.value.code == 2, "the hook's own copy of the final message wins over the transcript"
+
+
+def test_the_hook_input_is_read_in_its_live_forms(lg, tmp_path, monkeypatch):
+    """reAngle, 2026-10-10 (field observation on 2026.10.10a): a start as epoch milliseconds, a one-shot
+    cron with its schedule only, a command task under another type name."""
+    assert abs(lg.parse_ts(int(NOW * 1000)) - NOW) < 1 and abs(lg.parse_ts(str(int(NOW))) - NOW) < 1 and lg.parse_ts("not a time") is None
+    assert lg.parse_ts(ts(0)) is not None
+    import datetime as dt
+    local = dt.datetime.fromtimestamp(NOW + 1800)
+    due = lg.cron_next("%d %d %d %d *" % (local.minute, local.hour, local.day, local.month), NOW)
+    assert due is not None and abs(due - (NOW + 1800)) < 90, "a one-shot cron pinned to a local time"
+    assert lg.cron_next("*/5 * * * *", NOW) is not None and lg.cron_next("nonsense", NOW) is None
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "run").mkdir()
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
+    agent = {"id": "a1", "type": "background_subagent", "status": "running", "description": "Review A", "command": "Agent", "started_at": int((NOW - 300) * 1000)}
+    cron = {"id": "c1", "schedule": "%d %d %d %d *" % (local.minute, local.hour, local.day, local.month), "description": "ceiling", "command": "", "last_run_at": None}
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [agent], "session_crons": [cron]}, NOW, str(root))
+    assert pending and not unscheduled, (pending, unscheduled)
+    old = dict(agent, started_at=int((NOW - 7200) * 1000))
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [old], "session_crons": []}, NOW, str(root))
+    assert not pending and not unscheduled, "past its ceiling: neither pending nor waiting for a wake-up"
+    launched = {"id": "b1", "type": "shell", "status": "running", "description": "review", "command": "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p x", "started_at": ts(-60)}
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [launched], "session_crons": []}, NOW, str(root))
+    assert pending and not unscheduled, "a launched command is never an agent needing a wake-up"
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": str(root / "none"), "hook_event_name": "Stop", "background_tasks": [launched], "session_crons": []})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 0
+    recorded = json.loads((root / "run" / "supervisor" / "loop-guard-input.json").read_text(encoding="utf-8"))
+    assert recorded["background_tasks"][0]["id"] == "b1" and "transcript_path" not in recorded, "the guard records what it decided from"

@@ -99,7 +99,7 @@ def named_suite(argv):
     head, rest = head_of(argv), argv[1:3]
     return (head == "pytest"
              or head in ("python", "python3", "py") and rest[:2] in (["-m", "pytest"], ["-m", "unittest"])
-             or head == "uv" and rest[:2] == ["run", "pytest"]
+             or head == "uv" and argv[1:2] == ["run"] and "pytest" in argv[2:7]          # uv run [--project x] pytest
              or head in ("npm", "pnpm", "yarn") and (rest[:1] == ["test"] or (rest[:1] == ["run"] and rest[1:2] and rest[1].startswith("test")))
              or head == "npx" and rest[:1] in (["vitest"], ["jest"], ["playwright"])
              or head == "node" and rest[:1] == ["--test"]
@@ -112,8 +112,8 @@ def test_suite(argv, folder=None):
     head, rest = head_of(argv), argv[1:3]
     if not named_suite(argv):
         return False
-    if "/" in argv[0] or "\\" in argv[0]:
-        return False                                       # the runner by its bare name, never a program at a path
+    if ("/" in argv[0] or "\\" in argv[0]) and head not in ("python", "python3"):
+        return False                                       # the runner by its bare name, never a program at a path (a venv's python is the interpreter, not the runner)
     escapes = ESCAPE_OPTIONS.get(head, ())
     for i, a in enumerate(argv[1:], 1):
         name = a.split("=", 1)[0]
