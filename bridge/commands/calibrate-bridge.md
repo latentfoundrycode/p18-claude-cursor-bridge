@@ -119,6 +119,11 @@ Rules while applying **Now** items:
   no data of the owner's` where that is true. A brief packaged without it stops the builder.
 - A stage whose plan names no `Demonstration:` line (release A1b) gets one now, from the
   stage's increments, for every stage not yet closed.
+- `project.json` (release A2) is written at the Workspace root where it is missing, from the
+  status file and the inventory: `name`, `purpose` (one sentence), `kind` (`private` for a
+  project that was running before this release; a new project is asked at intake), `version`
+  (the product's, `0.0.0` until a release) and `state` (`phase`, `stage`, `bridge`, `updated`);
+  committed as its own checkpoint. Nothing about it is a question to the owner.
 - Configuration goes through `cursor-configurator` and is **append-only**: add the missing
   file, the missing hook entry, the missing pre-commit line; never rewrite an existing
   config. Commit the configuration change as its own checkpoint, exactly like Phase 5.

@@ -32,7 +32,10 @@ import sys
 import time
 from datetime import datetime, timezone
 
-GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source
+GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source (transcript fallback)
+AGENT_CEILING = 3600       # a background agent older than this no longer counts (release A2; `Agent ceiling:` in RUN_PARAMETERS overrides)
+KIND_CEILING = {"cursor-agent": 7200, "review": 3600, "gh pr checks": 3600, "# wake": 1800}
+GRACE_SECONDS = 600        # the launcher ends a run at its limit; the notification follows within this
 # A background command counts as a wake source only if it is of a kind that finishes: the
 # builder, the CI watch, or a command the supervisor marked with "# wake". Everything else
 # (servers, workers, probes) runs until killed and can never wake the session.
@@ -181,6 +184,62 @@ def wakes(tur, content, uses):
     return True
 
 
+def agent_ceiling(cwd):
+    """`Agent ceiling: <seconds>` from docs/RUN_PARAMETERS.md beside the status file, else the default."""
+    for status in status_candidates(cwd):
+        try:
+            with open(os.path.join(os.path.dirname(os.path.dirname(status)), "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
+                m = re.search(r"^\s*[-*]?\s*\**Agent ceiling\**\s*:\s*(\d+)", f.read(), re.M | re.I)
+            if m:
+                return int(m.group(1))
+        except OSError:
+            continue
+    return AGENT_CEILING
+
+
+def command_ceiling(cmd):
+    """The limit a launched command runs under: `--limit N` in the command; with `--limit auto`
+    twice its kind's default (the most the launcher learns without the owner's words)."""
+    m = re.search(r"--limit\s+(\d+)", cmd)
+    if m:
+        return int(m.group(1))
+    k = re.search(r"--kind\s+(builder|review|watch|test)", cmd)
+    kind = {"builder": "cursor-agent", "review": "review", "watch": "gh pr checks", "test": "# wake"}.get(k.group(1)) if k else None
+    for key, ceiling in KIND_CEILING.items():
+        if key == kind or (kind is None and key in cmd):
+            return 2 * ceiling if "--limit auto" in cmd else ceiling
+    return 2 * KIND_CEILING["# wake"] if "--limit auto" in cmd else KIND_CEILING["# wake"]
+
+
+def pending_from_hook(data, now, cwd):
+    """What Claude Code itself says is in flight (release A2): the background tasks and the
+    scheduled wake-ups of the hook input. None when the input has neither list, so the
+    transcript is read instead."""
+    tasks, crons = data.get("background_tasks"), data.get("session_crons")
+    if not isinstance(tasks, list) and not isinstance(crons, list):
+        return None
+    pending = []
+    for t in tasks if isinstance(tasks, list) else []:
+        if not isinstance(t, dict) or str(t.get("status") or "").lower() != "running":
+            continue
+        age = now - (parse_ts(str(t.get("started_at") or "")) or now)
+        kind, cmd = str(t.get("type") or ""), str(t.get("command") or "")
+        if kind == "command":
+            if not any(pat.search(cmd) for pat in WAKE_PATTERNS):
+                continue                                   # a server never finishes, so it never wakes you
+            if age <= command_ceiling(cmd) + GRACE_SECONDS:
+                pending.append("background command %s" % t.get("id"))
+        else:                                              # background_subagent, Agent SDK tool
+            if age <= agent_ceiling(cwd):
+                pending.append("background agent %s" % t.get("id"))
+    for c in crons if isinstance(crons, list) else []:
+        if isinstance(c, dict):
+            due = parse_ts(str(c.get("next_run_at") or ""))
+            if due and due >= now - 60:
+                pending.append("scheduled wake-up %s" % c.get("id"))
+    return pending
+
+
 def pending_wakeups(transcript_path, now):
     """Return a list of descriptions of background work that will still wake the session."""
     try:
@@ -277,7 +336,13 @@ def main():
     a = awaiting.lower()
     if a not in NOTHING and not a.startswith(("nothing", "none", "n/a")):
         allow()
+    listed = pending_from_hook(data, time.time(), cwd)
+    if listed:
+        allow()
     tp = data.get("transcript_path")
+    if listed is not None:                                 # Claude Code's own list is exact: nothing pending
+        sys.stderr.write(REASON.format(phase=phase.split()[0]) + chr(10))
+        sys.exit(2)
     if not tp or not os.path.isfile(tp):
         allow()
     pending = pending_wakeups(tp, time.time())

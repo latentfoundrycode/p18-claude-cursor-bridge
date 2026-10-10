@@ -68,6 +68,7 @@ def make_workspace(root, conformant=True):
     (root / "docs" / "INVENTORY.md").write_text(INVENTORY, encoding="utf-8")
     (root / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nBridge version: %s\nPhase: building\n" % VERSION, encoding="utf-8")
     (root / "docs" / "diagrams" / "INDEX.md").write_text("# Diagrams\n", encoding="utf-8")
+    (root / "project.json").write_text('{"name": "Thing", "purpose": "finds things", "kind": "private", "version": "0.0.0", "state": {"phase": "building", "stage": "Stage 1", "bridge": "%s", "updated": "2026-10-10"}}' % VERSION, encoding="utf-8")
     (root / ".cursor" / "rules" / "workspace-boundary.mdc").write_text("rule\n", encoding="utf-8")
     (root / ".cursor" / "rules" / "secure-coding.mdc").write_text("rule\n", encoding="utf-8")
     (root / ".cursor" / "hooks.json").write_text('{"hooks": ["boundary-check.py", "windowless-check.py"]}', encoding="utf-8")
@@ -222,6 +223,22 @@ def test_private_memory_notes_are_listed_by_name(tmp_path):
     rc, out = run(root, home=home)
     v, line = verdict(out, "Private memory notes")
     assert v == "NOTE" and "tdp-supervisor-workflow.md" in line and "1 note(s)" in line and "operating contract" not in out
+
+
+def test_the_project_file_is_a_floor_and_a_stale_one_is_noted(tmp_path):
+    """Release A2 (the owner's requirement of 2026-10-10): project.json at the Workspace root."""
+    make_workspace(tmp_path)
+    rc, out = run(tmp_path)
+    assert verdict(out, "project.json")[0] == "OK", out
+    (tmp_path / "project.json").write_text('{"name": "Thing", "purpose": "x", "kind": "public", "version": "1.0.0", "state": {"phase": "design"}}', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "project.json kind")[0] == "NOTE", out
+    (tmp_path / "project.json").write_text('{"name": "Thing", "purpose": "x", "kind": "commercial", "version": "1.0.0", "state": {"phase": "design"}}', encoding="utf-8")
+    rc, out = run(tmp_path)
+    assert verdict(out, "project.json state")[0] == "NOTE" and "building" in verdict(out, "project.json state")[1], out
+    (tmp_path / "project.json").unlink()
+    rc, out = run(tmp_path)
+    assert verdict(out, "project.json")[0] == "MISSING" and "private | commercial" in verdict(out, "project.json")[1], out
 
 
 def test_not_a_workspace(tmp_path):

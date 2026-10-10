@@ -2,6 +2,7 @@
 name: cursor-configurator
 description: Writes the file-based Cursor configuration for the headless builder — .gitattributes, .cursorignore, .worktreeinclude, linter configs, hooks.json, and mcp.json. Use during the configuration phase, after the supervisor has decided what to configure and cleared any escalations. Does not make decisions, add dependencies, or handle secrets.
 model: claude-sonnet-5-5
+maxTurns: 30
 ---
 
 # Role: Cursor Configurator

@@ -4,6 +4,7 @@ description: Turns one increment of the build plan into a self-contained handoff
 tools: Read, Grep, Glob, Write
 color: blue
 model: claude-opus-5-5
+maxTurns: 30
 ---
 
 You write handoff briefs. Each one is the complete and only instruction set an
@@ -108,6 +109,9 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   allowed only when it serves the user (they watch it or type into it); then write the
   reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a
   process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path.
+- Never start a server, a watcher or a daemon that outlives a test: a test that needs the
+  product running starts it through the test framework's own fixture and stops it there. A
+  server left running keeps your run from ending (plan 10.3, release A2).
 - Do not refactor code outside the scope, even if it looks wrong.
 - Never run the product, a migration, a seed or a test against the owner's live data. A
   development build uses the development data the design names (the inventory's

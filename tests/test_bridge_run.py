@@ -86,6 +86,105 @@ def test_only_the_loops_commands_are_accepted(tmp_path):
     assert p.returncode == 125
 
 
+def test_test_suites_are_accepted_by_name_and_their_kind_is_inferred(program):
+    br = program("bridge-run")
+    for cmd in (["pytest", "-q"], ["python", "-m", "pytest", "tests"], ["uv", "run", "pytest"], ["npm", "test"],
+                ["npx", "vitest", "run"], ["go", "test", "./..."], ["cargo", "test"], ["dotnet", "test"]):
+        assert br.kind_of(cmd) == "test" and br.accepted(cmd), cmd
+    assert br.kind_of(["cursor-agent", "-p"]) == "builder" and br.kind_of(["gh", "pr", "checks", "12"]) == "watch"
+    for cmd in (["python", "-c", "x"], ["npm", "run", "dev"], ["npx", "serve"], ["go", "run", "."]):
+        assert br.kind_of(cmd) is None, cmd
+
+
+def runs_of(tmp_path):
+    import json
+    log = tmp_path / "run" / "launcher" / "runs.jsonl"
+    return [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()] if log.is_file() else []
+
+
+def test_every_run_is_logged_without_its_prompt_and_can_be_marked_healthy(tmp_path):
+    (tmp_path / "run").mkdir()                             # the log is written only where a project's run/ exists
+    code = "import sys; print(1)"
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--kind", "test", "--", sys.executable, "-c", code, "a prompt with spaces that is not logged"],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 0, p.stderr
+    run_id = p.stderr.splitlines()[0].split()[-1]
+    runs = runs_of(tmp_path)
+    assert len(runs) == 1 and runs[0]["id"] == run_id and runs[0]["kind"] == "test" and runs[0]["exit"] == 0
+    assert runs[0]["healthy"] is None and "prompt" not in runs[0]["head"] and runs[0]["limit"] == 30
+    p = subprocess.run([sys.executable, PROG, "--healthy", run_id[:16]], capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 0 and "marked healthy" in p.stderr, p.stderr
+    assert runs_of(tmp_path)[0]["healthy"] is True
+    p = subprocess.run([sys.executable, PROG, "--healthy", "2000-01-01"], capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 1
+
+
+def test_a_run_ended_at_its_limit_is_logged_before_the_tree_dies(tmp_path):
+    (tmp_path / "run").mkdir()
+    pidfile = tmp_path / "pids.txt"
+    p = subprocess.run([sys.executable, PROG, "--limit", "2", "--kind", "test", "--", sys.executable, TREE, str(pidfile)],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 124
+    runs = runs_of(tmp_path)
+    assert len(runs) == 1 and runs[0]["exit"] == 124 and runs[0]["seconds"] >= 2
+    time.sleep(1)
+    for pid in [int(x) for x in pidfile.read_text().split()]:
+        if alive(pid):
+            subprocess.run(["taskkill", "/PID", str(pid), "/F"] if sys.platform == "win32" else ["kill", "-9", str(pid)], capture_output=True)
+
+
+def test_the_learned_limit_grows_only_from_healthy_runs_and_never_past_the_cap(program, tmp_path):
+    import json
+    br = program("bridge-run")
+    log = tmp_path / "run" / "launcher"
+    log.mkdir(parents=True)
+    rows = [{"id": "2026-10-07T10:00:00Z", "kind": "test", "seconds": 2400, "exit": 0, "healthy": None},
+            {"id": "2026-10-07T11:00:00Z", "kind": "test", "seconds": 900, "exit": 0, "healthy": True},
+            {"id": "2026-10-07T12:00:00Z", "kind": "test", "seconds": 5000, "exit": 124, "healthy": True},
+            {"id": "2026-10-07T13:00:00Z", "kind": "builder", "seconds": 7000, "exit": 0, "healthy": True}]
+    (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    assert br.learned_limit("test", str(tmp_path))[0] == 1800 and "default" in br.learned_limit("test", str(tmp_path))[1], "900 s healthy: 1.5x is below the default"
+    assert br.learned_limit("watch", str(tmp_path)) == (3600, "the default for watch"), "no run of the kind: the default"
+    rows[1]["seconds"] = 1600
+    (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 2400 and "2026-10-07T11:00:00Z" in why, (limit, why)
+    rows[1]["seconds"] = 3000
+    (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    assert br.learned_limit("test", str(tmp_path))[0] == 3600, "capped at twice the default (1.5 x 3000 = 4500)"
+    assert br.learned_limit("builder", str(tmp_path))[0] == 10500, "1.5 x 7000 under the cap of 14400"
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "RUN_PARAMETERS.md").write_text("Merge authority: supervisor\nCeiling above twice: test 6000 (the owner: 'let the suite run', 2026-10-07)\n", encoding="utf-8")
+    assert br.learned_limit("test", str(tmp_path))[0] == 4500, "the owner's words lift the cap"
+    p = subprocess.run([sys.executable, PROG, "--limit", "auto", "--kind", "test", "--", sys.executable, "-c", "print(1)"],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 0 and "bridge-run: limit 4500s for test (learned from run 2026-10-07T11:00:00Z" in p.stderr, p.stderr
+    p = subprocess.run([sys.executable, PROG, "--limit", "9999", "--kind", "watch", "--", sys.executable, "-c", "print(1)"],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 125 and "above twice the default" in p.stderr, "an explicit limit above the cap needs the owner's words"
+
+
+def test_the_key_file_reaches_the_child_only_and_must_lie_outside_the_workspace(tmp_path):
+    ws = tmp_path / "Workspace"
+    ws.mkdir()
+    outside = tmp_path / "keys.txt"
+    outside.write_text("# the key file\nTHING_API_KEY=value-never-printed\nnot a key line\n", encoding="utf-8")
+    code = "import os; print(os.environ.get('THING_API_KEY', 'absent'))"
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--kind", "test", "--key-file", str(outside), "--", sys.executable, "-c", code],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(ws))
+    assert p.returncode == 0 and p.stdout.strip() == "value-never-printed", p.stderr
+    assert "THING_API_KEY" in p.stderr and "value-never-printed" not in p.stderr, "names are printed, values never"
+    assert "THING_API_KEY" not in os.environ
+    inside = ws / "keys.txt"
+    inside.write_text("THING_API_KEY=x\n", encoding="utf-8")
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--kind", "test", "--key-file", str(inside), "--", sys.executable, "-c", code],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(ws))
+    assert p.returncode == 125 and "outside" in p.stderr
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--kind", "test", "--key-file", str(tmp_path / "missing.txt"), "--", sys.executable, "-c", code],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(ws))
+    assert p.returncode == 125
+
+
 def test_usage_errors(tmp_path):
     p = subprocess.run([sys.executable, PROG, "--limit", "x", "--", "echo"], capture_output=True, text=True, env=env_for(tmp_path))
     assert p.returncode == 2

@@ -5,6 +5,8 @@
       "Bash(cursor-agent:*)",
       "Bash(python ~/.claude/cursor-bridge/bridge-run.py --limit * -- cursor-agent *)",
       "Bash(python ~/.claude/cursor-bridge/bridge-run.py --limit * -- gh pr checks *)",
+      "Bash(python ~/.claude/cursor-bridge/bridge-run.py --limit * --kind test -- *)",
+      "Bash(python ~/.claude/cursor-bridge/bridge-run.py --healthy *)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git grep:*)",
