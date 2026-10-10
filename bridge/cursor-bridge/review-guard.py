@@ -235,7 +235,11 @@ def launch_info(err_path):
             lines = f.read().splitlines()
     except OSError:
         return None, None
-    m = re.search(r"started\s+(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", lines[0] if lines else "")
+    m = None
+    for line in lines[:5]:                                 # the launcher writes it first; a few lines of slack
+        m = re.search(r"bridge-run: started\s+(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", line)
+        if m:
+            break
     code = None
     for line in reversed(lines):
         e = re.match(r"bridge-run: exit (\d+)", line.strip())

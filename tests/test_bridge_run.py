@@ -90,10 +90,16 @@ def test_test_suites_are_accepted_by_name_and_their_kind_is_inferred(program):
     br = program("bridge-run")
     for cmd in (["pytest", "-q"], ["python", "-m", "pytest", "tests"], ["uv", "run", "pytest"], ["npm", "test"],
                 ["npx", "vitest", "run"], ["go", "test", "./..."], ["cargo", "test"], ["dotnet", "test"]):
-        assert br.kind_of(cmd) == "test" and br.accepted(cmd), cmd
+        assert br.kind_of(cmd) == "test" and (cmd[0] == "npx" or br.accepted(cmd)), cmd   # npx only with a local install
     assert br.kind_of(["cursor-agent", "-p"]) == "builder" and br.kind_of(["gh", "pr", "checks", "12"]) == "watch"
     for cmd in (["python", "-c", "x"], ["npm", "run", "dev"], ["npx", "serve"], ["go", "run", "."]):
         assert br.kind_of(cmd) is None, cmd
+    # review of 2026.10.10a, finding 9: options that run another program, and npx without a local install
+    for cmd in (["go", "test", "-exec", "evil", "./..."], ["pytest", "-p", "evil"], ["pytest", "--basetemp=../.."], ["cargo", "test", "--config", "x"], ["pytest", "-c", "x.ini"]):
+        assert not br.test_suite(cmd), cmd
+    assert not br.test_suite(["npx", "vitest"], folder=os.getcwd()) or os.path.isfile(os.path.join(os.getcwd(), "node_modules", ".bin", "vitest"))
+    for cmd in (["npm", "run", "test:e2e"], ["pnpm", "test"], ["yarn", "test"], ["node", "--test"], ["python", "-m", "unittest"]):
+        assert br.test_suite(cmd), cmd
 
 
 def runs_of(tmp_path):
@@ -108,13 +114,20 @@ def test_every_run_is_logged_without_its_prompt_and_can_be_marked_healthy(tmp_pa
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--kind", "test", "--", sys.executable, "-c", code, "a prompt with spaces that is not logged"],
                        capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
     assert p.returncode == 0, p.stderr
+    assert p.stderr.startswith("bridge-run: started 20"), "the launch line is the FIRST line, whatever else is printed: " + p.stderr
     run_id = p.stderr.splitlines()[0].split()[-1]
     runs = runs_of(tmp_path)
     assert len(runs) == 1 and runs[0]["id"] == run_id and runs[0]["kind"] == "test" and runs[0]["exit"] == 0
-    assert runs[0]["healthy"] is None and "prompt" not in runs[0]["head"] and runs[0]["limit"] == 30
-    p = subprocess.run([sys.executable, PROG, "--healthy", run_id[:16]], capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
-    assert p.returncode == 0 and "marked healthy" in p.stderr, p.stderr
-    assert runs_of(tmp_path)[0]["healthy"] is True
+    assert runs[0]["healthy"] is True, "a passing test run is its own gate (finding 5)"
+    assert "prompt" not in runs[0]["head"] and runs[0]["head"].startswith("python") and "-c" not in runs[0]["head"] and runs[0]["limit"] == 30
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--kind", "builder", "--", sys.executable, "-c", "print(2)"],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 0 and runs_of(tmp_path)[1]["healthy"] is None, "a builder run is marked by the supervisor after the merge"
+    run_id2 = p.stderr.splitlines()[0].split()[-1]
+    p = subprocess.run([sys.executable, PROG, "--healthy", run_id2[:10]], capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 1 and "fits 2 runs" in p.stderr, "a prefix that fits two runs is refused (finding 2): " + p.stderr
+    p = subprocess.run([sys.executable, PROG, "--healthy", run_id2[:10], "--kind", "builder"], capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
+    assert p.returncode == 0 and "marked healthy" in p.stderr and runs_of(tmp_path)[1]["healthy"] is True, p.stderr
     p = subprocess.run([sys.executable, PROG, "--healthy", "2000-01-01"], capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
     assert p.returncode == 1
 
@@ -140,7 +153,7 @@ def test_the_learned_limit_grows_only_from_healthy_runs_and_never_past_the_cap(p
     log.mkdir(parents=True)
     rows = [{"id": "2026-10-07T10:00:00Z", "kind": "test", "seconds": 2400, "exit": 0, "healthy": None},
             {"id": "2026-10-07T11:00:00Z", "kind": "test", "seconds": 900, "exit": 0, "healthy": True},
-            {"id": "2026-10-07T12:00:00Z", "kind": "test", "seconds": 5000, "exit": 124, "healthy": True},
+            {"id": "2026-10-07T12:00:00Z", "kind": "test", "seconds": 5000, "exit": 124, "healthy": None},
             {"id": "2026-10-07T13:00:00Z", "kind": "builder", "seconds": 7000, "exit": 0, "healthy": True}]
     (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
     assert br.learned_limit("test", str(tmp_path))[0] == 1800 and "default" in br.learned_limit("test", str(tmp_path))[1], "900 s healthy: 1.5x is below the default"
@@ -152,8 +165,15 @@ def test_the_learned_limit_grows_only_from_healthy_runs_and_never_past_the_cap(p
     rows[1]["seconds"] = 3000
     (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
     assert br.learned_limit("test", str(tmp_path))[0] == 3600, "capped at twice the default (1.5 x 3000 = 4500)"
+    rows[2]["healthy"] = True                              # finding 5: a run ended at its limit whose kept work merged counts
+    (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    assert br.learned_limit("test", str(tmp_path))[0] == 3600 and "2026-10-07T12:00:00Z" in br.learned_limit("test", str(tmp_path))[1]
+    rows[2]["healthy"] = None
+    (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
     assert br.learned_limit("builder", str(tmp_path))[0] == 10500, "1.5 x 7000 under the cap of 14400"
     (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "RUN_PARAMETERS.md").write_text("Merge authority: supervisor\nCeiling above twice: test 240 (a slip: minutes, 2026-10-07)\n", encoding="utf-8")
+    assert br.learned_limit("test", str(tmp_path))[0] == 3600, "an owner's value below twice the default is ignored (finding 6)"
     (tmp_path / "docs" / "RUN_PARAMETERS.md").write_text("Merge authority: supervisor\nCeiling above twice: test 6000 (the owner: 'let the suite run', 2026-10-07)\n", encoding="utf-8")
     assert br.learned_limit("test", str(tmp_path))[0] == 4500, "the owner's words lift the cap"
     p = subprocess.run([sys.executable, PROG, "--limit", "auto", "--kind", "test", "--", sys.executable, "-c", "print(1)"],
@@ -162,6 +182,37 @@ def test_the_learned_limit_grows_only_from_healthy_runs_and_never_past_the_cap(p
     p = subprocess.run([sys.executable, PROG, "--limit", "9999", "--kind", "watch", "--", sys.executable, "-c", "print(1)"],
                        capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path))
     assert p.returncode == 125 and "above twice the default" in p.stderr, "an explicit limit above the cap needs the owner's words"
+
+
+def test_the_launch_line_comes_first_and_review_guard_reads_it(program, tmp_path):
+    """Review of 2026.10.10a, finding 1: with --limit auto the launch time stayed the first line
+    that review-guard.py and pr-activity-check.py read; otherwise every merge is refused."""
+    (tmp_path / "run" / "review").mkdir(parents=True)
+    keys = tmp_path.parent / (tmp_path.name + "-keys.txt")   # outside the folder the launcher runs in
+    keys.write_text("X_TOKEN=never-printed\n", encoding="utf-8")
+    err = tmp_path / "run" / "review" / "REVIEW-001.err"
+    with open(err, "w", encoding="utf-8") as f:
+        p = subprocess.run([sys.executable, PROG, "--limit", "auto", "--kind", "review", "--key-file", str(keys), "--", sys.executable, "-c", "print(1)"],
+                           stdout=subprocess.DEVNULL, stderr=f, env=env_for(tmp_path / "elsewhere"), cwd=str(tmp_path))
+    assert p.returncode == 0
+    lines = err.read_text(encoding="utf-8").splitlines()
+    assert lines[0].startswith("bridge-run: started 20") and lines[-1] == "bridge-run: exit 0" and any("limit " in l for l in lines), lines
+    rg = program("review-guard")
+    launched, code = rg.launch_info(str(err))
+    assert launched and code == 0, (launched, code)
+    pac = program("pr-activity-check")
+    assert pac.parse_ts(lines[0].split()[-1]) is not None, "pr-activity-check --since takes the first line's time"
+    assert "never-printed" not in err.read_text(encoding="utf-8")
+
+
+def test_a_key_file_never_goes_to_the_agent(tmp_path):
+    keys = tmp_path / "keys.txt"
+    keys.write_text("X_TOKEN=x\n", encoding="utf-8")
+    env = env_for(tmp_path)
+    env.pop("BRIDGE_RUN_ALLOW_ANY")
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--key-file", str(keys), "--", "cursor-agent", "-p", "x"],
+                       capture_output=True, text=True, env=env, cwd=str(tmp_path / "ws") if (tmp_path / "ws").mkdir() is None else str(tmp_path))
+    assert p.returncode == 125 and "never goes to a cursor-agent run" in p.stderr, p.stderr
 
 
 def test_the_key_file_reaches_the_child_only_and_must_lie_outside_the_workspace(tmp_path):

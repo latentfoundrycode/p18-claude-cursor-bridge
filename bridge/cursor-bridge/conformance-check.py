@@ -420,8 +420,16 @@ def main():
             st = pj.get("state") if isinstance(pj.get("state"), dict) else {}
             phase = str(st.get("phase") or "").lower()
             status_phase = str(status_field(ws, "Phase") or "").lower()
+            stale = []
             if status_phase and not status_phase.startswith(phase.split()[0] if phase else "\0"):
-                add("NOTE", "project.json state", "its phase (%s) is not the status file's (%s): bring it up to date at this reflection point" % (phase or "none", status_phase))
+                stale.append("its phase (%s) is not the status file's (%s)" % (phase or "none", status_phase))
+            inst = (read(os.path.join(HERE, "VERSION")) or "").strip()
+            if inst and str(st.get("bridge") or "") != inst:
+                stale.append("its bridge version (%s) is not the installed one (%s)" % (st.get("bridge") or "none", inst))
+            if not re.match(r"^\d{4}-\d\d-\d\d$", str(st.get("updated") or "")):
+                stale.append("its updated date is missing or not YYYY-MM-DD")
+            if stale:
+                add("NOTE", "project.json state", "; ".join(stale) + ": bring it up to date at this reflection point")
     if os.path.isfile(os.path.join(ws, "docs", "DESIGN.md")):
         add("OK", "docs/DESIGN.md")
     else:

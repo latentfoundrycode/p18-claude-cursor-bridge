@@ -235,7 +235,8 @@ def test_the_project_file_is_a_floor_and_a_stale_one_is_noted(tmp_path):
     assert verdict(out, "project.json kind")[0] == "NOTE", out
     (tmp_path / "project.json").write_text('{"name": "Thing", "purpose": "x", "kind": "commercial", "version": "1.0.0", "state": {"phase": "design"}}', encoding="utf-8")
     rc, out = run(tmp_path)
-    assert verdict(out, "project.json state")[0] == "NOTE" and "building" in verdict(out, "project.json state")[1], out
+    kind, detail = verdict(out, "project.json state")
+    assert kind == "NOTE" and "building" in detail and "bridge version" in detail and "updated" in detail, out
     (tmp_path / "project.json").unlink()
     rc, out = run(tmp_path)
     assert verdict(out, "project.json")[0] == "MISSING" and "private | commercial" in verdict(out, "project.json")[1], out

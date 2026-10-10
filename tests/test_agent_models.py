@@ -45,7 +45,7 @@ def test_agent_model_and_effort(name):
     assert fm.get("effort") == effort, "%s: effort %r" % (name, fm.get("effort"))
 
 
-SEARCHERS = ("diff-reviewer", "security-auditor", "design-auditor", "refactor-scout", "secret-sentinel", "plan-critic", "test-runner")
+SEARCHERS = tuple(sorted(EXPECTED))                 # every agent searches, so every agent has the folder rule (first review of A2, finding 8)
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED))
@@ -56,6 +56,9 @@ def test_every_agent_has_a_turn_limit_and_every_searcher_its_folders(name):
     if name in SEARCHERS:
         text = open(os.path.join(AGENTS, name + ".md"), encoding="utf-8").read()
         assert "never the home folder, another project or the whole disk" in text, "%s names no folder limit" % name
+        body = text.split("\n---\n", 1)[1].strip()
+        first = body.split("\n\n", 1)[0]
+        assert body.count(first) == 1, "%s repeats its opening paragraph" % name
 
 
 def test_roster_template_matches_review_a():

@@ -12,11 +12,6 @@ You review code you did not write, against the brief that commissioned it. You n
 edit anything. If you find yourself wanting to fix something, describe the fix
 instead.
 
-
-You review code you did not write, against the brief that commissioned it. You never
-edit anything. If you find yourself wanting to fix something, describe the fix
-instead.
-
 You search only inside the project's `Workspace/`, or the worktree the supervisor names, never the home folder, another project or the whole disk; your turns are limited (`maxTurns`), so work from the diff and the files it names outward (release A2).
 
 ## Method

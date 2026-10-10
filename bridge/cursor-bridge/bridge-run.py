@@ -3,7 +3,7 @@
 process tree.
 
   python ~/.claude/cursor-bridge/bridge-run.py --limit <seconds|auto> [--kind <kind>] [--key-file <path>] -- <command> [args...]
-  python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id>
+  python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id> [--kind <kind>]
 
 Why it exists (KP-033): a background builder, reviewer or watch that hangs holds the loop
 until the owner notices, and on Windows a plain timeout kills only the first process while
@@ -18,10 +18,15 @@ process group, killed as a whole.
 What it accepts (release 0a review, F6; release A2): only the commands the loop runs through
 it, each by name: `cursor-agent …` (a builder, or Review B with `--kind review`), `gh pr
 checks …` (the CI watch) and the test suites the supervisor awaits (`pytest`, `python -m
-pytest`, `uv run pytest`, `npm test`, `npx vitest`, `npx jest`, `go test`, `cargo test`,
-`dotnet test`); anything else is refused with exit 125, so the launcher's allow rule cannot
-become a way to run arbitrary commands unseen. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run
-their own helpers through it.
+pytest`, `python -m unittest`, `uv run pytest`, `npm test`, `npm run test*`, `pnpm test`,
+`yarn test`, `npx vitest`, `npx jest`, `npx playwright test`, `node --test`, `go test`,
+`cargo test`, `dotnet test`); an option that would run another program or delete a folder
+(`-exec`, `-p`, `-c`, `--config`, `--basetemp`) is refused, an `npx` tool is accepted only
+when it is installed in the project (`node_modules/.bin/`), and `--key-file` is refused with
+`cursor-agent` (a key must never reach the builder); anything else is refused with exit 125,
+so the launcher's allow rule cannot become a way to run arbitrary commands unseen. A
+benchmark or a runner the launcher does not know runs directly in the background, marked
+`# wake`. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers through it.
 
 Ceilings (release A2, plan 10.3): every run is logged to `run/launcher/runs.jsonl` under the
 folder the launcher is started in (kind, limit, seconds, exit; never the prompt). `--limit
@@ -29,9 +34,12 @@ auto` takes the kind's default (builder 7200, review 3600, watch 3600, test 1800
 HEALTHY run of that kind is on record, one and a half times the longest healthy run, never
 below the default and never above twice it unless `docs/RUN_PARAMETERS.md` carries the
 owner's words on a line `Ceiling above twice: <kind> <seconds> (<their words>, <date>)`. The
-supervisor marks a run healthy with `--healthy <run id>` once its work passed the gate; the
-run id is the launch time printed on the first stderr line. The run that raised a ceiling is
+supervisor marks a run healthy with `--healthy <run id>` once its work passed the gate (the
+id is the launch time on the first stderr line, given whole or as a prefix that fits exactly
+one run; a run ended at its limit whose kept work merged counts too, so the ceiling can grow);
+a test run that exits 0 is marked by the launcher itself. The run that raised a ceiling is
 named when the ceiling is chosen. A slow but healthy task is never ended before its ceiling.
+An owner's cap below twice the default is ignored with a note: the line says "above twice".
 
 `--key-file <path>` (release A2): a file of `NAME=value` lines, outside the Workspace, whose
 values reach the child's environment only; names are printed, values never (the owner's
@@ -80,15 +88,33 @@ def head_of(argv):
     return os.path.basename(argv[0]).lower().replace(".exe", "").replace(".cmd", "") if argv else ""
 
 
-def test_suite(argv):
-    """The test suites the supervisor awaits, by name (release A2)."""
+ESCAPE_OPTIONS = ("-exec", "-p", "-c", "--config", "--basetemp", "--rootdir", "--plugin")
+
+
+def named_suite(argv):
+    """A test suite the launcher knows by name (release A2)."""
     head, rest = head_of(argv), argv[1:3]
     return (head == "pytest"
-            or head in ("python", "python3", "py") and rest[:2] == ["-m", "pytest"]
-            or head == "uv" and rest[:2] == ["run", "pytest"]
-            or head == "npm" and rest[:1] == ["test"]
-            or head == "npx" and rest[:1] in (["vitest"], ["jest"])
-            or head in ("go", "cargo", "dotnet") and rest[:1] == ["test"])
+             or head in ("python", "python3", "py") and rest[:2] in (["-m", "pytest"], ["-m", "unittest"])
+             or head == "uv" and rest[:2] == ["run", "pytest"]
+             or head in ("npm", "pnpm", "yarn") and (rest[:1] == ["test"] or (rest[:1] == ["run"] and rest[1:2] and rest[1].startswith("test")))
+             or head == "npx" and rest[:1] in (["vitest"], ["jest"], ["playwright"])
+             or head == "node" and rest[:1] == ["--test"]
+             or head in ("go", "cargo", "dotnet") and rest[:1] == ["test"])
+
+
+def test_suite(argv, folder=None):
+    """A named test suite the launcher accepts: never with an option that runs another program
+    or deletes a folder; an npx tool only when the project has it installed."""
+    head, rest = head_of(argv), argv[1:3]
+    if not named_suite(argv):
+        return False
+    if any(a in ESCAPE_OPTIONS or a.split("=", 1)[0] in ESCAPE_OPTIONS for a in argv[1:]):
+        return False
+    if head == "npx" and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0])) \
+            and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0] + ".cmd")):
+        return False                                       # npx would fetch it from the registry, outside the gate
+    return True
 
 
 def kind_of(argv):
@@ -98,16 +124,16 @@ def kind_of(argv):
         return "builder"
     if head == "gh" and argv[1:3] == ["pr", "checks"]:
         return "watch"
-    if test_suite(argv):
+    if named_suite(argv):
         return "test"
     return None
 
 
-def accepted(argv):
+def accepted(argv, folder=None):
     """The inner commands the loop runs through the launcher."""
     if not argv:
         return False
-    if kind_of(argv) is not None:
+    if kind_of(argv) is not None and (kind_of(argv) != "test" or test_suite(argv, folder)):
         return True
     return os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1"
 
@@ -141,6 +167,17 @@ def write_log(folder, entry):
         sys.stderr.write("bridge-run: run log not written (%s)\n" % e)
 
 
+def cap_for(kind, folder):
+    """(cap, note): twice the default, or the owner's recorded value when it is above that."""
+    default = KINDS[kind]
+    owner = owner_cap(kind, folder)
+    if owner and owner > CAP_FACTOR * default:
+        return owner, ""
+    if owner:
+        return CAP_FACTOR * default, "the run parameters' `Ceiling above twice: %s %d` is not above twice the default (%d) and is ignored" % (kind, owner, CAP_FACTOR * default)
+    return CAP_FACTOR * default, ""
+
+
 def owner_cap(kind, folder):
     """The owner's recorded words lifting a kind's cap above twice its default, or None."""
     try:
@@ -158,23 +195,27 @@ def learned_limit(kind, folder):
     """(limit, reason): the kind's default, or one and a half times the longest healthy run,
     never below the default and never above twice it without the owner's words."""
     default = KINDS[kind]
-    cap = owner_cap(kind, folder) or CAP_FACTOR * default
+    cap, _ = cap_for(kind, folder)
     healthy = [r for r in read_log(folder) if r.get("kind") == kind and r.get("healthy") is True
-               and isinstance(r.get("seconds"), (int, float)) and r.get("exit") == 0]
+               and isinstance(r.get("seconds"), (int, float)) and r.get("exit") in (0, 124)]   # 124: ended at its limit, its kept work merged
     if not healthy:
         return default, "the default for %s" % kind
     longest = max(healthy, key=lambda r: r["seconds"])
     if LEARN_FACTOR * longest["seconds"] <= default:
-        return default, "the default for %s (the longest healthy run, %ds, needs no more)" % (kind, int(longest["seconds"]))
+        return default, "the default for %s (the longest healthy run, %s at %ds, needs no more)" % (kind, longest.get("id"), int(longest["seconds"]))
     limit = int(min(cap, LEARN_FACTOR * longest["seconds"]))
     return limit, "learned from run %s (%ds, healthy); cap %ds" % (longest.get("id"), int(longest["seconds"]), int(cap))
 
 
-def mark_healthy(run_id, folder):
+def mark_healthy(run_id, folder, kind=None):
     runs = read_log(folder)
-    hit = [r for r in runs if str(r.get("id", "")).startswith(run_id)]
+    hit = [r for r in runs if str(r.get("id", "")).startswith(run_id) and (kind is None or r.get("kind") == kind)]
     if not hit:
         sys.stderr.write("bridge-run: no run %s in %s\n" % (run_id, LOG))
+        return 1
+    if len(hit) > 1:
+        sys.stderr.write("bridge-run: refused - %s fits %d runs (%s); give the whole id, and --kind when two kinds share it\n" % (
+            run_id, len(hit), ", ".join("%s %s" % (r.get("id"), r.get("kind")) for r in hit[:6])))
         return 1
     for r in hit:
         r["healthy"] = True
@@ -209,8 +250,13 @@ def key_file_env(path, folder):
 
 
 def head_text(argv):
-    """The command's name and its first short arguments, never a prompt."""
-    return " ".join(a for a in argv[:4] if len(a) <= 40 and " " not in a)[:80]
+    """The program's name and its subcommand, from the command as given: never an argument,
+    never a prompt (`cursor-agent`, `gh pr checks`, `pytest`, `npm test`)."""
+    head = head_of(argv)
+    subs = [a for a in argv[1:3] if re.match(r"^[a-z][a-z:-]{0,15}$", a)]
+    if head == "cursor-agent":
+        return head
+    return " ".join([head] + subs)[:40]
 
 
 def resolve(argv):
@@ -290,15 +336,19 @@ def main():
     argv = sys.argv[1:]
     folder = os.getcwd()
     if argv[:1] == ["--healthy"]:
-        return mark_healthy(argv[1], folder) if len(argv) == 2 and argv[1] else usage()
+        kind = argv[argv.index("--kind") + 1] if "--kind" in argv and argv.index("--kind") + 1 < len(argv) else None
+        return mark_healthy(argv[1], folder, kind) if len(argv) >= 2 and argv[1] and argv[1] != "--kind" else usage()
     if "--limit" not in argv or "--" not in argv:
         return usage()
     flags = argv[:argv.index("--")]
     cmd = argv[argv.index("--") + 1:]
     if not cmd:
         return usage()
-    if not accepted(cmd):
-        sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name (got %r)\n" % cmd[0])
+    if not accepted(cmd, folder):
+        sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
+        return 125
+    if "--key-file" in flags and head_of(cmd) == "cursor-agent":
+        sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
         return 125
     kind = flags[flags.index("--kind") + 1] if "--kind" in flags and flags.index("--kind") + 1 < len(flags) else kind_of(cmd)
     if kind is None and os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1":
@@ -307,15 +357,23 @@ def main():
         sys.stderr.write("bridge-run: refused - unknown kind %r (builder, review, watch, test)\n" % kind)
         return 125
     raw = flags[flags.index("--limit") + 1] if flags.index("--limit") + 1 < len(flags) else ""
+    if raw != "auto":
+        try:
+            float(raw)
+        except ValueError:
+            return usage()
+    head = head_text(cmd)
+    run_id = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+    sys.stderr.write("bridge-run: started %s\n" % run_id)         # the FIRST line: review-guard and pr-activity-check read it
+    sys.stderr.flush()
+    cap, cap_note = cap_for(kind, folder)
+    if cap_note:
+        sys.stderr.write("bridge-run: %s\n" % cap_note)
     if raw == "auto":
         limit, why = learned_limit(kind, folder)
         sys.stderr.write("bridge-run: limit %ds for %s (%s)\n" % (limit, kind, why))
     else:
-        try:
-            limit = float(raw)
-        except ValueError:
-            return usage()
-        cap = owner_cap(kind, folder) or CAP_FACTOR * KINDS[kind]
+        limit = float(raw)
         if limit > cap:
             sys.stderr.write("bridge-run: refused - a limit of %ds is above twice the default for %s (%ds); the owner's words in docs/RUN_PARAMETERS.md (`Ceiling above twice: %s <seconds> (<their words>, <date>)`) lift the cap\n" % (int(limit), kind, cap, kind))
             return 125
@@ -334,10 +392,7 @@ def main():
             return 125
         env.update(keys)
         sys.stderr.write("bridge-run: key file read (%d name(s): %s)\n" % (len(keys), ", ".join(sorted(keys)) or "none"))
-    run_id = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-    sys.stderr.write("bridge-run: started %s\n" % run_id)
-    sys.stderr.flush()
-    entry = {"id": run_id, "kind": kind, "head": head_text(cmd), "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
+    entry = {"id": run_id, "kind": kind, "head": head, "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
 
     killer = None
     if sys.platform == "win32":
@@ -388,7 +443,7 @@ def main():
         sys.stderr.write("bridge-run: exit %d\n" % rc)
         sys.stderr.flush()
     if entry["exit"] is None:
-        entry.update(seconds=int(time.time() - started), exit=rc)
+        entry.update(seconds=int(time.time() - started), exit=rc, healthy=(True if kind == "test" and rc == 0 else None))   # a passing test run is its own gate
         write_log(folder, entry)
     # The job handle is deliberately not closed here: it closes when this process exits,
     # after the exit code is set, and "kill on close" then ends any orphan the command left.
