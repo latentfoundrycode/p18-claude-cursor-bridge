@@ -472,7 +472,7 @@ Two options for reaching it:
   (`git status --porcelain` empty, then `git diff <merge-base>...HEAD`; a working-tree diff
   omits every untracked new file, and a reviewer that receives an incomplete diff has
   correctly refused it twice), then invoke Review B **through the launcher, with execution**:
-  `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- cursor-agent -p --force --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<nnn>.err`
+  `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<nnn>.err`
   (`--force` lets it run the project's tests, write throwaway reproductions, and try a
   temporary mutation to see whether the tests catch it — the reviewer's strongest findings
   in the record came from exactly that, and the owner decided on 2026-10-04 to keep it

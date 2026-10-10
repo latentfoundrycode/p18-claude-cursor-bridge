@@ -96,6 +96,84 @@ def test_field_variants(lg, text, value):
     assert lg.field(text, "Phase") == value
 
 
+def hook_input(root, tasks=None, crons=None, **more):
+    data = {"cwd": str(root), "transcript_path": str(root / "none.jsonl"), "hook_event_name": "Stop"}
+    if tasks is not None:
+        data["background_tasks"] = tasks
+    if crons is not None:
+        data["session_crons"] = crons
+    data.update(more)
+    return data
+
+
+def task(kind, command, age, status="running", tid="t1"):
+    return {"id": tid, "type": kind, "status": status, "description": command[:30], "command": command, "started_at": ts(-age)}
+
+
+@pytest.mark.parametrize("name,tasks,crons,allowed", [
+    ("a running builder read from the hook's list", [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x", 600)], None, True),
+    ("a builder past its limit plus grace no longer counts", [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x", 7200 + 601)], None, False),
+    ("a server never counts", [task("command", "npm run dev", 60)], None, False),
+    ("a completed task never counts", [task("command", "cursor-agent -p --force x", 60, status="completed")], None, False),
+    ("a background agent under its ceiling with its wake-up scheduled", [task("background_subagent", "Agent", 600)], [{"id": "c1", "schedule": "7 * * * *", "description": "ceiling check", "command": "", "last_run_at": None, "next_run_at": ts(2900)}], True),
+    ("a background agent with no wake-up scheduled is not a wake source (case 5)", [task("background_subagent", "Agent", 600)], [], False),
+    ("a wake-up scheduled after the ceiling does not bound the agent: sent back (second pass, S1)", [task("background_subagent", "Agent", 600)], [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(7200)}], False),
+    ("a wake-up past due still fires when the session is idle", [], [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(-300)}], True),
+    ("a test suite through the launcher counts without # wake", [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- pytest -q", 60)], None, True),
+    ("a background agent past its ceiling (case 5)", [task("background_subagent", "Agent", 3601)], None, False),
+    ("a scheduled wake-up still due", [], [{"id": "c1", "schedule": "7 * * * *", "description": "ceiling check", "command": "", "last_run_at": None, "next_run_at": ts(1800)}], True),
+    ("an empty list means nothing is pending", [], [], False),
+])
+def test_the_guard_reads_what_is_in_flight_from_the_hook(lg, tmp_path, monkeypatch, capsys, name, tasks, crons, allowed):
+    """Release A2 (plan 10.3): Claude Code's own list replaces the transcript reconstruction."""
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps(hook_input(root, tasks, crons))))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert (e.value.code == 0) is allowed, (name, capsys.readouterr().err)
+
+
+def test_the_agent_ceiling_can_be_raised_in_the_run_parameters(lg, tmp_path, monkeypatch):
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
+    (root / "docs" / "RUN_PARAMETERS.md").write_text("Merge authority: supervisor\nAgent ceiling: 7200\nCeiling above twice: builder 21600 (the owner: six hours, 2026-10-10)\n", encoding="utf-8")
+    assert lg.agent_ceiling(str(root)) == 7200
+    crons = [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(2000)}]
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps(hook_input(root, [task("background_subagent", "Agent", 5000)], crons))))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 0
+    assert lg.command_ceiling("python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p x", str(root)) == 21600, "the owner's raised ceiling (finding 7)"
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps(hook_input(root, [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p x", 5 * 3600)]))))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 0, "a builder five hours into a six-hour owner ceiling is still a wake source"
+
+
+def test_an_agent_without_its_wake_up_is_sent_back_with_the_reason(lg, tmp_path, monkeypatch, capsys):
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps(hook_input(root, [task("background_subagent", "Agent", 300)], []))))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 2 and "CronCreate" in capsys.readouterr().err
+
+
+def test_without_the_hook_list_the_transcript_is_read_as_before(lg, tmp_path, monkeypatch):
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
+    tp = write_transcript(tmp_path, "cursor-agent -p --force x")
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": tp, "hook_event_name": "Stop"})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    assert e.value.code == 0
+
+
 def test_stop_hook_active_allows(lg, monkeypatch, capsys):
     import io, sys
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"stop_hook_active": True})))

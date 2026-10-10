@@ -11,13 +11,16 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
   3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner);
   (and, in every phase: a turn whose last message holds a shell block and names no terminal
   is sent back once, because a run sheet without its terminal cannot be followed, rule 27);
-  4. nothing is pending that will wake the session: no background agent or scheduled
-     wake-up, and no background command *of a kind that finishes* - a builder run
-     (cursor-agent), a CI watch (gh pr checks --watch), or any command the supervisor marked
-     with `# wake` - started in the last GRACE_HOURS without a completion notification in
-     the transcript. A background command of any other kind (a dev server, a worker, a
-     probe) is NOT a wake source: a server never finishes, so nothing would ever wake the
-     session (KP-031: a dev stack left running masqueraded as a wake source for 7 hours);
+  4. nothing is pending that will wake the session. Since release A2 the hook's own lists
+     decide: a background command *of a kind that finishes* (a builder run, a CI watch, a
+     command run through bridge-run.py, or one marked `# wake`) counts until its limit plus a
+     grace; a background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
+     the run parameters) AND only while a scheduled wake-up is due no later than that
+     ceiling, because a hung agent never completes and nothing else would wake the session
+     (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the
+     session is idle). A background command of any other kind (a dev server, a worker, a
+     probe) is NOT a wake source: a server never finishes (KP-031). When the hook hands no
+     lists, the transcript is read as before, within GRACE_HOURS;
   5. this is not already a continuation forced by this hook (`stop_hook_active`), so it
      nudges at most once per stop sequence and can never trap the session.
 
@@ -32,12 +35,16 @@ import sys
 import time
 from datetime import datetime, timezone
 
-GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source
+GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source (transcript fallback)
+AGENT_CEILING = 3600       # a background agent older than this no longer counts (release A2; `Agent ceiling:` in RUN_PARAMETERS overrides)
+KIND_CEILING = {"cursor-agent": 7200, "review": 3600, "gh pr checks": 3600, "# wake": 1800}
+GRACE_SECONDS = 600        # the launcher ends a run at its limit; the notification follows within this
 # A background command counts as a wake source only if it is of a kind that finishes: the
 # builder, the CI watch, or a command the supervisor marked with "# wake". Everything else
 # (servers, workers, probes) runs until killed and can never wake the session.
 WAKE_PATTERNS = (
     re.compile(r"\bcursor-agent\b"),
+    re.compile(r"bridge-run\.py"),                       # anything the launcher runs is bounded by its limit
     re.compile(r"\bgh\s+pr\s+checks\b.*--watch"),
     re.compile(r"#\s*wake\b", re.I),
 )
@@ -181,6 +188,84 @@ def wakes(tur, content, uses):
     return True
 
 
+def agent_ceiling(cwd):
+    """`Agent ceiling: <seconds>` from docs/RUN_PARAMETERS.md beside the status file, else the default."""
+    for status in status_candidates(cwd):
+        try:
+            with open(os.path.join(os.path.dirname(os.path.dirname(status)), "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
+                m = re.search(r"^\s*[-*]?\s*\**Agent ceiling\**\s*:\s*(\d+)", f.read(), re.M | re.I)
+            if m:
+                return int(m.group(1))
+        except OSError:
+            continue
+    return AGENT_CEILING
+
+
+def owner_ceiling(cwd, kind):
+    """`Ceiling above twice: <kind> <seconds> (...)` from the run parameters beside the status file."""
+    for status in status_candidates(cwd):
+        try:
+            with open(os.path.join(os.path.dirname(os.path.dirname(status)), "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
+                for m in re.finditer(r"^\s*[-*]?\s*\**Ceiling above twice\**\s*:\s*(\w+)\s+(\d+)\s*\(", f.read(), re.M | re.I):
+                    if m.group(1).lower() == kind:
+                        return int(m.group(2))
+        except OSError:
+            continue
+    return None
+
+
+def command_ceiling(cmd, cwd=None):
+    """The limit a launched command runs under: `--limit N` in the command; with `--limit auto`
+    twice its kind's default, or the owner's raised ceiling (the most the launcher learns)."""
+    m = re.search(r"--limit\s+(\d+)", cmd)
+    if m:
+        return int(m.group(1))
+    k = re.search(r"--kind\s+(builder|review|watch|test)", cmd)
+    kind = k.group(1) if k else ("builder" if "cursor-agent" in cmd else "watch" if "gh pr checks" in cmd else "test")
+    key = {"builder": "cursor-agent", "review": "review", "watch": "gh pr checks", "test": "# wake"}[kind]
+    ceiling = KIND_CEILING[key]
+    if "--limit auto" in cmd:
+        return max(2 * ceiling, owner_ceiling(cwd, kind) or 0)
+    return ceiling
+
+
+def pending_from_hook(data, now, cwd):
+    """What Claude Code itself says is in flight (release A2): the background tasks and the
+    scheduled wake-ups of the hook input. None when the input has neither list, so the
+    transcript is read instead."""
+    tasks, crons = data.get("background_tasks"), data.get("session_crons")
+    if not isinstance(tasks, list) and not isinstance(crons, list):
+        return None, []
+    pending, unscheduled = [], []
+    dues = []
+    for c in crons if isinstance(crons, list) else []:
+        if isinstance(c, dict):
+            due = parse_ts(str(c.get("next_run_at") or ""))
+            if due is not None:
+                dues.append(due)
+                pending.append("scheduled wake-up %s" % c.get("id"))   # one past due fires as soon as the session is idle
+    for t in tasks if isinstance(tasks, list) else []:
+        if not isinstance(t, dict) or str(t.get("status") or "").lower() != "running":
+            continue
+        start = parse_ts(str(t.get("started_at") or "")) or now
+        age = now - start
+        kind, cmd = str(t.get("type") or ""), str(t.get("command") or "")
+        if kind == "command":
+            if not any(pat.search(cmd) for pat in WAKE_PATTERNS):
+                continue                                   # a server never finishes, so it never wakes you
+            if age <= command_ceiling(cmd, cwd) + GRACE_SECONDS:
+                pending.append("background command %s" % t.get("id"))
+        else:                                              # background_subagent, Agent SDK tool
+            ceiling = agent_ceiling(cwd)
+            if age > ceiling:
+                continue                                   # past its ceiling: stop it and re-run its task in the foreground
+            if any(due <= start + ceiling + 60 for due in dues):
+                pending.append("background agent %s" % t.get("id"))
+            else:
+                unscheduled.append("%s (started %ds ago, ceiling %ds)" % (t.get("id"), int(age), ceiling))
+    return pending, unscheduled
+
+
 def pending_wakeups(transcript_path, now):
     """Return a list of descriptions of background work that will still wake the session."""
     try:
@@ -277,7 +362,16 @@ def main():
     a = awaiting.lower()
     if a not in NOTHING and not a.startswith(("nothing", "none", "n/a")):
         allow()
+    listed, unscheduled = pending_from_hook(data, time.time(), cwd)
     tp = data.get("transcript_path")
+    if unscheduled:                                        # before anything else: a later wake-up does not bound the agent
+        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no wake-up scheduled at its ceiling: %s. A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, write it on the status file's `In flight:` line and schedule a one-shot wake-up at its ceiling with CronCreate (`recurring: false`, the prompt naming the agent); at that wake-up, stop an agent still running with TaskStop and run its task again in the foreground.%s" % (", ".join(unscheduled), chr(10)))
+        sys.exit(2)
+    if listed:
+        allow()
+    if listed is not None:                                 # Claude Code's own list is exact: nothing pending
+        sys.stderr.write(REASON.format(phase=phase.split()[0]) + chr(10))
+        sys.exit(2)
     if not tp or not os.path.isfile(tp):
         allow()
     pending = pending_wakeups(tp, time.time())

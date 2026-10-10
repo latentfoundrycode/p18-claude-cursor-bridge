@@ -53,7 +53,8 @@ KNOWN_PROSE = (
     "gh pr merge --admin",              # named as the thing the deny rules forbid
     "python ~/.claude/" + chr(0x2026),  # the permissions paragraph's "every python ~/.claude/... command"
 )
-PROSE_EXACT = ("git worktree remove", "gh pr merge")   # a command family named bare, never a runnable form
+PROSE_EXACT = ("git worktree remove", "gh pr merge", "npx vitest", "npx jest", "npx playwright test", "npm test", "npm run test*", "pnpm test",
+               "yarn test", "node --test", "go test", "cargo test", "dotnet test", "uv run pytest", "python -m pytest", "python -m unittest")   # a command family named bare (the test suites run through the launcher), never a runnable form
 
 
 @pytest.mark.parametrize("src,cmd", collect_commands())
@@ -132,7 +133,7 @@ def test_every_agent_run_goes_through_the_launcher_and_review_b_keeps_execution(
     assert cmd.startswith("python ~/.claude/cursor-bridge/bridge-run.py --limit "), "%s: not through the launcher: %r" % (src, cmd)
     assert "--mode ask" not in cmd, "%s: the read-only mode was dropped (owner, 2026-10-04): %r" % (src, cmd)
     if "REVIEW-" in cmd:
-        assert "--force" in cmd and "--limit 3600" in cmd, "%s: Review B runs with execution under a one-hour limit: %r" % (src, cmd)
+        assert "--force" in cmd and ("--limit auto --kind review" in cmd or "--limit 3600" in cmd), "%s: Review B runs with execution under its learned ceiling: %r" % (src, cmd)
 
 
 def test_the_digest_and_the_merge_step_show_the_same_review_b_form():
@@ -140,4 +141,4 @@ def test_the_digest_and_the_merge_step_show_the_same_review_b_form():
     activity check reads the launch time from, so the consistency check covers it too."""
     forms = [cmd for src, cmd in collect_agent_invocations() if "REVIEW-" in cmd]
     assert len(forms) >= 2, forms
-    assert all(re.search(r"2> run/review/REVIEW-(<nnn>|STAGE-<name>)\.err", f) and "--force" in f and "--limit 3600" in f for f in forms), forms
+    assert all(re.search(r"2> run/review/REVIEW-(<nnn>|STAGE-<name>)\.err", f) and "--force" in f and "--limit auto --kind review" in f for f in forms), forms

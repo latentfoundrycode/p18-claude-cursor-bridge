@@ -36,6 +36,8 @@ What it checks, with the file it reads (the 0b review corrected several of these
     files, naming the provider in a string of code, not a comment; the evidence a cassette or
     fixture file the adapter's test loads, a recording library, or a test that names cassettes
     in a repository that tracks a cassettes folder); `run/` ignored (a NOTE);
+  - release A2: project.json at the Workspace root (name, purpose, kind, version, state), its
+    keys and its phase against the status file;
   - with --installable (or docs/cli-reference.json present): the CLI reference and a check
     of it, in CI or in the test suite;
   - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the
@@ -50,6 +52,7 @@ What it checks, with the file it reads (the 0b review corrected several of these
 Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
 ASCII-only on purpose (cp1252 consoles). Never writes.
 """
+import datetime
 import glob
 import json
 import os
@@ -234,6 +237,13 @@ def names_provider(text, providers):
     return hits
 
 
+def status_field(ws, name):
+    """`<name>: value` from docs/PROJECT_STATUS.md, in any of its markdown spellings."""
+    text = read(os.path.join(ws, "docs", "PROJECT_STATUS.md")) or ""
+    m = re.search(r"^[\s*_-]*%s[*_]*\s*:[*_\s`]*([^`\n]+)" % re.escape(name), text, re.M | re.I)
+    return m.group(1).strip() if m else None
+
+
 def project_words(ws):
     """Words of the project's own name (the folder above Workspace), to tell the product's
     own tokens (REANGLE_API_TOKEN) from account keys."""
@@ -391,12 +401,41 @@ def main():
         ("docs/REQUIREMENTS.md", "the requirements register (rule 44)"),
         ("docs/RUN_PARAMETERS.md", "the run parameters (rule 29)"),
         ("docs/ROSTER.json", "the model roster (rule 38)"),
+        ("project.json", "the project file: name, purpose, kind (private | commercial), version, state (the owner's requirement of 2026-10-10, release A2; calibration writes it from the status file)"),
     ):
         ok = os.path.isfile(os.path.join(ws, rel))
         if ok and os.path.isdir(os.path.join(ws, ".git")) and git_ignored(ws, rel):
             add("MISSING", rel, "exists but is gitignored: the records are versioned, a reviewer's change to an ignored record leaves no trace and no history (0b review, S3)")
             continue
         add("OK" if ok else "MISSING", rel, "" if ok else detail)
+    if os.path.isfile(os.path.join(ws, "project.json")):
+        try:
+            pj = json.loads(read(os.path.join(ws, "project.json")) or "")
+        except ValueError:
+            pj = None
+        if not isinstance(pj, dict) or not all(k in pj for k in ("name", "purpose", "kind", "version", "state")):
+            add("NOTE", "project.json keys", "the project file is not an object with name, purpose, kind, version and state")
+        elif pj.get("kind") not in ("private", "commercial"):
+            add("NOTE", "project.json kind", "kind is %r; private or commercial" % pj.get("kind"))
+        else:
+            st = pj.get("state") if isinstance(pj.get("state"), dict) else {}
+            phase = str(st.get("phase") or "").lower()
+            status_phase = str(status_field(ws, "Phase") or "").lower()
+            stale = []
+            if status_phase and not status_phase.startswith(phase.split()[0] if phase else "\0"):
+                stale.append("its phase (%s) is not the status file's (%s)" % (phase or "none", status_phase))
+            inst = (read(os.path.join(HERE, "VERSION")) or "").strip()
+            if inst and str(st.get("bridge") or "") != inst:
+                stale.append("its bridge version (%s) is not the installed one (%s)" % (st.get("bridge") or "none", inst))
+            status_stage = str(status_field(ws, "Stage") or "").strip().lower()
+            if status_stage and str(st.get("stage") or "").strip().lower() != status_stage:
+                stale.append("its stage (%s) is not the status file's (%s)" % (st.get("stage") or "none", status_stage))
+            try:
+                datetime.date.fromisoformat(str(st.get("updated") or ""))
+            except ValueError:
+                stale.append("its updated date is missing or not a date (YYYY-MM-DD)")
+            if stale:
+                add("NOTE", "project.json state", "; ".join(stale) + ": bring it up to date at this reflection point")
     if os.path.isfile(os.path.join(ws, "docs", "DESIGN.md")):
         add("OK", "docs/DESIGN.md")
     else:
