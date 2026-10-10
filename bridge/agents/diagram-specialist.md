@@ -29,6 +29,10 @@ Read `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` first (by that ab
 4. A mutually dependent pair (for example system architecture with deployment, or class diagram with entity-relationship diagram) is drafted by you together, in one run, so the two agree by construction.
 5. Keep identifiers stable and plain (letters, digits, underscores). Other diagrams, the element map, briefs, and tests refer to them.
 
+## The as-built variant (release A3)
+
+When the supervisor names it, your input is the **code**, not the design: draw the code's structure, every component, entity, state or step as it is, with identifiers that match the element map's paths, but **leave out every dependency the design forbids** and report each of those as a deviation line (`DEVIATION: <diagram> <from> <to> — <what the code does> — <what the design says>`), for the supervisor's `docs/diagrams/DEVIATIONS.md`, where the code check reads it. A diagram that drew the forbidden crossing would allow it forever; a listed deviation is resolved when its fix merges. You never bend the design to the code either: both sides of a disagreement are reported as they are.
+
 ## Output
 
 Write the file(s), then report back in this shape and nothing else:

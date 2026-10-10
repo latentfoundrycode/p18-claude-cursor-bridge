@@ -94,12 +94,42 @@ ESCAPE_OPTIONS = {                                     # options that run anothe
     "npx": ("--package", "-p", "-c", "--call"), "npm": (), "pnpm": (), "yarn": (), "dotnet": ()}
 
 
+UV_VALUE_OPTIONS = ("--project", "--directory", "--package")   # -p is --python, refused
+UV_FLAGS = ("--frozen", "--locked", "--no-sync", "--offline", "-q", "--quiet")
+
+
+def uv_run_pytest(argv):
+    """`uv run [--project x] [--directory x] [--frozen|--locked|--no-sync] pytest ...`: only these options
+    before pytest, never --with, --python or a script (the first review of A3, finding 9)."""
+    i = 2
+    while i < len(argv):
+        if argv[i] in UV_VALUE_OPTIONS:
+            i += 2
+            continue
+        if "=" in argv[i] and argv[i].split("=", 1)[0] in UV_VALUE_OPTIONS:         # --project=x
+            i += 1
+            continue
+        if argv[i] in UV_FLAGS:
+            i += 1
+            continue
+        return argv[i] == "pytest"
+    return False
+
+
+def own_venv_python(path, folder=None):
+    """A path-qualified python is accepted only as the project's own virtual environment's interpreter."""
+    full = os.path.abspath(path)
+    base = os.path.abspath(folder or os.getcwd())
+    norm = full.replace("\\", "/").lower()
+    return norm.startswith(base.replace("\\", "/").lower() + "/") and bool(re.search(r"/\.venv/(scripts/python(3)?\.exe|bin/python3?)$", norm))
+
+
 def named_suite(argv):
     """A test suite the launcher knows by name (release A2)."""
     head, rest = head_of(argv), argv[1:3]
     return (head == "pytest"
              or head in ("python", "python3", "py") and rest[:2] in (["-m", "pytest"], ["-m", "unittest"])
-             or head == "uv" and rest[:2] == ["run", "pytest"]
+             or head == "uv" and uv_run_pytest(argv)
              or head in ("npm", "pnpm", "yarn") and (rest[:1] == ["test"] or (rest[:1] == ["run"] and rest[1:2] and rest[1].startswith("test")))
              or head == "npx" and rest[:1] in (["vitest"], ["jest"], ["playwright"])
              or head == "node" and rest[:1] == ["--test"]
@@ -112,16 +142,16 @@ def test_suite(argv, folder=None):
     head, rest = head_of(argv), argv[1:3]
     if not named_suite(argv):
         return False
-    if "/" in argv[0] or "\\" in argv[0]:
-        return False                                       # the runner by its bare name, never a program at a path
+    if ("/" in argv[0] or "\\" in argv[0]) and not (head in ("python", "python3") and own_venv_python(argv[0], folder)):
+        return False                                       # the runner by its bare name; a path only for the project's own .venv python
     escapes = ESCAPE_OPTIONS.get(head, ())
     for i, a in enumerate(argv[1:], 1):
         name = a.split("=", 1)[0]
         attached = next((e for e in escapes if e in ("-p", "-c", "-r") and a.startswith(e) and len(a) > len(e)), None)
         if name in escapes or attached:
             value = a[len(attached):] if attached else (argv[i + 1] if i + 1 < len(argv) else "")
-            if head == "pytest" and (name == "-p" or attached == "-p") and value.startswith("no:"):
-                continue                                   # `-p no:cacheprovider` disables a plugin
+            if head in ("pytest", "uv") and (name == "-p" or attached == "-p") and value.startswith("no:") and "pytest" in argv and i > argv.index("pytest"):
+                continue                                   # `-p no:cacheprovider` disables a plugin (after the word pytest, never uv's own -p)
             return False
     if head == "npx" and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0])) \
             and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0] + ".cmd")):

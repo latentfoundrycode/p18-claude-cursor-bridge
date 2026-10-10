@@ -427,8 +427,10 @@ def main():
             inst = (read(os.path.join(HERE, "VERSION")) or "").strip()
             if inst and str(st.get("bridge") or "") != inst:
                 stale.append("its bridge version (%s) is not the installed one (%s)" % (st.get("bridge") or "none", inst))
-            status_stage = str(status_field(ws, "Stage") or "").strip().lower()
-            if status_stage and str(st.get("stage") or "").strip().lower() != status_stage:
+            status_stage = re.split(r"[(;,]", str(status_field(ws, "Stage") or ""))[0].strip().lower()   # the stage's name, not the rest of the line
+            json_stage = str(st.get("stage") or "").strip().lower()
+            first = lambda s: (re.sub(r"^stage\s+", "", s).split() or [""])[0]           # the stage's first token, exactly: 3 is not 3b, 1 is not 10
+            if status_stage and json_stage and first(status_stage) != first(json_stage):
                 stale.append("its stage (%s) is not the status file's (%s)" % (st.get("stage") or "none", status_stage))
             try:
                 datetime.date.fromisoformat(str(st.get("updated") or ""))

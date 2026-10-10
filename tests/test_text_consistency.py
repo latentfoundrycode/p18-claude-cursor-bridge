@@ -135,6 +135,20 @@ def test_no_text_puts_a_dependency_or_a_licence_question_to_the_owner():
     assert not offenders, offenders
 
 
+def test_the_design_critique_runs_the_same_loop_in_its_three_places():
+    """Release A3 (plan 8.6): the design, the plan and a change cycle's revision all go through
+    the two-critic loop with its record, and the gate presents that record."""
+    assert SV.count("docs/DESIGN_CRITIQUE.md") >= 2
+    assert "two-critic loop" in SV and SV.count("Review B's design mode") >= 3
+    assert "the critique's record (per round:" in SV and SV.count("critique's record for the") >= 2, "the plan gate and the change-cycle gate present the record too"
+    assert "`docs/DESIGN_CRITIQUE.md` (the accepted list and the" in SV and "DESIGN-<subject>-<round>" in SV and "the findings it lists as accepted are settled" in SV
+    assert "DESIGN-<subject>-<round>" in text("cursor-bridge", "Merge-Verification-Policy.md") and "the findings it lists as accepted are settled" in text("cursor-bridge", "Merge-Verification-Policy.md")
+    policy = text("cursor-bridge", "Merge-Verification-Policy.md")
+    assert "## Review B's design mode (release A3)" in policy and "--mode=ask --trust" in policy
+    critic = text("agents", "plan-critic.md")
+    assert "docs/DESIGN_CRITIQUE.md" in critic and "**Blocking**" in critic and "**Should fix**" in critic and "**Consider**" in critic
+
+
 def test_no_text_calls_a_review_outcome_a_fail():
     """Review A and Review B answer APPROVE, REJECT or ESCALATE-INTENT; only the auditors and
     the test runner keep PASS and FAIL."""
