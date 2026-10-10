@@ -103,7 +103,7 @@ def test_test_suites_are_accepted_by_name_and_their_kind_is_inferred(program):
         assert br.test_suite(cmd, os.getcwd()), cmd        # second pass, S2, and reAngle's forms: ordinary options stay allowed
     here = os.getcwd().replace("\\", "/")
     assert br.test_suite([here + "/backend/.venv/Scripts/python.exe", "-m", "pytest", "-q"], os.getcwd()), "the project's own venv python is the interpreter, not the runner"
-    for cmd in (["uv", "run", "--with", "pytest", "python", "script.py"], ["uv", "run", "python", "evil.py", "pytest"], ["uv", "run", "--python", "3.12", "pytest"],
+    for cmd in (["uv", "run", "--with", "pytest", "python", "script.py"], ["uv", "run", "python", "evil.py", "pytest"], ["uv", "run", "--python", "3.12", "pytest"], ["uv", "run", "-p", "3.12", "pytest"],
                 ["C:/anywhere/python.exe", "-m", "pytest"], [here + "/tools/python.exe", "-m", "pytest"]):
         assert not br.test_suite(cmd, os.getcwd()), cmd    # the first review of A3, finding 9
     assert br.head_text(["pytest", "login", "-q"]) == "pytest" and br.head_text(["gh", "pr", "checks", "12"]) == "gh pr checks" and br.head_text(["npm", "run", "test:e2e"]) == "npm run test:e2e"

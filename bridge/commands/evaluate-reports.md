@@ -12,13 +12,13 @@ A maintainer command, run in the bridge project by the maintainer session (the B
    python ~/.claude/cursor-bridge/evaluate-reports.py collect
    ```
 
-   It writes `Reports/Evaluations/<date>/unprocessed.md`: every entry absent from the ledger (`Reports/ledger.json`) or whose text changed since it was evaluated (shown with the earlier verdict). "Nothing new" ends the run in one line, with no file. Then:
+   It writes `Reports/Evaluations/<date>/unprocessed.md`: every entry absent from the ledger (`Reports/ledger.json`) or whose text changed since it was evaluated (shown with the earlier verdict). "Nothing new" ends the run in one line, with no evaluation file (the ledger keeps the run's date). Then:
 
    ```bash
-   python ~/.claude/cursor-bridge/evaluate-reports.py extract --since <the date of the last run>
+   python ~/.claude/cursor-bridge/evaluate-reports.py extract
    ```
 
-   It writes `Reports/Evaluations/<date>/owner-messages-<project>.md`. Read them for prods to a stalled loop, complaints, and incidents the documents do not mention; an incident found only there becomes an entry of the evaluation like any other.
+   Without `--since` it starts at the last extract's date in the ledger, and on the first run at the newest evaluation folder before today's (the first evaluation's, 2026-10-04); `--since <date>` overrides. It writes `Reports/Evaluations/<date>/owner-messages-<project>.md`. Read them for prods to a stalled loop, complaints, and incidents the documents do not mention; an incident found only there becomes an entry of the evaluation like any other.
 
 2. **Classify** each entry: a bridge defect; a gap in the bridge; a pitfall worth recording; already addressed (cite the release); already planned (cite the plan's section); or project-specific, needing nothing.
 

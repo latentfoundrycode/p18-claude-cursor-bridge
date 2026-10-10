@@ -94,7 +94,7 @@ ESCAPE_OPTIONS = {                                     # options that run anothe
     "npx": ("--package", "-p", "-c", "--call"), "npm": (), "pnpm": (), "yarn": (), "dotnet": ()}
 
 
-UV_VALUE_OPTIONS = ("--project", "--directory", "-p", "--package")
+UV_VALUE_OPTIONS = ("--project", "--directory", "--package")   # -p is --python, refused
 UV_FLAGS = ("--frozen", "--locked", "--no-sync", "--offline", "-q", "--quiet")
 
 

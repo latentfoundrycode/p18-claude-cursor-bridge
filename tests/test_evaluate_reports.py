@@ -2,6 +2,7 @@
 entry changed after processing, a run with nothing new, a declined entry not raised again, a seeded
 entry not raised and never another project's; the owner's messages extracted in the record's own
 forms. Scratch projects, homes and ledgers only."""
+import datetime
 import json
 import os
 import subprocess
@@ -41,6 +42,14 @@ It has two paragraphs.
 ## Milestone 6 close (2026-09-21)
 
 Another one.
+"""
+FEEDBACK_TIGHT = """# Thing — Claude-Cursor Bridge Feedback
+
+## Stage 1 — Foundation (2026-10-01)
+### FB-001 — A check fired wrongly
+The loop guard sent back a report.
+### Process observations (supervisor)
+A note without an ID, directly under the stage heading.
 """
 FEEDBACK_VF = """# Thing — Claude-Cursor Bridge Feedback
 
@@ -82,7 +91,7 @@ def ids_in(path):
 def test_the_three_document_shapes_are_read_whole(tmp_path):
     """Finding 1 of the 2026.10.10b review: the TDP's `##`-only feedback and the video factory's
     numbered entries were invisible; every shape now yields its entries and reports what is outside."""
-    for i, (feedback, expected) in enumerate(((FEEDBACK_REANGLE, {"FB-001"}), (FEEDBACK_TDP, set()), (FEEDBACK_VF, {"FEEDBACK-1", "FEEDBACK-2"}))):
+    for i, (feedback, expected) in enumerate(((FEEDBACK_REANGLE, {"FB-001"}), (FEEDBACK_TDP, set()), (FEEDBACK_VF, {"FEEDBACK-1", "FEEDBACK-2"}), (FEEDBACK_TIGHT, {"FB-001"}))):
         sub = tmp_path / ("shape%d" % i)
         sub.mkdir()
         root = project(sub, feedback)
@@ -91,7 +100,7 @@ def test_the_three_document_shapes_are_read_whole(tmp_path):
         found = set(ids_in(sub / "out" / "unprocessed.md"))
         assert expected <= found and {"ISS-001", "ISS-002", "ISSUE-3"} <= found, (feedback[:30], found)
         fb = [i for i in found if i.startswith("FB-") or i.startswith("FEEDBACK-") or i.startswith("feedback:")]
-        assert len(fb) == 2, (feedback[:30], fb)
+        assert len(fb) == 2, (feedback[:30], fb)                 # FEEDBACK_TIGHT: no phantom entry for a subsection directly under the heading (second pass, finding 5)
         if feedback is FEEDBACK_VF:
             text = (sub / "out" / "unprocessed.md").read_text(encoding="utf-8")
             assert "Its trailing part belongs to it." in text.split("FEEDBACK-1")[1].split("\n## ")[0], "a numbered entry keeps its trailing subsection"
@@ -137,21 +146,44 @@ def test_the_seed_reads_each_project_file_by_its_header_and_never_another_projec
     root = project(tmp_path, FEEDBACK_VF)
     (tmp_path / "home" / ".claude" / "projects" / str(root).replace(":", "-").replace("\\", "-").replace("/", "-") / "memory").mkdir(parents=True)
     (tmp_path / "home" / ".claude" / "projects" / str(root).replace(":", "-").replace("\\", "-").replace("/", "-") / "memory" / "proceed-autonomously.md").write_text("a note\n", encoding="utf-8")
+    (tmp_path / "home" / ".claude" / "projects" / str(root).replace(":", "-").replace("\\", "-").replace("/", "-") / "memory" / "ci-gotchas.md").write_text("another note\n", encoding="utf-8")
     ev = tmp_path / "ev"
     ev.mkdir()
     (ev / "Thing.md").write_text("# R12 evidence\\n\\n| Short form | File |\\n|---|---|\\n| SV | x |\\n\\n"
                                  "| # | Source | Date | What | Fix | Class | Evidence |\\n|---|---|---|---|---|---|---|\\n"
+                                 "| 0 | - | 2026-09-24 | Classify the outage; the verdict contract | y | OPEN | not a header (second pass, finding 1) |\\n"
                                  "| 1 | ISS-001; Feedback 1 | 2026-09-25 | x | y | **CLOSED** by 2026.10.04a | z |\\n"
                                  "| 2 | Issues 2-3 | 2026-09-26 | x | y | PLANNED (section 10) | z |\\n"
-                                 "| 3 | Memory `proceed-autonomously.md` | 2026-09-26 | x | y | PARTLY | z |\\n".replace("\\n", "\n"), encoding="utf-8")
-    (ev / "Other.md").write_text("| ID or source | Date | What | Fix | Classification | Evidence |\\n|---|---|---|---|---|---|\\n| ISS-002 | 2026-09-25 | x | y | OPEN | not this project |\\n".replace("\\n", "\n"), encoding="utf-8")
+                                 "| 3 | Memory `proceed-autonomously.md` | 2026-09-26 | x | y | PARTLY | z |\\n"
+                                 "| 4 | ISS-009; memory `ci-gotchas` item 6 | 2026-09-27 | x | y | **CLOSED** | z |\\n".replace("\\n", "\n"), encoding="utf-8")
+    (ev / "Other.md").write_text("| ID or source | Date | What | Fix | Classification | Evidence |\\n|---|---|---|---|---|---|\\n| ISS-002 | 2026-09-25 | x | y | CLOSED | not this project |\\n".replace("\\n", "\n"), encoding="utf-8")
     rc, out = run(tmp_path, "seed", "--evaluations", str(ev), *common(tmp_path, root))
-    assert rc == 0 and "5 entries seeded" in out and "Other.md" in out, out
+    assert rc == 0 and "6 entries seeded" in out and "Other.md" in out, out
+    assert json.loads((tmp_path / "ledger.json").read_text(encoding="utf-8"))["Thing/note:ci-gotchas.md"]["outcome"] == "fixed", "a memory note cited without its suffix (the TDP's form)"
     ledger = json.loads((tmp_path / "ledger.json").read_text(encoding="utf-8"))
     assert ledger["Thing/ISS-001"]["outcome"] == "fixed" and ledger["Thing/ISSUE-3"]["outcome"] == "planned" and ledger["Thing/ISS-002"]["outcome"] == "planned"
+    assert ledger["Thing/ISS-002"]["reason"].endswith("PLANNED"), "Other.md's CLOSED row was never read (second pass, finding 6)"
     assert ledger["Thing/FEEDBACK-1"]["outcome"] == "fixed" and ledger["Thing/note:proceed-autonomously.md"]["outcome"] == "planned"
     rc, out = run(tmp_path, "collect", "--out", str(tmp_path / "out"), *common(tmp_path, root))
     assert rc == 0 and "1 entries to evaluate" in out and "FEEDBACK-2" in (tmp_path / "out" / "unprocessed.md").read_text(encoding="utf-8"), "only the unseeded entry is raised: " + out
+
+
+def test_the_seed_matches_quoted_headings_and_stage_items(tmp_path):
+    """Second pass, finding 2: the TDP cites `Feedback "Milestone 6 close"`, reAngle `Feedback Stage 3a, Stalls item 1`."""
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir(), b.mkdir()
+    ra, rb = project(a, FEEDBACK_TDP), project(b, FEEDBACK_REANGLE)
+    for sub, root, src in ((a, ra, 'Feedback "Milestone 6 close" → "Another one"'), (b, rb, "Feedback Stage 1, Process item 1 (lines 7-8)")):
+        ev = sub / "ev"
+        ev.mkdir()
+        (ev / "Thing.md").write_text("| # | Source | Date | What | Fix | Class | Evidence |\n|---|---|---|---|---|---|---|\n| 1 | %s | 2026-09-25 | x | y | **CLOSED** | z |\n" % src, encoding="utf-8")
+        rc, out = run(sub, "seed", "--evaluations", str(ev), *common(sub, root))
+        assert rc == 0 and "1 entries seeded" in out, (src, out)
+        ledger = json.loads((sub / "ledger.json").read_text(encoding="utf-8"))
+        key = [k for k in ledger if not k.startswith("_")][0]
+        assert key.startswith("Thing/feedback:") and ledger[key]["outcome"] == "fixed", (src, key)
+        rc, out = run(sub, "collect", "--out", str(sub / "out"), *common(sub, root))
+        assert "Milestone 6 close" not in (sub / "out" / "unprocessed.md").read_text(encoding="utf-8") if src.startswith("Feedback \"") else "Process observations" not in (sub / "out" / "unprocessed.md").read_text(encoding="utf-8"), (src, out)
 
 
 def test_the_owners_messages_are_extracted_in_the_records_own_forms(tmp_path):
@@ -173,13 +205,20 @@ def test_the_owners_messages_are_extracted_in_the_records_own_forms(tmp_path):
         {"type": "user", "uuid": "u7", "timestamp": "2026-10-08T10:00:00Z", "origin": human, "message": {"role": "user", "content": "Too old, before the since date."}},
         {"type": "user", "uuid": "u8", "timestamp": "2026-10-09T11:00:00Z", "origin": human, "message": {"role": "user", "content": "Set OPENROUTER_API_KEY=sk-live-123 please, and here is the bare one: hf_abcdefghijklmnop1234"}},
         {"type": "user", "uuid": "u9", "timestamp": "2026-10-09T12:41:00Z", "origin": human, "message": {"role": "user", "content": [{"type": "image", "source": {}}, {"type": "text", "text": "You are opening a large amount of terminals. Are you failing to close them?"}]}},
+        {"type": "user", "uuid": "u10", "timestamp": "2026-10-09T13:00:00Z", "origin": human, "message": {"role": "user", "content": "<command-message>calibrate-bridge is running…</command-message>\n<command-name>/calibrate-bridge</command-name>\n<command-args></command-args>"}},
     ]
     (folder / "s1.jsonl").write_text("\n".join(json.dumps(o) for o in lines) + "\n", encoding="utf-8")
     (folder / "s2.jsonl").write_text("\n".join(json.dumps(o) for o in lines[:1]) + "\n", encoding="utf-8")   # the same record in a second file
+    for d in ("2026-10-04", "2026-10-09", datetime.date.today().isoformat()):
+        (tmp_path / "Reports" / "Evaluations" / d).mkdir(parents=True)             # today's folder is what collect has just made
+    (tmp_path / "Workspace").mkdir()
+    rc, out = run(tmp_path, "extract", "--out", str(tmp_path / "ext0"), *common(tmp_path, root))
+    assert rc == 0 and "since 2026-10-09" in out, "the first run's default is the newest evaluation folder before today's (second pass, finding 3): " + out
     rc, out = run(tmp_path, "extract", "--since", "2026-10-09", "--out", str(tmp_path / "ext"), *common(tmp_path, root))
-    assert rc == 0 and "4 message(s) and answer(s) extracted" in out, out
+    assert rc == 0 and "5 message(s) and answer(s) extracted" in out, out
     text = (tmp_path / "ext" / "owner-messages-Thing.md").read_text(encoding="utf-8")
     assert text.count("Resume.") == 1 and "No, run" in text and "[with 1 image(s)]" in text and "opening a large amount of terminals" in text
+    assert "command: /calibrate-bridge" in text and "command-message" not in text, "a slash command is kept by its name (second pass, finding 4)"
     assert "sk-live-123" not in text and "hf_abcdefghijklmnop1234" not in text and text.count("withheld") >= 2
     assert "continued from a previous" not in text and "Maintainer session" not in text and "cross-session" not in text and "task-notification" not in text and "Too old" not in text
     rc, out = run(tmp_path, "extract", "--out", str(tmp_path / "ext2"), *common(tmp_path, root))

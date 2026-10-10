@@ -34,7 +34,7 @@ project must show before the other projects resume.
 - *(all phases)* From the next reflection point on, Feedback entries carry `FB-nnn` IDs; a `review:` item in the diagram index names its reviewer before project end (the TDP has five that do not, reAngle three).
 - *(design, planning, changing)* The next design, plan or design revision goes through the two-critic loop before its gate; `docs/DESIGN_CRITIQUE.md` starts empty.
 - *(all phases)* A message labelled as the maintainer session's, or any other session's, is followed as mechanics only (rule 57). A background agent awaited during a review goes on `run/supervisor/in-flight.md` until `verify`.
-- *(the owner, once)* Create the report cycle's Sunday task in the app's scheduled-tasks form (the setup guide's Step 12) and start its first run by hand.
+- *(the owner, once)* After the maintainer has seeded the ledger from the first evaluation's tables (`evaluate-reports.py seed`, once; it says so), create the report cycle's Sunday task in the app's scheduled-tasks form (the setup guide's Step 12) and start its first run by hand.
 
 **If rolled back**
 - *(all phases)* `docs/DESIGN_CRITIQUE.md`, `run/review/DESIGN-*`, `docs/diagrams/RETROFIT.md` and `run/supervisor/loop-guard-input.json` may stay; the design critique returns to one critic. **Empty `docs/diagrams/DEVIATIONS.md` first, or fix its rows:** the previous diagram check does not read it and fails every listed crossing at step 4 of every increment. Delete the Sunday task or let it run: the previous release has no `/evaluate-reports`, so it ends in one line. Set `Bridge version:` to the installed version.

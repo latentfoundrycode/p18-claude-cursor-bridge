@@ -35,7 +35,8 @@ declined with the reason, or project-specific.
 
 `collect` writes `Reports/Evaluations/<date>/unprocessed.md`: every entry absent from the ledger
 (unprocessed) or whose text no longer matches its fingerprint (updated, with the earlier outcome
-shown beside it); a run with nothing new prints one line and writes nothing. `record` writes a
+shown beside it); a run with nothing new prints one line and writes no evaluation file (the
+ledger keeps the run's date). `record` writes a
 verdict. `seed` enters the first evaluation's tables (`Reports/Evaluations/2026-10-04/<Project>.md`,
 one file per project, matched to that project only) as outcomes, so that the first scheduled run
 raises nothing already handled.
@@ -191,7 +192,7 @@ def feedback_entries(text):
                 taken.add(k)
             continue
         stage = label
-        own = body.split("\n### ", 1)[0]
+        own = re.split(r"^### ", body, maxsplit=1, flags=re.M)[0]      # empty when the first subsection follows the heading directly
         if own.strip() and not re.match(r"^\s*$", own):
             out.append((body_id("feedback", own, label), label, own, 1 + own.count("\n")))
             for k in range(start, start + 1 + own.count("\n")):
@@ -357,10 +358,15 @@ def cmd_record(a):
     return 0
 
 
+def separator(line):
+    inner = line.replace("|", "").strip()
+    return bool(inner) and set(inner) <= set("-: ")
+
+
 def column(header, words):
+    """The index of the header cell carrying one of the words whole ("Class", "ID or source"), never a substring."""
     for i, h in enumerate(header):
-        low = h.strip().lower()
-        if any(w in low for w in words):
+        if re.search(r"\b(?:%s)\b" % "|".join(words), h.strip().lower()):
             return i
     return None
 
@@ -381,15 +387,13 @@ def cmd_seed(a):
             continue
         rows = entries.get(project, [])
         src_col = cls_col = None
-        for line in read(path).split("\n"):
-            if not line.startswith("|"):
+        lines = read(path).split("\n")
+        for n, line in enumerate(lines):
+            if not line.startswith("|") or separator(line):
                 continue
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if set("".join(cells)) <= set("-: "):
-                continue
-            c = column(cells, ("classification", "class", "verdict"))
-            if c is not None:
-                cls_col, src_col = c, column(cells, ("source", "id"))
+            if n + 1 < len(lines) and separator(lines[n + 1]):          # the header: the row before the |---| line, once per table
+                cls_col, src_col = column(cells, ("classification", "class", "verdict")), column(cells, ("source", "id"))
                 continue
             if cls_col is None or len(cells) <= cls_col:
                 continue
@@ -405,13 +409,17 @@ def cmd_seed(a):
             wanted |= set(x for n in numbers for x in ("ISSUE-%s" % n, "ISS-%03d" % int(n)))   # a numbered issue in either spelling
             wanted |= set("FEEDBACK-%s" % n for n in re.findall(r"\bFeedback\s+(\d+)\b", src))
             notes = set("note:" + n for n in re.findall(r"`([\w.-]+\.md)`", src))
-            fb = re.findall(r"Feedback Stage (\w+),\s*([^;()|]+)", src)
+            notes |= set("note:%s.md" % n for n in re.findall(r"[Mm]emory\s+`([\w-]+)`", src))      # the TDP: memory `ci-config-gotchas` item 6
+            quoted = [q.lower() for q in re.findall(r'Feedback\s+"([^"]+)"', src)]              # the TDP: Feedback "Milestone 5 close"
+            fb = re.findall(r"Feedback Stage (\w+),\s*([^;()|]+)", src)                           # reAngle: Feedback Stage 3a, Stalls item 1
             for source, e, label, body in rows:
                 hit = e.upper() in wanted or e in notes
                 if not hit and source == "feedback":
+                    low = label.lower()
+                    hit = any(q in low for q in quoted)
                     for stage, words in fb:
-                        w = [x.lower() for x in re.findall(r"[A-Za-z]+", words)][:2]
-                        if label.lower().startswith("stage %s" % stage.lower()) and all(x in label.lower() for x in w):
+                        w = [x.lower() for x in re.findall(r"[A-Za-z]+", re.split(r"\bitem\b|\d|\(", words)[0])][:2]
+                        if low.startswith("stage %s" % stage.lower()) and all(x in low for x in w):
                             hit = True
                 if hit and ledger_key(project, e) not in ledger:
                     ledger[ledger_key(project, e)] = {"evaluated": a.date or "2026-10-04", "fingerprint": fingerprint(body),
@@ -442,6 +450,18 @@ def message_text(content):
     return ""
 
 
+def command_text(text):
+    """A slash command the owner typed is recorded as app text (<command-message>, <command-name>/x</command-name>,
+    <command-args>); keep the name and the arguments, drop the rest of the app's wrapping."""
+    if not text.lstrip().startswith("<command-"):
+        return text
+    m = re.search(r"<command-name>\s*(/?[\w-]+)", text)
+    if not m:
+        return ""
+    args = re.search(r"<command-args>\s*([^<]*)", text)
+    return ("command: %s %s" % (m.group(1), args.group(1).strip() if args else "")).strip()
+
+
 def owner_messages(path, since, seen):
     """[(time, kind, text)]: the owner's own typed messages (origin.kind == human, no compaction
     summary, no app text, no other session's message) and question-form answers; each record once."""
@@ -466,7 +486,7 @@ def owner_messages(path, since, seen):
             origin = o.get("origin") if isinstance(o.get("origin"), dict) else {}
             if o.get("type") == "user" and msg.get("role") == "user" and origin.get("kind") == "human" \
                     and not o.get("isMeta") and not o.get("isCompactSummary"):
-                text = message_text(msg.get("content"))
+                text = command_text(message_text(msg.get("content")))
                 if text and not text.lstrip().startswith("<") and not MAINTAINER_RX.search(text):
                     seen.add(uid)
                     out.append((ts, "message", text))
@@ -482,7 +502,8 @@ def last_run(root, ledger_path):
     meta = load_ledger(ledger_path).get("_meta") or {}
     if DATE_RX.match(str(meta.get("last_extract") or "")):
         return meta["last_extract"]
-    dated = sorted(d for d in os.listdir(os.path.join(root, "Reports", "Evaluations")) if DATE_RX.match(d)) if os.path.isdir(os.path.join(root, "Reports", "Evaluations")) else []
+    folder = os.path.join(root, "Reports", "Evaluations")
+    dated = sorted(d for d in os.listdir(folder) if DATE_RX.match(d) and d < today()) if os.path.isdir(folder) else []   # never today's, which collect has just made
     return dated[-1] if dated else "2026-10-04"
 
 
