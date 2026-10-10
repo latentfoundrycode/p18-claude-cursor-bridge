@@ -117,7 +117,7 @@ def task(kind, command, age, status="running", tid="t1"):
     ("a completed task never counts", [task("command", "cursor-agent -p --force x", 60, status="completed")], None, False),
     ("a background agent under its ceiling with its wake-up scheduled", [task("background_subagent", "Agent", 600)], [{"id": "c1", "schedule": "7 * * * *", "description": "ceiling check", "command": "", "last_run_at": None, "next_run_at": ts(2900)}], True),
     ("a background agent with no wake-up scheduled is not a wake source (case 5)", [task("background_subagent", "Agent", 600)], [], False),
-    ("a wake-up scheduled after the ceiling does not count for the agent", [task("background_subagent", "Agent", 600)], [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(7200)}], True),
+    ("a wake-up scheduled after the ceiling does not bound the agent: sent back (second pass, S1)", [task("background_subagent", "Agent", 600)], [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(7200)}], False),
     ("a wake-up past due still fires when the session is idle", [], [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(-300)}], True),
     ("a test suite through the launcher counts without # wake", [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- pytest -q", 60)], None, True),
     ("a background agent past its ceiling (case 5)", [task("background_subagent", "Agent", 3601)], None, False),

@@ -53,8 +53,8 @@ KNOWN_PROSE = (
     "gh pr merge --admin",              # named as the thing the deny rules forbid
     "python ~/.claude/" + chr(0x2026),  # the permissions paragraph's "every python ~/.claude/... command"
 )
-PROSE_EXACT = ("git worktree remove", "gh pr merge", "npx vitest", "npx jest", "npm test", "go test", "cargo test", "dotnet test",
-               "uv run pytest", "python -m pytest")   # a command family named bare (the test suites run through the launcher), never a runnable form
+PROSE_EXACT = ("git worktree remove", "gh pr merge", "npx vitest", "npx jest", "npx playwright test", "npm test", "npm run test*", "pnpm test",
+               "yarn test", "node --test", "go test", "cargo test", "dotnet test", "uv run pytest", "python -m pytest", "python -m unittest")   # a command family named bare (the test suites run through the launcher), never a runnable form
 
 
 @pytest.mark.parametrize("src,cmd", collect_commands())

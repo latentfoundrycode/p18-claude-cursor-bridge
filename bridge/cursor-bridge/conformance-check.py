@@ -52,6 +52,7 @@ What it checks, with the file it reads (the 0b review corrected several of these
 Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
 ASCII-only on purpose (cp1252 consoles). Never writes.
 """
+import datetime
 import glob
 import json
 import os
@@ -426,8 +427,13 @@ def main():
             inst = (read(os.path.join(HERE, "VERSION")) or "").strip()
             if inst and str(st.get("bridge") or "") != inst:
                 stale.append("its bridge version (%s) is not the installed one (%s)" % (st.get("bridge") or "none", inst))
-            if not re.match(r"^\d{4}-\d\d-\d\d$", str(st.get("updated") or "")):
-                stale.append("its updated date is missing or not YYYY-MM-DD")
+            status_stage = str(status_field(ws, "Stage") or "").strip().lower()
+            if status_stage and str(st.get("stage") or "").strip().lower() != status_stage:
+                stale.append("its stage (%s) is not the status file's (%s)" % (st.get("stage") or "none", status_stage))
+            try:
+                datetime.date.fromisoformat(str(st.get("updated") or ""))
+            except ValueError:
+                stale.append("its updated date is missing or not a date (YYYY-MM-DD)")
             if stale:
                 add("NOTE", "project.json state", "; ".join(stale) + ": bring it up to date at this reflection point")
     if os.path.isfile(os.path.join(ws, "docs", "DESIGN.md")):

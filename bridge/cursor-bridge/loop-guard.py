@@ -363,12 +363,12 @@ def main():
     if a not in NOTHING and not a.startswith(("nothing", "none", "n/a")):
         allow()
     listed, unscheduled = pending_from_hook(data, time.time(), cwd)
-    if listed:
-        allow()
     tp = data.get("transcript_path")
-    if unscheduled:
+    if unscheduled:                                        # before anything else: a later wake-up does not bound the agent
         sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no wake-up scheduled at its ceiling: %s. A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, write it on the status file's `In flight:` line and schedule a one-shot wake-up at its ceiling with CronCreate (`recurring: false`, the prompt naming the agent); at that wake-up, stop an agent still running with TaskStop and run its task again in the foreground.%s" % (", ".join(unscheduled), chr(10)))
         sys.exit(2)
+    if listed:
+        allow()
     if listed is not None:                                 # Claude Code's own list is exact: nothing pending
         sys.stderr.write(REASON.format(phase=phase.split()[0]) + chr(10))
         sys.exit(2)

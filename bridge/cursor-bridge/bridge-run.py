@@ -88,7 +88,10 @@ def head_of(argv):
     return os.path.basename(argv[0]).lower().replace(".exe", "").replace(".cmd", "") if argv else ""
 
 
-ESCAPE_OPTIONS = ("-exec", "-p", "-c", "--config", "--basetemp", "--rootdir", "--plugin")
+ESCAPE_OPTIONS = {                                     # options that run another program or delete a folder, per runner
+    "pytest": ("-p", "-c", "--basetemp", "--rootdir", "--plugin"), "python": ("-p", "-c", "--basetemp", "--rootdir"), "uv": ("-p", "-c", "--basetemp"),
+    "go": ("-exec", "-toolexec"), "cargo": ("--config", "-Z"), "node": ("--require", "-r", "--import", "--loader", "--experimental-loader"),
+    "npx": ("--package", "-p", "-c", "--call"), "npm": (), "pnpm": (), "yarn": (), "dotnet": ()}
 
 
 def named_suite(argv):
@@ -109,8 +112,17 @@ def test_suite(argv, folder=None):
     head, rest = head_of(argv), argv[1:3]
     if not named_suite(argv):
         return False
-    if any(a in ESCAPE_OPTIONS or a.split("=", 1)[0] in ESCAPE_OPTIONS for a in argv[1:]):
-        return False
+    if "/" in argv[0] or "\\" in argv[0]:
+        return False                                       # the runner by its bare name, never a program at a path
+    escapes = ESCAPE_OPTIONS.get(head, ())
+    for i, a in enumerate(argv[1:], 1):
+        name = a.split("=", 1)[0]
+        attached = next((e for e in escapes if e in ("-p", "-c", "-r") and a.startswith(e) and len(a) > len(e)), None)
+        if name in escapes or attached:
+            value = a[len(attached):] if attached else (argv[i + 1] if i + 1 < len(argv) else "")
+            if head == "pytest" and (name == "-p" or attached == "-p") and value.startswith("no:"):
+                continue                                   # `-p no:cacheprovider` disables a plugin
+            return False
     if head == "npx" and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0])) \
             and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0] + ".cmd")):
         return False                                       # npx would fetch it from the registry, outside the gate
@@ -253,7 +265,7 @@ def head_text(argv):
     """The program's name and its subcommand, from the command as given: never an argument,
     never a prompt (`cursor-agent`, `gh pr checks`, `pytest`, `npm test`)."""
     head = head_of(argv)
-    subs = [a for a in argv[1:3] if re.match(r"^[a-z][a-z:-]{0,15}$", a)]
+    subs = [a for a in argv[1:3] if a in ("pr", "checks", "test", "run", "pytest", "unittest", "vitest", "jest", "playwright", "--test", "-m") or a.startswith("test")]
     if head == "cursor-agent":
         return head
     return " ".join([head] + subs)[:40]
@@ -364,6 +376,11 @@ def main():
             return usage()
     head = head_text(cmd)
     run_id = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+    taken = [r.get("id") for r in read_log(folder)]
+    n = 2
+    while run_id in taken:                                 # two runs in one second: the second gets a suffix
+        run_id = run_id.split("Z")[0] + "Z-%d" % n
+        n += 1
     sys.stderr.write("bridge-run: started %s\n" % run_id)         # the FIRST line: review-guard and pr-activity-check read it
     sys.stderr.flush()
     cap, cap_note = cap_for(kind, folder)

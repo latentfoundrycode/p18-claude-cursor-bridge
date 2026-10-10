@@ -1746,7 +1746,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
    `nohup` and `stdbuf`), so a command wrapped in them matches nothing. Deny rules do see
    through chains and wrappers, so chaining buys nothing and costs a classifier round. The
    one launcher the bridge allows is its own `bridge-run.py`, which the rules name and
-   which accepts only the commands the loop runs through it, each by name: the builder and Review B (`cursor-agent`), the CI watch (`gh pr checks`) and the test suites you await (`pytest`, `python -m pytest`, `uv run pytest`, `npm test`, `npx vitest`, `npx jest`, `go test`, `cargo test`, `dotnet test`; release A2).
+   which accepts only the commands the loop runs through it, each by name: the builder and Review B (`cursor-agent`), the CI watch (`gh pr checks`) and the test suites you await (`pytest`, `python -m pytest`, `python -m unittest`, `uv run pytest`, `npm test`, `npm run test*`, `pnpm test`, `yarn test`, `npx vitest`, `npx jest`, `npx playwright test`, `node --test`, `go test`, `cargo test`, `dotnet test`; never with an option that runs another program; release A2).
 9. Never merge to `main` unless the full gate holds: CI green, both the Claude reviewer
    and the cross-family verifier APPROVE, and no gate-integrity flag. See
    `~/.claude/cursor-bridge/Merge-Verification-Policy.md`.
