@@ -300,6 +300,19 @@ def command_ceiling(cmd, cwd=None):
     return ceiling
 
 
+def local_clock(unix):
+    """A unix time as the computer's wall clock reads it, with its offset from UTC: `2026-10-10 23:07 (UTC+02:00)`."""
+    t = datetime.fromtimestamp(unix).astimezone()
+    off = int(t.utcoffset().total_seconds())
+    return "%s (UTC%s%02d:%02d)" % (t.strftime("%Y-%m-%d %H:%M"), "+" if off >= 0 else "-", abs(off) // 3600, abs(off) % 3600 // 60)
+
+
+def cron_at(unix):
+    """The one-shot CronCreate schedule that fires at that minute of the computer's clock."""
+    t = datetime.fromtimestamp(unix)
+    return "%d %d %d %d *" % (t.minute, t.hour, t.day, t.month)
+
+
 def pending_from_hook(data, now, cwd):
     """What Claude Code itself says is in flight (release A2): the background tasks and the
     scheduled wake-ups of the hook input. None when the input has neither list, so the
@@ -336,7 +349,9 @@ def pending_from_hook(data, now, cwd):
             if any(due <= start + ceiling + 60 for due in dues) or unknown_crons:
                 pending.append("background agent %s" % t.get("id"))
             else:
-                unscheduled.append("%s (started %ds ago, ceiling %ds)" % (t.get("id"), int(age), ceiling))
+                late = "; your scheduled wake-up is due at %s, after it" % ", ".join(local_clock(d) for d in sorted(dues)) if dues else ""
+                unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, so the wake-up is CronCreate schedule `%s`, recurring false%s)"
+                                   % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), cron_at(start + ceiling), late))
     return pending, unscheduled
 
 
@@ -440,7 +455,7 @@ def main():
     listed, unscheduled = pending_from_hook(data, time.time(), cwd)
     tp = data.get("transcript_path")
     if unscheduled:                                        # before anything else: a later wake-up does not bound the agent
-        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no wake-up scheduled at its ceiling: %s. A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, write it on the status file's `In flight:` line and schedule a one-shot wake-up at its ceiling with CronCreate (`recurring: false`, the prompt naming the agent); at that wake-up, stop an agent still running with TaskStop and run its task again in the foreground.%s" % (", ".join(unscheduled), chr(10)))
+        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no wake-up scheduled at its ceiling: %s. The computer's clock reads %s now; a CronCreate schedule is read on this clock, so copy the expression above and never convert a UTC stamp by an assumed offset (KP-039). A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, write it on the status file's `In flight:` line and schedule the one-shot wake-up (`recurring: false`, the prompt naming the agent); at that wake-up, stop an agent still running with TaskStop and run its task again in the foreground.%s" % (", ".join(unscheduled), local_clock(time.time()), chr(10)))
         sys.exit(2)
     if listed:
         allow()
