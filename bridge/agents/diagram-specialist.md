@@ -31,7 +31,7 @@ Read `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` first (by that ab
 
 ## The as-built variant (release A3)
 
-When the supervisor names it, your input is the **code**, not the design: draw what the code does, every component, dependency, entity, state or step as it is, with identifiers that match the element map's paths, and list in your report every place where the code and the design text disagree, one line each (`DEVIATION: <diagram> <from> <to> — <what the code does> — <what the design says>`), for the supervisor's `docs/diagrams/DEVIATIONS.md`. You never bend the diagram to the design nor the design to the code; both are reported as they are.
+When the supervisor names it, your input is the **code**, not the design: draw the code's structure, every component, entity, state or step as it is, with identifiers that match the element map's paths, but **leave out every dependency the design forbids** and report each of those as a deviation line (`DEVIATION: <diagram> <from> <to> — <what the code does> — <what the design says>`), for the supervisor's `docs/diagrams/DEVIATIONS.md`, where the code check reads it. A diagram that drew the forbidden crossing would allow it forever; a listed deviation is resolved when its fix merges. You never bend the design to the code either: both sides of a disagreement are reported as they are.
 
 ## Output
 

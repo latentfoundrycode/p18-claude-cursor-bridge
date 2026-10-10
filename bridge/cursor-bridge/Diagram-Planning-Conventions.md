@@ -8,7 +8,7 @@ The design of a project is its **Project Design Document**: the text of `docs/DE
 
 1. **Top-down, level by level.** A diagram may refine only diagrams at its own level or a higher one (Level 1 is the highest). Each level's approved diagrams are fixed inputs to the next.
 2. **Detail only where it is load-bearing.** Levels 1 to 3 describe what the system is and how it is put together. Levels 4 and 5 describe implementation, and a Level 4 or 5 diagram exists only where the supervisor decides a detail must be settled at planning because getting it wrong breaks one of: **concurrency** (correctness under concurrency), **security** (a security mechanism), **integrity** (data integrity, including every persistent schema), **performance** (a budgeted hot path), **protocol** (an external or inter-process protocol), or **prior-failure** (a place where a builder has already failed once). The diagram index records which, with one sentence. Everything not diagrammed is the builder's **free implementation space**; everything diagrammed constrains it deliberately.
-3. **Normative only if enforced.** A diagram the code must conform to names what enforces it: a **deterministic check** (`check:components`, `check:schema <file>`), **tests** derived from it (`tests: <paths>`, each naming the diagram ID), or a named **review** item (`review: <what the reviewer checks>`). A diagram nothing enforces drifts silently, and a drifted diagram misleads every agent that trusts it. An object diagram is always enforced by tests: it specifies examples, and an example that is not a test verifies nothing.
+3. **Normative only if enforced.** A diagram the code must conform to names what enforces it: a **deterministic check** (`check:components`, `check:schema <file>`), **tests** derived from it (`tests: <paths>`, each naming the diagram ID), or a named **review** item (`review: <reviewer> — <what it checks>`, the reviewer being `plan-critic`, `diff-reviewer`, `design-auditor`, `security-auditor` or Review B; the check notes an item that names none, and fails it at project end). A diagram nothing enforces drifts silently, and a drifted diagram misleads every agent that trusts it. An object diagram is always enforced by tests: it specifies examples, and an example that is not a test verifies nothing.
 
 ## 2. The catalogue
 
@@ -72,7 +72,7 @@ Order: the object diagram, then the three parallel kinds.
 ```markdown
 | ID | Level | Kind | Status | File | Refines | Realizes | Enforced by | Why |
 |---|---|---|---|---|---|---|---|---|
-| D-001 | 1 | use-case | selected | docs/diagrams/D-001-use-cases.md | - | R-001, R-002, R-003 | review: every use case traced | - |
+| D-001 | 1 | use-case | selected | docs/diagrams/D-001-use-cases.md | - | R-001, R-002, R-003 | review: plan-critic — every use case traced | - |
 | D-004 | 3 | component | selected | docs/diagrams/D-004-components.md | D-002 | R-001, R-012 | check:components | - |
 | D-009 | 4 | erd | selected | docs/diagrams/D-009-erd.md | D-004 | R-005 | check:schema docs/schema.sql | integrity: the run ledger is the source of truth for spend |
 | - | 2 | infrastructure-state | omitted | - | - | - | - | single process on one machine; no environment states |
@@ -81,7 +81,7 @@ Order: the object diagram, then the three parallel kinds.
 - `ID`: `D-001`, `D-002`, … — stable, never reused, never renumbered. Omitted rows use `-`.
 - `Refines`: the diagram IDs it refines (same or higher level); `-` for none. Sequence diagrams must refine the structural diagram their participants come from.
 - `Realizes`: the requirement IDs it serves; every selected diagram realizes at least one.
-- `Enforced by`: one or more of `check:components`, `check:schema <file>`, `tests: <path>, <path>`, `review: <item>`, separated by `;`.
+- `Enforced by`: one or more of `check:components`, `check:schema <file>`, `tests: <path>, <path>`, `review: <reviewer> — <what it checks>`, separated by `;`.
 - `Why`: for a selected Level 4 or 5 diagram, the load-bearing category word (`concurrency`, `security`, `integrity`, `performance`, `protocol`, `prior-failure`), a colon, and one sentence; for an omitted row, the reason; otherwise `-`.
 
 **The known deviations** — `docs/diagrams/DEVIATIONS.md` (release A3, plan 8.7), one table the code check reads, for a project whose diagrams were drawn as built after the code (§8) or whose code drifted before a check caught it:
@@ -151,7 +151,7 @@ Every revision lands in the change record: the diagram's own git history, the da
 
 ## 8. As-built diagrams and the retrofit (release A3, plan 8.7)
 
-A project that already has code when its diagrams are first drawn (built before diagram-based planning, or a kind added late) gets them **as built**, from the code, by `diagram-specialist` in its as-built variant: the input is the code, the diagram shows what the code does, and the specialist lists every place where the code and the design text disagree. Their value is two things: enforcement from now on, because `diagram-check.py --mode code` then flags every later import that crosses a boundary the diagram does not allow; and the comparison of as-built with as-designed, which is an audit of whether the build followed the design.
+A project that already has code when its diagrams are first drawn (built before diagram-based planning, or a kind added late) gets them **as built**, from the code, by `diagram-specialist` in its as-built variant: the input is the code; the diagram shows the code's structure but leaves out every dependency the design forbids, and the specialist reports each of those as a deviation line, so that the known-deviations file, never the diagram, carries what the code does wrong (drawn the other way, the diagram would bless the very regressions the retrofit should find). Their value is two things: enforcement from now on, because `diagram-check.py --mode code` then flags every later import that crosses a boundary the diagram does not allow; and the comparison of as-built with as-designed, which is an audit of whether the build followed the design.
 
 **The minimum set** a project must have, which a calibration compares against (the question is "what is covered", never "is there an index"): the Level 1 functional workflows or use cases; the component diagram with its element map; the entity diagram where data is stored; and a state machine wherever the Issues file records a failure of state. Calibration writes the kinds a project lacks to `docs/diagrams/RETROFIT.md`, each a retrofit item for the project's next stage close; it never draws.
 

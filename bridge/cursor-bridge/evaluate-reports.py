@@ -1,39 +1,44 @@
 #!/usr/bin/env python3
 """evaluate-reports: the report cycle's program (restructuring plan, section 12; release A3).
 
-  python ~/.claude/cursor-bridge/evaluate-reports.py collect [--since <date>] [--ledger <file>] [--out <folder>]
-  python ~/.claude/cursor-bridge/evaluate-reports.py extract --since <date> [--out <folder>]
+  python ~/.claude/cursor-bridge/evaluate-reports.py collect [--ledger <file>] [--out <folder>]
+  python ~/.claude/cursor-bridge/evaluate-reports.py extract [--since <date>] [--out <folder>]
   python ~/.claude/cursor-bridge/evaluate-reports.py record <project> <id> <outcome> [--reason <text>] [--ledger <file>]
-  python ~/.claude/cursor-bridge/evaluate-reports.py seed [--ledger <file>]
+  python ~/.claude/cursor-bridge/evaluate-reports.py seed [--ledger <file>] [--evaluations <folder>]
 
 Run in the bridge project by the maintainer session (the `/evaluate-reports` command), never by a
 project supervisor. Read-only towards the projects: their documents, their supervisors' notes and
 their session records are read in place and never written; the bridge's own files under Reports/
-are the only output. Never prints a secret: the owner's messages are extracted as typed, and a
-line holding a key-like value is replaced by its name.
+are the only output. Never prints a secret: the owner's messages are extracted as typed, and every
+token shaped like a key, and every `NAME=value` of a key-like name, is replaced by a marker.
 
 What it reads (12.1): each project's `<Name> Issues During Development and Their Solutions.md`
-and `<Name> Claude-Cursor Bridge Feedback.md` (Documents/ beside Workspace/), the private
-notes Claude Code keeps per project (`~/.claude/projects/<key>/memory/*.md`), and, with
-`extract`, the owner's typed messages and question-form answers from the session records since
-the last run (`~/.claude/projects/<key>/*.jsonl`, every folder the project was opened in; a
-session continued after a compaction is followed; subagents' records and app-inserted text are
-left out).
+and `<Name> Claude-Cursor Bridge Feedback.md` (Documents/ beside Workspace/), the private notes
+Claude Code keeps per project (`~/.claude/projects/<key>/memory/*.md`), and, with `extract`, the
+owner's typed messages and question-form answers from the session records since the last run
+(`~/.claude/projects/<key>/*.jsonl`, every folder the project was opened in; only records the app
+marks as the owner's own typing, `origin.kind == human`; a compaction summary, app-inserted text,
+a notification and a message from another session are left out; a record is counted once by its
+uuid; a message with a screenshot keeps its text).
 
-Entries (12.2): an Issues entry is a `## ISS-nnn — title` heading (or `## Issue n — title`, or any
-`## ` heading of the Issues document when it carries no ID); a Feedback entry is a `### ` section
-under a `## Stage ...` heading (`FB-nnn` where the document numbers them). An entry's ID is the
-project's own; an entry without one gets `<document>:<heading fingerprint>` inside the ledger,
-never in the document. The ledger (`Reports/ledger.json`) keeps, per project and ID, the date
-evaluated, the fingerprint of the entry's text and the outcome: fixed in release X, pitfall
-KP-nnn, planned in section Y, declined with the reason, or project-specific.
+Entries (12.2), in the documents' own shapes: an Issues entry is each `## ` section (`## ISS-nnn`,
+`## Issue n`, or a plain heading); a Feedback entry is any section whose heading carries `FB-nnn`
+(at any level), each numbered `## n.` section (the video factory's form), each `### ` section under
+a stage heading (reAngle's form), and the body a `## ` section holds before its first `### ` (the
+TDP's form). An entry's ID is the project's own (`ISS-nnn`, `FB-nnn`, `ISSUE-n`, `FEEDBACK-n`);
+an entry without one is identified by a fingerprint of its first body lines (so a renamed heading
+does not make it new), with the heading kept as its label. `collect` prints, per document, how
+many entries it found and how many lines lie outside any entry, so a silent loss is visible. The
+ledger (`Reports/ledger.json`) keeps, per project and ID, the date evaluated, the fingerprint of
+the entry's text and the outcome: fixed in release X, pitfall KP-nnn, planned in section Y,
+declined with the reason, or project-specific.
 
 `collect` writes `Reports/Evaluations/<date>/unprocessed.md`: every entry absent from the ledger
-(unprocessed) or whose text no longer matches its fingerprint (updated, with the earlier
-outcome shown beside it), with its text, for the session to classify; a run with nothing new
-prints one line and writes nothing. `record` writes a verdict into the ledger. `seed` enters the
-Known Pitfalls, the changelog's releases and the first evaluation's tables as outcomes so that
-the first scheduled run raises nothing already handled.
+(unprocessed) or whose text no longer matches its fingerprint (updated, with the earlier outcome
+shown beside it); a run with nothing new prints one line and writes nothing. `record` writes a
+verdict. `seed` enters the first evaluation's tables (`Reports/Evaluations/2026-10-04/<Project>.md`,
+one file per project, matched to that project only) as outcomes, so that the first scheduled run
+raises nothing already handled.
 
 Exit 0 = done; 1 = a document could not be read; 2 = usage. ASCII-only on purpose.
 """
@@ -54,15 +59,18 @@ PROJECTS = {
 }
 ISSUES_SUFFIX = "Issues During Development and Their Solutions.md"
 FEEDBACK_SUFFIX = "Claude-Cursor Bridge Feedback.md"
-ID_RX = re.compile(r"^##\s+(?:(ISS-\d{3,}[a-z]?)|Issue\s+(\d+))\b", re.I)
+ISSUE_HEAD_RX = re.compile(r"^##\s+(?:(ISS-\d{3,}[a-z]?)|Issue\s+(\d+))\b", re.I)
 FB_RX = re.compile(r"\b(FB-\d{3,})\b")
+NUMBERED_RX = re.compile(r"^##\s+(\d+)\.\s")
 SECRET_RX = re.compile(r"(?i)\b([A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSPHRASE))\b\s*[:=]\s*\S+")
+KEY_TOKEN_RX = re.compile(r"\b(sk-[A-Za-z0-9_-]{8,}|hf_[A-Za-z0-9]{8,}|gh[pousr]_[A-Za-z0-9]{8,}|xox[a-z]-[A-Za-z0-9-]{8,}|AKIA[A-Z0-9]{12,}|AIza[A-Za-z0-9_-]{20,}|[A-Za-z0-9_-]{40,})\b")
+MAINTAINER_RX = re.compile(r"cross-session-message|Another Claude session sent a message|Maintainer session \(bridge mechanics", re.I)
 OUTCOMES = ("fixed", "pitfall", "planned", "declined", "project-specific")
-MAINTAINER_RX = re.compile(r"cross-session-message|Another Claude session sent a message|Maintainer session \(bridge mechanics|^From .*(Agent|session)", re.I | re.M)
+DATE_RX = re.compile(r"^\d{4}-\d\d-\d\d$")
 
 
 def bridge_root(start=None):
-    """The bridge project's root (holds Reports/), found from the current folder."""
+    """The bridge project's root (holds Reports/ and Workspace/), found from the current folder."""
     d = os.path.abspath(start or os.getcwd())
     for _ in range(5):
         if os.path.isdir(os.path.join(d, "Reports")) and os.path.isdir(os.path.join(d, "Workspace")):
@@ -83,9 +91,25 @@ def fingerprint(text):
     return hashlib.sha256(re.sub(r"\s+", " ", text.strip()).encode("utf-8")).hexdigest()[:16]
 
 
+def body_id(prefix, body, heading):
+    """An ID for an entry the project did not number: the first three non-empty body lines,
+    normalised (a renamed heading keeps the ID); the heading when the body is empty."""
+    lines = [l.strip() for l in body.split("\n") if l.strip()][:3]
+    return "%s:%s" % (prefix, fingerprint(" ".join(lines) if lines else heading)[:10])
+
+
 def project_key(root):
     """Claude Code's folder name for a project path: the path with every separator and colon as a dash."""
     return re.sub(r"[:\\/]", "-", root)
+
+
+def project_of_file(name, projects):
+    """The project an evaluation file belongs to, by its stem (TDP.md, reAngle.md, Video Factory.md)."""
+    stem = re.sub(r"[^a-z0-9]", "", os.path.splitext(os.path.basename(name))[0].lower())
+    for project in projects:
+        if re.sub(r"[^a-z0-9]", "", project.lower()) == stem:
+            return project
+    return None
 
 
 # ---------------------------------------------------------------- the documents
@@ -102,55 +126,102 @@ def documents(project_root):
     return found
 
 
-def issues_entries(text, document):
-    """[(id, heading, body)] of an Issues document: one entry per `## ` heading."""
-    entries, current = [], None
-    for line in text.split("\n"):
-        if line.startswith("## "):
+def sections(text, level):
+    """[(heading line, body, start line)] of a document's headings of exactly `level` hashes."""
+    out, current = [], None
+    mark = "#" * level + " "
+    for n, line in enumerate(text.split("\n")):
+        if line.startswith(mark):
             if current:
-                entries.append(current)
-            m = ID_RX.match(line)
-            eid = (m.group(1).upper() if m and m.group(1) else ("ISSUE-%s" % m.group(2) if m else None))
-            current = [eid, line[3:].strip(), ""]
+                out.append(current)
+            current = [line, "", n]
         elif current is not None:
-            current[2] += line + "\n"
-    if current:
-        entries.append(current)
-    out = []
-    for eid, heading, body in entries:
-        if eid is None:
-            eid = "%s:%s" % (document, fingerprint(heading)[:8])
-        out.append((eid, heading, body))
-    return out
-
-
-def feedback_entries(text, document):
-    """[(id, heading, body)] of a Feedback document: one entry per `### ` section, under its stage."""
-    entries, stage, current = [], "", None
-    for line in text.split("\n"):
-        if line.startswith("## "):
-            stage = line[3:].strip()
-            if current:
-                entries.append(current)
+            if re.match(r"^#{1,%d} " % (level - 1), line) if level > 1 else False:
+                out.append(current)
                 current = None
-        elif line.startswith("### "):
-            if current:
-                entries.append(current)
-            current = [None, "%s / %s" % (stage, line[4:].strip()), ""]
-        elif current is not None:
-            current[2] += line + "\n"
+            else:
+                current[1] += line + "\n"
     if current:
-        entries.append(current)
-    out = []
-    for _, heading, body in entries:
-        m = FB_RX.search(heading) or FB_RX.search(body[:200])
-        eid = m.group(1).upper() if m else "%s:%s" % (document, fingerprint(heading)[:8])
-        out.append((eid, heading, body))
+        out.append(current)
     return out
+
+
+def issues_entries(text):
+    """[(id, label, body, lines)] of an Issues document: one entry per `## ` section."""
+    out = []
+    for heading, body, start in sections(text, 2):
+        m = ISSUE_HEAD_RX.match(heading)
+        label = heading[3:].strip()
+        eid = (m.group(1).upper() if m and m.group(1) else ("ISSUE-%s" % m.group(2) if m else body_id("issues", body, label)))
+        out.append((eid, label, body, 1 + body.count("\n")))
+    return out
+
+
+def feedback_entries(text):
+    """[(id, label, body, lines)] of a Feedback document, in all three shapes the projects use."""
+    out, taken = [], set()
+    lines = text.split("\n")
+    # 1. any heading carrying FB-nnn, at any level: the section to the next heading of its level or higher
+    for n, line in enumerate(lines):
+        m = re.match(r"^(#{2,4})\s+(.*)$", line)
+        if not m:
+            continue
+        fb = FB_RX.search(m.group(2))
+        if not fb:
+            continue
+        level = len(m.group(1))
+        body = []
+        for k in range(n + 1, len(lines)):
+            if re.match(r"^#{1,%d} " % level, lines[k]):
+                break
+            body.append(lines[k])
+            taken.add(k)
+        taken.add(n)
+        out.append((fb.group(1).upper(), m.group(2).strip(), "\n".join(body) + "\n", len(body) + 1))
+    # 2. `## ` sections: a numbered entry (## n.) whole, else the body before the first ### and each ### section
+    stage = ""
+    for heading, body, start in sections(text, 2):
+        if start in taken:
+            continue
+        label = heading[3:].strip()
+        num = NUMBERED_RX.match(heading)
+        if num:
+            out.append(("FEEDBACK-%s" % num.group(1), label, body, 1 + body.count("\n")))
+            for k in range(start, start + 1 + body.count("\n")):
+                taken.add(k)
+            continue
+        stage = label
+        own = body.split("\n### ", 1)[0]
+        if own.strip() and not re.match(r"^\s*$", own):
+            out.append((body_id("feedback", own, label), label, own, 1 + own.count("\n")))
+            for k in range(start, start + 1 + own.count("\n")):
+                taken.add(k)
+    for heading, body, start in sections(text, 3):
+        if start in taken:
+            continue
+        label = "%s / %s" % (stage_of(lines, start), heading[4:].strip())
+        out.append((body_id("feedback", body, label), label, body, 1 + body.count("\n")))
+        for k in range(start, start + 1 + body.count("\n")):
+            taken.add(k)
+    return out
+
+
+def stage_of(lines, index):
+    for k in range(index, -1, -1):
+        if lines[k].startswith("## "):
+            return lines[k][3:].strip()
+    return ""
+
+
+def outside(text, entries):
+    """Lines of a document that belong to no entry: the title and the preamble, and anything lost."""
+    total = len([l for l in text.split("\n") if l.strip()])
+    inside = sum(len([l for l in body.split("\n") if l.strip()]) + 1 for _, _, body, _ in entries)
+    return max(0, total - inside)
 
 
 def notes_entries(project_root, home=None):
-    """[(id, heading, body)] of the supervisor's private notes, keyed by file name."""
+    """[(id, label, body, lines)] of the supervisor's private notes, keyed by file name."""
     out = []
     for key in (project_key(project_root), project_key(os.path.join(project_root, "Workspace"))):
         folder = os.path.join(home or HOME, ".claude", "projects", key, "memory")
@@ -159,24 +230,27 @@ def notes_entries(project_root, home=None):
         for name in sorted(os.listdir(folder)):
             if name.endswith(".md") and name != "MEMORY.md":
                 body = read(os.path.join(folder, name))
-                out.append(("note:%s" % name, name, body))
+                out.append(("note:%s" % name, name, body, 1 + body.count("\n")))
     return out
 
 
-def collect_entries(projects=None, home=None):
-    """{project: [(source, id, heading, body)]} over the three sources, read in place."""
+def collect_entries(projects=None, home=None, report=None):
+    """{project: [(source, id, label, body)]} over the three sources, read in place."""
     found = {}
     for project, root in (projects or PROJECTS).items():
         rows = []
         docs = documents(root)
-        if "issues" in docs:
-            for eid, heading, body in issues_entries(read(docs["issues"]), "issues"):
-                rows.append(("issues", eid, heading, body))
-        if "feedback" in docs:
-            for eid, heading, body in feedback_entries(read(docs["feedback"]), "feedback"):
-                rows.append(("feedback", eid, heading, body))
-        for eid, heading, body in notes_entries(root, home):
-            rows.append(("note", eid, heading, body))
+        for source, parse in (("issues", issues_entries), ("feedback", feedback_entries)):
+            if source not in docs:
+                continue
+            text = read(docs[source])
+            entries = parse(text)
+            for eid, label, body, _ in entries:
+                rows.append((source, eid, label, body))
+            if report is not None:
+                report.append("%s %s: %d entries, %d line(s) outside any entry" % (project, source, len(entries), outside(text, entries)))
+        for eid, label, body, _ in notes_entries(root, home):
+            rows.append(("note", eid, label, body))
         found[project] = rows
     return found
 
@@ -208,32 +282,39 @@ def today():
 
 
 def unprocessed(entries, ledger):
-    """[(project, source, id, heading, body, earlier outcome or None)] absent from the ledger or changed since."""
+    """[(project, source, id, label, body, earlier outcome or None)] absent from the ledger or changed since."""
     out = []
     for project, rows in entries.items():
-        for source, eid, heading, body in rows:
+        for source, eid, label, body in rows:
             rec = ledger.get(ledger_key(project, eid))
-            fp = fingerprint(heading + "\n" + body)
+            fp = fingerprint(body)
             if rec is None:
-                out.append((project, source, eid, heading, body, None))
-            elif rec.get("fingerprint") != fp:
-                out.append((project, source, eid, heading, body, rec))
+                out.append((project, source, eid, label, body, None))
+            elif rec.get("fingerprint") and rec.get("fingerprint") != fp:
+                out.append((project, source, eid, label, body, rec))
     return out
 
 
 def redact(text):
-    return SECRET_RX.sub(lambda m: "%s=<value withheld>" % m.group(1), text)
+    text = SECRET_RX.sub(lambda m: "%s=<value withheld>" % m.group(1), text)
+    return KEY_TOKEN_RX.sub("<value withheld>", text)
+
+
+def projects_from(a):
+    return {a.project_name or os.path.basename(a.project_root): a.project_root} if getattr(a, "project_root", None) else None
 
 
 def cmd_collect(a):
     root = bridge_root()
     ledger_path = a.ledger or os.path.join(root, "Reports", "ledger.json")
     ledger = load_ledger(ledger_path)
-    projects = PROJECTS if not a.projects else {k: v for k, v in PROJECTS.items() if k in a.projects}
-    if a.project_root:
-        projects = {a.project_name or os.path.basename(a.project_root): a.project_root}
-    entries = collect_entries(projects, a.home)
+    report = []
+    entries = collect_entries(projects_from(a), a.home, report)
+    for line in report:
+        print("evaluate-reports: " + line)
     rows = unprocessed(entries, ledger)
+    ledger["_meta"] = {"last_collect": today()}
+    save_ledger(ledger_path, ledger)
     if not rows:
         total = sum(len(v) for v in entries.values())
         print("evaluate-reports: nothing new - %d entries of %d project(s), all evaluated and unchanged since" % (total, len(entries)))
@@ -244,9 +325,9 @@ def cmd_collect(a):
     with open(path, "w", encoding="utf-8") as f:
         f.write("# Unprocessed and updated entries, %s\n\n" % today())
         f.write("%d entries. Each needs one verdict: fixed <release> | pitfall KP-nnn | planned <section> | declined <reason> | project-specific. Record with `evaluate-reports.py record <project> <id> <outcome> --reason <text>`.\n\n" % len(rows))
-        for project, source, eid, heading, body, earlier in rows:
+        for project, source, eid, label, body, earlier in rows:
             tag = "UPDATED (earlier: %s %s)" % (earlier.get("outcome"), earlier.get("reason") or "") if earlier else "NEW"
-            f.write("## %s / %s / %s - %s\n\n%s\n\n%s\n\n" % (project, source, eid, tag, heading, redact(body.strip())[:6000]))
+            f.write("## %s / %s / %s - %s\n\n%s\n\n%s\n\n" % (project, source, eid, tag, label, redact(body.strip())[:6000]))
     print("evaluate-reports: %d entries to evaluate (%d new, %d updated) -> %s" % (
         len(rows), sum(1 for r in rows if r[5] is None), sum(1 for r in rows if r[5] is not None), path))
     return 0
@@ -262,72 +343,83 @@ def cmd_record(a):
         print("evaluate-reports: %s needs --reason (the release, the KP id, the plan section, or why)" % a.outcome)
         return 2
     ledger = load_ledger(ledger_path)
-    projects = {a.project_name or os.path.basename(a.project_root): a.project_root} if a.project_root else None
-    entries = collect_entries(projects, a.home)
+    entries = collect_entries(projects_from(a), a.home)
     fp = None
-    for source, eid, heading, body in entries.get(a.project, []):
+    for source, eid, label, body in entries.get(a.project, []):
         if eid == a.id:
-            fp = fingerprint(heading + "\n" + body)
+            fp = fingerprint(body)
     if fp is None and not a.force:
         print("evaluate-reports: no entry %s in %s's documents or notes (use --force to record it anyway)" % (a.id, a.project))
         return 2
-    ledger[ledger_key(a.project, a.id)] = {"evaluated": today(), "fingerprint": fp or "", "outcome": a.outcome, "reason": a.reason or ""}
+    ledger[ledger_key(a.project, a.id)] = {"evaluated": today(), "fingerprint": fp or "", "outcome": a.outcome, "reason": a.reason or "", "forced": fp is None}
     save_ledger(ledger_path, ledger)
     print("evaluate-reports: %s/%s -> %s%s" % (a.project, a.id, a.outcome, (" (%s)" % a.reason) if a.reason else ""))
     return 0
 
 
-def classification_column(header):
+def column(header, words):
     for i, h in enumerate(header):
-        if "classification" in h.lower() or h.strip().lower() in ("class", "verdict"):
+        low = h.strip().lower()
+        if any(w in low for w in words):
             return i
     return None
 
 
 def cmd_seed(a):
-    """The first scheduled run must raise nothing already handled: every entry the first
-    evaluation (Reports/Evaluations/2026-10-04/*.md) classified is recorded with its class."""
+    """The first scheduled run must raise nothing already handled: every entry the first evaluation
+    classified (one table file per project, matched to that project only) is recorded with its class."""
     root = bridge_root()
     ledger_path = a.ledger or os.path.join(root, "Reports", "ledger.json")
     ledger = load_ledger(ledger_path)
-    entries = collect_entries()
-    projects = {a.project_name or os.path.basename(a.project_root): a.project_root} if a.project_root else None
+    projects = projects_from(a) or PROJECTS
     entries = collect_entries(projects, a.home)
-    seeded = 0
+    seeded, skipped = 0, []
     for path in sorted(glob.glob(os.path.join(a.evaluations or os.path.join(root, "Reports", "Evaluations", "2026-10-04"), "*.md"))):
-        col = None
+        project = project_of_file(path, projects)
+        if project is None:
+            skipped.append(os.path.basename(path))
+            continue
+        rows = entries.get(project, [])
+        src_col = cls_col = None
         for line in read(path).split("\n"):
             if not line.startswith("|"):
                 continue
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if col is None or set("".join(cells)) <= set("-: "):
-                c = classification_column(cells)
-                if c is not None:
-                    col = c
+            if set("".join(cells)) <= set("-: "):
                 continue
-            if len(cells) <= col:
+            c = column(cells, ("classification", "class", "verdict"))
+            if c is not None:
+                cls_col, src_col = c, column(cells, ("source", "id"))
                 continue
-            m = re.search(r"\b(CLOSED|PLANNED|PARTLY|OPEN)\b", cells[col])
+            if cls_col is None or len(cells) <= cls_col:
+                continue
+            m = re.search(r"\b(CLOSED|PLANNED|PARTLY|OPEN)\b", cells[cls_col])
             if not m:
                 continue
             outcome = {"CLOSED": "fixed", "PLANNED": "planned", "PARTLY": "planned", "OPEN": "planned"}[m.group(1)]
-            wanted = set(x.upper() for x in re.findall(r"\b(ISS-\d{3,}[a-z]?|FB-\d{3,})\b", cells[0]))
-            wanted |= set("ISSUE-%s" % n for n in re.findall(r"\bIssue\s+(\d+)", cells[0]))
-            fb = re.findall(r"Feedback Stage (\w+),\s*([^;()|]+)", cells[0])
-            for project, rows in entries.items():
-                for source, e, heading, body in rows:
-                    hit = e.upper() in wanted
-                    if not hit and source == "feedback":
-                        for stage, words in fb:
-                            w = [x.lower() for x in re.findall(r"[A-Za-z]+", words)][:2]
-                            if heading.lower().startswith("stage %s" % stage.lower()) and all(x in heading.lower() for x in w):
-                                hit = True
-                    if hit and ledger_key(project, e) not in ledger:
-                        ledger[ledger_key(project, e)] = {"evaluated": a.date or "2026-10-04", "fingerprint": fingerprint(heading + "\n" + body),
-                                                          "outcome": outcome, "reason": "first evaluation of 2026-10-04: %s" % m.group(1)}
-                        seeded += 1
+            src = cells[src_col] if src_col is not None and len(cells) > src_col else cells[0]
+            wanted = set(x.upper() for x in re.findall(r"\b(ISS-\d{3,}[a-z]?|FB-\d{3,})\b", src))
+            numbers = set(re.findall(r"\bIssues?\s+(\d+)", src))
+            for lo, hi in re.findall(r"\bIssues?\s+(\d+)-(\d+)", src):
+                numbers |= set(str(n) for n in range(int(lo), int(hi) + 1))
+            wanted |= set(x for n in numbers for x in ("ISSUE-%s" % n, "ISS-%03d" % int(n)))   # a numbered issue in either spelling
+            wanted |= set("FEEDBACK-%s" % n for n in re.findall(r"\bFeedback\s+(\d+)\b", src))
+            notes = set("note:" + n for n in re.findall(r"`([\w.-]+\.md)`", src))
+            fb = re.findall(r"Feedback Stage (\w+),\s*([^;()|]+)", src)
+            for source, e, label, body in rows:
+                hit = e.upper() in wanted or e in notes
+                if not hit and source == "feedback":
+                    for stage, words in fb:
+                        w = [x.lower() for x in re.findall(r"[A-Za-z]+", words)][:2]
+                        if label.lower().startswith("stage %s" % stage.lower()) and all(x in label.lower() for x in w):
+                            hit = True
+                if hit and ledger_key(project, e) not in ledger:
+                    ledger[ledger_key(project, e)] = {"evaluated": a.date or "2026-10-04", "fingerprint": fingerprint(body),
+                                                      "outcome": outcome, "reason": "first evaluation of 2026-10-04: %s" % m.group(1)}
+                    seeded += 1
     save_ledger(ledger_path, ledger)
-    print("evaluate-reports: %d entries seeded; the ledger holds %d" % (seeded, len(ledger)))
+    print("evaluate-reports: %d entries seeded; the ledger holds %d%s" % (
+        seeded, len([k for k in ledger if not k.startswith("_")]), ("; files of no project skipped: %s" % ", ".join(skipped)) if skipped else ""))
     return 0
 
 
@@ -339,10 +431,21 @@ def session_files(project_root, home=None):
     return sorted(set(out))
 
 
-def owner_messages(path, since):
-    """[(time, kind, text)]: the owner's typed messages and question-form answers, nothing else."""
+def message_text(content):
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = [x.get("text", "") for x in content if isinstance(x, dict) and x.get("type") == "text"]
+        images = sum(1 for x in content if isinstance(x, dict) and x.get("type") == "image")
+        text = "\n".join(p for p in parts if p).strip()
+        return (text + (" [with %d image(s)]" % images if images else "")).strip() if (text or images) else ""
+    return ""
+
+
+def owner_messages(path, since, seen):
+    """[(time, kind, text)]: the owner's own typed messages (origin.kind == human, no compaction
+    summary, no app text, no other session's message) and question-form answers; each record once."""
     out = []
-    questions = {}
     try:
         f = open(path, encoding="utf-8", errors="replace")
     except OSError:
@@ -356,85 +459,89 @@ def owner_messages(path, since):
             ts = str(o.get("timestamp") or "")
             if ts[:10] < since:
                 continue
+            uid = o.get("uuid") or (ts + str(o.get("parentUuid")))
+            if uid in seen:
+                continue
             msg = o.get("message") or {}
-            if o.get("type") == "user" and msg.get("role") == "user" and not o.get("isMeta"):
-                c = msg.get("content")
-                if isinstance(c, str) and c.strip() and not c.lstrip().startswith("<") and not MAINTAINER_RX.search(c):
-                    out.append((ts, "message", c.strip()))   # the maintainer session's messages are not the owner's words (rule 57)
-            if msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
-                for x in msg["content"]:
-                    if isinstance(x, dict) and x.get("type") == "tool_use" and x.get("name") == "AskUserQuestion":
-                        questions[x.get("id")] = x.get("input") or {}
+            origin = o.get("origin") if isinstance(o.get("origin"), dict) else {}
+            if o.get("type") == "user" and msg.get("role") == "user" and origin.get("kind") == "human" \
+                    and not o.get("isMeta") and not o.get("isCompactSummary"):
+                text = message_text(msg.get("content"))
+                if text and not text.lstrip().startswith("<") and not MAINTAINER_RX.search(text):
+                    seen.add(uid)
+                    out.append((ts, "message", text))
             tur = o.get("toolUseResult")
             if isinstance(tur, dict) and isinstance(tur.get("answers"), dict):
+                seen.add(uid)
                 for q, ans in tur["answers"].items():
                     out.append((ts, "answer", "Q: %s\nA: %s" % (q.strip()[:300], str(ans).strip()[:300])))
     return out
 
 
+def last_run(root, ledger_path):
+    meta = load_ledger(ledger_path).get("_meta") or {}
+    if DATE_RX.match(str(meta.get("last_extract") or "")):
+        return meta["last_extract"]
+    dated = sorted(d for d in os.listdir(os.path.join(root, "Reports", "Evaluations")) if DATE_RX.match(d)) if os.path.isdir(os.path.join(root, "Reports", "Evaluations")) else []
+    return dated[-1] if dated else "2026-10-04"
+
+
 def cmd_extract(a):
     root = bridge_root()
+    ledger_path = a.ledger or os.path.join(root, "Reports", "ledger.json")
+    since = a.since or last_run(root, ledger_path)
     out_dir = a.out or os.path.join(root, "Reports", "Evaluations", today())
     os.makedirs(out_dir, exist_ok=True)
     total = 0
-    projects = {a.project_name or os.path.basename(a.project_root): a.project_root} if a.project_root else PROJECTS
-    for project, proot in projects.items():
-        rows = []
+    for project, proot in (projects_from(a) or PROJECTS).items():
+        rows, seen = [], set()
         for path in session_files(proot, a.home):
-            rows += owner_messages(path, a.since)
+            rows += owner_messages(path, since, seen)
         rows.sort()
         if not rows:
             continue
         total += len(rows)
         with open(os.path.join(out_dir, "owner-messages-%s.md" % project.replace(" ", "-")), "w", encoding="utf-8") as f:
-            f.write("# The owner's messages and answers, %s, since %s\n\nFilters: typed messages and question-form answers only; app-inserted text, pasted blocks, notifications and subagents' records left out; every session folder the project was opened in; values of keys withheld.\n\n" % (project, a.since))
+            f.write("# The owner's messages and answers, %s, since %s\n\nFilters: only records the app marks as the owner's own typing and the question-form answers; compaction summaries, app-inserted text, notifications and other sessions' messages left out; each record once; every session folder the project was opened in; key values and key-shaped tokens withheld.\n\n" % (project, since))
             for ts, kind, text in rows:
                 f.write("- %s [%s] %s\n" % (ts[:16].replace("T", " "), kind, redact(text).replace("\n", " / ")[:1200]))
-    print("evaluate-reports: %d message(s) and answer(s) extracted since %s -> %s" % (total, a.since, out_dir))
+    ledger = load_ledger(ledger_path)
+    ledger.setdefault("_meta", {})["last_extract"] = today()
+    save_ledger(ledger_path, ledger)
+    print("evaluate-reports: %d message(s) and answer(s) extracted since %s -> %s" % (total, since, out_dir))
     return 0
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd")
-    c = sub.add_parser("collect")
-    c.add_argument("--ledger")
-    c.add_argument("--out")
-    c.add_argument("--projects", nargs="*")
-    c.add_argument("--project-root", help="one project root instead of the three (tests)")
-    c.add_argument("--project-name")
-    c.add_argument("--home", help="the folder holding .claude/projects (tests)")
-    r = sub.add_parser("record")
-    r.add_argument("project")
-    r.add_argument("id")
-    r.add_argument("outcome")
-    r.add_argument("--reason")
-    r.add_argument("--ledger")
-    r.add_argument("--force", action="store_true")
-    r.add_argument("--project-root")
-    r.add_argument("--project-name")
-    r.add_argument("--home")
-    s = sub.add_parser("seed")
-    s.add_argument("--ledger")
-    s.add_argument("--date")
-    s.add_argument("--evaluations", help="the folder of the first evaluation's tables (default Reports/Evaluations/2026-10-04)")
-    s.add_argument("--project-root")
-    s.add_argument("--project-name")
-    s.add_argument("--home")
-    e = sub.add_parser("extract")
-    e.add_argument("--since", required=True)
-    e.add_argument("--out")
-    e.add_argument("--project-root")
-    e.add_argument("--project-name")
-    e.add_argument("--home")
+    for name in ("collect", "record", "seed", "extract"):
+        p = sub.add_parser(name)
+        p.add_argument("--ledger")
+        p.add_argument("--project-root", help="one project root instead of the three (tests)")
+        p.add_argument("--project-name")
+        p.add_argument("--home", help="the folder holding .claude/projects (tests)")
+        if name in ("collect", "extract"):
+            p.add_argument("--out")
+        if name == "record":
+            p.add_argument("project")
+            p.add_argument("id")
+            p.add_argument("outcome")
+            p.add_argument("--reason")
+            p.add_argument("--force", action="store_true")
+        if name == "seed":
+            p.add_argument("--date")
+            p.add_argument("--evaluations", help="the folder of the first evaluation's tables (default Reports/Evaluations/2026-10-04)")
+        if name == "extract":
+            p.add_argument("--since", help="a date; default the ledger's last extract, else the newest evaluation folder")
     a = ap.parse_args()
     if not a.cmd:
         ap.print_usage()
         return 2
     try:
         return {"collect": cmd_collect, "record": cmd_record, "seed": cmd_seed, "extract": cmd_extract}[a.cmd](a)
-    except OSError as e2:
-        print("evaluate-reports: a file could not be read or written (%s)" % e2)
+    except OSError as e:
+        print("evaluate-reports: a file could not be read or written (%s)" % e)
         return 1
 
 
