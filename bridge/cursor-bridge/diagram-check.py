@@ -23,7 +23,8 @@ Conventions: ~/.claude/cursor-bridge/Diagram-Planning-Conventions.md.
   SCHEMA      `check:schema <file>`: entities/tables and attributes/columns that differ.
   TESTS       `tests:` files that exist must name the diagram ID; for state machines every state
               must appear in them. Missing files are notes.
---mode done    (project end) - code checks, plus: missing enforcing test files, missing schema
+--mode done    (project end) - code checks, plus: a review item naming no reviewer, a deviation
+              still listed in docs/diagrams/DEVIATIONS.md, missing enforcing test files, missing schema
               dumps, and components with no code fail.
 Exit 0 = OK, 1 = at least one failure.
 """
@@ -506,7 +507,25 @@ def js_imports(path, text, fileset):
     return out
 
 
-def component_violations(did, fc, emap, files, done, fails, notes):
+DEVIATIONS = os.path.join("docs", "diagrams", "DEVIATIONS.md")
+REVIEWERS = re.compile(r"\b(diff-reviewer|design-auditor|security-auditor|plan-critic|refactor-scout|Review [AB])\b")
+
+
+def known_deviations(path=DEVIATIONS):
+    """{(diagram, from, to)} listed in docs/diagrams/DEVIATIONS.md (release A3, plan 8.7)."""
+    out = set()
+    if not os.path.isfile(path):
+        return out
+    header, rows = table_rows(read(path))
+    if not header or not header[0].startswith("diagram"):
+        return out
+    for r in rows:
+        if len(r) >= 3 and r[0] and r[1] and r[2]:
+            out.add((r[0].strip("`* "), r[1].strip("`* "), r[2].strip("`* ")))
+    return out
+
+
+def component_violations(did, fc, emap, files, done, fails, notes, deviations=frozenset()):
     elements = fc["elements"]
     for name, pat, _ in emap:
         if name not in elements:
@@ -555,6 +574,9 @@ def component_violations(did, fc, emap, files, done, fails, notes):
         for line, dst_file in imps:
             dst = owner(dst_file)
             if dst and dst != src and not allowed(src, dst):
+                if (did, src, dst) in deviations:
+                    notes.append("DEVIATION listed in %s: %s:%d (%s) imports %s (%s) - resolved when its fix merges" % (DEVIATIONS, f, line, src, dst_file, dst))
+                    continue
                 violations.append("IMPORT: %s:%d (%s) imports %s (%s) - %s draws no %s --> %s"
                                   % (f, line, src, dst_file, dst, did, src, dst))
     fails.extend(violations[:60])
@@ -671,6 +693,9 @@ def main():
                 fails.append("INDEX: %s uses check:components but is a %s diagram" % (did, kind))
             if e.startswith("check:schema") and kind != "erd":
                 fails.append("INDEX: %s uses check:schema but is a %s diagram" % (did, kind))
+            if e.startswith("review:") and not REVIEWERS.search(e):
+                (fails if done else notes).append("INDEX: %s review item '%s' names no reviewer; name who checks it (diff-reviewer, design-auditor, security-auditor, plan-critic or Review B; release A3)%s" % (
+                    did, e[7:].strip()[:50], "" if done else " - a failure at project end"))
         if kind == "object" and not any(e.startswith("tests:") for e in d["enforced"]):
             fails.append("INDEX: object diagram %s must be enforced by tests (the example becomes a fixture)" % did)
         if d["level"] >= 4:
@@ -758,6 +783,11 @@ def main():
         files = tracked()
         if files is None:
             notes.append("not a git repository - code conformance not checked")
+    deviations = known_deviations() if code_mode else frozenset()
+    if deviations:
+        notes.append("%d known deviation(s) listed in %s; each is resolved when its fix merges" % (len(deviations), DEVIATIONS))
+    if done and deviations:
+        fails.append("DEVIATIONS: %d deviation(s) still listed in %s at project end" % (len(deviations), DEVIATIONS))
     for did, d in diagrams.items():
         if "parsed" not in d:
             continue
@@ -767,7 +797,7 @@ def main():
                 if emap is None:
                     fails.append("FILE: %s is enforced by check:components but has no | Element | Paths | map" % did)
                 elif files is not None:
-                    component_violations(did, d["parsed"], emap, files, done, fails, notes)
+                    component_violations(did, d["parsed"], emap, files, done, fails, notes, deviations)
                 elif not code_mode:
                     for name, _, _ in emap:
                         if name not in d["parsed"]["elements"]:

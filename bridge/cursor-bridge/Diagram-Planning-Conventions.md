@@ -84,6 +84,16 @@ Order: the object diagram, then the three parallel kinds.
 - `Enforced by`: one or more of `check:components`, `check:schema <file>`, `tests: <path>, <path>`, `review: <item>`, separated by `;`.
 - `Why`: for a selected Level 4 or 5 diagram, the load-bearing category word (`concurrency`, `security`, `integrity`, `performance`, `protocol`, `prior-failure`), a colon, and one sentence; for an omitted row, the reason; otherwise `-`.
 
+**The known deviations** — `docs/diagrams/DEVIATIONS.md` (release A3, plan 8.7), one table the code check reads, for a project whose diagrams were drawn as built after the code (§8) or whose code drifted before a check caught it:
+
+```markdown
+| Diagram | From | To | As built | Since | Resolved by |
+|---|---|---|---|---|---|
+| D-004 | settings_ui | key_store | the view reads the store directly; the design routes it through the settings service | 2026-10-12 | TASK-041 |
+```
+
+A listed crossing (`Diagram`, `From`, `To`, the element identifiers) passes `check:components` as a note; anything not listed fails. A row leaves the table when its fix merges; a deviation is never resolved by editing the diagram to match the code (§8).
+
 **A diagram file** — `docs/diagrams/D-nnn-<slug>.md`: a heading with the ID and kind, optional notes, and **exactly one** fenced `mermaid` block. Agents read the text; people see a picture wherever Mermaid renders: GitHub renders `mermaid` fences in Markdown files, and Typora renders them once *Diagrams* is enabled in Preferences → Markdown. Typora 1.13 bundles Mermaid 11.13, so a diagram type introduced later (such as the native `usecase-beta` of Mermaid 12) shows there as text; the catalogue therefore uses notations that render in both.
 
 **Identifiers.** Every element that another diagram, the element map, a brief, or a test refers to has a plain identifier: letters, digits, underscores, starting with a letter (`key_store`, `SettingsView`). Labels carry the human wording: `key_store[Key store]`, or with the shape syntax `key_store@{ shape: cyl, label: "Key store" }`. Two Mermaid pitfalls are rules here: never name an element `end` (it breaks flowcharts and state machines; `diagram-check.py` fails it), and always put spaces around links (`a --> ops`, never `a-->ops`, because a node starting with `o` or `x` right after a link is read as a circle or cross edge).
@@ -117,7 +127,7 @@ Order: the object diagram, then the three parallel kinds.
 2. **Draft top-down.** For each level in turn, the supervisor runs `diagram-specialist` subagents: parallel kinds at once, a mutually dependent pair in one run, each given the level's upstream approved diagrams, its register rows, the design text, and (for Levels 4 and 5) its load-bearing reason.
 3. **Integrate.** The supervisor reconciles the drafts: identifiers, boundaries, contradictions, open points. A specialist's objection is resolved here or escalated per §7. Then `diagram-check.py --mode design` must pass.
 4. **Critique.** `plan-critic` reviews the design text and the diagrams together: selection and omissions, load-bearing reasons (and load-bearing detail left undrawn), enforcement, contradictions between diagrams that the check cannot see, trust boundaries.
-5. **Approve.** The owner approves the design with its diagrams. The Level 1 diagrams state what the software does, so the owner reads those; the rest are technical and are presented as such.
+5. **Approve.** The owner approves the Level 1 diagrams, which state what the software does, as one of the design gate's decisions; the other levels are technical, named in the brief and available to read, and are never put to the owner (release A3).
 
 ## 6. How diagrams are used during the build
 
@@ -138,3 +148,13 @@ A builder, reviewer, auditor, or specialist that finds a normative diagram unwor
 | A Level 1 diagram or a requirement | the owner | the design gate: it changes what the software does |
 
 Every revision lands in the change record: the diagram's own git history, the dated Change section of `DESIGN.md`, and the version.
+
+## 8. As-built diagrams and the retrofit (release A3, plan 8.7)
+
+A project that already has code when its diagrams are first drawn (built before diagram-based planning, or a kind added late) gets them **as built**, from the code, by `diagram-specialist` in its as-built variant: the input is the code, the diagram shows what the code does, and the specialist lists every place where the code and the design text disagree. Their value is two things: enforcement from now on, because `diagram-check.py --mode code` then flags every later import that crosses a boundary the diagram does not allow; and the comparison of as-built with as-designed, which is an audit of whether the build followed the design.
+
+**The minimum set** a project must have, which a calibration compares against (the question is "what is covered", never "is there an index"): the Level 1 functional workflows or use cases; the component diagram with its element map; the entity diagram where data is stored; and a state machine wherever the Issues file records a failure of state. Calibration writes the kinds a project lacks to `docs/diagrams/RETROFIT.md`, each a retrofit item for the project's next stage close; it never draws.
+
+**Deviations.** The as-built diagrams are drawn as they are; every discrepancy with the design is listed in `docs/diagrams/DEVIATIONS.md` (§3), which the code check reads: listed deviations pass as notes, anything new fails. They are resolved one at a time, and each leaves the list when its fix merges. Before a deviation is called unrecorded, the archived status logs and the change log are searched. For each deviation the supervisor decides: none recorded anywhere, design regression, a normal fix increment restores the design; recorded but the design text never updated, the design is corrected and an issue entry names the record-keeping failure; the built form judged better, a scoped design revision with the critique of Phase 2. The code is never silently blessed, and a diagram is never edited to match the code.
+
+**What reaches the owner** is unchanged: a deviation with a consequence the owner would live with, under the escalation rule, and the Level 1 diagrams in plain language. No technical approval comes to the owner, and the original design gate is not reopened. The number of unrecorded deviations a project accumulated says how well the loop held, and goes into the stage-close report.

@@ -124,6 +124,14 @@ Rules while applying **Now** items:
   project that was running before this release; a new project is asked at intake), `version`
   (the product's, `0.0.0` until a release) and `state` (`phase`, `stage`, `bridge`, `updated`);
   committed as its own checkpoint. Nothing about it is a question to the owner.
+- **The diagram coverage** (release A3, plan 8.7): compare the project's selected diagrams
+  with the minimum set (the Level 1 functional workflows or use cases; the component diagram
+  with its element map; the entity diagram where data is stored; a state machine wherever the
+  Issues file records a failure of state) and write `docs/diagrams/RETROFIT.md` naming the
+  kinds it lacks, each a retrofit item for the project's next stage close, to be drawn as
+  built by `diagram-specialist` (its as-built variant) with every discrepancy listed in
+  `docs/diagrams/DEVIATIONS.md`; a project whose set is complete writes nothing. Calibration
+  assesses and never draws; nothing here is a question to the owner.
 - Configuration goes through `cursor-configurator` and is **append-only**: add the missing
   file, the missing hook entry, the missing pre-commit line; never rewrite an existing
   config. Commit the configuration change as its own checkpoint, exactly like Phase 5.
