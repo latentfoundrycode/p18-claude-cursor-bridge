@@ -243,6 +243,33 @@ def test_the_run_sheet_check_applies_in_every_phase_and_blocks_the_stop(lg, tmp_
     assert e.value.code == 2, "the hook's own copy of the final message wins over the transcript"
 
 
+def test_the_refusal_prints_the_ceiling_on_the_computers_clock(lg, tmp_path, monkeypatch, capsys):
+    """reAngle, 2026-10-10 (KP-039): wake-ups computed from a UTC stamp with an assumed offset landed an hour
+    past the ceiling. The refusal prints the clock's reading, the ceiling's time and the schedule to copy, and
+    names a wake-up that is due after the ceiling."""
+    from datetime import datetime as dt
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
+    agent = {"id": "a1", "type": "background_subagent", "status": "running", "description": "Review A", "command": "Agent", "started_at": ts(-600)}
+    late = dt.fromtimestamp(NOW - 600 + 3600 + 3600)
+    cron = {"id": "c1", "schedule": "%d %d %d %d *" % (late.minute, late.hour, late.day, late.month), "description": "an hour late", "command": "", "last_run_at": None}
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [agent], "session_crons": [cron]}, NOW, str(root))
+    assert len(unscheduled) == 1 and "background agent a1" not in pending, (pending, unscheduled)   # the late wake-up is listed, the agent is not covered
+    ceiling = dt.fromtimestamp(NOW - 600 + 3600)
+    assert "`%d %d %d %d *`" % (ceiling.minute, ceiling.hour, ceiling.day, ceiling.month) in unscheduled[0] and ceiling.strftime("%Y-%m-%d %H:%M") in unscheduled[0], unscheduled[0]
+    assert "after it" in unscheduled[0] and late.strftime("%H:%M") in unscheduled[0], unscheduled[0]
+    assert "(UTC+" in unscheduled[0] or "(UTC-" in unscheduled[0], unscheduled[0]
+    near = dict(agent, started_at=ts(-3600 + 30))
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [near], "session_crons": []}, NOW, str(root))
+    assert len(unscheduled) == 1 and "TaskStop now" in unscheduled[0] and "CronCreate" not in unscheduled[0], "a ceiling at hand is stopped, not scheduled (review of 10c, finding 1): " + str(unscheduled)
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": str(root / "none"), "hook_event_name": "Stop", "background_tasks": [agent], "session_crons": [cron]})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    err = capsys.readouterr().err
+    assert e.value.code == 2 and "The computer's clock reads" in err and "KP-039" in err and "never convert a UTC stamp" in err, err
+
+
 def test_the_hook_input_is_read_in_its_live_forms(lg, tmp_path, monkeypatch):
     """reAngle, 2026-10-10 (field observation on 2026.10.10a): a start as epoch milliseconds, a one-shot
     cron with its schedule only, a command task under another type name."""

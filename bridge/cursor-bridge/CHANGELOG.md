@@ -15,6 +15,25 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.10c
+
+**A wake-up is scheduled on the computer's clock** (reAngle's field finding of 2026-10-10 on release 2026.10.10a, KP-039; the owner asked for it to be covered before the A3 install).
+
+**What changed**
+- **The loop guard's refusal does the arithmetic:** when a background agent waits with no wake-up at its ceiling, the refusal prints the computer's clock reading with its offset from UTC, the time the ceiling falls on that clock, the one-shot `CronCreate` schedule expression to copy, and any scheduled wake-up that is due after the ceiling.
+- **Rule 43** says the schedule is read on the computer's clock: copied from the refusal, or computed from `date` read at that moment, never from a UTC stamp converted by an assumed offset, which put every wake-up of a session an hour past the ceiling on reAngle. The digest says "(computer's clock)"; N7 lost "before the gate" to pay for it (the rule's text is unchanged). A ceiling within two minutes is not scheduled: the refusal says to stop the agent now and run its task in the foreground.
+- **KP-039** records the pitfall.
+
+**Running projects must**
+- *(building, changing)* Install, restart, `/calibrate-bridge`. At the next wake-up a supervisor schedules, copy the loop guard's expression or read the clock with `date`; a wake-up already scheduled by hand is checked against the clock once.
+
+**If rolled back**
+- Nothing to undo: the refusal loses its clock line and rule 43 its sentence. Set `Bridge version:` to the installed version.
+
+**Field acceptance on the trial project.** A refusal of the loop guard for an unscheduled agent shows the clock reading and the expression, and the wake-up the supervisor then schedules fires at or before the ceiling.
+
+---
+
 ## 2026.10.10b
 
 **Release A3 of the restructuring plan: the design critique, the report cycle, the retrofit's conventions** (plan 8.6, 8.7 and 12), the maintainer's channel, and the first field fixes of 2026.10.10a.
