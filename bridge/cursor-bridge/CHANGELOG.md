@@ -15,6 +15,29 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.10b
+
+**Release A3 of the restructuring plan: the design critique, the report cycle, the retrofit's conventions** (plan 8.6, 8.7 and 12), and the maintainer's channel.
+
+**What changed**
+- **The roster is resolved at intake** (plan 8.6): intake states the Cursor program as a prerequisite and writes and resolves `docs/ROSTER.json`, so a cross-family reviewer exists from the first phase; Phase 5 only re-resolves it.
+- **Review B gets a design mode:** the design, its diagrams, the register and the critic's lenses are committed to `run/review/DESIGN-<round>.md`, and the reviewer reads it read-only with the workspace trusted, through the launcher, answering in the critic's grades; the test that forbade the read-only mode now applies to code reviews only.
+- **Two critics before the gate, as peers, with a stop rule and two brakes:** a round is `plan-critic` and Review B's design mode on the same committed text, each given `docs/DESIGN_CRITIQUE.md` (the findings accepted with their reasons, each critic's grades per round); another round follows only on a Blocking finding or a Should-fix not accepted with a reason; a critic that returned nothing of that kind drops out; a reversal of an earlier fix and whatever is still Blocking after four rounds (the owner's ceiling) go to a resolution round; a dropped-out critic re-reads what changed, and the text leaving a fourth or a resolution round gets one confirming read by both. The same loop runs on the plan, on a change cycle's design revision and on a scoped revision. The gate presents the record as one of its separate decisions.
+- **A material change after a gate is announced** (rule 58, the owner's decision of 2026-10-10): a change to an approved design that alters what the software does, its scope or its cost leads the next report as a one-line notice the owner can stop; every other change goes into the design's change section.
+- **The maintainer's channel** (rule 57, the owner's decision of 2026-10-10): a message in the chat labelled as coming from the bridge's maintainer session is bridge mechanics (a pause, a calibration, a resume, a probe, a report back), never a gate, scope, money or a key; the report cycle's extract of the owner's words leaves those messages out.
+
+**Running projects must**
+- *(all phases)* Install, restart, `/calibrate-bridge` (step 0 writes the position down). A project past intake without a resolved roster gets one at calibration.
+- *(design, planning, changing)* The next design, plan or design revision goes through the two-critic loop before its gate; `docs/DESIGN_CRITIQUE.md` starts empty.
+- *(all phases)* A message labelled as the maintainer session's is followed as mechanics only (rule 57).
+
+**If rolled back**
+- *(all phases)* `docs/DESIGN_CRITIQUE.md` and `run/review/DESIGN-*.md` may stay; the design critique returns to one critic. Set `Bridge version:` to the installed version.
+
+**Field acceptance on the trial project.** A design, a plan or a design revision walked through its gate is criticised by both critics before it, the loop stops when both return nothing above Consider or at four rounds, and the record is in the gate presentation; a material change after a gate, if one occurs, produces the one-line notice.
+
+---
+
 ## 2026.10.10a
 
 **Release A2 of the restructuring plan: background tasks, the remainder** (plan 10.3, second table). Every run the loop starts has a ceiling it learns from the project's own healthy runs, every background agent has a ceiling with a wake-up at it, the loop guard reads what is in flight from Claude Code itself, and a run that ends at its limit is recorded.

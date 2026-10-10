@@ -366,6 +366,16 @@ ordinary re-delegation loop as a fresh finding.
 
 ---
 
+## Review B's design mode (release A3)
+
+Before the design gate, and again for a plan, a change cycle's design revision and a scoped revision, the cross-family reviewer reads the design as one of two critics (`supervisor.md`, Phase 2). The supervisor commits the design text, the diagrams, the requirements register and the critic's lenses (copied from `plan-critic`'s sections, so the reviewer needs nothing outside the Workspace) to `run/review/DESIGN-<round>.md` with `git add -f`, snapshots with `review-guard.py snapshot DESIGN-<round>`, and launches the reviewer **read-only, with the workspace trusted**, through the launcher:
+
+```bash
+python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --mode=ask --trust --model <review_b from docs/ROSTER.resolved.json> "The design to criticise is already written to run/review/DESIGN-<round>.md, with the lenses and the grades to answer in. Read that file whole; do not ask for it; answer with your findings in its grades, each naming the diagram, section or requirement it concerns, and nothing else." 2> run/review/REVIEW-DESIGN-<round>.err
+```
+
+It answers in the critic's grades, Blocking, Should fix and Consider, each finding naming the diagram, section or requirement it concerns, and ends with the counts per grade. A reply that names nothing from the file is a failed launch, not a verdict, as for a code review. `review-guard.py verify DESIGN-<round>` afterwards proves the reviewer read only. The record of every round lives in `docs/DESIGN_CRITIQUE.md`, each critic's grades apart. The installed test that forbids the read-only mode in a reviewer command applies to code reviews, which must execute; a design review must carry `--mode=ask --trust`.
+
 ## Who completes the merge — the `Merge authority` run parameter
 
 The gate decides *whether* a branch may merge; the owner's `Merge authority` run parameter
