@@ -314,7 +314,7 @@ def cmd_collect(a):
     for line in report:
         print("evaluate-reports: " + line)
     rows = unprocessed(entries, ledger)
-    ledger["_meta"] = {"last_collect": today()}
+    ledger.setdefault("_meta", {})["last_collect"] = today()                  # never drops last_extract (third pass, finding 1)
     save_ledger(ledger_path, ledger)
     if not rows:
         total = sum(len(v) for v in entries.values())
@@ -409,11 +409,13 @@ def cmd_seed(a):
             wanted |= set(x for n in numbers for x in ("ISSUE-%s" % n, "ISS-%03d" % int(n)))   # a numbered issue in either spelling
             wanted |= set("FEEDBACK-%s" % n for n in re.findall(r"\bFeedback\s+(\d+)\b", src))
             notes = set("note:" + n for n in re.findall(r"`([\w.-]+\.md)`", src))
-            notes |= set("note:%s.md" % n for n in re.findall(r"[Mm]emory\s+`([\w-]+)`", src))      # the TDP: memory `ci-config-gotchas` item 6
+            for span in re.findall(r"[Mm]emory\s+([^;|]*)", src):                                  # the TDP: memory `ci-config-gotchas` item 17, `tdp-mcp-claude-code-wiring`
+                notes |= set("note:%s.md" % n for n in re.findall(r"`([\w-]+)`", span))
+            headline = bool(re.search(r"\bIssues?\s+headline\b", src, re.I))                    # the video factory: Issues headline + Issues 1-4
             quoted = [q.lower() for q in re.findall(r'Feedback\s+"([^"]+)"', src)]              # the TDP: Feedback "Milestone 5 close"
             fb = re.findall(r"Feedback Stage (\w+),\s*([^;()|]+)", src)                           # reAngle: Feedback Stage 3a, Stalls item 1
             for source, e, label, body in rows:
-                hit = e.upper() in wanted or e in notes
+                hit = e.upper() in wanted or e in notes or (headline and source == "issues" and "headline" in label.lower())
                 if not hit and source == "feedback":
                     low = label.lower()
                     hit = any(q in low for q in quoted)
@@ -503,8 +505,13 @@ def last_run(root, ledger_path):
     if DATE_RX.match(str(meta.get("last_extract") or "")):
         return meta["last_extract"]
     folder = os.path.join(root, "Reports", "Evaluations")
-    dated = sorted(d for d in os.listdir(folder) if DATE_RX.match(d) and d < today()) if os.path.isdir(folder) else []   # never today's, which collect has just made
-    return dated[-1] if dated else "2026-10-04"
+    dated = sorted(d for d in os.listdir(folder) if DATE_RX.match(d) and d < today() and run_files(os.path.join(folder, d))) if os.path.isdir(folder) else []
+    return dated[-1] if dated else "2026-10-04"           # never today's folder (collect has just made it) nor one without a run's files
+
+
+def run_files(folder):
+    """A folder of a run of this command holds unprocessed.md or owner-messages-*.md; the first evaluation's tables and other notes do not count."""
+    return any(n == "unprocessed.md" or n.startswith("owner-messages-") for n in os.listdir(folder))
 
 
 def cmd_extract(a):

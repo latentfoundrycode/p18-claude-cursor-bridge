@@ -106,6 +106,9 @@ def uv_run_pytest(argv):
         if argv[i] in UV_VALUE_OPTIONS:
             i += 2
             continue
+        if "=" in argv[i] and argv[i].split("=", 1)[0] in UV_VALUE_OPTIONS:         # --project=x
+            i += 1
+            continue
         if argv[i] in UV_FLAGS:
             i += 1
             continue
@@ -147,8 +150,8 @@ def test_suite(argv, folder=None):
         attached = next((e for e in escapes if e in ("-p", "-c", "-r") and a.startswith(e) and len(a) > len(e)), None)
         if name in escapes or attached:
             value = a[len(attached):] if attached else (argv[i + 1] if i + 1 < len(argv) else "")
-            if head == "pytest" and (name == "-p" or attached == "-p") and value.startswith("no:"):
-                continue                                   # `-p no:cacheprovider` disables a plugin
+            if head in ("pytest", "uv") and (name == "-p" or attached == "-p") and value.startswith("no:") and "pytest" in argv and i > argv.index("pytest"):
+                continue                                   # `-p no:cacheprovider` disables a plugin (after the word pytest, never uv's own -p)
             return False
     if head == "npx" and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0])) \
             and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0] + ".cmd")):

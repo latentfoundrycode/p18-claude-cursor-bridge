@@ -99,7 +99,8 @@ def test_test_suites_are_accepted_by_name_and_their_kind_is_inferred(program):
                 ["go", "test", "-toolexec", "evil"], ["node", "--test", "--require", "evil.js"], ["./tools/pytest", "-q"], ["C:/x/pytest.exe"]):
         assert not br.test_suite(cmd), cmd
     for cmd in (["pytest", "-p", "no:cacheprovider", "-q"], ["pytest", "-pno:cacheprovider"], ["dotnet", "test", "-c", "Release"],
-                ["uv", "run", "--project", "backend", "pytest", "-q"], ["uv", "run", "--frozen", "pytest"]):
+                ["uv", "run", "--project", "backend", "pytest", "-q"], ["uv", "run", "--frozen", "pytest"],
+                ["uv", "run", "--project=backend", "pytest"], ["uv", "run", "--project", "x", "pytest", "-p", "no:cacheprovider"]):
         assert br.test_suite(cmd, os.getcwd()), cmd        # second pass, S2, and reAngle's forms: ordinary options stay allowed
     here = os.getcwd().replace("\\", "/")
     assert br.test_suite([here + "/backend/.venv/Scripts/python.exe", "-m", "pytest", "-q"], os.getcwd()), "the project's own venv python is the interpreter, not the runner"
