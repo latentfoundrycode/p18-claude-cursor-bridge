@@ -260,6 +260,9 @@ def test_the_refusal_prints_the_ceiling_on_the_computers_clock(lg, tmp_path, mon
     assert "`%d %d %d %d *`" % (ceiling.minute, ceiling.hour, ceiling.day, ceiling.month) in unscheduled[0] and ceiling.strftime("%Y-%m-%d %H:%M") in unscheduled[0], unscheduled[0]
     assert "after it" in unscheduled[0] and late.strftime("%H:%M") in unscheduled[0], unscheduled[0]
     assert "(UTC+" in unscheduled[0] or "(UTC-" in unscheduled[0], unscheduled[0]
+    near = dict(agent, started_at=ts(-3600 + 30))
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [near], "session_crons": []}, NOW, str(root))
+    assert len(unscheduled) == 1 and "TaskStop now" in unscheduled[0] and "CronCreate" not in unscheduled[0], "a ceiling at hand is stopped, not scheduled (review of 10c, finding 1): " + str(unscheduled)
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": str(root / "none"), "hook_event_name": "Stop", "background_tasks": [agent], "session_crons": [cron]})))
     with pytest.raises(SystemExit) as e:
         lg.main()

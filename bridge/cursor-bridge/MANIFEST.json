@@ -1,6 +1,6 @@
 {
   "version": "2026.10.10c",
-  "generated": "2026-10-10 22:02",
+  "generated": "2026-10-10 22:11",
   "files": {
     "agents/cursor-configurator.md": "1fb1b1f683cbbf855cce1d011dab61ca835a87d4524f68d7b92b5913339746c9",
     "agents/design-auditor.md": "1c69c7d8fae2eaa8064ad63d953b1fb3ef6fe1dfc9046db5446174160ae75f3d",
@@ -15,7 +15,7 @@
     "commands/calibrate-bridge.md": "6f46d948f9c79188da1c93747725547c9475308c57f763206e739eea0928ad55",
     "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
     "commands/supervisor.md": "4c18ea28cd1de52c910fbb893504196436fd29e3d1aa9ad184ec465ad2e15c63",
-    "cursor-bridge/CHANGELOG.md": "0bcd8df4b85a14deddefe2595852dc25054839988a95e8b3a5ca93376ea4a593",
+    "cursor-bridge/CHANGELOG.md": "5709ffc46055cbb127df23ba8cf3c31d1b361663503ba16f55cc98446bd0219f",
     "cursor-bridge/Cursor-File-Formats.md": "9a6360395b37793dd491641b3c4a924af4987af094446ba763671bd9af90673d",
     "cursor-bridge/Cursor-Project-Configuration.md": "3129ac1abbbba8ed8829c2cb13ffb8712333c4c9acd8ac4d5d5cf2bbe307c3b2",
     "cursor-bridge/Delivery-Conventions.md": "3b428aa7080c846c3f70530d142949c531d1054f8011c042dcbf4d0dedc72842",
@@ -81,7 +81,7 @@
     "cursor-bridge/installer-check.ps1": "c37e8da6ed3e24b023a09c38806f963dc7c09cdb76c6c5f60cd77d2b4997eb7e",
     "cursor-bridge/inventory-check.py": "6882c50b084dea4f613c8d4470dda54cb151f591b46e01cdfb1d7a04bab6e28d",
     "cursor-bridge/lock-check.py": "b88e0d5038b61063622a4a11b9fadf9ea7f16ec77a6d1833ec36687062971e63",
-    "cursor-bridge/loop-guard.py": "e41bc7acee7241038e5af0ae20afd3adfd8ed01237b6769a52a87e00333ac912",
+    "cursor-bridge/loop-guard.py": "ca68c7a7347a1e3f5cbe50e52f631f46f70165b0f62c34ce8e5cc6e1578a4f15",
     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
     "cursor-bridge/permission-guard.py": "14226f9ef80ae021321c9ed6135bbdb2fca9a92ed04d2a35fd62aba9e17d88b5",
     "cursor-bridge/plan-check.py": "e1eab2676f31478f517dbc524f8aa51f976641fa3e41c4430bb513e669c4dd3f",

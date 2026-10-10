@@ -21,7 +21,7 @@ project must show before the other projects resume.
 
 **What changed**
 - **The loop guard's refusal does the arithmetic:** when a background agent waits with no wake-up at its ceiling, the refusal prints the computer's clock reading with its offset from UTC, the time the ceiling falls on that clock, the one-shot `CronCreate` schedule expression to copy, and any scheduled wake-up that is due after the ceiling.
-- **Rule 43** says the schedule is read on the computer's clock: copied from the refusal, or computed from `date` read at that moment, never from a UTC stamp converted by an assumed offset, which put every wake-up of a session an hour past the ceiling on reAngle. The digest says "(computer's clock)".
+- **Rule 43** says the schedule is read on the computer's clock: copied from the refusal, or computed from `date` read at that moment, never from a UTC stamp converted by an assumed offset, which put every wake-up of a session an hour past the ceiling on reAngle. The digest says "(computer's clock)"; N7 lost "before the gate" to pay for it (the rule's text is unchanged). A ceiling within two minutes is not scheduled: the refusal says to stop the agent now and run its task in the foreground.
 - **KP-039** records the pitfall.
 
 **Running projects must**

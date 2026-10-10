@@ -350,8 +350,12 @@ def pending_from_hook(data, now, cwd):
                 pending.append("background agent %s" % t.get("id"))
             else:
                 late = "; your scheduled wake-up is due at %s, after it" % ", ".join(local_clock(d) for d in sorted(dues)) if dues else ""
-                unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, so the wake-up is CronCreate schedule `%s`, recurring false%s)"
-                                   % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), cron_at(start + ceiling), late))
+                if start + ceiling - now < 120:            # the minute is at hand or past: a schedule for it would never fire (review of 10c, finding 1)
+                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, within two minutes, so do not schedule: stop it with TaskStop now and run its task in the foreground%s)"
+                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), late))
+                else:
+                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, so the wake-up is CronCreate schedule `%s`, recurring false%s)"
+                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), cron_at(start + ceiling), late))
     return pending, unscheduled
 
 
