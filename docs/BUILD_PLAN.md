@@ -3,7 +3,7 @@
 The design is the Restructuring Plan's release B (§16) and the sections it rests on (§6, §15). This plan decomposes that scope into increments. Per §15 condition 3, **governance text is design: the supervisor authors it, gated by the two-critic design review; programs are implementation: the builder writes them, gated by the delegation loop.** Each increment marks its author. Status is derived from `origin/main` by `plan-check.py`, never written here. Revised 2026-10-11 after two-critic rounds 1–3 (converging: Blocking 7→6→1 and 5→1→2).
 
 ## Standing constraints (every increment)
-- **Manifest:** any increment that adds, moves, or removes a file under `bridge/` regenerates `bridge/cursor-bridge/MANIFEST.json` (`python tools/make-manifest.py`) in the same commit; `MANIFEST.json` is named in its Scope.
+- **Manifest:** any increment that adds, moves, removes, **or edits** a file under `bridge/` regenerates `bridge/cursor-bridge/MANIFEST.json` (`python tools/make-manifest.py`) in the same commit (a hash change fails `bridge-check --sources` in CI otherwise); `MANIFEST.json` is named in its Scope.
 - **Tests name the requirement:** each increment's test contains the literal `R-nnn` of every requirement it satisfies. A governance-text increment's test is structural (the file exists at its §6.11 path, opens with its compaction-survival list where applicable, declares its extension points by the registry's names, is within the R-032 bound, and — **from TASK-006 on** — `workflow-check.py` exits 0 on it).
 - **Moves, not copies:** text moved in the split (including a trait's gathered passages, §6.8) *moves* — it leaves its old home; the main workflow shrinks. A passage may move twice (baseline → phase module → trait file); `trace-check` accepts it found verbatim anywhere under `workflow/**`.
 - **Trace exceptions:** `bridge/cursor-bridge/workflow/trace-exceptions.md` carries two entry kinds — `reword <TASK> <file> <heading>` and `new <TASK> <file> <heading>` — appended by the supervisor-text increment that rewords or adds; it is named in that increment's Scope so the design review sees it.
@@ -61,7 +61,7 @@ Parallel: no
 Diagrams: none
 Scope: bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/MANIFEST.json; tests/test_open_list.py
 Satisfies: R-011
-Done when: every §6.3 product type, sub-type, and trait is listed with its definition, its default traits, its fixed workflow name / sub-workflow name, and a written/unwritten flag (all unwritten at first); the §6.10 add/change procedure is recorded; `test_open_list.py` (names R-011) asserts each entry has definition, default-traits, name, and flag, and the file parses in the shape `workflow-check.py` reads.
+Done when: every §6.3 product type, sub-type, and trait is listed with its definition, its default traits, its fixed workflow name / sub-workflow name, and a written/unwritten flag (all unwritten at first); the open list is the canonical source of a type's default traits (a type file's statement is checked against it by `workflow-check`); the §6.10 add/change procedure is recorded; `test_open_list.py` (names R-011) asserts each entry has definition, default-traits, name, and flag, and the file parses in the shape `workflow-check.py` reads.
 
 ### TASK-005 — The extension-point registry
 Author: supervisor.
@@ -81,7 +81,7 @@ Parallel: no
 Diagrams: none
 Scope: bridge/cursor-bridge/workflow-check.py; .github/workflows/tests.yml; tests/fixtures/workflows/; bridge/cursor-bridge/MANIFEST.json; tests/test_workflow_check.py
 Satisfies: R-014, R-033
-Done when: `workflow-check.py` exits 0 on the open list + sample fixtures and non-zero on (a) an undeclared/renamed extension point, (b) a trait that replaces or sets, (c) a replace on a non-replaceable phase (read from the registry), (d) a sub-workflow naming a missing type, (e) two product types / two sub-types / a sub-type not of its type on one part, (f) a `Workflows:` line naming an unwritten type; its **CI invocation checks `workflow/**` and `tests/fixtures/workflows/` only** (never the bridge's own `docs/PROJECT_STATUS.md`); it owns `tests/fixtures/workflows/`; `test_workflow_check.py` (names R-014, R-033) covers each case and the CI step. (The tree-wide registry↔module cross-check is a Done-when of TASK-014, once every module declares its points.)
+Done when: `workflow-check.py` exits 0 on the open list + sample fixtures and non-zero on (a) an undeclared/renamed extension point, (b) a trait that replaces or sets, (c) a replace on a non-replaceable phase (read from the registry), (d) a sub-workflow naming a missing type, (e) two product types / two sub-types / a sub-type not of its type on one part, (f) a `Workflows:` line naming an unwritten **type or sub-type** (which pauses the project); an **unwritten trait is flagged, non-fatal** (work continues, §6.7); its **CI invocation checks `workflow/**` and `tests/fixtures/workflows/` only** (never the bridge's own `docs/PROJECT_STATUS.md`); it creates `tests/fixtures/workflows/` and the sample fixtures; `test_workflow_check.py` (names R-014, R-033) covers each case, the unwritten-trait flag, and the CI step. (The tree-wide registry↔module cross-check is a Done-when of TASK-014, once every module declares its points.)
 
 ### TASK-007 — The Workflows status line: template and semantics
 Author: supervisor.
@@ -99,7 +99,7 @@ Parent: none
 Depends on: TASK-007
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/inventory-check.py; bridge/cursor-bridge/conformance-check.py; tests/test_workflows_line_check.py
+Scope: bridge/cursor-bridge/inventory-check.py; bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_workflows_line_check.py
 Satisfies: R-015
 Done when: `inventory-check.py`/`conformance-check.py` read the `Workflows:` line and report a malformed or missing one; `test_workflows_line_check.py` (names R-015) covers valid, missing, malformed.
 
@@ -114,7 +114,7 @@ Satisfies: R-028
 Done when: the glossary defines the closed set — conditional workflow, type workflow, sub-workflow, trait, trait addition, extension point, phase module, main workflow core, product type, sub-type, replace, set, add, open list, workflow check, workflow name, sub-workflow name, compaction-survival list; `test_glossary_terms.py` (names R-028) asserts each has a definition.
 
 ## Stage B3 — The core and phase-module split
-Demonstration: after a simulated compaction the session-start hook names exactly one phase module (plus the current phase's conditional files and the table's further files) to re-read, and the traceability comparison shows every standing rule and conditional passage mapped from the pinned pre-split baseline to its new file with nothing dropped.
+Demonstration: after a simulated compaction the session-start hook names the current phase's module(s) per the shared table (one for most phases; planning and building map to two) plus the current phase's conditional files and the table's further files to re-read, and the traceability comparison shows every standing rule and conditional passage mapped from the pinned pre-split baseline to its new file with nothing dropped.
 
 ### TASK-016 — The traceability comparison (built first)
 Author: builder.
@@ -124,17 +124,18 @@ Parallel: no
 Diagrams: none
 Scope: bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_trace_check.py
 Satisfies: R-029
-Done when: `trace-baseline.txt` pins the commit before the carve (after TASK-003/005/007's core edits); `trace-check.py` maps every standing rule and conditional passage (the project-layout/Workspace-boundary section included) from that baseline to its new file under `workflow/**`, accepts a passage found verbatim anywhere (a two-hop move), requires verbatim moves except `reword` entries in `trace-exceptions.md`, flags text new to the modules unless a `new` entry declares it, and checks every `~/.claude/...` reference and cited section still resolves, running incrementally; the empty `trace-exceptions.md` is scaffolded here; `test_trace_check.py` (names R-029) covers a clean move, a two-hop move, a silent reword (fails), an undeclared new passage (fails), a dropped boundary section (fails), a dangling reference (fails), and both exception kinds.
+Done when: `trace-baseline.txt` pins the commit before the carve (after TASK-003/005/007's core edits); `trace-check.py` maps every standing rule and conditional passage (the project-layout/Workspace-boundary section included) from that baseline to its home — a home is `supervisor.md` (for a rule that stays in the core) or any file under `workflow/**`; a passage found verbatim in **more than one** home fails as a **COPY** unless a `reword`/`new` entry explains it (so "moves, not copies" is enforced for every increment, not only where a per-increment test asserts absence); a two-hop move (baseline→module→trait, the source emptied) passes; verbatim moves are required except `reword` entries in `trace-exceptions.md`; text new to the modules is flagged unless a `new` entry declares it; every `~/.claude/...` reference and cited section still resolves; it runs incrementally; the empty `trace-exceptions.md` is scaffolded here; `test_trace_check.py` (names R-029) covers a clean move, a two-hop move, a **copy into two homes (fails)**, a silent reword (fails), an undeclared new passage (fails), a dropped boundary section (fails), a dangling reference (fails), and both exception kinds.
 
 ### TASK-010 — Carve the core and move the phase sections
 Author: supervisor.
 Parent: none
-Depends on: TASK-003, TASK-005, TASK-007, TASK-016
+Depends on: TASK-003, TASK-005, TASK-006, TASK-007, TASK-016
 Parallel: no
 Diagrams: none
-Scope: bridge/commands/supervisor.md; bridge/cursor-bridge/workflow/phases/intake.md; .../design.md; .../interface.md; .../planning.md; .../run-parameters.md; .../configuration.md; .../delegation-loop.md; .../change-cycle.md; .../reflection.md; .../project-end.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_core_carve.py
+Merge unit: TASK-010 and TASK-015 are built on one stage branch and merged as one PR (both IDs in the title) so the test suite is never red on `main` between the carve and the hook, and no release ships between them.
+Scope: bridge/commands/supervisor.md; bridge/cursor-bridge/workflow/phases/intake.md; .../design.md; .../interface.md; .../planning.md; .../run-parameters.md; .../configuration.md; .../delegation-loop.md; .../change-cycle.md; .../reflection.md; .../project-end.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_core_carve.py; tests/test_session_start.py
 Satisfies: R-003, R-032
-Done when: every phase section moves verbatim out of `supervisor.md` into its module in one commit; project-end is carved out of the `## Reflection points` block into `project-end.md` as a declared split recorded in `trace-exceptions.md`; the core keeps only roles/division, founding rules, loop shape, escalation/reporting, project state, and the standing rules that hold in every phase, pointing at the modules; `trace-check` green for the moved sections; the digest stays within `test_session_start.py`'s limit and that test's heading assertions are re-pointed to "the heading exists in `supervisor.md` or in one of the ten modules" (never weakened, never editing `session-start.py`); the core's post-carve size is recorded as a measurement; a proof test shows `workflow/**` installs from the regenerated manifest with no `bridge-install.py` change; `test_core_carve.py` (names R-003, R-032) asserts the core's section set, that no phase procedure remains, the modules exist, and **a release stamp (VERSION bump / `bridge-check --sources`) is refused while `session-start.py` carries no module table** (so no release ships between this and TASK-015).
+Done when: every phase section moves verbatim out of `supervisor.md` into its module in one commit; project-end is carved out of the `## Reflection points` block into `project-end.md` as a declared split recorded in `trace-exceptions.md`; the core keeps only roles/division, founding rules, loop shape, escalation/reporting, project state, and the standing rules that hold in every phase, pointing at the modules; `trace-check` green for the moved sections; the digest stays within `test_session_start.py`'s limit; the core's post-carve size is recorded as a measurement; a proof test shows `workflow/**` installs from the regenerated manifest with no `bridge-install.py` change; `test_core_carve.py` (names R-003, R-032) asserts the core's section set, that no phase procedure remains, and the modules exist. (`test_session_start.py`'s heading/line-range assertions are updated for the module table in the combined TASK-010+TASK-015 change, never weakened; the carve alone does not leave the suite red on `main` because the two land as one PR.)
 
 ### TASK-011 — Enrich phase modules: intake, design
 Author: supervisor.
@@ -154,7 +155,7 @@ Parallel: no
 Diagrams: none
 Scope: bridge/cursor-bridge/workflow/phases/interface.md; .../interface/mockups.md; .../interface/command-design.md; .../interface/contract-design.md; .../interface/playable-prototype.md; .../planning.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_interface_planning.py
 Satisfies: R-004, R-006, R-010, R-012, R-032
-Done when: interface.md declares all four variants once, each variant's text in its own file; the mockup-variant text (frozen interface rules, the design auditor, the running-interface tests) lives in `interface/mockups.md` and is declared an *addition* (R-010); planning.md and interface.md each open with their compaction-survival list and declare their extension points; the playable-prototype file is a declared stub pointing at the Game Development workflow (release E), not stand-in text; within the R-032 bound; `trace-check` green; `test_phase_modules_interface_planning.py` (names R-004, R-006, R-010, R-012, R-032) asserts both files' structure, the four variants, and the mockup-as-addition.
+Done when: interface.md declares all four variants once, each variant's text in its own file; `interface/mockups.md` holds the Phase-3 mockup procedure (today's `## Phase 3 — UI mockups`), declared an *addition* activated by the trait *has screens* (R-010) — the build-phase interface passages (the frozen-rule brief constraint, the design-auditor review step, the observability tests) are NOT here; they are gathered by the has-screens trait (TASK-017) from the build modules; planning.md and interface.md each open with their compaction-survival list and declare their extension points; the playable-prototype file is a declared pointer to the Game Development workflow (release E), worded to avoid `completion-check`'s stand-in patterns (verified by `completion-check --mode plan` reporting no stand-in on `workflow/**`); within the R-032 bound; `trace-check` green; `test_phase_modules_interface_planning.py` (names R-004, R-006, R-010, R-012, R-032) asserts both files' structure, the four variants, and the mockup-as-addition.
 
 ### TASK-013 — Enrich phase modules: run parameters, configuration, the delegation loop
 Author: supervisor.
@@ -182,9 +183,10 @@ Parent: none
 Depends on: TASK-010, TASK-006, TASK-007
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/session-start.py; tests/test_session_start_module.py
+Merge unit: merged with TASK-010 as one PR (see TASK-010) so the suite is never red on `main` between the carve and this hook.
+Scope: bridge/cursor-bridge/session-start.py; bridge/cursor-bridge/MANIFEST.json; tests/test_session_start_module.py; tests/test_session_start.py
 Satisfies: R-005
-Done when: given a project's `Phase:` and `Workflows:` lines the hook re-injects the digest and, as a **second run** (neither near the 10,000-char cap), names the current phase's module(s), the conditional files (type/sub-type/trait) touching that phase, and the table's further files, listing a split module's sub-files from the module's own pointer line (no table change); the shared Phase→module table maps every live value (planning→planning+run-parameters; building→delegation-loop+reflection; changing→change-cycle+delegation-loop; mockups/interface/configuration/done) and the convention re-reads (merge-policy+pitfalls while building/changing; diagram-conventions+glossary at design; project-config+pitfalls at configuration); emits trait files in the R-034 order; `test_session_start_module.py` (names R-005) covers every live phase value, a phase with and without conditionals, a split module (two sub-files), the convention files, and the trait order, using the TASK-006 fixtures.
+Done when: given a project's `Phase:` and `Workflows:` lines the hook re-injects the digest and, as a **second run** (neither near the 10,000-char cap), names the current phase's module(s), the conditional files (type/sub-type/trait) touching that phase, and the table's further files, listing a split module's sub-files from the module's own pointer line (no table change); the shared Phase→module table maps **every template value**: intake→intake; design→design; mockups→interface (+ the mockups variant); planning→planning+run-parameters; configuration→configuration; building→delegation-loop+reflection (+project-end at the last stage close); done→change-cycle (a request on a done project is a change cycle); changing→change-cycle+delegation-loop+reflection+project-end; plus the convention re-reads (merge-policy+pitfalls while building/changing; diagram-conventions+glossary at design; project-config+pitfalls at configuration); emits trait files in the R-034 order; `test_session_start.py`'s former heading/line-range assertions are re-pointed to the module table here (never weakened; the 9,500-char digest and status-at-limits cases kept); `test_session_start_module.py` (names R-005) covers every template phase value, a phase with and without conditionals, a split module (two sub-files), the convention files, and the trait order, using the TASK-006 fixtures.
 
 ## Stage B4 — The first conditional workflows
 Demonstration: the bridge, reAngle, the video factory, and the TDP are each classified per §6.3 on committed fixtures; `workflow-check.py` passes on all four; and a mock new project of an unwritten product type pauses at intake.
@@ -195,9 +197,9 @@ Parent: none
 Depends on: TASK-011, TASK-012, TASK-013, TASK-014, TASK-006
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/traits/has-screens.md; .../installable.md; .../performance-budgets.md; .../external-services.md; bridge/cursor-bridge/workflow/phases/interface.md; .../planning.md; .../configuration.md; .../delegation-loop.md; .../intake.md; .../design.md; .../reflection.md; bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_traits_existing.py
+Scope: bridge/cursor-bridge/workflow/traits/has-screens.md; .../installable.md; .../performance-budgets.md; .../external-services.md; bridge/cursor-bridge/workflow/phases/interface.md; .../planning.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/; .../intake.md; .../design.md; .../reflection.md; bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_traits_existing.py
 Satisfies: R-010, R-016, R-017, R-018, R-019
-Done when: each trait file gathers its passages by **moving** them out of the named phase modules (the modules shrink; `trace-check` maps baseline→module→trait) and adds only at declared points; *has screens* activates the mockup variant (whose text stays in `interface/mockups.md`, TASK-012) and holds the §6.8 extras; *installable* carries installers/install-scripts/command-reference/packaging-stage/installer-verification; *performance budgets* carries budgets-at-intake/mechanisms/benchmarks/the floor/the lens; *external services* carries contract capture, replay, and the deployed-layout/bounded-remote-wait checks; the four rows flip to written; `workflow-check.py` passes; `test_traits_existing.py` (names R-010, R-016–R-019) asserts each file adds-only, names its content, and that the source modules no longer hold the moved passages.
+Done when: each trait file gathers its passages by **moving** them out of the named phase modules (the modules shrink; `trace-check` maps baseline→module→trait) and adds only at declared points; *has screens* activates the mockup variant (whose procedure stays in `interface/mockups.md`, TASK-012) AND gathers, by moving, the build-phase interface-project passages — the frozen-rule brief constraint, the design-auditor review step, and the observability tests — from planning/configuration/the delegation loop/reflection, each at its phase's extension point, and **points at** founding rules N7/N9 (which stay in the core, not moved); *installable* carries installers/install-scripts/command-reference/packaging-stage/installer-verification; *performance budgets* carries budgets-at-intake/mechanisms/benchmarks/the floor/the lens; *external services* carries contract capture, replay, and the deployed-layout/bounded-remote-wait checks; the four rows flip to written; `workflow-check.py` passes; `test_traits_existing.py` (names R-010, R-016–R-019) asserts each file adds-only, names its content, that the source modules no longer hold the moved passages, and that N7/N9 remain in the core.
 
 ### TASK-018 — Trait files: spends money, long-running process, AI models
 Author: supervisor.
@@ -207,7 +209,7 @@ Parallel: no
 Diagrams: none
 Scope: bridge/cursor-bridge/workflow/traits/spends-money.md; .../long-running-process.md; .../ai-models.md; bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_traits_new.py
 Satisfies: R-020, R-021, R-022
-Done when: *spends money* carries approval-before-paid-action, the worst-case estimate, a cap, platform+account named, the §13.1 store of paid results that is never discarded, and a dry run on a copy before any paid run; *long-running process* carries start/stop/health, nothing-left-running, §8.1's conditions; *AI models* carries evaluation sets and thresholds, pinned models, recorded outputs; the three rows flip to written; `workflow-check.py` passes; `test_traits_new.py` (names R-020–R-022) asserts each adds-only and names its content.
+Done when: *spends money* carries approval-before-paid-action, the worst-case estimate, a cap, platform+account named, the §13.1 store of paid results that is never discarded, and a dry run on a copy before any paid run; *long-running process* **points at** founding rule N1/§8.1 (which stays in the core, not moved) and adds the start/stop/health procedure, the nothing-left-running check, and the brief constraint at the configuration and delegation-loop points; *AI models* carries evaluation sets and thresholds, pinned models, recorded outputs; the three rows flip to written; `workflow-check.py` passes; `test_traits_new.py` (names R-020–R-022) asserts each adds-only, names its content, and that N1/§8.1 remains in the core.
 
 ### TASK-019 — Type workflow: web app and local web app
 Author: supervisor.
@@ -268,7 +270,7 @@ Parent: none
 Depends on: TASK-023, TASK-006, TASK-008
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/conformance-check.py; tests/test_calibrate_program.py
+Scope: bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_calibrate_program.py
 Satisfies: R-027, R-033
 Done when: `conformance-check.py` runs `workflow-check` at calibration over a running project's status file and reports an unclassified line or one naming an unwritten workflow; `test_calibrate_program.py` (names R-027, R-033) covers a classified and an unclassified project.
 
@@ -279,8 +281,8 @@ Depends on: TASK-023, TASK-024, TASK-009, TASK-015, TASK-011, TASK-016
 Parallel: no
 Diagrams: none
 Scope: tests/test_reads_only_applicable.py; tests/test_running_projects_classify.py; tests/test_trace_full_split.py
-Satisfies: R-030, R-031
-Done when: `test_reads_only_applicable.py` (names R-030) walks a sample project intake→configuration and asserts only the core + current phase module + its own conditionals are named for reading; `test_running_projects_classify.py` (names R-031) asserts the bridge, reAngle, the video factory, and the TDP each classify per §6.3 on the committed fixtures (TASK-019–021) with `workflow-check` green; `test_trace_full_split.py` asserts `trace-check` green over the finished split (nothing dropped across all modules and traits).
+Satisfies: R-029, R-030, R-031
+Done when: `test_reads_only_applicable.py` (names R-030) walks a sample project intake→configuration and asserts only the core + current phase module + its own conditionals are named for reading; `test_running_projects_classify.py` (names R-031) asserts the bridge, reAngle, the video factory, and the TDP each classify per §6.3 on the committed fixtures (TASK-019–021) with `workflow-check` green; `test_trace_full_split.py` (names R-029) asserts `trace-check` green over the finished split (nothing dropped across all modules and traits, no passage in two homes).
 
 ## Stage B6 — Release and install
 Demonstration: release B is reviewed by a fresh context, stamped, installed with the projects paused, verified against the installed tree, and reAngle (the trial) calibrates onto the new structure and resumes.
@@ -288,12 +290,12 @@ Demonstration: release B is reviewed by a fresh context, stamped, installed with
 ### TASK-026 — Release-level review and fixes
 Author: supervisor (orchestrates the fresh-context review; findings close through the gate).
 Parent: none
-Depends on: TASK-025
+Depends on: TASK-022, TASK-025
 Parallel: no
 Diagrams: none
 Scope: Reports/Reviews/ (outside Workspace/, human-facing — the review record); its working inputs stay under run/review/ (KP-016)
 Satisfies: R-037
-Done when: a fresh-context release-level review of the whole release (one pass, fixes, a second pass) is recorded and every finding closed — findings needing code or text become dated addendum increments through the normal gate (supervisor text / builder programs), after which the stamp (TASK-027) runs; §15 condition 4's order (review → fix → stamp → install) holds.
+Done when: a fresh-context release-level review of the whole release (one pass, fixes, a second pass) is recorded and every finding closed — findings needing code or text become dated addendum increments through the normal gate (supervisor text / builder programs), after which the stamp (TASK-027) runs; the review confirms the carved core is still readable in one read (if not, the owner decides what else moves to a module); §15 condition 4's order (review → fix → stamp → install) holds.
 
 ### TASK-027 — Install run-sheet, stamp, install, and the trial
 Author: supervisor (run-sheet text, CHANGELOG entry, VERSION/MANIFEST stamp — all records) / owner (completes the merge and runs the install run sheet).
