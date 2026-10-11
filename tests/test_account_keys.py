@@ -138,8 +138,14 @@ def test_shim_withholds_exactly_what_the_python_recipe_does(program, tmp_path):
     p = subprocess.run([shutil.which("sh"), str(probe)], capture_output=True, text=True, env=env)
     assert p.returncode == 0, p.stderr
     names = {line.split("=", 1)[0] for line in p.stdout.splitlines() if "=" in line}
+    shim_file = tmp_path / "home" / ".cursor-bridge" / "gitconfig"
+    written = shim_file.read_text(encoding="utf-8")                     # read BEFORE the Python recipe rewrites it (review of 11c, H1)
+    assert "\\" not in written and "[include]" in written and "\thelper =\n" in written, "the shim's file holds forward slashes: " + written
+    g = subprocess.run(["git", "config", "--file", str(shim_file), "--list"], capture_output=True, text=True)
+    assert g.returncode == 0, "git must read the shim's file: " + g.stderr
     be = program("bridge_env")
     expected = be.stripped_env(env)
+    assert be.write_gitconfig(str(tmp_path / "home")) == str(shim_file) and shim_file.read_text(encoding="utf-8") == written, "the shim and the recipe write the same file"
     for k in WITHHELD:
         assert k not in names, "the shim lets %s through" % k
     for k in KEPT:

@@ -292,7 +292,7 @@ def test_shim_and_python_apply_the_same_recipe(program):
         assert var in shim, "the shim does not unset " + var
     assert 'export GH_CONFIG_DIR="$BRIDGE_GH_EMPTY"' in shim and "cursor-bridge/gh-empty" in shim
     assert "GIT_TERMINAL_PROMPT=0" in shim
-    assert "unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0" in shim and "[credential]" in shim and 'export GIT_CONFIG_GLOBAL="$BRIDGE_REAL_HOME_W/.cursor-bridge/gitconfig"' in shim
+    assert "unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0" in shim and "[credential]" in shim and 'export GIT_CONFIG_GLOBAL="$BRIDGE_REAL_HOME_M/.cursor-bridge/gitconfig"' in shim and "GIT_CONFIG_PARAMETERS=\"'credential.helper='\"" in shim
     assert shim.startswith("#!/bin/sh\n") and "\r" not in shim
     assert shim.rstrip().endswith('exec cursor-agent.cmd "$@"')
 

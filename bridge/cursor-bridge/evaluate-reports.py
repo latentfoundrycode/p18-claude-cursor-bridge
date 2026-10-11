@@ -193,7 +193,7 @@ def feedback_entries(text):
             continue
         stage = label
         own = re.split(r"^### ", body, maxsplit=1, flags=re.M)[0]      # empty when the first subsection follows the heading directly
-        if own.strip() and not re.fullmatch(r"[\d\W_]*", own.strip()):   # a bare heading with only a date line under it is not an entry (2026.10.11c)
+        if own.strip() and (re.search(r"^\s*(?:[-*]|\d+[.)])\s", own, re.M) or len(own.strip()) >= 400):   # a stage heading's short preamble (reAngle: "Bridge versions in force: ...") is not an entry; its items are the ### sections (2026.10.11c)
             out.append((body_id("feedback", own, label), label, own, 1 + own.count("\n")))
             for k in range(start, start + 1 + own.count("\n")):
                 taken.add(k)

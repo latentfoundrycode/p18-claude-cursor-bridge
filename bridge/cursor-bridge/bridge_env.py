@@ -224,8 +224,10 @@ def write_gitconfig(real):
                 return path
     except OSError:
         pass
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
+    os.replace(tmp, path)                                  # published whole (KP-047)
     return path
 
 
@@ -258,7 +260,11 @@ def stripped_env(env=None):
     drive, rest = os.path.splitdrive(home)
     if drive:
         e["HOMEDRIVE"], e["HOMEPATH"] = drive, rest
-    e["GIT_CONFIG_GLOBAL"] = write_gitconfig(real)
+    try:
+        e["GIT_CONFIG_GLOBAL"] = write_gitconfig(real)
+    except OSError as exc:
+        raise AgentHomeError("the bridge's git config file cannot be written (%s); it resets the credential helper for the run" % exc)
+    e["GIT_CONFIG_PARAMETERS"] = "'credential.helper='"   # read after the checkout's .git/config: a helper a builder writes there cannot re-enable the owner's login
     for var, rel in CACHES:
         if not e.get(var) and os.path.isdir(os.path.join(real, rel)):
             e[var] = os.path.join(real, rel)

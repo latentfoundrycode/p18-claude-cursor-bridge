@@ -37,11 +37,15 @@ FEEDBACK_TDP = """# Thing — Claude-Cursor Bridge Feedback
 ## Milestone 5 close (2026-09-20)
 
 The whole entry sits under the stage heading, with no subsection at all.
-It has two paragraphs.
+It has two paragraphs and a list:
+- the first lesson for the bridge
+- the second lesson for the bridge
 
 ## Milestone 6 close (2026-09-21)
 
-Another one.
+Another one, with what the stage taught about the bridge:
+- the lockfile check fired rightly
+- the reviewer read the whole diff
 """
 FEEDBACK_TIGHT = """# Thing — Claude-Cursor Bridge Feedback
 

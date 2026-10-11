@@ -52,6 +52,23 @@ def alive(pid):
         return False
 
 
+def command_line(pid):
+    """The command line of a process, or '' when it cannot be read."""
+    try:
+        if sys.platform == "win32":
+            p = subprocess.run(["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_Process -Filter 'ProcessId=%d').CommandLine" % pid],
+                               capture_output=True, text=True, timeout=30, creationflags=NO_WINDOW)
+            return (p.stdout or "").strip()
+        with open("/proc/%d/cmdline" % pid, "rb") as f:
+            return f.read().replace(b"\0", b" ").decode("utf-8", "replace").strip()
+    except (OSError, subprocess.SubprocessError):
+        try:
+            p = subprocess.run(["ps", "-o", "args=", "-p", str(pid)], capture_output=True, text=True, timeout=30, creationflags=NO_WINDOW)
+            return (p.stdout or "").strip()
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+
 def end_tree(pid):
     """End `pid` and everything under it; True when nothing of it is left."""
     if not alive(pid):
@@ -61,7 +78,8 @@ def end_tree(pid):
         subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True, text=True, creationflags=NO_WINDOW)
     else:
         try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
+            if os.getpgid(pid) != os.getpgid(0):           # never the caller's own group
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
         except OSError:
             pass
         try:
@@ -85,16 +103,29 @@ def main(argv):
         if len(argv) < 2 or not argv[1].isdigit():
             print("bridge-stop: --pid needs a number")
             return 2
-        return 0 if end_tree(int(argv[1])) else 1
+        pid = int(argv[1])
+        if not alive(pid):
+            print("bridge-stop: %d is not running (nothing to end)" % pid)
+            return 2
+        print("bridge-stop: ending %d: %s" % (pid, command_line(pid)[:160] or "(command line unreadable)"))
+        return 0 if end_tree(pid) else 1
     wanted = argv[0]
     pid_dir = os.path.join("run", "launcher", "pids")
     names = sorted(n for n in (os.listdir(pid_dir) if os.path.isdir(pid_dir) else []) if n == wanted.replace(":", "-") or n.startswith(wanted.replace(":", "-")))
     if len(names) == 1:                                    # a run still living: its pid file
+        pid_path = os.path.join(pid_dir, names[0])
         try:
-            with open(os.path.join(pid_dir, names[0]), encoding="utf-8") as f:
+            with open(pid_path, encoding="utf-8") as f:
                 pid, child_pid = (int(x) for x in f.read().split()[:2])
         except (OSError, ValueError) as e:
             print("bridge-stop: the pid file of %s is unreadable (%s)" % (names[0], e))
+            return 2
+        if not alive(pid) or "bridge-run" not in command_line(pid):   # a launcher killed from outside left its file; the pid may belong to another program by now
+            print("bridge-stop: the pid file of %s is stale (pid %d is not a running launcher); removed, nothing ended" % (names[0], pid))
+            try:
+                os.remove(pid_path)
+            except OSError:
+                pass
             return 2
         ok = end_tree(child_pid)
         ok = end_tree(pid) and ok
@@ -104,6 +135,9 @@ def main(argv):
         print("bridge-stop: %s run(s) match %s in %s and %d pid file(s); give the exact id" % (len(matches), wanted, LOG, len(names)))
         return 2
     e = matches[0]
+    if e.get("exit") is not None:
+        print("bridge-stop: run %s has ended (exit %s); nothing to stop" % (e["id"], e["exit"]))
+        return 2
     ok = True
     for key in ("child_pid", "pid"):
         if isinstance(e.get(key), int):

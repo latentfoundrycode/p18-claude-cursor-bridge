@@ -87,7 +87,7 @@ def main():
             i += 1
 
     names = git(["diff", "--name-only", base])
-    stat = git(["diff", "--shortstat", base, "--", ".", ":(exclude)handoff", ":(exclude)run"])   # the budget is product change; briefs and drivers are bookkeeping (2026.10.11c)
+    stat = git(["diff", "--shortstat", base, "--", ":(top)", ":(top,exclude)handoff", ":(top,exclude)run"])   # the budget is product change; briefs and drivers are bookkeeping (2026.10.11c)
     if names is None or stat is None:
         print("CANNOT VERIFY: git diff against %r failed" % base)
         return 2

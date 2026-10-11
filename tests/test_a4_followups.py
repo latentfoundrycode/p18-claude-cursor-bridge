@@ -76,6 +76,30 @@ def test_the_credential_helper_is_reset_in_the_bridges_git_config_file(program, 
     assert p.stdout.strip() == "", "git reads an empty helper list from the file: " + p.stdout
     p = subprocess.run(["git", "config", "--get", "user.name"], capture_output=True, text=True, env=out, cwd=str(tmp_path))
     assert p.stdout.strip() == "owner", "the owner's global config is included (a normal lookup follows the include; `--global --list` shows the key only): " + p.stdout
+    assert out["GIT_CONFIG_PARAMETERS"] == "'credential.helper='"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    marker = "!f() { echo username=MARKER; echo password=x; }; f"       # a helper a builder could write into the checkout's own config
+    for args in (["init", "-q"], ["config", "credential.helper", marker]):
+        subprocess.run(["git"] + args, cwd=str(repo), check=True, env=ENV)
+    ask = "protocol=https\nhost=example.invalid\n\n"
+    control = dict(out)
+    control.pop("GIT_CONFIG_PARAMETERS")
+    p = subprocess.run(["git", "credential", "fill"], input=ask, capture_output=True, text=True, env=control, cwd=str(repo))
+    assert "MARKER" in p.stdout, "the control: without the parameter the local helper answers: " + p.stdout + p.stderr
+    p = subprocess.run(["git", "credential", "fill"], input=ask, capture_output=True, text=True, env=out, cwd=str(repo))
+    assert "MARKER" not in p.stdout, "a helper written into the checkout's own config is reset by GIT_CONFIG_PARAMETERS (review of 11c, M1): " + p.stdout + p.stderr
+
+
+def test_bridge_stop_refuses_an_ended_run_and_removes_a_stale_pid_file(tmp_path):
+    (tmp_path / "run" / "launcher" / "pids").mkdir(parents=True)
+    (tmp_path / "run" / "launcher" / "runs.jsonl").write_text(json.dumps({"id": "2026-10-11T10:00:00Z", "kind": "test", "head": "python", "pid": 999999, "child_pid": 999998, "limit": 60, "seconds": 3, "exit": 0, "healthy": True}) + "\n", encoding="utf-8")
+    q = subprocess.run([sys.executable, os.path.join(CB, "bridge-stop.py"), "2026-10-11T10"], cwd=str(tmp_path), capture_output=True, text=True, env=ENV)
+    assert q.returncode == 2 and "has ended" in q.stdout, "an ended run is never killed by its old pid (review of 11c, M2): " + q.stdout
+    stale = tmp_path / "run" / "launcher" / "pids" / "2026-10-11T11-00-00Z"
+    stale.write_text("999999 999998\n", encoding="utf-8")
+    q = subprocess.run([sys.executable, os.path.join(CB, "bridge-stop.py"), "2026-10-11T11"], cwd=str(tmp_path), capture_output=True, text=True, env=ENV)
+    assert q.returncode == 2 and "stale" in q.stdout and not stale.exists(), "a stale pid file is removed, nothing is ended: " + q.stdout
 
 
 def test_refactor_check_budget_and_test_file_rule(tmp_path):
