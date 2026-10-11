@@ -63,11 +63,11 @@ def test_the_builders_report_is_a_file_in_every_brief_variant():
 def test_mutation_drivers_belong_to_the_supervisors_side():
     """Entry D3 (reAngle TASK-010c): five mutants that did not model their names cost three rounds."""
     step4 = section(SV, "### 4. Inspect", "### 5. Scan")
-    assert "written here too, on your side, never by the builder" in step4
+    assert "written here too, on your side, after the builder's run and never by the builder" in step4
     assert "a fix brief after a driver run asks for the code fix only" in step4
     assert "`bridge-stop.py` (KP-056)" in step4
     constraints = section(SP, "## Constraints", "## Done")
-    assert "is the supervisor's side's, written with the criterion tests" in constraints
+    assert "is the supervisor's side's, written after your run with the criterion" in constraints
     assert "asks you to list each mutation with" in constraints, "the brief's mutation list (A5) stays"
     assert "**A mutation driver is read like a test.**" in DR
     kp = text("cursor-bridge", "Known-Pitfalls.md")
@@ -173,4 +173,16 @@ def test_a_builders_report_file_is_bookkeeping_for_the_scope_check(tmp_path):
     out = p.stdout + p.stderr
     assert "BOOKKEEPING (1), never drift: handoff/TASK-001-r1-report.md" in out, out
     assert p.returncode == 1 and "handoff/TASK-001-notes.md" in out.split("SCOPE DRIFT (")[-1], "a handoff file that is not the report is still drift: " + out
-    assert re.search(r"REPORT_RX = re\.compile\(r\"handoff/\[A-Z\]\+-\\w\+-r\\d\+-report\\\.md\$\"\)", text("cursor-bridge", "scope-check.py"))
+
+
+def test_the_report_pattern_in_both_scripts():
+    import importlib.util
+    for name, path in (("scope_check", SCOPE_CHECK), ("plan_check", PLAN_CHECK)):
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        rx = mod.REPORT_RX
+        for good in ("handoff/TASK-012-r1-report.md", "handoff/REFAC-003-r2-report.md", "handoff/TASK-010c-r3-report.md", "handoff/BUG-004-r1-report.md"):
+            assert rx.match(good), (name, good)
+        for bad in ("handoff/TASK-012-r2.md", "handoff/TASK-012.md", "handoff/sub/TASK-012-r1-report.md", "handoff/TASK-012-r1-report.md.bak", "docs/TASK-012-r1-report.md"):
+            assert not rx.match(bad), (name, bad)

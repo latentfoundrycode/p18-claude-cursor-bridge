@@ -42,7 +42,8 @@ increment runs the product, a migration, a seed or a test against data, so the c
 has something to point at; an inventory without that row is the supervisor's gap to close before
 packaging (rule 55). Always list `docs/BUILDER_NOTES.md`: the Constraints section asks the builder to append
 to it; and always list the report file, `handoff/TASK-<nnn>-r<N>-report.md` (`r<N>` the round
-of this delegation, `r1` for the first), which the Done section asks the builder to write as
+of this delegation: `r1` for a brief named `TASK-<nnn>.md`, the `r<N>` of a re-delegation
+brief's own name), which the Done section asks the builder to write as
 it goes; this holds for the fix and the refactoring variants below as well. List
 `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` whenever the increment adds or changes a
 command of installable software: the delivery conventions require the first regenerated in
@@ -148,9 +149,10 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   its options and its working folder, so you run exactly it; "run the tests" is not an
   instruction. Where the increment's tests are to be checked by mutation, the brief says so
   and lets you mutate in-process in your own run, and asks you to list each mutation with
-  what caught it; the mutation driver itself (the script that applies each mutant, runs the
-  tests and restores the code) is the supervisor's side's, written with the criterion tests,
-  never yours, and a fix brief after a driver run asks you for the code fix only.
+  what caught it; you mutate by hand in your own run and no script of it lands in the diff:
+  the mutation driver itself (the script that applies each mutant, runs the tests and
+  restores the code) is the supervisor's side's, written after your run with the criterion
+  tests, and a fix brief after a driver run asks you for the code fix only.
 - Prefer reuse over new code — existing helpers, the standard library, native platform
   features, already-installed dependencies — and write the minimum that meets the
   acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a
@@ -217,7 +219,7 @@ Same file shape, with these differences, stated verbatim:
   nothing else." Then the **root cause in one sentence**, the **evidence lines** copied
   from the debug file, and the **reproduction test** (path and name) that currently fails
   and must pass.
-- **Scope** names the file(s) the cause lives in, the reproduction test, and `docs/BUILDER_NOTES.md` and the report file as in every brief (a cause the builder found on the way belongs in the notes). Nothing else.
+- **Scope** names the file(s) the cause lives in, the reproduction test, and `docs/BUILDER_NOTES.md` and the report file (`handoff/BUG-<nnn>-r<N>-report.md`) as in every brief (a cause the builder found on the way belongs in the notes). Nothing else.
 - **Acceptance criteria**: the reproduction test passes; the full suite passes with no
   other change in results; the named cause is addressed at the mechanism the evidence
   points at (state the mechanism).

@@ -15,7 +15,7 @@ argument-hint: [optional: a short description of what you want built — omitted
 
 **Founding rules.** N1 The loop's truth lives in files; one-shot programs compute everything; a background process only if it reads and never writes tracked files, is rebuildable, states its commit, starts on demand with a hard time limit, no gate depends on it, touches no data it does not own, migrates no live data outside a release, never runs unreleased code on live data, spends nothing unless asked. N2 No secret in any prompt to Cursor. N3 Every builder run is revertible from its checkpoint; a review run is restored to it (`review-guard.py`). N4 You never write implementation code. N5 One writer per checkout: the builder where it was launched, you in `Workspace/`; no IDE agent beside the loop. N6 Nothing reaches `main` except through the verified gate (CI green, Review A and cross-family Review B approving, no gate-integrity flag); who completes the merge is a run parameter. N7 Design quality is measured, never asked. N8 Security is measured, never asked. N9 For software with screens the running render is measured.
 
-**The loop (Phase 6, one increment).** 1 Checkpoint: clean tree, `sync-check.py`, `roster-check.py`, read `PROJECT_STATUS.md` and `INVENTORY.md` whole. 2 `spec-packager` packages the brief after a reality check of what is built. 3 Delegate in the background with the constant command exactly: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err`; on failure or exit 124, step 3b. 4 Inspect: `scope-check.py`, boundary violations, the builder's `Assumed, not verified` list copied, then dispositioned; `test-runner` before any reviewer; new tests once against the checkpoint. 5 Scan: `secret-sentinel`, `lock-check.py`; the admission gate for a new dependency. 6 Benchmarks and observability where they apply. 7 Decide by defect class (Review A, the auditors where they apply); a REJECT re-delegates with a corrected brief, never a question. 8 Merge through the gate: the diff committed to `run/review/`; `review-guard.py snapshot <nnn>`; Review B in the background: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<nnn>.err`, you writing nothing meanwhile; `review-guard.py verify <nnn>` OK (GATE-INTEGRITY stops it); `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the .err file's first line>` OK; `git rm` the review files, commit, push; `review-guard.py premerge <nnn> <n>` OK; under `Merge authority: owner` stop at READY TO MERGE and never arm auto-merge; else one background CI watch, `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast`, then `gh pr merge <n> --squash --match-head-commit <sha>`; then the completion, inventory, diagram checks. 9 Stage close, after the refactoring pass: both reviewers read the stage's whole change on a `stage/<name>` branch; the demonstration runs live; then the reflection items and `Documents/`.
+**The loop (Phase 6, one increment).** 1 Checkpoint: clean tree, `sync-check.py`, `roster-check.py`, read `PROJECT_STATUS.md` and `INVENTORY.md` whole. 2 `spec-packager` packages the brief after a reality check of what is built. 3 Delegate in the background with the constant command exactly: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a one-paragraph summary and the path of your report file." 2> run/agent/TASK-<nnn>.err`; on failure or exit 124, step 3b. 4 Inspect: `scope-check.py`, boundary violations, the builder's `Assumed, not verified` list copied, then dispositioned; `test-runner` before any reviewer; new tests once against the checkpoint. 5 Scan: `secret-sentinel`, `lock-check.py`; the admission gate for a new dependency. 6 Benchmarks and observability where they apply. 7 Decide by defect class (Review A, the auditors where they apply); a REJECT re-delegates with a corrected brief, never a question. 8 Merge through the gate: the diff committed to `run/review/`; `review-guard.py snapshot <nnn>`; Review B in the background: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<nnn>.err`, you writing nothing meanwhile; `review-guard.py verify <nnn>` OK (GATE-INTEGRITY stops it); `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the .err file's first line>` OK; `git rm` the review files, commit, push; `review-guard.py premerge <nnn> <n>` OK; under `Merge authority: owner` stop at READY TO MERGE and never arm auto-merge; else one background CI watch, `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast`, then `gh pr merge <n> --squash --match-head-commit <sha>`; then the completion, inventory, diagram checks. 9 Stage close, after the refactoring pass: both reviewers read the stage's whole change on a `stage/<name>` branch; the demonstration runs live; then the reflection items and `Documents/`.
 
 **Escalate to the owner only** for: product behaviour; scope (deferring or dropping a requirement); a consequence they bear (cost, legal, privacy, lock-in); what only they can provide (a key, an account), as a run sheet; an irreversible or out-of-repository action; a change to what "correct" means. Never correctness, a technical menu, process or round counts. Look in `INVENTORY.md` first.
 
@@ -175,8 +175,8 @@ fixed at intake (`<Name>`), never renamed:
 | `<Name> User Manual.md` | project end | every reflection point after that with a new `CHANGES.md` entry |
 
 Any other document the user keeps in `Documents/` is patched at reflection points too.
-`Documents/` is written **only** at reflection points (the issue placeholder is the one
-exception) — never mid-stage, so a stale copy never survives a stage boundary.
+`Documents/` is written **only** at reflection points (the issue placeholder and the answer
+to a maintainer's request, rule 57, are the exceptions) — never mid-stage, so a stale copy never survives a stage boundary.
 
 ---
 
@@ -845,7 +845,7 @@ before the checkpoint commit (release A4: a brief once silently dropped planned 
 ### 3. Delegate to Cursor
 
 ```bash
-python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
+python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a one-paragraph summary and the path of your report file." 2> run/agent/TASK-<nnn>.err
 ```
 
 The `--model` value is copied from `docs/ROSTER.resolved.json` (step 1), never typed from
@@ -889,7 +889,7 @@ Rules for this call, all of which matter:
 3. **Delegate each in the background**, pointing the builder at its checkout with `--workspace` and otherwise exactly as in step 3 (the launcher first, then `cursor-agent`):
 
 ```bash
-python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a list of files you changed and a one-paragraph summary." 2> run/agent/TASK-<nnn>.err
+python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a one-paragraph summary and the path of your report file." 2> run/agent/TASK-<nnn>.err
 ```
 
 4. **When a builder finishes**, remove its worktree from your checkout (`python ~/.claude/cursor-bridge/worktree-teardown.py ../Worktrees/TASK-<nnn>`, which refuses while anything is linked inside and never forces), switch your checkout to its branch, and run steps 4 to 8 there like any increment: the scope check with `--base <the recorded starting commit>`, the diagram check, the reviews, the tests, the accept commit, the pull request, the gate, the merge. Process finished branches **one at a time**. Before the accept commit of every branch after the first, run `git merge --no-edit origin/main` to bring in what merged meanwhile — the other increment's code, disjoint by construction, and its record updates, so the change log, the inventory, and the register do not conflict. CI runs on the pull request's merge with `main`, so the combined state is tested either way.
@@ -1003,7 +1003,7 @@ repository, so this log — written by the `boundary-check` hook — is the only
 builder reaching outside `Workspace/`. Any new entry is handled like `SCOPE DRIFT`: undo the
 outside edit by hand (`Documents/` is not under git), re-delegate, open an issue.
 
-**Then triage the builder's `Assumed, not verified` list** (rule 42). It is the one thing the builder knows that no reviewer can see — where it guessed. It stands in the builder's report file, `handoff/TASK-<nnn>-r<N>-report.md`, which the accept commit keeps; where a builder printed it only in its last message, copy it verbatim into `run/agent/TASK-<nnn>.assumptions.md` before anything else, since the message is lost with the run. A missing section means *unknown*, never *none*: note it, and the reviewers hunt unaided. Give every item exactly one disposition:
+**Then triage the builder's `Assumed, not verified` list** (rule 42). It is the one thing the builder knows that no reviewer can see — where it guessed. It stands in the builder's report file, `handoff/TASK-<nnn>-r<N>-report.md`, which the accept commit keeps (`git add -f` where the project ignores `handoff/`); where a builder printed it only in its last message, copy it verbatim into `run/agent/TASK-<nnn>.assumptions.md` before anything else, since the message is lost with the run. A missing section means *unknown*, never *none*: note it, and the reviewers hunt unaided. Give every item exactly one disposition:
 
 - **test** — a test settles it; you write it (N4 permits tests), and a failing one re-delegates like any defect;
 - **contract** — a fact about an external service; the increment is not done until recorded real responses or a live smoke confirm it (rule 37);
@@ -1026,7 +1026,9 @@ write those tests yourself first — you are allowed to write tests, and tests w
 the reviewer rather than the implementer are worth more; each carries the paragraph it
 enforces (`enforces: <document> §<section>` in its docstring or a comment). A mutation
 driver — the script that applies each mutant, runs the tests and restores the code — is
-written here too, on your side, never by the builder: a builder's driver is judged by
+written here too, on your side, after the builder's run and never by the builder (the
+brief's mutation list is the builder's own in-process check, by hand, no script of it in
+the diff): a builder's driver is judged by
 nobody, and five mutants that did not model their names once cost three rounds (reAngle
 TASK-010c); `diff-reviewer` reads a driver's mutants against their names as it reads a test
 against its paragraph, and a fix brief after a driver run asks for the code fix only. A
@@ -1037,9 +1039,10 @@ it knows which skips are the increment's: a test of the increment that was skipp
 step, like a failed one (a builder has reported passing tests that had been skipped). A suite that takes more
 than ten minutes is not run inside `test-runner`'s call: the Bash tool ends a foreground
 command at ten minutes (600 seconds, KP-061), so such a suite runs through the launcher in
-the background (`python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test --
-<the suite command>`, the tool's `timeout` at the suite cap, its output to a file under
-`run/`, rule 43), its completion wakes you, and `test-runner` then reads that file. Then
+the background (`python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the
+recorded suite command> > run/agent/TASK-<nnn>-suite.out 2>&1`, the tool's `timeout` at
+`3600000`; a runner the launcher does not know answers 125 and runs directly with `# wake`,
+rule 43), its completion wakes you, and `test-runner` then reads that file. Then
 run every new or changed test file once against the checkpoint's code: `git worktree add
 ../Worktrees/old-<nnn> <the checkpoint commit>` (the one worktree of your own that rule 39
 allows: read-only, torn down in this step), copy in the test files and the fixtures they
@@ -1272,7 +1275,7 @@ instead. In short, a branch merges to `main` only when **all** hold:
    (the next brief waits for `verify`; one once wrote `handoff/` during a Review B run and
    the guard flagged GATE-INTEGRITY, reAngle ISS-014), no `diagram-specialist`, no
    `cursor-configurator`, nothing that writes under the checkout, your own status-file edits
-   included (`run/supervisor/in-flight.md` exists for those, rule 43); the launcher's own `run/review/REVIEW-<nnn>.err` is
+   included (`run/supervisor/in-flight.md` exists for those, rule 43); besides that file, the launcher's own `run/review/REVIEW-<nnn>.err` is
    the one file written meanwhile, and the guard keeps it; read-only subagents
    (`security-auditor`, a Review A on another branch's committed diff) may run.
    **Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <nnn>` must print `OK`: it reads `.git/config`, the active hooks folder (`core.hooksPath`, `.githooks` on every project today) and `.git/hooks` first, as files, without git — a `core.fsmonitor` line or a hook left there would run the reviewer's program with your identity on your next git command, and a change there stops the guard before it runs any git command of its own; every git command it then runs has the repository's hooks and file monitor switched off. It checks HEAD, the branch, the local refs and the stashes, puts the branch and every moved or added local ref back, restores the tree with `git reset --hard` and `git clean -fd` (keeping the `.err` file, whose first line — the launch time — it prints), lists what it removed, and compares every ignored file (cache folders apart): a change under `docs/`, `handoff/` or `run/review/`, or to `.env*`, is a flag even where the project gitignores those files; any other is listed as left behind. `GATE-INTEGRITY` — a commit, a moved HEAD, a new or moved ref or stash, a changed configuration, hook, record or `.env` — opens the flag (condition 4) and an issue; the tree is back at the checkpoint, the merge is not. It prints the snapshot file's hash, which must equal the one `snapshot` printed (a reviewer could rewrite the snapshot). What the guard cannot see is said in its header and KP-032: the contents of cache folders, anything outside the checkout, a reviewer that reaches for the credential store on purpose. **Note the
@@ -1281,7 +1284,7 @@ instead. In short, a branch merges to `main` only when **all** hold:
    first line of the `.err` file. The launch carries the Bash tool's `timeout` at the review
    cap (`7200000`, step 3). Before the launch, write `run/review/SCOPE-<nnn>.md` and commit
    it beside the diff (removed with `git rm` with it): the brief's Scope and Out of scope
-   sections quoted, the tests you wrote first with the paragraph each enforces, and the
+   sections quoted, the tests and mutation drivers you wrote with the paragraph each enforces, and the
    bookkeeping and record files in the diff that are expected (`docs/BUILDER_NOTES.md`, the
    builder's report `handoff/TASK-<nnn>-r<N>-report.md`, the records you committed,
    `run/review/`). Nothing of this goes inline through the shell,
@@ -1473,7 +1476,7 @@ At every reflection point, run `python ~/.claude/cursor-bridge/conformance-check
 1. From a clean tree on `main` in sync with `origin/main`: `git switch -c stage/<name> origin/main`.
 2. Write the stage's whole change from committed state: `git diff <the stage's first checkpoint commit> origin/main > run/review/STAGE-<name>.diff`, then `git add -f run/review/STAGE-<name>.diff` and commit it on the stage branch.
 3. `python ~/.claude/cursor-bridge/review-guard.py snapshot STAGE-<name>`.
-4. Review A: `diff-reviewer` on `run/review/STAGE-<name>.diff`, told the stage's briefs and that it reads a stage, not an increment. A stage diff too large for one reading is written in parts from the same committed state (`git diff <the first checkpoint> origin/main -- <paths> > run/review/STAGE-<name>-<part>.diff`, committed with the whole), each part a launch of its own and the test files' part at most 25 files: a 79-file part once ended at the reviewer's turn limit without a verdict (reAngle, stage 3b), and a part that ends without a verdict is run again on what it had not reached (rule 43).
+4. Review A: `diff-reviewer` on `run/review/STAGE-<name>.diff`, told the stage's briefs and that it reads a stage, not an increment. A stage diff too large for one reading is written in parts from the same committed state (`git diff <the first checkpoint> origin/main -- <paths> > run/review/STAGE-<name>-<part>.diff`, committed with the whole), each part a `diff-reviewer` call of its own and the test files' part at most 25 files (counted by `git diff --name-only <the first checkpoint> origin/main -- <the test folders>`): a 79-file part once ended at the reviewer's turn limit without a verdict (reAngle, stage 3b), and a part that ends without a verdict is run again on what it had not reached (rule 43).
 5. Review B in the background, with execution, exactly as step 8 launches it: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<the directive prompt, naming run/review/STAGE-<name>.diff and the stage>" 2> run/review/REVIEW-STAGE-<name>.err`; you write nothing to the checkout meanwhile.
 6. `python ~/.claude/cursor-bridge/review-guard.py verify STAGE-<name>` must print `OK`; a GATE-INTEGRITY flag is handled as in step 8.
 7. A REJECT from either reviewer: do step 8 first (back on `main`, the stage branch deleted), then the fix brief goes through the loop; the stage does not close until it has merged, and the stage review then runs again from step 1 on the new whole change.
@@ -1961,7 +1964,8 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `docs/BOUNDARY_VIOLATIONS.md`, read at step 4) — never assume it is a wall. A violation
     is `SCOPE DRIFT`: undo by hand, re-delegate, open an issue.
 23. `Documents/` is written only at reflection points — stage close, approved phase gate,
-    project end — plus the issue placeholder on detection. At each: complete the Issues
+    project end — plus the issue placeholder on detection and the answer to a maintainer's
+    request (rule 57). At each: complete the Issues
     entries (one ID, two renderings, repeats counted not duplicated), append bridge feedback
     (yours and the builder's) without ever acting on it, patch the Project Summary and the
     rest of `Documents/`, patch the User Manual once it exists. At project end write the User
@@ -2188,6 +2192,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     on the status file's `Maintainer requests:` line when it arrives (what, asked when) and
     answered under its own `FB-nnn` entry in the project's Feedback document when done (the
     one write to `Documents/` outside a reflection point besides an issue placeholder; the
+    document is created then, with its heading, if no stage close has made it yet; the
     report cycle reads it there); the line then says `answered FB-nnn`, and your next report
     to the owner states the answer in one FYI line, so the owner relays nothing and asks
     nothing (the owner's decision D1 of 2026-10-11; release 2026.10.11d).

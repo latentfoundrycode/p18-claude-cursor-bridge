@@ -81,7 +81,8 @@ know which they are.
 says — a mutant named "drops the retry" that changes a log line proves nothing about the
 retry — and the driver restores the code in a `finally` and aborts on a byte mismatch at
 restore, since an interrupted run once left mutants in the product (KP-056). A driver is
-the supervisor's side's, never the builder's; one in a builder's diff is a deviation.
+the supervisor's side's, never the builder's; one the supervisor did not name as its own in
+the handoff is a deviation.
 
 **A path that changes data is tested on data the previous version made.** Reset, migration,
 upgrade and repair paths were tested only on empty databases once, and the owner's live data
