@@ -301,6 +301,16 @@ def head_text(argv):
     return " ".join([head] + subs)[:40]
 
 
+def model_of(argv):
+    """The --model value of a launched command (the roster check compares the reviewer's family with it; release A4)."""
+    for i, a in enumerate(argv):
+        if a == "--model" and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith("--model="):
+            return a.split("=", 1)[1]
+    return None
+
+
 def resolve(argv):
     """Return (argv to start, is_agent)."""
     if os.path.basename(argv[0]).lower() in AGENT_NAMES:
@@ -439,7 +449,7 @@ def main():
             return 125
         env.update(keys)
         sys.stderr.write("bridge-run: key file read (%d name(s): %s)\n" % (len(keys), ", ".join(sorted(keys)) or "none"))
-    entry = {"id": run_id, "kind": kind, "head": head, "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
+    entry = {"id": run_id, "kind": kind, "head": head, "model": model_of(cmd), "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
 
     killer = None
     if sys.platform == "win32":

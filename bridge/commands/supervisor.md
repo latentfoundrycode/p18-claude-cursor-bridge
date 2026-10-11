@@ -1047,7 +1047,10 @@ approved."
 ### 5. Scan
 
 Delegate to **secret-sentinel** before anything is committed. This runs on every
-increment without exception, including ones that look trivial. `secret-sentinel` still flags
+increment without exception, including ones that look trivial. It runs
+`python ~/.claude/cursor-bridge/invisible-check.py` first (release A4): a zero-width or
+bidirectional character in a changed file hides a token from every reader and reorders
+what a reviewer sees, and the diff reviewers cannot see it either. `secret-sentinel` still flags
 unpinned or oddly-shaped dependency names and protected-path/`.gitignore` issues, but
 dependency **reputation** now belongs to the admission gate below, not its heuristic.
 

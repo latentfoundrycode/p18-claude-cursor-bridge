@@ -86,6 +86,23 @@ def run_git(args, root, common):
     return p.stdout
 
 
+def held_elsewhere(branch_ref, root, common):
+    """The path of another worktree that has `branch_ref` checked out, else None (release A4)."""
+    try:
+        out = run_git(["worktree", "list", "--porcelain"], root, common)
+    except RuntimeError:
+        return None
+    here = os.path.normcase(os.path.realpath(root))
+    path = None
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            path = line[len("worktree "):].strip()
+        elif line.startswith("branch ") and line[len("branch "):].strip() == branch_ref and path:
+            if os.path.normcase(os.path.realpath(path)) != here:
+                return path
+    return None
+
+
 def find_git_dirs(start):
     """(worktree root, git dir, common dir) found by walking up from `start`, without running
     git: `.git` may be a folder or a worktree's `gitdir: <path>` file."""
@@ -369,7 +386,18 @@ def cmd_verify(nnn, cwd):
             run_git(["update-ref", snap["branch"], snap["head"]], root, common)
             notes.append("repaired: %s recreated at %s" % (snap["branch"], snap["head"][:12]))
         if branch != snap["branch"]:
+            held = held_elsewhere(snap["branch"], root, common)
+            if held:                                   # P3 (second pass of the plan review): a reset here would rewind the branch we are on
+                print("review-guard: GATE-INTEGRITY - %s is checked out in another worktree (%s); the checkout was NOT restored and nothing was reset: tear that worktree down first (worktree-teardown.py), then verify again" % (snap["branch"], held))
+                return 1
             run_git(["checkout", "-q", "-f", snap["branch"][len("refs/heads/"):] if snap["branch"].startswith("refs/heads/") else snap["branch"]], root, common)
+            try:
+                now_on = run_git(["symbolic-ref", "-q", "HEAD"], root, common).strip()
+            except RuntimeError:
+                now_on = ""
+            if now_on != snap["branch"]:
+                print("review-guard: GATE-INTEGRITY - the checkout could not be put back on %s (it is on %s); nothing was reset" % (snap["branch"], now_on or "a detached HEAD"))
+                return 1
         run_git(["reset", "-q", "--hard", snap["head"]], root, common)
     else:
         run_git(["checkout", "-q", "-f", "--detach", snap["head"]], root, common)

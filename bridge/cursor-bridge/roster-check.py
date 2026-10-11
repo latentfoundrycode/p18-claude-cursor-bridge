@@ -2,7 +2,7 @@
 """roster-check: resolve which models fill the builder / Review A / Review B roles today,
 prove three distinct families, and (optionally) prove each model answers.
 
-  python roster-check.py docs/ROSTER.json [--command "<delegate command>"] [--no-probe] [--out docs/ROSTER.resolved.json]
+  python roster-check.py docs/ROSTER.json [--command "<delegate command>"] [--no-probe] [--out docs/ROSTER.resolved.json] [--run-log run/launcher/runs.jsonl]
 
 docs/ROSTER.json (v2):
 {
@@ -95,6 +95,23 @@ def norm_entry(entry):
     if isinstance(entry, dict):
         return entry.get("model", ""), entry.get("family"), entry.get("pool")
     return entry or "", None, None
+
+
+def built_by(run_log):
+    """The model of the last builder run in the launcher's run log (release A4), or None."""
+    try:
+        with open(run_log, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(e, dict) and e.get("kind") == "builder" and e.get("model"):
+            return str(e["model"])
+    return None
 
 
 def family_of(model_id, override=None):
@@ -390,6 +407,7 @@ def main():
     path = argv[0]
     command = argv[argv.index("--command") + 1] if "--command" in argv and argv.index("--command") + 1 < len(argv) else None
     do_probe = "--no-probe" not in argv
+    run_log = argv[argv.index("--run-log") + 1] if "--run-log" in argv and argv.index("--run-log") + 1 < len(argv) else os.path.join("run", "launcher", "runs.jsonl")
     out_path = argv[argv.index("--out") + 1] if "--out" in argv and argv.index("--out") + 1 < len(argv) else os.path.join(os.path.dirname(path) or ".", "ROSTER.resolved.json")
     try:
         roster = load_roster(path)
@@ -449,6 +467,10 @@ def main():
         return 1
 
     print("roster-check: other_pool=%s  review_a=%s (%s)" % (other_pool, ra_id, ra_fam))
+    built_model = built_by(run_log)
+    built_fam = family_of(built_model) if built_model else None
+    if built_model:
+        print("roster-check: the last builder run was %s (%s family), from %s" % (built_model, built_fam, run_log))
     chosen = None
     for prof in profiles:
         name = prof.get("name", "?")
@@ -467,6 +489,8 @@ def main():
         fams = {"builder": b_fam, "review_a": ra_fam, "review_b": r_fam}
         if len(set(fams.values())) < 3:
             print("    skip: family collision %s" % fams); continue
+        if built_fam and r_fam == built_fam:
+            print("    skip: review_b %s is of the %s family, which built this change (%s); the reviewer of a change is never of the family that built it (release A4)" % (r_id, r_fam, built_model)); continue
         if do_probe:
             usable = True
             for role, mid in (("builder", b_id), ("review_b", r_id)):

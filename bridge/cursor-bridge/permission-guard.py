@@ -28,6 +28,14 @@ program (a commit message) is data. `powershell` without `-Command` runs the res
 `-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
 and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
 GraphQL query built by a command substitution are refused unread.
+  - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands
+    (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command
+    wrapped in `cd …` (rule 8: one command per call; a chain once built an increment on a
+    merged branch; release A4). A pipe into a reader and a chain of reads pass.
+  - a commit or push that skips its checks: `--no-verify`, commit's `-n`, or a
+    `-c core.hooksPath=…` override (rule 4; release A4), except the two snapshots the merge
+    policy allows, whose message says so: the pre-delegation checkpoint ("checkpoint …") and
+    a builder's hand-off ("… hand-off").
   - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,
     `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or
     `powershell`), which would run it with the owner's real home and identity (KP-038): the
@@ -66,6 +74,10 @@ PS_VALUE_SWITCHES = ("-executionpolicy", "-ep", "-ex", "-version", "-v", "-windo
                      "-outputformat", "-of", "-psconsolefile", "-psc", "-configurationname", "-config", "-settingsfile", "-settings")
 ENCODED = object()
 PREMERGE_DIR = os.path.join("bridge", "premerge")
+STATE_GIT = ("add", "commit", "push", "pull", "merge", "rebase", "switch", "checkout", "reset", "rm", "mv", "cherry-pick", "revert",
+             "am", "apply", "clean", "restore", "stash", "worktree", "branch", "tag", "fetch", "submodule")
+GH_READ = ("view", "list", "checks", "status", "diff", "search", "download", "auth", "--version", "version")
+HOOK_SKIPPERS = ("commit", "push", "merge", "rebase", "am", "cherry-pick", "revert")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
@@ -117,6 +129,62 @@ def split_commands(text):
         i += 1
     parts.append(buf)
     return [p.strip() for p in parts if p.strip()]
+
+
+def in_workspace(cwd):
+    """A bridge Workspace: the folder the hook runs in holds the project's status file."""
+    return bool(cwd) and os.path.isfile(os.path.join(cwd, "docs", "PROJECT_STATUS.md"))
+
+
+def chain_parts(text):
+    """The commands a line chains with &&, ||, ; or a new line (quotes respected); a pipe is one command."""
+    parts, buf, quote, i = [], "", None, 0
+    while i < len(text):
+        c = text[i]
+        if quote:
+            buf += c
+            if c == quote and (i == 0 or text[i - 1] != "\\"):
+                quote = None
+        elif c in ("'", '"'):
+            quote = c
+            buf += c
+        elif text.startswith("&&", i) or text.startswith("||", i):
+            parts.append(buf); buf = ""; i += 1
+        elif c in (";", "\n"):
+            parts.append(buf); buf = ""
+        else:
+            buf += c
+        i += 1
+    parts.append(buf)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def state_changing(w):
+    """A git or gh command that changes something, as opposed to a read."""
+    if is_git(w):
+        sub, _ = git_subcommand(w)
+        return sub in STATE_GIT
+    if base(w[0]) in ("gh", "gh.exe"):
+        group, sub, _ = gh_words(w)
+        return bool(group) and group not in GH_READ and sub not in GH_READ
+    return False
+
+
+def chain_reason(command, cwd):
+    """Inside a Workspace, a chain carrying a state change or wrapped in cd is refused (rule 8)."""
+    if not in_workspace(cwd):
+        return None
+    parts = chain_parts(strip_heredocs(command))
+    if len(parts) < 2:
+        return None
+    heads = [strip_prefix(words(p)) for p in parts]
+    heads = [h for h in heads if h]
+    if heads and base(heads[0][0]) == "cd":
+        return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
+    for w in heads:
+        if state_changing(w):
+            return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(w[:2]))
+    return None
 
 
 def strip_heredocs(text):
@@ -294,6 +362,9 @@ def check(command, cwd=None):
     """Return the reason to refuse, or None."""
     if re.search(r"\bgh\s+api\s+graphql\b[^\n]*(\$\(|`)", command):
         return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
+    r = chain_reason(command, cwd)
+    if r:
+        return r
     for simple in split_commands(strip_heredocs(command)):
         w = strip_prefix(words(simple))
         if not w:
@@ -322,6 +393,14 @@ def check(command, cwd=None):
                 if ALIAS_RX.match(a) or (a.lower().startswith("alias.") and re.search(r"worktree\s+remove|pr\s+merge|push\b.*(--force|--forc|-f\b|\+)", a, re.I)):
                     return "a git alias that defines a refused command (%s)" % a[:60]
             sub, args = git_subcommand(w)
+            if any(re.match(r"^core\.hookspath=", a, re.I) for a in w) and not helpful:
+                return "git -c core.hooksPath=... (the checks a commit runs are switched off; rule 4)"
+            if sub in HOOK_SKIPPERS and not helpful:
+                message = next((args[i + 1] for i, a in enumerate(args) if a in ("-m", "--message") and i + 1 < len(args)), "")
+                snapshot = bool(re.match(r"^\s*checkpoint\b", message, re.I) or re.search(r"\bhand-off\b", message, re.I))
+                for a in args:
+                    if (a == "--no-verify" or (sub == "commit" and re.match(r"^-[A-Za-z]*n[A-Za-z]*$", a))) and not snapshot:
+                        return "git %s %s (a commit that skips its checks; the merge policy allows it only for the checkpoint commit and a builder's hand-off snapshot, whose message says so)" % (sub, a)
             if sub == "push" and not helpful:
                 r = force_push_reason(args)
                 if r:
