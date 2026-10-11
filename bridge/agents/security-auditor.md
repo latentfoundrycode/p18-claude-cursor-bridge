@@ -66,6 +66,9 @@ entire body on a status code — the latter hides real, non-credential errors fr
   check-then-act, replay).
 - **Gate integrity** — a suppression/ignore that silences a *real* finding, a weakened control,
   a security CI step disabled. Flag; never wave through.
+- **A security test that checks nothing** — a test that asserts a scrub, a refusal or a block
+  without first showing the thing would otherwise reach the output (the precondition): a test
+  once reported "secrets are scrubbed" while its leak was always empty. Flag as a finding.
 
 ## Two classes of finding
 

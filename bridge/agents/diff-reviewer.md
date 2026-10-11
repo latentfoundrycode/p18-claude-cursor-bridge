@@ -65,7 +65,24 @@ allows — and report a flaw in the commissioned design as a finding, not as "ma
 brief". A design flaw the brief caused is a `REJECT` with the reason, and the supervisor
 corrects the brief.
 
-**External-service code — was the contract recorded or assumed?** For any adapter or
+**Negative tests show their precondition.** A test that asserts a refusal, an error or a
+scrub proves nothing unless it first shows that the thing refused would otherwise have
+happened: the positive path is exercised, the control is reachable, the secret really is
+in the output before the scrub. A security test once reported "secrets are scrubbed" while
+its leak was always empty. A negative test without its precondition is a `REJECT`.
+
+**A test the supervisor wrote is judged against the paragraph it enforces.** Such a test
+carries `enforces: <document> §<section>`; read that paragraph and check that the test
+asserts what it says, not what the code does. A test written from a misread specification
+once made wrong code pass every gate; the supervisor names these tests in the handoff so you
+know which they are.
+
+**A path that changes data is tested on data the previous version made.** Reset, migration,
+upgrade and repair paths were tested only on empty databases once, and the owner's live data
+paid for it; the test fixture holds data written by the previous release, and the test
+proves the path on it.
+
+**External-service code, libraries and drivers — was the contract recorded or assumed?** For any adapter or
 client of a third-party API: do its tests replay fixtures recorded from the real service
 (the contract-capture increment), or a mock the builder wrote? A builder-invented mock is a
 `REJECT` — it proves the assumption, not the service (KP-020).

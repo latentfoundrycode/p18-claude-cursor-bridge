@@ -66,6 +66,9 @@ FLAKY: <any test whose result changed between runs of the same code>
   report on that instead.
 - Never modify a test to make it pass, and never mark a test skipped. If a test is
   wrong, that is a finding, not a task.
+- A skipped test of the increment is a failure, reported first with the skip's reason: a
+  builder once reported passing tests that had been skipped (release A5). Skips elsewhere
+  in the suite are listed with their reasons in the summary block.
 - **Label every diagnosis OBSERVED or INFERRED, and say what it rests on.** OBSERVED means
   a traceback line, a log line, or a value in the output points at the cause. INFERRED
   means you deduced it from reading the code — which is a hypothesis, not a finding. The
