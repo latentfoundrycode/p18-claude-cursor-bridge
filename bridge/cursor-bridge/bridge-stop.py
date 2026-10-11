@@ -47,9 +47,14 @@ def alive(pid):
         return str(pid) in p.stdout
     try:
         os.kill(pid, 0)
-        return True
     except OSError:
         return False
+    try:
+        with open("/proc/%d/stat" % pid, encoding="utf-8", errors="replace") as f:
+            state = f.read().rsplit(")", 1)[-1].split()[0]
+        return state != "Z"                                # a zombie has ended; its parent has not reaped it yet
+    except (OSError, IndexError):
+        return True
 
 
 def command_line(pid):

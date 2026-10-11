@@ -27,7 +27,7 @@ project must show before the other projects resume.
 - `refactor-check.py`'s size budget leaves out `handoff/` and `run/` (a refactoring's driver re-anchors are bookkeeping); `test_*.py` and `*_test.py` count as test files only under a tests folder, so a product module named like a test is product.
 - `conformance-check.py` recognises Socket's pin in `npm install -g @socketsecurity/cli@<version>`, and the adapter evidence accepts a folder of recordings (`fixtures/modal_contract/`) loaded through a helper.
 - `evaluate-reports.py` does not count a stage heading's short preamble without a list item of its own (reAngle's "Bridge versions in force: ..." lines; its items are the `###` sections) as an entry, and an entry cut at the 6,000-character display limit of `unprocessed.md` says so.
-- Not in this release: the subagent resumed by `SendMessage` (the evaluation's item 3) waits for its reproduction on reAngle (requested through the channel on 2026-10-11).
+- The subagent resumed by `SendMessage` (the evaluation's item 3) was reproduced on reAngle on 2026-10-11 before anything changed: the hook lists the resumed agent under its original id, type `subagent`, status `running`, which the loop guard already reads as a background agent; with its wake-timer running the stop was allowed. No change; the project's record (`run/supervisor/loop-guard-input-resumed-2026-10-11.json`) is the evidence.
 
 **Running projects must**
 - *(building, changing)* Install, restart, `/calibrate-bridge`. A delegation wrapper of the project's own carries `# wake builder` or `# wake review`; a verification loop is stopped with `bridge-stop.py`; nothing else changes in the loop.
