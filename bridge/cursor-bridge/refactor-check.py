@@ -49,11 +49,19 @@ def git(args):
         return None
 
 
+TEST_FOLDERS = ("tests", "test", "__tests__", "spec", "specs", "e2e")
+
+
 def is_test(path):
+    """A test file. `test_*.py` and `*_test.py` count only under a tests folder: a product module
+    named like a test (a CLI group `test`) is product (2026.10.11c)."""
     p = path.replace("\\", "/")
     name = p.rsplit("/", 1)[-1]
+    folders = p.split("/")[:-1]
     for pat in TEST_PATTERNS:
         if fnmatch.fnmatch(p, pat) or fnmatch.fnmatch(name, pat):
+            if pat in ("test_*.py", "*_test.py") and not any(f in TEST_FOLDERS for f in folders):
+                continue
             return True
     return False
 
@@ -79,7 +87,7 @@ def main():
             i += 1
 
     names = git(["diff", "--name-only", base])
-    stat = git(["diff", "--shortstat", base])
+    stat = git(["diff", "--shortstat", base, "--", ":(top)", ":(top,exclude)handoff", ":(top,exclude)run"])   # the budget is product change; briefs and drivers are bookkeeping (2026.10.11c)
     if names is None or stat is None:
         print("CANNOT VERIFY: git diff against %r failed" % base)
         return 2

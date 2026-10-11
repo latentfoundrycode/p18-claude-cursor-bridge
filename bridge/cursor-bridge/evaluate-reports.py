@@ -193,7 +193,7 @@ def feedback_entries(text):
             continue
         stage = label
         own = re.split(r"^### ", body, maxsplit=1, flags=re.M)[0]      # empty when the first subsection follows the heading directly
-        if own.strip() and not re.match(r"^\s*$", own):
+        if own.strip() and (re.search(r"^\s*(?:[-*]|\d+[.)])\s", own, re.M) or len(own.strip()) >= 400):   # a stage heading's short preamble (reAngle: "Bridge versions in force: ...") is not an entry; its items are the ### sections (2026.10.11c)
             out.append((body_id("feedback", own, label), label, own, 1 + own.count("\n")))
             for k in range(start, start + 1 + own.count("\n")):
                 taken.add(k)
@@ -328,7 +328,10 @@ def cmd_collect(a):
         f.write("%d entries. Each needs one verdict: fixed <release> | pitfall KP-nnn | planned <section> | declined <reason> | project-specific. Record with `evaluate-reports.py record <project> <id> <outcome> --reason <text>`.\n\n" % len(rows))
         for project, source, eid, label, body, earlier in rows:
             tag = "UPDATED (earlier: %s %s)" % (earlier.get("outcome"), earlier.get("reason") or "") if earlier else "NEW"
-            f.write("## %s / %s / %s - %s\n\n%s\n\n%s\n\n" % (project, source, eid, tag, label, redact(body.strip())[:6000]))
+            shown = redact(body.strip())
+            if len(shown) > 6000:
+                shown = shown[:6000] + "\n\n[cut at 6,000 characters; the document holds the rest]"
+            f.write("## %s / %s / %s - %s\n\n%s\n\n%s\n\n" % (project, source, eid, tag, label, shown))
     print("evaluate-reports: %d entries to evaluate (%d new, %d updated) -> %s" % (
         len(rows), sum(1 for r in rows if r[5] is None), sum(1 for r in rows if r[5] is not None), path))
     return 0

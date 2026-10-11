@@ -50,7 +50,9 @@ def assert_own_home(out, tmp_path):
     assert os.path.lexists(agent_home / ".cursor") and os.path.samefile(agent_home / ".cursor", tmp_path / "home" / ".cursor")
     assert sorted(os.listdir(agent_home)) == [".cursor", "AppData", "Desktop", "Documents", "Downloads"], "the link and the empty skeleton of a profile (KP-038)"
     assert sorted(os.listdir(agent_home / "AppData")) == ["Local", "LocalLow", "Roaming"]
-    assert same_path(out["GIT_CONFIG_GLOBAL"], str(tmp_path / "home" / ".gitconfig"))
+    assert same_path(out["GIT_CONFIG_GLOBAL"], str(tmp_path / "home" / ".cursor-bridge" / "gitconfig")), out["GIT_CONFIG_GLOBAL"]
+    text = open(out["GIT_CONFIG_GLOBAL"], encoding="utf-8").read()
+    assert "[credential]\n\thelper =\n" in text and str(tmp_path / "home" / ".gitconfig").replace("\\", "/") in text, "the bridge's git config includes the owner's and resets the helper list (2026.10.11c): " + text
     if os.name == "nt":
         assert out["HOMEDRIVE"] + out["HOMEPATH"] == out["USERPROFILE"]
     home = tmp_path / "home"
@@ -87,7 +89,7 @@ def test_python_recipe_withholds_account_keys_and_keeps_the_rest(program, tmp_pa
         assert k not in out, "%s must not reach a builder or reviewer run" % k
     for k in KEPT:
         assert k in out, "%s was withheld by mistake" % k
-    assert out["GIT_CONFIG_KEY_0"] == "credential.helper", "the recipe's own variable must survive its own filter"
+    assert "GIT_CONFIG_VALUE_0" not in out and "GIT_CONFIG_COUNT" not in out, "the empty variable is gone: a wholesale restore drops it (reAngle ISS-016, 2026.10.11c)"
     assert_own_home(out, tmp_path)
     again = be.stripped_env(sample_env(tmp_path))
     assert again["HOME"] == out["HOME"], "a second run finds the folder and uses it"
@@ -136,15 +138,21 @@ def test_shim_withholds_exactly_what_the_python_recipe_does(program, tmp_path):
     p = subprocess.run([shutil.which("sh"), str(probe)], capture_output=True, text=True, env=env)
     assert p.returncode == 0, p.stderr
     names = {line.split("=", 1)[0] for line in p.stdout.splitlines() if "=" in line}
+    shim_file = tmp_path / "home" / ".cursor-bridge" / "gitconfig"
+    written = shim_file.read_text(encoding="utf-8")                     # read BEFORE the Python recipe rewrites it (review of 11c, H1)
+    assert "\\" not in written and "[include]" in written and "\thelper =\n" in written, "the shim's file holds forward slashes: " + written
+    g = subprocess.run(["git", "config", "--file", str(shim_file), "--list"], capture_output=True, text=True)
+    assert g.returncode == 0, "git must read the shim's file: " + g.stderr
     be = program("bridge_env")
     expected = be.stripped_env(env)
+    assert be.write_gitconfig(str(tmp_path / "home")) == str(shim_file) and shim_file.read_text(encoding="utf-8") == written, "the shim and the recipe write the same file"
     for k in WITHHELD:
         assert k not in names, "the shim lets %s through" % k
     for k in KEPT:
         assert k in names, "the shim withheld %s by mistake" % k
     for k in WITHHELD + KEPT:
         assert (k in names) == (k in expected), "shim and bridge_env disagree on %s" % k
-    assert "GIT_CONFIG_KEY_0" in names and "BRIDGE_V" not in names
+    assert "GIT_CONFIG_KEY_0" not in names and "GIT_CONFIG_GLOBAL" in names and "BRIDGE_V" not in names
     values = dict(line.split("=", 1) for line in p.stdout.splitlines() if "=" in line)
     assert_own_home(values, tmp_path)
     assert not any(k.startswith("BRIDGE_") for k in values)

@@ -291,8 +291,8 @@ def command_ceiling(cmd, cwd=None):
     m = re.search(r"--limit\s+(\d+)", cmd)
     if m:
         return int(m.group(1))
-    k = re.search(r"--kind\s+(builder|review|watch|test)", cmd)
-    kind = k.group(1) if k else ("builder" if "cursor-agent" in cmd else "watch" if "gh pr checks" in cmd else "test")
+    k = re.search(r"--kind\s+(builder|review|watch|test)", cmd) or re.search(r"#\s*wake\s+(builder|review|watch|test)\b", cmd, re.I)   # a project's own wrapper names its kind (2026.10.11c)
+    kind = k.group(1).lower() if k else ("builder" if "cursor-agent" in cmd else "watch" if "gh pr checks" in cmd else "test")
     key = {"builder": "cursor-agent", "review": "review", "watch": "gh pr checks", "test": "# wake"}[kind]
     ceiling = KIND_CEILING[key]
     if "--limit auto" in cmd:

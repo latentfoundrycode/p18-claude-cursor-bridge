@@ -507,7 +507,7 @@ it applies.**
 ### KP-056 — Interrupted mutation-driver runs left mutants in the product code
 - **Surfaced:** reAngle, 2026-10 (ISS-017, twice): a driver that patches a product file and restores it in `finally` was killed mid-run (a dropped builder connection; a `TaskStop` of a background bash loop on Windows, which leaves the loop and its children running), and mutants stayed in the product; once the builder re-anchored its drivers around the mutated code.
 - **Cause:** a killed process never reaches its `finally`, and a stopped loop on Windows does not stop its children.
-- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped only between drivers, its `bash.exe` first, then the driver and the tests; a driver aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
+- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver; until then only between drivers, its `bash.exe` first; a driver aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
 - **Applies:** every mutation or fault-injection driver that edits product files. The sign: `git status` showing a product file changed after a test run.
 
 ### KP-057 — An orphaned server held a delegation open for six hours through an inherited output pipe

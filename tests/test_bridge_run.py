@@ -256,7 +256,7 @@ def test_usage_errors(tmp_path):
 
 def test_stripped_environment_reaches_the_child(tmp_path):
     """With --strip the child sees no token and gh's empty config folder (what cursor-agent gets)."""
-    code = "import os; print(os.environ.get('GH_TOKEN','absent'), os.environ.get('GH_CONFIG_DIR',''), os.environ.get('GIT_TERMINAL_PROMPT',''), repr(os.environ.get('GIT_CONFIG_VALUE_0')))"
+    code = "import os; print(os.environ.get('GH_TOKEN','absent'), os.environ.get('GH_CONFIG_DIR',''), os.environ.get('GIT_TERMINAL_PROMPT',''), repr('' if os.environ.get('GIT_CONFIG_GLOBAL','').replace(chr(92),'/').endswith('/.cursor-bridge/gitconfig') and 'GIT_CONFIG_VALUE_0' not in os.environ else None))"
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--strip", "--", sys.executable, "-c", code],
                        capture_output=True, text=True, env=env_for(tmp_path, GH_TOKEN="secret"))
     assert p.returncode == 0, p.stderr
@@ -279,7 +279,7 @@ def test_stripped_environment_recipe(program, tmp_path, monkeypatch):
     env = program("bridge_env").stripped_env({"GH_TOKEN": "x", "GITHUB_TOKEN": "y", "PATH": os.environ.get("PATH", ""), "HOME": "h"})
     assert "GH_TOKEN" not in env and "GITHUB_TOKEN" not in env
     assert env["GIT_TERMINAL_PROMPT"] == "0"
-    assert env["GIT_CONFIG_KEY_0"] == "credential.helper" and env["GIT_CONFIG_VALUE_0"] == ""
+    assert "GIT_CONFIG_VALUE_0" not in env and env["GIT_CONFIG_GLOBAL"].replace("\\", "/").endswith("/.cursor-bridge/gitconfig"), "the helper is reset in the bridge's git config file (2026.10.11c)"
     assert env["GH_CONFIG_DIR"] == os.path.join(str(tmp_path), "cursor-bridge", "gh-empty")
 
 
@@ -292,7 +292,7 @@ def test_shim_and_python_apply_the_same_recipe(program):
         assert var in shim, "the shim does not unset " + var
     assert 'export GH_CONFIG_DIR="$BRIDGE_GH_EMPTY"' in shim and "cursor-bridge/gh-empty" in shim
     assert "GIT_TERMINAL_PROMPT=0" in shim
-    assert "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0=" in shim
+    assert "unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0" in shim and "[credential]" in shim and 'export GIT_CONFIG_GLOBAL="$BRIDGE_REAL_HOME_M/.cursor-bridge/gitconfig"' in shim and "GIT_CONFIG_PARAMETERS=\"'credential.helper='\"" in shim
     assert shim.startswith("#!/bin/sh\n") and "\r" not in shim
     assert shim.rstrip().endswith('exec cursor-agent.cmd "$@"')
 
