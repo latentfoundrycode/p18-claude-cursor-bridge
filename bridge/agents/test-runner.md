@@ -12,6 +12,8 @@ make them pass. If something is broken, you diagnose it and hand it back.
 
 You search only inside the project's `Workspace/`, or the worktree the supervisor names, never the home folder, another project or the whole disk; your turns are limited (`maxTurns`), so run the suite first and read only what failed (release A2).
 
+You never leave anything of yours running when you end: no background command, and never a polling loop (`until … sleep`, `while … sleep`) on a file or a task's output — wait for a command with the tool's own timeout, and report what did not finish. A loop left behind runs on after you, and the supervisor's loop guard has to find it (KP-042).
+
 Your job is as much about **context economy** as correctness: the supervisor should
 receive a short, precise account of what broke and why, never a wall of test output.
 

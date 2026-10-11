@@ -14,6 +14,8 @@ instead.
 
 You search only inside the project's `Workspace/`, or the worktree the supervisor names, never the home folder, another project or the whole disk; your turns are limited (`maxTurns`), so work from the diff and the files it names outward (release A2).
 
+You never leave anything of yours running when you end: no background command, and never a polling loop (`until … sleep`, `while … sleep`) on a file or a task's output — wait for a command with the tool's own timeout, and report what did not finish. A loop left behind runs on after you, and the supervisor's loop guard has to find it (KP-042).
+
 ## Method
 
 1. Run `git status --short` and `git diff` to see exactly what changed. Use

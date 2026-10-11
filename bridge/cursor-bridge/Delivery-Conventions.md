@@ -48,17 +48,17 @@ Inno Setup: free, script-based (the script is a committed, reviewable file), one
 #define AppVersion "<version>"          ; injected at build time from the single version source (§5)
 #define AppPublisher "<publisher>"
 #define AppExe "<Name>.exe"
-#define AppId "{{<GUID — generated once, never changed>}}"   ; the identity that makes upgrades in-place
+#define AppGuid "<GUID — generated once, never changed, without braces>"   ; the identity that makes upgrades in-place
 
 [Setup]
-AppId={#AppId}
+AppId={{{#AppGuid}}          ; the [Setup] escape: {{ is a literal brace, so the value is {<GUID>}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
 DefaultDirName={localappdata}\Programs\{#AppName}   ; per-user; {autopf} only for a per-machine design
 PrivilegesRequired=lowest
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=x64os                 ; x64 Windows only; x64compatible would admit an Arm64 host under emulation (R24)
+ArchitecturesInstallIn64BitMode=x64os
 OutputDir=..\dist
 OutputBaseFilename={#AppName}-Setup-{#AppVersion}-x64
 UninstallDisplayIcon={app}\{#AppExe}
@@ -84,14 +84,15 @@ Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait pos
 // --- already installed: Upgrade / Uninstall / Cancel ------------------------------------
 function InstalledUninstallString(var S: string): Boolean;
 begin
-  Result := RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + '{#AppId}' + '_is1', 'UninstallString', S)
-         or RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + '{#AppId}' + '_is1', 'UninstallString', S);
+  // inside [Code] the preprocessor substitutes the bare GUID; the braces are added here, since the {{ escape is a [Setup] rule only (R24)
+  Result := RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + '{' + '{#AppGuid}' + '}' + '_is1', 'UninstallString', S)
+         or RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + '{' + '{#AppGuid}' + '}' + '_is1', 'UninstallString', S);
 end;
 
 function InstalledVersion(): string;
 begin
-  if not RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + '{#AppId}' + '_is1', 'DisplayVersion', Result) then
-    if not RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + '{#AppId}' + '_is1', 'DisplayVersion', Result) then
+  if not RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + '{' + '{#AppGuid}' + '}' + '_is1', 'DisplayVersion', Result) then
+    if not RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + '{' + '{#AppGuid}' + '}' + '_is1', 'DisplayVersion', Result) then
       Result := '';
 end;
 

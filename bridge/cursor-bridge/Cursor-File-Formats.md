@@ -522,17 +522,27 @@ architecture; `docs/design/DESIGN.md` = visual system; `.cursor/rules/vercel-int
 
 ## `.semgrep.yml` (project root) — pinned SAST ruleset
 
-Points the Semgrep floor at the ruleset the project builds against, pinned so a resumed
-session runs the same rules. Either an inline `rules:` set or a reference to pinned registry
-rulesets. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if behaviour looks
-off; native Windows support is now GA, but the floor still runs Semgrep in CI on Linux).
+Holds the project's **own** rules, in Semgrep's rule schema (`id`, `languages`, `severity`,
+`message`, `pattern` or `patterns`), the same shape as the bundled `semgrep-bridge-rules.yml`.
+A registry pack (`p/default`) is **not** a rule and is not valid inside this file (the plan
+review's R24: the TDP had to pass the packs on the command line); the packs are named on the
+gate command, pinned by the Semgrep CLI version recorded in `docs/INVENTORY.md` (Resources)
+by the file that pins it. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if
+behaviour looks off; native Windows support is now GA, but the floor still runs Semgrep in CI
+on Linux).
+
+```bash
+semgrep ci --config p/default --config p/secrets --config p/owasp-top-ten --config .semgrep/bridge-rules.yml --config .semgrep.yml
+```
 
 ```yaml
-# Pinned ruleset reference — record the file that pins it in docs/INVENTORY.md (Resources), never the commit itself
+# .semgrep.yml — the project's own rules; registry packs go on the gate command, never here
 rules:
-  - p/default
-  - p/secrets
-  - p/owasp-top-ten
+  - id: <project>-<what-it-catches>
+    languages: [python]
+    severity: ERROR
+    message: <what is wrong and what to do instead>
+    pattern: <the shape to catch>
 ```
 
 - Prefer curated registry packs (`p/…`) pinned to a recorded version, or vendor a fixed
