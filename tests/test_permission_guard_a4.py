@@ -76,6 +76,11 @@ def test_a_commit_that_skips_its_checks_is_refused(tmp_path, command):
     'git commit --no-verify --message="checkpoint before TASK-001"',
     "git commit --no-verify -m \"$(cat <<'EOF'\ncheckpoint before TASK-003\n\nthe tree as delegated\nEOF\n)\"",
     'git -C ../Worktrees/TASK-001 commit --no-verify -m "TASK-001 builder hand-off"',
+    'git commit --no-verify -m "checkpoint before TASK-105 (brief handoff/TASK-105.md)"',
+    'git commit --no-verify -m "checkpoint before TASK-159 r2 (round 1 builder output, scope clean)"',
+    'git commit --no-verify -m "checkpoint: roster re-resolved before TASK-159 r3"',
+    'git commit --no-verify -m "checkpoint: TASK-059e round-5 builder work"',
+    'git commit --no-verify -m "checkpoint before CONFIG-001a"',
 ])
 def test_the_snapshots_the_policy_allows_and_a_dry_run_pass(tmp_path, command):
     """The pre-delegation checkpoint (its exact subject, in any of the app's commit forms) and a builder's hand-off
@@ -91,6 +96,9 @@ def test_the_snapshots_the_policy_allows_and_a_dry_run_pass(tmp_path, command):
     "HUSKY=0 git commit -m x",
     "git config core.hooksPath /dev/null",
     "git config --unset core.hooksPath",
+    "git config core.hooksPath ../elsewhere",
+    "git commit -n -m \"accept TASK-003\" -m \"$(cat <<'EOF'\ncheckpoint before TASK-003\nEOF\n)\"",
+    'git commit --no-verify -m "checkpoint: merge TASK-003 to main"',
 ])
 def test_the_words_alone_do_not_open_the_exemption(tmp_path, command):
     """First pass, F6 and F14: the exemption is the policy's exact subject, the hand-off only inside a worktree;
@@ -119,6 +127,8 @@ def test_continued_lines_and_read_forms_pass(workspace, command):
     "git add -A & git commit -m x",
     "(git add -A) && (git commit -m x)",
     'eval "git add -A && git commit -m x"',
+    "git status && git stash",
+    "git remote add x https://example.invalid/r.git && git status",
 ])
 def test_the_remaining_chain_spellings_are_refused(workspace, command):
     """First pass, F14: a single &, parentheses and eval do not hide a chain."""

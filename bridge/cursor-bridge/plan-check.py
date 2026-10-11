@@ -22,10 +22,11 @@ A stage heading is followed by a line `Demonstration: <what is shown live, on th
 built, when the stage closes>` (release A1b); a stage with increments and no such line is noted.
 
 Status is not written in the plan; it is derived from git. An increment counts as merged
-when a commit on <base> has a subject that STARTS with its ID (a squash commit, a PR title),
-a merge commit whose branch name starts with the ID, or a `Merges: TASK-nnn` trailer; a
-subject that merely mentions an ID ("docs: plan split TASK-003 out of TASK-004") merges
-nothing (release A4). A group is merged when all its children are. A dated addendum file
+when a commit on <base> has a subject that STARTS with its ID or IDs (a squash commit, a PR
+title: `TASK-103 TASK-104: ...`), a merge commit whose branch name starts with the ID, a
+subject whose IDs stand in parentheses at its end (`feat(x): ... (TASK-100, R-027) - v0.2.0`),
+or a `Merges: TASK-nnn` trailer; a subject that merely mentions an ID ("docs: plan split
+TASK-003 out of TASK-004") merges nothing (release A4). A group is merged when all its children are. A dated addendum file
 (`docs/BUILD_PLAN-<date>*.md`) is read with the plan and noted as such.
 
 Checks (exit 1 on any):
@@ -70,8 +71,19 @@ def ids_in(value):
 
 
 def scope_paths(value):
+    """The paths of a Scope field. `folder/ (a.py, b.py: note)` names folder/a.py and folder/b.py
+    (the TDP's form, second pass N4); a non-breaking space is whitespace; a wildcard's prefix counts."""
+    value = (value or "").replace("\u00a0", " ")
+
+    def expand(m):
+        folder, inner = m.group(1), m.group(2)
+        names = [re.split(r"[:\s]", x.strip(), 1)[0] for x in inner.split(",")]
+        names = [n for n in names if n and "." in n]
+        return ", ".join(folder + n for n in names) if names else folder
+
+    value = re.sub(r"(\S+/)\s*\(([^()]*)\)", expand, value)
     out = []
-    for part in re.split(r"[,;]", value or ""):
+    for part in re.split(r"[,;]", value):
         p = part.strip().strip("`").replace("\\", "/")
         if not p or p.lower() in ("none", "-"):
             continue

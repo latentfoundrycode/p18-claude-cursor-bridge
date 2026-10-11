@@ -13,8 +13,9 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
 
 --mode plan  (plan gate, every stage close)
   REGISTER    the register exists, rows are well-formed, IDs unique.
-  UNPLANNED   a planned/built requirement that no increment's `Satisfies:` field names (a
-              mention in prose is not a plan; release A4).
+  UNPLANNED   a `planned` requirement that no increment's `Satisfies:` field names (a mention
+              in prose is not a plan; release A4). A `built` row needs evidence, not a plan
+              increment: the plan that built it may be gone (the video factory's older plans).
   UNAPPROVED  a deferred/dropped row without "owner" and a date.
   NO EVIDENCE a `built` requirement whose Evidence cell names no test file (release A4: a
               release was declared complete while features returned empty data).
@@ -147,7 +148,7 @@ def main():
         for m in re.finditer(r"^\s*(?:[-*]\s+)?\**Satisfies\**\s*:\s*(.*)$", plan_text, re.M | re.I):
             satisfied.update(ID_RX.findall(m.group(1)))
         for rid, (kind, text) in sorted(reqs.items()):
-            if kind in ("planned", "built") and rid not in satisfied:
+            if kind == "planned" and rid not in satisfied:
                 fails.append("UNPLANNED: %s (%s) is in no increment's Satisfies: field" % (rid, text[:70]))
     for rid, (kind, text) in sorted(reqs.items()):
         if kind == "built" and not any(TEST_PATH.search(tok.strip("`*, ").replace("\\", "/")) for tok in evidence.get(rid, "").split()):

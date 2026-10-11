@@ -15,9 +15,16 @@ file is still diff-reviewer's judgement; this tool owns the file-level floor.
 Usage:
     python scope-check.py handoff/TASK-<nnn>.md [--base <git-ref>]
 
-    --base   commit to diff against. Default: the commit that last touched the brief (the
-             checkpoint commits the brief), so a builder's own commits are inside the diff;
-             HEAD when the brief is not committed.
+    --base   commit to diff against. Default: the commit that FIRST added the brief (the
+             checkpoint commits the brief; a brief fixed and committed later never moves the
+             base past the builder's commits); HEAD when the brief is not committed.
+
+Output lines: BASE (with how it was chosen), SCOPE, NOT READ AS A PATH (a Scope bullet that
+names no path, reported and ignored), CHANGED, BOOKKEEPING (the files a builder must write),
+RECORDS (the supervisor's record files changed only by commits that touched records alone
+since the checkpoint: not drift; a commit that mixes code with a record is the builder's),
+IN SCOPE, SCOPE DRIFT, VERDICT. The Scope is the brief's top-level bullets up to the first
+line that is neither a bullet nor blank (a bold note, prose): sub-bullets are not paths.
 
 Exit codes:
     0  every changed file is inside the declared Scope
@@ -104,7 +111,9 @@ def parse_scope(brief_path):
         if in_scope and re.match(r"^#+\s+", line):
             break                                          # any heading ends the Scope, a `### Out of scope` included
         if in_scope:
-            m = re.match(r"^\s*[-*]\s+(.+?)\s*$", line)
+            if entries and line.strip() and not re.match(r"^[-*]\s", line):
+                break                                      # a bold note or prose after the path list ends the Scope (N8)
+            m = re.match(r"^[-*]\s+(.+?)\s*$", line)      # top-level bullets only: sub-bullets are not paths
             if m:
                 entry = m.group(1).strip()
                 if entry.lower().startswith("do not"):
@@ -142,14 +151,20 @@ def is_record(path):
 
 
 def supervisors_own(path, base, uncommitted):
-    """A records file changed only by the supervisor's own commits since the checkpoint (every
-    author is the checkout's user.email) and not in the working tree: the supervisor's bookkeeping,
-    not the builder's drift. A builder's commit carries another identity (the owner's is withheld)."""
+    """A records file changed, since the checkpoint, only by commits that touched records and
+    bookkeeping alone (the supervisor's record keeping) and not in the working tree. A commit that
+    mixes code with a record is the builder's, and its record edit is drift. Authorship cannot tell
+    the two apart: every commit on the computer carries the owner's git identity (second pass, N1)."""
     if path in uncommitted:
         return False
-    mine = _run_git(["config", "user.email"]).strip()
-    authors = _run_git(["log", "--format=%ae", base + "..HEAD", "--", path]).split()
-    return bool(mine) and bool(authors) and all(a == mine for a in authors)
+    shas = _run_git(["log", "--format=%H", base + "..HEAD", "--", path]).split()
+    if not shas:
+        return False
+    for sha in shas:
+        files = [_norm(f) for f in _run_git(["show", "--name-only", "--format=", sha]).splitlines() if f.strip()]
+        if not files or not all(is_record(f) or bookkeeping(f) for f in files):
+            return False
+    return True
 
 
 def changed_files(base):

@@ -38,6 +38,33 @@ def test_the_base_stays_at_the_briefs_first_commit_and_records_commits_are_not_d
     (repo / "docs" / "REQUIREMENTS.md").write_text("| r |\n", encoding="utf-8")
     rc, out = run_scope(repo, b)
     assert "docs/REQUIREMENTS.md" in drift_list(out), "an uncommitted records change is still drift: " + out
+    (repo / "src" / "core" / "b.py").write_text("B = 2\n", encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "a builder's round: code and a record together")
+    rc, out = run_scope(repo, b)
+    assert "docs/REQUIREMENTS.md" in drift_list(out), "a commit mixing code with a record is the builder's, whatever its author (second pass, N1): " + out
+
+
+def test_a_bold_note_and_sub_bullets_end_the_scope(repo):
+    b = brief(repo, ["- src/core/a.py", "- src/core/b.py", "", "**Limits inside Scope:**", "- advance.py stays as it is", "- the registry is read only"])
+    (repo / "src" / "core" / "a.py").write_text("A = 2\n", encoding="utf-8")
+    rc, out = run_scope(repo, b)
+    assert rc == 0 and "NOT READ AS A PATH" not in out and "advance.py" not in out.split("SCOPE:")[1].split("\n")[0], "the path list ends at the bold note (second pass, N8): " + out
+
+
+def test_a_plan_scope_with_a_parenthesised_list_names_the_files(program):
+    pc = program("plan-check")
+    assert pc.scope_paths("tdp/ingest/normalize/ (located_build.py, azure_reader.py: the dropped strings), tdp/service/ (admin.py), tests/service/\u00a0, see docs/CHANGES.md") == \
+        ["tdp/ingest/normalize/located_build.py", "tdp/ingest/normalize/azure_reader.py", "tdp/service/admin.py", "tests/service", "see docs/CHANGES.md"], "the TDP's form (second pass, N4)"
+
+
+def test_a_built_row_needs_evidence_not_a_plan_increment(tmp_path):
+    from test_completion_check import make, run as run_completion
+    r = make(tmp_path)
+    plan = (r / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8").replace("Satisfies: R-001, R-004", "Satisfies: R-001")
+    (r / "docs" / "BUILD_PLAN.md").write_text(plan, encoding="utf-8")
+    rc, out = run_completion(r, "--mode", "plan")
+    assert "UNPLANNED: R-004" not in out, "a built row of a plan since removed is not UNPLANNED (second pass, N3): " + out
 
 
 def test_a_quoted_path_with_a_note_is_read_and_an_unreadable_bullet_is_said(repo):
