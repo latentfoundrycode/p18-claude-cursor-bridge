@@ -21,6 +21,10 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
 | GitHub repository (protected `main`) | config | github.com/latentfoundrycode/p18-claude-cursor-bridge | the gate, every PR | pre-B |
 | Semgrep / OSV-Scanner / Socket | tool | to be added to .github/workflows/tests.yml, pinned by commit (TASK-002) | the bridge's CI gate | planned (R-002) |
 | SEMGREP_APP_TOKEN, Socket token | repo secret | GitHub repository secrets (names only) | the security floor in CI | n/a — set when TASK-002 lands; no spend possible beyond free tier |
+| BRIDGE_RUN_ALLOW_ANY | config | an optional override read by bridge-run.py (lets any command through the launcher); unset in normal use | bridge/cursor-bridge/bridge-run.py | pre-B; no value stored |
+| ROSTER_NOW | config | an optional clock override read by roster-check.py (for deterministic reset-day tests); unset in normal use | bridge/cursor-bridge/roster-check.py | pre-B; no value stored |
+| GH_TOKEN, GH_CONFIG_DIR, GIT_CONFIG_GLOBAL, GIT_TERMINAL_PROMPT | test-only | set and read by the test harness to isolate subprocesses (tests/test_bridge_run.py); not real credentials | the bridge's test suite | pre-B; no value stored |
+| MODAL_TOKEN_ID, THING_API_KEY | test-only | fixture env names used by the conformance/secret-scan tests to exercise detection (tests/); not real credentials | the bridge's test suite | pre-B; no value stored |
 
 No paid API key is needed to build the bridge itself; the roster uses the owner's Cursor subscription (native profile while the Other Models pool shows a usage limit).
 
@@ -41,4 +45,6 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
 ## Deferred
 | Item | Why deferred | Since | Owner decision needed |
 |---|---|---|---|
-| Installing release B from a second checkout that only holds `main` | A1a left this "settled at release B's intake"; it affects only the install step at the end of release B, not the build | 2026-10-11 | yes — before the install run sheet |
+| (none) | — | — | — |
+
+Note: the release-B install mechanics (the second-checkout question) were settled 2026-10-11 — see Decisions, R-038 (pause & switch at B6).
