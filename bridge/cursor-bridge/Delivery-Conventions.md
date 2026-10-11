@@ -133,6 +133,13 @@ end;
 
 ### 2.3 Verification — `installer-check.ps1`, silent, per-user, reversed
 
+The check runs **from the owner's own terminal, by a run sheet**, never from the supervisor's
+session: a session run from the packaged desktop app writes under the user's local
+application folder into a hidden, per-application copy of it, which the owner's own programs
+and the installer never see (KP-055). The same holds for anything else others must find
+there: it is created by a run sheet the owner runs. `-AppId` takes the GUID in braces, as the
+installer registers it.
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1 -Installer dist\<Name>-Setup-<v>-x64.exe -AppName "<Name>" -AppId "<GUID>" -Exe "<Name>.exe" -Version "<v>"
 ```

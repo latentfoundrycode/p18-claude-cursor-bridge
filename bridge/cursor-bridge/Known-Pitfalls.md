@@ -432,3 +432,104 @@ it applies.**
 - **Correction (2026.10.11a):** the bound of a waited-on background agent is a background command, `wake-timer.py <seconds> "<the agent>"`, whose completion notification does wake the session (a background command's completion arrived in the same experiment); the loop guard counts an agent as bounded only while a timer ending no later than its ceiling runs, and its refusal prints the timer command to copy. A scheduled wake-up stays right for an idle wait with nothing in the background (a checkpoint on a quiet session).
 - **Applies:** every wait on a background subagent; any design that relies on a cron firing while background work runs. The sign: a one-shot still listed after its minute while an agent runs.
 
+### KP-044 — A global tool older than the project's own, and a pre-commit check weaker than CI, let a stage's worth of drift through
+- **Surfaced:** the TDP (memory `ci-config-gotchas`, items 1 and 2, 2026-09) and the video factory (Issue 14, 2026-09-26): a global `ruff` was an older version with laxer defaults than the project's `.venv` copy and missed three rule classes; CI ran the formatter check as a separate step that the local pre-commit hook omitted, so four files' layout drift passed every local commit and was caught by the cross-family reviewer at the stage's end.
+- **Cause:** a tool resolved from `PATH` instead of the project's own environment, and a local gate that enforced less than CI.
+- **Correction:** the project's own toolchain is authoritative (`.venv/Scripts/python.exe -m ruff`, never a bare `ruff`); the generated pre-commit hook runs every check CI runs, the formatter check beside the linter; the inventory records the tool versions by the file that pins them.
+- **Applies:** every project with a linter or formatter in CI. The sign: a reviewer or CI flagging formatting that local commits passed.
+
+### KP-045 — CI is Linux, the workstation is Windows: default paths, platform stubs, the Python floor and the developer's `.env` differ
+- **Surfaced:** the TDP (gotchas 3, 11, 12, 18: `subprocess.CREATE_NO_WINDOW` not narrowed by mypy on Linux; `msvcrt` stubs passing locally and failing CI; `os.path.isjunction` of Python 3.12 crashing the 3.11 CI; a "default runtime folder" test patching only `LOCALAPPDATA`) and reAngle (ISS-018, BUG-019: a test that let the CLI read the developer's `.env` passed on Windows, in WSL and in five review rounds, and failed on CI, which has no `.env`).
+- **Cause:** every local check ran on the platform that wrote the code; nothing ran the increment the way CI runs it.
+- **Correction:** before every push, the increment's new tests run once under Linux from a folder with no `.env` (reAngle's `run/tools/wsl_pgtest_noenv.sh`), and mypy runs with `--platform linux` where Windows-only code is touched; Windows-only attributes are read with `getattr(..., 0)` and bodies guarded by `sys.platform`; the Python floor CI uses is the floor the code is written to (`type(Path())`, not `pathlib.Path`, for a subclass).
+- **Applies:** every Windows-developed project with Linux CI. The sign: a failure on CI only, after every review approved.
+
+### KP-046 — One setting read on both sides of the WSL boundary named the other side's path
+- **Surfaced:** reAngle, 2026-10-03 (ISS-010, BUG-016): the API on Windows read the shared budget folder from the setting that names it in its WSL form (`/mnt/c/...`), a folder that does not exist on Windows, and reported the spend record unreadable while the CLI read the same file; the tests had supplied a real temporary folder through the same setting, so the platform difference never showed.
+- **Cause:** a path setting shared between the Windows and the WSL side without a per-side resolution.
+- **Correction:** every setting read on both sides of a WSL, container or host boundary gets a per-side resolution function at design time (`%LOCALAPPDATA%\...` on Windows, `/mnt/c/...` in WSL), and a test on each side with the other side's form.
+- **Applies:** Windows-and-WSL hybrids, container-and-host hybrids. The sign: a path setting whose value starts with `/mnt/` read by Windows code, or with a drive letter read by Linux code.
+
+### KP-047 — A file another process polls was published half-written
+- **Surfaced:** reAngle, 2026-09 (ISS-005, BUG-004): a stage process wrote its result file with `Path.write_text`, which truncates first and fills afterwards; the batch runner polled the folder meanwhile, read an empty file and recorded a contract error for a job that had succeeded; it failed once in a few hundred runs, on Linux under load only, and passed on every rerun.
+- **Cause:** a writer and a poller sharing a path without an atomic publication.
+- **Correction:** a file another process reads while it may be written is published atomically: written to a temporary file in the same folder, then moved into place with `os.replace`; "a writer and a poller share a path" is a design-time checklist item; a flaky test on CI only is examined for a race before it is rerun.
+- **Applies:** every result file, lock file, status file or queue entry read by another process. The sign: an empty or truncated file read exactly once in many runs.
+
+### KP-048 — A web framework writes instruction files into the repository, and a build empties a tracked folder
+- **Surfaced:** reAngle (Feedback, 2026-10): Next.js 16 generates `frontend/AGENTS.md` and `frontend/CLAUDE.md` on `next dev` and `next build`, which reappear in the working tree after every build as untracked changes and would steer an agent that reads them; the video factory (Issue 12): the web build emptied `app/web/`, deleting the tracked `.gitkeep` that keeps the folder present, and the deletion was flagged by the reviewers after the scope check had missed it as a build side effect.
+- **Cause:** build tools that write into the repository outside the build output folder.
+- **Correction:** generated instruction files are listed in `.gitignore` and `.cursorignore` and never read as the project's rules (the project's rules are its own `.cursor/rules/` and the bridge's); a build that touches a tracked folder is a review checkpoint, and tracked placeholders are restored after the build before any commit; the scope check lists them if they are gone.
+- **Applies:** Next.js 16 and later, any framework with agent-file generation, any build into a tracked folder. The sign: `AGENTS.md`, `CLAUDE.md` or a deleted `.gitkeep` in `git status` after a build.
+
+### KP-049 — A container image pinned by name and tag stopped being pullable
+- **Surfaced:** reAngle, 2026-09-25 (ISS-001): `docker compose up` aborted on `pull access denied` for the object store's image, pinned by name and release tag; the repository had left the public registry, the alternatives had been retired or needed a login, and the failure interrupted the other pulls of the same compose run.
+- **Cause:** a pin by name and tag is a promise the registry can withdraw; nothing in the project held the image.
+- **Correction:** images are pinned by digest and mirrored where the project can hold them (a registry the owner controls, or an exported archive kept with the project's assets); a pull is verified first on a fresh machine before a stage relies on it; the inventory records the image, its digest and where the copy lives.
+- **Applies:** every container image a project depends on. The sign: a compose or CI step failing on `pull access denied` or `not found` for an image nobody changed.
+
+### KP-050 — A vulnerability newly published against a pinned lock entry failed every pull request at once
+- **Surfaced:** the TDP, 2026-09-29 and 2026-10-01 (DEP-001, DEP-002; gotcha 16): OSV-Scanner failed every open pull request after an advisory was published for a pinned dependency none of them touched; the supervisor had to invent the procedure.
+- **Cause:** the scanner reads the lockfile, so a new advisory blocks every branch regardless of its diff.
+- **Correction:** the merge policy's procedure (release A5): a separate `DEP-<nnn>` increment off `main` bumps the pin, writes the change-log entry and passes the sentinel, both reviews and CI; it merges first, then `main` is merged into each blocked branch; nothing in a blocked branch is edited to pass.
+- **Applies:** every project with a lock-reading scanner in CI. The sign: several pull requests failing the scanner on the same advisory on the same day.
+
+### KP-051 — A CI watch started right after a push reported the previous commit's finished run
+- **Surfaced:** the TDP, 2026-09-30 (TASK-117-r2; gotcha 14): the watch ended green on the run of the commit before the push, since the new run had not started when the watch began.
+- **Cause:** the watch takes the newest run it sees, not the run of the pushed head.
+- **Correction:** when a watch ends, the green run's head is confirmed to equal the pushed head (`gh pr view <n> --json statusCheckRollup,headRefOid`) before the merge; `premerge` checks the pull request's head as well; the maintainer's own rule is the same (a release is handed over only after its checks ran green on the pushed head, 2026-10-11).
+- **Applies:** every CI watch. The sign: a watch that ends within seconds of the push.
+
+### KP-052 — An escape typed in a here-document arrived as the real character
+- **Surfaced:** the TDP, 2026-09-29 (gotcha 10): a `\u202e` typed in a Bash here-document landed in a brief as the real right-to-left override, and the sentinel blocked it; the maintainer's own drafts were mangled the same way twice on 2026-10-10 (backslashes halved, backticks run as substitutions).
+- **Cause:** a shell reads escapes and substitutions inside the text it is handed.
+- **Correction:** files that carry escapes, backslashes or backticks are written with the Write tool, never through a here-document or an inline command; a string with such a character is built in code (`chr(92) + 'u202e'`); `invisible-check.py` lists any such character in the changed files (release A4).
+- **Applies:** every brief, note or file written through a shell. The sign: a character the writer never typed, or a backslash missing.
+
+### KP-053 — The Bash tool ends a background command after thirty minutes unless its own timeout is set
+- **Surfaced:** the TDP, 2026-10-06 (TASK-157 r13d; gotcha 22): the builder, launched through `bridge-run.py --limit 7200` in the background, was killed at thirty minutes, mid-work and with no report, before the launcher's limit.
+- **Cause:** the app's own default timeout for a background command, independent of the launcher's.
+- **Correction:** the launch sets the Bash tool's `timeout` to the launcher's limit in milliseconds (supervisor.md step 3; `7200000` for a builder, the review's or the watch's limit for those); a run that ended without `bridge-run: exit` in its `.err` file was killed from outside and is inspected as step 3b says.
+- **Applies:** every background launch through the Bash tool. The sign: a run ending at exactly thirty minutes with no exit line.
+
+### KP-054 — The installed product, run from the Workspace, ran the development code against the owner's live data
+- **Surfaced:** the TDP, 2026-10-02 (gotcha 17): a plain `tdp status` typed with the Workspace as the current folder spawned a server that imported the development package from the working directory (`python -m` puts the current folder first on `sys.path`) and migrated the owner's live corpus databases.
+- **Cause:** a command name that resolves to the development install, and an import path that prefers the current folder.
+- **Correction:** rule 55 keeps development data apart; in addition, no product command is run from the Workspace folder, the installed executable is called by its full path from a neutral folder (`C:\`), and the inventory records the check (`python -c "import <package>; print(<package>.__file__)"` from that folder); an editable development install on `PATH` is named in the inventory as a hazard.
+- **Applies:** every installable product with a development install on the same computer. The sign: the installed command's `__file__` under the Workspace.
+
+### KP-055 — A session run from the packaged desktop app writes into a hidden copy of the local application folder
+- **Surfaced:** the TDP and reAngle, 2026-10 (plan 13.1): files a session wrote under the user's local application folder landed in a per-application virtualised copy that the owner's own programs, the installer and the installer check never see, because the desktop app is a packaged application.
+- **Cause:** the packaged app's file-system virtualisation of `%LOCALAPPDATA%` and its siblings.
+- **Correction:** anything others must see there is created by a run sheet the owner runs in their own terminal, and an installer is verified from the owner's terminal (`Delivery-Conventions.md` §2.3), never from the session; a session verifies only what it can read back in the same way the owner's programs do.
+- **Applies:** every write under `%LOCALAPPDATA%`, `%APPDATA%` or the registry made from a session of the desktop app. The sign: a file the session wrote that the owner's program cannot find.
+
+### KP-056 — Interrupted mutation-driver runs left mutants in the product code
+- **Surfaced:** reAngle, 2026-10 (ISS-017, twice): a driver that patches a product file and restores it in `finally` was killed mid-run (a dropped builder connection; a `TaskStop` of a background bash loop on Windows, which leaves the loop and its children running), and mutants stayed in the product; once the builder re-anchored its drivers around the mutated code.
+- **Cause:** a killed process never reaches its `finally`, and a stopped loop on Windows does not stop its children.
+- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped only between drivers, its `bash.exe` first, then the driver and the tests; a driver aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
+- **Applies:** every mutation or fault-injection driver that edits product files. The sign: `git status` showing a product file changed after a test run.
+
+### KP-057 — An orphaned server held a delegation open for six hours through an inherited output pipe
+- **Surfaced:** reAngle, 2026-10-02 (ISS-008, TASK-015b round 6): the builder started the project's dev server for its observability suite and left it running; the supervisor's wrapper waited on the builder's output pipe, which the server's children had inherited, so the wrapper did not return until the owner noticed six hours later.
+- **Cause:** waiting on a pipe instead of on the child process, with grandchildren holding the pipe open.
+- **Correction:** the launcher waits on the process and kills the whole tree at the limit (KP-033); a brief forbids leaving a server behind and says how a test starts and stops it (the brief's checklist, release A5); a wrapper of the supervisor's own never captures output through a pipe it then waits on.
+- **Applies:** every delegation that may start a server. The sign: a run that neither ends nor writes.
+
+### KP-058 — A module reloaded in a test, and a log handler left behind, corrupted later tests
+- **Surfaced:** the video factory (Issue 10): a test reloaded modules in-process to re-read start-time settings, which replaced the modules' classes, so later tests comparing classes by identity failed, and the first fix pushed an identity workaround into product code; reAngle (ISS-015, BUG-017): app construction bound a root log handler to the current `sys.stderr`, a `capsys` test left it bound to a closed stream, and a later CLI test failed intermittently with a logging traceback in its output.
+- **Cause:** process-global state (module objects, root logging) changed by one test and seen by the next.
+- **Correction:** start-time or environment-driven configuration is verified in a fresh subprocess, never by reloading modules; logging handlers are configured once per process, or an autouse fixture restores the root logger after every test; a test that passes alone and fails in the suite is examined for shared state before anything else.
+- **Applies:** every test suite with settings read at import or with root logging configured by the app. The sign: a failure that depends on the order or the selection of tests.
+
+### KP-059 — A browser launched detached on Windows opened a console window for every helper process
+- **Surfaced:** the video factory, 2026-10-06 (Issue 15): dozens of terminal windows titled with Chrome's headless shell accumulated on the owner's desktop during test runs; `@puppeteer/browsers` launches Chrome with `detached: true` on Windows, so the main process has no console and every helper (GPU, utility, renderer) allocates its own.
+- **Cause:** a detached launch of a console program on Windows, inside a windowless parent.
+- **Correction:** a browser is launched attached (`detached: false`) from the project's own code in every path that drives it, the brief's process checklist says so (release A5), and rule 24's windowless requirement covers the browser's helpers; the supervisor closes leftover windows after its own runs until the fix merges.
+- **Applies:** every Windows project that drives puppeteer, Playwright's Chromium or another browser from a windowless parent. The sign: console windows titled with a browser's helper on the owner's desktop.
+
+### KP-060 — Merge-conflict markers survived a crashed resolver and were committed
+- **Surfaced:** the TDP, 2026-10-01 (gotcha 15): a resolver script crashed after writing part of a merged file; the conflict markers stayed and the commit went through.
+- **Cause:** a commit after a resolution step that was not checked for its own failure.
+- **Correction:** after resolving a merge conflict, `git grep -n '^<<<<<<<\|^>>>>>>>'` must print nothing before the commit; the sentinel's scan lists a marker as a finding.
+- **Applies:** every merge of `main` into a branch. The sign: a line of seven `<` or `>` in a committed file.

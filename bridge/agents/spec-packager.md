@@ -59,6 +59,8 @@ decisions inside the scope, not a retelling of the whole project.
 Satisfies: <the requirement IDs from the build plan, e.g. R-004, R-011 — each with its one-line text from docs/REQUIREMENTS.md>
 
 ## Scope
+One brief carries one increment's scope; work that needs a second scope is a second
+brief, never a second section here.
 Files and directories you may create or modify:
 - path/one
 - path/two
@@ -123,6 +125,27 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   wording) is fixed: the Context section names the test that pins it; do not change the
   value or that test, and report it if the work seems to need a change (rule 52).
 - Follow existing conventions in the files you touch.
+- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`,
+  `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`,
+  `git diff` and `git log` only. (The parallel variant's hand-off commit is the one
+  exception, and it is spelled out there.)
+- Numbers from text, a file, a reply or an environment variable are parsed with the
+  language's own parser (`int`, `float`, `Decimal`, `parseInt` with its radix, a date
+  library), never by slicing or splitting a string; the brief states each value's unit and
+  its range, and the code rejects a value outside it. (Three defects in one project came
+  from numbers read by hand.)
+- An increment that starts a process (a server, a browser, a worker, a child for a test)
+  meets every point of this checklist: the process is windowless (above); it is stopped in
+  a `finally` or a fixture's teardown, and its whole tree with it; nothing it started
+  outlives the test or the command; a browser launched on Windows is launched attached
+  (`detached: false` for puppeteer's Chrome, since a detached Chrome's helpers open console
+  windows); its output pipes are closed or drained, so a parent waiting on the pipe is not
+  held open by a child left behind.
+- Every verification command the Done section asks you to run is written here in full, with
+  its options and its working folder, so you run exactly it; "run the tests" is not an
+  instruction. Where the increment's tests are to be checked by mutation, the brief says so
+  and lets you mutate in-process in your own run, and asks you to list each mutation with
+  what caught it.
 - Prefer reuse over new code — existing helpers, the standard library, native platform
   features, already-installed dependencies — and write the minimum that meets the
   acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a
@@ -130,7 +153,9 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
 - <task-specific constraints>
 
 ## Done
-Print a list of every file you changed and a one-paragraph summary of what you did. Then print a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, print `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
+Your last message is your report, and nothing follows it: the supervisor reads only the
+last message, so a report printed earlier and then followed by more work is lost. Print a
+list of every file you changed and a one-paragraph summary of what you did. Then print a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, print `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
 ```
 
 The `Assumed, not verified` section belongs to the Done section of **every** brief, in every variant below; never drop or shorten it. The builder's run is one-shot: where it guessed is known only while it runs, so the brief must ask before the run ends (supervisor rule 42).

@@ -279,7 +279,23 @@ Each reviewer returns exactly one of:
   categories in §"What the human decides." Never for "is this code correct."
 
 Merge is authorised iff: **CI green AND Review A = APPROVE AND Review B = APPROVE AND no
-open gate-integrity flag.** Anything else does not merge.
+open gate-integrity flag.** Anything else does not merge. A reply from either reviewer that
+carries none of the three verdicts is a failed launch, never a verdict of any kind: the
+supervisor re-runs it once and then takes the roster's failure path (release A5).
+
+**CI green means the run of the pushed head.** A watch started right after a push can
+report the previous commit's finished run; before the merge the supervisor confirms that
+the green run's head equals the pushed head (`gh pr view <n> --json statusCheckRollup,headRefOid`),
+which `premerge` checks for the pull request's head as well (the TDP's TASK-117-r2, KP-051).
+
+**A vulnerability newly published in a pinned library nobody touched** fails every pull
+request of the project at once, since the scanner reads the lock. The procedure (the TDP's
+DEP-001 and DEP-002, release A5): a separate supervisor increment `DEP-<nnn>` off `main`
+bumps the lock's pin (and the manifest's floor where the fix needs it), writes the
+`CHANGES.md` entry, runs the sentinel, Review A and Review B and CI like any increment, and
+merges first; then `main` is merged into each blocked branch, whose checks go green without
+a change of their own. Nothing in a blocked branch is edited to pass; no finding is ignored
+or suppressed (§Anti-gaming).
 
 **Re-delegation runs while the code converges, and converges by defect class rather than a
 round count.** Several REJECTs are not a stop. If each round surfaces *new, legitimate*
@@ -490,7 +506,11 @@ Two options for reaching it:
   GitHub identity from the process, so a post, push or merge from inside the review fails,
   and ends the run at the limit, KP-032 and KP-033) with
   a prompt that tells it to **read the diff from that file** — do **not** pass the diff
-  inline through the shell. (Inline heredocs mangle or drop the diff; a reviewer that got no
+  inline through the shell — and that says where the increment ends (the brief's Scope and
+  Out of scope), which tests the supervisor wrote first and the paragraph each enforces, that
+  a claim about a build is verified by building it, that the bookkeeping files in the diff
+  are expected, and that the reply is one of the three verdicts (release A5; supervisor.md
+  step 8 has the sentences). (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
   real failure that has happened — the file path avoids it.) Confirm from its reply that it
   actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<nnn>.md` — the branch's builder assumption lists with their dispositions (supervisor.md step 8) — as extra places to look, never as its scope. Per the roster above, Review B is

@@ -15,6 +15,33 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.11b
+
+**Release A5 of the restructuring plan: the briefs, the reviewers' instructions and the pitfalls** (plan section 13.1 and the A5 scope). Text only: no program changes, no new numbered rule.
+
+**What changed**
+- **The tests run before the first reviewer** (step 4): `test-runner` right after the scope and diagram checks; a skipped test of the increment fails the step; every new or changed test is run once against the checkpoint's code in a temporary worktree and must fail there; step 6 keeps the benchmark floor and the observability tests; a test the supervisor writes carries `enforces: <document> §<section>` and `diff-reviewer` checks it against that paragraph.
+- **The brief** (`spec-packager`): the git commands that are not the builder's to run; numbers parsed with the language's parser, with the unit and range stated; the checklist for an increment that starts a process (windowless, stopped in `finally`, no orphan, a browser attached on Windows, the pipes closed); every verification command written in full; the builder's last message is its report; one scope per brief; the mutation list.
+- **Review B's prompt** (step 8, the policy): where the increment ends (the brief's Scope and Out of scope), which tests the supervisor wrote first and the paragraph each enforces, that a claim about a build is verified by building it, that the bookkeeping files in the diff are expected, that the reply is one of the three verdicts; a reply with none of them is a failed launch, re-run once, then the roster's failure path.
+- **The reviewers' lists**: a negative test shows its precondition (`diff-reviewer`, `security-auditor`); a path that changes data is tested on data the previous version made; libraries and drivers are tested against the real thing, as an external service is; `test-runner` reports a skipped test of the increment as a failure.
+- **The merge policy**: the procedure for a vulnerability newly published in a pinned library nobody touched (a `DEP-<nnn>` increment off `main`, merged first, then `main` into each blocked branch); the CI watch's green run must be the pushed head's.
+- **The delegate step**: the Bash tool's own `timeout` is set to the launcher's limit (the tool ends a background command after thirty minutes otherwise).
+- **The delivery conventions**: the installer check runs from the owner's terminal by a run sheet, as does anything others must see under the local application folder, since the packaged desktop app writes into a hidden copy of it; `-AppId` in braces.
+- **Known Pitfalls KP-044 to KP-060**, from the three projects: the local tool and the weaker pre-commit; Linux CI against a Windows workstation; a setting read on both sides of the WSL boundary; a polled file published half-written; a framework writing instruction files and a build emptying a tracked folder; an image pinned by name only; a vulnerability published after the pin; a watch reporting the previous run; an escape typed in a here-document; the Bash tool's thirty minutes; the installed product run from the Workspace; the packaged app's hidden folder copy; interrupted mutation drivers; an orphaned server holding a pipe; test isolation; a detached browser's console windows; surviving conflict markers.
+
+**Running projects must**
+- *(building, changing)* Install, restart, `/calibrate-bridge`. From the next increment on: the tests run before Review A and the new tests once against the checkpoint; every background launch carries the Bash tool's `timeout` at the launcher's limit; the next brief carries the new Constraints (the packager's template has them); the next Review B prompt says where the increment ends, which tests the supervisor wrote and that the bookkeeping files are expected.
+- *(building, changing)* A test the supervisor wrote before this release gets its `enforces:` line at the next stage close reflection; a negative test without its precondition is fixed when its file is next touched.
+- *(all phases)* At the next reflection point, read KP-044 to KP-060 against the project's own records: a pitfall the project has already met and recorded elsewhere gets a pointer to the KP; one it has not met yet gets a checklist line where its sign would appear (the pre-commit hook, the CI job, the inventory).
+- *(done, changing)* A project with an installer runs the installer check from the owner's terminal by a run sheet at its next delivery.
+
+**If rolled back**
+- Nothing to restore: the previous texts read the same files. A brief written under this release stays valid under the previous one. Set `Bridge version:` to the installed version.
+
+**Field acceptance on the trial project.** One increment walked through the loop under the new texts: the tests ran before Review A and the new tests were run against the checkpoint (the report names the worktree and the result), the brief carried the new Constraints, Review B's prompt named where the increment ends and the tests the supervisor wrote, and its reply carried one of the three verdicts on the first launch.
+
+---
+
 ## 2026.10.11a
 
 **Release A4 of the restructuring plan: the bridge's programs** (plan section 13.1 and the plan review's R17; the A1b, A2 and A3 reviews' follow-ups; the field findings of 2026-10-10 and 11). One regression test per defect, each failing on the old program.
