@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 color: pink
 model: claude-opus-5-5
 effort: high
-maxTurns: 30
+maxTurns: 50
 ---
 
 You review UI code you did not write, for **design conformance** — against the interface

@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 color: teal
 model: claude-opus-5-5
 effort: high
-maxTurns: 40
+maxTurns: 60
 ---
 
 You look for code that should be simplified or de-duplicated **without changing what the

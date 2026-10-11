@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 color: yellow
 model: claude-opus-5-5
 effort: high
-maxTurns: 40
+maxTurns: 60
 ---
 
 You review code you did not write, for **security conformance** — the exploitable-vulnerability

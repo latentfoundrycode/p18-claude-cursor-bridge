@@ -528,7 +528,7 @@ rulesets. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if b
 off; native Windows support is now GA, but the floor still runs Semgrep in CI on Linux).
 
 ```yaml
-# Pinned ruleset reference — record the exact version/commit in docs/INVENTORY.md (Resources)
+# Pinned ruleset reference — record the file that pins it in docs/INVENTORY.md (Resources), never the commit itself
 rules:
   - p/default
   - p/secrets

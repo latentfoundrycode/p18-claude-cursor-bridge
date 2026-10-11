@@ -407,3 +407,28 @@ it applies.**
 - **Cause:** Claude Code reads a session cron on the computer's clock, in its local time, while the hook input carries task starts as UTC stamps or epoch values; a supervisor that adds the ceiling to a UTC stamp and converts by an offset it believes in has no check against the clock, and a wrong belief shifts every wake-up of the session by the same amount.
 - **Correction (2026.10.10c):** the loop guard's refusal prints the computer's clock reading with its offset, the ceiling's time on that clock, the one-shot schedule expression to copy, and any scheduled wake-up that is due after the ceiling; rule 43 says the schedule is read on the computer's clock, copied from the refusal or computed from `date` read at that moment, never converted from a UTC stamp by an assumed offset.
 - **Applies:** every `CronCreate` a supervisor schedules (an agent's ceiling, a checkpoint); any arithmetic on the hook's timestamps. The sign: the guard refusing a stop although a wake-up is listed, or a wake-up firing long after the agent ended.
+
+### KP-040 — The Stop hook's live input differs from its documented shape
+- **Surfaced:** reAngle, 2026-10-10, the first day on release 2026.10.10a: the loop guard refused every stop while the supervisor waited, because a task's start arrived as epoch milliseconds (read as "now"), a one-shot wake-up carried its schedule only (no next time), and the launched builder came under a type other than `command` (read as an agent).
+- **Cause:** the guard read the hook's input in the one shape the documentation showed; the app hands it in several.
+- **Correction (2026.10.10b):** the guard reads a start as ISO or epoch, a wake-up by its next time or its cron expression, a launched command under any type name; it records its input under `run/supervisor/loop-guard-input.json` so the next such difference has evidence.
+- **Applies:** every program that reads a hook's input. The sign: a refusal whose reason contradicts what the session can see (a builder "started 0s ago", a scheduled wake-up "not seen").
+
+### KP-041 — Writing the In-flight line during a review is GATE-INTEGRITY
+- **Surfaced:** reAngle, 2026-10-10: rule 43 said to write the waited-on agent on the status file's In-flight line, while a Review B ran on a snapshot of the tree; the write changed the reviewed tree, which `review-guard.py verify` reports.
+- **Cause:** two rules met on one file.
+- **Correction (2026.10.10b):** while a review runs on a snapshot, the line goes to `run/supervisor/in-flight.md` and is copied to the status file after `verify`.
+- **Applies:** any write the supervisor makes while a snapshot is under review; `run/` is the one place for it.
+
+### KP-042 — A test-writing subagent left polling loops behind, which the guard counted as the supervisor's agents
+- **Surfaced:** reAngle, 2026-10-10 (pull request 86): four `until grep -q ^exit <task output>; do sleep 15; done` loops, left by a subagent polling task-output files that no longer existed, ran on; the loop guard (under 2026.10.10a's defects) listed them among the supervisor's agents.
+- **Cause:** a subagent waited on its own background commands with a shell loop instead of the app's notification, and nothing ended the loops when their files vanished.
+- **Correction (2026.10.11a):** the loop guard never counts a polling loop and names it in its refusal for `TaskStop`; the subagent definitions forbid leaving a waiter behind.
+- **Applies:** every subagent that runs commands; the sign: a background shell task whose command is `until` or `while` with `sleep`.
+
+### KP-043 — A scheduled wake-up does not fire while a background agent runs, so it cannot bound the agent it was set for
+- **Surfaced:** reAngle, 2026-10-10/11 (ISS-021): the one-shot wake-up `58 23 10 10 *`, set at 23:00 for a background subagent's one-hour ceiling, was still listed unfired at 00:41; the owner noticed the agent running for an hour and forty minutes.
+- **Cause (proven in the maintainer's session on 2026-10-11):** a session-scoped scheduled prompt fires only while the session is idle, and a session waiting on a background subagent is not idle for the scheduler. A one-shot set for 09:51 beside a background agent that ended at 09:52:59 did not fire; it fired at 09:53:34, thirty seconds after the session went idle with nothing in the background. The documentation says a missed fire runs "once when Claude becomes idle" and is silent on background agents.
+- **Correction (2026.10.11a):** the bound of a waited-on background agent is a background command, `wake-timer.py <seconds> "<the agent>"`, whose completion notification does wake the session (a background command's completion arrived in the same experiment); the loop guard counts an agent as bounded only while a timer ending no later than its ceiling runs, and its refusal prints the timer command to copy. A scheduled wake-up stays right for an idle wait with nothing in the background (a checkpoint on a quiet session).
+- **Applies:** every wait on a background subagent; any design that relies on a cron firing while background work runs. The sign: a one-shot still listed after its minute while an agent runs.
+

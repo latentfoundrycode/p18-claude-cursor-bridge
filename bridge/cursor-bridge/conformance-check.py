@@ -224,14 +224,29 @@ def code_strings(text):
     return text.lower()
 
 
+HOSTLIKE = re.compile(r"""["'`][^"'`\n]*(?:://|[a-z0-9-]+\.(?:com|ai|io|net|org|dev|cloud|run|app|co|sh|xyz|tech|ms|us|eu)\b)[^"'`\n]*["'`]""")
+
+
+def code_text(text):
+    """The source without its docstrings and comments, case kept: where a key name is written."""
+    text = re.sub(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'', "", text)
+    text = re.sub(r"/\*[\s\S]*?\*/", "", text)
+    return re.sub(r"(^|[ \t])(#|//)[^\n]*", "", text, flags=re.M)
+
+
 def names_provider(text, providers):
-    """The providers a source file names, as a whole word, in a string literal of its code (a
-    host, a key name, a service name); never in a docstring or a comment."""
+    """The providers a source file names as a whole word in a host or URL string of its code, or
+    in an upper-case key name (MODAL_TOKEN_ID); never in any other string, a docstring or a
+    comment (release A4: a log string that said "modal" made a health check an adapter)."""
     low = code_strings(text)
+    raw = code_text(text)
+    hosts = HOSTLIKE.findall(low)
     hits = []
     for w in providers:
         for alt in SYNONYMS.get(w, (w,)):
-            if re.search(r"""["'`][^"'`\n]*(?<![a-z0-9])%s(?![a-z0-9])""" % re.escape(alt), low):
+            in_host = any(re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(alt), h) for h in hosts)
+            in_key = re.search(r"\b[A-Z0-9_]*%s[A-Z0-9_]*\b" % re.escape(alt.upper()), raw)   # MODAL_TOKEN_ID, OPENROUTER_API_KEY
+            if in_host or in_key:
                 hits.append(w)
                 break
     return hits

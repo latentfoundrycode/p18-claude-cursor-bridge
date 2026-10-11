@@ -149,18 +149,41 @@ def git(folder, *args):
 def not_the_merged_state(release):
     """Why `release`, when it is a checkout of the bridge's repository, is not main as merged;
     None when it is, or when the folder is no checkout (a release copied somewhere)."""
-    if git(release, "rev-parse", "--is-inside-work-tree") != "true":
+    inside = git(release, "rev-parse", "--is-inside-work-tree")
+    if inside is None:
+        if has_git_dir(release):
+            return "git could not say whether it is main as merged (git failed or is not installed), so that cannot be confirmed"
+        return None                                        # no checkout: a release copied somewhere
+    if inside != "true":
         return None
     branch = git(release, "rev-parse", "--abbrev-ref", "HEAD")
+    if branch is None:
+        return "git could not read its branch, so main as merged cannot be confirmed"
     if branch != "main":
         return "it is on '%s', not on main" % branch
     home = git(release, "rev-parse", "--verify", "--quiet", "origin/main")
-    if home and home != git(release, "rev-parse", "HEAD"):
+    if home is None:
+        return "its origin/main cannot be read (no origin remote, or never fetched), so main as merged cannot be confirmed"
+    if home != git(release, "rev-parse", "HEAD"):
         return "its main differs from origin/main (not pulled, or holding commits that were never merged)"
     changed = git(release, "status", "--porcelain", "--", ".")
-    if changed:
-        return "it holds %d change(s) that are not committed" % len(changed.splitlines())
+    if changed is None:
+        return "git could not read its status, so main as merged cannot be confirmed"
+    lines = [l for l in changed.splitlines() if "__pycache__" not in l and not l.rstrip().endswith(".pyc")]   # Python's cache is no change (S3)
+    if lines:
+        return "it holds %d change(s) that are not committed" % len(lines)
     return None
+
+
+def has_git_dir(folder):
+    d = os.path.abspath(folder)
+    while True:
+        if os.path.exists(os.path.join(d, ".git")):
+            return True
+        parent = os.path.dirname(d)
+        if parent == d:
+            return False
+        d = parent
 
 
 def bridge_settings_of(tree):
@@ -567,9 +590,14 @@ def install(target, dry, anyway=False):
         print("  previous       %s kept at %s" % (old_version, dest))
         print("  way back       python %s --rollback" % os.path.join(HERE, "bridge-install.py").replace("\\", "/"))
         changed = [] if dry else not_as_released(dest, fingerprints_of(dest)[1])
+        changed = [c for c in changed if "(missing)" not in c]   # a missing file is an interrupted replacement being completed, not a change on this computer
+        if changed and not anyway:                         # S4: a release whose way back would refuse is not installed
+            print("bridge-install: the release installed now (%s) could not be taken back afterwards: %d file(s) of it had been changed or were missing on this computer (%s), "
+                  "and the way back refuses such a copy. Nothing was changed. Tell the maintainer, who repairs the installed tree first (the same release installed again from its folder); "
+                  "--anyway installs regardless (the maintainer's rehearsals)." % (old_version, len(changed), few(changed)))
+            return 2
         if changed:
-            print("  WARNING        the kept %s is not that release as shipped: %d file(s) had been changed or were missing on this computer (%s). "
-                  "The way back refuses such a copy; tell the maintainer before the trial." % (old_version, len(changed), few(changed)))
+            print("  WARNING        the kept %s is not that release as shipped: %d file(s) had been changed or were missing on this computer (%s); installed with --anyway." % (old_version, len(changed), few(changed)))
     replace_release(target, RELEASE, inputs[0], inputs[1], dry)
     if dry:
         return 0
@@ -598,7 +626,7 @@ def rollback(target, dry):
     off = not_as_released(prev_tree, fingerprints)
     if off:
         print("bridge-install: the kept copy of %s is not complete or not that release as shipped (%d of its %d files: %s); nothing was changed. "
-              "Tell the maintainer, who installs that release from the bridge's repository instead (its commit checked out, its own bridge-install.py run)."
+              "Tell the maintainer, who installs that release from the bridge's repository instead (its commit checked out, its own bridge-install.py run with --anyway, since a past commit is not main as merged)."
               % (prev_version, len(off), len(fingerprints), few(off)))
         return 2
     inputs = read_inputs(target, prev_tree)

@@ -19,6 +19,7 @@ param(
   [Parameter(Mandatory=$true)][string]$Exe,
   [Parameter(Mandatory=$true)][string]$Version,
   [string]$SmokeArgs = "--version",
+  [ValidateSet("x64", "x86", "arm64")][string]$Arch = "x64",
   [switch]$PerMachine,
   [switch]$KeepInstalled
 )
@@ -68,7 +69,17 @@ if (-not (Installed)) { Fail "Apps & features entry missing: $regKey" }
 $rv = RegVersion
 if ($rv -ne $Version) { Fail "registered version '$rv' != expected '$Version'" }
 if (-not (Test-Path $startMenu)) { Fail "Start-menu shortcut missing: $startMenu" }
-Ok "folder, executable, registry entry ($rv), Start-menu shortcut present"
+# the architecture check (release A4, R24): the installed executable's machine type is the one the
+# installer was built for (Inno Setup's ArchitecturesInstallIn64BitMode / ArchitecturesAllowed), read
+# from the PE header: 0x8664 = x64, 0x014C = x86, 0xAA64 = arm64; an x86 build in an x64 installer
+# lands in the wrong Program Files and runs under emulation on arm64
+$machines = @{ "x64" = 0x8664; "x86" = 0x014C; "arm64" = 0xAA64 }
+$bytes = [System.IO.File]::ReadAllBytes($exeFull)
+$peOffset = [System.BitConverter]::ToInt32($bytes, 0x3C)
+$machine = [System.BitConverter]::ToUInt16($bytes, $peOffset + 4)
+if ($machine -ne $machines[$Arch]) { Fail ("executable machine type 0x{0:X4} is not {1} (0x{2:X4})" -f $machine, $Arch, $machines[$Arch]) }
+if ($Arch -eq "x64" -and $PerMachine -and $installDir -like "*Program Files (x86)*") { Fail "an x64 build installed under Program Files (x86)" }
+Ok "folder, executable ($Arch), registry entry ($rv), Start-menu shortcut present"
 
 # 3. launch smoke
 $step = "smoke"

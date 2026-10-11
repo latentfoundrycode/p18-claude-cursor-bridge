@@ -125,7 +125,7 @@ def test_both_parts_fit_under_the_cap_for_every_phase_on_a_realistic_status_file
     assert "**Founding rules.**" in digest and "43 Never end a turn" in digest
     installed = open(os.path.join(CLAUDE, "cursor-bridge", "VERSION"), encoding="utf-8").read().strip()
     assert "(bridge %s)" % installed in digest, "the digest is the installed release's, whatever the status file records"
-    assert "the status file records 2026.10.04c, so this project is not calibrated to the installed bridge" in pointers
+    assert "the status file records 2026.10.04c, so this project is not calibrated to the installed bridge" in pointers and "maintainer session's message (rule 57)" in pointers
 
 
 def test_a_project_calibrated_to_the_installed_bridge_is_not_told_otherwise(tmp_path, home):

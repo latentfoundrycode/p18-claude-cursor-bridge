@@ -30,7 +30,7 @@ python ~/.claude/cursor-bridge/bridge-check.py
 It hashes every governance file against the release manifest and prints `OK` / `STALE` /
 `MISSING` per file and a `RESULT` line. **If the result is `NOT CALIBRATED`, stop here.**
 Report it as a **run sheet** (`explain-for-decision` skill): which files are stale or
-missing, the terminal to use (Git Bash), the one install command — `python <the bridge's repository>/bridge/cursor-bridge/bridge-install.py`, which copies the release, merges the bridge's entries into `settings.json` without touching the owner's own keys, and installs the `cursor-agent` shim — with the placeholder explained, the app restart, and
+missing, the terminal to use (Git Bash), the setup guide's three install steps as three commands — `git -C <the bridge's repository> switch main`, `git -C <the bridge's repository> pull --ff-only`, then `python <the bridge's repository>/bridge/cursor-bridge/bridge-install.py`, which copies the release, merges the bridge's entries into `settings.json` without touching the owner's own keys, and installs the `cursor-agent` shim — with the placeholder explained, the app restart, and
 "then run `/calibrate-bridge` again". Do nothing else until the check passes — calibrating
 to a half-copied tree would leave the project on a mixture of two releases.
 
