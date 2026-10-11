@@ -15,6 +15,30 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.11d
+
+**The report cycle's text items** (the follow-ups accepted by the evaluation of 2026-10-11, plan section 16 under A5's status; the A5 follow-up), with the trial's observations under A5 and the owner's decision D1. Text, with two small program changes for the builder's report file.
+
+**What changed**
+- **Step 8's quiet rule names the writing subagents**: while Review B runs on a snapshot, no `spec-packager` (the next brief waits for `verify`), no `diagram-specialist`, no `cursor-configurator`, nothing that writes under the checkout, the status file included (reAngle ISS-014: a brief written during a review flagged GATE-INTEGRITY, rightly).
+- **The builder's report is a file it writes as it runs**, `handoff/TASK-<nnn>-r<N>-report.md` (`REFAC-` for a refactoring), its last message the summary and the path; twice a last message arrived as one line and the report with it would have been lost (A5 made the last message the report). The brief's Scope names the file beside `docs/BUILDER_NOTES.md`; the `Assumed, not verified` section stands in it and the accept commit keeps it; the SCOPE file for Review B lists it as expected; `diff-reviewer` reads it as the self-report it is. `scope-check.py` counts it as bookkeeping (never drift) and `plan-check.py` neither reads it as a brief nor flags it in a Scope — two program lines, each with a test. The constant pointer's last clause now asks for the summary and the report's path.
+- **Mutation drivers are the supervisor's side's**: written in step 4 with the criterion tests, never by the builder, read by `diff-reviewer` mutant by mutant against the names, ended whole with `bridge-stop.py`; the builder's in-process mutation stays by hand, no script of it in the diff; a fix brief after a driver run asks for the code fix only (reAngle TASK-010c: three rounds on five mutants that did not model their names). The brief's mutation list stays.
+- **A maintainer's request is recorded and answered without the owner** (decision D1, 2026-10-11): the status file gains a `Maintainer requests:` line; the answer goes into the project's Feedback document under its own `FB-nnn` entry when done (the one write to `Documents/` outside a reflection point besides an issue placeholder), and the next report to the owner states it in one FYI line (rule 57).
+- **A stage review in parts**: a stage diff too large for one reading is written in parts from the same committed state, the test files' part at most 25 files; a part that ends at the reviewer's turn limit without a verdict is run again on what it had not reached (reAngle: a 79-file part hit the limit).
+- **A suite over ten minutes** runs through the launcher in the background (`--kind test`), never inside `test-runner`'s foreground call, which the Bash tool ends at 600 seconds; `test-runner` hands such a suite back and reads the output file afterwards (KP-061, from reAngle's A5 walk).
+- **The CI watch that returns at once**: wait for the first check to appear, start the same watch again, and confirm the green run's head is the pushed head before `premerge` (KP-051 named in step 8).
+
+**Running projects must**
+- *(building, changing)* Install, restart, `/calibrate-bridge`. Add the `Maintainer requests:` line to `docs/PROJECT_STATUS.md` (`none`). From the next brief on, the Scope names the builder's report file and the Done section asks for it (the packager's template has both); a mutation driver the builder wrote is replaced by one of the supervisor's side's at the increment's next touch; a suite over ten minutes runs through the launcher; a wrapper of the project's own that carries the constant pointer's text (reAngle's `run/tools/delegate_pg.py`) takes the new last clause at calibration; the accept commit adds the report with `git add -f` where the project ignores `handoff/`.
+- *(all phases)* A maintainer's request received before this release and not yet answered goes on the `Maintainer requests:` line now and is answered in the Feedback document.
+
+**If rolled back**
+- The previous `plan-check.py` reads a report file under `handoff/` as a brief and flags the report line in a Scope: for every unmerged increment, move its `handoff/*-report.md` under `run/agent/` and drop the report line from the brief's Scope. Remove the `Maintainer requests:` line, or leave it (the previous texts ignore it). A wrapper of the project's own that carries the constant pointer takes the previous wording back. Set `Bridge version:` to the installed version.
+
+**Field acceptance on the trial project.** One increment delivered with its report file in `handoff/`, the scope check listing it under BOOKKEEPING and `plan-check.py` not flagging it; one maintainer's request recorded on the status line and answered under an `FB-nnn` entry, stated in the next report; and, where a stage review falls in the window, its parts of at most 25 test files.
+
+---
+
 ## 2026.10.11c
 
 **The report cycle's program items** (the follow-ups accepted by the evaluation of 2026-10-11, plan section 16 under A5's status; the A4 follow-up). Each with a regression test that fails on 2026.10.11b.

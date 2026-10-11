@@ -41,7 +41,10 @@ them). Copy the inventory's `Development data:` decision into the Context sectio
 increment runs the product, a migration, a seed or a test against data, so the constraint below
 has something to point at; an inventory without that row is the supervisor's gap to close before
 packaging (rule 55). Always list `docs/BUILDER_NOTES.md`: the Constraints section asks the builder to append
-to it; this holds for the fix and the refactoring variants below as well. List
+to it; and always list the report file, `handoff/TASK-<nnn>-r<N>-report.md` (`r<N>` the round
+of this delegation: `r1` for a brief named `TASK-<nnn>.md`, the `r<N>` of a re-delegation
+brief's own name), which the Done section asks the builder to write as
+it goes; this holds for the fix and the refactoring variants below as well. List
 `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` whenever the increment adds or changes a
 command of installable software: the delivery conventions require the first regenerated in
 the same diff, the builder's generator renders the second from it, and the reviewer rejects
@@ -65,6 +68,7 @@ Files and directories you may create or modify:
 - path/one
 - path/two
 - docs/BUILDER_NOTES.md
+- handoff/TASK-<nnn>-r<N>-report.md
 
 Do not modify anything else.
 
@@ -145,7 +149,10 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   its options and its working folder, so you run exactly it; "run the tests" is not an
   instruction. Where the increment's tests are to be checked by mutation, the brief says so
   and lets you mutate in-process in your own run, and asks you to list each mutation with
-  what caught it.
+  what caught it; you mutate by hand in your own run and no script of it lands in the diff:
+  the mutation driver itself (the script that applies each mutant, runs the tests and
+  restores the code) is the supervisor's side's, written after your run with the criterion
+  tests, and a fix brief after a driver run asks you for the code fix only.
 - Prefer reuse over new code — existing helpers, the standard library, native platform
   features, already-installed dependencies — and write the minimum that meets the
   acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a
@@ -153,12 +160,17 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
 - <task-specific constraints>
 
 ## Done
-Your last message is your report, and nothing follows it: the supervisor reads only the
-last message, so a report printed earlier and then followed by more work is lost. Print a
-list of every file you changed and a one-paragraph summary of what you did. Then print a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, print `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
+Your report is the file `handoff/TASK-<nnn>-r<N>-report.md`, which you write as you go —
+what you did, what you changed, what you ran and what it printed, what you could not do —
+so that nothing of it is lost when your run ends early. When you finish, it holds a list of
+every file you changed, a one-paragraph summary of what you did, and a section headed
+exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
+Your last message is the summary and the report file's path, and nothing follows it: the
+supervisor reads only the last message, and a message printed earlier and then followed by
+more work is lost.
 ```
 
-The `Assumed, not verified` section belongs to the Done section of **every** brief, in every variant below; never drop or shorten it. The builder's run is one-shot: where it guessed is known only while it runs, so the brief must ask before the run ends (supervisor rule 42).
+The report file and the `Assumed, not verified` section belong to the Done section of **every** brief, in every variant below (`handoff/REFAC-<nnn>-r<N>-report.md` for the refactoring variant); never drop or shorten them. The builder's run is one-shot: where it guessed is known only while it runs, so the brief must ask before the run ends (supervisor rule 42).
 
 ## The refactoring variant — `handoff/REFAC-<nnn>.md`
 
@@ -169,7 +181,7 @@ differences, stated verbatim in the brief:
 - **Objective** opens with: "Refactoring — remove duplication / simplify **without any
   change in behaviour**." Then the candidate's sites (file:lines), its proposed shape, and
   every caller to update.
-- **Scope** names the sites and the callers, and `docs/BUILDER_NOTES.md` as in every brief. Nothing else.
+- **Scope** names the sites and the callers, and `docs/BUILDER_NOTES.md` and the report file (`handoff/REFAC-<nnn>-r<N>-report.md`) as in every brief. Nothing else.
 - **Acceptance criteria** are: the full test suite passes with the **same** test set; every
   listed caller now uses the single implementation; no public signature outside the listed
   sites changed; the duplicate/dead code is gone.
@@ -207,7 +219,7 @@ Same file shape, with these differences, stated verbatim:
   nothing else." Then the **root cause in one sentence**, the **evidence lines** copied
   from the debug file, and the **reproduction test** (path and name) that currently fails
   and must pass.
-- **Scope** names the file(s) the cause lives in, the reproduction test, and `docs/BUILDER_NOTES.md` as in every brief (a cause the builder found on the way belongs there). Nothing else.
+- **Scope** names the file(s) the cause lives in, the reproduction test, and `docs/BUILDER_NOTES.md` and the report file (`handoff/BUG-<nnn>-r<N>-report.md`) as in every brief (a cause the builder found on the way belongs in the notes). Nothing else.
 - **Acceptance criteria**: the reproduction test passes; the full suite passes with no
   other change in results; the named cause is addressed at the mechanism the evidence
   points at (state the mechanism).

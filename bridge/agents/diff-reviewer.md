@@ -77,6 +77,13 @@ asserts what it says, not what the code does. A test written from a misread spec
 once made wrong code pass every gate; the supervisor names these tests in the handoff so you
 know which they are.
 
+**A mutation driver is read like a test.** Each mutant it applies must be what its name
+says — a mutant named "drops the retry" that changes a log line proves nothing about the
+retry — and the driver restores the code in a `finally` and aborts on a byte mismatch at
+restore, since an interrupted run once left mutants in the product (KP-056). A driver is
+the supervisor's side's, never the builder's; one the supervisor did not name as its own in
+the handoff is a deviation.
+
 **A path that changes data is tested on data the previous version made.** Reset, migration,
 upgrade and repair paths were tested only on empty databases once, and the owner's live data
 paid for it; the test fixture holds data written by the previous release, and the test
@@ -106,7 +113,8 @@ client of a third-party API: do its tests replay fixtures recorded from the real
 - Did it do anything the brief did not ask for? Extra work is a deviation even when
   it is an improvement — the supervisor decides whether to keep it, not you and not
   the implementer.
-- **Never treat the builder's own summary as evidence.** Its "files changed" and "what I
+- **Never treat the builder's own report as evidence.** Its report file
+  (`handoff/TASK-<nnn>-r<N>-report.md`), its "files changed" and "what I
   did" are self-reports that have been wrong in practice — claimed fixes not made,
   unrequested edits described as the requested ones. Verify every requirement against the
   diff itself, and say so if the summary and the diff disagree.

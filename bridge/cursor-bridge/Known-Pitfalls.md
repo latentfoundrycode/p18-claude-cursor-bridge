@@ -507,7 +507,7 @@ it applies.**
 ### KP-056 — Interrupted mutation-driver runs left mutants in the product code
 - **Surfaced:** reAngle, 2026-10 (ISS-017, twice): a driver that patches a product file and restores it in `finally` was killed mid-run (a dropped builder connection; a `TaskStop` of a background bash loop on Windows, which leaves the loop and its children running), and mutants stayed in the product; once the builder re-anchored its drivers around the mutated code.
 - **Cause:** a killed process never reaches its `finally`, and a stopped loop on Windows does not stop its children.
-- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver; until then only between drivers, its `bash.exe` first; a driver aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
+- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver; the driver is written on the supervisor's side with the criterion tests, never by the builder (2026.10.11d); until then only between drivers, its `bash.exe` first; a driver aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
 - **Applies:** every mutation or fault-injection driver that edits product files. The sign: `git status` showing a product file changed after a test run.
 
 ### KP-057 — An orphaned server held a delegation open for six hours through an inherited output pipe
@@ -533,3 +533,9 @@ it applies.**
 - **Cause:** a commit after a resolution step that was not checked for its own failure.
 - **Correction:** after resolving a merge conflict, `git grep -n '^<<<<<<<\|^>>>>>>>'` must print nothing before the commit; `secret-sentinel`'s checklist has the same grep (release A5).
 - **Applies:** every merge of `main` into a branch. The sign: a line of seven `<` or `>` in a committed file.
+
+### KP-061 — A test suite over ten minutes ended inside a subagent's foreground call
+- **Surfaced:** reAngle, 2026-10-11 (the walk of release A5, PR 90): `test-runner` ran the project's suite in its own foreground call; the Bash tool ended the command at ten minutes, before the suite had finished, and the result was lost.
+- **Cause:** the Bash tool's foreground limit of 600 seconds, a different limit from the thirty-minute end of a background command (KP-053); a subagent cannot raise it past ten minutes.
+- **Correction:** a suite that takes more than ten minutes runs through the launcher in the background (`bridge-run.py --limit auto --kind test`), its output to a file under `run/`, with the Bash tool's `timeout` at the suite cap; `test-runner` reads the file afterwards and never starts such a suite itself (supervisor.md step 4, test-runner.md; release 2026.10.11d).
+- **Applies:** every project whose suite runs longer than ten minutes. The sign: a `test-runner` report that ends with a timeout and no result.

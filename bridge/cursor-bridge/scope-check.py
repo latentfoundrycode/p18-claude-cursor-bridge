@@ -37,7 +37,7 @@ files, directories (trailing "/" or a bare directory name), or globs (* and ?; b
 literal, as in a route folder `[id]`). A bullet may name several paths (commas, "and"),
 quoted or in backticks; prose after a path is dropped; an ellipsis cannot be verified.
 The bookkeeping files a builder must write (docs/BUILDER_NOTES.md, docs/BOUNDARY_VIOLATIONS.md,
-anything under run/) are never drift. Paths are compared with forward slashes.
+anything under run/, its report file handoff/<brief>-rN-report.md) are never drift. Paths are compared with forward slashes.
 """
 
 import fnmatch
@@ -67,11 +67,12 @@ def _norm(p):
 
 
 BOOKKEEPING = ("docs/BUILDER_NOTES.md", "docs/BOUNDARY_VIOLATIONS.md", "run/")
+REPORT_RX = re.compile(r"handoff/[A-Z]+-\w+-r\d+-report\.md$")          # the builder's report, written as it runs (2026.10.11d)
 PATH_RX = re.compile(r"^[\w.@~\[\]()*?/-]+$")
 
 
 def bookkeeping(path):
-    return any(path == b or (b.endswith("/") and path.startswith(b)) for b in BOOKKEEPING)
+    return bool(REPORT_RX.match(path)) or any(path == b or (b.endswith("/") and path.startswith(b)) for b in BOOKKEEPING)
 
 
 def split_entry(entry):
