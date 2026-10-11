@@ -37,7 +37,7 @@ NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 def gh(args):
     try:
-        p = subprocess.run(["gh"] + args, capture_output=True, text=True, timeout=60, creationflags=NO_WINDOW)
+        p = subprocess.run(["gh"] + args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)   # a cp1252 console crashed on one character of a comment (2026.10.11c)
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, str(e)
     if p.returncode != 0:

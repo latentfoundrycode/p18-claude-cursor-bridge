@@ -204,6 +204,31 @@ CACHES = (("HF_HUB_CACHE", os.path.join(".cache", "huggingface", "hub")),
           ("PUPPETEER_CACHE_DIR", os.path.join(".cache", "puppeteer")))
 
 
+def write_gitconfig(real):
+    """`<profile>/.cursor-bridge/gitconfig`: includes the owner's global git config when it
+    exists and resets the credential helper list (an empty `helper =` resets it, as git
+    documents), so a builder or reviewer run keeps the owner's identity and safe.directory
+    entries and has no helper that could hand out the owner's GitHub login (2026.10.11c)."""
+    base = os.path.join(real, ".cursor-bridge")
+    os.makedirs(base, exist_ok=True)
+    path = os.path.join(base, "gitconfig")
+    owner = os.path.join(real, ".gitconfig")
+    lines = ["# written by the Claude-Cursor Bridge before every builder or reviewer run; do not edit"]
+    if os.path.isfile(owner):
+        lines += ["[include]", "\tpath = " + owner.replace("\\", "/")]
+    lines += ["[credential]", "\thelper ="]
+    text = "\n".join(lines) + "\n"
+    try:
+        with open(path, encoding="utf-8") as f:
+            if f.read() == text:
+                return path
+    except OSError:
+        pass
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return path
+
+
 def stripped_env(env=None):
     """Return a copy of `env` (default: os.environ) in which gh is logged out, no token
     variable and no variable named like an account key survives, git has no credential
@@ -221,26 +246,19 @@ def stripped_env(env=None):
     for k in [k for k in e if secret_like(k)]:
         e.pop(k, None)
     e["GIT_TERMINAL_PROMPT"] = "0"
-    # GIT_CONFIG_* is read last, so an empty credential.helper resets the helper list that
-    # the system and global gitconfig built up (git >= 2.31).
-    e["GIT_CONFIG_COUNT"] = "1"
-    e["GIT_CONFIG_KEY_0"] = "credential.helper"
-    e["GIT_CONFIG_VALUE_0"] = ""
-    # The run's own home folder (2026.10.06a, KP-038); git keeps the owner's global
-    # configuration (identity, safe.directory) through GIT_CONFIG_GLOBAL.
+    for k in ("GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"):
+        e.pop(k, None)                                 # until 2026.10.11b an empty GIT_CONFIG_VALUE_0 reset the helper list; a wholesale environment restore on Windows drops an empty variable (reAngle ISS-016)
+    # The run's own home folder (2026.10.06a, KP-038); git reads the bridge's own global
+    # config file, which includes the owner's and resets the credential helper list.
     home, problem = agent_home(e)
     if problem:
         raise AgentHomeError("the agent's home folder is not usable: %s (KP-038)" % problem)
     real = real_home(e)
-    gitconfig = os.path.join(real, ".gitconfig")
     e["HOME"] = e["USERPROFILE"] = home
     drive, rest = os.path.splitdrive(home)
     if drive:
         e["HOMEDRIVE"], e["HOMEPATH"] = drive, rest
-    if os.path.isfile(gitconfig):
-        e["GIT_CONFIG_GLOBAL"] = gitconfig
-    else:
-        e.pop("GIT_CONFIG_GLOBAL", None)
+    e["GIT_CONFIG_GLOBAL"] = write_gitconfig(real)
     for var, rel in CACHES:
         if not e.get(var) and os.path.isdir(os.path.join(real, rel)):
             e[var] = os.path.join(real, rel)

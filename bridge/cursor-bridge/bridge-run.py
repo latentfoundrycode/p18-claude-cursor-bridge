@@ -301,6 +301,29 @@ def head_text(argv):
     return " ".join([head] + subs)[:40]
 
 
+def write_pid_file(folder, run_id, pid, child_pid):
+    """`run/launcher/pids/<run id>`: the launcher's and the child's pids, for bridge-stop.py; only where run/ exists."""
+    if not os.path.isdir(os.path.join(folder, "run")):
+        return None
+    try:
+        d = os.path.join(folder, "run", "launcher", "pids")
+        os.makedirs(d, exist_ok=True)
+        path = os.path.join(d, run_id.replace(":", "-"))
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("%d %d\n" % (pid, child_pid))
+        return path
+    except OSError:
+        return None
+
+
+def remove_pid_file(path):
+    if path:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 def branch_of(folder):
     """The checkout's branch at launch (the roster check matches a builder run to the branch under review)."""
     try:
@@ -488,6 +511,8 @@ def main():
         killer = lambda: os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # noqa: E731
 
     started = time.time()
+    entry.update(pid=os.getpid(), child_pid=proc.pid)
+    pid_file = write_pid_file(folder, run_id, os.getpid(), proc.pid)   # read by bridge-stop.py while the run lives (2026.10.11c)
     try:
         rc = proc.wait(timeout=limit)
     except subprocess.TimeoutExpired:
@@ -505,6 +530,7 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
         rc = 124
+    remove_pid_file(pid_file)
     if rc != 124:
         sys.stderr.write("bridge-run: exit %d\n" % rc)
         sys.stderr.flush()

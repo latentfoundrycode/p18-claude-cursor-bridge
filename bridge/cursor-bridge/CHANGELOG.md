@@ -15,6 +15,30 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.11c
+
+**The report cycle's program items** (the follow-ups accepted by the evaluation of 2026-10-11, plan section 16 under A5's status; the A4 follow-up). Each with a regression test that fails on 2026.10.11b.
+
+**What changed**
+- `pr-activity-check.py` reads the gh output as UTF-8: on a cp1252 console one character of a pull-request comment crashed the check and printed CANNOT VERIFY (a check that cannot run is a gate that passes by accident).
+- The loop guard takes a kind from a project's own delegation wrapper marked `# wake builder` or `# wake review` (reAngle's `run/tools/delegate_pg.py`, which calls the launcher itself) and gives it that kind's ceiling; rule 43 says so where `# wake` is introduced.
+- **`bridge-stop.py`** (new) ends a background task's whole process tree: a launcher run by its id, from the pid file the launcher now writes under `run/launcher/pids/` while it runs (and the pids in its log entry), or any process by `--pid`; on Windows through `taskkill /T /F`, elsewhere the process group. Stopping a verification loop with it never advances the loop into its next driver (KP-056); `TaskStop` ends the loop only.
+- The credential helper is reset in a git config file of the bridge's own, `<profile>/.cursor-bridge/gitconfig`, which includes the owner's global config and holds an empty `helper =`; `GIT_CONFIG_GLOBAL` points at it, and the empty `GIT_CONFIG_VALUE_0` is gone (a wholesale environment restore on Windows dropped it, reAngle ISS-016, twenty builder-only test failures). The shim writes the same file.
+- `refactor-check.py`'s size budget leaves out `handoff/` and `run/` (a refactoring's driver re-anchors are bookkeeping); `test_*.py` and `*_test.py` count as test files only under a tests folder, so a product module named like a test is product.
+- `conformance-check.py` recognises Socket's pin in `npm install -g @socketsecurity/cli@<version>`, and the adapter evidence accepts a folder of recordings (`fixtures/modal_contract/`) loaded through a helper.
+- `evaluate-reports.py` does not count a bare stage heading (a date line and nothing of its own) as an entry, and an entry cut at the 6,000-character display limit of `unprocessed.md` says so.
+- Not in this release: the subagent resumed by `SendMessage` (the evaluation's item 3) waits for its reproduction on reAngle (requested through the channel on 2026-10-11).
+
+**Running projects must**
+- *(building, changing)* Install, restart, `/calibrate-bridge`. A delegation wrapper of the project's own carries `# wake builder` or `# wake review`; a verification loop is stopped with `bridge-stop.py`; nothing else changes in the loop.
+
+**If rolled back**
+- Nothing to restore: `run/launcher/pids/` may stay; the previous recipe sets the empty variable again. Set `Bridge version:` to the installed version.
+
+**Field acceptance on the trial project.** reAngle's wrapper marked `# wake builder` counts under the builder's ceiling (the loop guard allows the stop); one builder or reviewer run under the new git config file finishes its git reads and writes as before (the identity kept, no credential prompt, no helper); `bridge-stop.py` ends one launcher run or one loop whole.
+
+---
+
 ## 2026.10.11b
 
 **Release A5 of the restructuring plan: the briefs, the reviewers' instructions and the pitfalls** (plan section 13.1 and the A5 scope). Text only: no program changes, no new numbered rule.

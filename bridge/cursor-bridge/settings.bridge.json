@@ -40,6 +40,7 @@
       "Bash(python ~/.claude/cursor-bridge/scope-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/invisible-check.py:*)",
       "Bash(python ~/.claude/cursor-bridge/wake-timer.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/bridge-stop.py:*)",
       "Bash(python .cursor/hooks/windowless-check.py:*)",
       "Bash(npx --yes jscpd@*)",
       "Bash(python ~/.claude/cursor-bridge/refactor-check.py:*)",

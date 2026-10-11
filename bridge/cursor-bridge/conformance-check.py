@@ -66,7 +66,7 @@ SECRET_NAME = re.compile(r"(TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|API_?KEY
 LOCAL_SERVICE = re.compile(r"^(POSTGRES|PG|MYSQL|MARIADB|MONGO|REDIS|MINIO|RABBITMQ|CLICKHOUSE|ELASTIC|OPENSEARCH|NEO4J|DB|DATABASE|LOCAL|DEV|TEST)[A-Z0-9_]*(PASSWORD|PASSWD|PASS|SECRET)$", re.I)
 ENV_SECRET = re.compile(r"((^|_)TOKENS?(_|$)|(^|_)SECRETS?(_|$)|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEYS?$)")  # as bridge_env.SECRET_LIKE
 LOCATION_NAME = re.compile(r"_(PATH|DIR|FILE|FOLDER|URL)$")  # where a store is, not a secret
-SCANNERS = (("Semgrep", r"\bsemgrep\b"), ("OSV-Scanner", r"osv-scanner"), ("Socket", r"\bsocket\b"))
+SCANNERS = (("Semgrep", r"\bsemgrep\b"), ("OSV-Scanner", r"osv-scanner"), ("Socket", r"\bsocket(security)?\b"))   # `npm install -g @socketsecurity/cli@<version>` carries the pin (2026.10.11c)
 GH_TIMEOUT = 25
 
 
@@ -175,7 +175,7 @@ GENERIC_WORDS = {"api", "key", "keys", "token", "tokens", "secret", "secrets", "
                  "store", "the", "and", "of", "for", "rule", "judge", "repo", "github", "provider", "app", "dev", "test", "local", "root",
                  "url", "host", "endpoint", "login", "credential", "credentials", "model", "models", "files"}
 SYNONYMS = {"hf": ("hf", "huggingface"), "gh": ("gh", "github"), "oai": ("oai", "openai"), "gcp": ("gcp", "google")}
-EVIDENCE_RX = re.compile(r"\bvcr\b|\brespx\b|responses\.activate|\bnock\b|\bmsw\b|(cassettes?|fixtures?|recorded|recordings|replies|contracts?)[/\\][\w.-]+\.(json|ya?ml|har|txt)\b", re.I)
+EVIDENCE_RX = re.compile(r"\bvcr\b|\brespx\b|responses\.activate|\bnock\b|\bmsw\b|(cassettes?|fixtures?|recorded|recordings|replies|contracts?)[/\\][\w.-]+(\.(json|ya?ml|har|txt)\b|[/\\]|(?=[\x22\x27\s)\]]))", re.I)   # a file, or a folder of recordings loaded through a helper (2026.10.11c)
 
 
 def chargeable_rows(sections, words):
@@ -600,7 +600,7 @@ def main():
     files = tracked_files(ws) if providers else []
     client_rx = re.compile(r"^\s*(?:from|import)\s+(requests|httpx2?|aiohttp|urllib3|urllib\.request|http\.client|openai|anthropic|modal|replicate|stripe|boto3|botocore|google\.cloud|azure|huggingface_hub|supabase|twilio|sendgrid|slack_sdk)\b", re.M)
     js_client_rx = re.compile(r"""\bfetch\(\s*[`"'](?:https?:)?//(?!localhost|127\.0\.0\.1|0\.0\.0\.0)|\baxios\b""")
-    adapters, tests = {}, []
+    adapters, tests, helpers = {}, [], {}
     for rel in files:
         n = os.path.basename(rel)
         is_test = bool(re.search(r"(^|/)(tests?|__tests__|spec)(/|$)", rel)) or n.startswith("test_") or bool(re.search(r"[._](test|spec)\.(py|js|ts|mjs|tsx)$", n))
@@ -608,6 +608,7 @@ def main():
             text = read(os.path.join(ws, rel)) or ""
             if is_test:
                 tests.append(text)
+                helpers[os.path.splitext(n)[0]] = text
             elif client_rx.search(text) and names_provider(text, providers):
                 adapters[os.path.splitext(n)[0]] = rel
             elif client_rx.search(text) and LAST_WORD_ONLY:
@@ -620,6 +621,11 @@ def main():
                 adapters[re.sub(r"\.(js|ts|mjs|tsx)$", "", n)] = rel
             elif js_client_rx.search(text) and LAST_WORD_ONLY:
                 WORD_ONLY_FILES.append(rel)
+    merged = []
+    for t in tests:                                        # a helper the test imports from its folder counts as part of it: recordings loaded through a helper (2026.10.11c)
+        names = {a or b for a, b in re.findall(r"^\s*(?:from\s+(?:tests?\.)?\.?(\w+)\s+import|import\s+(\w+))", t, re.M)}
+        merged.append(t + "".join("\n" + helpers[s] for s in sorted(names) if s in helpers and helpers[s] is not t))
+    tests = merged
     if WORD_ONLY_FILES:
         add("NOTE", "Adapters named in a string only", "%d client file(s) name a listed provider only in a plain string, not in a host, a URL or a key name, and are not counted as its adapters (release A4): %s" % (len(WORD_ONLY_FILES), ", ".join(sorted(WORD_ONLY_FILES)[:6])))
     if adapters:
