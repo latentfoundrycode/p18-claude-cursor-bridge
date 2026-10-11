@@ -538,7 +538,7 @@ Write `docs/BUILD_PLAN.md` as an ordered list of increments. Each increment must
 - **Scoped** — the files and directories it may touch are named
 - **Demonstrated** — every stage heading (`## <stage>`) is followed by a line `Demonstration: <what is shown live, on the product as built, when the stage closes>` (release A1b; `plan-check.py` notes a stage without one)
 - **Placed** — its heading is `### TASK-nnn — <title>` and its field lines state `Parent:` (a group increment it helps fulfil, or none), `Depends on:` (the increments that must be merged first, or none), `Parallel:` (yes if it may be built alongside other ready increments), `Diagrams:` (the normative diagrams its brief carries), and `Scope:`. A large task is a `Kind: group` heading whose children are increments; the group is done when all its children are. Status is never written in the plan: `python ~/.claude/cursor-bridge/plan-check.py` derives it from the commits on `origin/main`, validates the fields (missing dependencies, cycles, parallel increments whose scopes overlap, diagrams not in the index), and lists what is ready.
-- **Traced** — it names the requirement IDs it satisfies (`Satisfies: R-004, R-011`). Every `planned` requirement in `docs/REQUIREMENTS.md` is satisfied by at least one increment; `python ~/.claude/cursor-bridge/completion-check.py --mode plan` must pass before the plan gate. A requirement no increment satisfies is either planned now or put to the owner as a deferral — never left out silently.
+- **Traced** — it names the requirement IDs it satisfies (`Satisfies: R-004, R-011`). Every `planned` requirement in `docs/REQUIREMENTS.md` is satisfied by at least one increment; `python ~/.claude/cursor-bridge/completion-check.py --mode plan` must pass before the plan gate; it counts an increment's `Satisfies:` field, never a mention in prose, and fails a `built` requirement whose Evidence names no test file (release A4). On an older project brought under the register part by part, `--only R-001,R-002` limits a run to those rows. A requirement no increment satisfies is either planned now or put to the owner as a deferral — never left out silently.
 
 Each **UI-bearing** increment additionally **cites the approved mockup screen(s) and the
 relevant `docs/design/DESIGN.md` sections** it implements, and carries **design acceptance
@@ -833,7 +833,10 @@ note tooling friction in `docs/BUILDER_NOTES.md` (spec-packager's constraints te
 spec-packager's **reality check** runs first: the schema, configuration, data, and
 interfaces the increment assumes must exist in the codebase *as built*; "approved in the
 plan" is not "fits the data" (KP-019). A mismatch comes back to you as a scope question,
-not as a brief.
+not as a brief. Once the brief is written, `python ~/.claude/cursor-bridge/plan-check.py`
+compares it with its increment: a Scope path outside the increment's Scope or a requirement
+the increment satisfies that the brief does not name is a `BRIEF` failure, fixed in the brief
+before the checkpoint commit (release A4: a brief once silently dropped planned work).
 
 ### 3. Delegate to Cursor
 
@@ -1101,7 +1104,9 @@ existing mockup-fidelity judgement (they do not add a new pass).
 
 ### 7. Decide (accept the increment)
 
-- **Accept** — local review, scan, and tests pass. Commit to the increment branch with a
+- **Accept** — local review, scan, and tests pass. Run `scope-check.py` once more just
+  before this commit (its base is the commit that committed the brief, so a builder's own
+  commits are inside the diff; release A4). Commit to the increment branch with a
   message referencing the task ID. Update `docs/PROJECT_STATUS.md` (rewrite the fields; never append history) and, when the increment changes behaviour or needs a new resource, `docs/INVENTORY.md` — in the same commit as the increment's `CHANGES.md` entry, moving `Reflected through:` to that entry (rule 41). When the increment completes a requirement, set its row in `docs/REQUIREMENTS.md` to `built` and name the tests — which carry the requirement's ID — in its Evidence cell, in the same commit. Move to the next
   increment. Increments accumulate on the branch; merging to `main` is a separate,
   verified step (below), not something you do per increment.

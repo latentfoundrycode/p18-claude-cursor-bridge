@@ -16,10 +16,13 @@ Exit 0 = no FAIL, 1 = at least one FAIL, 2 = cannot read an input.
 ASCII-only on purpose (cp1252 consoles).
 """
 import json
+import re
 import sys
 
 DEFAULT_TOL = 10.0
-LOWER_IS_BETTER_HINT = ("ms", "mb", "usd", "tokens", "bytes", "s", "kb", "gb")
+HIGHER_HINTS = ("ops", "rps", "qps", "fps", "iops", "throughput", "per_s", "per_sec", "per_second", "score")
+LOWER_HINTS = ("ms", "us", "ns", "s", "sec", "secs", "seconds", "minutes", "kb", "mb", "gb", "bytes", "usd", "cost", "tokens",
+               "latency", "duration", "time", "p50", "p90", "p95", "p99", "errors", "failures")
 
 
 def load(path):
@@ -38,14 +41,28 @@ def index(results):
     return out
 
 
-def lower_is_better(budget, metric):
+def direction(budget, metric):
+    """'lower' | 'higher' | None: from the budget (direction, max, min), else from a unit the metric
+    names whole (`latency_ms`, `requests_per_s`); never from its last letters (release A4: a
+    throughput named `requests` was read as lower-is-better because it ends in s)."""
     if budget is not None:
+        d = str(budget.get("direction") or "").lower()
+        if d in ("lower", "higher"):
+            return d
         if "max" in budget:
-            return True
+            return "lower"
         if "min" in budget:
-            return False
+            return "higher"
     m = (metric or "").lower()
-    return any(m == h or m.endswith("_" + h) or m.endswith(h) for h in LOWER_IS_BETTER_HINT)
+    if m.endswith(HIGHER_HINTS) or any(t in HIGHER_HINTS for t in re.split(r"[^a-z0-9]+", m)):
+        return "higher"
+    if any(t in LOWER_HINTS for t in re.split(r"[^a-z0-9]+", m)):
+        return "lower"
+    return None
+
+
+def lower_is_better(budget, metric):
+    return direction(budget, metric) == "lower"
 
 
 def pct_change(new, old, lower_better):
@@ -74,6 +91,8 @@ def main():
         seen.add(key)
         bid = b.get("id", "?")
         tol = float(b.get("tolerance_pct", DEFAULT_TOL))
+        if direction(b, key[1]) is None:
+            print("FAIL  %-9s %s/%s  DIRECTION UNKNOWN (give the budget max, min or direction: lower | higher)" % (bid, key[0], key[1])); fails += 1; continue
         lb = lower_is_better(b, key[1])
         if key not in cur:
             print("FAIL  %-9s %s/%s  NOT MEASURED" % (bid, key[0], key[1])); fails += 1; continue
@@ -97,6 +116,8 @@ def main():
             continue
         if key not in cur:
             print("FAIL  %-9s %s/%s  NOT MEASURED (baselined metric missing)" % ("-", key[0], key[1])); fails += 1; continue
+        if direction(None, key[1]) is None:
+            print("note  %-9s %s/%s = %g  direction unknown, not judged against baseline %g (add a budget with max, min or direction)" % ("-", key[0], key[1], cur[key], old)); notes += 1; continue
         lb = lower_is_better(None, key[1])
         ch = pct_change(cur[key], old, lb)
         if ch > DEFAULT_TOL:

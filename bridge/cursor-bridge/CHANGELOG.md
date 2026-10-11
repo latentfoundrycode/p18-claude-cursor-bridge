@@ -15,6 +15,24 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.11a
+
+**Release A4 of the restructuring plan: the bridge's programs** (plan section 13.1 and the plan review's R17; the A1b, A2 and A3 reviews' follow-ups; the field findings of 2026-10-10 and 11). One regression test per defect, each failing on the old program.
+
+**What changed**
+- **Part 1, the increment checks.** `scope-check.py`: any heading ends the Scope (a bullet under `### Out of scope` is not scope); a rename shows its deleted path; the default base is the commit that committed the brief, so a builder's own commit is inside the diff; `.github/` keeps its dot; an ellipsis cannot be verified; one bullet may name several paths, quoted or in backticks, prose after a path is dropped; a bracketed folder (`[id]`) is a folder; the bookkeeping files a builder must write (`docs/BUILDER_NOTES.md`, `docs/BOUNDARY_VIOLATIONS.md`, `run/`) are never drift. `plan-check.py`: a commit merges an increment only when its subject starts with the ID, a merge commit's branch does, or a `Merges:` trailer names it (a subject that mentions two IDs merges neither); an unreadable `Depends on` or `Parent` value (`TASK-02`) fails instead of vanishing; each brief under `handoff/` is compared with its unmerged increment (`BRIEF`); a dated addendum file is read with the plan. `completion-check.py`: planned means an increment's `Satisfies:` field; a `built` requirement whose Evidence names no test file fails in plan mode too; `--only R-001,R-002` limits a run. `refactor-check.py` counts the test files of Go, Java, Kotlin, C# and Ruby. `bench-check.py` takes a metric's direction from its budget (`direction`, `max`, `min`) or a unit it names whole, never from its last letters; an unknown direction fails a budget and is noted, not judged, for a baseline-only metric. `lock-check.py` raises no alarm for a manifest changed outside its dependencies or for a folder with no lockfile in use. `diagram-check.py` reads the project's own shortcut paths from `tsconfig.json` or `jsconfig.json`, treats a tracked `build/` or `dist/` as source, and keeps a column named like a keyword (`key`, `index`, `check`).
+
+**Running projects must**
+- *(building, changing)* Install, restart, `/calibrate-bridge`. Run `plan-check.py` once after calibration: a `BRIEF` or `DEPENDS` finding on a brief or an increment already in the plan is fixed in the plan or the brief, never worked around; a `DIRECTION UNKNOWN` in a benchmark budget gets its `max`, `min` or `direction`.
+- *(building, changing)* From the next increment on, the accept step runs `scope-check.py` once more before the accept commit.
+
+**If rolled back**
+- Nothing to restore: the previous programs read the same files. A budget given a `direction` keeps it (the previous `bench-check.py` ignores the field). Set `Bridge version:` to the installed version.
+
+**Field acceptance on the trial project.** One increment walked through the loop with the new checks: the scope check's base line names the brief's commit, a planted scope case from part 1 (a bullet under `### Out of scope`, or prose after a path) is read correctly, and the plan check compares the brief with its increment without a false `BRIEF` finding.
+
+---
+
 ## 2026.10.10c
 
 **A wake-up is scheduled on the computer's clock** (reAngle's field finding of 2026-10-10 on release 2026.10.10a, KP-039; the owner asked for it to be covered before the A3 install).

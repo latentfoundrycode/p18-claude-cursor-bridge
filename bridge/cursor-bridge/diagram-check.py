@@ -32,6 +32,7 @@ import argparse
 import fnmatch
 import glob
 import os
+import json
 import re
 import subprocess
 import sys
@@ -67,7 +68,7 @@ D_RX = re.compile(r"\bD-\d{3,}\b")
 IDENT = r"[A-Za-z_]\w*"
 TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec|specs|e2e|testing|fixtures)(/|$)"
                        r"|(^|/)test_[^/]*$|_test\.[a-z]+$|\.(test|spec)\.[a-z]+$", re.I)
-SKIP_PATH = re.compile(r"(^|/)(docs|\.claude|\.cursor|\.github|node_modules|vendor|third_party|dist|build)(/|$)", re.I)
+SKIP_PATH = re.compile(r"(^|/)(docs|\.claude|\.cursor|\.github|node_modules|vendor|third_party)(/|$)", re.I)   # a tracked build/ or dist/ is source (release A4)
 PY_EXT = {".py"}
 JS_EXT = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".vue", ".svelte"}
 JS_RESOLVE = ["", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte", ".d.ts",
@@ -491,17 +492,54 @@ def py_imports(path, text, index):
 JS_IMPORT = re.compile(r"""(?:\bimport|\bexport)\s+(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"]|\brequire\(\s*['"]([^'"]+)['"]\s*\)|\bimport\(\s*['"]([^'"]+)['"]\s*\)""")
 
 
+_ALIASES = None
+
+
+def path_aliases():
+    """[(prefix, [targets])] from tsconfig.json / jsconfig.json `compilerOptions.paths` with `baseUrl`
+    (release A4: a project's own shortcut paths, instead of assuming `@/` means `src/`)."""
+    global _ALIASES
+    if _ALIASES is not None:
+        return _ALIASES
+    out = []
+    for cfg in ("tsconfig.json", "jsconfig.json"):
+        if not os.path.isfile(cfg):
+            continue
+        try:
+            raw = re.sub(r"//[^\n]*|/\*.*?\*/", "", read(cfg), flags=re.S)
+            obj = json.loads(re.sub(r",\s*([}\]])", r"\1", raw))
+        except ValueError:
+            continue
+        co = obj.get("compilerOptions") or {}
+        base = (co.get("baseUrl") or ".").strip("./") or "."
+        for key, targets in (co.get("paths") or {}).items():
+            prefix = key[:-1] if key.endswith("*") else key
+            tgts = []
+            for t in targets if isinstance(targets, list) else [targets]:
+                t = str(t)[:-1] if str(t).endswith("*") else str(t)
+                tgts.append(os.path.normpath(os.path.join(base, t)).replace("\\", "/").strip("./"))
+            out.append((prefix, tgts))
+    _ALIASES = sorted(out, key=lambda a: -len(a[0]))
+    return _ALIASES
+
+
 def js_imports(path, text, fileset):
     out = []
+    aliases = path_aliases()
     for m in JS_IMPORT.finditer(text):
         spec = (m.group(1) or m.group(2) or m.group(3) or "").split("?")[0]
+        bases = []
         if spec.startswith("."):
-            base = os.path.normpath(os.path.join(os.path.dirname(path), spec)).replace("\\", "/")
-        elif spec.startswith(("@/", "~/")):
-            base = "src/" + spec[2:]
+            bases = [os.path.normpath(os.path.join(os.path.dirname(path), spec)).replace("\\", "/")]
         else:
+            alias = next((a for a in aliases if spec.startswith(a[0])), None)
+            if alias:
+                bases = [os.path.normpath(os.path.join(t, spec[len(alias[0]):])).replace("\\", "/") for t in alias[1]]
+            elif spec.startswith(("@/", "~/")) and not aliases:
+                bases = ["src/" + spec[2:]]
+        if not bases:
             continue
-        hit = next((base + ext for ext in JS_RESOLVE if (base + ext) in fileset), None)
+        hit = next((b + ext for b in bases for ext in JS_RESOLVE if (b + ext) in fileset), None)
         if hit:
             out.append((text.count("\n", 0, m.start()) + 1, hit))
     return out
@@ -594,6 +632,22 @@ def component_violations(did, fc, emap, files, done, fails, notes, deviations=fr
             fails.append("%s: component '%s' matches no source file - drawn but not built" % (did, leaf))
 
 
+def is_constraint(tok):
+    """A table-level constraint line, not a column: a quoted name is always a column; KEY/INDEX/CHECK
+    are constraints only in their constraint form (`KEY name (cols)`, `INDEX (col)`, `CHECK (expr)`),
+    so a column named key, index or check is kept (release A4, 13.1)."""
+    head = tok[0]
+    if head[0] in "`\"[":
+        return False
+    up = head.upper()
+    if up in ("CONSTRAINT", "PRIMARY", "FOREIGN", "UNIQUE"):
+        return True
+    if up in ("KEY", "INDEX", "CHECK", "FULLTEXT", "SPATIAL"):
+        rest = " ".join(tok[1:])
+        return bool(re.match(r"^(\w+\s+)?\(", rest))   # `KEY idx (id)` or `CHECK (x)`, never `key VARCHAR(10)`
+    return False
+
+
 def sql_schema(text):
     text = re.sub(r"--[^\n]*", "", text)
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
@@ -613,7 +667,7 @@ def sql_schema(text):
                 depth -= 1
             if ch == "," and depth == 0:
                 tok = cur.strip().split()
-                if tok and tok[0].upper() not in ("CONSTRAINT", "PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "KEY", "INDEX"):
+                if tok and not is_constraint(tok):
                     cols.add(tok[0].strip('`"[]').lower())
                 cur = ""
             else:

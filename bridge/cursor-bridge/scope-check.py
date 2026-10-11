@@ -15,7 +15,9 @@ file is still diff-reviewer's judgement; this tool owns the file-level floor.
 Usage:
     python scope-check.py handoff/TASK-<nnn>.md [--base <git-ref>]
 
-    --base   commit to diff against (default HEAD - i.e. the pre-delegation checkpoint).
+    --base   commit to diff against. Default: the commit that last touched the brief (the
+             checkpoint commits the brief), so a builder's own commits are inside the diff;
+             HEAD when the brief is not committed.
 
 Exit codes:
     0  every changed file is inside the declared Scope
@@ -23,8 +25,12 @@ Exit codes:
     2  cannot verify (brief missing, no Scope section, or git failed) - treat as
        needs-attention; do NOT proceed as if scope were clean.
 
-Scope entries (bullets under "## Scope") may be exact files, directories (trailing "/" or
-a bare directory name), or globs (*, ?, [..]). Paths are compared with forward slashes.
+Scope entries (bullets under "## Scope", up to the next heading of any level) may be exact
+files, directories (trailing "/" or a bare directory name), or globs (* and ?; brackets are
+literal, as in a route folder `[id]`). A bullet may name several paths (commas, "and"),
+quoted or in backticks; prose after a path is dropped; an ellipsis cannot be verified.
+The bookkeeping files a builder must write (docs/BUILDER_NOTES.md, docs/BOUNDARY_VIOLATIONS.md,
+anything under run/) are never drift. Paths are compared with forward slashes.
 """
 
 import fnmatch
@@ -47,7 +53,34 @@ def _run_git(args):
 
 
 def _norm(p):
-    return p.strip().replace("\\", "/").lstrip("./")
+    p = p.strip().replace("\\", "/")
+    while p.startswith("./"):
+        p = p[2:]
+    return p
+
+
+BOOKKEEPING = ("docs/BUILDER_NOTES.md", "docs/BOUNDARY_VIOLATIONS.md", "run/")
+PATH_RX = re.compile(r"^[\w.@~\[\]()*?/-]+$")
+
+
+def bookkeeping(path):
+    return any(path == b or (b.endswith("/") and path.startswith(b)) for b in BOOKKEEPING)
+
+
+def split_entry(entry):
+    """The paths one bullet names: `a.py`, `b.py` and "c.py" -> three; prose after a path dropped."""
+    entry = re.split(r"\s+(?:\(|#|--|-\s|—)", entry, maxsplit=1)[0]
+    out = []
+    for piece in re.split(r"\s*,\s*|\s+and\s+|\s*;\s*", entry):
+        piece = piece.strip().strip("`'\"").strip()
+        if not piece:
+            continue
+        tok = piece.split()[0].strip("`'\"").rstrip(",;:")
+        if "..." in tok or "\u2026" in tok:
+            return None
+        if tok and PATH_RX.match(tok):
+            out.append(tok)
+    return out
 
 
 def parse_scope(brief_path):
@@ -63,18 +96,19 @@ def parse_scope(brief_path):
         if re.match(r"^##\s+Scope\b", line, re.IGNORECASE):
             in_scope = True
             continue
-        if in_scope and re.match(r"^##\s+", line):
-            break
+        if in_scope and re.match(r"^#+\s+", line):
+            break                                          # any heading ends the Scope, a `### Out of scope` included
         if in_scope:
             m = re.match(r"^\s*[-*]\s+(.+?)\s*$", line)
             if m:
                 entry = m.group(1).strip()
-                # Strip a trailing annotation: "path  (new)", "path - comment", "path # note",
-                # "path -- note". Only the leading path token is the scope entry.
-                entry = re.split(r"\s+(?:\(|#|--|-\s|—)", entry, maxsplit=1)[0]
-                entry = entry.strip().strip("`").strip().rstrip(",;")
-                if entry and not entry.lower().startswith("do not"):
-                    entries.append(_norm(entry))
+                if entry.lower().startswith("do not"):
+                    continue
+                paths = split_entry(entry)
+                if paths is None:
+                    print("CANNOT VERIFY: a Scope entry carries an ellipsis (%s); name every path or a glob." % entry[:80])
+                    sys.exit(2)
+                entries.extend(_norm(p) for p in paths)
     if not entries:
         print("CANNOT VERIFY: no Scope entries found under '## Scope' in %s "
               "(spec-packager defect - the brief must fence its scope)." % brief_path)
@@ -82,10 +116,17 @@ def parse_scope(brief_path):
     return entries
 
 
+def checkpoint_of(brief):
+    """The commit that last touched the brief: the checkpoint commits it before the delegation.
+    None when the brief is not committed."""
+    out = _run_git(["log", "-1", "--format=%H", "--", brief]).strip()
+    return out or None
+
+
 def changed_files(base):
     files = set()
-    # Tracked files modified/added/deleted/renamed relative to the checkpoint.
-    for line in _run_git(["diff", "--name-only", base]).splitlines():
+    # Tracked files modified/added/deleted relative to the checkpoint; a rename shows both paths.
+    for line in _run_git(["diff", "--name-only", "--no-renames", base]).splitlines():
         if line.strip():
             files.add(_norm(line))
     # Untracked new files (git diff does not show these) - list individually.
@@ -97,15 +138,13 @@ def changed_files(base):
 
 def in_scope(path, entries):
     for e in entries:
-        if any(ch in e for ch in "*?["):
-            if fnmatch.fnmatch(path, e) or fnmatch.fnmatch(path, e.rstrip("/") + "/*"):
-                return True
-            continue
         e_dir = e.rstrip("/")
-        if path == e or path == e_dir:
-            return True
-        if path.startswith(e_dir + "/"):
-            return True
+        if path == e or path == e_dir or path.startswith(e_dir + "/"):
+            return True                                    # literal first: a bracketed folder is a folder
+        if any(ch in e for ch in "*?"):
+            g = e.replace("[", "[[]")                      # brackets stay literal inside the glob
+            if fnmatch.fnmatch(path, g) or fnmatch.fnmatch(path, g.rstrip("/") + "/*"):
+                return True
     return False
 
 
@@ -114,22 +153,33 @@ def main(argv):
         print(__doc__)
         sys.exit(2)
     brief = argv[1]
-    base = "HEAD"
+    base = None
     if "--base" in argv:
         i = argv.index("--base")
         if i + 1 < len(argv):
             base = argv[i + 1]
+    note = ""
+    if base is None:
+        base = checkpoint_of(_norm(brief))
+        note = " (the checkpoint: the commit that committed the brief)" if base else ""
+        if base is None:
+            base = "HEAD"
+            note = " (the brief is not committed; HEAD. A builder's own commit is inside the diff only with --base <checkpoint>)"
 
     entries = parse_scope(brief)
     changed = changed_files(base)
 
+    books = [p for p in changed if bookkeeping(p)]
+    changed = [p for p in changed if not bookkeeping(p)]
     inside = [p for p in changed if in_scope(p, entries)]
     drift = [p for p in changed if not in_scope(p, entries)]
 
     print("BRIEF:        %s" % brief)
-    print("BASE:         %s" % base)
+    print("BASE:         %s%s" % (base, note))
     print("SCOPE:        %s" % ", ".join(entries))
     print("CHANGED (%d): %s" % (len(changed), ", ".join(changed) if changed else "(none)"))
+    if books:
+        print("BOOKKEEPING (%d), never drift: %s" % (len(books), ", ".join(books)))
     print("IN SCOPE (%d): %s" % (len(inside), ", ".join(inside) if inside else "(none)"))
     if drift:
         print("SCOPE DRIFT (%d) - outside the brief's Scope:" % len(drift))

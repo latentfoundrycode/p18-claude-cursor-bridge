@@ -2,7 +2,7 @@
 """completion-check: is every specified requirement planned, built and tested - or deferred by
 the owner - and does the shipped code contain no stand-ins presented as features?
 
-  python completion-check.py [--mode plan|done] [--requirements docs/REQUIREMENTS.md]
+  python completion-check.py [--mode plan|done] [--requirements docs/REQUIREMENTS.md] [--only R-001,R-002]
 
 Run from the Workspace root. Deterministic; reads only. ASCII output.
 
@@ -13,13 +13,18 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
 
 --mode plan  (plan gate, every stage close)
   REGISTER    the register exists, rows are well-formed, IDs unique.
-  UNPLANNED   a planned/built requirement that no docs/BUILD_PLAN*.md mentions.
+  UNPLANNED   a planned/built requirement that no increment's `Satisfies:` field names (a
+              mention in prose is not a plan; release A4).
   UNAPPROVED  a deferred/dropped row without "owner" and a date.
+  NO EVIDENCE a `built` requirement whose Evidence cell names no test file (release A4: a
+              release was declared complete while features returned empty data).
   stand-ins are listed as notes (mid-build a later stage may legitimately be pending).
 --mode done  (project end, and the start of every change cycle) - everything above, plus:
   NOT BUILT   a requirement still `planned`.
-  NO EVIDENCE a `built` requirement whose ID appears in no tracked test file. Tests carry the
-              requirement ID (a comment, docstring, or test name) - that is the trace.
+  NO EVIDENCE also a `built` requirement whose ID appears in no tracked test file. Tests carry
+              the requirement ID (a comment, docstring, or test name) - that is the trace.
+--only R-001,R-002  limits every check to those IDs (an older project brought under the
+              register part by part, or one stage's requirements; release A4).
   STAND-IN    shipped (non-test) code shows a user-visible stand-in: "arrives in a later
               stage", "coming soon", "not yet implemented/available", "under construction",
               a *Placeholder{View,Page,Screen,Tab,Panel} component, todo!()/unimplemented!().
@@ -91,11 +96,13 @@ def main():
     ap = argparse.ArgumentParser(description="Check requirements coverage and shipped stand-ins.")
     ap.add_argument("--mode", choices=("plan", "done"), default="done")
     ap.add_argument("--requirements", default="docs/REQUIREMENTS.md")
+    ap.add_argument("--only", default="", help="comma-separated requirement IDs; the run is limited to them")
     a = ap.parse_args()
+    only = set(ID_RX.findall(a.only))
     fails, notes = [], []
     done = a.mode == "done"
 
-    reqs = {}
+    reqs, evidence = {}, {}
     if not os.path.exists(a.requirements):
         fails.append("REGISTER: %s does not exist" % a.requirements)
     else:
@@ -122,8 +129,13 @@ def main():
             if kind in ("deferred", "dropped") and not OWNER_DATED.search(status):
                 fails.append("UNAPPROVED: %s is %s without the owner's approval and a date (%s)" % (rid, kind, status[:60]))
             reqs[rid] = (kind, r[1])
+            evidence[rid] = r[4] if len(r) > 4 else ""
         if not reqs and not any(f.startswith("REGISTER") for f in fails):
             fails.append("REGISTER: %s has no requirement rows" % a.requirements)
+        if only:
+            total = len(reqs)
+            reqs = {k: v for k, v in reqs.items() if k in only}
+            notes.append("limited to %d of %d requirements (--only %s)" % (len(reqs), total, ", ".join(sorted(only))))
 
     # plan coverage
     plans = sorted(glob.glob("docs/BUILD_PLAN*.md"))
@@ -131,9 +143,15 @@ def main():
     if not plans:
         notes.append("no docs/BUILD_PLAN*.md found - plan coverage not checked")
     else:
+        satisfied = set()
+        for m in re.finditer(r"^\s*(?:[-*]\s+)?\**Satisfies\**\s*:\s*(.*)$", plan_text, re.M | re.I):
+            satisfied.update(ID_RX.findall(m.group(1)))
         for rid, (kind, text) in sorted(reqs.items()):
-            if kind in ("planned", "built") and not re.search(r"\b%s\b" % re.escape(rid), plan_text):
-                fails.append("UNPLANNED: %s (%s) is in no build plan increment" % (rid, text[:70]))
+            if kind in ("planned", "built") and rid not in satisfied:
+                fails.append("UNPLANNED: %s (%s) is in no increment's Satisfies: field" % (rid, text[:70]))
+    for rid, (kind, text) in sorted(reqs.items()):
+        if kind == "built" and not any(TEST_PATH.search(tok.strip("`*, ").replace("\\", "/")) for tok in evidence.get(rid, "").split()):
+            fails.append("NO EVIDENCE: %s (%s) is marked built but its Evidence names no test file" % (rid, text[:60]))
 
     files = tracked()
     if files is None:

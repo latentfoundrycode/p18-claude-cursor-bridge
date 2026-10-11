@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """plan-check: is the build plan well-formed, and which increments are ready to build?
 
-  python plan-check.py [--plan "docs/BUILD_PLAN*.md"] [--base origin/main] [--no-git]
+  python plan-check.py [--plan "docs/BUILD_PLAN*.md"] [--base origin/main] [--no-git] [--briefs handoff]
 
 Run from the Workspace root. Deterministic; reads only. ASCII output.
 
@@ -22,8 +22,11 @@ A stage heading is followed by a line `Demonstration: <what is shown live, on th
 built, when the stage closes>` (release A1b); a stage with increments and no such line is noted.
 
 Status is not written in the plan; it is derived from git. An increment counts as merged
-when a commit on <base> names its ID in the subject (PR titles and squash commits start with
-the increment ID). A group is merged when all its children are.
+when a commit on <base> has a subject that STARTS with its ID (a squash commit, a PR title),
+a merge commit whose branch name starts with the ID, or a `Merges: TASK-nnn` trailer; a
+subject that merely mentions an ID ("docs: plan split TASK-003 out of TASK-004") merges
+nothing (release A4). A group is merged when all its children are. A dated addendum file
+(`docs/BUILD_PLAN-<date>*.md`) is read with the plan and noted as such.
 
 Checks (exit 1 on any):
   SHAPE       duplicate IDs, unknown fields' values, increments without Scope, groups with Scope.
@@ -33,6 +36,11 @@ Checks (exit 1 on any):
               overlap (one path is a prefix of the other). Disjoint scopes are what let two
               builders work at once without touching the same files.
   DIAGRAMS    a named diagram missing from docs/diagrams/INDEX.md or not selected there.
+  DEPENDS     also a Depends on / Parent value the parser cannot read whole (`TASK-02`): it
+              fails instead of vanishing (release A4).
+  BRIEF       a brief under --briefs (default handoff/) for an unmerged increment whose Scope
+              reaches outside the increment's Scope, or which does not name every requirement
+              the increment satisfies (release A4, 13.1).
 Report: MERGED count, READY increments (not merged, all dependencies merged, not deferred),
 and which ready increments may run together.
 """
@@ -139,12 +147,55 @@ def stages_without_demonstration(paths):
     return missing
 
 
+SUBJECT_RX = re.compile(r"^\s*(%s)\b" % ID)
+MERGE_RX = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(task-\d{3,}[a-z]?)\b", re.I)
+
+
 def merged_ids(base):
-    p = subprocess.run(["git", "log", base, "--format=%s"], capture_output=True, text=True,
+    p = subprocess.run(["git", "log", base, "--format=%s%n%(trailers:key=Merges,valueonly)"], capture_output=True, text=True,
                        encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
     if p.returncode != 0:
         return None
-    return set(ID_RX.findall(p.stdout))
+    out = set()
+    for line in p.stdout.splitlines():
+        m = SUBJECT_RX.match(line) or MERGE_RX.match(line)
+        if m:
+            out.add(m.group(1).upper())
+        elif re.match(r"^\s*(%s)(\s*,\s*%s)*\s*$" % (ID, ID), line):      # a Merges: trailer line
+            out.update(ID_RX.findall(line))
+    return out
+
+
+def unreadable(value):
+    """What is left of a Depends on / Parent value once the IDs and the fillers are removed."""
+    rest = ID_RX.sub("", value or "")
+    rest = re.sub(r"\bnone\b|(?<!\S)-(?!\S)", "", rest, flags=re.I)        # the fillers, never the hyphen inside TASK-02
+    return re.sub(r"[,;\s]+", " ", rest).strip()
+
+
+def brief_findings(path, item):
+    """The brief's Scope paths outside the increment's Scope, and the increment's requirements the brief does not name."""
+    text = read(path)
+    scope, in_scope = [], False
+    for line in text.splitlines():
+        if re.match(r"^##\s+Scope\b", line, re.I):
+            in_scope = True
+            continue
+        if in_scope and re.match(r"^#+\s", line):
+            break
+        m = re.match(r"^\s*[-*]\s+(.+?)\s*$", line) if in_scope else None
+        if m and not m.group(1).lower().startswith("do not"):
+            tok = re.split(r"\s+(?:\(|#|--|-\s)", m.group(1), maxsplit=1)[0].split()[0].strip("`'\"").rstrip(",;:")
+            scope.append(tok.replace("\\", "/"))
+    found = []
+    inc = item["scope"]
+    for p in scope:
+        if not any(p == s or p.startswith(s + "/") or (s == "" ) for s in inc):
+            found.append("names %s in its Scope, outside %s's Scope (%s)" % (p, item["id"], ", ".join(inc) or "none"))
+    for rid in re.findall(r"\bR-\d{3,}\b", item["fields"].get("satisfies") or ""):
+        if not re.search(r"\b%s\b" % rid, text):
+            found.append("does not name %s, which %s satisfies" % (rid, item["id"]))
+    return found
 
 
 def main():
@@ -152,6 +203,7 @@ def main():
     ap.add_argument("--plan", default="docs/BUILD_PLAN*.md")
     ap.add_argument("--base", default="origin/main")
     ap.add_argument("--no-git", action="store_true", help="skip deriving merged increments from git")
+    ap.add_argument("--briefs", default="handoff", help="folder of the briefs compared with their increments")
     a = ap.parse_args()
     paths = sorted(glob.glob(a.plan))
     if not paths:
@@ -159,6 +211,9 @@ def main():
         return 1
     items, order, fails = parse(paths)
     notes = []
+    for p in paths:
+        if re.search(r"\d{4}-\d{2}-\d{2}", os.path.basename(p)):
+            notes.append("addendum %s read with the plan" % p.replace("\\", "/"))
 
     kinds = {}
     for tid in order:
@@ -184,6 +239,10 @@ def main():
 
     children = {}
     for tid in order:
+        for key in ("parent", "depends on"):
+            rest = unreadable(items[tid]["fields"].get(key))
+            if rest:
+                fails.append("DEPENDS: %s has an unreadable %s value '%s' (IDs are TASK-nnn, three digits or more)" % (tid, key.title(), rest[:40]))
         for p in ids_in(items[tid]["fields"].get("parent")):
             if p not in items:
                 fails.append("PARENT: %s names parent %s, which does not exist" % (tid, p))
@@ -283,6 +342,13 @@ def main():
             merged = m
     inc = [t for t in order if kinds[t] == "increment"]
     done = {t for t in inc if t in merged}
+    if a.briefs and os.path.isdir(a.briefs):
+        for bp in sorted(glob.glob(os.path.join(a.briefs, "TASK-*.md"))):
+            m = ID_RX.search(os.path.basename(bp))
+            tid = m.group(0) if m else None
+            if tid in items and tid not in done and kinds.get(tid) == "increment":
+                for finding in brief_findings(bp, items[tid]):
+                    fails.append("BRIEF: %s %s" % (bp.replace("\\", "/"), finding))
     for s, ids in stages_without_demonstration(paths):
         if any(t not in merged for t in ids):                 # a closed stage is not noted
             notes.append("stage '%s' names no Demonstration: line; the stage close runs it live (release A1b), add one from the stage's increments" % s[:60])
