@@ -79,7 +79,19 @@ PREMERGE_DIR = os.path.join("bridge", "premerge")
 STATE_GIT = ("add", "commit", "push", "pull", "merge", "rebase", "switch", "checkout", "reset", "rm", "mv", "cherry-pick", "revert",
              "am", "apply", "clean", "restore", "stash", "worktree", "branch", "tag", "submodule", "config")
 BRANCH_WRITES = ("-d", "-D", "-m", "-M", "-c", "-C", "--delete", "--move", "--copy", "--set-upstream-to", "-u", "--unset-upstream", "-f", "--force")
-SNAPSHOT_RX = re.compile(r"^\s*checkpoint\b(?!.*\b(?:accept\w*|merg\w*|release\w*|ship\w*)\b).*\b(?:TASK|BUG|REFAC|FIX|CONFIG)-(?:\d{3,}[a-z]?|<nnn>)(?!\w)", re.I)   # starts with checkpoint, names the increment, no accept/merge/release word (second pass, N2)
+INCREMENT_RX = re.compile(r"\b(?:TASK|BUG|REFAC|FIX|CONFIG)-(?:\d{3,}[a-z]?|<nnn>|[\w-]+)(?!\w)", re.I)   # the plan's IDs, and a project's own spelling (FIX-next-sharp)
+NOT_A_SNAPSHOT_RX = re.compile(r"(?<![-\w])(?:accept\w*|merge|merges|merging|release\w*|ship\w*)\b", re.I)   # an action word; "merged" (a status note) and "overlay-merge" (a name) are not
+
+
+def snapshot_subject(message):
+    """The checkpoint commit the merge policy exempts: the subject says `checkpoint` and names the
+    increment, and its leading clause (before any parenthesis) carries no accept, merge, release or
+    ship word (`checkpoint before TASK-159 r2 (round 1 builder output)`, `TASK-010c round 3
+    checkpoint (status after TASK-059b merge)`, `BUG-022: round-2 brief (checkpoint)`, `checkpoint
+    (paused by owner): TASK-141-r2 builder work`; never `checkpoint: accept TASK-003`, and never a
+    product commit that only speaks of a checkpoint marker without an increment's ID)."""
+    clause = message.split("(", 1)[0]
+    return bool(re.search(r"\bcheckpoint\b", message, re.I)) and bool(INCREMENT_RX.search(message)) and not NOT_A_SNAPSHOT_RX.search(clause)   # starts with checkpoint, names the increment, no accept/merge/release word (second pass, N2)
 GH_READ = ("view", "list", "checks", "status", "diff", "search", "download", "auth", "--version", "version")
 HOOK_SKIPPERS = ("commit", "push", "merge", "rebase", "am", "cherry-pick", "revert")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -171,7 +183,10 @@ def state_changing(w):
     if is_git(w):
         sub, args = git_subcommand(w)
         if sub == "branch":
-            return any(a in BRANCH_WRITES for a in args) or any(not a.startswith("-") for a in args)
+            reads = ("--list", "-l", "--contains", "--no-contains", "--merged", "--no-merged", "--points-at", "--show-current", "-r", "-a", "-v", "-vv", "--sort", "--format")
+            if any(a in BRANCH_WRITES for a in args):
+                return True
+            return any(not a.startswith("-") for a in args) and not any(a.split("=", 1)[0] in reads for a in args)
         if sub == "stash":
             return not args or args[0] not in ("list", "show")            # a bare `git stash` pushes (N5)
         if sub in ("worktree", "tag"):
@@ -381,18 +396,16 @@ def merge_reason(args, cwd):
 def commit_message(args, command):
     """The message of a git commit: `-m <value>`, `--message=<value>`, or the first line of a
     here-document the command feeds it (the app's own commit form)."""
-    msg, plain = "", ""
-    for i, a in enumerate(args):
+    msg = None
+    for i, a in enumerate(args):                           # git's subject is the FIRST -m's first line (third pass, T5)
         if a in ("-m", "--message") and i + 1 < len(args):
             msg = args[i + 1]
-        elif a.startswith("--message="):
+            break
+        if a.startswith("--message="):
             msg = a.split("=", 1)[1]
-        else:
-            continue
-        if msg.strip() and "<<" not in msg and "$(" not in msg and not plain:
-            plain = msg                                    # the first plain -m is the subject; a here-document counts only without one (N6)
-    if plain:
-        return plain.strip()
+            break
+    if msg is None:
+        msg = ""
     if not msg.strip() or "<<" in msg or "$(" in msg:
         for m in HEREDOC_RX.finditer(command):
             body = m.group(0).split("\n", 1)[1]
@@ -454,14 +467,15 @@ def check(command, cwd=None):
                 return "git -c core.hooksPath=... (the checks a commit runs are switched off; rule 4)"
             if sub == "config" and not helpful and any(a.lower() == "core.hookspath" for a in args) and not any(a.startswith("--get") for a in args):
                 value = next((a for a in args[args.index(next(x for x in args if x.lower() == "core.hookspath")) + 1:] if not a.startswith("-")), "")
-                if "--unset" in args or value.lower() in ("/dev/null", "nul", "") or os.path.isabs(value) or value.startswith(".."):
+                norm = os.path.normpath(os.path.expanduser(value)).replace("\\", "/") if value else ""
+                if "--unset" in args or value.lower() in ("/dev/null", "nul", "") or os.path.isabs(norm) or norm.startswith("..") or norm.lower() in ("/dev/null", "nul"):
                     return "git config core.hooksPath %s (the checks a commit runs are switched off; rule 4)" % (value or "--unset")
             if sub in HOOK_SKIPPERS and not helpful:
                 message = commit_message(args, command)
-                snapshot = bool(SNAPSHOT_RX.match(message)) or (bool(re.search(r"\bhand-off\b", message, re.I)) and in_worktree(w, cwd))
+                snapshot = snapshot_subject(message) or (bool(re.search(r"\bhand-off\b", message, re.I)) and in_worktree(w, cwd))
                 for a in args:
                     if (a == "--no-verify" or (sub == "commit" and re.match(r"^-[A-Za-z]*n[A-Za-z]*$", a))) and not snapshot:
-                        return "git %s %s (a commit that skips its checks; the merge policy allows it only for the checkpoint commit and a builder's hand-off snapshot, whose message says so)" % (sub, a)
+                        return "git %s %s (a commit that skips its checks; the merge policy allows it only for the checkpoint commit, whose subject says `checkpoint` and names the increment before any parenthesis without an accept, merge or release word, and for a builder's hand-off snapshot inside a worktree)" % (sub, a)
             if sub == "push" and not helpful:
                 r = force_push_reason(args)
                 if r:

@@ -52,6 +52,24 @@ def test_a_bold_note_and_sub_bullets_end_the_scope(repo):
     assert rc == 0 and "NOT READ AS A PATH" not in out and "advance.py" not in out.split("SCOPE:")[1].split("\n")[0], "the path list ends at the bold note (second pass, N8): " + out
 
 
+def test_a_wrapped_bullet_continues_and_later_paths_stay(repo):
+    b = brief(repo, ["- src/core/a.py, which holds the parser and", "  the tokenizer that goes with it", "- src/core/b.py"])
+    (repo / "src" / "core" / "b.py").write_text("B = 2\n", encoding="utf-8")
+    rc, out = run_scope(repo, b)
+    assert rc == 0 and "src/core/b.py" in out.split("SCOPE:")[1].split("\n")[0], "an indented continuation line does not end the Scope (third pass, T2): " + out
+
+
+def test_an_emphasised_note_after_a_plan_folder_is_not_a_path(program):
+    pc = program("plan-check")
+    assert pc.scope_paths("tests/service/ *(amended 2026-10-10: the service tests; see docs/CHANGES.md)*, src/x.py") == ["tests/service", "src/x.py"], "third pass, T4"
+
+
+def test_the_plan_check_reads_a_brief_as_the_scope_check_does(program):
+    pc = program("plan-check")
+    text = "# TASK-023\n\n## Scope\n- src/a.py\n- A **cassette directory** (recommend\n  tests/cassettes/) for the replays\n- `src/b.py`: the writer\n\n**Limits:**\n- advance.py stays\n\n## Constraints\n- none\n"
+    assert pc.brief_scope(text) == ["src/a.py", "src/b.py"], "a wrapped prose bullet yields no entry and the limits list is not scope (third pass, T7): " + str(pc.brief_scope(text))
+
+
 def test_a_plan_scope_with_a_parenthesised_list_names_the_files(program):
     pc = program("plan-check")
     assert pc.scope_paths("tdp/ingest/normalize/ (located_build.py, azure_reader.py: the dropped strings), tdp/service/ (admin.py), tests/service/\u00a0, see docs/CHANGES.md") == \

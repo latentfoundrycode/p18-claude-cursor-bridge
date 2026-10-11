@@ -45,10 +45,12 @@ Inno Setup: free, script-based (the script is a committed, reviewable file), one
 
 ```ini
 #define AppName "<Name>"
-#define AppVersion "<version>"          ; injected at build time from the single version source (§5)
+; AppVersion is injected at build time from the single version source (§5)
+#define AppVersion "<version>"
 #define AppPublisher "<publisher>"
 #define AppExe "<Name>.exe"
-#define AppGuid "<GUID — generated once, never changed, without braces>"   ; the identity that makes upgrades in-place
+; AppGuid is the identity that makes upgrades in-place: generated once, never changed, without braces
+#define AppGuid "<GUID — generated once, never changed, without braces>"
 
 [Setup]
 ; the [Setup] escape: {{ is a literal brace, so the value is {<GUID>}. A comment is a whole line in Inno Setup; never put one after a directive

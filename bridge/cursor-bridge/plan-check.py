@@ -74,6 +74,7 @@ def scope_paths(value):
     """The paths of a Scope field. `folder/ (a.py, b.py: note)` names folder/a.py and folder/b.py
     (the TDP's form, second pass N4); a non-breaking space is whitespace; a wildcard's prefix counts."""
     value = (value or "").replace("\u00a0", " ")
+    value = re.sub(r"[*_]\([^()]*\)[*_]", "", value)           # an emphasised note `*(amended …)*` is not a path (third pass, T4)
 
     def expand(m):
         folder, inner = m.group(1), m.group(2)
@@ -87,8 +88,11 @@ def scope_paths(value):
         p = part.strip().strip("`").replace("\\", "/")
         if not p or p.lower() in ("none", "-"):
             continue
-        p = re.split(r"[*?\[]", p, maxsplit=1)[0]          # prefix before the first wildcard
-        out.append(p.rstrip("/"))
+        p = re.split(r"[*?\[]", p, maxsplit=1)[0].strip()  # prefix before the first wildcard
+        if p.endswith(")") and "(" not in p:
+            continue                                       # the tail of a note whose opening bracket was split off
+        if p:
+            out.append(p.rstrip("/"))
     return out
 
 
@@ -197,20 +201,48 @@ def unreadable(value):
     return re.sub(r"[,;\s]+", " ", rest).strip()
 
 
-def brief_findings(path, item):
-    """The brief's Scope paths outside the increment's Scope, and the increment's requirements the brief does not name."""
-    text = read(path)
-    scope, in_scope = [], False
+def brief_scope(text):
+    """The paths of a brief's Scope, read as scope-check.py reads them (third pass, T7): top-level
+    bullets up to the first non-indented line that is no bullet, an indented line continuing its
+    bullet, a sub-bullet ignored; several paths per bullet; a token without a slash, a dot or a
+    glob is prose, not a path."""
+    raw, in_scope = [], False
     for line in text.splitlines():
         if re.match(r"^##\s+Scope\b", line, re.I):
             in_scope = True
             continue
-        if in_scope and re.match(r"^#+\s", line):
+        if not in_scope:
+            continue
+        if re.match(r"^#+\s", line):
             break
-        m = re.match(r"^\s*[-*]\s+(.+?)\s*$", line) if in_scope else None
-        if m and not m.group(1).lower().startswith("do not"):
-            tok = re.split(r"\s+(?:\(|#|--|-\s)", m.group(1), maxsplit=1)[0].split()[0].strip("`'\"").rstrip(",;:")
-            scope.append(tok.replace("\\", "/"))
+        if line.strip() and line[0] in " \t":
+            if raw and not re.match(r"^\s*[-*]\s", line):
+                raw[-1] += " " + line.strip()
+            continue
+        if raw and line.strip() and not re.match(r"^[-*]\s", line):
+            break
+        m = re.match(r"^[-*]\s+(.+?)\s*$", line)
+        if m:
+            raw.append(m.group(1).strip())
+    out = []
+    for entry in raw:
+        if entry.lower().startswith("do not"):
+            continue
+        entry = re.split(r"\s+(?:\(|#|--|-\s|\u2014)", entry, maxsplit=1)[0]
+        for piece in re.split(r"\s*,\s*|\s+and\s+|\s*;\s*", entry):
+            piece = piece.strip().strip("`'\"").strip()
+            if not piece:
+                continue
+            tok = piece.split()[0].rstrip(",;:").strip("`'\"").rstrip(",;:")
+            if tok and re.match(r"^[\w.@~\[\]()*?/-]+$", tok) and re.search(r"[./*?\[]", tok):
+                out.append(tok.replace("\\", "/"))
+    return out
+
+
+def brief_findings(path, item):
+    """The brief's Scope paths outside the increment's Scope, and the increment's requirements the brief does not name."""
+    text = read(path)
+    scope = brief_scope(text)
     found = []
     inc = item["scope"]
     for p in scope:

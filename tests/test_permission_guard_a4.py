@@ -81,6 +81,15 @@ def test_a_commit_that_skips_its_checks_is_refused(tmp_path, command):
     'git commit --no-verify -m "checkpoint: roster re-resolved before TASK-159 r3"',
     'git commit --no-verify -m "checkpoint: TASK-059e round-5 builder work"',
     'git commit --no-verify -m "checkpoint before CONFIG-001a"',
+    'git commit --no-verify -m "checkpoint before TASK-159 r3 (round 2 builder output; frozen acceptance tests kept)"',
+    'git commit --no-verify -m "TASK-010c round 3 checkpoint (status after TASK-059b merge)"',
+    'git commit --no-verify -m "BUG-022: round-2 brief, one spend-record snapshot per raise (checkpoint)"',
+    'git commit --no-verify -m "checkpoint before FIX-next-sharp: roster resolved"',
+    'git commit --no-verify -m "checkpoint (paused by owner): TASK-141-r2 builder work - junction guard"',
+    'git commit --no-verify -m "checkpoint before TASK-057 round 3: reproductions of the overlay-merge finding (red)"',
+    'git commit --no-verify -m "checkpoint: TASK-056a merged (PR #17 @ 0f99ae1); correct PROJECT_STATUS drift; resume at TASK-056b"',
+    "git config core.hooksPath .githooks && git branch -r --contains abc1234",
+    'git branch --list "task-*" && git status',
 ])
 def test_the_snapshots_the_policy_allows_and_a_dry_run_pass(tmp_path, command):
     """The pre-delegation checkpoint (its exact subject, in any of the app's commit forms) and a builder's hand-off
@@ -99,6 +108,11 @@ def test_the_snapshots_the_policy_allows_and_a_dry_run_pass(tmp_path, command):
     "git config core.hooksPath ../elsewhere",
     "git commit -n -m \"accept TASK-003\" -m \"$(cat <<'EOF'\ncheckpoint before TASK-003\nEOF\n)\"",
     'git commit --no-verify -m "checkpoint: merge TASK-003 to main"',
+    "git commit -n -m \"$(cat <<'EOF'\naccept TASK-003\nEOF\n)\" -m \"checkpoint before TASK-003\"",
+    "git config core.hooksPath ~/elsewhere",
+    'git commit --no-verify -m "G-7e: since-the-last-learning-run checkpoint (frozen test, RED)"',
+    'git commit --no-verify -m "checkpoint: restore HARDENING text lost to shell backtick substitution"',
+    "git config core.hooksPath .githooks/../../elsewhere",
 ])
 def test_the_words_alone_do_not_open_the_exemption(tmp_path, command):
     """First pass, F6 and F14: the exemption is the policy's exact subject, the hand-off only inside a worktree;

@@ -103,7 +103,7 @@ def parse_scope(brief_path):
         sys.exit(2)
 
     # Collect bullet lines under the "## Scope" heading, up to the next "## " heading.
-    in_scope, entries = False, []
+    in_scope, entries, raw = False, [], []
     for line in text.splitlines():
         if re.match(r"^##\s+Scope\b", line, re.IGNORECASE):
             in_scope = True
@@ -111,18 +111,23 @@ def parse_scope(brief_path):
         if in_scope and re.match(r"^#+\s+", line):
             break                                          # any heading ends the Scope, a `### Out of scope` included
         if in_scope:
-            if entries and line.strip() and not re.match(r"^[-*]\s", line):
+            if line.strip() and line[0] in " \t":
+                if raw and not re.match(r"^\s*[-*]\s", line):
+                    raw[-1] += " " + line.strip()          # an indented line continues its bullet (third pass, T2)
+                continue                                   # an indented bullet is a sub-bullet, not a path
+            if raw and line.strip() and not re.match(r"^[-*]\s", line):
                 break                                      # a bold note or prose after the path list ends the Scope (N8)
-            m = re.match(r"^[-*]\s+(.+?)\s*$", line)      # top-level bullets only: sub-bullets are not paths
+            m = re.match(r"^[-*]\s+(.+?)\s*$", line)      # top-level bullets only
             if m:
-                entry = m.group(1).strip()
-                if entry.lower().startswith("do not"):
-                    continue
-                paths = split_entry(entry)
-                if paths is None:
-                    print("CANNOT VERIFY: a Scope entry carries an ellipsis (%s); name every path or a glob." % entry[:80])
-                    sys.exit(2)
-                entries.extend(_norm(p) for p in paths)
+                raw.append(m.group(1).strip())
+    for entry in raw:
+        if entry.lower().startswith("do not"):
+            continue
+        paths = split_entry(entry)
+        if paths is None:
+            print("CANNOT VERIFY: a Scope entry carries an ellipsis (%s); name every path or a glob." % entry[:80])
+            sys.exit(2)
+        entries.extend(_norm(p) for p in paths)
     if not entries:
         print("CANNOT VERIFY: no Scope entries found under '## Scope' in %s "
               "(spec-packager defect - the brief must fence its scope)." % brief_path)
@@ -230,7 +235,7 @@ def main(argv):
     if books:
         print("BOOKKEEPING (%d), never drift: %s" % (len(books), ", ".join(books)))
     if records:
-        print("RECORDS (%d), the supervisor's own commits since the checkpoint, not drift: %s" % (len(records), ", ".join(records)))
+        print("RECORDS (%d), changed only by records-only commits since the checkpoint, not drift: %s" % (len(records), ", ".join(records)))
     print("IN SCOPE (%d): %s" % (len(inside), ", ".join(inside) if inside else "(none)"))
     if drift:
         print("SCOPE DRIFT (%d) - outside the brief's Scope:" % len(drift))
