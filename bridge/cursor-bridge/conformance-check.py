@@ -242,6 +242,7 @@ def names_provider(text, providers):
     raw = code_text(text)
     hosts = HOSTLIKE.findall(low)
     hits = []
+    del LAST_WORD_ONLY[:]
     for w in providers:
         for alt in SYNONYMS.get(w, (w,)):
             in_host = any(re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(alt), h) for h in hosts)
@@ -249,7 +250,13 @@ def names_provider(text, providers):
             if in_host or in_key:
                 hits.append(w)
                 break
+            if re.search(r"""["'`][^"'`\n]*(?<![a-z0-9])%s(?![a-z0-9])""" % re.escape(alt), low):
+                LAST_WORD_ONLY.append(w)                   # named in a plain string only: not counted, but said (F20c)
     return hits
+
+
+LAST_WORD_ONLY = []
+WORD_ONLY_FILES = []
 
 
 def status_field(ws, name):
@@ -603,12 +610,18 @@ def main():
                 tests.append(text)
             elif client_rx.search(text) and names_provider(text, providers):
                 adapters[os.path.splitext(n)[0]] = rel
+            elif client_rx.search(text) and LAST_WORD_ONLY:
+                WORD_ONLY_FILES.append(rel)
         elif n.endswith((".js", ".ts", ".mjs", ".tsx")) and not n.endswith(".d.ts"):
             text = read(os.path.join(ws, rel)) or ""
             if is_test:
                 tests.append(text)
             elif js_client_rx.search(text) and names_provider(text, providers):
                 adapters[re.sub(r"\.(js|ts|mjs|tsx)$", "", n)] = rel
+            elif js_client_rx.search(text) and LAST_WORD_ONLY:
+                WORD_ONLY_FILES.append(rel)
+    if WORD_ONLY_FILES:
+        add("NOTE", "Adapters named in a string only", "%d client file(s) name a listed provider only in a plain string, not in a host, a URL or a key name, and are not counted as its adapters (release A4): %s" % (len(WORD_ONLY_FILES), ", ".join(sorted(WORD_ONLY_FILES)[:6])))
     if adapters:
         recordings = any(re.search(r"(^|/)(cassettes?|recorded|recordings)/", rel, re.I) for rel in files)
         loose_rx = re.compile(r"cassette|recorded|replay", re.I)   # enough when the repository tracks recordings

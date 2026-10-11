@@ -15,8 +15,8 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
      decide: a background command *of a kind that finishes* (a builder run, a CI watch, a
      command run through bridge-run.py, or one marked `# wake`) counts until its limit plus a
      grace; a background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
-     the run parameters) AND only while a wake-timer command that ends no later than that is running
-     ceiling, because a hung agent never completes and nothing else would wake the session
+     the run parameters) AND only while a wake-timer command that ends no later than that
+     ceiling is running, because a hung agent never completes and nothing else would wake the session
      (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the
      session is idle). A background command of any other kind (a dev server, a worker, a
      probe) is NOT a wake source: a server never finishes (KP-031). When the hook hands no
@@ -318,17 +318,31 @@ WAITER_RX = re.compile(r"\b(until|while)\b[^\n]*\bsleep\b", re.I)
 WAITERS = []
 
 
+TIMER_SLACK = 300          # the model's latency between the refusal and the timer's start
+
+
 def timers_of(tasks, now):
-    """[(start, end)] of the running wake-timer commands (release A4, KP-043: the bound of a background agent)."""
+    """[(id, start or None, seconds)] of the running wake-timer commands (release A4, KP-043: the bound
+    of a background agent). A timer whose start the hook does not give has None."""
     out = []
     for t in tasks if isinstance(tasks, list) else []:
         if not isinstance(t, dict) or str(t.get("status") or "").lower() != "running":
             continue
         m = TIMER_RX.search(str(t.get("command") or ""))
         if m:
-            start = parse_ts(t.get("started_at") if t.get("started_at") is not None else t.get("startedAt")) or now
-            out.append((start, start + int(m.group(1))))
+            raw = t.get("started_at") if t.get("started_at") is not None else t.get("startedAt")
+            out.append((str(t.get("id")), parse_ts(raw) if raw is not None else None, int(m.group(1))))
     return out
+
+
+def bounds(timer, start, ceiling):
+    """Does this timer end no later than the agent's ceiling (plus the slack)? A timer with no
+    readable start counts when its seconds are no more than the ceiling: the supervisor copied
+    the printed value."""
+    tid, t_start, seconds = timer
+    if t_start is None:
+        return seconds <= ceiling + TIMER_SLACK
+    return t_start + seconds <= start + ceiling + TIMER_SLACK
 
 
 def pending_from_hook(data, now, cwd):
@@ -372,17 +386,18 @@ def pending_from_hook(data, now, cwd):
             ceiling = agent_ceiling(cwd)
             if age > ceiling:
                 continue                                   # past its ceiling: stop it and re-run its task in the foreground
-            if any(end <= start + ceiling + 60 for _, end in timers):
+            if any(bounds(tm, start, ceiling) for tm in timers):
                 pending.append("background agent %s" % t.get("id"))
             else:
                 crons = "; your scheduled wake-up (%s) cannot fire while a background agent runs (KP-043), so it is not the bound" % ", ".join(local_clock(d) for d in sorted(dues)) if (dues or unknown_crons) else ""
+                rejected = "; running timer(s) that end after the ceiling: %s" % ", ".join("%s (ends at %s)" % (tid, local_clock((ts0 if ts0 is not None else now) + sec)) for tid, ts0, sec in timers) if timers else ""
                 left = int(round(start + ceiling - now))
                 if left < 120:                             # the ceiling is at hand or past
-                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, within two minutes, so do not start a timer: stop it with TaskStop now and run its task in the foreground%s)"
-                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), crons))
+                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, within two minutes, so do not start a timer: stop it with TaskStop now and run its task in the foreground%s%s)"
+                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), crons, rejected))
                 else:
-                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, so start its timer in the background now: python ~/.claude/cursor-bridge/wake-timer.py %d \"%s\"%s)"
-                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), left, t.get("description") or t.get("id"), crons))
+                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, so start its timer in the background now: python ~/.claude/cursor-bridge/wake-timer.py %d \"%s\"%s%s)"
+                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), left, re.sub(r"[^\w.-]", "", str(t.get("id"))), crons, rejected))
     return pending, unscheduled
 
 

@@ -147,8 +147,10 @@ def stages_without_demonstration(paths):
     return missing
 
 
-SUBJECT_RX = re.compile(r"^\s*(%s)\b" % ID)
+SUBJECT_RX = re.compile(r"^\s*((?:%s[\s,:]*)+)" % ID)                     # one or more IDs at the start: `TASK-103 TASK-104: ...`
+TRAIL_RX = re.compile(r"\(([^()]*%s[^()]*)\)\s*(?:[-\u2014\u2013]\s*v?[\w.]+\s*)?(?:\(#\d+\))?\s*$" % ID)   # `feat(x): ... (TASK-100, R-027) - v0.2.0 (#148)`
 MERGE_RX = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(task-\d{3,}[a-z]?)\b", re.I)
+BOOKKEEPING = ("docs/BUILDER_NOTES.md", "docs/BOUNDARY_VIOLATIONS.md", "run/")   # every brief names them; no plan lists them
 
 
 def merged_ids(base):
@@ -158,17 +160,27 @@ def merged_ids(base):
         return None
     out = set()
     for line in p.stdout.splitlines():
-        m = SUBJECT_RX.match(line) or MERGE_RX.match(line)
+        m = SUBJECT_RX.match(line)
         if m:
-            out.add(m.group(1).upper())
-        elif re.match(r"^\s*(%s)(\s*,\s*%s)*\s*$" % (ID, ID), line):      # a Merges: trailer line
+            out.update(ID_RX.findall(m.group(1)))              # the case as written: TASK-010c is not TASK-010C
+            continue
+        m = MERGE_RX.match(line)
+        if m:
+            out.add("TASK-" + m.group(1)[5:])                  # a branch name's lower-case prefix, its letter kept
+            continue
+        m = TRAIL_RX.search(line)
+        if m:
+            out.update(ID_RX.findall(m.group(1)))              # the one extra form: the IDs in parentheses at the end
+            continue
+        if re.match(r"^\s*(%s)(\s*,\s*%s)*\s*$" % (ID, ID), line):      # a Merges: trailer line
             out.update(ID_RX.findall(line))
     return out
 
 
 def unreadable(value):
     """What is left of a Depends on / Parent value once the IDs and the fillers are removed."""
-    rest = ID_RX.sub("", value or "")
+    rest = re.sub(r"\([^()]*\)", "", value or "")                          # a dated note in parentheses is not an ID
+    rest = ID_RX.sub("", rest)
     rest = re.sub(r"\bnone\b|(?<!\S)-(?!\S)", "", rest, flags=re.I)        # the fillers, never the hyphen inside TASK-02
     return re.sub(r"[,;\s]+", " ", rest).strip()
 
@@ -190,6 +202,8 @@ def brief_findings(path, item):
     found = []
     inc = item["scope"]
     for p in scope:
+        if any(p == b or (b.endswith("/") and p.startswith(b)) for b in BOOKKEEPING):
+            continue                                           # the files every brief must name (the packager's constraints)
         if not any(p == s or p.startswith(s + "/") or (s == "" ) for s in inc):
             found.append("names %s in its Scope, outside %s's Scope (%s)" % (p, item["id"], ", ".join(inc) or "none"))
     for rid in re.findall(r"\bR-\d{3,}\b", item["fields"].get("satisfies") or ""):

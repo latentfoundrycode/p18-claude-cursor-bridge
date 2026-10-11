@@ -51,13 +51,16 @@ Inno Setup: free, script-based (the script is a committed, reviewable file), one
 #define AppGuid "<GUID — generated once, never changed, without braces>"   ; the identity that makes upgrades in-place
 
 [Setup]
-AppId={{{#AppGuid}}          ; the [Setup] escape: {{ is a literal brace, so the value is {<GUID>}
+; the [Setup] escape: {{ is a literal brace, so the value is {<GUID>}. A comment is a whole line in Inno Setup; never put one after a directive
+AppId={{{#AppGuid}}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
-DefaultDirName={localappdata}\Programs\{#AppName}   ; per-user; {autopf} only for a per-machine design
+; per-user; {autopf} only for a per-machine design
+DefaultDirName={localappdata}\Programs\{#AppName}
 PrivilegesRequired=lowest
-ArchitecturesAllowed=x64os                 ; x64 Windows only; x64compatible would admit an Arm64 host under emulation (R24)
+; x64 Windows only (Inno Setup 6.3 and later; x64compatible would admit an Arm64 host under emulation, R24)
+ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 OutputDir=..\dist
 OutputBaseFilename={#AppName}-Setup-{#AppVersion}-x64

@@ -34,7 +34,7 @@ def make(tmp_path, with_lock=True):
     (r / "pyproject.toml").write_text(PYPROJECT, encoding="utf-8")
     (r / "package.json").write_text(PACKAGE, encoding="utf-8")
     if with_lock:
-        (r / "uv.lock").write_text("# lock\n", encoding="utf-8")
+        (r / "poetry.lock").write_text("# lock\n", encoding="utf-8")     # Poetry's lock does not record the root version; uv.lock does (first pass, F11)
         (r / "package-lock.json").write_text("{}\n", encoding="utf-8")
     git(r, "init", "-q", "-b", "main")
     git(r, "add", "-A")

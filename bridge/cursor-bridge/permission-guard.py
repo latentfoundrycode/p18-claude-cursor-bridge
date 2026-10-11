@@ -75,7 +75,9 @@ PS_VALUE_SWITCHES = ("-executionpolicy", "-ep", "-ex", "-version", "-v", "-windo
 ENCODED = object()
 PREMERGE_DIR = os.path.join("bridge", "premerge")
 STATE_GIT = ("add", "commit", "push", "pull", "merge", "rebase", "switch", "checkout", "reset", "rm", "mv", "cherry-pick", "revert",
-             "am", "apply", "clean", "restore", "stash", "worktree", "branch", "tag", "fetch", "submodule")
+             "am", "apply", "clean", "restore", "stash", "worktree", "branch", "tag", "submodule", "config")
+BRANCH_WRITES = ("-d", "-D", "-m", "-M", "-c", "-C", "--delete", "--move", "--copy", "--set-upstream-to", "-u", "--unset-upstream", "-f", "--force")
+SNAPSHOT_RX = re.compile(r"^\s*checkpoint before (?:TASK|BUG|REFAC|FIX)-(?:\d{3,}[a-z]?|<nnn>)\s*$", re.I)   # the policy's exact subject (the texts quote it with <nnn>)
 GH_READ = ("view", "list", "checks", "status", "diff", "search", "download", "auth", "--version", "version")
 HOOK_SKIPPERS = ("commit", "push", "merge", "rebase", "am", "cherry-pick", "revert")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -152,17 +154,26 @@ def chain_parts(text):
             parts.append(buf); buf = ""; i += 1
         elif c in (";", "\n"):
             parts.append(buf); buf = ""
+        elif c == "&" and (i == 0 or text[i - 1] not in "<>") and (i + 1 >= len(text) or text[i + 1] != ">"):
+            parts.append(buf); buf = ""                        # a single & sequences in cmd and backgrounds in bash; 2>&1 is not one
         else:
             buf += c
         i += 1
     parts.append(buf)
-    return [p.strip() for p in parts if p.strip()]
+    return [re.sub(r"^\(+|\)+$", "", p.strip()).strip() for p in parts if p.strip()]
 
 
 def state_changing(w):
-    """A git or gh command that changes something, as opposed to a read."""
+    """A git or gh command that changes something, as opposed to a read (`git branch --show-current`,
+    `git stash list`, `git worktree list`, `git tag -l`, `git fetch` and `git remote` are reads)."""
     if is_git(w):
-        sub, _ = git_subcommand(w)
+        sub, args = git_subcommand(w)
+        if sub == "branch":
+            return any(a in BRANCH_WRITES for a in args) or any(not a.startswith("-") for a in args)
+        if sub in ("stash", "worktree", "tag"):
+            return bool(args) and args[0] not in ("list", "show", "-l", "--list", "-v", "--verbose", "-n")
+        if sub == "config":
+            return any(a == "core.hookspath" for a in (x.lower() for x in args)) and not any(a.startswith("--get") for a in args)
         return sub in STATE_GIT
     if base(w[0]) in ("gh", "gh.exe"):
         group, sub, _ = gh_words(w)
@@ -179,6 +190,9 @@ def chain_reason(command, cwd):
         return None
     heads = [strip_prefix(words(p)) for p in parts]
     heads = [h for h in heads if h]
+    for h in list(heads):
+        if base(h[0]) == "eval" and len(h) > 1:            # eval "git add -A && git commit": the string is the chain
+            heads += [strip_prefix(words(p)) for p in chain_parts(" ".join(h[1:]))]
     if heads and base(heads[0][0]) == "cd":
         return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
     for w in heads:
@@ -358,8 +372,33 @@ def merge_reason(args, cwd):
     return None
 
 
+def commit_message(args, command):
+    """The message of a git commit: `-m <value>`, `--message=<value>`, or the first line of a
+    here-document the command feeds it (the app's own commit form)."""
+    msg = ""
+    for i, a in enumerate(args):
+        if a in ("-m", "--message") and i + 1 < len(args):
+            msg = args[i + 1]
+        elif a.startswith("--message="):
+            msg = a.split("=", 1)[1]
+    if not msg.strip() or "<<" in msg or "$(" in msg:
+        for m in HEREDOC_RX.finditer(command):
+            body = m.group(0).split("\n", 1)[1]
+            lines = [l for l in body.splitlines() if l.strip() and not re.match(r"^\w+\s*$", l)]
+            if lines:
+                return lines[0].strip()
+    return msg.strip()
+
+
+def in_worktree(w, cwd):
+    """A commit made inside a builder's worktree (`-C ../Worktrees/x`, or a cwd under Worktrees/)."""
+    paths = [cwd or ""] + [w[i + 1] for i, a in enumerate(w) if a == "-C" and i + 1 < len(w)]
+    return any(re.search(r"[\\/]Worktrees[\\/]", p) for p in paths)
+
+
 def check(command, cwd=None):
     """Return the reason to refuse, or None."""
+    command = re.sub(r"\\\r?\n|`\r?\n", " ", command)                     # a line continued with \ or a PowerShell backtick is one line
     if re.search(r"\bgh\s+api\s+graphql\b[^\n]*(\$\(|`)", command):
         return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
     r = chain_reason(command, cwd)
@@ -370,6 +409,12 @@ def check(command, cwd=None):
         if not w:
             continue
         head = base(w[0])
+        if re.search(r"(^|\s)HUSKY=0(\s|$)", simple) and re.search(r"\bgit\s+(commit|push|merge)\b", simple):
+            return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
+        if head == "eval" and len(w) > 1:
+            r = check(" ".join(w[1:]), cwd)
+            if r:
+                return r
         if head in WRAPPER_SHELLS:
             inner = shell_inner(w)
             if inner is ENCODED:
@@ -395,9 +440,13 @@ def check(command, cwd=None):
             sub, args = git_subcommand(w)
             if any(re.match(r"^core\.hookspath=", a, re.I) for a in w) and not helpful:
                 return "git -c core.hooksPath=... (the checks a commit runs are switched off; rule 4)"
+            if sub == "config" and not helpful and any(a.lower() == "core.hookspath" for a in args) and not any(a.startswith("--get") for a in args):
+                value = next((a for a in args[args.index(next(x for x in args if x.lower() == "core.hookspath")) + 1:] if not a.startswith("-")), "")
+                if "--unset" in args or value.lower() in ("/dev/null", "nul", "") or os.path.isabs(value):
+                    return "git config core.hooksPath %s (the checks a commit runs are switched off; rule 4)" % (value or "--unset")
             if sub in HOOK_SKIPPERS and not helpful:
-                message = next((args[i + 1] for i, a in enumerate(args) if a in ("-m", "--message") and i + 1 < len(args)), "")
-                snapshot = bool(re.match(r"^\s*checkpoint\b", message, re.I) or re.search(r"\bhand-off\b", message, re.I))
+                message = commit_message(args, command)
+                snapshot = bool(SNAPSHOT_RX.match(message)) or (bool(re.search(r"\bhand-off\b", message, re.I)) and in_worktree(w, cwd))
                 for a in args:
                     if (a == "--no-verify" or (sub == "commit" and re.match(r"^-[A-Za-z]*n[A-Za-z]*$", a))) and not snapshot:
                         return "git %s %s (a commit that skips its checks; the merge policy allows it only for the checkpoint commit and a builder's hand-off snapshot, whose message says so)" % (sub, a)

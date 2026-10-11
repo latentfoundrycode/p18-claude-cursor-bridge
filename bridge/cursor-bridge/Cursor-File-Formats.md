@@ -526,8 +526,10 @@ Holds the project's **own** rules, in Semgrep's rule schema (`id`, `languages`, 
 `message`, `pattern` or `patterns`), the same shape as the bundled `semgrep-bridge-rules.yml`.
 A registry pack (`p/default`) is **not** a rule and is not valid inside this file (the plan
 review's R24: the TDP had to pass the packs on the command line); the packs are named on the
-gate command, pinned by the Semgrep CLI version recorded in `docs/INVENTORY.md` (Resources)
-by the file that pins it. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if
+gate command. What is pinnable is the Semgrep CLI version (recorded in `docs/INVENTORY.md`,
+Resources, by the file that pins it) and a rule file vendored into the repository, such as the
+bundled bridge rules; a registry pack is not: its rules change in the registry under the same
+name, so a pack is a floor the project accepts, never a pin in rule 14's sense. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if
 behaviour looks off; native Windows support is now GA, but the floor still runs Semgrep in CI
 on Linux).
 
@@ -545,8 +547,8 @@ rules:
     pattern: <the shape to catch>
 ```
 
-- Prefer curated registry packs (`p/…`) pinned to a recorded version, or vendor a fixed
-  rule file into the repo. Pin the **Semgrep CLI version** too (`docs/INVENTORY.md` (Resources)).
+- Use the curated registry packs (`p/…`) as the floor and vendor a fixed rule file into the
+  repo for anything that must stay the same between sessions. Pin the **Semgrep CLI version** too (`docs/INVENTORY.md` (Resources)).
 - Findings above the chosen severity block in CI. Inline `# nosemgrep` suppressions are a
   **gate-integrity flag** (see `Merge-Verification-Policy.md`) unless justified as a false
   positive with a stated reason.

@@ -33,6 +33,23 @@ Scope: src/graph/
 Depends on: TASK-003
 Satisfies: R-005
 Scope: src/export.py
+
+### TASK-006a — lettered one
+Satisfies: R-010
+Scope: src/l1.py
+
+### TASK-006b — lettered two
+Satisfies: R-011
+Scope: src/l2.py
+
+### TASK-007 — exporter, merged under the TDP's subject form
+Depends on: TASK-006a, TASK-006b (TASK-006b added 2026-10-03: the pair ships together; see the note)
+Satisfies: R-009
+Scope: src/exp/
+
+### TASK-008 — merged by a records commit's Merges: trailer
+Satisfies: R-012
+Scope: src/rec.py
 """
 
 
@@ -53,6 +70,9 @@ def make(tmp_path, plan=PLAN):
     git(r, "commit", "-q", "--allow-empty", "-m", "TASK-001: the parser")
     git(r, "commit", "-q", "--allow-empty", "-m", "Merge pull request #5 from owner/task-002-writer")
     git(r, "commit", "-q", "--allow-empty", "-m", "docs: plan split TASK-003 out of TASK-004")
+    git(r, "commit", "-q", "--allow-empty", "-m", "TASK-006a TASK-006b: the lettered pair (#7)")
+    git(r, "commit", "-q", "--allow-empty", "-m", "feat(export): the exporter (TASK-007, R-009) - v0.2.0 (#8)")
+    git(r, "commit", "-q", "--allow-empty", "-m", "records: the stage close\n\nMerges: TASK-008")
     return r
 
 
@@ -64,7 +84,10 @@ def run(repo, *args):
 def test_a_commit_that_mentions_two_increments_merges_neither(tmp_path):
     r = make(tmp_path)
     rc, out = run(r)
-    assert rc == 0 and "2 merged" in out and "READY: TASK-003" in out and "READY: TASK-004" not in out, "the docs commit marked TASK-003 and TASK-004 merged (R17): " + out
+    assert rc == 0 and "6 merged" in out and "READY: TASK-003" in out and "READY: TASK-004" not in out, "the docs commit marked TASK-003 and TASK-004 merged (R17): " + out
+    for tid in ("TASK-006a", "TASK-006b", "TASK-007", "TASK-008"):
+        assert "READY: %s" % tid not in out, "%s is merged: a lettered ID keeps its case, several IDs at the start all count, the IDs in parentheses at the end count, a Merges: trailer counts (first pass, F1 and F4): %s" % (tid, out)
+    assert "DEPENDS" not in out, "a dated note in parentheses on a Depends on line is not an ID (first pass, F3): " + out
 
 
 def test_an_unreadable_dependency_fails_instead_of_vanishing(tmp_path):
@@ -75,12 +98,12 @@ def test_an_unreadable_dependency_fails_instead_of_vanishing(tmp_path):
 
 def test_each_brief_is_compared_with_its_increment(tmp_path):
     r = make(tmp_path)
-    (r / "handoff" / "TASK-003.md").write_text("# TASK-003\nSatisfies: R-003 graph\n\n## Scope\n- src/graph/draw.py\n- src/export.py\n\n## Constraints\n- none\n", encoding="utf-8")
+    (r / "handoff" / "TASK-003.md").write_text("# TASK-003\nSatisfies: R-003 graph\n\n## Scope\n- src/graph/draw.py\n- src/export.py\n- docs/BUILDER_NOTES.md\n\n## Constraints\n- none\n", encoding="utf-8")
     rc, out = run(r)
     assert rc == 1 and "BRIEF: handoff/TASK-003.md" in out and "src/export.py" in out and "R-004" in out, "a brief that drops a requirement and reaches outside its increment (13.1): " + out
-    (r / "handoff" / "TASK-003.md").write_text("# TASK-003\nSatisfies: R-003, R-004\n\n## Scope\n- src/graph/draw.py\n\n## Constraints\n- none\n", encoding="utf-8")
+    (r / "handoff" / "TASK-003.md").write_text("# TASK-003\nSatisfies: R-003, R-004\n\n## Scope\n- src/graph/draw.py\n- docs/BUILDER_NOTES.md\n\n## Constraints\n- none\n", encoding="utf-8")
     rc, out = run(r)
-    assert rc == 0, out
+    assert rc == 0, "the bookkeeping file every brief names is not a BRIEF finding (first pass, F2): " + out
 
 
 def test_a_dated_addendum_is_read_with_the_plan(tmp_path):

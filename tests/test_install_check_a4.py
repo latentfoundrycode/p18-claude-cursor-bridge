@@ -61,7 +61,9 @@ def test_a_release_that_could_not_be_taken_back_is_not_installed(tmp_path, progr
     assert rc == 0, out
     (target / "cursor-bridge" / "scope-check.py").write_text("changed on this computer\n", encoding="utf-8")
     rc, out = install_old(tmp_path, old, target)
-    assert rc == 2 and "could not be taken back" in out and "Nothing was changed" in out, "the release was installed although the way back would refuse (S4): " + out
+    assert rc == 2 and "changed on this computer" in out and "Nothing was changed" in out, "the release was installed although the way back would refuse (S4): " + out
     assert (target / "cursor-bridge" / "scope-check.py").read_text(encoding="utf-8") == "changed on this computer\n", "the target was replaced"
+    kept = sorted(p.name for p in (target / "cursor-bridge-previous").iterdir()) if (target / "cursor-bridge-previous").exists() else []
+    assert kept == [], "a refused install must not rotate the kept copy (first pass, F9): " + str(kept)
     rc, out = run(old / "cursor-bridge" / "bridge-install.py", tmp_path, "--target", str(target), "--anyway")
     assert rc == 0 and "MATCHES bridge " + OLD_VERSION in out, "the maintainer's rehearsals install regardless: " + out

@@ -75,12 +75,17 @@ def split_entry(entry):
         piece = piece.strip().strip("`'\"").strip()
         if not piece:
             continue
-        tok = piece.split()[0].strip("`'\"").rstrip(",;:")
+        tok = piece.split()[0].rstrip(",;:").strip("`'\"").rstrip(",;:")
         if "..." in tok or "\u2026" in tok:
             return None
-        if tok and PATH_RX.match(tok):
+        if tok and PATH_RX.match(tok) and re.search(r"[./*?\[]", tok):   # a path has a slash, a dot or a glob; a bare word is prose
             out.append(tok)
+        else:
+            UNREAD.append(piece[:60])                          # reported, never dropped in silence
     return out
+
+
+UNREAD = []
 
 
 def parse_scope(brief_path):
@@ -116,11 +121,35 @@ def parse_scope(brief_path):
     return entries
 
 
+RECORDS = ("docs/BUILD_PLAN", "docs/INVENTORY.md", "docs/CHANGES.md", "docs/REQUIREMENTS.md", "docs/PROJECT_STATUS.md",
+           "docs/RUN_PARAMETERS.md", "docs/DESIGN.md", "docs/diagrams/", "handoff/")
+
+
 def checkpoint_of(brief):
-    """The commit that last touched the brief: the checkpoint commits it before the delegation.
-    None when the brief is not committed."""
-    out = _run_git(["log", "-1", "--format=%H", "--", brief]).strip()
-    return out or None
+    """(the commit that first added the brief, the number of later commits that touched it): the
+    checkpoint commits the brief before the delegation; a brief fixed and committed later must
+    not move the base past the builder's commits. (None, 0) when the brief is not committed."""
+    added = _run_git(["log", "--diff-filter=A", "--format=%H", "--", brief]).split()
+    if not added:
+        return None, 0
+    base = added[-1]
+    later = _run_git(["log", "--format=%H", base + "..HEAD", "--", brief]).split()
+    return base, len(later)
+
+
+def is_record(path):
+    return any(path == r or path.startswith(r) for r in RECORDS)
+
+
+def supervisors_own(path, base, uncommitted):
+    """A records file changed only by the supervisor's own commits since the checkpoint (every
+    author is the checkout's user.email) and not in the working tree: the supervisor's bookkeeping,
+    not the builder's drift. A builder's commit carries another identity (the owner's is withheld)."""
+    if path in uncommitted:
+        return False
+    mine = _run_git(["config", "user.email"]).strip()
+    authors = _run_git(["log", "--format=%ae", base + "..HEAD", "--", path]).split()
+    return bool(mine) and bool(authors) and all(a == mine for a in authors)
 
 
 def changed_files(base):
@@ -160,26 +189,33 @@ def main(argv):
             base = argv[i + 1]
     note = ""
     if base is None:
-        base = checkpoint_of(_norm(brief))
-        note = " (the checkpoint: the commit that committed the brief)" if base else ""
+        base, later = checkpoint_of(_norm(brief))
+        note = " (the checkpoint: the commit that first added the brief%s)" % ("; the brief was changed in %d later commit(s), the base stays" % later if later else "") if base else ""
         if base is None:
             base = "HEAD"
             note = " (the brief is not committed; HEAD. A builder's own commit is inside the diff only with --base <checkpoint>)"
 
     entries = parse_scope(brief)
     changed = changed_files(base)
+    uncommitted = {_norm(l[3:]) for l in _run_git(["status", "--porcelain", "-uall"]).splitlines() if len(l) > 3}
 
     books = [p for p in changed if bookkeeping(p)]
     changed = [p for p in changed if not bookkeeping(p)]
+    records = [p for p in changed if is_record(p) and not in_scope(p, entries) and base != "HEAD" and supervisors_own(p, base, uncommitted)]
+    changed = [p for p in changed if p not in records]
     inside = [p for p in changed if in_scope(p, entries)]
     drift = [p for p in changed if not in_scope(p, entries)]
 
     print("BRIEF:        %s" % brief)
     print("BASE:         %s%s" % (base, note))
     print("SCOPE:        %s" % ", ".join(entries))
+    for u in UNREAD:
+        print("NOT READ AS A PATH: %s" % u)
     print("CHANGED (%d): %s" % (len(changed), ", ".join(changed) if changed else "(none)"))
     if books:
         print("BOOKKEEPING (%d), never drift: %s" % (len(books), ", ".join(books)))
+    if records:
+        print("RECORDS (%d), the supervisor's own commits since the checkpoint, not drift: %s" % (len(records), ", ".join(records)))
     print("IN SCOPE (%d): %s" % (len(inside), ", ".join(inside) if inside else "(none)"))
     if drift:
         print("SCOPE DRIFT (%d) - outside the brief's Scope:" % len(drift))

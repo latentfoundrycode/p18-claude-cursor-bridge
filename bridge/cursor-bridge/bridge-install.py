@@ -586,18 +586,20 @@ def install(target, dry, anyway=False):
     old_version, old_files = manifest_of(target)
     print("bridge-install: %s -> %s%s" % (RELEASE, target, " (dry run)" if dry else ""))
     if old_version and old_version != new_version:
+        kept = os.path.join(target, PREVIOUS, old_version)
+        already_kept = os.path.isdir(kept) and not not_as_released(kept, fingerprints_of(kept)[1])   # a repeated run after an interruption: the way back is saved whole
+        changed = [] if (dry or already_kept) else not_as_released(target, fingerprints_of(target)[1])
+        changed = [c for c in changed if "(missing)" not in c]   # a missing file is an interrupted replacement being completed, not a change on this computer
+        if changed and not anyway:                         # S4, checked on the installed tree BEFORE the kept copy is rotated (F9): the older way back survives a refusal
+            print("bridge-install: the release installed now (%s) has %d file(s) changed on this computer (%s), so the way back to it would refuse. Nothing was changed, and the kept copy of the "
+                  "release before it is untouched. Tell the maintainer, who repairs the installed tree first (the same release installed again from its folder); "
+                  "--anyway installs regardless (the maintainer's rehearsals)." % (old_version, len(changed), few(changed)))
+            return 2
         dest = save_previous(target, old_version, old_files, dry)
         print("  previous       %s kept at %s" % (old_version, dest))
         print("  way back       python %s --rollback" % os.path.join(HERE, "bridge-install.py").replace("\\", "/"))
-        changed = [] if dry else not_as_released(dest, fingerprints_of(dest)[1])
-        changed = [c for c in changed if "(missing)" not in c]   # a missing file is an interrupted replacement being completed, not a change on this computer
-        if changed and not anyway:                         # S4: a release whose way back would refuse is not installed
-            print("bridge-install: the release installed now (%s) could not be taken back afterwards: %d file(s) of it had been changed or were missing on this computer (%s), "
-                  "and the way back refuses such a copy. Nothing was changed. Tell the maintainer, who repairs the installed tree first (the same release installed again from its folder); "
-                  "--anyway installs regardless (the maintainer's rehearsals)." % (old_version, len(changed), few(changed)))
-            return 2
         if changed:
-            print("  WARNING        the kept %s is not that release as shipped: %d file(s) had been changed or were missing on this computer (%s); installed with --anyway." % (old_version, len(changed), few(changed)))
+            print("  WARNING        the kept %s is not that release as shipped: %d file(s) had been changed on this computer (%s); installed with --anyway." % (old_version, len(changed), few(changed)))
     replace_release(target, RELEASE, inputs[0], inputs[1], dry)
     if dry:
         return 0

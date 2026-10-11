@@ -54,8 +54,10 @@ DEP_TABLE_RX = re.compile(r"dependenc|dependency-groups|build-system|tool\.(uv|p
 PKG_KEYS = ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies", "overrides", "resolutions", "workspaces", "packageManager", "engines")
 
 
-def dependency_text(name, text):
-    """The part of a manifest a lockfile depends on."""
+def dependency_text(name, text, strict=False):
+    """The part of a manifest a lockfile depends on; with `strict` the root package's own name and
+    version too (Cargo.lock and uv.lock record them, and `cargo --locked` / `uv lock --check` fail
+    on a bump without the lockfile)."""
     if name == "package.json":
         try:
             obj = json.loads(text)
@@ -74,6 +76,9 @@ def dependency_text(name, text):
                 keep.append(s)
                 if s.startswith("]") or s.endswith("]"):
                     in_array = False
+                continue
+            if strict and table in ("package", "project") and re.match(r"^(name|version)\s*=", s):
+                keep.append(s)
                 continue
             if DEP_TABLE_RX.search(table) or re.match(r"^(requires-python|requires|dependencies|optional-dependencies|install_requires|extras_require|setup_requires|tests_require)\b", s):
                 keep.append(s)
@@ -95,7 +100,9 @@ def unchanged_dependencies(base, path):
     except OSError:
         return False
     name = path.rsplit("/", 1)[-1]
-    return dependency_text(name, old) == dependency_text(name, new)
+    beside = {c.rsplit("/", 1)[-1] for c in tracked_in(os.path.dirname(path))}
+    strict = name == "Cargo.toml" or (name == "pyproject.toml" and "uv.lock" in beside)
+    return dependency_text(name, old, strict) == dependency_text(name, new, strict)
 
 
 def tracked_in(folder):

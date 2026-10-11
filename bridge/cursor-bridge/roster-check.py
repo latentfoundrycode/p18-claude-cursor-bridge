@@ -97,21 +97,35 @@ def norm_entry(entry):
     return entry or "", None, None
 
 
+def current_branch():
+    try:
+        p = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, creationflags=NO_WINDOW)
+        return p.stdout.strip() if p.returncode == 0 else ""
+    except OSError:
+        return ""
+
+
 def built_by(run_log):
-    """The model of the last builder run in the launcher's run log (release A4), or None."""
+    """The model of the last builder run of the branch under review in the launcher's run log
+    (release A4; the log records the branch); the last builder run of any branch when none names it."""
     try:
         with open(run_log, encoding="utf-8") as f:
             lines = f.read().splitlines()
     except OSError:
         return None
-    for line in reversed(lines):
+    branch = current_branch()
+    entries = []
+    for line in lines:
         try:
             e = json.loads(line)
         except ValueError:
             continue
         if isinstance(e, dict) and e.get("kind") == "builder" and e.get("model"):
+            entries.append(e)
+    for e in reversed(entries):
+        if branch and e.get("branch") == branch:
             return str(e["model"])
-    return None
+    return str(entries[-1]["model"]) if entries else None
 
 
 def family_of(model_id, override=None):

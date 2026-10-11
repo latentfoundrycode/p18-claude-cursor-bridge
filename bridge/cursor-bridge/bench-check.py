@@ -53,10 +53,10 @@ def direction(budget, metric):
             return "lower"
         if "min" in budget:
             return "higher"
-    m = (metric or "").lower()
-    if m.endswith(HIGHER_HINTS) or any(t in HIGHER_HINTS for t in re.split(r"[^a-z0-9]+", m)):
-        return "higher"
-    if any(t in LOWER_HINTS for t in re.split(r"[^a-z0-9]+", m)):
+    toks = [t for t in re.split(r"[^a-z0-9]+", (metric or "").lower()) if t]
+    if "_".join(toks[-2:]) in ("per_s", "per_sec", "per_second") or any(t in HIGHER_HINTS for t in toks):
+        return "higher"                                    # whole tokens only: frame_drops is not ops
+    if any(t in LOWER_HINTS for t in toks):
         return "lower"
     return None
 

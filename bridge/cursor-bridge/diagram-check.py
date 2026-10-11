@@ -492,40 +492,87 @@ def py_imports(path, text, index):
 JS_IMPORT = re.compile(r"""(?:\bimport|\bexport)\s+(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"]|\brequire\(\s*['"]([^'"]+)['"]\s*\)|\bimport\(\s*['"]([^'"]+)['"]\s*\)""")
 
 
-_ALIASES = None
+_ALIASES = {}
 
 
-def path_aliases():
-    """[(prefix, [targets])] from tsconfig.json / jsconfig.json `compilerOptions.paths` with `baseUrl`
-    (release A4: a project's own shortcut paths, instead of assuming `@/` means `src/`)."""
-    global _ALIASES
-    if _ALIASES is not None:
-        return _ALIASES
+def strip_json_comments(text):
+    """`//` and `/* */` comments removed outside strings (a `$schema` URL holds `//`), trailing commas dropped."""
+    out, i, n, in_str = [], 0, len(text), False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1]); i += 2; continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True; out.append(c)
+        elif text.startswith("//", i):
+            j = text.find("\n", i); i = n if j < 0 else j; continue
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2); i = n if j < 0 else j + 2; continue
+        else:
+            out.append(c)
+        i += 1
+    return re.sub(r",\s*([}\]])", r"\1", "".join(out))
+
+
+def read_tsconfig(cfg, seen=()):
+    """compilerOptions of a tsconfig/jsconfig with its `extends` chain applied (the child wins)."""
+    if cfg in seen:
+        return {}
+    try:
+        obj = json.loads(strip_json_comments(read(cfg)))
+    except (ValueError, OSError):
+        return {}
+    co = dict(obj.get("compilerOptions") or {})
+    ext = obj.get("extends")
+    if isinstance(ext, str) and (ext.startswith(".") or ext.endswith(".json")):
+        parent = os.path.normpath(os.path.join(os.path.dirname(cfg), ext if ext.endswith(".json") else ext + ".json"))
+        merged = read_tsconfig(parent, seen + (cfg,))
+        merged.update(co)
+        co = merged
+    return co
+
+
+def path_aliases(for_file="."):
+    """[(prefix, [targets])] from the nearest tsconfig.json / jsconfig.json above `for_file`, its
+    `paths` resolved against `baseUrl` relative to that file's own folder, `extends` followed
+    (release A4: a project's own shortcut paths; reAngle's is frontend/tsconfig.json with `@/*` -> `./*`)."""
+    d = os.path.dirname(for_file) or "."
+    cfg = None
+    while True:
+        for name in ("tsconfig.json", "jsconfig.json"):
+            cand = os.path.normpath(os.path.join(d, name))
+            if os.path.isfile(cand):
+                cfg = cand
+                break
+        if cfg or os.path.normpath(d) in (".", os.path.sep) or os.path.dirname(d) == d:
+            break
+        d = os.path.dirname(d) or "."
+    if cfg is None:
+        return []
+    if cfg in _ALIASES:
+        return _ALIASES[cfg]
+    co = read_tsconfig(cfg)
+    folder = os.path.dirname(cfg)
+    base = os.path.normpath(os.path.join(folder, co.get("baseUrl") or "."))
     out = []
-    for cfg in ("tsconfig.json", "jsconfig.json"):
-        if not os.path.isfile(cfg):
-            continue
-        try:
-            raw = re.sub(r"//[^\n]*|/\*.*?\*/", "", read(cfg), flags=re.S)
-            obj = json.loads(re.sub(r",\s*([}\]])", r"\1", raw))
-        except ValueError:
-            continue
-        co = obj.get("compilerOptions") or {}
-        base = (co.get("baseUrl") or ".").strip("./") or "."
-        for key, targets in (co.get("paths") or {}).items():
-            prefix = key[:-1] if key.endswith("*") else key
-            tgts = []
-            for t in targets if isinstance(targets, list) else [targets]:
-                t = str(t)[:-1] if str(t).endswith("*") else str(t)
-                tgts.append(os.path.normpath(os.path.join(base, t)).replace("\\", "/").strip("./"))
-            out.append((prefix, tgts))
-    _ALIASES = sorted(out, key=lambda a: -len(a[0]))
-    return _ALIASES
+    for key, targets in (co.get("paths") or {}).items():
+        prefix = key[:-1] if key.endswith("*") else key
+        tgts = []
+        for t in targets if isinstance(targets, list) else [targets]:
+            t = str(t)[:-1] if str(t).endswith("*") else str(t)
+            tgts.append(os.path.normpath(os.path.join(base, t)).replace("\\", "/").strip("./") or ".")
+        out.append((prefix, tgts))
+    _ALIASES[cfg] = sorted(out, key=lambda a: -len(a[0]))
+    return _ALIASES[cfg]
 
 
 def js_imports(path, text, fileset):
     out = []
-    aliases = path_aliases()
+    aliases = path_aliases(path)
     for m in JS_IMPORT.finditer(text):
         spec = (m.group(1) or m.group(2) or m.group(3) or "").split("?")[0]
         bases = []
@@ -632,6 +679,11 @@ def component_violations(did, fc, emap, files, done, fails, notes, deviations=fr
             fails.append("%s: component '%s' matches no source file - drawn but not built" % (did, leaf))
 
 
+SQL_TYPES = {"INT", "INTEGER", "SMALLINT", "BIGINT", "TINYINT", "SERIAL", "BIGSERIAL", "DECIMAL", "NUMERIC", "FLOAT", "REAL", "DOUBLE",
+             "MONEY", "CHAR", "VARCHAR", "NCHAR", "NVARCHAR", "TEXT", "CLOB", "BLOB", "BYTEA", "BINARY", "VARBINARY", "BOOLEAN", "BOOL",
+             "BIT", "DATE", "TIME", "DATETIME", "TIMESTAMP", "TIMESTAMPTZ", "INTERVAL", "JSON", "JSONB", "UUID", "XML", "ENUM", "ARRAY"}
+
+
 def is_constraint(tok):
     """A table-level constraint line, not a column: a quoted name is always a column; KEY/INDEX/CHECK
     are constraints only in their constraint form (`KEY name (cols)`, `INDEX (col)`, `CHECK (expr)`),
@@ -643,6 +695,8 @@ def is_constraint(tok):
     if up in ("CONSTRAINT", "PRIMARY", "FOREIGN", "UNIQUE"):
         return True
     if up in ("KEY", "INDEX", "CHECK", "FULLTEXT", "SPATIAL"):
+        if len(tok) > 1 and tok[1].upper().split("(")[0] in SQL_TYPES:
+            return False                                   # `key DECIMAL (10,2)`: a column of a known type
         rest = " ".join(tok[1:])
         return bool(re.match(r"^(\w+\s+)?\(", rest))   # `KEY idx (id)` or `CHECK (x)`, never `key VARCHAR(10)`
     return False
