@@ -1,0 +1,15 @@
+{
+  "profile": "native",
+  "builder": "composer-2.5",
+  "review_a": "claude-opus-5-5",
+  "review_b": "grok-4.7-medium",
+  "families": {
+    "builder": "cursor",
+    "review_a": "anthropic",
+    "review_b": "xai"
+  },
+  "other_pool": "available",
+  "probed": true,
+  "resolved_at": "2026-10-11T19:23 UTC",
+  "reset_day": 16
+}
