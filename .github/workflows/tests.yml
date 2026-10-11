@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
-      - run: python -m pip install pytest==9.1.1
+      - run: python -m pip install pytest==9.1.1 pyyaml==6.0.3
       - run: python -m pytest tests -q
       - name: windowless check over the bridge's programs
         run: python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge
