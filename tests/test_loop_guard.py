@@ -115,7 +115,8 @@ def task(kind, command, age, status="running", tid="t1"):
     ("a builder past its limit plus grace no longer counts", [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x", 7200 + 601)], None, False),
     ("a server never counts", [task("command", "npm run dev", 60)], None, False),
     ("a completed task never counts", [task("command", "cursor-agent -p --force x", 60, status="completed")], None, False),
-    ("a background agent under its ceiling with its wake-up scheduled", [task("background_subagent", "Agent", 600)], [{"id": "c1", "schedule": "7 * * * *", "description": "ceiling check", "command": "", "last_run_at": None, "next_run_at": ts(2900)}], True),
+    ("a background agent under its ceiling with its timer running (KP-043)", [task("background_subagent", "Agent", 600), task("command", 'python ~/.claude/cursor-bridge/wake-timer.py 3000 "Agent"', 600, tid="t2")], [], True),
+    ("a background agent with only a scheduled wake-up is not bounded (KP-043)", [task("background_subagent", "Agent", 600)], [{"id": "c1", "schedule": "7 * * * *", "description": "ceiling check", "command": "", "last_run_at": None, "next_run_at": ts(2900)}], False),
     ("a background agent with no wake-up scheduled is not a wake source (case 5)", [task("background_subagent", "Agent", 600)], [], False),
     ("a wake-up scheduled after the ceiling does not bound the agent: sent back (second pass, S1)", [task("background_subagent", "Agent", 600)], [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(7200)}], False),
     ("a wake-up past due still fires when the session is idle", [], [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(-300)}], True),
@@ -141,8 +142,8 @@ def test_the_agent_ceiling_can_be_raised_in_the_run_parameters(lg, tmp_path, mon
     (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
     (root / "docs" / "RUN_PARAMETERS.md").write_text("Merge authority: supervisor\nAgent ceiling: 7200\nCeiling above twice: builder 21600 (the owner: six hours, 2026-10-10)\n", encoding="utf-8")
     assert lg.agent_ceiling(str(root)) == 7200
-    crons = [{"id": "c1", "schedule": "x", "description": "", "command": "", "last_run_at": None, "next_run_at": ts(2000)}]
-    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps(hook_input(root, [task("background_subagent", "Agent", 5000)], crons))))
+    timer = task("command", 'python ~/.claude/cursor-bridge/wake-timer.py 7200 "Agent"', 5000, tid="t2")   # ends at the raised ceiling (KP-043)
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps(hook_input(root, [task("background_subagent", "Agent", 5000), timer], []))))
     with pytest.raises(SystemExit) as e:
         lg.main()
     assert e.value.code == 0
@@ -244,9 +245,9 @@ def test_the_run_sheet_check_applies_in_every_phase_and_blocks_the_stop(lg, tmp_
 
 
 def test_the_refusal_prints_the_ceiling_on_the_computers_clock(lg, tmp_path, monkeypatch, capsys):
-    """reAngle, 2026-10-10 (KP-039): wake-ups computed from a UTC stamp with an assumed offset landed an hour
-    past the ceiling. The refusal prints the clock's reading, the ceiling's time and the schedule to copy, and
-    names a wake-up that is due after the ceiling."""
+    """reAngle, 2026-10-10 (KP-039) and 2026-10-11 (KP-043, ISS-021): a scheduled wake-up cannot bound a background
+    agent, because it does not fire while one runs; the bound is a wake-timer command. The refusal prints the clock's
+    reading, the ceiling's time and the timer command to copy, and says why the scheduled wake-up is not the bound."""
     from datetime import datetime as dt
     root = tmp_path / "proj" / "Workspace"
     (root / "docs").mkdir(parents=True)
@@ -257,9 +258,18 @@ def test_the_refusal_prints_the_ceiling_on_the_computers_clock(lg, tmp_path, mon
     pending, unscheduled = lg.pending_from_hook({"background_tasks": [agent], "session_crons": [cron]}, NOW, str(root))
     assert len(unscheduled) == 1 and "background agent a1" not in pending, (pending, unscheduled)   # the late wake-up is listed, the agent is not covered
     ceiling = dt.fromtimestamp(NOW - 600 + 3600)
-    assert "`%d %d %d %d *`" % (ceiling.minute, ceiling.hour, ceiling.day, ceiling.month) in unscheduled[0] and ceiling.strftime("%Y-%m-%d %H:%M") in unscheduled[0], unscheduled[0]
-    assert "after it" in unscheduled[0] and late.strftime("%H:%M") in unscheduled[0], unscheduled[0]
+    assert "wake-timer.py 3000" in unscheduled[0] and ceiling.strftime("%Y-%m-%d %H:%M") in unscheduled[0], unscheduled[0]
     assert "(UTC+" in unscheduled[0] or "(UTC-" in unscheduled[0], unscheduled[0]
+    assert "cannot fire while a background agent runs" in unscheduled[0] and late.strftime("%H:%M") in unscheduled[0], unscheduled[0]
+    timer = {"id": "t1", "type": "shell", "status": "running", "description": "ceiling timer", "command": 'python ~/.claude/cursor-bridge/wake-timer.py 3000 "Review A"', "started_at": ts(-600)}
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [agent, timer], "session_crons": []}, NOW, str(root))
+    assert not unscheduled and "background agent a1" in pending and "wake-timer t1" in pending, "a running timer that ends at the ceiling is the bound (KP-043): " + str((pending, unscheduled))
+    short = dict(timer, command='python ~/.claude/cursor-bridge/wake-timer.py 7200 "Review A"')
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [agent, short], "session_crons": []}, NOW, str(root))
+    assert len(unscheduled) == 1, "a timer that ends after the ceiling is no bound: " + str((pending, unscheduled))
+    waiter = {"id": "w1", "type": "shell", "status": "running", "description": "poll", "command": "until grep -q ^exit out.txt; do sleep 15; done", "started_at": ts(-60)}
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [waiter], "session_crons": []}, NOW, str(root))
+    assert not pending and not unscheduled and lg.WAITERS == ["w1"], "a leftover polling loop never counts: " + str((pending, unscheduled, lg.WAITERS))
     near = dict(agent, started_at=ts(-3600 + 30))
     pending, unscheduled = lg.pending_from_hook({"background_tasks": [near], "session_crons": []}, NOW, str(root))
     assert len(unscheduled) == 1 and "TaskStop now" in unscheduled[0] and "CronCreate" not in unscheduled[0], "a ceiling at hand is stopped, not scheduled (review of 10c, finding 1): " + str(unscheduled)
@@ -267,7 +277,7 @@ def test_the_refusal_prints_the_ceiling_on_the_computers_clock(lg, tmp_path, mon
     with pytest.raises(SystemExit) as e:
         lg.main()
     err = capsys.readouterr().err
-    assert e.value.code == 2 and "The computer's clock reads" in err and "KP-039" in err and "never convert a UTC stamp" in err, err
+    assert e.value.code == 2 and "The computer's clock reads" in err and "KP-043" in err and "wake-timer" in err, err
 
 
 def test_the_hook_input_is_read_in_its_live_forms(lg, tmp_path, monkeypatch):
@@ -286,7 +296,8 @@ def test_the_hook_input_is_read_in_its_live_forms(lg, tmp_path, monkeypatch):
     (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
     agent = {"id": "a1", "type": "background_subagent", "status": "running", "description": "Review A", "command": "Agent", "started_at": int((NOW - 300) * 1000)}
     cron = {"id": "c1", "schedule": "%d %d %d %d *" % (local.minute, local.hour, local.day, local.month), "description": "ceiling", "command": "", "last_run_at": None}
-    pending, unscheduled = lg.pending_from_hook({"background_tasks": [agent], "session_crons": [cron]}, NOW, str(root))
+    timer = {"id": "t2", "type": "shell", "status": "running", "description": "ceiling timer", "command": 'python ~/.claude/cursor-bridge/wake-timer.py 3300 "Review A"', "started_at": int((NOW - 300) * 1000)}
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [agent, timer], "session_crons": [cron]}, NOW, str(root))
     assert pending and not unscheduled, (pending, unscheduled)
     old = dict(agent, started_at=int((NOW - 7200) * 1000))
     pending, unscheduled = lg.pending_from_hook({"background_tasks": [old], "session_crons": []}, NOW, str(root))

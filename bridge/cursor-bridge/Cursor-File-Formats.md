@@ -522,21 +522,33 @@ architecture; `docs/design/DESIGN.md` = visual system; `.cursor/rules/vercel-int
 
 ## `.semgrep.yml` (project root) — pinned SAST ruleset
 
-Points the Semgrep floor at the ruleset the project builds against, pinned so a resumed
-session runs the same rules. Either an inline `rules:` set or a reference to pinned registry
-rulesets. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if behaviour looks
-off; native Windows support is now GA, but the floor still runs Semgrep in CI on Linux).
+Holds the project's **own** rules, in Semgrep's rule schema (`id`, `languages`, `severity`,
+`message`, `pattern` or `patterns`), the same shape as the bundled `semgrep-bridge-rules.yml`.
+A registry pack (`p/default`) is **not** a rule and is not valid inside this file (the plan
+review's R24: the TDP had to pass the packs on the command line); the packs are named on the
+gate command. What is pinnable is the Semgrep CLI version (recorded in `docs/INVENTORY.md`,
+Resources, by the file that pins it) and a rule file vendored into the repository, such as the
+bundled bridge rules; a registry pack is not: its rules change in the registry under the same
+name, so a pack is a floor the project accepts, never a pin in rule 14's sense. **Docs-verified 6 September 2026** (Semgrep is beta — re-verify if
+behaviour looks off; native Windows support is now GA, but the floor still runs Semgrep in CI
+on Linux).
 
-```yaml
-# Pinned ruleset reference — record the exact version/commit in docs/INVENTORY.md (Resources)
-rules:
-  - p/default
-  - p/secrets
-  - p/owasp-top-ten
+```bash
+semgrep ci --config p/default --config p/secrets --config p/owasp-top-ten --config .semgrep/bridge-rules.yml --config .semgrep.yml
 ```
 
-- Prefer curated registry packs (`p/…`) pinned to a recorded version, or vendor a fixed
-  rule file into the repo. Pin the **Semgrep CLI version** too (`docs/INVENTORY.md` (Resources)).
+```yaml
+# .semgrep.yml — the project's own rules; registry packs go on the gate command, never here
+rules:
+  - id: <project>-<what-it-catches>
+    languages: [python]
+    severity: ERROR
+    message: <what is wrong and what to do instead>
+    pattern: <the shape to catch>
+```
+
+- Use the curated registry packs (`p/…`) as the floor and vendor a fixed rule file into the
+  repo for anything that must stay the same between sessions. Pin the **Semgrep CLI version** too (`docs/INVENTORY.md` (Resources)).
 - Findings above the chosen severity block in CI. Inline `# nosemgrep` suppressions are a
   **gate-integrity flag** (see `Merge-Verification-Policy.md`) unless justified as a false
   positive with a stated reason.

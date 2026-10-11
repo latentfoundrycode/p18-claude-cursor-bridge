@@ -33,6 +33,7 @@ NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 TEST_PATTERNS = [
     "test_*.py", "*_test.py", "*.test.*", "*.spec.*", "conftest.py",
+    "*_test.go", "*Test.java", "*Tests.java", "*Test.kt", "*Tests.cs", "*Test.cs", "*_spec.rb",      # release A4 (R17)
     "tests/*", "test/*", "__tests__/*", "e2e/*", "spec/*",
     "*/tests/*", "*/test/*", "*/__tests__/*", "*/e2e/*", "*/spec/*",
 ]

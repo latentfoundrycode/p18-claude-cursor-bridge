@@ -240,7 +240,7 @@ The supervisor decides and records; `cursor-configurator` writes the files. See
 3. **Impeccable version pin.** Record the pinned CLI version in `docs/INVENTORY.md` (Resources).
    Every detector invocation — hook, CI, and manual — uses `npx impeccable@<pinned> detect`
    so a resumed session never silently changes what "clean" means (the rule count drifts
-   between releases; pin ≥ v3.0.2, never hard-code the count).
+   between releases; pin ≥ v3.3.0, the first with `projectRoots` (R24), never hard-code the count).
 
 4. **The design-detect hook.** Add the *second* `afterFileEdit` entry to the existing
    `.cursor/hooks.json` array (see `Cursor-File-Formats.md`): the Impeccable detector by

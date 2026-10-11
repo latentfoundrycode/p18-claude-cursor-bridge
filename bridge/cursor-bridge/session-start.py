@@ -156,7 +156,7 @@ def pointers_part(status, sections, source):
     recorded = re.search(r"[0-9]{4}\.[0-9]{2}\.[0-9]{2}[a-z]?", field(status, "Bridge version") or "")
     recorded = recorded.group(0) if recorded else ""
     if recorded and version != "?" and recorded != version:
-        version += "; the status file records %s, so this project is not calibrated to the installed bridge: say so in your next report, /calibrate-bridge is the owner's to start" % recorded
+        version += "; the status file records %s, so this project is not calibrated to the installed bridge: say so in your next report; /calibrate-bridge is started by the owner, or by the maintainer session's message (rule 57)" % recorded
     waiting = awaiting.lower() not in ("nothing", "none", "", "-")
     out = ["CLAUDE-CURSOR BRIDGE: this folder belongs to a bridge project (bridge %s) and this message is for its supervisor session. "
            "If you are not the project's supervisor (you were not asked to act as supervisor here), ignore this message and the digest. "

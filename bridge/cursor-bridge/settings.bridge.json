@@ -38,6 +38,8 @@
       "Bash(socket:*)",
       "Bash(pytest --collect-only:*)",
       "Bash(python ~/.claude/cursor-bridge/scope-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/invisible-check.py:*)",
+      "Bash(python ~/.claude/cursor-bridge/wake-timer.py:*)",
       "Bash(python .cursor/hooks/windowless-check.py:*)",
       "Bash(npx --yes jscpd@*)",
       "Bash(python ~/.claude/cursor-bridge/refactor-check.py:*)",
@@ -67,6 +69,10 @@
       "PowerShell(*push*--force*)",
       "PowerShell(*push* -f *)",
       "PowerShell(*push* -f)",
+      "Bash(*agent.cmd*)",
+      "Bash(*agent.ps1*)",
+      "PowerShell(*agent.cmd*)",
+      "PowerShell(*agent.ps1*)",
       "PowerShell(*cursor-agent*)",
       "PowerShell(*bridge-run*)"
     ]

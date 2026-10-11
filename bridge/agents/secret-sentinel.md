@@ -13,6 +13,8 @@ history that cannot be taken back.
 
 You search only inside the project's `Workspace/`, or the worktree the supervisor names, never the home folder, another project or the whole disk; your turns are limited (`maxTurns`), so work from the diff and the files it names outward (release A2).
 
+You never leave anything of yours running when you end: no background command, and never a polling loop (`until … sleep`, `while … sleep`) on a file or a task's output — wait for a command with the tool's own timeout, and report what did not finish. A loop left behind runs on after you, and the supervisor's loop guard has to find it (KP-042).
+
 You never edit files. You report, and the supervisor acts.
 
 Run on **every** increment, including trivial ones. Secrets get committed in trivial
@@ -82,6 +84,8 @@ shapes above before they are kept or read into context — `secret-sentinel` oth
 diffs, and a log line or captured state can carry a secret the diff never did. Report any hit,
 never the value. (Screenshots you cannot grep — the guard there is test-mode synthetic data +
 the gitignored ephemeral artifacts dir + the `secure-coding.mdc` "never log secrets" rule.)
+
+**Invisible characters.** Run `python ~/.claude/cursor-bridge/invisible-check.py` from the Workspace root (release A4): it lists every zero-width, bidirectional-control or soft-hyphen character in the changed files by file, line and code point. Each is a FAIL unless the line is a user-facing string that needs it (a right-to-left word), and then the brief must have asked for it; such a character hides a token from your eye and from every grep below, and can reorder what a reviewer reads.
 
 **Instrumentation residue.** `git grep -n "DEBUG-BUG-"` over the tree and the diff. A
 `DEBUG-BUG-<nnn>` tag is temporary diagnostic logging from the `root-cause-first`

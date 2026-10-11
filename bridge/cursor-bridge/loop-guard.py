@@ -15,8 +15,8 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
      decide: a background command *of a kind that finishes* (a builder run, a CI watch, a
      command run through bridge-run.py, or one marked `# wake`) counts until its limit plus a
      grace; a background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
-     the run parameters) AND only while a scheduled wake-up is due no later than that
-     ceiling, because a hung agent never completes and nothing else would wake the session
+     the run parameters) AND only while a wake-timer command that ends no later than that
+     ceiling is running, because a hung agent never completes and nothing else would wake the session
      (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the
      session is idle). A background command of any other kind (a dev server, a worker, a
      probe) is NOT a wake source: a server never finishes (KP-031). When the hook hands no
@@ -313,6 +313,38 @@ def cron_at(unix):
     return "%d %d %d %d *" % (t.minute, t.hour, t.day, t.month)
 
 
+TIMER_RX = re.compile(r"wake-timer\.py\s+(\d+)")
+WAITER_RX = re.compile(r"\b(until|while)\b[^\n]*\bsleep\b", re.I)
+WAITERS = []
+
+
+TIMER_SLACK = 300          # the model's latency between the refusal and the timer's start
+
+
+def timers_of(tasks, now):
+    """[(id, start or None, seconds)] of the running wake-timer commands (release A4, KP-043: the bound
+    of a background agent). A timer whose start the hook does not give has None."""
+    out = []
+    for t in tasks if isinstance(tasks, list) else []:
+        if not isinstance(t, dict) or str(t.get("status") or "").lower() != "running":
+            continue
+        m = TIMER_RX.search(str(t.get("command") or ""))
+        if m:
+            raw = t.get("started_at") if t.get("started_at") is not None else t.get("startedAt")
+            out.append((str(t.get("id")), parse_ts(raw) if raw is not None else None, int(m.group(1))))
+    return out
+
+
+def bounds(timer, start, ceiling):
+    """Does this timer end no later than the agent's ceiling (plus the slack)? A timer with no
+    readable start counts when its seconds are no more than the ceiling: the supervisor copied
+    the printed value."""
+    tid, t_start, seconds = timer
+    if t_start is None:
+        return seconds <= ceiling + TIMER_SLACK
+    return t_start + seconds <= start + ceiling + TIMER_SLACK
+
+
 def pending_from_hook(data, now, cwd):
     """What Claude Code itself says is in flight (release A2): the background tasks and the
     scheduled wake-ups of the hook input. None when the input has neither list, so the
@@ -322,6 +354,8 @@ def pending_from_hook(data, now, cwd):
         return None, []
     pending, unscheduled = [], []
     dues, unknown_crons = [], 0
+    timers = timers_of(tasks, now)
+    del WAITERS[:]
     for c in crons if isinstance(crons, list) else []:
         if isinstance(c, dict):
             due = parse_ts(c.get("next_run_at")) or (cron_next(str(c.get("schedule") or ""), now) if c.get("schedule") else None)
@@ -338,6 +372,12 @@ def pending_from_hook(data, now, cwd):
         kind, cmd = str(t.get("type") or "").lower(), str(t.get("command") or "")
         is_agent = kind in ("background_subagent", "subagent", "agent", "agent sdk tool") or (not cmd and kind != "command")
         if not is_agent:                                   # a command: whatever the hook calls its type
+            if WAITER_RX.search(cmd):
+                WAITERS.append(str(t.get("id")))           # a polling loop a subagent left behind never ends and never counts
+                continue
+            if TIMER_RX.search(cmd):
+                pending.append("wake-timer %s" % t.get("id"))   # its completion wakes the session at the ceiling
+                continue
             if not any(pat.search(cmd) for pat in WAKE_PATTERNS):
                 continue                                   # a server never finishes, so it never wakes you
             if age <= command_ceiling(cmd, cwd) + GRACE_SECONDS:
@@ -346,16 +386,18 @@ def pending_from_hook(data, now, cwd):
             ceiling = agent_ceiling(cwd)
             if age > ceiling:
                 continue                                   # past its ceiling: stop it and re-run its task in the foreground
-            if any(due <= start + ceiling + 60 for due in dues) or unknown_crons:
+            if any(bounds(tm, start, ceiling) for tm in timers):
                 pending.append("background agent %s" % t.get("id"))
             else:
-                late = "; your scheduled wake-up is due at %s, after it" % ", ".join(local_clock(d) for d in sorted(dues)) if dues else ""
-                if start + ceiling - now < 120:            # the minute is at hand or past: a schedule for it would never fire (review of 10c, finding 1)
-                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, within two minutes, so do not schedule: stop it with TaskStop now and run its task in the foreground%s)"
-                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), late))
+                crons = "; your scheduled wake-up (%s) cannot fire while a background agent runs (KP-043), so it is not the bound" % ", ".join(local_clock(d) for d in sorted(dues)) if (dues or unknown_crons) else ""
+                rejected = "; running timer(s) that end after the ceiling: %s" % ", ".join("%s (ends at %s)" % (tid, local_clock((ts0 if ts0 is not None else now) + sec)) for tid, ts0, sec in timers) if timers else ""
+                left = int(round(start + ceiling - now))
+                if left < 120:                             # the ceiling is at hand or past
+                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, within two minutes, so do not start a timer: stop it with TaskStop now and run its task in the foreground%s%s)"
+                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), crons, rejected))
                 else:
-                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, so the wake-up is CronCreate schedule `%s`, recurring false%s)"
-                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), cron_at(start + ceiling), late))
+                    unscheduled.append("%s (started %ds ago, ceiling %ds: it ends at %s, so start its timer in the background now: python ~/.claude/cursor-bridge/wake-timer.py %d \"%s\"%s%s)"
+                                       % (t.get("id"), int(age), ceiling, local_clock(start + ceiling), left, re.sub(r"[^\w.-]", "", str(t.get("id"))), crons, rejected))
     return pending, unscheduled
 
 
@@ -459,12 +501,12 @@ def main():
     listed, unscheduled = pending_from_hook(data, time.time(), cwd)
     tp = data.get("transcript_path")
     if unscheduled:                                        # before anything else: a later wake-up does not bound the agent
-        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no wake-up scheduled at its ceiling: %s. The computer's clock reads %s now; a CronCreate schedule is read on this clock, so copy the expression above and never convert a UTC stamp by an assumed offset (KP-039). A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, write it on the status file's `In flight:` line and schedule the one-shot wake-up (`recurring: false`, the prompt naming the agent); at that wake-up, stop an agent still running with TaskStop and run its task again in the foreground.%s" % (", ".join(unscheduled), local_clock(time.time()), chr(10)))
+        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling: %s. The computer's clock reads %s now. A scheduled wake-up (CronCreate) does not fire while a background agent runs, so the bound is a wake-timer command started in the background, whose completion wakes you (KP-043). A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, write it on the status file's `In flight:` line and start the timer with the command above (run in the background); when the timer ends, stop an agent still running with TaskStop and run its task again in the foreground.%s%s" % (", ".join(unscheduled), local_clock(time.time()), (" Leftover polling loop(s) %s never end and never count: stop them with TaskStop." % ", ".join(WAITERS)) if WAITERS else "", chr(10)))
         sys.exit(2)
     if listed:
         allow()
     if listed is not None:                                 # Claude Code's own list is exact: nothing pending
-        sys.stderr.write(REASON.format(phase=phase.split()[0]) + chr(10))
+        sys.stderr.write(REASON.format(phase=phase.split()[0]) + ((" Leftover polling loop(s) %s never end and never count: stop them with TaskStop (a subagent must never leave one)." % ", ".join(WAITERS)) if WAITERS else "") + chr(10))
         sys.exit(2)
     if not tp or not os.path.isfile(tp):
         allow()

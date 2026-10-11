@@ -15,10 +15,14 @@ Known pairs (manifest -> any of these lockfiles):
   Cargo.toml -> Cargo.lock;  go.mod -> go.sum;  Gemfile -> Gemfile.lock
   composer.json -> composer.lock;  pubspec.yaml -> pubspec.lock;  *.csproj -> packages.lock.json
 --lock adds a project-specific lockfile path to the candidate list.
-Exit 0 = consistent (or no manifest changed), 1 = manifest changed without its lockfile,
-2 = cannot verify. Untracked lockfiles count as changed. ASCII-only on purpose.
+A manifest changed outside its dependencies (a version bump, a tool setting) needs no lockfile
+change; a folder with no lockfile in use beside the manifest has nothing to go stale (release
+A4, 13.1: the false alarms). Exit 0 = consistent (or no manifest changed), 1 = manifest changed
+without its lockfile, 2 = cannot verify. Untracked lockfiles count as changed. ASCII-only.
 """
+import json
 import os
+import re
 import subprocess
 import sys
 
@@ -46,6 +50,67 @@ def git(args):
         sys.exit(2)
 
 
+DEP_TABLE_RX = re.compile(r"dependenc|dependency-groups|build-system|tool\.(uv|poetry|pdm|hatch|pixi)", re.I)
+PKG_KEYS = ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies", "overrides", "resolutions", "workspaces", "packageManager", "engines")
+
+
+def dependency_text(name, text, strict=False):
+    """The part of a manifest a lockfile depends on; with `strict` the root package's own name and
+    version too (Cargo.lock and uv.lock record them, and `cargo --locked` / `uv lock --check` fail
+    on a bump without the lockfile)."""
+    if name == "package.json":
+        try:
+            obj = json.loads(text)
+            return json.dumps({k: obj.get(k) for k in PKG_KEYS}, sort_keys=True)
+        except ValueError:
+            return text
+    if name in ("pyproject.toml", "setup.cfg", "Cargo.toml", "pubspec.yaml", "Pipfile"):
+        keep, table, in_array = [], "", False
+        for line in text.splitlines():
+            s = line.strip()
+            m = re.match(r"^\[+([^\]]+)\]+", s)
+            if m:
+                table, in_array = m.group(1).strip(), False
+                continue
+            if in_array:
+                keep.append(s)
+                if s.startswith("]") or s.endswith("]"):
+                    in_array = False
+                continue
+            if strict and table in ("package", "project") and re.match(r"^(name|version)\s*=", s):
+                keep.append(s)
+                continue
+            if DEP_TABLE_RX.search(table) or re.match(r"^(requires-python|requires|dependencies|optional-dependencies|install_requires|extras_require|setup_requires|tests_require)\b", s):
+                keep.append(s)
+                if "[" in s and "]" not in s.split("[", 1)[1]:
+                    in_array = True
+        return "\n".join(keep)
+    return text
+
+
+def unchanged_dependencies(base, path):
+    try:
+        old = subprocess.run(["git", "show", "%s:%s" % (base, path)], capture_output=True, text=True, check=True,
+                             encoding="utf-8", errors="replace", creationflags=NO_WINDOW).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False                                       # new or unreadable at base: treat as changed
+    try:
+        with open(path, encoding="utf-8-sig", errors="replace") as f:
+            new = f.read()
+    except OSError:
+        return False
+    name = path.rsplit("/", 1)[-1]
+    beside = {c.rsplit("/", 1)[-1] for c in tracked_in(os.path.dirname(path))}
+    strict = name == "Cargo.toml" or (name == "pyproject.toml" and "uv.lock" in beside)
+    return dependency_text(name, old, strict) == dependency_text(name, new, strict)
+
+
+def tracked_in(folder):
+    out = subprocess.run(["git", "ls-files", "--", folder or "."], capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", creationflags=NO_WINDOW).stdout
+    return {l.strip().replace("\\", "/") for l in out.splitlines() if l.strip()}
+
+
 def main():
     argv = sys.argv[1:]
     if not argv:
@@ -65,7 +130,7 @@ def main():
     def same_dir(a, b):
         return os.path.dirname(a) == os.path.dirname(b)
 
-    problems, checked = [], 0
+    problems, checked, skipped = [], 0, []
     for path in sorted(changed):
         name = base_name(path)
         for manifests, locks in PAIRS:
@@ -74,8 +139,19 @@ def main():
                 candidates = list(locks) + [base_name(x) for x in extra_locks]
                 lock_changed = any(base_name(c) in candidates and same_dir(c, path) for c in changed) \
                     or any(x.replace("\\", "/") in changed for x in extra_locks)
-                if not lock_changed:
-                    problems.append((path, ", ".join(candidates)))
+                if lock_changed:
+                    continue
+                if unchanged_dependencies(base, path):
+                    skipped.append("%s changed outside its dependencies (no lockfile change needed)" % path)
+                    continue
+                folder = os.path.dirname(path)
+                in_use = [c for c in tracked_in(folder) if base_name(c) in candidates and same_dir(c, path)] + [x for x in extra_locks if os.path.exists(x)]
+                if not in_use:
+                    skipped.append("%s changed, and no lockfile is in use beside it (none of %s is tracked): nothing can go stale" % (path, ", ".join(locks)))
+                    continue
+                problems.append((path, ", ".join(candidates)))
+    for s in skipped:
+        print("lock-check: " + s)
     if name_csproj := [p for p in changed if p.endswith(".csproj")]:
         checked += len(name_csproj)
         if not any(base_name(c) == "packages.lock.json" for c in changed):

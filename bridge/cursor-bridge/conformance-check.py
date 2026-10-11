@@ -224,17 +224,39 @@ def code_strings(text):
     return text.lower()
 
 
+HOSTLIKE = re.compile(r"""["'`][^"'`\n]*(?:://|[a-z0-9-]+\.(?:com|ai|io|net|org|dev|cloud|run|app|co|sh|xyz|tech|ms|us|eu)\b)[^"'`\n]*["'`]""")
+
+
+def code_text(text):
+    """The source without its docstrings and comments, case kept: where a key name is written."""
+    text = re.sub(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'', "", text)
+    text = re.sub(r"/\*[\s\S]*?\*/", "", text)
+    return re.sub(r"(^|[ \t])(#|//)[^\n]*", "", text, flags=re.M)
+
+
 def names_provider(text, providers):
-    """The providers a source file names, as a whole word, in a string literal of its code (a
-    host, a key name, a service name); never in a docstring or a comment."""
+    """The providers a source file names as a whole word in a host or URL string of its code, or
+    in an upper-case key name (MODAL_TOKEN_ID); never in any other string, a docstring or a
+    comment (release A4: a log string that said "modal" made a health check an adapter)."""
     low = code_strings(text)
+    raw = code_text(text)
+    hosts = HOSTLIKE.findall(low)
     hits = []
+    del LAST_WORD_ONLY[:]
     for w in providers:
         for alt in SYNONYMS.get(w, (w,)):
-            if re.search(r"""["'`][^"'`\n]*(?<![a-z0-9])%s(?![a-z0-9])""" % re.escape(alt), low):
+            in_host = any(re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(alt), h) for h in hosts)
+            in_key = re.search(r"\b[A-Z0-9_]*%s[A-Z0-9_]*\b" % re.escape(alt.upper()), raw)   # MODAL_TOKEN_ID, OPENROUTER_API_KEY
+            if in_host or in_key:
                 hits.append(w)
                 break
+            if re.search(r"""["'`][^"'`\n]*(?<![a-z0-9])%s(?![a-z0-9])""" % re.escape(alt), low):
+                LAST_WORD_ONLY.append(w)                   # named in a plain string only: not counted, but said (F20c)
     return hits
+
+
+LAST_WORD_ONLY = []
+WORD_ONLY_FILES = []
 
 
 def status_field(ws, name):
@@ -588,12 +610,18 @@ def main():
                 tests.append(text)
             elif client_rx.search(text) and names_provider(text, providers):
                 adapters[os.path.splitext(n)[0]] = rel
+            elif client_rx.search(text) and LAST_WORD_ONLY:
+                WORD_ONLY_FILES.append(rel)
         elif n.endswith((".js", ".ts", ".mjs", ".tsx")) and not n.endswith(".d.ts"):
             text = read(os.path.join(ws, rel)) or ""
             if is_test:
                 tests.append(text)
             elif js_client_rx.search(text) and names_provider(text, providers):
                 adapters[re.sub(r"\.(js|ts|mjs|tsx)$", "", n)] = rel
+            elif js_client_rx.search(text) and LAST_WORD_ONLY:
+                WORD_ONLY_FILES.append(rel)
+    if WORD_ONLY_FILES:
+        add("NOTE", "Adapters named in a string only", "%d client file(s) name a listed provider only in a plain string, not in a host, a URL or a key name, and are not counted as its adapters (release A4): %s" % (len(WORD_ONLY_FILES), ", ".join(sorted(WORD_ONLY_FILES)[:6])))
     if adapters:
         recordings = any(re.search(r"(^|/)(cassettes?|recorded|recordings)/", rel, re.I) for rel in files)
         loose_rx = re.compile(r"cassette|recorded|replay", re.I)   # enough when the repository tracks recordings

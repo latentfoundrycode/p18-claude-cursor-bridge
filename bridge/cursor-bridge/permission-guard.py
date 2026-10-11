@@ -28,6 +28,16 @@ program (a commit message) is data. `powershell` without `-Command` runs the res
 `-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
 and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
 GraphQL query built by a command substitution are refused unread.
+  - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands
+    (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command
+    wrapped in `cd …` (rule 8: one command per call; a chain once built an increment on a
+    merged branch; release A4). A pipe into a reader and a chain of reads pass.
+  - a commit or push that skips its checks: `--no-verify`, commit's `-n`, or a
+    `-c core.hooksPath=…` override (rule 4; release A4), except the two snapshots the merge
+    policy allows: the pre-delegation checkpoint, whose subject starts with "checkpoint" and
+    names the increment (`checkpoint before TASK-nnn`, with a round or a note after it,
+    `checkpoint: … before TASK-nnn …`) and carries no accept, merge or release word; and a
+    builder's hand-off ("… hand-off") made inside a worktree (`-C …/Worktrees/…`).
   - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,
     `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or
     `powershell`), which would run it with the owner's real home and identity (KP-038): the
@@ -66,6 +76,24 @@ PS_VALUE_SWITCHES = ("-executionpolicy", "-ep", "-ex", "-version", "-v", "-windo
                      "-outputformat", "-of", "-psconsolefile", "-psc", "-configurationname", "-config", "-settingsfile", "-settings")
 ENCODED = object()
 PREMERGE_DIR = os.path.join("bridge", "premerge")
+STATE_GIT = ("add", "commit", "push", "pull", "merge", "rebase", "switch", "checkout", "reset", "rm", "mv", "cherry-pick", "revert",
+             "am", "apply", "clean", "restore", "stash", "worktree", "branch", "tag", "submodule", "config")
+BRANCH_WRITES = ("-d", "-D", "-m", "-M", "-c", "-C", "--delete", "--move", "--copy", "--set-upstream-to", "-u", "--unset-upstream", "-f", "--force")
+INCREMENT_RX = re.compile(r"\b(?:TASK|BUG|REFAC|FIX|CONFIG)-(?:\d{3,}[a-z]?|<nnn>|[\w-]+)(?!\w)", re.I)   # the plan's IDs, and a project's own spelling (FIX-next-sharp)
+NOT_A_SNAPSHOT_RX = re.compile(r"(?<![-\w])(?:accept\w*|merge|merges|merging|release\w*|ship\w*)\b", re.I)   # an action word; "merged" (a status note) and "overlay-merge" (a name) are not
+
+
+def snapshot_subject(message):
+    """The checkpoint commit the merge policy exempts: the subject says `checkpoint` and names the
+    increment, and its leading clause (before any parenthesis) carries no accept, merge, release or
+    ship word (`checkpoint before TASK-159 r2 (round 1 builder output)`, `TASK-010c round 3
+    checkpoint (status after TASK-059b merge)`, `BUG-022: round-2 brief (checkpoint)`, `checkpoint
+    (paused by owner): TASK-141-r2 builder work`; never `checkpoint: accept TASK-003`, and never a
+    product commit that only speaks of a checkpoint marker without an increment's ID)."""
+    clause = message.split("(", 1)[0]
+    return bool(re.search(r"\bcheckpoint\b", message, re.I)) and bool(INCREMENT_RX.search(message)) and not NOT_A_SNAPSHOT_RX.search(clause)   # starts with checkpoint, names the increment, no accept/merge/release word (second pass, N2)
+GH_READ = ("view", "list", "checks", "status", "diff", "search", "download", "auth", "--version", "version")
+HOOK_SKIPPERS = ("commit", "push", "merge", "rebase", "am", "cherry-pick", "revert")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
@@ -117,6 +145,81 @@ def split_commands(text):
         i += 1
     parts.append(buf)
     return [p.strip() for p in parts if p.strip()]
+
+
+def in_workspace(cwd):
+    """A bridge Workspace: the folder the hook runs in holds the project's status file."""
+    return bool(cwd) and os.path.isfile(os.path.join(cwd, "docs", "PROJECT_STATUS.md"))
+
+
+def chain_parts(text):
+    """The commands a line chains with &&, ||, ; or a new line (quotes respected); a pipe is one command."""
+    parts, buf, quote, i = [], "", None, 0
+    while i < len(text):
+        c = text[i]
+        if quote:
+            buf += c
+            if c == quote and (i == 0 or text[i - 1] != "\\"):
+                quote = None
+        elif c in ("'", '"'):
+            quote = c
+            buf += c
+        elif text.startswith("&&", i) or text.startswith("||", i):
+            parts.append(buf); buf = ""; i += 1
+        elif c in (";", "\n"):
+            parts.append(buf); buf = ""
+        elif c == "&" and (i == 0 or text[i - 1] not in "<>") and (i + 1 >= len(text) or text[i + 1] != ">"):
+            parts.append(buf); buf = ""                        # a single & sequences in cmd and backgrounds in bash; 2>&1 is not one
+        else:
+            buf += c
+        i += 1
+    parts.append(buf)
+    return [re.sub(r"^\(+|\)+$", "", p.strip()).strip() for p in parts if p.strip()]
+
+
+def state_changing(w):
+    """A git or gh command that changes something, as opposed to a read (`git branch --show-current`,
+    `git stash list`, `git worktree list`, `git tag -l`, `git fetch` and `git remote` are reads)."""
+    if is_git(w):
+        sub, args = git_subcommand(w)
+        if sub == "branch":
+            reads = ("--list", "-l", "--contains", "--no-contains", "--merged", "--no-merged", "--points-at", "--show-current", "-r", "-a", "-v", "-vv", "--sort", "--format")
+            if any(a in BRANCH_WRITES for a in args):
+                return True
+            return any(not a.startswith("-") for a in args) and not any(a.split("=", 1)[0] in reads for a in args)
+        if sub == "stash":
+            return not args or args[0] not in ("list", "show")            # a bare `git stash` pushes (N5)
+        if sub in ("worktree", "tag"):
+            return bool(args) and args[0] not in ("list", "show", "-l", "--list", "-v", "--verbose", "-n")
+        if sub == "remote":
+            return bool(args) and args[0] in ("add", "remove", "rm", "rename", "set-url", "set-head", "prune", "update")
+        if sub == "config":
+            return any(a == "core.hookspath" for a in (x.lower() for x in args)) and not any(a.startswith("--get") for a in args)
+        return sub in STATE_GIT
+    if base(w[0]) in ("gh", "gh.exe"):
+        group, sub, _ = gh_words(w)
+        return bool(group) and group not in GH_READ and sub not in GH_READ
+    return False
+
+
+def chain_reason(command, cwd):
+    """Inside a Workspace, a chain carrying a state change or wrapped in cd is refused (rule 8)."""
+    if not in_workspace(cwd):
+        return None
+    parts = chain_parts(strip_heredocs(command))
+    if len(parts) < 2:
+        return None
+    heads = [strip_prefix(words(p)) for p in parts]
+    heads = [h for h in heads if h]
+    for h in list(heads):
+        if base(h[0]) == "eval" and len(h) > 1:            # eval "git add -A && git commit": the string is the chain
+            heads += [strip_prefix(words(p)) for p in chain_parts(" ".join(h[1:]))]
+    if heads and base(heads[0][0]) == "cd":
+        return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
+    for w in heads:
+        if state_changing(w):
+            return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(w[:2]))
+    return None
 
 
 def strip_heredocs(text):
@@ -290,15 +393,53 @@ def merge_reason(args, cwd):
     return None
 
 
+def commit_message(args, command):
+    """The message of a git commit: `-m <value>`, `--message=<value>`, or the first line of a
+    here-document the command feeds it (the app's own commit form)."""
+    msg = None
+    for i, a in enumerate(args):                           # git's subject is the FIRST -m's first line (third pass, T5)
+        if a in ("-m", "--message") and i + 1 < len(args):
+            msg = args[i + 1]
+            break
+        if a.startswith("--message="):
+            msg = a.split("=", 1)[1]
+            break
+    if msg is None:
+        msg = ""
+    if not msg.strip() or "<<" in msg or "$(" in msg:
+        for m in HEREDOC_RX.finditer(command):
+            body = m.group(0).split("\n", 1)[1]
+            lines = [l for l in body.splitlines() if l.strip() and not re.match(r"^\w+\s*$", l)]
+            if lines:
+                return lines[0].strip()
+    return msg.strip()
+
+
+def in_worktree(w, cwd):
+    """A commit made inside a builder's worktree (`-C ../Worktrees/x`, or a cwd under Worktrees/)."""
+    paths = [cwd or ""] + [w[i + 1] for i, a in enumerate(w) if a == "-C" and i + 1 < len(w)]
+    return any(re.search(r"[\\/]Worktrees[\\/]", p) for p in paths)
+
+
 def check(command, cwd=None):
     """Return the reason to refuse, or None."""
+    command = re.sub(r"\\\r?\n|`\r?\n", " ", command)                     # a line continued with \ or a PowerShell backtick is one line
     if re.search(r"\bgh\s+api\s+graphql\b[^\n]*(\$\(|`)", command):
         return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
+    r = chain_reason(command, cwd)
+    if r:
+        return r
     for simple in split_commands(strip_heredocs(command)):
         w = strip_prefix(words(simple))
         if not w:
             continue
         head = base(w[0])
+        if re.search(r"(^|\s)HUSKY=0(\s|$)", simple) and re.search(r"\bgit\s+(commit|push|merge)\b", simple):
+            return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
+        if head == "eval" and len(w) > 1:
+            r = check(" ".join(w[1:]), cwd)
+            if r:
+                return r
         if head in WRAPPER_SHELLS:
             inner = shell_inner(w)
             if inner is ENCODED:
@@ -322,6 +463,19 @@ def check(command, cwd=None):
                 if ALIAS_RX.match(a) or (a.lower().startswith("alias.") and re.search(r"worktree\s+remove|pr\s+merge|push\b.*(--force|--forc|-f\b|\+)", a, re.I)):
                     return "a git alias that defines a refused command (%s)" % a[:60]
             sub, args = git_subcommand(w)
+            if any(re.match(r"^core\.hookspath=", a, re.I) for a in w) and not helpful:
+                return "git -c core.hooksPath=... (the checks a commit runs are switched off; rule 4)"
+            if sub == "config" and not helpful and any(a.lower() == "core.hookspath" for a in args) and not any(a.startswith("--get") for a in args):
+                value = next((a for a in args[args.index(next(x for x in args if x.lower() == "core.hookspath")) + 1:] if not a.startswith("-")), "")
+                norm = os.path.normpath(os.path.expanduser(value)).replace("\\", "/") if value else ""
+                if "--unset" in args or value.lower() in ("/dev/null", "nul", "") or os.path.isabs(norm) or norm.startswith("..") or norm.lower() in ("/dev/null", "nul"):
+                    return "git config core.hooksPath %s (the checks a commit runs are switched off; rule 4)" % (value or "--unset")
+            if sub in HOOK_SKIPPERS and not helpful:
+                message = commit_message(args, command)
+                snapshot = snapshot_subject(message) or (bool(re.search(r"\bhand-off\b", message, re.I)) and in_worktree(w, cwd))
+                for a in args:
+                    if (a == "--no-verify" or (sub == "commit" and re.match(r"^-[A-Za-z]*n[A-Za-z]*$", a))) and not snapshot:
+                        return "git %s %s (a commit that skips its checks; the merge policy allows it only for the checkpoint commit, whose subject says `checkpoint` and names the increment before any parenthesis without an accept, merge or release word, and for a builder's hand-off snapshot inside a worktree)" % (sub, a)
             if sub == "push" and not helpful:
                 r = force_push_reason(args)
                 if r:
