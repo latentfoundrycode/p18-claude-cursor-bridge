@@ -509,7 +509,7 @@ Two options for reaching it:
   inline through the shell — and that names `run/review/SCOPE-<nnn>.md`, committed beside
   the diff, where the supervisor wrote the brief's Scope and Out of scope, the tests it wrote
   first with the paragraph each enforces, and the bookkeeping files in the diff that are
-  expected; the prompt itself says only that design for later increments is not this diff's
+  expected (`docs/BUILDER_NOTES.md`, the builder's report file under `handoff/`); the prompt itself says only that design for later increments is not this diff's
   defect, that a claim about a build is verified by building it, and that the reply is one of
   the three verdicts (release A5; supervisor.md step 8 has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a

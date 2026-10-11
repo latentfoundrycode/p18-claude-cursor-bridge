@@ -41,7 +41,8 @@ Checks (exit 1 on any):
               fails instead of vanishing (release A4).
   BRIEF       a brief under --briefs (default handoff/) for an unmerged increment whose Scope
               reaches outside the increment's Scope, or which does not name every requirement
-              the increment satisfies (release A4, 13.1).
+              the increment satisfies (release A4, 13.1). A builder's report file beside the
+              brief (`TASK-nnn-rN-report.md`, 2026.10.11d) is not a brief and is not read.
 Report: MERGED count, READY increments (not merged, all dependencies merged, not deferred),
 and which ready increments may run together.
 """
@@ -167,6 +168,7 @@ SUBJECT_RX = re.compile(r"^\s*((?:%s[\s,:]*)+)" % ID)                     # one 
 TRAIL_RX = re.compile(r"\(([^()]*%s[^()]*)\)\s*(?:[-\u2014\u2013]\s*v?[\w.]+\s*)?(?:\(#\d+\))?\s*$" % ID)   # `feat(x): ... (TASK-100, R-027) - v0.2.0 (#148)`
 MERGE_RX = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(task-\d{3,}[a-z]?)\b", re.I)
 BOOKKEEPING = ("docs/BUILDER_NOTES.md", "docs/BOUNDARY_VIOLATIONS.md", "run/")   # every brief names them; no plan lists them
+REPORT_RX = re.compile(r"handoff/[A-Z]+-\w+-r\d+-report\.md$")                 # the builder's report file, named in every Scope (2026.10.11d)
 
 
 def merged_ids(base):
@@ -246,7 +248,7 @@ def brief_findings(path, item):
     found = []
     inc = item["scope"]
     for p in scope:
-        if any(p == b or (b.endswith("/") and p.startswith(b)) for b in BOOKKEEPING):
+        if REPORT_RX.match(p) or any(p == b or (b.endswith("/") and p.startswith(b)) for b in BOOKKEEPING):
             continue                                           # the files every brief must name (the packager's constraints)
         if not any(p == s or p.startswith(s + "/") or (s == "" ) for s in inc):
             found.append("names %s in its Scope, outside %s's Scope (%s)" % (p, item["id"], ", ".join(inc) or "none"))
@@ -402,6 +404,8 @@ def main():
     done = {t for t in inc if t in merged}
     if a.briefs and os.path.isdir(a.briefs):
         for bp in sorted(glob.glob(os.path.join(a.briefs, "TASK-*.md"))):
+            if bp.endswith("-report.md"):                    # the builder's report beside its brief (2026.10.11d)
+                continue
             m = ID_RX.search(os.path.basename(bp))
             tid = m.group(0) if m else None
             if tid in items and tid not in done and kinds.get(tid) == "increment":

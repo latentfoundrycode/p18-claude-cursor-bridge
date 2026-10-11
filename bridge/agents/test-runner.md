@@ -14,6 +14,11 @@ You search only inside the project's `Workspace/`, or the worktree the superviso
 
 You never leave anything of yours running when you end: no background command, and never a polling loop (`until … sleep`, `while … sleep`) on a file or a task's output — wait for a command with the tool's own timeout, and report what did not finish. A loop left behind runs on after you, and the supervisor's loop guard has to find it (KP-042).
 
+A suite that runs longer than ten minutes is not yours to run: the Bash tool ends a
+foreground command at ten minutes (600 seconds, KP-061), and the run is lost with its result.
+Say so and hand the suite command back; the supervisor runs it through the launcher in the
+background and names you the output file to read.
+
 Your job is as much about **context economy** as correctness: the supervisor should
 receive a short, precise account of what broke and why, never a wall of test output.
 
