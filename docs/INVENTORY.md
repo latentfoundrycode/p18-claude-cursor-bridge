@@ -28,7 +28,9 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
 | Decision | Reason | Settled | Revisit only if |
 |---|---|---|---|
 | The bridge is a supervised project from release B | §15: release B and later are large enough to earn the full loop; the maintainer built releases 0–A5 | 2026-10-11, §15 / owner | the full loop proves unworkable for the bridge |
-| Product type: host extension → Claude Code extension; trait: installable | §6.3 classification | 2026-10-11, design (the plan) | the bridge gains a new interface or trait |
+| Product type: host extension → Claude Code extension; trait: installable | §6.3 classification | 2026-10-11, owner (decision 6 confirmed) | the bridge gains a new interface or trait |
+| Decision 6 confirmed: the §6.3 product-type revisions and all classifications — video factory & reAngle = web app → local web app; TDP = software on your own computer → local service; the bridge = host extension → Claude Code extension. Note (owner, 2026-10-11): the SFVF's "web app" label is loose and approximate, not a precise fit — do not over-read it in future | §6.3 / §18 decision 6, asked at release B start | 2026-10-11, owner | a project's interface changes |
+| R-038: release B is installed by pausing and switching this checkout to `main` at stage B6 (after all increments merge); an urgent mid-build install uses the maintainer's separate clone (§15 exception) | the normal flow installs once at B6, when main holds the release; no second clone to maintain | 2026-10-11, owner | a mid-build install becomes routine |
 | Merge authority: owner | §15 condition 5: the app refuses a session that merges its own work | 2026-10-11, forced | — |
 | Stage pause: run; refactoring pass: on; parallel increments: off; kind: private | owner's run-parameter answers | 2026-10-11, owner | the owner changes a run parameter |
 | Governance text is the supervisor's to write; programs are the builder's | §15 condition 3, keeping N4 intact | 2026-10-11, §15 | — |
