@@ -74,7 +74,12 @@ plan-critic returned 0 Blocking (round-3 findings confirmed resolved, graph acyc
 7. **Unwritten type vs unwritten trait (Review B SF, R-014/R-036):** FIX: workflow-check *fails* an unwritten type/sub-type (pauses the project) but *flags* (non-fatal) an unwritten trait (work continues, §6.7) — stated in TASK-006 and R-014.
 8. **Smaller:** TASK-026 depends on TASK-025 and TASK-022 (R-026 lands before the release review, §15 cond 4); TASK-010 depends on TASK-006; `workflow/phases/delegation-loop/` added to TASK-017 Scope; R-020 includes §13.1's paid-results store + dry-run-on-copy; TASK-025 names R-029 (the full-split trace); R-005 and the B3 demonstration say "module(s)"; the release review checks the core is readable in one read; open list is canonical for default traits.
 
-**Confirming read (the ceiling reached):** the fixed text gets one confirming read by both critics; if clean, the plan goes to the owner's gate; a residual Blocking goes to a resolution round, not another full round.
+**Confirming read (the ceiling reached) — DONE, both critics clean.** plan-critic: "no residual Blocking — fit for the owner's Phase-4 gate" (0 Blocking, 1 Should-fix, 3 Consider). Review B: "the plan is sound and ready for the owner's gate; the round-4 fixes hold" (0 Blocking, 2 Should-fix, 1 Consider). Both dropped out — no resolution round. The only remaining findings were convergent register/record wording (R-014, R-020, R-021 lagged the critique record) plus three minor plan wordings (merge-unit title starts with the IDs; the hook lists variant files from the declared-variants line rather than naming `mockups.md`; the glossary Phase entry lists all eight values) — all applied before the gate. **The plan goes to the owner's Phase-4 gate.**
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| plan | confirming | plan-critic | 0 | 1 | 3 | yes — applied |
+| plan | confirming | Review B | 0 | 2 | 1 | yes — applied |
 
 ## Resolution
 | Question | Settled | How |

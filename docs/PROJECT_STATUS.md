@@ -4,8 +4,8 @@ Phase: planning
 Change cycle: none
 Increment: TASK-001 — Intake and configuration records
 Last accepted: none (release B not yet started; releases 0, A1a–A5 are the baseline)
-Awaiting user on: nothing — round 2 of the plan's two-critic review is running; the build-plan gate follows
-Next: on convergence (no Blocking, no un-accepted Should-fix), present the build-plan gate; on approval, configuration (CI security floor) then the delegation loop
+Awaiting user on: the build-plan gate — approve the release B build plan before configuration and delegation begin
+Next: on approval → Phase 5 configuration (the CI security floor, TASK-002) then the delegation loop (TASK-001 records are already on this branch); the two-critic plan review is complete (4 rounds + confirming read, both critics clean)
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
 Software name: Claude-Cursor Bridge
