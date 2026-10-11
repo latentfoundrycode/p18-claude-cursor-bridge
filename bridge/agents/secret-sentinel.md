@@ -87,6 +87,8 @@ the gitignored ephemeral artifacts dir + the `secure-coding.mdc` "never log secr
 
 **Invisible characters.** Run `python ~/.claude/cursor-bridge/invisible-check.py` from the Workspace root (release A4): it lists every zero-width, bidirectional-control or soft-hyphen character in the changed files by file, line and code point. Each is a FAIL unless the line is a user-facing string that needs it (a right-to-left word), and then the brief must have asked for it; such a character hides a token from your eye and from every grep below, and can reorder what a reviewer reads.
 
+**Merge-conflict markers.** `git grep -n '^<<<<<<<\|^>>>>>>>'` must print nothing; a crashed resolver once left them and the commit went through (KP-060).
+
 **Instrumentation residue.** `git grep -n "DEBUG-BUG-"` over the tree and the diff. A
 `DEBUG-BUG-<nnn>` tag is temporary diagnostic logging from the `root-cause-first`
 procedure; it must never reach a commit. Any hit is a **BLOCK**, with file and line, so a

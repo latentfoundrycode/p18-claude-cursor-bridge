@@ -506,11 +506,12 @@ Two options for reaching it:
   GitHub identity from the process, so a post, push or merge from inside the review fails,
   and ends the run at the limit, KP-032 and KP-033) with
   a prompt that tells it to **read the diff from that file** — do **not** pass the diff
-  inline through the shell — and that says where the increment ends (the brief's Scope and
-  Out of scope), which tests the supervisor wrote first and the paragraph each enforces, that
-  a claim about a build is verified by building it, that the bookkeeping files in the diff
-  are expected, and that the reply is one of the three verdicts (release A5; supervisor.md
-  step 8 has the sentences). (Inline heredocs mangle or drop the diff; a reviewer that got no
+  inline through the shell — and that names `run/review/SCOPE-<nnn>.md`, committed beside
+  the diff, where the supervisor wrote the brief's Scope and Out of scope, the tests it wrote
+  first with the paragraph each enforces, and the bookkeeping files in the diff that are
+  expected; the prompt itself says only that design for later increments is not this diff's
+  defect, that a claim about a build is verified by building it, and that the reply is one of
+  the three verdicts (release A5; supervisor.md step 8 has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
   real failure that has happened — the file path avoids it.) Confirm from its reply that it
   actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<nnn>.md` — the branch's builder assumption lists with their dispositions (supervisor.md step 8) — as extra places to look, never as its scope. Per the roster above, Review B is

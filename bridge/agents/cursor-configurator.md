@@ -36,7 +36,9 @@ Only the items the supervisor names, drawn from this set:
 - `.githooks/pre-commit` — the git-native lint gate, running the same settled lint command
   (in git-`sh` form) so a failing commit is blocked. Write the file; the supervisor sets
   `git config core.hooksPath .githooks` (that is a git-config command, not a file you write).
-  Lint only. See `Cursor-File-Formats.md`.
+  The lint command, and beside it the formatter's check where the project's CI runs one
+  (`ruff format --check`, `prettier --check`, the project's own): a local gate weaker than CI
+  let a stage's worth of layout drift through (KP-044). See `Cursor-File-Formats.md`.
 - `~/.cursor/mcp.json` — MCP servers the supervisor specifies (e.g. Context7). Use
   `${env:NAME}` interpolation for any value that would otherwise be a secret; never
   write a literal key.
