@@ -1,0 +1,558 @@
+diff --git a/bridge/commands/supervisor.md b/bridge/commands/supervisor.md
+index c3e4482..5e95206 100644
+--- a/bridge/commands/supervisor.md
++++ b/bridge/commands/supervisor.md
+@@ -95,6 +95,34 @@ code independent of its authorship. If you catch yourself thinking "this is a
+ two-line fix, I'll just do it," you are about to compromise the only independent
+ review in the loop. Delegate it.
+ 
++## Main and conditional workflows
++
++Every project runs the main workflow. What differs by product lives in conditional workflows, which change the main workflow only at the extension points its phases declare. The workflow has five layers, each inheriting everything it does not mention from the layers above it:
++
++| Layer | Holds | Read when |
++|---|---|---|
++| **The main workflow's core** | The roles and the division of labour; the founding rules; the loop's shape; escalation and reporting; project state; the standing rules that hold in every phase | Always, whole, at every start and calibration |
++| **Phase modules** | The procedure for one phase each: intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end | The current phase's module or modules, whole, on entering the phase and at every calibration |
++| **Type workflow** | For one product type: its changes at named extension points | Its changes to the current phase, whole, alongside the phase's module or modules |
++| **Sub-workflow** | For one sub-type: a more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
++| **Trait additions** | For one trait: what it adds, whatever the product type | Their additions to the current phase, when the part has the trait |
++
++Until the phases are moved into files of their own, each phase's section of this file is its phase module (the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; reflection points include project end), and rule 28 governs the reading as it does today: this file is read whole at every start, resume and calibration, and after every compaction or resume you read the sections the session-start hook names before your next action. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits. Once the phases are modules, the core is still read whole at those same points, and with it the current phase's module or modules and the conditional workflows that apply; you never read a phase you are not in, or a conditional workflow that does not apply.
++
++**Three kinds of change.** Each change a conditional workflow makes is one of these:
++
++- **Add** — extra questions, sections, diagram kinds, checks, brief constraints, stages, completion conditions, reflection items.
++- **Replace** — a whole phase module, only where the phase declares that it may be replaced.
++- **Set** — a value the main workflow leaves open, such as the kind of performance budget (page load, frame time) or the delivery kind.
++
++**Only type workflows and sub-workflows may replace or set; trait additions may only add.** Each part follows one path down the tree of product types and sub-types, so two replacements never collide, and because traits only add, any combination of traits composes. A product that looks like a hybrid is declared as one product type with its sub-type plus a list of traits, never improvised.
++
++**A sub-workflow inherits its type workflow** and changes only what differs, at the same extension points. It may override its type workflow's replacement or setting: that is inheritance, not a collision. **Siblings are exclusive:** a part has at most one sub-type of its product type. **Two levels only:** a product type and its sub-types; a third level needs evidence from a real project.
++
++**The order additions apply in.** Additions from several conditional workflows apply together, never one in place of another, in this stated order, at each extension point: the phase module's own content there first, then the type workflow's additions, then the sub-workflow's, then each trait's, the traits taken in the order the open list gives them (today: has screens, installable, performance budgets, external services, spends money, long-running process, AI models, personal data, multiplayer); the open list governs this order and places a trait added later at its end. Within one workflow, its additions keep the order it writes them in. In a phase that covers several parts, at each extension point the phase module's own content there comes once, first; then, for each part in the order the status file lists them, that part's type workflow's, sub-workflow's and traits' additions, each applying to that part. A conditional workflow two parts share is read once, but its additions apply to every part that has it, in each part's own place in this order. Whatever lists or applies a phase's additions uses this order, so two sessions on one project read the same procedure in the same sequence.
++
++A conditional workflow can never remove a founding rule, weaken the merge gate, or skip the requirements register, the inventory, or the reviews. Those belong to the core and are not extension points; a conditional workflow's text that would do any of these does not apply, and on these points the core governs.
++
+ ---
+ 
+ ## The project layout
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 1624cc5..d13b7c3 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-11 16:55",
++  "generated": "2026-10-12 16:05",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -14,7 +14,7 @@
+     "agents/test-runner.md": "8358d18b3e8d109d7643ce2610ee433aa5668c4d9601976ece28a4d914f62649",
+     "commands/calibrate-bridge.md": "5ccdaa582af3a0084c6ceb20d62ac4dc1998ec86e085aa8688af4dc7ee59294a",
+     "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
+-    "commands/supervisor.md": "19c68d67ba427732b798167f351322860cbc69989d3f26b4799af281aa8f28f0",
++    "commands/supervisor.md": "4220828068f3145cab3b67680c5cb70ae478cea84a22efbcd94720b1a2bc8cf2",
+     "cursor-bridge/CHANGELOG.md": "e437fac211a07e96e54a236f016a9a4062b7c323d84ae0a961b39fdb982102ed",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 62c71f5..0ba2969 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -81,6 +81,62 @@ plan-critic returned 0 Blocking (round-3 findings confirmed resolved, graph acyc
+ | plan | confirming | plan-critic | 0 | 1 | 3 | yes — applied |
+ | plan | confirming | Review B | 0 | 2 | 1 | yes — applied |
+ 
++## Build rounds — supervisor-authored governance text
++
++Each supervisor-authored text increment takes one combined round that serves as both the two-critic design review and the merge gate: Review A (diff-reviewer with the plan-critic lenses) and Review B (cross-family, with execution) on the committed diff. Convergent findings are blocking.
++
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| TASK-003 | 1 | Review A | 0 | 4 | 6 | yes — round 2 (see below) |
++| TASK-003 | 1 | Review B | 0 | 2 | 2 | yes — round 2 (see below) |
++
++### TASK-003 round 1 — disposition
++Both APPROVE. Two findings converged and were treated as blocking:
++
++1. **"Siblings are exclusive" was pinned only as a label** (Review A Should fix, Review B Should fix). FIX: the test asserts the meaning, "a part has at most one sub-type of its product type".
++2. **"The core governs" was loose and unpinned** (Review A Should fix, Review B Consider: read loosely it would cancel replace and set). FIX: scoped to the floor ("a conditional workflow's text that would do any of these does not apply, and on these points the core governs") and pinned.
++
++Also fixed: the order is stated per extension point; "module or modules" (planning and building map to two); the transitional sentence says this file is still read whole until the phases move into modules, and maps the plan's phase names to this file's headings (Review B Consider); the open list governs the trait order and places a later trait at its end; several parts are taken in the status file's order; the Read-when cells are pinned exactly and the Holds cells by their items (Review B Should fix; the round-2 fix, reviewed in round 3, pinned the Holds cells whole).
++
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| TASK-003 | 2 | Review A | 0 | 2 | 4 | yes — round 3 (see below) |
++| TASK-003 | 2 | Review B | 0 | 0 | 3 | yes — round 3 (see below) |
++
++### TASK-003 round 2 — disposition
++Both APPROVE; the round-1 fixes confirmed. Two findings converged and were treated as blocking:
++
++1. **The sub-workflow's Holds cell was not pinned whole** ("a more detailed version of its type workflow" could go unnoticed; Review A Should fix, Review B Consider), and the record overstated the pinning. FIX: every Holds cell is pinned by equality.
++2. **The status file's Next line was stale** (both, Consider). FIX: rewritten.
++
++Also fixed:
++- **"Still read whole" collided with rule 28** (Review A Should fix). After a compaction the hook names the sections to re-read, so the sentence now says read whole "at every start and calibration (after a compaction, re-read what the hook names, rule 28)".
++- **The heading crosswalk was unpinned** (Review B Consider). It is now pinned, and each named heading is checked to exist.
++- **"The interface phase is Phase 3" could be misread** on a project without screens (Review A Consider). It now says Phase 3 "today holds only the mockup variant".
++- **The type workflow's Read-when said "the phase module"** (Review A Consider). It now says "the phase's module or modules".
++- **How parts and extension points nest was unstated** (Review A Consider). It is now stated: the phase module's own content comes once, then each part's type, sub-workflow and trait additions in status-file order. A trait two parts share applies once, at the first part that has it. This is pinned.
++
++Deferred, each to the increment that owns it (design for later increments is not this diff's defect):
++- how a replaced phase and a trait's attachment point are declared → TASK-005 (registry) and TASK-012 (declared points);
++- a guard against a conditional workflow's sentence that contradicts the core → TASK-006 (workflow-check);
++- R-007 is `built` on the text; it is exercised once the phases are modules and the hook names them → TASK-010 and TASK-015;
++- TASK-004's brief carries "a sub-type must earn its place" (§6.5) and cross-checks the open list's trait order against the order stated here.
++
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| TASK-003 | 3 | Review A | 0 | 1 | 3 | yes — round 4 (see below) |
++| TASK-003 | 3 | Review B | 1 | 0 | 2 | yes — round 4 (see below) |
++
++### TASK-003 round 3 — disposition
++Review A APPROVE, Review B REJECT.
++
++**REVIEWERS DISAGREE on the transitional reading sentence** (supervisor.md, the paragraph after the layer table). Review A approved it. Review B blocked it: it named start, calibration and compaction but not resume, and "reading only the current phase at those points" would replace the core's always-whole read. The crux is correctness, not intent. It is settled for Review B, because rule 28 is an established invariant: it re-reads the governing files whole on every start, resume and calibration, and after every compaction or resume it reads what the hook names. FIX: the sentence now defers to rule 28 unchanged. Once the phases are modules, the core is still read whole at those points, and the current phase's module or modules and the applicable conditional workflows are read with it. A test forbids the phase-only wording.
++
++One finding converged and was treated as blocking:
++- **"A trait two parts share is applied once, at the first part that has it"** (Review A Should fix, Review B Consider). It could be read as the trait's work being done for one part only, which is off-source (§6.2 applies a trait per part). FIX: "a conditional workflow two parts share is read once, but its additions apply to every part that has it, in each part's own place in this order". The parts sentence also restates "at each extension point" (Review A Consider).
++
++Also fixed: the crosswalk test checks every phase heading the Holds cell names (intake, design, run parameters, the change cycle; Review A Consider); the round-1 note above names the round that pinned the Holds cells (Review A Consider); the status file's Remote sync line names PR #17 (Review B Consider).
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index b7e9a60..7e07bd9 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -2,23 +2,24 @@
+ Last updated: 2026-10-12
+ Phase: building
+ Change cycle: none
+-Increment: TASK-001 — Intake and configuration records (at merge)
+-Last accepted: none (release B not yet started; releases 0, A1a–A5 are the baseline)
+-Awaiting user on: nothing — records consistent (the owner corrected line 25); re-gating PR #15 (fresh snapshot → Review B → verify → premerge) and completing the squash-merge, all commands run BARE so the owner's installed allow rules match (maintainer mechanics note 2026-10-12).
+-Next: gate #15 (snapshot → Review B → verify → premerge → merge on CI green), then TASK-002 through the delegation loop; build-plan gate approved 2026-10-11.
++Increment: TASK-003 — The conditional-workflow model in the core (branch task-003, started 2026-10-12 while PR #16 waits)
++Last accepted: TASK-001 at commit 9e181e6 (merged to main 2026-10-12)
++Awaiting user on: the repository variable SOCKET_ORG_SLUG (their Socket organization slug; run sheet given 2026-10-12; still unset at the resume check 2026-10-12). PR #16 (TASK-002, branch task-002) has passed every other gate condition — Review A and Review B (second round) APPROVE, secret-sentinel CLEAR, spec test 12/12, premerge OK at head e9299e6. On "variable set": re-run the PR's failed CI job, confirm all checks green on e9299e6 (read the Socket step log), merge bare (`gh pr merge 16 --squash --match-head-commit e9299e62773f86d3a8c3494951dd670a359b807d`), mark runs healthy, sync main, then make the `security floor` job a required check.
++Previously: paused by the owner 2026-10-12 for an app restart; resumed on the owner's word the same day (relayed by the maintainer). Owner decided 2026-10-12: Semgrep runs the OSS engine with explicit rulesets and no token. B2 confirmed 2026-10-12 as a post-B release.
++Next: TASK-003 (PR #17) — rounds 1–2 APPROVE, round 3 split (Review B blocked the reading sentence on rule 28; settled for B) and fixed (record in docs/DESIGN_CRITIQUE.md); round 4 (snapshot 003d) then CI, premerge and the merge; merge #16 when the variable is set; then TASK-004 onward.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: none
++Working files: run/supervisor/ — in-flight.md (the position; read first on resume), status-task002-wip.md (task-002's status copy), task-002-reviewA.md, maintainer-b2.md, mutate_ci_floor.py, gpt-usage-limit.err
+ Delegated gates: none
+-Remote sync: in sync at 2026-10-11
++Remote sync: in sync at 2026-10-12 (main at 9e181e6); task-002 pushed at e9299e6; task-003 pushed, PR #17
+ Workflows: host extension → Claude Code extension; traits: installable
+ Stage: Release B — Last reflection: none yet (intake 2026-10-11)
+-Open issues: none
+-Maintainer requests: none
++Open issues: ISS-002 (TASK-002's rounds; open until #16 merges)
++Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
+ Bridge version: 2026.10.11d
+ Calibrated: n/a — the bridge runs the installed 2026.10.11d it is the source of; intake 2026-10-11
+ Calibration pending: none
+@@ -27,6 +28,7 @@ Run parameters: see docs/RUN_PARAMETERS.md (stage pause=run / merge authority=su
+ ## Release B — notes for a resuming session
+ - This is the first release the bridge's own supervisor builds, as a supervised project (§15 condition 6). The design is the Restructuring Plan (Documents/Claude-Cursor Bridge Restructuring Plan.md), release B, §16 and §6.
+ - Roster: native profile in use (builder composer-2.5, Review A claude-opus-5-5, Review B grok-4.7-medium). The Other Models pool is marked exhausted (gpt-5.6-sol-high returned a usage limit; recorded 2026-10-12); automatic reset due 2026-10-16 00:00 UTC (reset day 16), or earlier when the owner says "usage reset".
+-- Branch: release-b-intake holds the intake artifacts (PR #15, not yet merged; merge authority = supervisor — the supervisor completes the gated merge).
++- Two branches live: task-002 (PR #16, reviewed, waiting on the owner's variable) and task-003 (in progress). Both edit this file, so whichever merges second takes `main` in first; if #16 is second, its new head is re-reviewed (policy: an updated branch is a new head).
++- Merge authority = supervisor — the supervisor completes each gated merge with bare `gh pr merge --squash --match-head-commit` (piped/compound forms fall to the classifier; --admin/force stay refused).
+ - One writer at a time (§15 condition 2): while this supervisor builds, the maintainer session must not touch this repo.
+ - Governance text is authored by the supervisor and gated by the two-critic design review; programs are delegated to the builder and gated by the delegation loop (§15 condition 3).
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 0d2155c..d5aaf3c 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -4,15 +4,15 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ 
+ | ID | Requirement | Source | Status | Evidence |
+ |---|---|---|---|---|
+-| R-001 | The bridge is set up as a supervised project: a status file, a requirements register drawn from this plan, a resolved model roster, run parameters, and a `project.json`. | DESIGN §15 condition 6 | planned | — |
++| R-001 | The bridge is set up as a supervised project: a status file, a requirements register drawn from this plan, a resolved model roster, run parameters, and a `project.json`. | DESIGN §15 condition 6 | built | tests/test_release_b_bootstrap.py (TASK-001, merged 9e181e6) |
+ | R-002 | The security floor (Semgrep, OSV-Scanner, Socket) runs in the bridge's own CI gate, pinned by commit, installing from a committed lockfile, alongside the tests it already runs. | DESIGN §15 condition 6 (P2) | planned | — |
+ | R-003 | The supervisor's instructions are split into the main-workflow core and per-phase modules; the core holds the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state, and the standing rules that hold in every phase. | DESIGN §6.2 | planned | — |
+ | R-004 | Each phase module holds its phase's whole procedure and opens with the short list of what must survive a compaction. | DESIGN §16; §6.2 | planned | — |
+ | R-005 | The compaction/session-start hook names the current phase's module(s) to re-read after a compaction (one for most phases; planning and building map to two), plus the conditional-workflow files (type, sub-type, trait) that touch the current phase; it carries the Phase→module table for every template phase value, including the reflection and project-end modules and any further files the phase re-reads. | DESIGN §16; §6.2 | planned | — |
+ | R-006 | Extension points are declared — a canonical registry (the §6.4 initial set, including Definition of done and Delivery) naming which phase module declares each, and, in each phase module, the points that phase offers. | DESIGN §6.4 | planned | — |
+-| R-007 | The conditional-workflow layering is in force: main core, phase modules, type workflow, sub-workflow, trait additions; each layer inherits what it does not mention and is read only when it applies. | DESIGN §6.2 | planned | — |
+-| R-008 | Only type workflows and sub-workflows may replace or set; trait additions may only add; no conditional workflow can remove a founding rule, weaken the merge gate, or skip the register, the inventory, or the reviews. | DESIGN §6.5 | planned | — |
+-| R-009 | A sub-workflow inherits its type workflow and may override its replacement or setting; siblings are exclusive; two levels (type and sub-type) only. | DESIGN §6.5 | planned | — |
++| R-007 | The conditional-workflow layering is in force: main core, phase modules, type workflow, sub-workflow, trait additions; each layer inherits what it does not mention and is read only when it applies. | DESIGN §6.2 | built | tests/test_workflow_model.py (TASK-003) |
++| R-008 | Only type workflows and sub-workflows may replace or set; trait additions may only add; no conditional workflow can remove a founding rule, weaken the merge gate, or skip the register, the inventory, or the reviews. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
++| R-009 | A sub-workflow inherits its type workflow and may override its replacement or setting; siblings are exclusive; two levels (type and sub-type) only. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-010 | The interface phase runs one variant per kind of interface a part has, and the trait *has screens* adds (activates) the mockup variant — an addition, not a replacement — keeping the frozen interface rules, the design auditor, and the running-interface tests together. | DESIGN §6.5 | planned | — |
+ | R-011 | `workflow/open-list.md` lists every product type, sub-type, and trait with its definition and whether its workflow is written, and records the §6.10 procedure for adding or changing a conditional workflow. | DESIGN §6.3, §6.10, §6.11 | planned | — |
+ | R-012 | The interface-phase variants are declared once in the main workflow's interface module (mockups for screens, command design, contract design, playable prototype), each variant's text in one place. | DESIGN §6.4, §6.9 | planned | — |
+@@ -37,7 +37,7 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-031 | The bridge, reAngle, the video factory, and the TDP each classify under §6.3 (checked on committed fixtures) and calibrate onto the new structure, none pausing, without reopening a gate: reAngle live as the release-B trial, the bridge by running the release, the video factory and the TDP when they resume per the owner's standing pause/resume policy (one calibration each). | DESIGN §6.3; release B "Accepted when" | planned | — |
+ | R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | planned | — |
+ | R-033 | The workflow check runs at every bridge release (CI) and at every calibration. | DESIGN §6.6 | planned | — |
+-| R-034 | Trait additions from several conditional workflows are applied together in a stated order. | DESIGN §6.5 | planned | — |
++| R-034 | Trait additions from several conditional workflows are applied together in a stated order. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-035 | Traits are proposed at intake and settled at the design gate; a product type's default traits are proposals settled at the same gate. | DESIGN §6.3 | planned | — |
+ | R-036 | A new or defined-but-unwritten trait is handled by writing its extra handling into the project's design, flagging it at the design gate (where the owner may still pause), and putting it to the promotion pass at project end. | DESIGN §6.7 | planned | — |
+ | R-037 | Release B is delivered: a release-level review by a fresh context (one pass, fixes, a second pass); the stamp (VERSION, a regenerated MANIFEST, a CHANGELOG entry with its "if rolled back" notes); the projects paused; `bridge-install.py` run; `bridge-check.py` green on the installed tree; the trial project (reAngle) calibrated and resumed; field acceptance met; the others resumed. | DESIGN §15 conditions 4–5; §16 | planned | — |
+diff --git a/run/review/ASSUMPTIONS-003d.md b/run/review/ASSUMPTIONS-003d.md
+new file mode 100644
+index 0000000..03295a9
+--- /dev/null
++++ b/run/review/ASSUMPTIONS-003d.md
+@@ -0,0 +1,7 @@
++# TASK-003 — assumptions (unchanged in rounds 2, 3 and 4; the fix commits add none)
++
++No builder ran; the text is supervisor-authored. The supervisor's own assumptions, as extra places to look (never the review's scope):
++
++- The open list will keep §6.3's trait order (has screens … multiplayer), so the order this text names stays true → test in TASK-004 (its test can cross-check against this section).
++- "Until the phases are moved into files of their own, each phase's section of this file is its phase module" is the right transitional statement while release B's carve (TASK-010+) has not landed → accepted; the carve increments edit it.
++- No existing test pins the region between "## The division of labour" and "## The project layout" → test: the full suite passed (883 passed, 20 fixed skips) with the section inserted.
+diff --git a/run/review/PLAN-6-003d.md b/run/review/PLAN-6-003d.md
+new file mode 100644
+index 0000000..a57f656
+--- /dev/null
++++ b/run/review/PLAN-6-003d.md
+@@ -0,0 +1,102 @@
++### 6.2 The structure
++
++Every project runs the main workflow. What differs by product is held in three layers of conditional workflows, and each layer inherits everything it does not mention from the layers above it:
++
++| Layer | Holds | Read when |
++|---|---|---|
++| **The main workflow's core** | The roles and the division of labour; the founding rules; the loop's shape; escalation and reporting; project state; the standing rules that hold in every phase | Always, whole, at every start and calibration |
++| **Phase modules** | The procedure for each phase: intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end | The module for the current phase, whole, on entering the phase and at every calibration |
++| **Type workflow** | For one product type: its changes at named extension points | The part's type workflow's changes to the current phase, whole, alongside the phase module |
++| **Sub-workflow** | For one sub-type: a tailored, more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
++| **Trait additions** | For one trait: what it adds, whatever the product type | The additions of the part's traits to the current phase |
++
++The supervisor never reads a phase it is not in, or a conditional workflow that does not apply. A project's status file records, for each part (section 7), its product type, sub-type and traits on a `Workflows:` line, and the project's phase on the `Phase:` line; together they name exactly what a resumed session must read. A project with one part has one `Workflows:` line.
++
++### 6.3 Product types, sub-types and traits
++
++*Revised 2026-10-04 after the plan review (R11). Awaiting the owner (decision 6): two definitions change, two sub-types are added, and all three running projects are classified.*
++
++**A product type answers one question: how does the product reach its user?** That covers what the user meets it through, how it is delivered, and where it runs. Each part of a project has exactly one product type, and at most one of its sub-types. **A trait is a property that adds work whatever the product type:** a settings screen, calls to paid services, a background server, speed targets. A part may have any number of traits.
++
++**When they are decided.** The product type and sub-type are fixed at intake, because every phase that follows depends on them, and a new product type pauses the project (6.7). Traits are proposed at intake and settled at the design gate, because several of them only emerge from the design (whether the product needs accounts, for instance). A product type's default traits are proposals too, settled at the same gate.
++
++**What the review found.** The earlier definitions folded two things into one: what the user meets the product through, and where the product runs. The video factory runs on the owner's own computer and is used in a browser; by the plan's own test (does it keep data for its users?) it was a web app, and the plan called it a pipeline. A project that fits two product types equally pauses (6.7), so release B's calibration would have paused it. reAngle was not classified at all. And the TDP's main interface is not its command line but a contract other software calls. The definitions below separate the two: the product type follows **what the user meets**, and a sub-type says where it runs when that changes the work.
++
++**The running projects, classified:**
++
++| Project | Product type → sub-type | Traits |
++|---|---|---|
++| The Short-Form Video Factory | Web app → local web app | has screens, installable, long-running process, external services, spends money, AI models |
++| reAngle | Web app → local web app | has screens, installable, long-running process, external services, spends money, AI models |
++| The TDP | Software on your own computer → local service | installable, long-running process, external services, spends money, AI models; performance budgets again once its code map carries one |
++| The bridge itself | Host extension → Claude Code extension | installable |
++
++reAngle also deploys code of its own to a cloud platform (its GPU jobs), and one of its recorded failures happened exactly there. No product type or sub-type carries that step, so its checks (the deployed layout tested before any deployment, every remote wait bounded) are written into the *external services* trait in release B (second pass, P11).
++
++**The lists are open.** Nobody can foresee every product type or trait, so each entry carries a definition: a project is classified against the definitions, and a product type or trait that fits none of them is recognised as new rather than forced into the nearest entry (6.7).
++
++**Product types.** Each product type's workflow has a **workflow name** and each sub-type's a **sub-workflow name**, fixed here, used in the status file's `Workflows:` line and in the progress graph's header (7.8); the owner chose the game's on 2026-10-01 and the others follow the same shape (the type's name, as a name for the work rather than the product).
++
++| Product type | Definition | Sub-types | Default traits |
++|---|---|---|---|
++| Mobile app | Installed on a phone or tablet from an app store | Android; iOS later | has screens, installable |
++| Web app | Used in a browser; keeps data for its users (accounts, saved state, runs, orders). Without a sub-type it runs on a server the owner operates and is delivered by deployment | **Local web app:** installed and run on the user's own computer and opened in their browser at a local address; it is delivered by an installer instead of a deployment and has a local server to start and stop | has screens, personal data; the local sub-type has installable and long-running process instead of personal data |
++| Website | Used in a browser; presents content; keeps no data for its users | — | has screens |
++| Software on your own computer | Installed and run on the user's own computer, and met through something other than a browser page | GUI (a window) · CLI (a terminal) · pipeline (nothing: it runs jobs unattended and its output is files or records) · **local service** (other software on the same computer calls it through a protocol, such as an MCP server; its interface is a contract) | installable; the GUI sub-type adds has screens; the local service adds long-running process |
++| Backend service | Runs on a server, has no screen, serves other software over a network | — | long-running process |
++| Library | Code that other programs include; delivered as a package | — | — |
++| Video game (workflow name **Game Development**) | Built around a real-time play loop | Roblox (sub-workflow name **Roblox Game**); a game with no sub-type runs under the Game Development workflow alone | has screens, performance budgets; the Roblox sub-type adds multiplayer |
++| Host extension | Runs inside another application, through that application's extension points | Claude Code extension (the bridge itself) · browser extension | installable |
++
++To tell a website from a web app at intake, one question decides: **does it keep data for its users** (accounts, saved progress, runs, orders)? If yes, it is a web app. To tell a web app from software on your own computer: **does its user meet it in a browser?** If yes, it is a web app, wherever it runs.
++
++**Traits:**
++
++| Trait | Definition | Status |
++|---|---|---|
++| Has screens | Shows a visual interface to a person | Exists today, as the bridge's conditions for interface projects |
++| Installable | Delivered as something the user installs | Exists today |
++| Performance budgets | Speed, size or frame-rate targets are requirements | Exists today |
++| External services | Depends on services run by others | Exists today |
++| Spends money | Its actions cost real money (paid APIs, purchases) | Defined; **written in release B**, because all three running projects carry it |
++| Long-running process | Keeps a process running between uses (a server, a watcher) | Defined; **written in release B**, because all three running projects carry it |
++| AI models | Its results come from models, so correctness is judged by evaluation rather than by exact tests | Defined; **written in release B**, because all three running projects carry it |
++| Personal data | Holds data about people: accounts, sign-in, privacy, deletion | Defined; written when a project first needs it |
++| Multiplayer | Several people interact live through a server | Defined; written with the Roblox sub-workflow in release E, whose default trait it is |
++
++### 6.4 Extension points
++
++A conditional workflow may change the procedure only at extension points declared in the phase modules. The initial list, to be refined during implementation:
++
++| Phase | Extension points |
++|---|---|
++| Intake | Additional questions; additional requirement sources; the product type's target environment |
++| Design | Additional design sections; additions to the diagram catalogue; mandatory diagram kinds |
++| Interface phase | The main workflow holds its variants once, one per kind of interface a part can have: mockups for screens, command design for commands, contract design for a protocol other software calls, a playable prototype for play. A part's interface phase runs the variant of every kind it has; type workflows, sub-workflows and the trait *has screens* add the variants that apply, and a type workflow or sub-workflow may replace the phase with its own |
++| Planning | Mandatory stages (such as a packaging stage); additions to the plan critic's lenses |
++| Run parameters | Additional run parameters |
++| Configuration | Additional configuration items, tools and checks |
++| The delegation loop | Additional checks at the inspect and test steps; additional brief constraints |
++| Definition of done | Additional completion conditions |
++| Delivery | The delivery procedure (installer, store package, web deployment, installation into a host) |
++| Reflection points | Additional reflection items |
++
++### 6.5 What each layer can do
++
++Each change a conditional workflow makes is one of three kinds:
++
++- **Add**: extra questions, sections, diagram kinds, checks, brief constraints, stages, completion conditions, reflection items. Additions from several conditional workflows are applied together, in a stated order.
++- **Replace**: a whole phase module, only where the phase declares that it may be replaced.
++- **Set**: a value the main workflow leaves open, such as the kind of performance budget (page load, frame time) or the delivery kind.
++
++**Only type workflows and sub-workflows may replace or set; trait additions may only add** (agreed 2026-09-29). Each part follows one path down the tree of product types and sub-types, so two replacements can never collide; trait additions only add, so any combination of traits composes cleanly. A product that looks like a hybrid is therefore never improvised: it is declared, as one product type with its sub-type plus a list of traits, and the workflow check verifies it.
++
++**A sub-workflow inherits its type workflow** and changes only what differs, at the same extension points. It may override its type workflow's replacement or setting: if the video game type workflow replaces mockups with a playable prototype, the Roblox sub-workflow may replace that prototype phase again. That is inheritance, not a collision.
++
++**A sub-type must earn its place.** It must change a phase, a gate, a check or the tooling. A difference that changes none of these (a puzzle game against a shooter) is a design choice and belongs in the project's design document. A Roblox game earns its sub-type: a different editor, language, testing and publishing.
++
++**Siblings are exclusive:** a part is a Roblox game or a Unity game, never both. **Two levels are enough** (a product type and its sub-types); a third needs evidence from a real project.
++
++A conditional workflow can never remove a founding rule, weaken the merge gate, or skip the requirements register, the inventory, or the reviews. Those belong to the core and are not extension points.
++
++**Today's interface conditions stay together** (revised 2026-10-04, R11). The earlier text split them: the mockup phase, as a replacement, was to move out of the trait *has screens* and be selected by product types, leaving the trait with the interface rules, the design auditor and the tests of the running interface. But the design auditor, and the design detector in the merge gate, both judge against the approved mockup and the design document the mockup phase writes. A project given the trait without the phase would have kept a reviewer with nothing to review against, and changes to the video factory's screens would no longer have passed the owner's visual approval. So the mockup variant is an addition, not a replacement: the interface phase runs one variant per kind of interface the part has (6.4), and the trait *has screens* adds the mockup variant, sized to the screens there are, together with the frozen interface rules, the design auditor and the tests of the running interface. The rule that trait additions only add is kept, and a settings tab gets a small mockup rather than none.
+diff --git a/run/review/SCOPE-003d.md b/run/review/SCOPE-003d.md
+new file mode 100644
+index 0000000..38bd324
+--- /dev/null
++++ b/run/review/SCOPE-003d.md
+@@ -0,0 +1,69 @@
++# TASK-003 — scope of the review (round 4)
++
++Branch `task-003`, from `origin/main` 9e181e6. The diff is `run/review/REVIEW-003d.diff` — the branch's whole change against `origin/main`. The plan's §6.2–6.5 are at `run/review/PLAN-6-003d.md`.
++
++## Round 4 — what changed since round 3
++
++Round 3 (head e4818f5): Review A APPROVE, Review B REJECT. Commit ac6ee03 applies the findings; the disposition is in `docs/DESIGN_CRITIQUE.md` ("TASK-003 round 3 — disposition"). Check that each fix holds and introduced nothing new:
++- the transitional reading sentence (supervisor.md, the paragraph after the layer table) now defers to rule 28 unchanged: read whole at every start, resume and calibration; after every compaction or resume, read the sections the session-start hook names. Once the phases are modules, the core is still read whole at those points, with the current phase's module(s) and the applicable conditional workflows read alongside it. Check against rule 28 (its text near "On every start or resume, and whenever the owner runs `/calibrate-bridge`"), the core's Read-when cell, and `bridge/cursor-bridge/session-start.py`. The old phase-only wording is forbidden by a test;
++- the parts sentence restates "at each extension point"; "a conditional workflow two parts share is read once, but its additions apply to every part that has it, in each part's own place in this order" (pinned);
++- the crosswalk test checks every phase heading the Holds cell names (intake, design, interface, planning, run parameters, configuration, delegation loop, change cycle, reflection points);
++- the round-1 note in DESIGN_CRITIQUE names the round that pinned the Holds cells; the status file's Remote sync names PR #17.
++
++## Round 3 — what changed since round 2 (kept for the record)
++
++Round 2 (head 8907e8e): Review A and Review B both APPROVE. The latest TASK-003 fix commit applies their findings; the disposition is in `docs/DESIGN_CRITIQUE.md` ("TASK-003 round 2 — disposition"). Check that each fix holds and introduced nothing new:
++- every Holds cell is pinned by equality;
++- "still read whole at every start and calibration (after a compaction, re-read what the hook names, rule 28)" — consistent with rule 28 and the session-start hook (pinned);
++- the heading crosswalk is pinned and each named heading checked to exist; Phase 3 "today holds only the mockup variant";
++- the type workflow's Read-when says "the phase's module or modules";
++- parts × extension point nesting: the phase module's own content once, first; then each part's type, sub-workflow and trait additions in status-file order; a trait two parts share applied once, at the first part that has it (pinned);
++- the status file's Next line is current.
++
++## Round 2 — what changed since round 1 (kept for the record)
++
++Round 1 (head 18e9f57): Review A and Review B both APPROVE. Commit 58ed1d2 applies their findings; the disposition is recorded in `docs/DESIGN_CRITIQUE.md` ("TASK-003 round 1 — disposition"). Check that each fix holds and that it introduced nothing new:
++- the meaning of "Siblings are exclusive" ("a part has at most one sub-type of its product type") is asserted;
++- the floor's precedence is scoped: "a conditional workflow's text that would do any of these does not apply, and on these points the core governs" (pinned);
++- the additions order holds "at each extension point"; the open list governs the trait order and places a later trait at its end; several parts are taken in the status file's order (all pinned);
++- "module or modules"; the transitional sentence maps the plan's phase names to this file's headings and says this file "is still read whole" until the phases move into modules (pinned);
++- the Holds and Read-when cells of the five layers are pinned exactly.
++Items deferred to later increments are listed there and are not this diff's defect.
++
++## What this increment is
++
++Supervisor-authored governance text, not a builder run: release B's plan (docs/BUILD_PLAN.md, TASK-003, "Author: supervisor") assigns governance text to the supervisor and gates it by the two-critic design review (§15 condition 3). This round serves as both that design review and the merge gate. Grade findings as **Blocking**, **Should fix** or **Consider**, then give one verdict: APPROVE, REJECT or ESCALATE-INTENT.
++
++## Scope (from docs/BUILD_PLAN.md, TASK-003)
++
++- Scope: `bridge/commands/supervisor.md; bridge/cursor-bridge/MANIFEST.json; tests/test_workflow_model.py`
++- Satisfies: R-007, R-008, R-009, R-034
++- Done when: the core describes the five layers, inheritance, read-when, replace/set/add ("only type/sub-workflows may replace or set; trait additions only add"), the founding-rule/merge-gate/register floor, and the stated order several traits' additions compose in (R-034); `test_workflow_model.py` (names R-007, R-008, R-009, R-034) asserts those statements and that the digest stays within its limit.
++- Standing constraints: MANIFEST.json regenerated (`python tools/make-manifest.py`) on any `bridge/` edit; tests name their R-IDs; no hard line wraps in Markdown.
++
++## Out of scope (later increments; not this diff's defect)
++
++- The open list of types/sub-types/traits as a file (TASK-004). This text states the trait order by naming the open list's order and listing today's traits; TASK-004 will make the file canonical.
++- The extension-point registry and each phase's declared points (TASK-005, TASK-014); the workflow check program (TASK-006); the `Workflows:` status line template (TASK-007); splitting the phases into module files (TASK-010 onward); the hook naming files in the R-034 order (TASK-015); the first trait files (TASK-017 onward).
++- The compaction digest is not extended: it is at 9,490 of its 9,500-character cap, so the model lives in the core body only (the full text governs).
++
++## Source the text must match
++
++The plan's §6.2–6.5 are copied verbatim to `run/review/PLAN-6-003d.md` (the plan itself lives outside the Workspace). `Documents/Claude-Cursor Bridge Restructuring Plan.md` §6.2 (layers table, inheritance, read-when), §6.4 (extension points), §6.5 (add/replace/set; only types/sub-workflows replace or set; sub-workflow inheritance; siblings exclusive; two levels; the floor). The plan leaves R-034's order unstated ("in a stated order"); this text states it: phase module, type, sub-workflow, then traits in the open list's order (§6.3's trait table), later traits appended, each workflow's own order kept. Copies of the relevant docs records are in `docs/` (REQUIREMENTS.md rows R-007/008/009/034, BUILD_PLAN.md TASK-003, DESIGN_CRITIQUE.md).
++
++## Tests the supervisor wrote
++
++`tests/test_workflow_model.py` — enforces docs/BUILD_PLAN.md TASK-003 Done when and plan §6.2/§6.5:
++- placement in the core, outside the digest (R-007);
++- the five layers in order, each with Holds and Read-when (R-007);
++- inheritance, read-only-when-applies, changes only at extension points (R-007);
++- add/replace/set, replace only where declared, the "only type workflows and sub-workflows may replace or set" sentence (R-008);
++- the floor sentence: founding rule, merge gate, requirements register, inventory, reviews (R-008);
++- sub-workflow inherits and may override, siblings exclusive, two levels (R-009);
++- the stated order: phase module → type → sub-workflow → traits, traits in §6.3's order, later traits, a workflow's own order (R-034);
++- the digest keeps its 9,500 / 20,000 limits.
++Against `origin/main` the file fails (the heading is absent). No mutation driver (text test).
++
++## Expected bookkeeping in the diff
++
++`docs/PROJECT_STATUS.md` (position rewrite), `docs/DESIGN_CRITIQUE.md` (the round-1 record), `docs/REQUIREMENTS.md` (R-007/008/009/034 → built with the test as evidence; R-001 → built, a correction of TASK-001's row, which its merge left at planned), `bridge/cursor-bridge/MANIFEST.json` (regenerated hash of supervisor.md), `run/review/` (these review files).
+diff --git a/tests/test_workflow_model.py b/tests/test_workflow_model.py
+new file mode 100644
+index 0000000..e3e499f
+--- /dev/null
++++ b/tests/test_workflow_model.py
+@@ -0,0 +1,150 @@
++"""Release B — TASK-003: the conditional-workflow model stands in the core of supervisor.md.
++
++enforces: docs/BUILD_PLAN.md TASK-003 Done when; the Restructuring Plan §6.2 (the five layers,
++inheritance, read-when) and §6.5 (add / replace / set, the floor, sub-workflows, siblings, two
++levels, additions applied together in a stated order). Satisfies R-007, R-008, R-009, R-034.
++The section is core text: it sits after the division of labour and before the project layout,
++outside the compaction digest, which keeps its limits.
++"""
++import os
++import re
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++SV = os.path.join(HERE, os.pardir, "bridge", "commands", "supervisor.md")
++TEXT = open(SV, encoding="utf-8").read()
++HEADING = "## Main and conditional workflows"
++
++
++def model():
++    a = TEXT.index(HEADING)
++    b = TEXT.index("\n## ", a + len(HEADING))
++    return TEXT[a:b]
++
++
++def flat(s):
++    """The section with its emphasis marks and line breaks removed, for phrase matching."""
++    return re.sub(r"\s+", " ", s.replace("**", ""))
++
++
++def layer_rows():
++    rows = [r for r in model().split("\n") if r.startswith("| **")]
++    return [[c.strip() for c in r.strip("|").split("|")] for r in rows]
++
++
++def test_r007_the_section_is_core_text_between_the_division_of_labour_and_the_layout():
++    """R-007: the model belongs to the core, which is read whole at every start."""
++    i = TEXT.index(HEADING)
++    assert TEXT.index("## The division of labour") < i < TEXT.index("## The project layout")
++    assert i > TEXT.index("<!-- digest:end -->"), "the model is core text, not part of the digest"
++    assert TEXT.count(HEADING) == 1
++
++
++def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read():
++    """R-007 (plan §6.2): main core, phase modules, type workflow, sub-workflow, trait additions."""
++    rows = layer_rows()
++    names = [re.sub(r"\*\*(.+?)\*\*.*", r"\1", r[0]) for r in rows]
++    assert names == ["The main workflow's core", "Phase modules", "Type workflow", "Sub-workflow", "Trait additions"], names
++    assert all(len(r) == 3 and r[1] and r[2] for r in rows), "every layer says what it holds and when it is read"
++    holds = [r[1] for r in rows]
++    assert holds[0] == ("The roles and the division of labour; the founding rules; the loop's shape; "
++                        "escalation and reporting; project state; the standing rules that hold in every phase")
++    assert holds[1] == ("The procedure for one phase each: intake, design, the interface phase, planning, "
++                        "run parameters, configuration, the delegation loop, the change cycle, reflection points "
++                        "and project end")
++    assert holds[2] == "For one product type: its changes at named extension points"
++    assert holds[3] == ("For one sub-type: a more detailed version of its type workflow, changing only what "
++                        "differs for that sub-type")
++    assert holds[4] == "For one trait: what it adds, whatever the product type"
++    read_when = [r[2] for r in rows]
++    assert read_when[0] == "Always, whole, at every start and calibration"
++    assert read_when[1] == "The current phase's module or modules, whole, on entering the phase and at every calibration"
++    assert read_when[2] == "Its changes to the current phase, whole, alongside the phase's module or modules"
++    assert read_when[3] == "Alongside its type workflow, when the part has a sub-type"
++    assert read_when[4] == "Their additions to the current phase, when the part has the trait"
++
++
++def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when_it_applies():
++    s = flat(model())
++    assert "each inheriting everything it does not mention from the layers above it" in s
++    assert ("rule 28 governs the reading as it does today: this file is read whole at every start, resume and "
++            "calibration, and after every compaction or resume you read the sections the session-start hook names "
++            "before your next action") in s, "the transitional reading is rule 28's, unchanged"
++    assert ("Once the phases are modules, the core is still read whole at those same points, and with it the current "
++            "phase's module or modules and the conditional workflows that apply; you never read a phase you are not "
++            "in, or a conditional workflow that does not apply") in s, "the core stays whole; phases and conditionals add"
++    assert "reading only the current phase" not in s, "the core is never replaced by a phase-only read"
++
++
++def test_r007_until_the_carve_each_phase_module_is_a_named_section_of_this_file():
++    """R-007: the plan's phase names map to this file's headings, and each heading exists."""
++    s = flat(model())
++    assert ("each phase's section of this file is its phase module (the interface phase is Phase 3, which today "
++            "holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is "
++            "Phase 6; reflection points include project end)") in s
++    for heading in ("## Phase 1 — Intake", "## Phase 2 — Design", "## Phase 3 — UI mockups", "## Phase 4 — Build plan",
++                    "## Run parameters", "## Phase 5 — Configure", "## Phase 6 — The delegation loop",
++                    "## The change cycle", "## Reflection points"):
++        assert "\n" + heading in TEXT, heading
++    assert "project end" in TEXT[TEXT.index("## Reflection points"):].split("\n", 1)[0].lower()
++    assert "you never read a phase you are not in, or a conditional workflow that does not apply" in s
++    assert "only at the extension points" in s, "a conditional workflow changes the procedure only at declared points"
++
++
++def test_r008_three_kinds_of_change_and_who_may_make_each():
++    """R-008 (plan §6.5): add, replace, set; only types and sub-workflows replace or set."""
++    s = flat(model())
++    for kind in ("- Add —", "- Replace —", "- Set —"):
++        assert kind in s, kind
++    assert "only where the phase declares that it may be replaced" in s
++    assert "Only type workflows and sub-workflows may replace or set; trait additions may only add." in s
++
++
++def test_r008_no_conditional_workflow_touches_the_floor():
++    """R-008: no founding rule removed, merge gate weakened, register / inventory / reviews skipped."""
++    s = flat(model())
++    floor = s[s.index("A conditional workflow can never"):]
++    floor = floor[:floor.index(".") + 1]
++    for item in ("remove a founding rule", "weaken the merge gate", "the requirements register", "the inventory", "the reviews"):
++        assert item in floor, item
++    assert "not extension points" in s
++    assert "a conditional workflow's text that would do any of these does not apply, and on these points the core governs" in s
++
++
++def test_r009_sub_workflow_inheritance_exclusive_siblings_two_levels():
++    """R-009 (plan §6.5): a sub-workflow inherits and may override; siblings exclusive; two levels."""
++    s = flat(model())
++    assert "A sub-workflow inherits its type workflow" in s
++    assert "may override its type workflow's replacement or setting" in s
++    assert "Siblings are exclusive: a part has at most one sub-type of its product type" in s
++    assert "Two levels only" in s and "a third level needs evidence from a real project" in s
++
++
++def test_r034_additions_apply_together_in_a_stated_order():
++    """R-034 (plan §6.5): additions from several workflows apply together, in a stated order."""
++    s = flat(model())
++    order = s[s.index("The order additions apply in."):]
++    order = order[:order.index("A conditional workflow can never")]
++    assert "apply together" in order and "never one in place of another" in order
++    assert "at each extension point" in order, "the order holds where the additions land, not after the phase"
++    assert "the open list governs this order and places a trait added later at its end" in order
++    assert ("In a phase that covers several parts, at each extension point the phase module's own content there comes "
++            "once, first; then, for each part in the order the status file lists them, that part's type workflow's, "
++            "sub-workflow's and traits' additions, each applying to that part") in order
++    assert ("A conditional workflow two parts share is read once, but its additions apply to every part that has it, "
++            "in each part's own place in this order") in order, "a shared trait's work is done for every part"
++    seq = ["the phase module's own", "the type workflow's", "the sub-workflow's", "each trait's"]
++    pos = [order.index(p) for p in seq]
++    assert pos == sorted(pos), "phase module, then type, then sub-workflow, then traits"
++    traits = ["has screens", "installable", "performance budgets", "external services", "spends money",
++              "long-running process", "AI models", "personal data", "multiplayer"]
++    tpos = [order.index(t) for t in traits]
++    assert tpos == sorted(tpos), "the traits in the order the open list gives them (plan §6.3)"
++    assert "added later" in order, "a trait added later has a place in the order"
++    assert "keep the order it writes them in" in order, "within one workflow its own order holds"
++
++
++def test_the_digest_keeps_its_limits():
++    """The new section must not push the digest past the hook's cap or out of a compaction's reach."""
++    a, b = TEXT.find("<!-- digest:start -->"), TEXT.find("<!-- digest:end -->")
++    assert 0 < a < b < 20000
++    assert len(TEXT[a:b]) <= 9500
