@@ -1,0 +1,41 @@
+# TASK-003 — scope of the review
+
+Branch `task-003`, from `origin/main` 9e181e6. The diff is `run/review/REVIEW-003.diff`.
+
+## What this increment is
+
+Supervisor-authored governance text, not a builder run: release B's plan (docs/BUILD_PLAN.md, TASK-003, "Author: supervisor") assigns governance text to the supervisor and gates it by the two-critic design review (§15 condition 3). This round serves as both that design review and the merge gate. Grade findings as **Blocking**, **Should fix** or **Consider**, then give one verdict: APPROVE, REJECT or ESCALATE-INTENT.
+
+## Scope (from docs/BUILD_PLAN.md, TASK-003)
+
+- Scope: `bridge/commands/supervisor.md; bridge/cursor-bridge/MANIFEST.json; tests/test_workflow_model.py`
+- Satisfies: R-007, R-008, R-009, R-034
+- Done when: the core describes the five layers, inheritance, read-when, replace/set/add ("only type/sub-workflows may replace or set; trait additions only add"), the founding-rule/merge-gate/register floor, and the stated order several traits' additions compose in (R-034); `test_workflow_model.py` (names R-007, R-008, R-009, R-034) asserts those statements and that the digest stays within its limit.
+- Standing constraints: MANIFEST.json regenerated (`python tools/make-manifest.py`) on any `bridge/` edit; tests name their R-IDs; no hard line wraps in Markdown.
+
+## Out of scope (later increments; not this diff's defect)
+
+- The open list of types/sub-types/traits as a file (TASK-004). This text states the trait order by naming the open list's order and listing today's traits; TASK-004 will make the file canonical.
+- The extension-point registry and each phase's declared points (TASK-005, TASK-014); the workflow check program (TASK-006); the `Workflows:` status line template (TASK-007); splitting the phases into module files (TASK-010 onward); the hook naming files in the R-034 order (TASK-015); the first trait files (TASK-017 onward).
+- The compaction digest is not extended: it is at 9,490 of its 9,500-character cap, so the model lives in the core body only (the full text governs).
+
+## Source the text must match
+
+The plan's §6.2–6.5 are copied verbatim to `run/review/PLAN-6-003.md` (the plan itself lives outside the Workspace). `Documents/Claude-Cursor Bridge Restructuring Plan.md` §6.2 (layers table, inheritance, read-when), §6.4 (extension points), §6.5 (add/replace/set; only types/sub-workflows replace or set; sub-workflow inheritance; siblings exclusive; two levels; the floor). The plan leaves R-034's order unstated ("in a stated order"); this text states it: phase module, type, sub-workflow, then traits in the open list's order (§6.3's trait table), later traits appended, each workflow's own order kept. Copies of the relevant docs records are in `docs/` (REQUIREMENTS.md rows R-007/008/009/034, BUILD_PLAN.md TASK-003, DESIGN_CRITIQUE.md).
+
+## Tests the supervisor wrote
+
+`tests/test_workflow_model.py` — enforces docs/BUILD_PLAN.md TASK-003 Done when and plan §6.2/§6.5:
+- placement in the core, outside the digest (R-007);
+- the five layers in order, each with Holds and Read-when (R-007);
+- inheritance, read-only-when-applies, changes only at extension points (R-007);
+- add/replace/set, replace only where declared, the "only type workflows and sub-workflows may replace or set" sentence (R-008);
+- the floor sentence: founding rule, merge gate, requirements register, inventory, reviews (R-008);
+- sub-workflow inherits and may override, siblings exclusive, two levels (R-009);
+- the stated order: phase module → type → sub-workflow → traits, traits in §6.3's order, later traits, a workflow's own order (R-034);
+- the digest keeps its 9,500 / 20,000 limits.
+Against `origin/main` the file fails (the heading is absent). No mutation driver (text test).
+
+## Expected bookkeeping in the diff
+
+`docs/PROJECT_STATUS.md` (position rewrite), `docs/REQUIREMENTS.md` (R-007/008/009/034 → built with the test as evidence; R-001 → built, a correction of TASK-001's row, which its merge left at planned), `bridge/cursor-bridge/MANIFEST.json` (regenerated hash of supervisor.md), `run/review/` (these review files).
