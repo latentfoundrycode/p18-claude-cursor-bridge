@@ -1,6 +1,6 @@
 # The extension-point registry
 
-This file is the canonical list of the extension points: the named places where a conditional workflow (a type workflow, a sub-workflow or a trait's additions) may change the main workflow (Restructuring Plan §6.4, §6.5). It names, for each point, the phase module that declares it, and for each phase module whether a type workflow or sub-workflow may replace it. A conditional workflow that changes anything at a point not listed here, or replaces a phase not marked replaceable here, fails `workflow-check.py`. A point is added, renamed or removed only by the bridge's maintainer, in a bridge release, in the same change as the phase module that declares it; the workflow check then fails every conditional workflow still naming an old point (§6.6), loudly rather than silently. A project's supervisor never changes this file.
+This file is the canonical list of the extension points: the named places where a conditional workflow (a type workflow, a sub-workflow or a trait's additions) may change the main workflow (Restructuring Plan §6.4, §6.5). It names, for each point, the phase module that declares it, and for each phase module whether a type workflow or sub-workflow may replace it. A conditional workflow that changes anything at a point not listed here, sets a value at a point whose Changes do not include `set`, or replaces a phase not marked replaceable here, fails `workflow-check.py`. A point is added, renamed or removed only by the bridge's maintainer, in a bridge release, in the same change as the phase module that declares it; the workflow check then fails every conditional workflow still naming an old point (§6.6), loudly rather than silently. A project's supervisor never changes this file.
 
 What no point offers stays with the core: a conditional workflow can never remove a founding rule, weaken the merge gate, or skip the requirements register, the inventory or the reviews (`supervisor.md`, "Main and conditional workflows").
 
@@ -14,8 +14,8 @@ What no point offers stays with the core: a conditional workflow can never remov
 - **Key** — the point's identifier: its module's key, a dot, then the point's own name in lowercase letters, digits and hyphens. Unique; a conditional workflow names a point by it.
 - **Point** — what may be changed there, in plain words.
 - **Declared by** — the key of the phase module that declares the point; always a module of the first table. A point's phase is replaceable exactly when the module that declares it is, so the flag is read from that module's row and stated once.
-- **Changes** — the kinds of change the point accepts: `add`, or `add, set` where the main workflow leaves a value open there for a type workflow or sub-workflow to set (§6.5). Every point accepts additions, from type workflows, sub-workflows and traits alike.
-- **Applies** — `part` where an addition is made for each part that has the conditional workflow; `project` where the thing it adds exists once for the whole project, so an addition two parts share is made once.
+- **Changes** — the kinds of change the point accepts: `add`, or `add, set` where the main workflow leaves a value open there for a type workflow or sub-workflow to set (§6.5). Every point accepts additions, from type workflows, sub-workflows and traits alike; at a point that holds a value, an addition adds to what is asked or recorded about that value (a further question about the target environment), never a second value.
+- **Applies** — `part` where an addition is made for each part that has the conditional workflow; `project` where the thing it adds exists once for the whole project, so an addition two parts share is made once, in the place of the first part, in the status file's order, that has the conditional workflow. The core's order ("The order additions apply in") governs every point; its rule that a shared conditional workflow's additions apply to every part that has it, each in that part's own place, is the rule for `part` points, and a `project` point is the one exception, as stated here (`supervisor.md` is to cite it when the core is carved, BUILD_PLAN TASK-010).
 
 ## Phase modules
 
@@ -32,7 +32,7 @@ What no point offers stays with the core: a conditional workflow can never remov
 | reflection | Reflection points | no |
 | project-end | Project end | no |
 
-The interface phase is the one replaceable module (§6.4): the main workflow holds its variants once, one per kind of interface a part can have, and a type workflow or sub-workflow may replace the phase with its own; a sub-workflow may replace its type workflow's replacement again (§6.5). The change cycle declares no points of its own: it runs the other phases' modules again for the change, and their points apply there.
+The interface phase is the one replaceable module (§6.4): the main workflow holds its variants once, one per kind of interface a part can have, and a type workflow or sub-workflow may replace the phase with its own; a sub-workflow may replace its type workflow's replacement again (§6.5). A replacement declares the same points as the module it replaces, so the additions of the layers below it, such as the trait *has screens* adding the mockup variant at `interface.variants`, still apply to it (§6.5, "Today's interface conditions stay together"). The change cycle declares no points of its own: it runs the other phases' modules again for the change, and their points apply there; its module has no `## Extension points` section.
 
 ## Extension points
 
@@ -42,6 +42,7 @@ The interface phase is the one replaceable module (§6.4): the main workflow hol
 | intake.requirement-sources | Intake | Additional requirement sources | intake | add | part |
 | intake.target-environment | Intake | The product type's target environment | intake | add, set | part |
 | intake.budget-kind | Intake | The kind of performance budget the part is measured by (page load, frame time); the kind is the value set | intake | add, set | part |
+| intake.delivery-kind | Intake | The kind of delivery the part ends in (installer, store package, web deployment, installation into a host); the kind is the value set | intake | add, set | part |
 | design.sections | Design | Additional design sections | design | add | part |
 | design.diagram-catalogue | Design | Additions to the diagram catalogue | design | add | project |
 | design.mandatory-diagrams | Design | Mandatory diagram kinds | design | add | part |
@@ -49,15 +50,15 @@ The interface phase is the one replaceable module (§6.4): the main workflow hol
 | planning.stages | Planning | Mandatory stages, such as a packaging stage | planning | add | part |
 | planning.critic-lenses | Planning | Additions to the plan critic's lenses | planning | add | project |
 | run-parameters.parameters | Run parameters | Additional run parameters | run-parameters | add | project |
-| configuration.items | Configuration | Additional configuration items, tools and checks | configuration | add | part |
+| configuration.items | Configuration | Additional configuration items, tools and checks | configuration | add | project |
 | delegation-loop.inspect-checks | The delegation loop | Additional checks at the inspect step | delegation-loop | add | part |
 | delegation-loop.test-checks | The delegation loop | Additional checks at the test step | delegation-loop | add | part |
 | delegation-loop.brief-constraints | The delegation loop | Additional brief constraints | delegation-loop | add | part |
 | project-end.completion-conditions | Definition of done | Additional completion conditions | project-end | add | part |
-| project-end.delivery | Delivery | The delivery procedure (installer, store package, web deployment, installation into a host); the delivery kind is the value set | project-end | add, set | part |
+| project-end.delivery | Delivery | The delivery procedure for the kind set at intake (installer, store package, web deployment, installation into a host) | project-end | add | part |
 | reflection.items | Reflection points | Additional reflection items | reflection | add | project |
 
-§6.4 calls its list initial, to be refined during implementation; a refinement is a change to this file as above, never an unlisted point in a conditional workflow. §6.4's "additional checks at the inspect and test steps" is two points here, one per step, so that a check names the step it runs at. One point is added to §6.4's list: `intake.budget-kind`, because §6.5 names the kind of performance budget as a value a type workflow or sub-workflow sets, and the budgets are settled at intake.
+§6.4 calls its list initial, to be refined during implementation; a refinement is a change to this file as above, never an unlisted point in a conditional workflow. §6.4's "additional checks at the inspect and test steps" is two points here, one per step, so that a check names the step it runs at; the test step is the running of the tests, which today sits inside step 4 (Inspect) and step 6 of the delegation loop's section. Two points are added to §6.4's list, both at intake, because §6.5 names their kinds as values a type workflow or sub-workflow sets and the core settles both at intake, before design and planning act on them: `intake.budget-kind`, the kind of performance budget, and `intake.delivery-kind`, the delivery kind; `project-end.delivery` holds the procedure for the kind set there. A completion condition added at `project-end.completion-conditions` is checked at project end; a condition the plan must build toward is also added at intake (`intake.requirement-sources`), so that it enters the requirements register before planning.
 
 ## How a conditional workflow names a point
 
@@ -71,4 +72,4 @@ A trait attaches to the main workflow only through its `Add at` headings, so eac
 
 ## How a phase module declares its points
 
-Each phase module declares the points it offers in a section headed `## Extension points`, one line per point, giving the point's key from the table above, in the table's order. A module declares exactly the points this registry names it as declaring, and every point it declares is in this registry; `workflow-check.py` checks both directions once every module declares its points (BUILD_PLAN TASK-014).
+Each phase module that declares points does so in a section headed `## Extension points`, one line per point, giving the point's key from the table above, in the table's order. A module declares exactly the points this registry names it as declaring, and every point it declares is in this registry; `workflow-check.py` checks both directions once every module declares its points (BUILD_PLAN TASK-014).

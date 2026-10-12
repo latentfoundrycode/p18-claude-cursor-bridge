@@ -203,6 +203,29 @@ Both APPROVE; round 2's fixes confirmed. Review B's first launch (15:10:49Z) was
 - the opening paragraph and the paragraph after it both point to "When something does not fit" → wording, in TASK-017, the first increment with `open-list.md` in its Scope;
 - the status file listed ISS-004 under Open issues while calling it fixed → its cause is recorded in the Issues document (reproduced: `git show <rev>:<path> --output=<file>` creates the file empty and prints the content to standard output; the plan file is now copied with a redirect and its size checked), and the status file drops it (TASK-005's branch).
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 1 | Review A | 1 | 3 | 5 | yes — round 2 (see below) |
+| TASK-005 | 1 | Review B | 0 | 2 | 1 | yes — round 2 (see below) |
+
+### TASK-005 round 1 — disposition
+Review A REJECT, Review B APPROVE. One finding converged and is treated as blocking beside Review A's own.
+
+Blocking:
+1. **The delivery kind was set at a point the project-end module declares** (Review A), so a type workflow's `Set at` would first be read at the last stage close, though intake confirms the kind and design and planning act on it (`supervisor.md` Phase 1). FIX: `intake.delivery-kind` (`add, set`) beside `intake.budget-kind`, both stated as refinements of §6.4; `project-end.delivery` holds the procedure for the kind and is `add` only. TASK-014's "project-end declares Delivery" and the type workflows' "sets delivery" (TASK-019, TASK-021) still hold.
+2. **`project` Applies against the core's shared-workflow sentence** (converged: Review A Should fix, Review B Should fix): `supervisor.md` says a shared conditional workflow's additions apply to every part that has it, each in its own place; the registry said a `project` addition is made once and did not say where. FIX: the core's order governs every point; its per-part rule is the rule for `part` points; a `project` point is the one exception, made once in the place of the first part, in the status file's order, that has the workflow. The core is to cite this when it is carved (TASK-010, which has `supervisor.md` in its Scope).
+
+Also fixed:
+- **What becomes of a replaced module's points** (Review A Should fix): a replacement declares the same points as the module it replaces, so the trait *has screens* still adds the mockup variant to a replaced interface phase (§6.5, "Today's interface conditions stay together"). The check of it → TASK-006's brief.
+- **A set at a point that opens no value** (Review A Should fix) is named among what fails the workflow check; → TASK-006's brief, beside its Done when (a)–(f).
+- **`configuration.items` was `part`** (Review B Should fix). REVIEWERS DISAGREE (correctness, not intent): Review A called it the author's call and raised nothing; Review B asked for `project`. Settled for Review B on the registry's own definition: Configuration sets up one project environment (`supervisor.md` Phase 5), so a tool two parts share is installed once.
+- A completion condition read only at project end could not shape the plan (Review A Consider): one the plan must build toward is also added at intake (`intake.requirement-sources`), so it enters the requirements register.
+- The change cycle's module has no `## Extension points` section (Review A Consider), one answer for TASK-014's cross-check.
+- The Applies column is pinned whole; the test cites BUILD_PLAN's Scope for the file's path, not §6.11; the `workflow/phases/<module>.md` statement is pinned (Review A Consider).
+- An addition at a point that holds a value adds to what is asked or recorded about it, never a second value (Review A Consider).
+- "The test step" names where the tests run today, inside step 4 (Inspect) and step 6 (Review B Consider).
+- The status file's Remote sync line names PR #19 (Review A Consider).
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|

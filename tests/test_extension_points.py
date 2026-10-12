@@ -1,9 +1,9 @@
 """Release B — TASK-005: the extension-point registry.
 
-enforces: docs/BUILD_PLAN.md TASK-005 Done when; the Restructuring Plan §6.4 (the initial points per
-phase, Definition of done and Delivery included; the interface phase replaceable), §6.5 (add,
-replace, set; only type workflows and sub-workflows replace or set) and §6.11 (the phase modules'
-paths). Satisfies R-006.
+enforces: docs/BUILD_PLAN.md TASK-005 (its Scope path and Done when); the Restructuring Plan §6.4
+(the initial points per phase, Definition of done and Delivery included; the interface phase
+replaceable), §6.5 (add, replace, set; only type workflows and sub-workflows replace or set) and
+§6.11 (the phase modules' paths, `workflow/phases/<phase>.md`). Satisfies R-006.
 The two tables are the shape `workflow-check.py` (TASK-006) reads: each found by its heading, the
 first Markdown table after it (its rows running to the first line that is not a table line), one row
 per entry, cells split on `|`, columns found by their header names.
@@ -33,9 +33,11 @@ S64 = [
     ("Intake", "Additional questions", "intake.questions"),
     ("Intake", "Additional requirement sources", "intake.requirement-sources"),
     ("Intake", "target environment", "intake.target-environment"),
-    # The one refinement of §6.4's list: §6.5 names the kind of performance budget as a value a
-    # type workflow or sub-workflow sets, and the budgets are settled at intake (supervisor.md, Phase 1).
+    # The two refinements of §6.4's list: §6.5 names the kind of performance budget and the delivery
+    # kind as values a type workflow or sub-workflow sets, and the core settles both at intake
+    # (supervisor.md, Phase 1), before design and planning act on them.
     ("Intake", "kind of performance budget", "intake.budget-kind"),
+    ("Intake", "kind of delivery", "intake.delivery-kind"),
     ("Design", "Additional design sections", "design.sections"),
     ("Design", "diagram catalogue", "design.diagram-catalogue"),
     ("Design", "Mandatory diagram kinds", "design.mandatory-diagrams"),
@@ -52,8 +54,12 @@ S64 = [
     ("Reflection points", "Additional reflection items", "reflection.items"),
 ]
 # §6.5: the values the main workflow leaves open for a type workflow or sub-workflow to set — its
-# two examples, the kind of performance budget and the delivery kind, and §6.4's target environment.
-SETTABLE = {"intake.target-environment", "intake.budget-kind", "project-end.delivery"}
+# two examples, the kind of performance budget and the delivery kind, and §6.4's target environment;
+# all three at intake, where the core settles them. Project end's delivery point holds the procedure.
+SETTABLE = {"intake.target-environment", "intake.budget-kind", "intake.delivery-kind"}
+# Which additions exist once for the whole project rather than per part (the round-1 record ratifies it).
+PROJECT_WIDE = {"design.diagram-catalogue", "planning.critic-lenses", "run-parameters.parameters",
+                "configuration.items", "reflection.items"}
 
 
 def table(heading):
@@ -86,8 +92,9 @@ def points():
     return table("## Extension points")
 
 
-def test_r006_the_file_sits_at_the_s6_11_path_and_is_bounded():
-    """R-006, §6.11: `workflow/extension-points.md` beside the open list; a bounded reference text."""
+def test_r006_the_file_sits_at_its_planned_path_and_is_bounded():
+    """R-006, BUILD_PLAN TASK-005 Scope: `workflow/extension-points.md` beside the open list; a bounded
+    reference text."""
     assert os.path.isfile(EP)
     assert "\r" not in TEXT
     assert len(TEXT) < 20000
@@ -119,14 +126,15 @@ def test_r006_every_s6_4_point_is_present_with_its_declaring_module():
     _, rows = points()
     by_key = {r["Key"]: r for r in rows}
     assert len(by_key) == len(rows), "keys are unique"
-    assert [r["Key"] for r in rows] == [k for _, _, k in S64], "the §6.4 points and the one refinement, in §6.4's order"
+    assert [r["Key"] for r in rows] == [k for _, _, k in S64], "the §6.4 points and the two refinements, in §6.4's order"
     for phase, phrase, key in S64:
         r = by_key[key]
         assert r["Phase"] == phase, key
         assert phrase.lower() in r["Point"].lower(), key
         assert r["Declared by"] == key.split(".")[0], key
     assert {"Definition of done", "Delivery"} <= {r["Phase"] for r in rows}
-    assert "One point is added to §6.4's list: `intake.budget-kind`, because §6.5 names the kind of performance budget" in TEXT
+    assert "Two points are added to §6.4's list, both at intake, because §6.5 names their kinds as values a type workflow or sub-workflow sets and the core settles both at intake, before design and planning act on them" in TEXT
+    assert "`project-end.delivery` holds the procedure for the kind set there" in TEXT
 
 
 def test_r006_every_point_is_well_formed_and_names_a_listed_module():
@@ -188,9 +196,10 @@ def test_r006_a_shared_addition_at_a_project_point_is_made_once():
     """TASK-003's deferral: a project-wide addition from a conditional workflow two parts share."""
     assert "so an addition two parts share is made once" in TEXT
     assert "`part` where an addition is made for each part that has the conditional workflow" in TEXT
+    assert "in the place of the first part, in the status file's order, that has the conditional workflow" in TEXT
+    assert "is the rule for `part` points, and a `project` point is the one exception, as stated here" in TEXT
     applies = {r["Key"]: r["Applies"] for r in points()[1]}
-    assert applies["run-parameters.parameters"] == "project"
-    assert applies["planning.critic-lenses"] == "project"
+    assert {k for k, v in applies.items() if v == "project"} == PROJECT_WIDE
 
 
 def test_r006_how_a_phase_module_declares_its_points():
@@ -204,3 +213,36 @@ def test_r006_points_change_only_in_a_bridge_release_and_the_core_stays_closed()
     assert "only by the bridge's maintainer, in a bridge release" in TEXT
     assert "A project's supervisor never changes this file." in TEXT
     assert "can never remove a founding rule, weaken the merge gate, or skip the requirements register, the inventory or the reviews" in TEXT
+
+
+def test_r006_a_replacement_keeps_the_points_of_the_module_it_replaces():
+    """§6.5 ("Today's interface conditions stay together") and TASK-003's deferral: additions from the
+    layers below still land on a replaced phase."""
+    assert "A replacement declares the same points as the module it replaces" in TEXT
+    assert "such as the trait *has screens* adding the mockup variant at `interface.variants`, still apply to it" in TEXT
+
+
+def test_r006_what_the_workflow_check_fails():
+    """§6.5/§6.6: an unlisted point, a set where no value is open, a replace of a fixed phase."""
+    assert ("A conditional workflow that changes anything at a point not listed here, sets a value at a point whose "
+            "Changes do not include `set`, or replaces a phase not marked replaceable here, fails `workflow-check.py`") in TEXT
+
+
+def test_r006_an_addition_at_a_value_point_never_sets_a_second_value():
+    """§6.5: only type workflows and sub-workflows set; a trait's addition at a value point adds to it."""
+    assert "at a point that holds a value, an addition adds to what is asked or recorded about that value" in TEXT
+    assert "never a second value" in TEXT
+
+
+def test_r006_a_completion_condition_the_plan_builds_toward_enters_at_intake():
+    """The plan is checked against the register (completion-check --mode plan); a condition read only at
+    project end would never shape it."""
+    assert "a condition the plan must build toward is also added at intake (`intake.requirement-sources`)" in TEXT
+
+
+def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():
+    """§6.11: each module is `workflow/phases/<module>.md`; TASK-014's two-way cross-check needs one answer
+    for the change cycle."""
+    assert "`workflow/phases/<module>.md` (§6.11)" in TEXT
+    assert "its module has no `## Extension points` section" in TEXT
+    assert "Each phase module that declares points does so in a section headed `## Extension points`" in TEXT
