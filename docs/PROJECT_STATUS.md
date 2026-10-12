@@ -4,8 +4,8 @@ Phase: building
 Change cycle: none
 Increment: TASK-002 — The security floor in the bridge's CI (next; not started)
 Last accepted: TASK-001 at commit 9e181e6 (merged to main 2026-10-12)
-Awaiting user on: the owner to confirm the scope addition of Release B2 (machine-readable record headers; added to the plan by the maintainer at the owner's decision of 2026-10-12 — a scope addition needs the owner's own word, rule 57; details in run/supervisor/maintainer-b2.md). B2 is post-B and does not block TASK-002.
-Next: TASK-002 (the CI security floor) through the delegation loop (full gate; I merge autonomously, bare commands). PR #15 merged autonomously 2026-10-12 (commit 9e181e6) — the first self-gated merge on the bridge's own repo.
+Awaiting user on: the owner to provide TASK-002's security-floor repo secrets — a Socket token (SOCKET_SECURITY_API_KEY) and a Semgrep token (SEMGREP_APP_TOKEN) — or to choose the token-free OSS floor (OSV-Scanner + Semgrep OSS, no Socket, reduced coverage). No repo secrets are set yet. B2 (the record-headers release) was confirmed by the owner 2026-10-12 as a post-B release.
+Next: on the tokens (or the OSS choice) → build TASK-002 (the CI security floor) through the delegation loop, merged autonomously; then TASK-003 onward. PR #15 merged autonomously 2026-10-12 (commit 9e181e6) — the first self-gated merge on the bridge's own repo. B2 follows release B.
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
 Software name: Claude-Cursor Bridge
@@ -18,7 +18,7 @@ Remote sync: in sync at 2026-10-12 (main at 9e181e6, #15 merged)
 Workflows: host extension → Claude Code extension; traits: installable
 Stage: Release B — Last reflection: none yet (intake 2026-10-11)
 Open issues: none
-Maintainer requests: Release B2 added to the plan by the maintainer (owner's decision 2026-10-12) — asked the owner to confirm the scope — 2026-10-12 — open (see run/supervisor/maintainer-b2.md)
+Maintainer requests: Release B2 added to the plan by the maintainer (owner's decision 2026-10-12); owner confirmed the scope 2026-10-12 — recorded as a post-B release (run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
 Bridge version: 2026.10.11d
 Calibrated: n/a — the bridge runs the installed 2026.10.11d it is the source of; intake 2026-10-11
 Calibration pending: none
