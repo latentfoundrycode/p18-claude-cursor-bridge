@@ -95,6 +95,34 @@ code independent of its authorship. If you catch yourself thinking "this is a
 two-line fix, I'll just do it," you are about to compromise the only independent
 review in the loop. Delegate it.
 
+## Main and conditional workflows
+
+Every project runs the main workflow. What differs by product lives in conditional workflows, which change the main workflow only at the extension points its phases declare. The workflow has five layers, each inheriting everything it does not mention from the layers above it:
+
+| Layer | Holds | Read when |
+|---|---|---|
+| **The main workflow's core** | The roles and the division of labour; the founding rules; the loop's shape; escalation and reporting; project state; the standing rules that hold in every phase | Always, whole, at every start and calibration |
+| **Phase modules** | The procedure for one phase each: intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end | The current phase's module or modules, whole, on entering the phase and at every calibration |
+| **Type workflow** | For one product type: its changes at named extension points | Its changes to the current phase, whole, alongside the phase's module or modules |
+| **Sub-workflow** | For one sub-type: a more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
+| **Trait additions** | For one trait: what it adds, whatever the product type | Their additions to the current phase, when the part has the trait |
+
+Until the phases are moved into files of their own, each phase's section of this file is its phase module (the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; reflection points include project end), and rule 28 governs the reading as it does today: this file is read whole at every start, resume and calibration, and after every compaction or resume you read the sections the session-start hook names before your next action. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits. Once the phases are modules, the core is still read whole at those same points, and with it the current phase's module or modules and the conditional workflows that apply; you never read a phase you are not in, or a conditional workflow that does not apply.
+
+**Three kinds of change.** Each change a conditional workflow makes is one of these:
+
+- **Add** — extra questions, sections, diagram kinds, checks, brief constraints, stages, completion conditions, reflection items.
+- **Replace** — a whole phase module, only where the phase declares that it may be replaced.
+- **Set** — a value the main workflow leaves open, such as the kind of performance budget (page load, frame time) or the delivery kind.
+
+**Only type workflows and sub-workflows may replace or set; trait additions may only add.** Each part follows one path down the tree of product types and sub-types, so two replacements never collide, and because traits only add, any combination of traits composes. A product that looks like a hybrid is declared as one product type with its sub-type plus a list of traits, never improvised.
+
+**A sub-workflow inherits its type workflow** and changes only what differs, at the same extension points. It may override its type workflow's replacement or setting: that is inheritance, not a collision. **Siblings are exclusive:** a part has at most one sub-type of its product type. **Two levels only:** a product type and its sub-types; a third level needs evidence from a real project.
+
+**The order additions apply in.** Additions from several conditional workflows apply together, never one in place of another, in this stated order, at each extension point: the phase module's own content there first, then the type workflow's additions, then the sub-workflow's, then each trait's, the traits taken in the order the open list gives them (today: has screens, installable, performance budgets, external services, spends money, long-running process, AI models, personal data, multiplayer); the open list governs this order and places a trait added later at its end. Within one workflow, its additions keep the order it writes them in. In a phase that covers several parts, at each extension point the phase module's own content there comes once, first; then, for each part in the order the status file lists them, that part's type workflow's, sub-workflow's and traits' additions, each applying to that part. A conditional workflow two parts share is read once, but its additions apply to every part that has it, in each part's own place in this order. Whatever lists or applies a phase's additions uses this order, so two sessions on one project read the same procedure in the same sequence.
+
+A conditional workflow can never remove a founding rule, weaken the merge gate, or skip the requirements register, the inventory, or the reviews. Those belong to the core and are not extension points; a conditional workflow's text that would do any of these does not apply, and on these points the core governs.
+
 ---
 
 ## The project layout
@@ -1760,6 +1788,7 @@ Keep `docs/PROJECT_STATUS.md` current after every accepted increment. **It is cu
 # Project Status
 Last updated: <timestamp>
 Phase: <intake | design | mockups | planning | configuration | building | done | changing>
+Workflows: <one line per part, in the grammar below; "not yet classified" until intake classifies the part>
 Change cycle: <none | "<short name>" opened <date> — step <n> of the change cycle>
 Increment: TASK-<nnn> — <title>
 Last accepted: TASK-<nnn> at commit <sha>
@@ -1784,6 +1813,19 @@ Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refa
 ```
 
 **Awaiting user on** is read by the `loop-guard` Stop hook (rule 43): `nothing` means the loop is running and must not stop without a pending background task to wake it; anything else means you are legitimately waiting for the owner. Set it whenever you stop for them — an escalation, a gate, a pause they asked for, a stage pause — and clear it when they answer. A stale entry either traps the loop in idleness or hides a real wait, so it is rewritten at every stop.
+
+**Workflows** records, for each part, the conditional workflows it runs: one `Workflows:` line per part, beside `Phase:`; with the `Phase:` line they name exactly what a resumed session must read (see "Main and conditional workflows"). A line has this grammar:
+
+`Workflows: [<part>: ]<Workflow name>[ → <Sub-workflow name>]; traits: <Trait name>[, <Trait name>…]`
+
+- the product type is named by its **Workflow name**, the sub-type by its **Sub-workflow name** and each trait by its **Name**, spelled exactly as `~/.claude/cursor-bridge/workflow/open-list.md` spells them; every name on the line is in the open list;
+- exactly one product type and at most one of its sub-types; ` → <Sub-workflow name>` (the arrow is `→`) is left out when the part has no sub-type;
+- the traits follow `; traits: `, separated by a comma and a space, in the order the open list gives them; a part with no trait reads `; traits: none`;
+- `<part>: `, the part's name and a colon, follows `Workflows: ` only when the project has more than one part; a project with one part has one line without it; a part's name contains no `:`, `;` or `→`;
+- with several parts, the lines stand together right after `Phase:`, one per part, in the order of the project's parts; that is the order "for each part in the order the status file lists them" reads;
+- until intake has classified a part, its line reads `not yet classified` in place of the names (`Workflows: not yet classified` in a project with one part).
+
+For example, the bridge itself: `Workflows: Host Extension Development → Claude Code Extension; traits: Installable`. The line is written at intake, when the part is classified, with the traits proposed there; the design gate settles them, and the line is rewritten then if they changed. At intake, a part whose product type or sub-type is not yet written pauses the project; a trait not yet written is flagged and the work continues (the open list's "When something does not fit").
 
 **Terms fixed** is the `explain-for-decision` skill's lookup: which technical terms have been
 explained to the user in which sense, and which of them the user has stumbled on (Risky). A

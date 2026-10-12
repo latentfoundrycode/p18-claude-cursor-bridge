@@ -81,6 +81,225 @@ plan-critic returned 0 Blocking (round-3 findings confirmed resolved, graph acyc
 | plan | confirming | plan-critic | 0 | 1 | 3 | yes — applied |
 | plan | confirming | Review B | 0 | 2 | 1 | yes — applied |
 
+## Build rounds — supervisor-authored governance text
+
+Each supervisor-authored text increment takes one combined round that serves as both the two-critic design review and the merge gate: Review A (diff-reviewer with the plan-critic lenses) and Review B (cross-family, with execution) on the committed diff. Convergent findings are blocking.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-003 | 1 | Review A | 0 | 4 | 6 | yes — round 2 (see below) |
+| TASK-003 | 1 | Review B | 0 | 2 | 2 | yes — round 2 (see below) |
+
+### TASK-003 round 1 — disposition
+Both APPROVE. Two findings converged and were treated as blocking:
+
+1. **"Siblings are exclusive" was pinned only as a label** (Review A Should fix, Review B Should fix). FIX: the test asserts the meaning, "a part has at most one sub-type of its product type".
+2. **"The core governs" was loose and unpinned** (Review A Should fix, Review B Consider: read loosely it would cancel replace and set). FIX: scoped to the floor ("a conditional workflow's text that would do any of these does not apply, and on these points the core governs") and pinned.
+
+Also fixed: the order is stated per extension point; "module or modules" (planning and building map to two); the transitional sentence says this file is still read whole until the phases move into modules, and maps the plan's phase names to this file's headings (Review B Consider); the open list governs the trait order and places a later trait at its end; several parts are taken in the status file's order; the Read-when cells are pinned exactly and the Holds cells by their items (Review B Should fix; the round-2 fix, reviewed in round 3, pinned the Holds cells whole).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-003 | 2 | Review A | 0 | 2 | 4 | yes — round 3 (see below) |
+| TASK-003 | 2 | Review B | 0 | 0 | 3 | yes — round 3 (see below) |
+
+### TASK-003 round 2 — disposition
+Both APPROVE; the round-1 fixes confirmed. Two findings converged and were treated as blocking:
+
+1. **The sub-workflow's Holds cell was not pinned whole** ("a more detailed version of its type workflow" could go unnoticed; Review A Should fix, Review B Consider), and the record overstated the pinning. FIX: every Holds cell is pinned by equality.
+2. **The status file's Next line was stale** (both, Consider). FIX: rewritten.
+
+Also fixed:
+- **"Still read whole" collided with rule 28** (Review A Should fix). After a compaction the hook names the sections to re-read, so the sentence now says read whole "at every start and calibration (after a compaction, re-read what the hook names, rule 28)".
+- **The heading crosswalk was unpinned** (Review B Consider). It is now pinned, and each named heading is checked to exist.
+- **"The interface phase is Phase 3" could be misread** on a project without screens (Review A Consider). It now says Phase 3 "today holds only the mockup variant".
+- **The type workflow's Read-when said "the phase module"** (Review A Consider). It now says "the phase's module or modules".
+- **How parts and extension points nest was unstated** (Review A Consider). It is now stated: the phase module's own content comes once, then each part's type, sub-workflow and trait additions in status-file order. A trait two parts share applies once, at the first part that has it. This is pinned.
+
+Deferred, each to the increment that owns it (design for later increments is not this diff's defect):
+- how a replaced phase and a trait's attachment point are declared → TASK-005 (registry) and TASK-012 (declared points);
+- a guard against a conditional workflow's sentence that contradicts the core → TASK-006 (workflow-check);
+- R-007 is `built` on the text; it is exercised once the phases are modules and the hook names them → TASK-010 and TASK-015;
+- TASK-004's brief carries "a sub-type must earn its place" (§6.5) and cross-checks the open list's trait order against the order stated here.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-003 | 3 | Review A | 0 | 1 | 3 | yes — round 4 (see below) |
+| TASK-003 | 3 | Review B | 1 | 0 | 2 | yes — round 4 (see below) |
+
+### TASK-003 round 3 — disposition
+Review A APPROVE, Review B REJECT.
+
+**REVIEWERS DISAGREE on the transitional reading sentence** (supervisor.md, the paragraph after the layer table). Review A approved it. Review B blocked it: it named start, calibration and compaction but not resume, and "reading only the current phase at those points" would replace the core's always-whole read. The crux is correctness, not intent. It is settled for Review B, because rule 28 is an established invariant: it re-reads the governing files whole on every start, resume and calibration, and after every compaction or resume it reads what the hook names. FIX: the sentence now defers to rule 28 unchanged. Once the phases are modules, the core is still read whole at those points, and the current phase's module or modules and the applicable conditional workflows are read with it. A test forbids the phase-only wording.
+
+One finding converged and was treated as blocking:
+- **"A trait two parts share is applied once, at the first part that has it"** (Review A Should fix, Review B Consider). It could be read as the trait's work being done for one part only, which is off-source (§6.2 applies a trait per part). FIX: "a conditional workflow two parts share is read once, but its additions apply to every part that has it, in each part's own place in this order". The parts sentence also restates "at each extension point" (Review A Consider).
+
+Also fixed: the crosswalk test checks every phase heading the Holds cell names (intake, design, run parameters, the change cycle; Review A Consider); the round-1 note above names the round that pinned the Holds cells (Review A Consider); the status file's Remote sync line names PR #17 (Review B Consider).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-003 | 4 | Review A | 0 | 0 | 4 | deferred (see below) |
+| TASK-003 | 4 | Review B | 0 | 0 | 0 | — |
+
+### TASK-003 round 4 — disposition
+Both APPROVE; the round-3 fixes confirmed. Merged as f00f12e (2026-10-12). Nothing converged. Review A's four Consider findings are deferred, each to the increment that owns it:
+- "the conditional workflows that apply" in the transitional sentence could be read as whole files; it should say "their changes to the current phase" → TASK-010 (the carve), re-pinned there;
+- the core's Read-when cell lacks "resume", and the phase modules' cell lacks start and resume, beside rule 28 → reconciled at TASK-010;
+- a project-wide addition from a trait two parts share (a run parameter, an intake question): asked once or per part → the TASK-005 and TASK-012 briefs;
+- the negative test against the phase-only wording is narrow; the positive pins of the sentence are the guard → no change.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-004 | 1 | Review A | 1 | 1 | 8 | yes — round 2 (see below) |
+| TASK-004 | 1 | Review B | 0 | 3 | 2 | yes — round 2 (see below) |
+
+### TASK-004 round 1 — disposition
+Review A REJECT, Review B APPROVE. The split is settled for Review A on the approved plan, an established invariant: BUILD_PLAN TASK-020 scopes `workflow/types/own-computer.md` and its `own-computer/local-service.md`, so the key `software-on-your-own-computer` would put the type workflow at a path the plan does not name. FIX: the key is `own-computer` (the type's row, its four sub-types' Of type, the tests); the workflow name follows the plan's shape, "Own-Computer Software Development".
+
+Three findings converged and were treated as blocking:
+1. **Six sub-types' default traits were checked only as a superset** of their type's (Review B Should fix, Review A Consider), though a sub-type's cell is its complete set. FIX: every sub-type is pinned by equality.
+2. **§6.10 step 2 asked every new entry for a workflow name** (Review B Should fix, Review A Consider): a trait has none, a sub-type has a sub-workflow name, and "its written flag set" was ambiguous. FIX: the entry joins with every column of its own table; step 3 sets Written to `yes` in the same change, once the check passes.
+3. **The §6.7 trait bullet stopped at the promotion pass** (both Consider). FIX: "from which the maintainer may write it as trait additions", as §6.7 says; pinned.
+
+Also fixed:
+- **Name and Workflow name both claimed the `Workflows:` line** (Review A Should fix). §6.3 (plan line 216) is kept: the workflow or sub-workflow name is what the line names; Name is plain words for prose and intake; a trait, which has no workflow name, is named by its Name.
+- **§6.7 was pinned by its titles only** (Review B Should fix). The pause conditions ("fits no product type, fits two equally, or fits one whose workflow is not yet written"), "stops before design" and the unwritten-trait sentence are pinned.
+- **The table shape was implied, not stated** (Review A Consider). "How this file is read" states it: the first table after its heading, rows to the first non-table line, columns by header name, no `|` in a cell, no meaning in the order inside a Default traits cell. The test's parser reads only that first table. The GUI cell is in trait order.
+- **The canonical-source sentence named product types only** (Review A Consider). It now covers a type workflow or sub-workflow.
+- **An all-`no` test would break on the first written workflow** (Review A Consider). It is replaced by the invariant: Written is `yes` exactly when the file exists at the key's path.
+- **The Planned cells outside release B were unpinned** (Review B Consider). Every cell is pinned.
+- The status file's Remote sync line names PR #18 (Review A Consider).
+
+Not taken: pinning every definition verbatim (Review A Consider) duplicates the text; the reviewers check the definitions against §6.3 each round. "And its entry here" in the changing paragraph stays: it follows from the file being the canonical source.
+
+Deferred: the `Workflows:` line's grammar (which column names a type, a sub-type and a trait on it, and the bridge's own line rewritten to match) → TASK-007's brief.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-004 | 2 | Review A | 0 | 1 | 4 | yes — round 3 (see below) |
+| TASK-004 | 2 | Review B | 0 | 0 | 0 | — |
+
+### TASK-004 round 2 — disposition
+Both APPROVE; round 1's fixes confirmed by both. The first launch of this round (snapshot 004b) gave Review B an empty plan-sections file and was stopped before a verdict (ISS-004); the round ran again whole as 004c. Nothing converged. REVIEWERS DISAGREE on whether the derived workflow and sub-workflow names need pinning (correctness, not intent): Review B accepted the scoped choice to pin only the owner's two, Review A asked for every name. Settled for Review A on §6.3, which calls the names "fixed here": a fixed value is fixed in a test.
+
+Fixed:
+- **Only Game Development and Roblox Game were pinned** (Review A Should fix). Every workflow and sub-workflow name is pinned by equality; renaming one changes the file and its pin together.
+- The status file's Next named the abandoned 004b (Review A Consider). It names round 3.
+- The opening sentence cited the core's "Main and conditional workflows" for classification at intake (Review A Consider); it now points to "When something does not fit" and §6.7.
+- §6.10 step 2's colon read as the full column list (Review A Consider); it says "filled, including".
+- The test's parser did not compare the separator's cell count with the header's (Review A Consider); it does.
+
+Noted, no change: a key unique within its table is enough, since the three tables are read apart (Review A); the Written flag's "the check passes" half belongs to TASK-006.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-004 | 3 | Review A | 0 | 0 | 4 | deferred (see below) |
+| TASK-004 | 3 | Review B | 0 | 0 | 0 | — |
+
+### TASK-004 round 3 — disposition
+Both APPROVE; round 2's fixes confirmed. Review B's first launch (15:10:49Z) was ended at four minutes for the owner's pause and ran again whole on the same head (18:24:01Z, a fresh snapshot). Merged as f40bf82 (2026-10-12). Nothing converged. Review A's four Consider findings, none taken on the reviewed head:
+- the §6.10 test pins "Its entry joins this list with every column of its table" but not the "filled, including" that round 2 added, and the test's comment "types with their workflow names where the owner fixed them" is stale now that every name is pinned → `tests/test_open_list.py` is in no later increment's Scope, so both go to release B's stage-close pass, test-infrastructure lane (supervisor.md step 9, 3b), recorded in `docs/HARDENING.md` there;
+- the opening paragraph and the paragraph after it both point to "When something does not fit" → wording, in TASK-017, the first increment with `open-list.md` in its Scope;
+- the status file listed ISS-004 under Open issues while calling it fixed → its cause is recorded in the Issues document (reproduced: `git show <rev>:<path> --output=<file>` creates the file empty and prints the content to standard output; the plan file is now copied with a redirect and its size checked), and the status file drops it (TASK-005's branch).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 1 | Review A | 1 | 3 | 5 | yes — round 2 (see below) |
+| TASK-005 | 1 | Review B | 0 | 2 | 1 | yes — round 2 (see below) |
+
+### TASK-005 round 1 — disposition
+Review A REJECT, Review B APPROVE. One finding converged and is treated as blocking beside Review A's own.
+
+Blocking:
+1. **The delivery kind was set at a point the project-end module declares** (Review A), so a type workflow's `Set at` would first be read at the last stage close, though intake confirms the kind and design and planning act on it (`supervisor.md` Phase 1). FIX: `intake.delivery-kind` (`add, set`) beside `intake.budget-kind`, both stated as refinements of §6.4; `project-end.delivery` holds the procedure for the kind and is `add` only. TASK-014's "project-end declares Delivery" and the type workflows' "sets delivery" (TASK-019, TASK-021) still hold.
+2. **`project` Applies against the core's shared-workflow sentence** (converged: Review A Should fix, Review B Should fix): `supervisor.md` says a shared conditional workflow's additions apply to every part that has it, each in its own place; the registry said a `project` addition is made once and did not say where. FIX: the core's order governs every point; its per-part rule is the rule for `part` points; a `project` point is the one exception, made once in the place of the first part, in the status file's order, that has the workflow. The core is to cite this when it is carved (TASK-010, which has `supervisor.md` in its Scope).
+
+Also fixed:
+- **What becomes of a replaced module's points** (Review A Should fix): a replacement declares the same points as the module it replaces, so the trait *has screens* still adds the mockup variant to a replaced interface phase (§6.5, "Today's interface conditions stay together"). The check of it → TASK-006's brief.
+- **A set at a point that opens no value** (Review A Should fix) is named among what fails the workflow check; → TASK-006's brief, beside its Done when (a)–(f).
+- **`configuration.items` was `part`** (Review B Should fix). REVIEWERS DISAGREE (correctness, not intent): Review A called it the author's call and raised nothing; Review B asked for `project`. Settled for Review B on the registry's own definition: Configuration sets up one project environment (`supervisor.md` Phase 5), so a tool two parts share is installed once.
+- A completion condition read only at project end could not shape the plan (Review A Consider): one the plan must build toward is also added at intake (`intake.requirement-sources`), so it enters the requirements register.
+- The change cycle's module has no `## Extension points` section (Review A Consider), one answer for TASK-014's cross-check.
+- The Applies column is pinned whole; the test cites BUILD_PLAN's Scope for the file's path, not §6.11; the `workflow/phases/<module>.md` statement is pinned (Review A Consider).
+- An addition at a point that holds a value adds to what is asked or recorded about it, never a second value (Review A Consider).
+- "The test step" names where the tests run today, inside step 4 (Inspect) and step 6 (Review B Consider).
+- The status file's Remote sync line names PR #19 (Review A Consider).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 2 | Review A | 0 | 1 | 3 | yes — round 3 (see below) |
+| TASK-005 | 2 | Review B | 0 | 1 | 0 | yes — round 3 (see below) |
+
+### TASK-005 round 2 — disposition
+Both APPROVE; round 1's fixes confirmed by both (Review A ran the tests against the round-1 file: the 8 new or changed assertions fail there). Nothing converged. Every finding taken:
+- **A delivery addition had no tie to its kind** (Review A Should fix, new with round 1's fix): with `project-end.delivery` add-only, a type workflow's deployment procedure would reach a sub-type that delivers an installer in its place (§6.9; TASK-019), and the trait *installable*'s installer a part whose kind is installation into a host (TASK-021). FIX: each addition there names the kind it is for and applies only to a part of that kind; pinned. → TASK-006's brief, beside round 1's two checks.
+- **"The test step" was placed in step 6 as well** (Review B Should fix): the tests run in step 4 (Inspect); step 6 adds the benchmark floor to tests already run (`supervisor.md` step 6 opens so). FIX: the point is the run in step 4, and step 6 is not it; pinned.
+- A replacement "declares" the same points without a form to declare them in (Review A Consider): it keeps them, without declaring them again under its `## Replace` heading.
+- The core's duty to cite the Applies rule was recorded here only (Review A Consider): it joins the carry list for TASK-010's brief (`run/supervisor/in-flight.md`, copied into the status file's Next at TASK-010).
+- A completion condition copied at intake could drift from its original (Review A Consider): the intake addition names that completion condition as its source.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 3 | Review A | 0 | 2 | 2 | yes — round 4 (see below) |
+| TASK-005 | 3 | Review B | 0 | 0 | 0 | — |
+
+### TASK-005 round 3 — disposition
+Both APPROVE; round 2's fixes confirmed by both (each ran the tests against the round-2 file: exactly the 4 new or changed tests fail there). Nothing converged. The gate would have allowed the merge; Review A's two Should fix items are taken first, on this branch, because the registry is in no later increment's Scope (TASK-017 could not repair it without a scope deviation):
+- **The benchmark floor had no point** (Review A Should fix, new with round 2's fix): "step 6 … is not this point" left the floor, which the trait *performance budgets* carries (§6.8; TASK-017), with nowhere to be added. FIX: step 6 runs no tests of its own; its benchmark floor is a check at the test step. Review B's correction holds: the tests run in step 4.
+- **The delivery kinds came from two lists, and an unset kind was unstated** (Review A Should fix): the registry named §6.4's four, the core's intake confirms the kinds of `Delivery-Conventions.md` §1, and a part no workflow sets a kind for (the TDP's path, TASK-020) would have got no procedure from the trait *installable*. FIX: one list (`installer`, `install-script`, `package`, `web-deployment`, `store-package`, `host-installation`) for both the value set and the kind an addition names; where no workflow sets it, the kind confirmed at intake is the part's kind. → TASK-006's brief (the form of the name), TASK-020's brief (its kind confirmed at intake).
+- Where the inspect step's checks fall against the test run (Review A Consider): both sit in step 4, the checks of the diff first, then the tests and the checks that run with them.
+- The core has no notion yet of an addition scoped to a delivery kind (Review A Consider): joins TASK-010's carry list beside the Applies rule.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 4 | Review A | 0 | 1 | 1 | yes — round 5 (see below) |
+| TASK-005 | 4 | Review B | 0 | 0 | 0 | — |
+
+### TASK-005 round 4 — disposition
+Both APPROVE; round 3's fixes confirmed by both (each ran the tests against the round-3 file: exactly the 3 new or rewritten tests fail there). Nothing converged. Review A's items taken before the merge, for round 3's reason:
+- **The design auditor's pass had no point** (Review A Should fix, round 3's defect class again): "the inspect step's checks are step 4's checks of the diff before the tests run" left out the design auditor, which runs after the tests and which the trait *has screens* moves out of the loop (TASK-017). The cause was the same in rounds 2 to 4: each fix defined the two points by where today's text places a check, and each placement left some check out. FIX: the two points divide every check of an increment between them, wherever the module's text places it: the test step is the test run and the checks that run with it (the benchmark floor among them); the inspect step is every other check or review of the diff before the accept decision, before or after the tests (the design auditor among them). Pinned.
+- The kind confirmed at intake is recorded by its key from the list (Review A Consider), so a check reading a part's kind (TASK-006) finds a key.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 5 | Review A | 0 | 1 | 4 | yes — round 6 (see below) |
+| TASK-005 | 5 | Review B | 0 | 0 | 0 | — |
+
+### TASK-005 round 5 — disposition
+Both APPROVE; round 4's fixes confirmed by both (each ran the tests against the round-4 file: exactly the 2 rewritten tests fail there). Nothing converged. Review A's items taken before the merge, for round 3's reason:
+- **The stage refactoring pass fell outside both points** (Review A Should fix): "every check of an increment … before the accept decision" left out step 9's per-candidate inspection and test run and its single gate pass, where the design auditor also runs, so the trait *has screens*'s addition (TASK-017) would not have reached a screen project's refactoring. FIX: the two points divide every check and review the loop makes of a change, whatever the change is (an increment, a fix, a refactoring candidate, the gate pass of a stage's refactoring branch); the merge gate's conditions (step 8) belong to the core and offer no point, and a CI check a conditional workflow needs is added at `configuration.items`. With no qualifier left on either point, the placement class of rounds 2 to 5 is closed.
+- "Of the diff" narrowed the inspect point (Review A Consider): dropped; the triage of the builder's assumptions, the secret scan and the dependency admission are named there.
+- "Today both sit inside step 4" contradicted the new definition (Review A Consider): replaced by where an addition is placed (at the step that runs it).
+- The pin of round 2's correction was lost in round 5's rewrite (Review A Consider): "step 6 runs no tests of its own, the tests having run in step 4" is pinned again.
+- Where the confirmed kind's key is recorded (Review A Consider) is a later increment's design: → TASK-006's and TASK-011's briefs.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 6 | Review A | 0 | 0 | 3 | not taken on the reviewed head (see below) |
+| TASK-005 | 6 | Review B | 0 | 0 | 0 | — |
+
+### TASK-005 round 6 — disposition
+Both APPROVE; round 5's fixes confirmed by both. Nothing converged. Merged as 82f0e44 (2026-10-12) on Consider findings only; Review A's three, none taken on the reviewed head:
+- "every check and review" reads against the merge gate's conditions, which the same paragraph exempts → wording only; the exemption stands two sentences later in the same paragraph, so nothing is ambiguous for a check.
+- an addition whose check runs at several steps (a check repeated before and after the tests) has no stated placement → TASK-010's brief (the core's carry list) and TASK-017's (the trait *has screens*, whose design auditor is the case).
+- three statements are unpinned: the CI route through `configuration.items`, the members named at the inspect step, and the placement sentence → `tests/test_extension_points.py` is in no later increment's Scope, so they go to release B's stage-close pass, test-infrastructure lane, beside TASK-004 round 3's two.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-007 | 1 | Review A | 0 | 1 | 6 | yes — round 2 (see below) |
+| TASK-007 | 1 | Review B | 0 | 0 | 1 | yes — round 2 (see below) |
+
+### TASK-007 round 1 — disposition
+Both APPROVE (each ran the new tests against origin/main's text: 8 of 9 fail there, the ninth testing the checker alone). Nothing converged. The gate would have allowed the merge; the items are taken first because TASK-008's builder writes its check from this paragraph:
+- **The part prefix "begins a line"** (Review A Should fix) while the grammar puts it after `Workflows: `: a literal reading would accept `<part>: Workflows: …`. FIX: it follows `Workflows: `; the checker refuses the prefix before it.
+- What the grammar left open for a check (Review A Consider): a part's name contains no `:`, `;` or `→`; with several parts the lines stand together after `Phase:` in the parts' order, the order the core's "for each part in the order the status file lists them" reads; the line carries the traits proposed at intake and is rewritten at the design gate if they changed.
+- The pause had no time anchor (Review A Consider): it is at intake (§6.7). Every entry of the open list is still unwritten, the bridge's own type included, so TASK-008's check reads the line's form and the names' membership, never the Written flag, and its brief says which copy of the open list it reads → TASK-008's brief (the carry list).
+- The checker's refusals were asserted without their reason, and some paths were unexercised (Review A Consider); the out-of-order sample was also out of alphabetical order, so an alphabetical sort would have passed (Review B Consider). FIX: each refusal names its fault; repeated traits, an unknown sub-workflow name, a prefixed `not yet classified`, and a pair alphabetical order accepts but the Traits table does not are added; the bridge's own line is checked to stand right after `Phase:`.
+- The status file's Remote sync and Next lines were stale (Review A Consider): PR #20 is named, and TASK-008 beside TASK-009.
+- task-002's status copy still carries the old form of the line (Review A Consider): when main is merged into task-002, the status file takes main's form (the step is in the supervisor's position file).
+- The plan excerpt the reviewers read began at §6.3 (Review A Consider): round 2's excerpt carries §6.1–6.2 as well.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
