@@ -1,8 +1,18 @@
-# TASK-003 — scope of the review (round 2)
+# TASK-003 — scope of the review (round 3)
 
-Branch `task-003`, from `origin/main` 9e181e6. The diff is `run/review/REVIEW-003b.diff` — the branch's whole change against `origin/main`. The plan's §6.2–6.5 are at `run/review/PLAN-6-003b.md`.
+Branch `task-003`, from `origin/main` 9e181e6. The diff is `run/review/REVIEW-003c.diff` — the branch's whole change against `origin/main`. The plan's §6.2–6.5 are at `run/review/PLAN-6-003c.md`.
 
-## Round 2 — what changed since round 1
+## Round 3 — what changed since round 2
+
+Round 2 (head 8907e8e): Review A and Review B both APPROVE. The latest TASK-003 fix commit applies their findings; the disposition is in `docs/DESIGN_CRITIQUE.md` ("TASK-003 round 2 — disposition"). Check that each fix holds and introduced nothing new:
+- every Holds cell is pinned by equality;
+- "still read whole at every start and calibration (after a compaction, re-read what the hook names, rule 28)" — consistent with rule 28 and the session-start hook (pinned);
+- the heading crosswalk is pinned and each named heading checked to exist; Phase 3 "today holds only the mockup variant";
+- the type workflow's Read-when says "the phase's module or modules";
+- parts × extension point nesting: the phase module's own content once, first; then each part's type, sub-workflow and trait additions in status-file order; a trait two parts share applied once, at the first part that has it (pinned);
+- the status file's Next line is current.
+
+## Round 2 — what changed since round 1 (kept for the record)
 
 Round 1 (head 18e9f57): Review A and Review B both APPROVE. Commit 58ed1d2 applies their findings; the disposition is recorded in `docs/DESIGN_CRITIQUE.md` ("TASK-003 round 1 — disposition"). Check that each fix holds and that it introduced nothing new:
 - the meaning of "Siblings are exclusive" ("a part has at most one sub-type of its product type") is asserted;
@@ -31,7 +41,7 @@ Supervisor-authored governance text, not a builder run: release B's plan (docs/B
 
 ## Source the text must match
 
-The plan's §6.2–6.5 are copied verbatim to `run/review/PLAN-6-003b.md` (the plan itself lives outside the Workspace). `Documents/Claude-Cursor Bridge Restructuring Plan.md` §6.2 (layers table, inheritance, read-when), §6.4 (extension points), §6.5 (add/replace/set; only types/sub-workflows replace or set; sub-workflow inheritance; siblings exclusive; two levels; the floor). The plan leaves R-034's order unstated ("in a stated order"); this text states it: phase module, type, sub-workflow, then traits in the open list's order (§6.3's trait table), later traits appended, each workflow's own order kept. Copies of the relevant docs records are in `docs/` (REQUIREMENTS.md rows R-007/008/009/034, BUILD_PLAN.md TASK-003, DESIGN_CRITIQUE.md).
+The plan's §6.2–6.5 are copied verbatim to `run/review/PLAN-6-003c.md` (the plan itself lives outside the Workspace). `Documents/Claude-Cursor Bridge Restructuring Plan.md` §6.2 (layers table, inheritance, read-when), §6.4 (extension points), §6.5 (add/replace/set; only types/sub-workflows replace or set; sub-workflow inheritance; siblings exclusive; two levels; the floor). The plan leaves R-034's order unstated ("in a stated order"); this text states it: phase module, type, sub-workflow, then traits in the open list's order (§6.3's trait table), later traits appended, each workflow's own order kept. Copies of the relevant docs records are in `docs/` (REQUIREMENTS.md rows R-007/008/009/034, BUILD_PLAN.md TASK-003, DESIGN_CRITIQUE.md).
 
 ## Tests the supervisor wrote
 

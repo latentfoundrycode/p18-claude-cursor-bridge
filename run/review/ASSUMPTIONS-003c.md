@@ -1,4 +1,4 @@
-# TASK-003 — assumptions (unchanged in round 2; the round-2 commit adds none)
+# TASK-003 — assumptions (unchanged in rounds 2 and 3; the fix commits add none)
 
 No builder ran; the text is supervisor-authored. The supervisor's own assumptions, as extra places to look (never the review's scope):
 
