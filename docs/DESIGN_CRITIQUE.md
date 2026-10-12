@@ -285,6 +285,21 @@ Both APPROVE; round 5's fixes confirmed by both. Nothing converged. Merged as 82
 - an addition whose check runs at several steps (a check repeated before and after the tests) has no stated placement → TASK-010's brief (the core's carry list) and TASK-017's (the trait *has screens*, whose design auditor is the case).
 - three statements are unpinned: the CI route through `configuration.items`, the members named at the inspect step, and the placement sentence → `tests/test_extension_points.py` is in no later increment's Scope, so they go to release B's stage-close pass, test-infrastructure lane, beside TASK-004 round 3's two.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-007 | 1 | Review A | 0 | 1 | 6 | yes — round 2 (see below) |
+| TASK-007 | 1 | Review B | 0 | 0 | 1 | yes — round 2 (see below) |
+
+### TASK-007 round 1 — disposition
+Both APPROVE (each ran the new tests against origin/main's text: 8 of 9 fail there, the ninth testing the checker alone). Nothing converged. The gate would have allowed the merge; the items are taken first because TASK-008's builder writes its check from this paragraph:
+- **The part prefix "begins a line"** (Review A Should fix) while the grammar puts it after `Workflows: `: a literal reading would accept `<part>: Workflows: …`. FIX: it follows `Workflows: `; the checker refuses the prefix before it.
+- What the grammar left open for a check (Review A Consider): a part's name contains no `:`, `;` or `→`; with several parts the lines stand together after `Phase:` in the parts' order, the order the core's "for each part in the order the status file lists them" reads; the line carries the traits proposed at intake and is rewritten at the design gate if they changed.
+- The pause had no time anchor (Review A Consider): it is at intake (§6.7). Every entry of the open list is still unwritten, the bridge's own type included, so TASK-008's check reads the line's form and the names' membership, never the Written flag, and its brief says which copy of the open list it reads → TASK-008's brief (the carry list).
+- The checker's refusals were asserted without their reason, and some paths were unexercised (Review A Consider); the out-of-order sample was also out of alphabetical order, so an alphabetical sort would have passed (Review B Consider). FIX: each refusal names its fault; repeated traits, an unknown sub-workflow name, a prefixed `not yet classified`, and a pair alphabetical order accepts but the Traits table does not are added; the bridge's own line is checked to stand right after `Phase:`.
+- The status file's Remote sync and Next lines were stale (Review A Consider): PR #20 is named, and TASK-008 beside TASK-009.
+- task-002's status copy still carries the old form of the line (Review A Consider): when main is merged into task-002, the status file takes main's form (the step is in the supervisor's position file).
+- The plan excerpt the reviewers read began at §6.3 (Review A Consider): round 2's excerpt carries §6.1–6.2 as well.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|

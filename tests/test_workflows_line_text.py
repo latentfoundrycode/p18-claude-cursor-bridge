@@ -28,6 +28,11 @@ def flat(s):
     return re.sub(r"\s+", " ", s.replace("**", ""))
 
 
+def model_section():
+    a = TEXT.index("## Main and conditional workflows")
+    return TEXT[a:TEXT.index("\n## ", a + 3)]
+
+
 def template():
     a = TEXT.index("## Project state")
     a = TEXT.index("```markdown\n# Project Status\n", a)
@@ -84,8 +89,10 @@ def check(line, several_parts=False):
         order = [t["Name"] for t in TRAITS]
         if any(n not in order for n in names):
             faults.append("a trait is not a trait Name of the open list")
-        elif [order.index(n) for n in names] != sorted(order.index(n) for n in names) or len(set(names)) != len(names):
-            faults.append("traits not in the open list's order, or repeated")
+        elif len(set(names)) != len(names):
+            faults.append("a trait is repeated")
+        elif [order.index(n) for n in names] != sorted(order.index(n) for n in names):
+            faults.append("traits not in the open list's order")
     return faults
 
 
@@ -133,15 +140,20 @@ def test_r015_one_type_at_most_one_of_its_sub_types_traits_in_order_or_none():
 def test_r015_a_part_prefix_only_with_several_parts_and_the_unclassified_form():
     """Plan §6.2: a project with one part has one line; §7's parts each get their own."""
     p = flat(paragraph())
-    assert "begins a line only when the project has more than one part; a project with one part has one line without it" in p
+    assert ("follows `Workflows: ` only when the project has more than one part; a project with one part has one "
+            "line without it; a part's name contains no `:`, `;` or `→`") in p
+    assert ("with several parts, the lines stand together right after `Phase:`, one per part, in the order of the "
+            "project's parts; that is the order \"for each part in the order the status file lists them\" reads") in p
+    assert "for each part in the order the status file lists them" in flat(model_section()), "the core reads that order"
     assert "`Workflows: not yet classified` in a project with one part" in p
-    assert "written at intake, when the part is classified, and its traits are settled at the design gate" in p
+    assert ("written at intake, when the part is classified, with the traits proposed there; the design gate settles "
+            "them, and the line is rewritten then if they changed") in p
 
 
 def test_r015_unwritten_type_pauses_unwritten_trait_is_flagged():
     """Plan §6.7, as the open list states it: the line is where an unwritten workflow shows."""
     p = flat(paragraph())
-    assert ("A part whose product type or sub-type is not yet written pauses the project; a trait not yet "
+    assert ("At intake, a part whose product type or sub-type is not yet written pauses the project; a trait not yet "
             "written is flagged and the work continues") in p
     assert "## When something does not fit" in OL
 
@@ -155,22 +167,37 @@ def test_r015_the_example_line_is_valid_against_the_open_list():
 
 def test_r015_this_projects_own_status_line_obeys_the_grammar():
     """The bridge's own status file (a supervised project since release B) carries a valid line."""
-    lines = [l for l in open(STATUS, encoding="utf-8").read().split("\n") if l.startswith("Workflows:")]
+    all_lines = open(STATUS, encoding="utf-8").read().split("\n")
+    lines = [l for l in all_lines if l.startswith("Workflows:")]
     assert len(lines) == 1, "one part, one line"
     assert check(lines[0]) == [], (lines[0], check(lines[0]))
+    i = next(n for n, l in enumerate(all_lines) if l.startswith("Phase: "))
+    assert all_lines[i + 1] == lines[0], "the line sits right after Phase:"
 
 
 def test_the_checker_here_refuses_what_the_grammar_forbids():
     """The rules above, read as a checker, refuse each kind of malformed line (so the two tests before are not vacuous)."""
     good = "Workflows: Host Extension Development → Claude Code Extension; traits: Installable"
     assert check(good) == []
-    assert check("Workflows: host extension → Claude Code extension; traits: installable")  # keys and plain names
-    assert check("Workflows: Host Extension Development → Roblox Game; traits: Installable")  # another type's sub-type
-    assert check("Workflows: Host Extension Development; traits: Installable, Has screens")  # out of order
-    assert check("Workflows: Host Extension Development; traits: installable")  # a key, not a Name
-    assert check("Workflows: Host Extension Development → Claude Code Extension")  # no traits part
-    assert check("Bridge: " + good[len("Workflows: "):]) == ["not in the grammar"]
-    assert check("Workflows: Bridge: Host Extension Development; traits: none") != []  # prefix with one part
+    hx = "Workflows: Host Extension Development"
+    assert check("Workflows: host extension → Claude Code Extension; traits: Installable") == [
+        "product type is not a Workflow name of the open list"]  # the type's plain Name
+    assert check(hx + " → Claude Code extension; traits: Installable") == [
+        "sub-type is not a Sub-workflow name of the open list"]  # the sub-type's plain Name
+    assert check(hx + " → Roblox Game; traits: Installable") == ["sub-type is not of the line's product type"]
+    assert check(hx + "; traits: installable") == ["a trait is not a trait Name of the open list"]  # a key
+    # alphabetical, but not the Traits table's order (Performance budgets comes before External services there)
+    assert check(hx + "; traits: External services, Performance budgets") == ["traits not in the open list's order"]
+    assert check(hx + "; traits: Performance budgets, External services") == []
+    assert check(hx + "; traits: Installable, Installable") == ["a trait is repeated"]
+    assert check(hx + " → Claude Code Extension") == ["not in the grammar"]  # no traits part
+    assert check("Bridge: " + good[len("Workflows: "):]) == ["not in the grammar"]  # no `Workflows: ` at all
+    assert check("Bridge: " + good, several_parts=True) == ["not in the grammar"]  # the prefix before `Workflows: `
+    one_part = ["part prefix only when the project has several parts"]
+    assert check("Workflows: Bridge: Host Extension Development; traits: none") == one_part
     assert check("Workflows: Bridge: Host Extension Development; traits: none", several_parts=True) == []
-    assert check("Workflows: Host Extension Development; traits: none") == []
+    assert check("Workflows: Host Extension Development; traits: none", several_parts=True) == one_part
+    assert check(hx + "; traits: none") == []
     assert check("Workflows: not yet classified") == []
+    assert check("Workflows: Bridge: not yet classified", several_parts=True) == []
+    assert check("Workflows: Bridge: not yet classified") == one_part
