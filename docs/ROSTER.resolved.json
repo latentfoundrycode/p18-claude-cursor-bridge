@@ -8,8 +8,8 @@
     "review_a": "anthropic",
     "review_b": "xai"
   },
-  "other_pool": "available",
+  "other_pool": "exhausted",
   "probed": true,
-  "resolved_at": "2026-10-11T19:23 UTC",
+  "resolved_at": "2026-10-12T08:19 UTC",
   "reset_day": 16
 }

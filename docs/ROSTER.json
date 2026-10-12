@@ -1,5 +1,5 @@
 {
-  "other_pool": "available",
+  "other_pool": "exhausted",
   "reset_day": 16,
   "review_a": "claude-opus-5-5",
   "profiles": [

@@ -1,5 +1,5 @@
 # Project Status
-Last updated: 2026-10-11
+Last updated: 2026-10-12
 Phase: building
 Change cycle: none
 Increment: TASK-001 — Intake and configuration records (at merge)
@@ -26,7 +26,7 @@ Run parameters: see docs/RUN_PARAMETERS.md (stage pause=run / merge authority=ow
 
 ## Release B — notes for a resuming session
 - This is the first release the bridge's own supervisor builds, as a supervised project (§15 condition 6). The design is the Restructuring Plan (Documents/Claude-Cursor Bridge Restructuring Plan.md), release B, §16 and §6.
-- Roster: native profile in use (builder composer-2.5, Review A claude-opus-5-5, Review B grok-4.7-medium). The Other Models pool showed a usage limit on 2026-10-11 (gpt-5.6-sol-high); the full profile returns on reset day 16 UTC or when the owner says "usage reset".
-- Branch: release-b-intake holds the intake artifacts (not yet merged; merge authority = owner).
+- Roster: native profile in use (builder composer-2.5, Review A claude-opus-5-5, Review B grok-4.7-medium). The Other Models pool is marked exhausted (gpt-5.6-sol-high returned a usage limit; recorded 2026-10-12); automatic reset due 2026-10-16 00:00 UTC (reset day 16), or earlier when the owner says "usage reset".
+- Branch: release-b-intake holds the intake artifacts (PR #15, not yet merged; merge authority = supervisor — the supervisor completes the gated merge).
 - One writer at a time (§15 condition 2): while this supervisor builds, the maintainer session must not touch this repo.
 - Governance text is authored by the supervisor and gated by the two-critic design review; programs are delegated to the builder and gated by the delegation loop (§15 condition 3).

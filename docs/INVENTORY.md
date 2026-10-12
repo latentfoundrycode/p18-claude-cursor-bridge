@@ -40,6 +40,7 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
 | Governance text is the supervisor's to write; programs are the builder's | §15 condition 3, keeping N4 intact | 2026-10-11, §15 | — |
 | Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1) | a session must never load the half-edited bridge, and an install must never run unreleased code on a running project | 2026-10-11, §15 | — |
 | Who decided is recorded: owner / supervisor / design(the plan) / maintainer; no agent recorded as a person | rule 51 | 2026-10-11 | — |
+| Baseline measurement (precondition 3) met before release B: the compaction baseline was taken 2026-10-11 (Reports/Maintainer/2026-10-11-compaction-baseline.md) — about one compaction per active day per project before the digest hook | release B's precondition §14.3 | 2026-10-11, maintainer | the measure is re-taken after release B |
 | No diagram index for release B | the design is the plan's prose and its §6.2 layering / §6.11 file layout tables; this is governance text, not a code architecture with components to draw | 2026-10-11, supervisor | a later release adds code whose architecture is load-bearing |
 
 ## Deferred
