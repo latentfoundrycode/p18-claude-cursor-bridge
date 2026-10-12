@@ -226,6 +226,19 @@ Also fixed:
 - "The test step" names where the tests run today, inside step 4 (Inspect) and step 6 (Review B Consider).
 - The status file's Remote sync line names PR #19 (Review A Consider).
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 2 | Review A | 0 | 1 | 3 | yes — round 3 (see below) |
+| TASK-005 | 2 | Review B | 0 | 1 | 0 | yes — round 3 (see below) |
+
+### TASK-005 round 2 — disposition
+Both APPROVE; round 1's fixes confirmed by both (Review A ran the tests against the round-1 file: the 8 new or changed assertions fail there). Nothing converged. Every finding taken:
+- **A delivery addition had no tie to its kind** (Review A Should fix, new with round 1's fix): with `project-end.delivery` add-only, a type workflow's deployment procedure would reach a sub-type that delivers an installer in its place (§6.9; TASK-019), and the trait *installable*'s installer a part whose kind is installation into a host (TASK-021). FIX: each addition there names the kind it is for and applies only to a part of that kind; pinned. → TASK-006's brief, beside round 1's two checks.
+- **"The test step" was placed in step 6 as well** (Review B Should fix): the tests run in step 4 (Inspect); step 6 adds the benchmark floor to tests already run (`supervisor.md` step 6 opens so). FIX: the point is the run in step 4, and step 6 is not it; pinned.
+- A replacement "declares" the same points without a form to declare them in (Review A Consider): it keeps them, without declaring them again under its `## Replace` heading.
+- The core's duty to cite the Applies rule was recorded here only (Review A Consider): it joins the carry list for TASK-010's brief (`run/supervisor/in-flight.md`, copied into the status file's Next at TASK-010).
+- A completion condition copied at intake could drift from its original (Review A Consider): the intake addition names that completion condition as its source.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|

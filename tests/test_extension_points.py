@@ -218,7 +218,7 @@ def test_r006_points_change_only_in_a_bridge_release_and_the_core_stays_closed()
 def test_r006_a_replacement_keeps_the_points_of_the_module_it_replaces():
     """§6.5 ("Today's interface conditions stay together") and TASK-003's deferral: additions from the
     layers below still land on a replaced phase."""
-    assert "A replacement declares the same points as the module it replaces" in TEXT
+    assert "A replacement keeps the points of the module it replaces, without declaring them again under its `## Replace` heading" in TEXT
     assert "such as the trait *has screens* adding the mockup variant at `interface.variants`, still apply to it" in TEXT
 
 
@@ -237,7 +237,22 @@ def test_r006_an_addition_at_a_value_point_never_sets_a_second_value():
 def test_r006_a_completion_condition_the_plan_builds_toward_enters_at_intake():
     """The plan is checked against the register (completion-check --mode plan); a condition read only at
     project end would never shape it."""
-    assert "a condition the plan must build toward is also added at intake (`intake.requirement-sources`)" in TEXT
+    assert ("a condition the plan must build toward is also added at intake (`intake.requirement-sources`), "
+            "naming that completion condition as its source") in TEXT
+
+
+def test_r006_a_delivery_procedure_applies_only_to_its_kind():
+    """§6.9 (an installer in place of a deployment) and BUILD_PLAN TASK-019/021: with the procedure
+    add-only, an addition must name its kind, or a type's procedure would reach a sub-type of another kind."""
+    assert ("Each addition at `project-end.delivery` names the delivery kind it is for and applies only to a part "
+            "whose kind, set at `intake.delivery-kind`, is that kind") in TEXT
+    assert "a sub-workflow that sets another kind leaves its type workflow's procedure behind" in TEXT
+
+
+def test_r006_the_test_step_is_the_run_in_inspect_not_the_benchmark_step():
+    """supervisor.md Phase 6: the tests run in step 4; step 6 adds the benchmark floor to tests already run."""
+    assert "the test step is the running of the increment's tests and the suite, which today sits inside step 4 (Inspect)" in TEXT
+    assert "step 6 adds the benchmark floor to tests that have already run, and is not this point" in TEXT
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():
