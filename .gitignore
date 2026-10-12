@@ -7,3 +7,6 @@ impeccable/
 # Claude Code may create local files there (approvals, worktrees) in a session opened here.
 .claude/
 __pycache__/
+
+# Supervisor working/review artifacts
+run/
