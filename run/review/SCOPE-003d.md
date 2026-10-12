@@ -1,8 +1,16 @@
-# TASK-003 — scope of the review (round 3)
+# TASK-003 — scope of the review (round 4)
 
-Branch `task-003`, from `origin/main` 9e181e6. The diff is `run/review/REVIEW-003c.diff` — the branch's whole change against `origin/main`. The plan's §6.2–6.5 are at `run/review/PLAN-6-003c.md`.
+Branch `task-003`, from `origin/main` 9e181e6. The diff is `run/review/REVIEW-003d.diff` — the branch's whole change against `origin/main`. The plan's §6.2–6.5 are at `run/review/PLAN-6-003d.md`.
 
-## Round 3 — what changed since round 2
+## Round 4 — what changed since round 3
+
+Round 3 (head e4818f5): Review A APPROVE, Review B REJECT. Commit ac6ee03 applies the findings; the disposition is in `docs/DESIGN_CRITIQUE.md` ("TASK-003 round 3 — disposition"). Check that each fix holds and introduced nothing new:
+- the transitional reading sentence (supervisor.md, the paragraph after the layer table) now defers to rule 28 unchanged: read whole at every start, resume and calibration; after every compaction or resume, read the sections the session-start hook names. Once the phases are modules, the core is still read whole at those points, with the current phase's module(s) and the applicable conditional workflows read alongside it. Check against rule 28 (its text near "On every start or resume, and whenever the owner runs `/calibrate-bridge`"), the core's Read-when cell, and `bridge/cursor-bridge/session-start.py`. The old phase-only wording is forbidden by a test;
+- the parts sentence restates "at each extension point"; "a conditional workflow two parts share is read once, but its additions apply to every part that has it, in each part's own place in this order" (pinned);
+- the crosswalk test checks every phase heading the Holds cell names (intake, design, interface, planning, run parameters, configuration, delegation loop, change cycle, reflection points);
+- the round-1 note in DESIGN_CRITIQUE names the round that pinned the Holds cells; the status file's Remote sync names PR #17.
+
+## Round 3 — what changed since round 2 (kept for the record)
 
 Round 2 (head 8907e8e): Review A and Review B both APPROVE. The latest TASK-003 fix commit applies their findings; the disposition is in `docs/DESIGN_CRITIQUE.md` ("TASK-003 round 2 — disposition"). Check that each fix holds and introduced nothing new:
 - every Holds cell is pinned by equality;
@@ -41,7 +49,7 @@ Supervisor-authored governance text, not a builder run: release B's plan (docs/B
 
 ## Source the text must match
 
-The plan's §6.2–6.5 are copied verbatim to `run/review/PLAN-6-003c.md` (the plan itself lives outside the Workspace). `Documents/Claude-Cursor Bridge Restructuring Plan.md` §6.2 (layers table, inheritance, read-when), §6.4 (extension points), §6.5 (add/replace/set; only types/sub-workflows replace or set; sub-workflow inheritance; siblings exclusive; two levels; the floor). The plan leaves R-034's order unstated ("in a stated order"); this text states it: phase module, type, sub-workflow, then traits in the open list's order (§6.3's trait table), later traits appended, each workflow's own order kept. Copies of the relevant docs records are in `docs/` (REQUIREMENTS.md rows R-007/008/009/034, BUILD_PLAN.md TASK-003, DESIGN_CRITIQUE.md).
+The plan's §6.2–6.5 are copied verbatim to `run/review/PLAN-6-003d.md` (the plan itself lives outside the Workspace). `Documents/Claude-Cursor Bridge Restructuring Plan.md` §6.2 (layers table, inheritance, read-when), §6.4 (extension points), §6.5 (add/replace/set; only types/sub-workflows replace or set; sub-workflow inheritance; siblings exclusive; two levels; the floor). The plan leaves R-034's order unstated ("in a stated order"); this text states it: phase module, type, sub-workflow, then traits in the open list's order (§6.3's trait table), later traits appended, each workflow's own order kept. Copies of the relevant docs records are in `docs/` (REQUIREMENTS.md rows R-007/008/009/034, BUILD_PLAN.md TASK-003, DESIGN_CRITIQUE.md).
 
 ## Tests the supervisor wrote
 
