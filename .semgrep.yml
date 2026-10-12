@@ -1,0 +1,5 @@
+# TASK-002 Semgrep floor. Registry rulesets on the gate command (pinned names):
+#   p/python — Python injection, dangerous calls, and related checks
+#   p/secrets — secret and credential patterns
+# Project-specific rules go below; bridge concat-SQLi rules load from bridge/cursor-bridge/semgrep-bridge-rules.yml.
+rules: []
