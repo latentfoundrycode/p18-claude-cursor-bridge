@@ -300,6 +300,18 @@ Both APPROVE (each ran the new tests against origin/main's text: 8 of 9 fail the
 - task-002's status copy still carries the old form of the line (Review A Consider): when main is merged into task-002, the status file takes main's form (the step is in the supervisor's position file).
 - The plan excerpt the reviewers read began at §6.3 (Review A Consider): round 2's excerpt carries §6.1–6.2 as well.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-007 | 2 | Review A | 0 | 0 | 5 | not taken on the reviewed head (see below) |
+| TASK-007 | 2 | Review B | 0 | 0 | 1 | not taken on the reviewed head (see below) |
+
+### TASK-007 round 2 — disposition
+Both APPROVE; round 1's fixes confirmed by both (each ran the round-2 test against round 1's text: the 2 rewritten pins fail there). Nothing converged. Merged as d4023f6 (2026-10-12) on Consider findings only, none taken on the reviewed head; the paragraph moves with "Project state" in TASK-010, which takes the wording:
+- the parts' order is defined by the status file itself, which the sentence states in a circle; and "beside `Phase:`" for one part against "right after `Phase:`" for several (Review A) → wording, TASK-010.
+- part names are not required to be distinct (Review A); each trait appearing at most once is checked but not stated (Review B) → TASK-010 states both; TASK-008's brief checks both.
+- "At intake" names only one of the times a pause can happen: the workflow check also fails a line at a release and at a calibration (§6.6, §6.8) (Review A) → TASK-006's and TASK-024's briefs.
+- a change cycle that changes a part's traits, or adds a part, rewrites the line, which the paragraph does not say (Review A) → the brief of the increment that writes the change-cycle module.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
