@@ -274,6 +274,17 @@ Both APPROVE; round 4's fixes confirmed by both (each ran the tests against the 
 - The pin of round 2's correction was lost in round 5's rewrite (Review A Consider): "step 6 runs no tests of its own, the tests having run in step 4" is pinned again.
 - Where the confirmed kind's key is recorded (Review A Consider) is a later increment's design: → TASK-006's and TASK-011's briefs.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 6 | Review A | 0 | 0 | 3 | not taken on the reviewed head (see below) |
+| TASK-005 | 6 | Review B | 0 | 0 | 0 | — |
+
+### TASK-005 round 6 — disposition
+Both APPROVE; round 5's fixes confirmed by both. Nothing converged. Merged as 82f0e44 (2026-10-12) on Consider findings only; Review A's three, none taken on the reviewed head:
+- "every check and review" reads against the merge gate's conditions, which the same paragraph exempts → wording only; the exemption stands two sentences later in the same paragraph, so nothing is ambiguous for a check.
+- an addition whose check runs at several steps (a check repeated before and after the tests) has no stated placement → TASK-010's brief (the core's carry list) and TASK-017's (the trait *has screens*, whose design auditor is the case).
+- three statements are unpinned: the CI route through `configuration.items`, the members named at the inspect step, and the placement sentence → `tests/test_extension_points.py` is in no later increment's Scope, so they go to release B's stage-close pass, test-infrastructure lane, beside TASK-004 round 3's two.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
