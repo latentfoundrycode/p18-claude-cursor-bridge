@@ -45,18 +45,30 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
     names = [re.sub(r"\*\*(.+?)\*\*.*", r"\1", r[0]) for r in rows]
     assert names == ["The main workflow's core", "Phase modules", "Type workflow", "Sub-workflow", "Trait additions"], names
     assert all(len(r) == 3 and r[1] and r[2] for r in rows), "every layer says what it holds and when it is read"
+    holds = [r[1] for r in rows]
+    for item in ("the division of labour", "the founding rules", "the loop's shape", "escalation and reporting",
+                 "project state", "the standing rules that hold in every phase"):
+        assert item in holds[0], item
+    assert holds[1].startswith("The procedure for one phase each")
+    for phase in ("intake", "design", "the interface phase", "planning", "run parameters", "configuration",
+                  "the delegation loop", "the change cycle", "reflection points", "project end"):
+        assert phase in holds[1], phase
+    assert holds[2] == "For one product type: its changes at named extension points"
+    assert holds[3].startswith("For one sub-type:") and "changing only what differs for that sub-type" in holds[3]
+    assert holds[4] == "For one trait: what it adds, whatever the product type"
     read_when = [r[2] for r in rows]
-    assert read_when[0].startswith("Always, whole")
-    assert "current phase" in read_when[1] and "whole" in read_when[1]
-    assert "current phase" in read_when[2] and "alongside the phase module" in read_when[2]
-    assert "Alongside its type workflow" in read_when[3] and "sub-type" in read_when[3]
-    assert "current phase" in read_when[4] and "has the trait" in read_when[4]
+    assert read_when[0] == "Always, whole, at every start and calibration"
+    assert read_when[1] == "The current phase's module or modules, whole, on entering the phase and at every calibration"
+    assert read_when[2] == "Its changes to the current phase, whole, alongside the phase module"
+    assert read_when[3] == "Alongside its type workflow, when the part has a sub-type"
+    assert read_when[4] == "Their additions to the current phase, when the part has the trait"
 
 
 def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when_it_applies():
     s = flat(model())
     assert "each inheriting everything it does not mention from the layers above it" in s
-    assert "You never read a phase you are not in, or a conditional workflow that does not apply" in s
+    assert "this file is still read whole: reading only the current phase takes effect as each phase moves into its own module" in s
+    assert "Once the phases are modules, you never read a phase you are not in, or a conditional workflow that does not apply" in s
     assert "only at the extension points" in s, "a conditional workflow changes the procedure only at declared points"
 
 
@@ -77,6 +89,7 @@ def test_r008_no_conditional_workflow_touches_the_floor():
     for item in ("remove a founding rule", "weaken the merge gate", "the requirements register", "the inventory", "the reviews"):
         assert item in floor, item
     assert "not extension points" in s
+    assert "a conditional workflow's text that would do any of these does not apply, and on these points the core governs" in s
 
 
 def test_r009_sub_workflow_inheritance_exclusive_siblings_two_levels():
@@ -84,7 +97,7 @@ def test_r009_sub_workflow_inheritance_exclusive_siblings_two_levels():
     s = flat(model())
     assert "A sub-workflow inherits its type workflow" in s
     assert "may override its type workflow's replacement or setting" in s
-    assert "Siblings are exclusive" in s
+    assert "Siblings are exclusive: a part has at most one sub-type of its product type" in s
     assert "Two levels only" in s and "a third level needs evidence from a real project" in s
 
 
@@ -94,6 +107,9 @@ def test_r034_additions_apply_together_in_a_stated_order():
     order = s[s.index("The order additions apply in."):]
     order = order[:order.index("A conditional workflow can never")]
     assert "apply together" in order and "never one in place of another" in order
+    assert "at each extension point" in order, "the order holds where the additions land, not after the phase"
+    assert "the open list governs this order and places a trait added later at its end" in order
+    assert "the parts are taken in the order the status file lists them" in order
     seq = ["the phase module's own", "the type workflow's", "the sub-workflow's", "each trait's"]
     pos = [order.index(p) for p in seq]
     assert pos == sorted(pos), "phase module, then type, then sub-workflow, then traits"

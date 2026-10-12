@@ -81,6 +81,29 @@ plan-critic returned 0 Blocking (round-3 findings confirmed resolved, graph acyc
 | plan | confirming | plan-critic | 0 | 1 | 3 | yes — applied |
 | plan | confirming | Review B | 0 | 2 | 1 | yes — applied |
 
+## Build rounds — supervisor-authored governance text
+
+Each supervisor-authored text increment takes one combined round that serves as both the two-critic design review and the merge gate: Review A (diff-reviewer with the plan-critic lenses) and Review B (cross-family, with execution) on the committed diff. Convergent findings are blocking.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-003 | 1 | Review A | 0 | 4 | 6 | yes — round 2 (see below) |
+| TASK-003 | 1 | Review B | 0 | 2 | 2 | yes — round 2 (see below) |
+
+### TASK-003 round 1 — disposition
+Both APPROVE. Two findings converged and were treated as blocking:
+
+1. **"Siblings are exclusive" was pinned only as a label** (Review A Should fix, Review B Should fix). FIX: the test asserts the meaning, "a part has at most one sub-type of its product type".
+2. **"The core governs" was loose and unpinned** (Review A Should fix, Review B Consider: read loosely it would cancel replace and set). FIX: scoped to the floor ("a conditional workflow's text that would do any of these does not apply, and on these points the core governs") and pinned.
+
+Also fixed: the order is stated per extension point; "module or modules" (planning and building map to two); the transitional sentence says this file is still read whole until the phases move into modules, and maps the plan's phase names to this file's headings (Review B Consider); the open list governs the trait order and places a later trait at its end; several parts are taken in the status file's order; the Holds and Read-when cells are pinned exactly (Review B Should fix).
+
+Deferred, each to the increment that owns it (design for later increments is not this diff's defect):
+- how a replaced phase and a trait's attachment point are declared → TASK-005 (registry) and TASK-012 (declared points);
+- a guard against a conditional workflow's sentence that contradicts the core → TASK-006 (workflow-check);
+- R-007 is `built` on the text; it is exercised once the phases are modules and the hook names them → TASK-010 and TASK-015;
+- TASK-004's brief carries "a sub-type must earn its place" (§6.5) and cross-checks the open list's trait order against the order stated here.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
