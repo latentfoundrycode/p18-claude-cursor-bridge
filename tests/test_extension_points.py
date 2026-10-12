@@ -244,15 +244,29 @@ def test_r006_a_completion_condition_the_plan_builds_toward_enters_at_intake():
 def test_r006_a_delivery_procedure_applies_only_to_its_kind():
     """§6.9 (an installer in place of a deployment) and BUILD_PLAN TASK-019/021: with the procedure
     add-only, an addition must name its kind, or a type's procedure would reach a sub-type of another kind."""
-    assert ("Each addition at `project-end.delivery` names the delivery kind it is for and applies only to a part "
-            "whose kind, set at `intake.delivery-kind`, is that kind") in TEXT
+    assert "Each addition at `project-end.delivery` names the delivery kind it is for and applies only to a part of that kind" in TEXT
     assert "a sub-workflow that sets another kind leaves its type workflow's procedure behind" in TEXT
 
 
-def test_r006_the_test_step_is_the_run_in_inspect_not_the_benchmark_step():
-    """supervisor.md Phase 6: the tests run in step 4; step 6 adds the benchmark floor to tests already run."""
-    assert "the test step is the running of the increment's tests and the suite, which today sits inside step 4 (Inspect)" in TEXT
-    assert "step 6 adds the benchmark floor to tests that have already run, and is not this point" in TEXT
+def test_r006_the_delivery_kinds_are_one_list_and_an_unset_kind_is_intakes():
+    """Delivery-Conventions.md §1 and §6.4's kinds as one list; a part no workflow sets a kind for (the TDP's
+    path, BUILD_PLAN TASK-020) takes the kind confirmed at intake, so a trait's procedure still reaches it."""
+    for kind in ("installer", "install-script", "package", "web-deployment", "store-package", "host-installation"):
+        assert "`%s` (" % kind in TEXT, kind
+    assert ("the value set at `intake.delivery-kind` and the kind an addition at `project-end.delivery` names "
+            "are both drawn from it") in TEXT
+    assert ("Where no type workflow or sub-workflow sets a part's kind, the kind the supervisor confirms with the "
+            "owner at intake (Phase 1) is the part's kind") in TEXT
+
+
+def test_r006_the_inspect_and_test_steps_and_the_benchmark_floor():
+    """supervisor.md Phase 6: both steps sit in step 4 (the checks of the diff first, then the tests); step 6
+    runs no tests, and its benchmark floor, which the trait performance budgets carries (§6.8; BUILD_PLAN
+    TASK-017), is a check at the test step."""
+    assert "the inspect step's checks are step 4's checks of the diff before the tests run" in TEXT
+    assert "the test step is the running of the increment's tests and the suite, and the checks that run with them" in TEXT
+    assert ("Step 6 runs no tests of its own; the benchmark floor it adds is a check at the test step, "
+            "the one the trait *performance budgets* carries (§6.8)") in TEXT
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():

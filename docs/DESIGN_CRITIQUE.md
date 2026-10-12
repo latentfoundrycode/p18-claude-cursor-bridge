@@ -239,6 +239,18 @@ Both APPROVE; round 1's fixes confirmed by both (Review A ran the tests against 
 - The core's duty to cite the Applies rule was recorded here only (Review A Consider): it joins the carry list for TASK-010's brief (`run/supervisor/in-flight.md`, copied into the status file's Next at TASK-010).
 - A completion condition copied at intake could drift from its original (Review A Consider): the intake addition names that completion condition as its source.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 3 | Review A | 0 | 2 | 2 | yes — round 4 (see below) |
+| TASK-005 | 3 | Review B | 0 | 0 | 0 | — |
+
+### TASK-005 round 3 — disposition
+Both APPROVE; round 2's fixes confirmed by both (each ran the tests against the round-2 file: exactly the 4 new or changed tests fail there). Nothing converged. The gate would have allowed the merge; Review A's two Should fix items are taken first, on this branch, because the registry is in no later increment's Scope (TASK-017 could not repair it without a scope deviation):
+- **The benchmark floor had no point** (Review A Should fix, new with round 2's fix): "step 6 … is not this point" left the floor, which the trait *performance budgets* carries (§6.8; TASK-017), with nowhere to be added. FIX: step 6 runs no tests of its own; its benchmark floor is a check at the test step. Review B's correction holds: the tests run in step 4.
+- **The delivery kinds came from two lists, and an unset kind was unstated** (Review A Should fix): the registry named §6.4's four, the core's intake confirms the kinds of `Delivery-Conventions.md` §1, and a part no workflow sets a kind for (the TDP's path, TASK-020) would have got no procedure from the trait *installable*. FIX: one list (`installer`, `install-script`, `package`, `web-deployment`, `store-package`, `host-installation`) for both the value set and the kind an addition names; where no workflow sets it, the kind confirmed at intake is the part's kind. → TASK-006's brief (the form of the name), TASK-020's brief (its kind confirmed at intake).
+- Where the inspect step's checks fall against the test run (Review A Consider): both sit in step 4, the checks of the diff first, then the tests and the checks that run with them.
+- The core has no notion yet of an addition scoped to a delivery kind (Review A Consider): joins TASK-010's carry list beside the Applies rule.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
