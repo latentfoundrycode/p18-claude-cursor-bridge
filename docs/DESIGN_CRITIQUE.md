@@ -137,6 +137,61 @@ One finding converged and was treated as blocking:
 
 Also fixed: the crosswalk test checks every phase heading the Holds cell names (intake, design, run parameters, the change cycle; Review A Consider); the round-1 note above names the round that pinned the Holds cells (Review A Consider); the status file's Remote sync line names PR #17 (Review B Consider).
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-003 | 4 | Review A | 0 | 0 | 4 | deferred (see below) |
+| TASK-003 | 4 | Review B | 0 | 0 | 0 | — |
+
+### TASK-003 round 4 — disposition
+Both APPROVE; the round-3 fixes confirmed. Merged as f00f12e (2026-10-12). Nothing converged. Review A's four Consider findings are deferred, each to the increment that owns it:
+- "the conditional workflows that apply" in the transitional sentence could be read as whole files; it should say "their changes to the current phase" → TASK-010 (the carve), re-pinned there;
+- the core's Read-when cell lacks "resume", and the phase modules' cell lacks start and resume, beside rule 28 → reconciled at TASK-010;
+- a project-wide addition from a trait two parts share (a run parameter, an intake question): asked once or per part → the TASK-005 and TASK-012 briefs;
+- the negative test against the phase-only wording is narrow; the positive pins of the sentence are the guard → no change.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-004 | 1 | Review A | 1 | 1 | 8 | yes — round 2 (see below) |
+| TASK-004 | 1 | Review B | 0 | 3 | 2 | yes — round 2 (see below) |
+
+### TASK-004 round 1 — disposition
+Review A REJECT, Review B APPROVE. The split is settled for Review A on the approved plan, an established invariant: BUILD_PLAN TASK-020 scopes `workflow/types/own-computer.md` and its `own-computer/local-service.md`, so the key `software-on-your-own-computer` would put the type workflow at a path the plan does not name. FIX: the key is `own-computer` (the type's row, its four sub-types' Of type, the tests); the workflow name follows the plan's shape, "Own-Computer Software Development".
+
+Three findings converged and were treated as blocking:
+1. **Six sub-types' default traits were checked only as a superset** of their type's (Review B Should fix, Review A Consider), though a sub-type's cell is its complete set. FIX: every sub-type is pinned by equality.
+2. **§6.10 step 2 asked every new entry for a workflow name** (Review B Should fix, Review A Consider): a trait has none, a sub-type has a sub-workflow name, and "its written flag set" was ambiguous. FIX: the entry joins with every column of its own table; step 3 sets Written to `yes` in the same change, once the check passes.
+3. **The §6.7 trait bullet stopped at the promotion pass** (both Consider). FIX: "from which the maintainer may write it as trait additions", as §6.7 says; pinned.
+
+Also fixed:
+- **Name and Workflow name both claimed the `Workflows:` line** (Review A Should fix). §6.3 (plan line 216) is kept: the workflow or sub-workflow name is what the line names; Name is plain words for prose and intake; a trait, which has no workflow name, is named by its Name.
+- **§6.7 was pinned by its titles only** (Review B Should fix). The pause conditions ("fits no product type, fits two equally, or fits one whose workflow is not yet written"), "stops before design" and the unwritten-trait sentence are pinned.
+- **The table shape was implied, not stated** (Review A Consider). "How this file is read" states it: the first table after its heading, rows to the first non-table line, columns by header name, no `|` in a cell, no meaning in the order inside a Default traits cell. The test's parser reads only that first table. The GUI cell is in trait order.
+- **The canonical-source sentence named product types only** (Review A Consider). It now covers a type workflow or sub-workflow.
+- **An all-`no` test would break on the first written workflow** (Review A Consider). It is replaced by the invariant: Written is `yes` exactly when the file exists at the key's path.
+- **The Planned cells outside release B were unpinned** (Review B Consider). Every cell is pinned.
+- The status file's Remote sync line names PR #18 (Review A Consider).
+
+Not taken: pinning every definition verbatim (Review A Consider) duplicates the text; the reviewers check the definitions against §6.3 each round. "And its entry here" in the changing paragraph stays: it follows from the file being the canonical source.
+
+Deferred: the `Workflows:` line's grammar (which column names a type, a sub-type and a trait on it, and the bridge's own line rewritten to match) → TASK-007's brief.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-004 | 2 | Review A | 0 | 1 | 4 | yes — round 3 (see below) |
+| TASK-004 | 2 | Review B | 0 | 0 | 0 | — |
+
+### TASK-004 round 2 — disposition
+Both APPROVE; round 1's fixes confirmed by both. The first launch of this round (snapshot 004b) gave Review B an empty plan-sections file and was stopped before a verdict (ISS-004); the round ran again whole as 004c. Nothing converged. REVIEWERS DISAGREE on whether the derived workflow and sub-workflow names need pinning (correctness, not intent): Review B accepted the scoped choice to pin only the owner's two, Review A asked for every name. Settled for Review A on §6.3, which calls the names "fixed here": a fixed value is fixed in a test.
+
+Fixed:
+- **Only Game Development and Roblox Game were pinned** (Review A Should fix). Every workflow and sub-workflow name is pinned by equality; renaming one changes the file and its pin together.
+- The status file's Next named the abandoned 004b (Review A Consider). It names round 3.
+- The opening sentence cited the core's "Main and conditional workflows" for classification at intake (Review A Consider); it now points to "When something does not fit" and §6.7.
+- §6.10 step 2's colon read as the full column list (Review A Consider); it says "filled, including".
+- The test's parser did not compare the separator's cell count with the header's (Review A Consider); it does.
+
+Noted, no change: a key unique within its table is enough, since the three tables are read apart (Review A); the Written flag's "the check passes" half belongs to TASK-006.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
