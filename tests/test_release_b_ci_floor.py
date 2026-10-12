@@ -2,10 +2,12 @@
 
 enforces: docs/BUILD_PLAN.md TASK-002 Done when; satisfies R-002.
 Supervisor-authored (reviewer-independent). Asserts the committed CI floor:
-Semgrep (OSS engine, explicit pinned rulesets, --error, diff-aware), OSV-Scanner,
-and Socket run unguarded on ubuntu from a committed requirements.lock, every
-action pinned by commit SHA, no secret value, and the floor cannot silently skip
-itself (no step- or job-level guard, no `|| true`). Reads committed files only.
+Semgrep (OSS engine, no token, explicit rulesets, --error, diff-aware), OSV-Scanner,
+and Socket (authenticated by its repo secret) run unguarded on ubuntu from a
+committed requirements.lock; every action is pinned by commit SHA; checkouts do not
+persist credentials; secrets appear only in step-level env; and the floor cannot
+silently skip itself (no step- or job-level guard, no `|| true` / `|| :` / `|| echo`).
+Reads committed files only.
 """
 import pathlib
 import re
@@ -17,12 +19,11 @@ WORKFLOW = ROOT / ".github" / "workflows" / "tests.yml"
 LOCKFILE = ROOT / "requirements.lock"
 
 SHA40 = re.compile(r"@[0-9a-f]{40}(?:\s|$|#)")
-SCANNERS = (
-    ("semgrep", re.compile(r"\bsemgrep\b", re.I)),
-    ("osv-scanner", re.compile(r"osv-scanner", re.I)),
-    ("socket", re.compile(r"\bsocket(?:security)?\b", re.I)),
-)
-DISABLERS = re.compile(r"\|\|\s*(true|exit\s+0|:)\b")
+SEMGREP = re.compile(r"\bsemgrep\b", re.I)
+OSV = re.compile(r"osv-scanner", re.I)
+SOCKET = re.compile(r"\bsocket(?:security)?\b", re.I)
+SCANNERS = (("semgrep", SEMGREP), ("osv-scanner", OSV), ("socket", SOCKET))
+DISABLERS = re.compile(r"\|\|\s*(?:true\b|exit\s+0\b|:(?=\s|$|;)|echo\b)")
 
 
 def _text():
@@ -33,22 +34,42 @@ def _data():
     return yaml.safe_load(_text())
 
 
-def _step_body(step):
-    if not isinstance(step, dict):
-        return ""
+def _jobs(data):
+    return {n: j for n, j in (data.get("jobs") or {}).items() if isinstance(j, dict)}
+
+
+def _steps(job):
+    return [s for s in (job.get("steps") or []) if isinstance(s, dict)]
+
+
+def _body(step):
     return "\n".join(str(step.get(k)) for k in ("uses", "run") if step.get(k))
 
 
 def _ubuntu_jobs(data):
-    for name, job in (data.get("jobs") or {}).items():
-        if isinstance(job, dict) and str(job.get("runs-on", "")).strip() == "ubuntu-latest":
-            yield name, job
+    return {n: j for n, j in _jobs(data).items() if str(j.get("runs-on", "")).strip() == "ubuntu-latest"}
+
+
+def _semgrep_step(data):
+    for job in _ubuntu_jobs(data).values():
+        for step in _steps(job):
+            if SEMGREP.search(_body(step)):
+                return step
+    raise AssertionError("R-002: no Semgrep step on ubuntu-latest")
+
+
+def test_r002_disabler_pattern_catches_the_idioms():
+    """R-002: the guard this test relies on catches the usual exit-status swallowers (a negative test must show its precondition)."""
+    for bad in ("socket ci || true", "socket ci || :", "x || exit 0", "x || echo skipped", "x ||:;"):
+        assert DISABLERS.search(bad), bad
+    for ok in ("a && b", "set -euo pipefail", "exit \"$code\""):
+        assert not DISABLERS.search(ok), ok
 
 
 def test_r002_workflow_parses():
     """R-002: the workflow is valid YAML with jobs."""
     data = _data()
-    assert isinstance(data, dict) and "jobs" in data
+    assert isinstance(data, dict) and _jobs(data)
 
 
 def test_r002_three_scanners_unguarded_on_ubuntu():
@@ -56,35 +77,43 @@ def test_r002_three_scanners_unguarded_on_ubuntu():
     data = _data()
     for label, pattern in SCANNERS:
         found = False
-        for _name, job in _ubuntu_jobs(data):
-            # the job itself must not be conditional or allowed to fail
-            assert "if" not in job, f"R-002: scanner job has a job-level if:"
-            assert not job.get("continue-on-error"), "R-002: scanner job uses continue-on-error"
-            for step in job.get("steps") or []:
-                body = _step_body(step)
+        for job in _ubuntu_jobs(data).values():
+            for step in _steps(job):
+                body = _body(step)
                 if not pattern.search(body):
                     continue
+                assert "if" not in job, f"R-002: the job running {label} has a job-level if:"
+                assert not job.get("continue-on-error"), f"R-002: the job running {label} uses continue-on-error"
                 assert "if" not in step, f"R-002: {label} step is guarded by if:"
-                assert not step.get("continue-on-error"), f"R-002: {label} uses continue-on-error"
-                assert not DISABLERS.search(body), f"R-002: {label} command disables its own exit status"
+                assert not step.get("continue-on-error"), f"R-002: {label} step uses continue-on-error"
+                assert not DISABLERS.search(body), f"R-002: {label} command swallows its own exit status"
                 found = True
         assert found, f"R-002: no unguarded {label} step on ubuntu-latest"
 
 
-def test_r002_semgrep_blocks_with_explicit_rules():
-    """R-002: the Semgrep step runs `semgrep scan` with --error and explicit --config rulesets (not a bare/registry-policy run)."""
+def test_r002_semgrep_not_on_other_runners():
+    """R-002: Semgrep runs only on ubuntu (it is unreliable on Windows), never on another runner."""
     data = _data()
-    for _name, job in _ubuntu_jobs(data):
-        for step in job.get("steps") or []:
-            body = _step_body(step)
-            if not re.search(r"\bsemgrep\b", body, re.I):
-                continue
-            assert "scan" in body, "R-002: Semgrep must use `semgrep scan` (deterministic), not `semgrep ci`"
-            assert "--error" in body, "R-002: the Semgrep step must pass --error so a finding fails the step"
-            assert body.count("--config") >= 2, "R-002: Semgrep must name explicit rulesets via --config"
-            assert "bridge/cursor-bridge/semgrep-bridge-rules.yml" in body, "R-002: the bridge rules must be in the Semgrep config"
-            return
-    raise AssertionError("R-002: no Semgrep step found on ubuntu-latest")
+    ubuntu = _ubuntu_jobs(data)
+    for name, job in _jobs(data).items():
+        if name in ubuntu:
+            continue
+        for step in _steps(job):
+            assert not SEMGREP.search(_body(step)), f"R-002: Semgrep runs in non-ubuntu job {name}"
+
+
+def test_r002_semgrep_oss_blocking_explicit_diff_aware():
+    """R-002: Semgrep is a `scan` (OSS, no token, no --pro) with --error, explicit --config rulesets incl. the bridge rules, and diff-aware baselines."""
+    step = _semgrep_step(_data())
+    body = _body(step)
+    assert re.search(r"\(scan\b|\bsemgrep\S*\s+scan\b", body), "R-002: Semgrep must run `scan`, not `ci`"
+    assert "--error" in body, "R-002: --error must make a finding fail the step"
+    assert body.count("--config") >= 2, "R-002: explicit rulesets via --config"
+    assert "bridge/cursor-bridge/semgrep-bridge-rules.yml" in body, "R-002: the bridge rules must be loaded"
+    assert "pull_request" in body and "push" in body, "R-002: Semgrep must branch on pull_request and push"
+    assert body.count("--baseline-commit") >= 2, "R-002: Semgrep must be diff-aware on both pull_request and push (--baseline-commit on each path)"
+    assert "--pro" not in body and "install-semgrep-pro" not in body, "R-002: OSS engine (owner's decision 2026-10-12)"
+    assert "SEMGREP_APP_TOKEN" not in _text(), "R-002: no Semgrep token in the workflow (OSS engine)"
 
 
 def test_r002_every_uses_is_commit_pinned():
@@ -99,13 +128,27 @@ def test_r002_every_uses_is_commit_pinned():
     assert seen >= 1, "R-002: no uses: lines found (vacuous pass)"
 
 
+def test_r002_checkouts_do_not_persist_credentials():
+    """R-002: every actions/checkout step sets persist-credentials: false, and at least one exists."""
+    seen = 0
+    for job in _jobs(_data()).values():
+        for step in _steps(job):
+            if "actions/checkout" not in str(step.get("uses", "")):
+                continue
+            seen += 1
+            assert (step.get("with") or {}).get("persist-credentials") is False, "R-002: checkout persists credentials"
+    assert seen >= 1, "R-002: no checkout step found (vacuous pass)"
+
+
 def test_r002_pip_installs_only_from_lockfile():
-    """R-002: every pip install is exactly `-r requirements.lock` with no extra packages and no direct pytest/pyyaml pins."""
+    """R-002: every pip install is exactly `-r requirements.lock`, and at least one exists."""
+    seen = 0
     for line in _text().splitlines():
         if "pip install" not in line:
             continue
-        after = line.split("pip install", 1)[1].strip()
-        assert after == "-r requirements.lock", f"R-002: pip install must be exactly `-r requirements.lock`: {line!r}"
+        seen += 1
+        assert line.split("pip install", 1)[1].strip() == "-r requirements.lock", f"R-002: pip install must be exactly `-r requirements.lock`: {line!r}"
+    assert seen >= 1, "R-002: no pip install found (vacuous pass)"
 
 
 def test_r002_lockfile_pins_closure():
@@ -120,29 +163,30 @@ def test_r002_lockfile_pins_closure():
         assert "==" in s, f"R-002: unpinned requirement line: {s!r}"
 
 
-def test_r002_secrets_only_in_step_env_no_values():
-    """R-002: repo secrets are referenced only inside step-level env: mappings, never at workflow or job env, and no secret value is embedded."""
-    text = _text()
-    # no literal-looking secret assignment (a secret reference is always ${{ secrets.NAME }})
-    for line in text.splitlines():
-        if re.search(r"(SEMGREP_APP_TOKEN|SOCKET_\w*API\w*TOKEN|SOCKET_SECURITY_API_KEY)\s*[:=]", line):
-            assert "${{" in line and "secrets." in line, f"R-002: secret not referenced via ${{{{ secrets.* }}}}: {line!r}"
+def test_r002_secrets_only_in_step_env():
+    """R-002: `secrets.` appears only inside a step's env: mapping (never in run/with/uses, job- or workflow-level keys), and Socket is authenticated by its repo secret."""
     data = _data()
-    workflow_env = str(data.get("env", {}))
-    assert "secrets." not in workflow_env, "R-002: a secret is referenced at workflow-level env"
-    for name, job in (data.get("jobs") or {}).items():
-        if not isinstance(job, dict):
-            continue
-        assert "secrets." not in str(job.get("env", {})), f"R-002: a secret is referenced at job-level env in {name}"
+    assert "secrets." not in str({k: v for k, v in data.items() if k != "jobs"}), "R-002: secret at workflow level"
+    socket_authenticated = False
+    for name, job in _jobs(data).items():
+        assert "secrets." not in str({k: v for k, v in job.items() if k != "steps"}), f"R-002: secret at job level in {name}"
+        for step in _steps(job):
+            for key, value in step.items():
+                if key == "env":
+                    continue
+                assert "secrets." not in str(value), f"R-002: secret outside step env ({key}) in {name}"
+            if SOCKET.search(_body(step)) and "run" in step:
+                socket_authenticated = "secrets.SOCKET_SECURITY_API_KEY" in str(step.get("env") or {})
+    assert socket_authenticated, "R-002: the Socket step is not authenticated by secrets.SOCKET_SECURITY_API_KEY in its env"
 
 
 def test_r002_least_privilege_permissions():
-    """R-002: the workflow sets a least-privilege permissions block (contents: read at workflow or security job level)."""
+    """R-002: a least-privilege `permissions: {contents: read}` block covers the floor."""
     data = _data()
     top = data.get("permissions")
     if isinstance(top, dict) and top.get("contents") == "read":
         return
-    for _name, job in _ubuntu_jobs(data):
+    for job in _ubuntu_jobs(data).values():
         perms = job.get("permissions")
         if isinstance(perms, dict) and perms.get("contents") == "read":
             return

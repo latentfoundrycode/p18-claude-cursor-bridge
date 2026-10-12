@@ -1,0 +1,3 @@
+# socket.yml — Socket policy; no ignores until agreed
+version: 2
+issueRules: {}

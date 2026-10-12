@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   pull_request:
+permissions:
+  contents: read
 jobs:
   tests:
     name: bridge programs (${{ matrix.os }})
@@ -13,12 +15,69 @@ jobs:
         os: [windows-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
-      - run: python -m pip install pytest==9.1.1 pyyaml==6.0.3
+      - run: python -m pip install -r requirements.lock
       - run: python -m pytest tests -q
       - name: windowless check over the bridge's programs
         run: python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge
       - name: the manifest matches the tree
         run: python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet
+  security-floor:
+    name: security floor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Semgrep
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+          GITHUB_EVENT_PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=(scan --config p/python --config p/secrets --config .semgrep.yml --config bridge/cursor-bridge/semgrep-bridge-rules.yml --error)
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BASELINE="$(git merge-base "${GITHUB_EVENT_PULL_REQUEST_BASE_SHA}" "${GITHUB_SHA}")"
+            ARGS+=(--baseline-commit "$BASELINE")
+          elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            BEFORE="${GITHUB_EVENT_BEFORE}"
+            if [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+              ARGS+=(--baseline-commit "$BEFORE")
+            fi
+          fi
+          pipx run semgrep==1.176.1 "${ARGS[@]}" .
+      - name: OSV-Scanner
+        shell: bash
+        run: |
+          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"
+          echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          set +e
+          ./osv-scanner scan source --config=osv-scanner.toml --lockfile='requirements.txt:requirements.lock'
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            exit 0
+          fi
+          if [ "$code" -eq 128 ]; then
+            echo "OSV-Scanner exit 128: requirements.lock was not read"
+            exit 128
+          fi
+          exit "$code"
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "22"
+      - name: Socket
+        env:
+          SOCKET_CLI_API_TOKEN: ${{ secrets.SOCKET_SECURITY_API_KEY }}
+        run: |
+          npm install -g @socketsecurity/cli@2.1.0
+          socket ci

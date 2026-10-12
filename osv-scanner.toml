@@ -1,0 +1,5 @@
+# osv-scanner.toml — no ignores until a reasoned, expiring exception is agreed
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2026-12-31
+# reason = "why this is acceptable, who agreed, and when it is revisited"
