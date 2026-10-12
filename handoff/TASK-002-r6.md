@@ -1,6 +1,6 @@
 # TASK-002 — round 6 (the Socket CLI must not print part of its key)
 
-Everything else in the floor is accepted: Review A and Review B approved the merged head 0517c5b, and CI ran green on it. **Fix only the Socket step**, in `.github/workflows/tests.yml`.
+Satisfies: R-002 (the security floor runs in the bridge's CI gate). Everything else in the floor is accepted: Review A and Review B approved the merged head 0517c5b, and CI ran green on it. **Fix only the Socket step**, in `.github/workflows/tests.yml`.
 
 ## What the CI log showed (PR #16, run 38309209568, job "security floor")
 - The Socket CLI 1.7.0 prints a banner line before it runs: `CLI: v1.7.0 | cmd: socket ci | org: (not set) | token: <the first 5 characters of the API key>*** (env)`.
