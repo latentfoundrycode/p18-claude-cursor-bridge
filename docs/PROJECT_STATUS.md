@@ -1,11 +1,11 @@
 # Project Status
 Last updated: 2026-10-11
-Phase: planning
+Phase: building
 Change cycle: none
-Increment: TASK-001 — Intake and configuration records
+Increment: TASK-001 — Intake and configuration records (at merge)
 Last accepted: none (release B not yet started; releases 0, A1a–A5 are the baseline)
-Awaiting user on: the build-plan gate — approve the release B build plan before configuration and delegation begin
-Next: on approval → Phase 5 configuration (the CI security floor, TASK-002) then the delegation loop (TASK-001 records are already on this branch); the two-critic plan review is complete (4 rounds + confirming read, both critics clean)
+Awaiting user on: READY TO MERGE — PR #15 (TASK-001 foundation); the owner clicks the merge (merge authority = owner)
+Next: on merge of #15 → TASK-002 (the CI security floor) through the delegation loop with the full gate; the build-plan gate is approved (2026-10-11); the two-critic plan review is complete (4 rounds + confirming read, both critics clean)
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
 Software name: Claude-Cursor Bridge
