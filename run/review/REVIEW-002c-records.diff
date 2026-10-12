@@ -1,0 +1,111 @@
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 31472b4..2ac5399 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -300,6 +300,18 @@ Both APPROVE (each ran the new tests against origin/main's text: 8 of 9 fail the
+ - task-002's status copy still carries the old form of the line (Review A Consider): when main is merged into task-002, the status file takes main's form (the step is in the supervisor's position file).
+ - The plan excerpt the reviewers read began at §6.3 (Review A Consider): round 2's excerpt carries §6.1–6.2 as well.
+ 
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| TASK-007 | 2 | Review A | 0 | 0 | 5 | not taken on the reviewed head (see below) |
++| TASK-007 | 2 | Review B | 0 | 0 | 1 | not taken on the reviewed head (see below) |
++
++### TASK-007 round 2 — disposition
++Both APPROVE; round 1's fixes confirmed by both (each ran the round-2 test against round 1's text: the 2 rewritten pins fail there). Nothing converged. Merged as d4023f6 (2026-10-12) on Consider findings only, none taken on the reviewed head; the paragraph moves with "Project state" in TASK-010, which takes the wording:
++- the parts' order is defined by the status file itself, which the sentence states in a circle; and "beside `Phase:`" for one part against "right after `Phase:`" for several (Review A) → wording, TASK-010.
++- part names are not required to be distinct (Review A); each trait appearing at most once is checked but not stated (Review B) → TASK-010 states both; TASK-008's brief checks both.
++- "At intake" names only one of the times a pause can happen: the workflow check also fails a line at a release and at a calibration (§6.6, §6.8) (Review A) → TASK-006's and TASK-024's briefs.
++- a change cycle that changes a part's traits, or adds a part, rewrites the line, which the paragraph does not say (Review A) → the brief of the increment that writes the change-cycle module.
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 3dfa4b1..c55af9f 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -14,6 +14,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | Conditional-workflow model | The core's statement of the five layers, add/replace/set, inheritance and the order additions apply in | bridge/commands/supervisor.md, "Main and conditional workflows" | tests/test_workflow_model.py | release B (TASK-003) |
+ | The open list | Every product type, sub-type and trait with its definition, default traits, workflow name and written flag; the add/change procedure | bridge/cursor-bridge/workflow/open-list.md | tests/test_open_list.py | release B (TASK-004) |
+ | The extension-point registry | Every phase module with its replaceable flag, and every point a conditional workflow may change, each with its declaring module, the kinds of change it accepts and whether it applies per part or per project; how a conditional workflow names a point | bridge/cursor-bridge/workflow/extension-points.md | tests/test_extension_points.py | release B (TASK-005) |
++| The CI security floor | Semgrep (OSS engine, explicit rulesets, diff-aware), OSV-Scanner and Socket run in the `security floor` job beside the tests; the tests install from a committed lockfile; every action pinned by commit SHA, checkouts without persisted credentials, secrets only in step-level env | .github/workflows/tests.yml; requirements.lock; .semgrep.yml; osv-scanner.toml; socket.yml | tests/test_release_b_ci_floor.py | release B (TASK-002) |
+ | The `Workflows:` status line | One line per part beside `Phase:`, naming the part's product type, sub-type and traits by the open list's workflow and trait names, in a stated grammar; `not yet classified` before intake | bridge/commands/supervisor.md, "Project state" | tests/test_workflows_line_text.py | release B (TASK-007) |
+ 
+ ## Resources
+@@ -21,10 +22,12 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ |---|---|---|---|---|
+ | Cursor (`cursor-agent`) | tool | installed, signed in on this computer | the builder and Review B | pre-B |
+ | Model roster | config | docs/ROSTER.json; resolved to docs/ROSTER.resolved.json | every delegation and Review B | 2026-10-11 |
+-| Python 3.12 + pytest 9.1.1 + pyyaml 6.0.3 | tool | .github/workflows/tests.yml | the bridge's CI | pre-B |
++| Python 3.12 + pytest 9.1.1 + pyyaml 6.0.3 (with their closure) | tool | requirements.lock (CI installs from it since TASK-002); Python pinned in .github/workflows/tests.yml | the bridge's CI | pre-B; lockfile since TASK-002 |
+ | GitHub repository (protected `main`) | config | github.com/latentfoundrycode/p18-claude-cursor-bridge | the gate, every PR | pre-B |
+-| Semgrep / OSV-Scanner / Socket | tool | to be added to .github/workflows/tests.yml, pinned by commit (TASK-002) | the bridge's CI gate | planned (R-002) |
+-| SEMGREP_APP_TOKEN, Socket token | repo secret | GitHub repository secrets (names only) | the security floor in CI | n/a — set when TASK-002 lands; no spend possible beyond free tier |
++| Semgrep 1.176.1 / OSV-Scanner 2.7.0 / Socket CLI 1.7.0 | tool | .github/workflows/tests.yml, job `security floor` (Semgrep through pipx at its version; OSV-Scanner's binary checked by SHA-256; Socket CLI at its version) | the bridge's CI gate | TASK-002 |
++| SOCKET_SECURITY_API_KEY | repo secret | GitHub repository secrets (name only) | the Socket step of the security floor (`SOCKET_CLI_API_TOKEN`) | the owner, 2026-10-12; free tier, no spend |
++| SEMGREP_APP_TOKEN | repo secret | GitHub repository secrets (name only) | nothing: Semgrep runs the OSS engine without a token (owner, 2026-10-12) | the owner; unused |
++| SOCKET_ORG_SLUG, SOCKET_CLI_ORG_SLUG | repo variable (not a secret), passed to the Socket CLI under the second name | GitHub repository variables; value `latent-foundry` | the Socket step of the security floor (`SOCKET_CLI_ORG_SLUG`) | the owner, 2026-10-12 |
+ | BRIDGE_RUN_ALLOW_ANY | config | an optional override read by bridge-run.py (lets any command through the launcher); unset in normal use | bridge/cursor-bridge/bridge-run.py | pre-B; no value stored |
+ | ROSTER_NOW | config | an optional clock override read by roster-check.py (for deterministic reset-day tests); unset in normal use | bridge/cursor-bridge/roster-check.py | pre-B; no value stored |
+ | GH_TOKEN, GH_CONFIG_DIR, GIT_CONFIG_GLOBAL, GIT_TERMINAL_PROMPT | test-only | set and read by the test harness to isolate subprocesses (tests/test_bridge_run.py); not real credentials | the bridge's test suite | pre-B; no value stored |
+@@ -40,6 +43,7 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | Decision 6 confirmed: the §6.3 product-type revisions and all classifications — video factory & reAngle = web app → local web app; TDP = software on your own computer → local service; the bridge = host extension → Claude Code extension. Note (owner, 2026-10-11): the SFVF's "web app" label is loose and approximate, not a precise fit — do not over-read it in future | §6.3 / §18 decision 6, asked at release B start | 2026-10-11, owner | a project's interface changes |
+ | R-038: release B is installed by pausing and switching this checkout to `main` at stage B6 (after all increments merge); an urgent mid-build install uses the maintainer's separate clone (§15 exception) | the normal flow installs once at B6, when main holds the release; no second clone to maintain | 2026-10-11, owner | a mid-build install becomes routine |
+ | Merge authority: supervisor (see RUN_PARAMETERS.md) | possible once the bridge became a supervised project; §15 cond 5's earlier reading applied before that | 2026-10-12, owner | — |
++| Semgrep runs the OSS engine with explicit rulesets and no token | the bridge's own code has no SQL or web surface, where the Pro engine's taint analysis earns its place | 2026-10-12, owner | the bridge gains code with a SQL or web surface |
+ | Stage pause: run; refactoring pass: on; parallel increments: off; kind: private | owner's run-parameter answers | 2026-10-11, owner | the owner changes a run parameter |
+ | Governance text is the supervisor's to write; programs are the builder's | §15 condition 3, keeping N4 intact | 2026-10-11, §15 | — |
+ | Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1) | a session must never load the half-edited bridge, and an install must never run unreleased code on a running project | 2026-10-11, §15 | — |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index c77a936..66d73de 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,11 +3,11 @@ Last updated: 2026-10-12
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: TASK-007 — The `Workflows:` status line (branch task-007, started 2026-10-12 while PR #16 waits)
+-Last accepted: TASK-005 at commit 82f0e44 (merged to main 2026-10-12)
+-Awaiting user on: the repository variable SOCKET_ORG_SLUG (their Socket organization slug; run sheet given 2026-10-12; still unset at the resume check 2026-10-12; the owner asked what the slug is and was told 2026-10-12: the name after /org/ in the Socket dashboard's address, likely `latent-foundry`, theirs to confirm). PR #16 (TASK-002, branch task-002) has passed every other gate condition — Review A and Review B (second round) APPROVE, secret-sentinel CLEAR, spec test 12/12, premerge OK at head e9299e6. On "variable set": re-run the PR's failed CI job, confirm all checks green on e9299e6 (read the Socket step log), merge bare (`gh pr merge 16 --squash --match-head-commit e9299e62773f86d3a8c3494951dd670a359b807d`), mark runs healthy, sync main, then make the `security floor` job a required check.
+-Previously: paused by the owner twice on 2026-10-12 for app restarts; resumed on the owner's word each time (relayed by the maintainer). Owner decided 2026-10-12: Semgrep runs the OSS engine with explicit rulesets and no token. B2 confirmed 2026-10-12 as a post-B release.
+-Next: TASK-007 round 2 (snapshot 007b: Review A + Review B on round 1's Should fix and Consider items), CI, premerge and the merge; then TASK-008 (the builder's check of the `Workflows:` line) and TASK-009 (the glossary); merge #16 when the variable is set (it then needs origin/main merged in and a re-review, since TASK-003 and later increments changed this file); TASK-006 follows #16.
++Increment: TASK-002 — The security floor in the bridge's CI (PR #16, branch task-002, origin/main merged in 2026-10-12; re-review of the new head)
++Last accepted: TASK-007 at commit d4023f6 (merged to main 2026-10-12)
++Awaiting user on: nothing
++Previously: the owner set the repository variable SOCKET_ORG_SLUG = latent-foundry on 2026-10-12 (verified); PR #16 had been approved at e9299e6, and conflicted with main only on this file. Paused by the owner twice on 2026-10-12 for app restarts; resumed on the owner's word each time (relayed by the maintainer). Owner decided 2026-10-12: Semgrep runs the OSS engine with explicit rulesets and no token. B2 confirmed 2026-10-12 as a post-B release.
++Next: PR #16's re-review (snapshot 002c: Review A + Review B on the merged head), CI, premerge and the merge; then the `security floor` job made a required check on main; then TASK-006 (now unblocked), TASK-008 and TASK-009 as plan-check orders them.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
+ Software name: Claude-Cursor Bridge
+@@ -16,7 +16,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ — in-flight.md (the position; read first on resume), drafts/ (the supervisor's drafts), status-task002-wip.md (task-002's status copy), task-002-reviewA.md, maintainer-b2.md, mutate_ci_floor.py, gpt-usage-limit.err
+ Delegated gates: none
+-Remote sync: in sync at 2026-10-12 (main at 82f0e44); task-002 pushed at e9299e6; task-007 pushed as PR #20 (round 2 under review)
++Remote sync: in sync at 2026-10-12 (main at d4023f6, #20 merged); task-002 to be pushed with main merged in (PR #16)
+ Stage: Release B — Last reflection: none yet (intake 2026-10-11)
+ Open issues: ISS-002 (TASK-002's rounds; open until #16 merges)
+ Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
+@@ -28,7 +28,7 @@ Run parameters: see docs/RUN_PARAMETERS.md (stage pause=run / merge authority=su
+ ## Release B — notes for a resuming session
+ - This is the first release the bridge's own supervisor builds, as a supervised project (§15 condition 6). The design is the Restructuring Plan (Documents/Claude-Cursor Bridge Restructuring Plan.md), release B, §16 and §6.
+ - Roster: native profile in use (builder composer-2.5, Review A claude-opus-5-5, Review B grok-4.7-medium). The Other Models pool is marked exhausted (gpt-5.6-sol-high returned a usage limit; recorded 2026-10-12); automatic reset due 2026-10-16 00:00 UTC (reset day 16), or earlier when the owner says "usage reset".
+-- Two branches live: task-002 (PR #16, reviewed, waiting on the owner's variable) and task-007 (in progress). TASK-003 merged first, so #16 now takes `main` in before it merges, and its new head is re-reviewed (policy: an updated branch is a new head).
++- One branch live: task-002 (PR #16). TASK-003 to TASK-007 merged first, so #16 took `main` in and its new head is re-reviewed (policy: an updated branch is a new head).
+ - Merge authority = supervisor — the supervisor completes each gated merge with bare `gh pr merge --squash --match-head-commit` (piped/compound forms fall to the classifier; --admin/force stay refused).
+ - One writer at a time (§15 condition 2): while this supervisor builds, the maintainer session must not touch this repo.
+ - Governance text is authored by the supervisor and gated by the two-critic design review; programs are delegated to the builder and gated by the delegation loop (§15 condition 3).
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 2010110..9ff97a0 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -5,7 +5,7 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | ID | Requirement | Source | Status | Evidence |
+ |---|---|---|---|---|
+ | R-001 | The bridge is set up as a supervised project: a status file, a requirements register drawn from this plan, a resolved model roster, run parameters, and a `project.json`. | DESIGN §15 condition 6 | built | tests/test_release_b_bootstrap.py (TASK-001, merged 9e181e6) |
+-| R-002 | The security floor (Semgrep, OSV-Scanner, Socket) runs in the bridge's own CI gate, pinned by commit, installing from a committed lockfile, alongside the tests it already runs. | DESIGN §15 condition 6 (P2) | planned | — |
++| R-002 | The security floor (Semgrep, OSV-Scanner, Socket) runs in the bridge's own CI gate, pinned by commit, installing from a committed lockfile, alongside the tests it already runs. | DESIGN §15 condition 6 (P2) | built | tests/test_release_b_ci_floor.py (TASK-002) |
+ | R-003 | The supervisor's instructions are split into the main-workflow core and per-phase modules; the core holds the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state, and the standing rules that hold in every phase. | DESIGN §6.2 | planned | — |
+ | R-004 | Each phase module holds its phase's whole procedure and opens with the short list of what must survive a compaction. | DESIGN §16; §6.2 | planned | — |
+ | R-005 | The compaction/session-start hook names the current phase's module(s) to re-read after a compaction (one for most phases; planning and building map to two), plus the conditional-workflow files (type, sub-type, trait) that touch the current phase; it carries the Phase→module table for every template phase value, including the reflection and project-end modules and any further files the phase re-reads. | DESIGN §16; §6.2 | planned | — |
