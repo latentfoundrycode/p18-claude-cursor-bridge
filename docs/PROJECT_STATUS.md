@@ -6,7 +6,7 @@ Increment: TASK-003 — The conditional-workflow model in the core (branch task-
 Last accepted: TASK-001 at commit 9e181e6 (merged to main 2026-10-12)
 Awaiting user on: the repository variable SOCKET_ORG_SLUG (their Socket organization slug; run sheet given 2026-10-12; still unset at the resume check 2026-10-12). PR #16 (TASK-002, branch task-002) has passed every other gate condition — Review A and Review B (second round) APPROVE, secret-sentinel CLEAR, spec test 12/12, premerge OK at head e9299e6. On "variable set": re-run the PR's failed CI job, confirm all checks green on e9299e6 (read the Socket step log), merge bare (`gh pr merge 16 --squash --match-head-commit e9299e62773f86d3a8c3494951dd670a359b807d`), mark runs healthy, sync main, then make the `security floor` job a required check.
 Previously: paused by the owner 2026-10-12 for an app restart; resumed on the owner's word the same day (relayed by the maintainer). Owner decided 2026-10-12: Semgrep runs the OSS engine with explicit rulesets and no token. B2 confirmed 2026-10-12 as a post-B release.
-Next: TASK-003 (PR #17) — rounds 1 and 2 both APPROVE (record in docs/DESIGN_CRITIQUE.md); round-2 findings fixed; round 3 (snapshot 003c) then CI, premerge and the merge; merge #16 when the variable is set; then TASK-004 onward.
+Next: TASK-003 (PR #17) — rounds 1–2 APPROVE, round 3 split (Review B blocked the reading sentence on rule 28; settled for B) and fixed (record in docs/DESIGN_CRITIQUE.md); round 4 (snapshot 003d) then CI, premerge and the merge; merge #16 when the variable is set; then TASK-004 onward.
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
 Software name: Claude-Cursor Bridge
@@ -15,7 +15,7 @@ Worktrees: none
 In flight: none
 Working files: run/supervisor/ — in-flight.md (the position; read first on resume), status-task002-wip.md (task-002's status copy), task-002-reviewA.md, maintainer-b2.md, mutate_ci_floor.py, gpt-usage-limit.err
 Delegated gates: none
-Remote sync: in sync at 2026-10-12 (main at 9e181e6); task-002 pushed at e9299e6; task-003 pushed (PR pending)
+Remote sync: in sync at 2026-10-12 (main at 9e181e6); task-002 pushed at e9299e6; task-003 pushed, PR #17
 Workflows: host extension → Claude Code extension; traits: installable
 Stage: Release B — Last reflection: none yet (intake 2026-10-11)
 Open issues: ISS-002 (TASK-002's rounds; open until #16 merges)

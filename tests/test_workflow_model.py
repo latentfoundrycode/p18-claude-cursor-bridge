@@ -66,9 +66,13 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
 def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when_it_applies():
     s = flat(model())
     assert "each inheriting everything it does not mention from the layers above it" in s
-    assert ("this file is still read whole at every start and calibration (after a compaction, re-read what the "
-            "hook names, rule 28): reading only the current phase at those points takes effect as each phase moves "
-            "into its own module") in s, "read whole at start and calibration; a compaction keeps the hook's re-reads"
+    assert ("rule 28 governs the reading as it does today: this file is read whole at every start, resume and "
+            "calibration, and after every compaction or resume you read the sections the session-start hook names "
+            "before your next action") in s, "the transitional reading is rule 28's, unchanged"
+    assert ("Once the phases are modules, the core is still read whole at those same points, and with it the current "
+            "phase's module or modules and the conditional workflows that apply; you never read a phase you are not "
+            "in, or a conditional workflow that does not apply") in s, "the core stays whole; phases and conditionals add"
+    assert "reading only the current phase" not in s, "the core is never replaced by a phase-only read"
 
 
 def test_r007_until_the_carve_each_phase_module_is_a_named_section_of_this_file():
@@ -77,11 +81,12 @@ def test_r007_until_the_carve_each_phase_module_is_a_named_section_of_this_file(
     assert ("each phase's section of this file is its phase module (the interface phase is Phase 3, which today "
             "holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is "
             "Phase 6; reflection points include project end)") in s
-    for heading in ("## Phase 3 — UI mockups", "## Phase 4 — Build plan", "## Phase 5 — Configure",
-                    "## Phase 6 — The delegation loop", "## Reflection points"):
+    for heading in ("## Phase 1 — Intake", "## Phase 2 — Design", "## Phase 3 — UI mockups", "## Phase 4 — Build plan",
+                    "## Run parameters", "## Phase 5 — Configure", "## Phase 6 — The delegation loop",
+                    "## The change cycle", "## Reflection points"):
         assert "\n" + heading in TEXT, heading
     assert "project end" in TEXT[TEXT.index("## Reflection points"):].split("\n", 1)[0].lower()
-    assert "Once the phases are modules, you never read a phase you are not in, or a conditional workflow that does not apply" in s
+    assert "you never read a phase you are not in, or a conditional workflow that does not apply" in s
     assert "only at the extension points" in s, "a conditional workflow changes the procedure only at declared points"
 
 
@@ -122,9 +127,11 @@ def test_r034_additions_apply_together_in_a_stated_order():
     assert "apply together" in order and "never one in place of another" in order
     assert "at each extension point" in order, "the order holds where the additions land, not after the phase"
     assert "the open list governs this order and places a trait added later at its end" in order
-    assert ("In a phase that covers several parts, the phase module's own content still comes once, first; then, "
-            "for each part in the order the status file lists them, that part's type workflow's, sub-workflow's and "
-            "traits' additions; a trait two parts share is applied once, at the first part that has it") in order
+    assert ("In a phase that covers several parts, at each extension point the phase module's own content there comes "
+            "once, first; then, for each part in the order the status file lists them, that part's type workflow's, "
+            "sub-workflow's and traits' additions, each applying to that part") in order
+    assert ("A conditional workflow two parts share is read once, but its additions apply to every part that has it, "
+            "in each part's own place in this order") in order, "a shared trait's work is done for every part"
     seq = ["the phase module's own", "the type workflow's", "the sub-workflow's", "each trait's"]
     pos = [order.index(p) for p in seq]
     assert pos == sorted(pos), "phase module, then type, then sub-workflow, then traits"
