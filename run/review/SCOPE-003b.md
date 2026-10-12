@@ -1,6 +1,16 @@
-# TASK-003 — scope of the review
+# TASK-003 — scope of the review (round 2)
 
-Branch `task-003`, from `origin/main` 9e181e6. The diff is `run/review/REVIEW-003.diff`.
+Branch `task-003`, from `origin/main` 9e181e6. The diff is `run/review/REVIEW-003b.diff` — the branch's whole change against `origin/main`. The plan's §6.2–6.5 are at `run/review/PLAN-6-003b.md`.
+
+## Round 2 — what changed since round 1
+
+Round 1 (head 18e9f57): Review A and Review B both APPROVE. Commit 58ed1d2 applies their findings; the disposition is recorded in `docs/DESIGN_CRITIQUE.md` ("TASK-003 round 1 — disposition"). Check that each fix holds and that it introduced nothing new:
+- the meaning of "Siblings are exclusive" ("a part has at most one sub-type of its product type") is asserted;
+- the floor's precedence is scoped: "a conditional workflow's text that would do any of these does not apply, and on these points the core governs" (pinned);
+- the additions order holds "at each extension point"; the open list governs the trait order and places a later trait at its end; several parts are taken in the status file's order (all pinned);
+- "module or modules"; the transitional sentence maps the plan's phase names to this file's headings and says this file "is still read whole" until the phases move into modules (pinned);
+- the Holds and Read-when cells of the five layers are pinned exactly.
+Items deferred to later increments are listed there and are not this diff's defect.
 
 ## What this increment is
 
@@ -21,7 +31,7 @@ Supervisor-authored governance text, not a builder run: release B's plan (docs/B
 
 ## Source the text must match
 
-The plan's §6.2–6.5 are copied verbatim to `run/review/PLAN-6-003.md` (the plan itself lives outside the Workspace). `Documents/Claude-Cursor Bridge Restructuring Plan.md` §6.2 (layers table, inheritance, read-when), §6.4 (extension points), §6.5 (add/replace/set; only types/sub-workflows replace or set; sub-workflow inheritance; siblings exclusive; two levels; the floor). The plan leaves R-034's order unstated ("in a stated order"); this text states it: phase module, type, sub-workflow, then traits in the open list's order (§6.3's trait table), later traits appended, each workflow's own order kept. Copies of the relevant docs records are in `docs/` (REQUIREMENTS.md rows R-007/008/009/034, BUILD_PLAN.md TASK-003, DESIGN_CRITIQUE.md).
+The plan's §6.2–6.5 are copied verbatim to `run/review/PLAN-6-003b.md` (the plan itself lives outside the Workspace). `Documents/Claude-Cursor Bridge Restructuring Plan.md` §6.2 (layers table, inheritance, read-when), §6.4 (extension points), §6.5 (add/replace/set; only types/sub-workflows replace or set; sub-workflow inheritance; siblings exclusive; two levels; the floor). The plan leaves R-034's order unstated ("in a stated order"); this text states it: phase module, type, sub-workflow, then traits in the open list's order (§6.3's trait table), later traits appended, each workflow's own order kept. Copies of the relevant docs records are in `docs/` (REQUIREMENTS.md rows R-007/008/009/034, BUILD_PLAN.md TASK-003, DESIGN_CRITIQUE.md).
 
 ## Tests the supervisor wrote
 
@@ -38,4 +48,4 @@ Against `origin/main` the file fails (the heading is absent). No mutation driver
 
 ## Expected bookkeeping in the diff
 
-`docs/PROJECT_STATUS.md` (position rewrite), `docs/REQUIREMENTS.md` (R-007/008/009/034 → built with the test as evidence; R-001 → built, a correction of TASK-001's row, which its merge left at planned), `bridge/cursor-bridge/MANIFEST.json` (regenerated hash of supervisor.md), `run/review/` (these review files).
+`docs/PROJECT_STATUS.md` (position rewrite), `docs/DESIGN_CRITIQUE.md` (the round-1 record), `docs/REQUIREMENTS.md` (R-007/008/009/034 → built with the test as evidence; R-001 → built, a correction of TASK-001's row, which its merge left at planned), `bridge/cursor-bridge/MANIFEST.json` (regenerated hash of supervisor.md), `run/review/` (these review files).
