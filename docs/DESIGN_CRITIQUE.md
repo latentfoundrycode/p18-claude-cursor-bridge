@@ -96,7 +96,25 @@ Both APPROVE. Two findings converged and were treated as blocking:
 1. **"Siblings are exclusive" was pinned only as a label** (Review A Should fix, Review B Should fix). FIX: the test asserts the meaning, "a part has at most one sub-type of its product type".
 2. **"The core governs" was loose and unpinned** (Review A Should fix, Review B Consider: read loosely it would cancel replace and set). FIX: scoped to the floor ("a conditional workflow's text that would do any of these does not apply, and on these points the core governs") and pinned.
 
-Also fixed: the order is stated per extension point; "module or modules" (planning and building map to two); the transitional sentence says this file is still read whole until the phases move into modules, and maps the plan's phase names to this file's headings (Review B Consider); the open list governs the trait order and places a later trait at its end; several parts are taken in the status file's order; the Holds and Read-when cells are pinned exactly (Review B Should fix).
+Also fixed: the order is stated per extension point; "module or modules" (planning and building map to two); the transitional sentence says this file is still read whole until the phases move into modules, and maps the plan's phase names to this file's headings (Review B Consider); the open list governs the trait order and places a later trait at its end; several parts are taken in the status file's order; the Read-when cells are pinned exactly and the Holds cells by their items (Review B Should fix; round 2 pinned the Holds cells whole).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-003 | 2 | Review A | 0 | 2 | 4 | yes — round 3 (see below) |
+| TASK-003 | 2 | Review B | 0 | 0 | 3 | yes — round 3 (see below) |
+
+### TASK-003 round 2 — disposition
+Both APPROVE; the round-1 fixes confirmed. Two findings converged and were treated as blocking:
+
+1. **The sub-workflow's Holds cell was not pinned whole** ("a more detailed version of its type workflow" could go unnoticed; Review A Should fix, Review B Consider), and the record overstated the pinning. FIX: every Holds cell is pinned by equality.
+2. **The status file's Next line was stale** (both, Consider). FIX: rewritten.
+
+Also fixed:
+- **"Still read whole" collided with rule 28** (Review A Should fix). After a compaction the hook names the sections to re-read, so the sentence now says read whole "at every start and calibration (after a compaction, re-read what the hook names, rule 28)".
+- **The heading crosswalk was unpinned** (Review B Consider). It is now pinned, and each named heading is checked to exist.
+- **"The interface phase is Phase 3" could be misread** on a project without screens (Review A Consider). It now says Phase 3 "today holds only the mockup variant".
+- **The type workflow's Read-when said "the phase module"** (Review A Consider). It now says "the phase's module or modules".
+- **How parts and extension points nest was unstated** (Review A Consider). It is now stated: the phase module's own content comes once, then each part's type, sub-workflow and trait additions in status-file order. A trait two parts share applies once, at the first part that has it. This is pinned.
 
 Deferred, each to the increment that owns it (design for later increments is not this diff's defect):
 - how a replaced phase and a trait's attachment point are declared → TASK-005 (registry) and TASK-012 (declared points);
