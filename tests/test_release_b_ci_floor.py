@@ -180,6 +180,17 @@ def test_r002_secrets_only_in_step_env():
     assert socket_authenticated, "R-002: the Socket step is not authenticated by secrets.SOCKET_SECURITY_API_KEY in its env"
 
 
+def test_r002_socket_names_its_organization():
+    """R-002: the Socket step names its organization through SOCKET_CLI_ORG_SLUG from the repository variable SOCKET_ORG_SLUG (without it the Socket API answers 404 Organization not found, observed on PR #16)."""
+    for job in _ubuntu_jobs(_data()).values():
+        for step in _steps(job):
+            if SOCKET.search(_body(step)) and "run" in step:
+                env = step.get("env") or {}
+                assert "vars.SOCKET_ORG_SLUG" in str(env.get("SOCKET_CLI_ORG_SLUG", "")), "R-002: Socket step lacks SOCKET_CLI_ORG_SLUG: ${{ vars.SOCKET_ORG_SLUG }}"
+                return
+    raise AssertionError("R-002: no Socket step found on ubuntu-latest")
+
+
 def test_r002_least_privilege_permissions():
     """R-002: a least-privilege `permissions: {contents: read}` block covers the floor."""
     data = _data()
