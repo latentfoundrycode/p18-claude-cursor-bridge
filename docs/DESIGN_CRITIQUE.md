@@ -192,6 +192,17 @@ Fixed:
 
 Noted, no change: a key unique within its table is enough, since the three tables are read apart (Review A); the Written flag's "the check passes" half belongs to TASK-006.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-004 | 3 | Review A | 0 | 0 | 4 | deferred (see below) |
+| TASK-004 | 3 | Review B | 0 | 0 | 0 | — |
+
+### TASK-004 round 3 — disposition
+Both APPROVE; round 2's fixes confirmed. Review B's first launch (15:10:49Z) was ended at four minutes for the owner's pause and ran again whole on the same head (18:24:01Z, a fresh snapshot). Merged as f40bf82 (2026-10-12). Nothing converged. Review A's four Consider findings, none taken on the reviewed head:
+- the §6.10 test pins "Its entry joins this list with every column of its table" but not the "filled, including" that round 2 added, and the test's comment "types with their workflow names where the owner fixed them" is stale now that every name is pinned → `tests/test_open_list.py` is in no later increment's Scope, so both go to release B's stage-close pass, test-infrastructure lane (supervisor.md step 9, 3b), recorded in `docs/HARDENING.md` there;
+- the opening paragraph and the paragraph after it both point to "When something does not fit" → wording, in TASK-017, the first increment with `open-list.md` in its Scope;
+- the status file listed ISS-004 under Open issues while calling it fixed → its cause is recorded in the Issues document (reproduced: `git show <rev>:<path> --output=<file>` creates the file empty and prints the content to standard output; the plan file is now copied with a redirect and its size checked), and the status file drops it (TASK-005's branch).
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
