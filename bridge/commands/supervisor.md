@@ -1788,6 +1788,7 @@ Keep `docs/PROJECT_STATUS.md` current after every accepted increment. **It is cu
 # Project Status
 Last updated: <timestamp>
 Phase: <intake | design | mockups | planning | configuration | building | done | changing>
+Workflows: <one line per part, in the grammar below; "not yet classified" until intake classifies the part>
 Change cycle: <none | "<short name>" opened <date> — step <n> of the change cycle>
 Increment: TASK-<nnn> — <title>
 Last accepted: TASK-<nnn> at commit <sha>
@@ -1812,6 +1813,19 @@ Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refa
 ```
 
 **Awaiting user on** is read by the `loop-guard` Stop hook (rule 43): `nothing` means the loop is running and must not stop without a pending background task to wake it; anything else means you are legitimately waiting for the owner. Set it whenever you stop for them — an escalation, a gate, a pause they asked for, a stage pause — and clear it when they answer. A stale entry either traps the loop in idleness or hides a real wait, so it is rewritten at every stop.
+
+**Workflows** records, for each part, the conditional workflows it runs: one `Workflows:` line per part, beside `Phase:`; with the `Phase:` line they name exactly what a resumed session must read (see "Main and conditional workflows"). A line has this grammar:
+
+`Workflows: [<part>: ]<Workflow name>[ → <Sub-workflow name>]; traits: <Trait name>[, <Trait name>…]`
+
+- the product type is named by its **Workflow name**, the sub-type by its **Sub-workflow name** and each trait by its **Name**, spelled exactly as `~/.claude/cursor-bridge/workflow/open-list.md` spells them; every name on the line is in the open list;
+- exactly one product type and at most one of its sub-types; ` → <Sub-workflow name>` (the arrow is `→`) is left out when the part has no sub-type;
+- the traits follow `; traits: `, separated by a comma and a space, in the order the open list gives them; a part with no trait reads `; traits: none`;
+- `<part>: `, the part's name and a colon, follows `Workflows: ` only when the project has more than one part; a project with one part has one line without it; a part's name contains no `:`, `;` or `→`;
+- with several parts, the lines stand together right after `Phase:`, one per part, in the order of the project's parts; that is the order "for each part in the order the status file lists them" reads;
+- until intake has classified a part, its line reads `not yet classified` in place of the names (`Workflows: not yet classified` in a project with one part).
+
+For example, the bridge itself: `Workflows: Host Extension Development → Claude Code Extension; traits: Installable`. The line is written at intake, when the part is classified, with the traits proposed there; the design gate settles them, and the line is rewritten then if they changed. At intake, a part whose product type or sub-type is not yet written pauses the project; a trait not yet written is flagged and the work continues (the open list's "When something does not fit").
 
 **Terms fixed** is the `explain-for-decision` skill's lookup: which technical terms have been
 explained to the user in which sense, and which of them the user has stumbled on (Risky). A
