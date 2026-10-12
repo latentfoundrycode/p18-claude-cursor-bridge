@@ -4,8 +4,8 @@ Phase: building
 Change cycle: none
 Increment: TASK-001 — Intake and configuration records (at merge)
 Last accepted: none (release B not yet started; releases 0, A1a–A5 are the baseline)
-Awaiting user on: nothing — gating PR #15 (records round) and merging it autonomously (merge authority = supervisor, owner's instruction 2026-10-12)
-Next: gate #15 (snapshot → Review B → verify → premerge → merge on CI green), then TASK-002 (the CI security floor) through the delegation loop; the build-plan gate is approved (2026-10-11)
+Awaiting user on: nothing — merge authority = supervisor (owner 2026-10-12); gating PR #15 and merging autonomously through the gate. The owner's settings already allow git push / gh pr merge; the earlier refusals were a piped command (`| tail`) falling to the classifier — push and merge are run BARE so the installed allow rules match (maintainer mechanics note 2026-10-12).
+Next: gate #15 (snapshot → Review B → verify → premerge → merge on CI green), then TASK-002 through the delegation loop; build-plan gate approved 2026-10-11.
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
 Software name: Claude-Cursor Bridge
