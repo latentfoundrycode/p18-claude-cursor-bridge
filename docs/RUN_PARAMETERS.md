@@ -1,7 +1,7 @@
 # Run parameters
 Set: 2026-10-11   (owner may change any of these at any time by saying so; update this file)
 Stage pause: run
-Merge authority: owner
+Merge authority: supervisor   (owner's instruction 2026-10-12: as a supervised project the bridge's supervisor completes the merge itself through the gate — the pre-supervised-project barrier, no premerge record possible, is gone; the supervisor never uses --admin or force-push, which the guard and branch rules refuse)
 Refactoring pass: on
 Installer verification: n/a (host extension — the bridge's install program is rehearsed on a copy and run by the owner from a run sheet, not a desktop installer-check)
 Parallel increments: off
