@@ -175,6 +175,23 @@ Not taken: pinning every definition verbatim (Review A Consider) duplicates the 
 
 Deferred: the `Workflows:` line's grammar (which column names a type, a sub-type and a trait on it, and the bridge's own line rewritten to match) → TASK-007's brief.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-004 | 2 | Review A | 0 | 1 | 4 | yes — round 3 (see below) |
+| TASK-004 | 2 | Review B | 0 | 0 | 0 | — |
+
+### TASK-004 round 2 — disposition
+Both APPROVE; round 1's fixes confirmed by both. The first launch of this round (snapshot 004b) gave Review B an empty plan-sections file and was stopped before a verdict (ISS-004); the round ran again whole as 004c. Nothing converged. REVIEWERS DISAGREE on whether the derived workflow and sub-workflow names need pinning (correctness, not intent): Review B accepted the scoped choice to pin only the owner's two, Review A asked for every name. Settled for Review A on §6.3, which calls the names "fixed here": a fixed value is fixed in a test.
+
+Fixed:
+- **Only Game Development and Roblox Game were pinned** (Review A Should fix). Every workflow and sub-workflow name is pinned by equality; renaming one changes the file and its pin together.
+- The status file's Next named the abandoned 004b (Review A Consider). It names round 3.
+- The opening sentence cited the core's "Main and conditional workflows" for classification at intake (Review A Consider); it now points to "When something does not fit" and §6.7.
+- §6.10 step 2's colon read as the full column list (Review A Consider); it says "filled, including".
+- The test's parser did not compare the separator's cell count with the header's (Review A Consider); it does.
+
+Noted, no change: a key unique within its table is enough, since the three tables are read apart (Review A); the Written flag's "the check passes" half belongs to TASK-006.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|

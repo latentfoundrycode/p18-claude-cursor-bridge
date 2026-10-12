@@ -67,6 +67,20 @@ PLANNED = {
     "ai-models": "release B", "personal-data": "when a project first needs it",
     "multiplayer": "release E, with the Roblox sub-workflow",
 }
+# §6.3: the workflow and sub-workflow names are "fixed here"; the owner chose the game's (2026-10-01)
+# and the others take the same shape. Renaming one is a change to this file and to these pins together.
+WORKFLOW_NAMES = {
+    "mobile-app": "Mobile App Development", "web-app": "Web App Development",
+    "website": "Website Development", "own-computer": "Own-Computer Software Development",
+    "backend-service": "Backend Service Development", "library": "Library Development",
+    "video-game": "Game Development", "host-extension": "Host Extension Development",
+}
+SUB_WORKFLOW_NAMES = {
+    "android": "Android App", "ios": "iOS App", "local-web-app": "Local Web App",
+    "gui": "GUI Software", "cli": "CLI Software", "pipeline": "Pipeline Software",
+    "local-service": "Local Service Software", "roblox": "Roblox Game",
+    "claude-code-extension": "Claude Code Extension", "browser-extension": "Browser Extension",
+}
 WF = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "workflow")
 
 
@@ -84,6 +98,7 @@ def table(heading):
     cells = [[c.strip() for c in l.strip().strip("|").split("|")] for l in lines]
     head, sep, body = cells[0], cells[1], cells[2:]
     assert all(set(c) <= set("-:") and c for c in sep), "the second table line is the separator"
+    assert len(sep) == len(head), "the separator has one cell per column"
     rows = []
     for r in body:
         assert len(r) == len(head), "every row has one cell per column: %r" % (r,)
@@ -129,7 +144,7 @@ def test_r011_every_s6_3_product_type_is_listed_with_its_workflow_name_and_defau
     by = {r["Key"]: r for r in rows}
     assert [r["Key"] for r in rows] == TYPES
     for k in TYPES:
-        assert by[k]["Workflow name"], k
+        assert by[k]["Workflow name"] == WORKFLOW_NAMES[k], k
         assert traits_of(by[k]["Default traits"]) == DEFAULTS[k], k
     assert by["video-game"]["Workflow name"] == "Game Development", "the owner's name (2026-10-01)"
     names = [r["Workflow name"] for r in rows]
@@ -143,7 +158,7 @@ def test_r011_every_s6_3_sub_type_is_listed_under_its_type_with_its_name_and_def
     assert set(by) == set(SUBTYPES)
     for k, of in SUBTYPES.items():
         assert by[k]["Of type"] == of, k
-        assert by[k]["Sub-workflow name"], k
+        assert by[k]["Sub-workflow name"] == SUB_WORKFLOW_NAMES[k], k
         assert traits_of(by[k]["Default traits"]) == DEFAULTS[k], k
     assert by["roblox"]["Sub-workflow name"] == "Roblox Game", "the owner's name (2026-10-01)"
     names = [r["Sub-workflow name"] for r in rows]

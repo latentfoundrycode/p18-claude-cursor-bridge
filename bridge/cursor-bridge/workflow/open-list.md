@@ -1,6 +1,6 @@
 # The open list — product types, sub-types and traits
 
-This file is the canonical list of every product type, sub-type and trait the bridge knows, each with its definition and whether its conditional workflow is written (Restructuring Plan §6.3, §6.11). It is the one source of the default traits of a product type and of a sub-type: a type workflow or sub-workflow that states its default traits is checked against this file by `workflow-check.py`. Each part of a project is classified against the definitions here at intake (`supervisor.md`, "Main and conditional workflows").
+This file is the canonical list of every product type, sub-type and trait the bridge knows, each with its definition and whether its conditional workflow is written (Restructuring Plan §6.3, §6.11). It is the one source of the default traits of a product type and of a sub-type: a type workflow or sub-workflow that states its default traits is checked against this file by `workflow-check.py`. Each part of a project is classified against the definitions here at intake, and a part that fits none of them is handled as "When something does not fit" below says (§6.7).
 
 **The lists are open.** Nobody can foresee every product type or trait, so each entry carries a definition: a part is classified against the definitions, and a part that fits none of them is recognised as new rather than forced into the nearest entry (see "When something does not fit" below).
 
@@ -83,7 +83,7 @@ At intake, the supervisor classifies each part against the definitions above (§
 The procedure (§6.10):
 
 1. The owner describes the product type, sub-type or trait and what should differ, in plain words, in the maintainer's session; a project paused for a new product type brings its supervisor's reasons.
-2. The maintainer writes the conditional workflow: which extension points it uses, and what it adds, replaces or sets at each (trait additions only add). Its entry joins this list with every column of its table: for a product type or sub-type its definition, default traits and workflow or sub-workflow name (and a sub-type's Of type); for a trait its definition.
+2. The maintainer writes the conditional workflow: which extension points it uses, and what it adds, replaces or sets at each (trait additions only add). Its entry joins this list with every column of its table filled, including, for a product type or sub-type its definition, default traits and workflow or sub-workflow name (and a sub-type's Of type); for a trait its definition.
 3. The workflow check passes, and the entry's Written flag is set to `yes` in the same change.
 4. The release's changelog names the conditional workflow, and calibration applies it to running projects of that product type by phase, reopening no gate.
 
