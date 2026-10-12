@@ -186,7 +186,8 @@ def test_r002_socket_names_its_organization():
         for step in _steps(job):
             if SOCKET.search(_body(step)) and "run" in step:
                 env = step.get("env") or {}
-                assert "vars.SOCKET_ORG_SLUG" in str(env.get("SOCKET_CLI_ORG_SLUG", "")), "R-002: Socket step lacks SOCKET_CLI_ORG_SLUG: ${{ vars.SOCKET_ORG_SLUG }}"
+                value = re.sub(r"\s+", "", str(env.get("SOCKET_CLI_ORG_SLUG", "")))
+                assert value == "${{vars.SOCKET_ORG_SLUG}}", "R-002: Socket step must set exactly SOCKET_CLI_ORG_SLUG: ${{ vars.SOCKET_ORG_SLUG }}"
                 return
     raise AssertionError("R-002: no Socket step found on ubuntu-latest")
 
