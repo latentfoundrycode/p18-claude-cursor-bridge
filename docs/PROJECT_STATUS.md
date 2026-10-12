@@ -4,7 +4,7 @@ Phase: building
 Change cycle: none
 Increment: TASK-001 — Intake and configuration records (at merge)
 Last accepted: none (release B not yet started; releases 0, A1a–A5 are the baseline)
-Awaiting user on: nothing — merge authority = supervisor (owner 2026-10-12); gating PR #15 and merging autonomously through the gate. The owner's settings already allow git push / gh pr merge; the earlier refusals were a piped command (`| tail`) falling to the classifier — push and merge are run BARE so the installed allow rules match (maintainer mechanics note 2026-10-12).
+Awaiting user on: nothing — records consistent (the owner corrected line 25); re-gating PR #15 (fresh snapshot → Review B → verify → premerge) and completing the squash-merge, all commands run BARE so the owner's installed allow rules match (maintainer mechanics note 2026-10-12).
 Next: gate #15 (snapshot → Review B → verify → premerge → merge on CI green), then TASK-002 through the delegation loop; build-plan gate approved 2026-10-11.
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
@@ -22,7 +22,7 @@ Maintainer requests: none
 Bridge version: 2026.10.11d
 Calibrated: n/a — the bridge runs the installed 2026.10.11d it is the source of; intake 2026-10-11
 Calibration pending: none
-Run parameters: see docs/RUN_PARAMETERS.md (stage pause=run / merge authority=owner / refactoring pass=on / installer verification=n/a / parallel increments=off)
+Run parameters: see docs/RUN_PARAMETERS.md (stage pause=run / merge authority=supervisor / refactoring pass=on / installer verification=n/a / parallel increments=off)
 
 ## Release B — notes for a resuming session
 - This is the first release the bridge's own supervisor builds, as a supervised project (§15 condition 6). The design is the Restructuring Plan (Documents/Claude-Cursor Bridge Restructuring Plan.md), release B, §16 and §6.
