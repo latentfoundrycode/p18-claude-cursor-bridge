@@ -192,6 +192,20 @@ def test_r002_socket_names_its_organization():
     raise AssertionError("R-002: no Socket step found on ubuntu-latest")
 
 
+def test_r002_socket_prints_no_banner():
+    """R-002 / Merge-Verification-Policy §Security (no secret in a log): every `socket ci` call runs with --no-banner. The CLI's
+    banner prints the first characters of its API token ("token: <5 chars>*** (env)"); GitHub masks only a whole secret, and
+    the repository is public, so the banner put part of the key into public logs (PR #16, 2026-10-12)."""
+    calls = 0
+    for job in _ubuntu_jobs(_data()).values():
+        for step in _steps(job):
+            for line in str(step.get("run") or "").splitlines():
+                if re.search(r"(?:^|\s)socket\s+ci\b", line):
+                    calls += 1
+                    assert re.search(r"(?:^|\s)--no-banner(?:\s|$)", line), f"R-002: socket ci must run with --no-banner: {line.strip()!r}"
+    assert calls >= 1, "R-002: no `socket ci` call found (vacuous pass)"
+
+
 def test_r002_least_privilege_permissions():
     """R-002: a least-privilege `permissions: {contents: read}` block covers the floor."""
     data = _data()
