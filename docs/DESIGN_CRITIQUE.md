@@ -149,6 +149,32 @@ Both APPROVE; the round-3 fixes confirmed. Merged as f00f12e (2026-10-12). Nothi
 - a project-wide addition from a trait two parts share (a run parameter, an intake question): asked once or per part → the TASK-005 and TASK-012 briefs;
 - the negative test against the phase-only wording is narrow; the positive pins of the sentence are the guard → no change.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-004 | 1 | Review A | 1 | 1 | 8 | yes — round 2 (see below) |
+| TASK-004 | 1 | Review B | 0 | 3 | 2 | yes — round 2 (see below) |
+
+### TASK-004 round 1 — disposition
+Review A REJECT, Review B APPROVE. The split is settled for Review A on the approved plan, an established invariant: BUILD_PLAN TASK-020 scopes `workflow/types/own-computer.md` and its `own-computer/local-service.md`, so the key `software-on-your-own-computer` would put the type workflow at a path the plan does not name. FIX: the key is `own-computer` (the type's row, its four sub-types' Of type, the tests); the workflow name follows the plan's shape, "Own-Computer Software Development".
+
+Three findings converged and were treated as blocking:
+1. **Six sub-types' default traits were checked only as a superset** of their type's (Review B Should fix, Review A Consider), though a sub-type's cell is its complete set. FIX: every sub-type is pinned by equality.
+2. **§6.10 step 2 asked every new entry for a workflow name** (Review B Should fix, Review A Consider): a trait has none, a sub-type has a sub-workflow name, and "its written flag set" was ambiguous. FIX: the entry joins with every column of its own table; step 3 sets Written to `yes` in the same change, once the check passes.
+3. **The §6.7 trait bullet stopped at the promotion pass** (both Consider). FIX: "from which the maintainer may write it as trait additions", as §6.7 says; pinned.
+
+Also fixed:
+- **Name and Workflow name both claimed the `Workflows:` line** (Review A Should fix). §6.3 (plan line 216) is kept: the workflow or sub-workflow name is what the line names; Name is plain words for prose and intake; a trait, which has no workflow name, is named by its Name.
+- **§6.7 was pinned by its titles only** (Review B Should fix). The pause conditions ("fits no product type, fits two equally, or fits one whose workflow is not yet written"), "stops before design" and the unwritten-trait sentence are pinned.
+- **The table shape was implied, not stated** (Review A Consider). "How this file is read" states it: the first table after its heading, rows to the first non-table line, columns by header name, no `|` in a cell, no meaning in the order inside a Default traits cell. The test's parser reads only that first table. The GUI cell is in trait order.
+- **The canonical-source sentence named product types only** (Review A Consider). It now covers a type workflow or sub-workflow.
+- **An all-`no` test would break on the first written workflow** (Review A Consider). It is replaced by the invariant: Written is `yes` exactly when the file exists at the key's path.
+- **The Planned cells outside release B were unpinned** (Review B Consider). Every cell is pinned.
+- The status file's Remote sync line names PR #18 (Review A Consider).
+
+Not taken: pinning every definition verbatim (Review A Consider) duplicates the text; the reviewers check the definitions against §6.3 each round. "And its entry here" in the changing paragraph stays: it follows from the file being the canonical source.
+
+Deferred: the `Workflows:` line's grammar (which column names a type, a sub-type and a trait on it, and the bridge's own line rewritten to match) → TASK-007's brief.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|

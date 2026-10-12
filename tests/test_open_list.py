@@ -5,7 +5,8 @@ sub-type and trait with its definition, default traits and fixed workflow name),
 must earn its place; siblings exclusive; two levels), §6.7 (what does not fit), §6.8 (what release B
 writes), §6.10 (the add/change procedure) and §6.11 (the file's path). Satisfies R-011.
 The three tables are the shape `workflow-check.py` (TASK-006) reads: each found by its heading, the
-first Markdown table under it, one row per entry, cells split on `|`.
+first Markdown table after it (its rows running to the first line that is not a table line), one row
+per entry, cells split on `|`, columns found by their header names.
 """
 import os
 import re
@@ -22,11 +23,11 @@ SUB_COLS = ["Key", "Name", "Of type", "Definition", "Sub-workflow name", "Defaul
 TRAIT_COLS = ["Key", "Name", "Definition", "Written", "Planned"]
 
 # §6.3, as the plan states it (types with their workflow names where the owner fixed them).
-TYPES = ["mobile-app", "web-app", "website", "software-on-your-own-computer", "backend-service",
+TYPES = ["mobile-app", "web-app", "website", "own-computer", "backend-service",
          "library", "video-game", "host-extension"]
 SUBTYPES = {"android": "mobile-app", "ios": "mobile-app", "local-web-app": "web-app",
-            "gui": "software-on-your-own-computer", "cli": "software-on-your-own-computer",
-            "pipeline": "software-on-your-own-computer", "local-service": "software-on-your-own-computer",
+            "gui": "own-computer", "cli": "own-computer",
+            "pipeline": "own-computer", "local-service": "own-computer",
             "roblox": "video-game", "claude-code-extension": "host-extension",
             "browser-extension": "host-extension"}
 # §6.3's trait order, which supervisor.md's "The order additions apply in" also states (R-034).
@@ -36,24 +37,50 @@ DEFAULTS = {
     "mobile-app": {"has-screens", "installable"},
     "web-app": {"has-screens", "personal-data"},
     "website": {"has-screens"},
-    "software-on-your-own-computer": {"installable"},
+    "own-computer": {"installable"},
     "backend-service": {"long-running-process"},
     "library": set(),
     "video-game": {"has-screens", "performance-budgets"},
     "host-extension": {"installable"},
+    # a sub-type's cell is its complete default set (§6.3); where §6.3 adds nothing it is its type's
+    "android": {"has-screens", "installable"},
+    "ios": {"has-screens", "installable"},
     "local-web-app": {"has-screens", "installable", "long-running-process"},
-    "gui": {"installable", "has-screens"},
+    "gui": {"has-screens", "installable"},
+    "cli": {"installable"},
+    "pipeline": {"installable"},
     "local-service": {"installable", "long-running-process"},
     "roblox": {"has-screens", "performance-budgets", "multiplayer"},
+    "claude-code-extension": {"installable"},
+    "browser-extension": {"installable"},
 }
+# §6.3, §6.8, §6.9: when each entry's workflow is to be written.
+FIRST = "when the first project of this type arrives"
+PLANNED = {
+    "mobile-app": FIRST, "web-app": "release B", "website": FIRST, "own-computer": "release B",
+    "backend-service": FIRST, "library": FIRST, "video-game": "release E", "host-extension": "release B",
+    "android": FIRST, "ios": "when the owner builds on a Mac", "local-web-app": "release B", "gui": FIRST,
+    "cli": FIRST, "pipeline": FIRST, "local-service": "release B", "roblox": "release E",
+    "claude-code-extension": "release B", "browser-extension": FIRST,
+    "has-screens": "release B", "installable": "release B", "performance-budgets": "release B",
+    "external-services": "release B", "spends-money": "release B", "long-running-process": "release B",
+    "ai-models": "release B", "personal-data": "when a project first needs it",
+    "multiplayer": "release E, with the Roblox sub-workflow",
+}
+WF = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "workflow")
 
 
 def table(heading):
-    """The first Markdown table under `heading`: (header cells, rows as dicts)."""
+    """The first Markdown table after `heading`, to the first non-table line: (header cells, rows)."""
     a = TEXT.index("\n" + heading + "\n")
     b = TEXT.find("\n## ", a + 1)
-    section = TEXT[a:b if b != -1 else len(TEXT)]
-    lines = [l for l in section.split("\n") if l.startswith("|")]
+    section = TEXT[a:b if b != -1 else len(TEXT)].split("\n")
+    start = next(i for i, l in enumerate(section) if l.startswith("|"))
+    lines = []
+    for l in section[start:]:
+        if not l.startswith("|"):
+            break
+        lines.append(l)
     cells = [[c.strip() for c in l.strip().strip("|").split("|")] for l in lines]
     head, sep, body = cells[0], cells[1], cells[2:]
     assert all(set(c) <= set("-:") and c for c in sep), "the second table line is the separator"
@@ -117,12 +144,7 @@ def test_r011_every_s6_3_sub_type_is_listed_under_its_type_with_its_name_and_def
     for k, of in SUBTYPES.items():
         assert by[k]["Of type"] == of, k
         assert by[k]["Sub-workflow name"], k
-        assert by[k]["Default traits"], k
-        if k in DEFAULTS:
-            assert traits_of(by[k]["Default traits"]) == DEFAULTS[k], k
-        else:
-            # a sub-type §6.3 adds nothing to keeps its type's defaults (or more), never fewer
-            assert traits_of(by[k]["Default traits"]) >= DEFAULTS[of], k
+        assert traits_of(by[k]["Default traits"]) == DEFAULTS[k], k
     assert by["roblox"]["Sub-workflow name"] == "Roblox Game", "the owner's name (2026-10-01)"
     names = [r["Sub-workflow name"] for r in rows]
     assert len(names) == len(set(names))
@@ -148,32 +170,42 @@ def test_r011_r034_the_traits_are_listed_in_the_s6_3_order_the_core_states():
     assert "a trait added later goes at the end of the table" in TEXT
 
 
-def test_r011_all_entries_start_unwritten():
-    """R-011: no conditional workflow is written yet; later increments flip each flag with its file."""
+def test_r011_an_entry_is_written_exactly_when_its_file_exists_at_its_key_path():
+    """R-011, §6.11: Written is `yes` iff the entry's workflow file exists at its key's path; the
+    increment that writes the file sets the flag in the same change."""
     for heading in ("## Product types", "## Sub-types", "## Traits"):
         for r in table(heading)[1]:
-            assert r["Written"] == "no", r["Key"]
+            if heading == "## Product types":
+                path = os.path.join(WF, "types", r["Key"] + ".md")
+            elif heading == "## Sub-types":
+                path = os.path.join(WF, "types", r["Of type"], r["Key"] + ".md")
+            else:
+                path = os.path.join(WF, "traits", r["Key"] + ".md")
+            assert (r["Written"] == "yes") == os.path.isfile(path), r["Key"]
 
 
-def test_r011_release_b_entries_are_planned_for_release_b():
+def test_r011_every_entry_is_planned_as_s6_3_s6_8_and_s6_9_say():
     """§6.8: release B writes these; the rest wait for their release or their first project."""
     planned = {r["Key"]: r["Planned"] for h in ("## Product types", "## Sub-types", "## Traits")
                for r in table(h)[1]}
-    for k in ("web-app", "local-web-app", "software-on-your-own-computer", "local-service",
-              "host-extension", "claude-code-extension", "has-screens", "installable",
-              "performance-budgets", "external-services", "spends-money", "long-running-process",
-              "ai-models"):
-        assert planned[k] == "release B", k
-    for k in ("video-game", "roblox", "multiplayer"):
-        assert "release E" in planned[k], k
-    assert "Mac" in planned["ios"]
+    assert planned == PLANNED
+
+
+def test_r011_the_tables_shape_is_stated_for_the_reader():
+    """R-011: the shape `workflow-check.py` relies on is stated, not only implied by the tables."""
+    flat = re.sub(r"\s+", " ", TEXT)
+    assert "Each table is the first table after its heading" in flat
+    assert "its rows running to the first line that is not a table line" in flat
+    assert "its columns are found by their header names; no cell contains a `|`" in flat
+    assert "The order inside a cell carries no meaning; the order traits apply in is the Traits table's." in flat
 
 
 def test_r011_the_open_list_is_the_canonical_source_of_default_traits():
-    """R-011: a type file's default traits are checked against this file by workflow-check."""
+    """R-011: a type or sub-type file's default traits are checked against this file by workflow-check."""
     flat = re.sub(r"\s+", " ", TEXT)
-    assert "the one source of a product type's default traits" in flat
-    assert "checked against this file by `workflow-check.py`" in flat
+    assert "the one source of the default traits of a product type and of a sub-type" in flat
+    assert "a type workflow or sub-workflow that states its default traits is checked against this " \
+           "file by `workflow-check.py`" in flat
 
 
 def test_r011_the_classification_rules_are_recorded():
@@ -185,7 +217,11 @@ def test_r011_the_classification_rules_are_recorded():
     assert "Siblings are exclusive: a part has at most one sub-type of its product type." in flat
     assert "Two levels are enough" in flat
     assert "A new product type or sub-type pauses the project." in flat
+    assert "fits no product type, fits two equally, or fits one whose workflow is not yet written" in flat
+    assert "the supervisor stops before design" in flat
     assert "A new trait is flagged, and the work continues." in flat
+    assert "from which the maintainer may write it as trait additions" in flat
+    assert "The same holds for a trait that is defined but not yet written." in flat
 
 
 def test_r011_the_s6_10_procedure_is_recorded():
@@ -196,7 +232,8 @@ def test_r011_the_s6_10_procedure_is_recorded():
     assert len(steps) == 4
     flat = re.sub(r"\s+", " ", section)
     assert "in the maintainer's session" in flat
-    assert "The workflow check passes." in flat
+    assert "The workflow check passes, and the entry's Written flag is set to `yes` in the same change." in flat
+    assert "Its entry joins this list with every column of its table" in flat
     assert "calibration applies it to running projects" in flat and "reopening no gate" in flat
     assert "Changing an existing one is the same" in flat
     assert "A project's supervisor never writes a conditional workflow" in flat
