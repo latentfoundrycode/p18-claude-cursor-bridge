@@ -81,4 +81,4 @@ jobs:
           SOCKET_CLI_ORG_SLUG: ${{ vars.SOCKET_ORG_SLUG }}
         run: |
           npm install -g @socketsecurity/cli@1.7.0
-          socket ci
+          socket ci --no-banner
