@@ -1,6 +1,6 @@
 # Inventory — Claude-Cursor Bridge
 Reflected through: none
-Updated: 2026-10-11
+Updated: 2026-10-12
 
 The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
 
@@ -11,6 +11,8 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
 | Bridge programs | The one-shot checks and launchers the loop relies on | bridge/cursor-bridge/*.py | tests/ | pre-B |
 | Governance conventions | The reference texts (merge policy, delivery, diagrams, performance, observability, pitfalls) | bridge/cursor-bridge/*.md | tests/ | pre-B |
 | Install & lifecycle | Install, upgrade-in-place, take-back of the bridge on one computer | bridge/cursor-bridge/bridge-install.py | tests/ | release A1a |
+| Conditional-workflow model | The core's statement of the five layers, add/replace/set, inheritance and the order additions apply in | bridge/commands/supervisor.md, "Main and conditional workflows" | tests/test_workflow_model.py | release B (TASK-003) |
+| The open list | Every product type, sub-type and trait with its definition, default traits, workflow name and written flag; the add/change procedure | bridge/cursor-bridge/workflow/open-list.md | tests/test_open_list.py | release B (TASK-004) |
 
 ## Resources
 | Name | Kind | Where it lives | Used by | Provided |

@@ -137,6 +137,18 @@ One finding converged and was treated as blocking:
 
 Also fixed: the crosswalk test checks every phase heading the Holds cell names (intake, design, run parameters, the change cycle; Review A Consider); the round-1 note above names the round that pinned the Holds cells (Review A Consider); the status file's Remote sync line names PR #17 (Review B Consider).
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-003 | 4 | Review A | 0 | 0 | 4 | deferred (see below) |
+| TASK-003 | 4 | Review B | 0 | 0 | 0 | — |
+
+### TASK-003 round 4 — disposition
+Both APPROVE; the round-3 fixes confirmed. Merged as f00f12e (2026-10-12). Nothing converged. Review A's four Consider findings are deferred, each to the increment that owns it:
+- "the conditional workflows that apply" in the transitional sentence could be read as whole files; it should say "their changes to the current phase" → TASK-010 (the carve), re-pinned there;
+- the core's Read-when cell lacks "resume", and the phase modules' cell lacks start and resume, beside rule 28 → reconciled at TASK-010;
+- a project-wide addition from a trait two parts share (a run parameter, an intake question): asked once or per part → the TASK-005 and TASK-012 briefs;
+- the negative test against the phase-only wording is narrow; the positive pins of the sentence are the guard → no change.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
