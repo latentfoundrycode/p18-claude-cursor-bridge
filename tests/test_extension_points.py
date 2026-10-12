@@ -256,17 +256,19 @@ def test_r006_the_delivery_kinds_are_one_list_and_an_unset_kind_is_intakes():
     assert ("the value set at `intake.delivery-kind` and the kind an addition at `project-end.delivery` names "
             "are both drawn from it") in TEXT
     assert ("Where no type workflow or sub-workflow sets a part's kind, the kind the supervisor confirms with the "
-            "owner at intake (Phase 1) is the part's kind") in TEXT
+            "owner at intake (Phase 1) is the part's kind, recorded by its key from this list") in TEXT
 
 
-def test_r006_the_inspect_and_test_steps_and_the_benchmark_floor():
-    """supervisor.md Phase 6: both steps sit in step 4 (the checks of the diff first, then the tests); step 6
-    runs no tests, and its benchmark floor, which the trait performance budgets carries (§6.8; BUILD_PLAN
-    TASK-017), is a check at the test step."""
-    assert "the inspect step's checks are step 4's checks of the diff before the tests run" in TEXT
-    assert "the test step is the running of the increment's tests and the suite, and the checks that run with them" in TEXT
-    assert ("Step 6 runs no tests of its own; the benchmark floor it adds is a check at the test step, "
-            "the one the trait *performance budgets* carries (§6.8)") in TEXT
+def test_r006_the_inspect_and_test_steps_divide_every_check():
+    """supervisor.md Phase 6 and BUILD_PLAN TASK-017: every check a trait moves out of the loop has a point —
+    the benchmark floor (performance budgets, §6.8) at the test step, the design auditor's pass (has screens),
+    which runs after the tests, at the inspect step."""
+    assert "The two points divide every check of an increment between them, wherever the module's text places it" in TEXT
+    assert "the test step is the running of the increment's tests and the suite, and the checks that run with them, such as the benchmark floor" in TEXT
+    assert "the trait *performance budgets* carries the floor, §6.8" in TEXT
+    assert ("the inspect step is every other check or review of the diff the loop makes before the accept decision, "
+            "whether before the tests") in TEXT
+    assert "or after them (a reviewer pass, such as the design auditor the trait *has screens* carries)" in TEXT
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():

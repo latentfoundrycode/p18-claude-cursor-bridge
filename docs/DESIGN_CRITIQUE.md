@@ -251,6 +251,16 @@ Both APPROVE; round 2's fixes confirmed by both (each ran the tests against the 
 - Where the inspect step's checks fall against the test run (Review A Consider): both sit in step 4, the checks of the diff first, then the tests and the checks that run with them.
 - The core has no notion yet of an addition scoped to a delivery kind (Review A Consider): joins TASK-010's carry list beside the Applies rule.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 4 | Review A | 0 | 1 | 1 | yes — round 5 (see below) |
+| TASK-005 | 4 | Review B | 0 | 0 | 0 | — |
+
+### TASK-005 round 4 — disposition
+Both APPROVE; round 3's fixes confirmed by both (each ran the tests against the round-3 file: exactly the 3 new or rewritten tests fail there). Nothing converged. Review A's items taken before the merge, for round 3's reason:
+- **The design auditor's pass had no point** (Review A Should fix, round 3's defect class again): "the inspect step's checks are step 4's checks of the diff before the tests run" left out the design auditor, which runs after the tests and which the trait *has screens* moves out of the loop (TASK-017). The cause was the same in rounds 2 to 4: each fix defined the two points by where today's text places a check, and each placement left some check out. FIX: the two points divide every check of an increment between them, wherever the module's text places it: the test step is the test run and the checks that run with it (the benchmark floor among them); the inspect step is every other check or review of the diff before the accept decision, before or after the tests (the design auditor among them). Pinned.
+- The kind confirmed at intake is recorded by its key from the list (Review A Consider), so a check reading a part's kind (TASK-006) finds a key.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
