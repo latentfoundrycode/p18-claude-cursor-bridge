@@ -95,6 +95,34 @@ code independent of its authorship. If you catch yourself thinking "this is a
 two-line fix, I'll just do it," you are about to compromise the only independent
 review in the loop. Delegate it.
 
+## Main and conditional workflows
+
+Every project runs the main workflow. What differs by product lives in conditional workflows, which change the main workflow only at the extension points its phases declare. The workflow has five layers, each inheriting everything it does not mention from the layers above it:
+
+| Layer | Holds | Read when |
+|---|---|---|
+| **The main workflow's core** | The roles and the division of labour; the founding rules; the loop's shape; escalation and reporting; project state; the standing rules that hold in every phase | Always, whole, at every start and calibration |
+| **Phase modules** | The procedure for one phase each: intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end | The current phase's module, whole, on entering the phase and at every calibration |
+| **Type workflow** | For one product type: its changes at named extension points | Its changes to the current phase, whole, alongside the phase module |
+| **Sub-workflow** | For one sub-type: a more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
+| **Trait additions** | For one trait: what it adds, whatever the product type | Their additions to the current phase, when the part has the trait |
+
+Until the phases are moved into files of their own, each phase's section of this file is its phase module. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits. You never read a phase you are not in, or a conditional workflow that does not apply.
+
+**Three kinds of change.** Each change a conditional workflow makes is one of these:
+
+- **Add** — extra questions, sections, diagram kinds, checks, brief constraints, stages, completion conditions, reflection items.
+- **Replace** — a whole phase module, only where the phase declares that it may be replaced.
+- **Set** — a value the main workflow leaves open, such as the kind of performance budget (page load, frame time) or the delivery kind.
+
+**Only type workflows and sub-workflows may replace or set; trait additions may only add.** Each part follows one path down the tree of product types and sub-types, so two replacements never collide, and because traits only add, any combination of traits composes. A product that looks like a hybrid is declared as one product type with its sub-type plus a list of traits, never improvised.
+
+**A sub-workflow inherits its type workflow** and changes only what differs, at the same extension points. It may override its type workflow's replacement or setting: that is inheritance, not a collision. **Siblings are exclusive:** a part has at most one sub-type of its product type. **Two levels only:** a product type and its sub-types; a third level needs evidence from a real project.
+
+**The order additions apply in.** Additions from several conditional workflows apply together, never one in place of another, in this stated order: the phase module's own steps first, then the type workflow's additions, then the sub-workflow's, then each trait's, the traits taken in the order the open list gives them (has screens, installable, performance budgets, external services, spends money, long-running process, AI models, personal data, multiplayer), with a trait added later placed after these in the order it was added. Within one workflow, its additions keep the order it writes them in. Whatever lists or applies a phase's additions uses this order, so two sessions on one project read the same procedure in the same sequence.
+
+A conditional workflow can never remove a founding rule, weaken the merge gate, or skip the requirements register, the inventory, or the reviews. Those belong to the core and are not extension points; where a conditional workflow's text says otherwise, the core governs.
+
 ---
 
 ## The project layout
