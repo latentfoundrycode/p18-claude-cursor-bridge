@@ -6,7 +6,7 @@ Increment: TASK-005 — The extension-point registry (branch task-005, started 2
 Last accepted: TASK-004 at commit f40bf82 (merged to main 2026-10-12)
 Awaiting user on: the repository variable SOCKET_ORG_SLUG (their Socket organization slug; run sheet given 2026-10-12; still unset at the resume check 2026-10-12; the owner asked what the slug is and was told 2026-10-12: the name after /org/ in the Socket dashboard's address, likely `latent-foundry`, theirs to confirm). PR #16 (TASK-002, branch task-002) has passed every other gate condition — Review A and Review B (second round) APPROVE, secret-sentinel CLEAR, spec test 12/12, premerge OK at head e9299e6. On "variable set": re-run the PR's failed CI job, confirm all checks green on e9299e6 (read the Socket step log), merge bare (`gh pr merge 16 --squash --match-head-commit e9299e62773f86d3a8c3494951dd670a359b807d`), mark runs healthy, sync main, then make the `security floor` job a required check.
 Previously: paused by the owner twice on 2026-10-12 for app restarts; resumed on the owner's word each time (relayed by the maintainer). Owner decided 2026-10-12: Semgrep runs the OSS engine with explicit rulesets and no token. B2 confirmed 2026-10-12 as a post-B release.
-Next: TASK-005 round 5 (snapshot 005e: Review A + Review B on round 4's Should fix and Consider items), CI, premerge and the merge; merge #16 when the variable is set (it then needs origin/main merged in and a re-review, since TASK-003 and later increments changed this file); then TASK-006 onward.
+Next: TASK-005 round 6 (snapshot 005f: Review A + Review B on round 5's Should fix and Consider items), CI, premerge and the merge; merge #16 when the variable is set (it then needs origin/main merged in and a re-review, since TASK-003 and later increments changed this file); then TASK-006 onward.
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
 Software name: Claude-Cursor Bridge
@@ -15,7 +15,7 @@ Worktrees: none
 In flight: none
 Working files: run/supervisor/ — in-flight.md (the position; read first on resume), drafts/ (the supervisor's drafts), status-task002-wip.md (task-002's status copy), task-002-reviewA.md, maintainer-b2.md, mutate_ci_floor.py, gpt-usage-limit.err
 Delegated gates: none
-Remote sync: in sync at 2026-10-12 (main at f40bf82); task-002 pushed at e9299e6; task-005 pushed as PR #19 (round 5 under review)
+Remote sync: in sync at 2026-10-12 (main at f40bf82); task-002 pushed at e9299e6; task-005 pushed as PR #19 (round 6 under review)
 Workflows: host extension → Claude Code extension; traits: installable
 Stage: Release B — Last reflection: none yet (intake 2026-10-11)
 Open issues: ISS-002 (TASK-002's rounds; open until #16 merges)

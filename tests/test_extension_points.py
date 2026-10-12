@@ -260,15 +260,19 @@ def test_r006_the_delivery_kinds_are_one_list_and_an_unset_kind_is_intakes():
 
 
 def test_r006_the_inspect_and_test_steps_divide_every_check():
-    """supervisor.md Phase 6 and BUILD_PLAN TASK-017: every check a trait moves out of the loop has a point —
-    the benchmark floor (performance budgets, §6.8) at the test step, the design auditor's pass (has screens),
-    which runs after the tests, at the inspect step."""
-    assert "The two points divide every check of an increment between them, wherever the module's text places it" in TEXT
-    assert "the test step is the running of the increment's tests and the suite, and the checks that run with them, such as the benchmark floor" in TEXT
-    assert "the trait *performance budgets* carries the floor, §6.8" in TEXT
-    assert ("the inspect step is every other check or review of the diff the loop makes before the accept decision, "
-            "whether before the tests") in TEXT
-    assert "or after them (a reviewer pass, such as the design auditor the trait *has screens* carries)" in TEXT
+    """supervisor.md Phase 6 (steps 4 to 6 and step 9) and BUILD_PLAN TASK-017: every check the loop makes of
+    any change has one point — the benchmark floor (performance budgets, §6.8) at the test step, the design
+    auditor's pass (has screens), which runs after the tests, at the inspect step, the refactoring pass included;
+    the merge gate is the core's."""
+    assert ("The two points divide between them every check and review the delegation loop makes of a change, "
+            "wherever the module's text places it and whatever the change is: an increment, a fix, a refactoring "
+            "candidate, or the gate pass of a stage's refactoring branch") in TEXT
+    assert "the checks that run with them, such as the observability tests and the benchmark floor" in TEXT
+    assert "step 6 runs no tests of its own, the tests having run in step 4" in TEXT
+    assert "the trait *performance budgets* carries the floor (§6.8)" in TEXT
+    assert "The inspect step is every other check or review, before the tests or after them" in TEXT
+    assert "the reviewer passes (such as the design auditor the trait *has screens* carries)" in TEXT
+    assert "The merge gate's conditions (step 8) belong to the core and offer no point" in TEXT
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():

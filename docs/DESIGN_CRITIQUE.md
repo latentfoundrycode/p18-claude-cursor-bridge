@@ -261,6 +261,19 @@ Both APPROVE; round 3's fixes confirmed by both (each ran the tests against the 
 - **The design auditor's pass had no point** (Review A Should fix, round 3's defect class again): "the inspect step's checks are step 4's checks of the diff before the tests run" left out the design auditor, which runs after the tests and which the trait *has screens* moves out of the loop (TASK-017). The cause was the same in rounds 2 to 4: each fix defined the two points by where today's text places a check, and each placement left some check out. FIX: the two points divide every check of an increment between them, wherever the module's text places it: the test step is the test run and the checks that run with it (the benchmark floor among them); the inspect step is every other check or review of the diff before the accept decision, before or after the tests (the design auditor among them). Pinned.
 - The kind confirmed at intake is recorded by its key from the list (Review A Consider), so a check reading a part's kind (TASK-006) finds a key.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-005 | 5 | Review A | 0 | 1 | 4 | yes — round 6 (see below) |
+| TASK-005 | 5 | Review B | 0 | 0 | 0 | — |
+
+### TASK-005 round 5 — disposition
+Both APPROVE; round 4's fixes confirmed by both (each ran the tests against the round-4 file: exactly the 2 rewritten tests fail there). Nothing converged. Review A's items taken before the merge, for round 3's reason:
+- **The stage refactoring pass fell outside both points** (Review A Should fix): "every check of an increment … before the accept decision" left out step 9's per-candidate inspection and test run and its single gate pass, where the design auditor also runs, so the trait *has screens*'s addition (TASK-017) would not have reached a screen project's refactoring. FIX: the two points divide every check and review the loop makes of a change, whatever the change is (an increment, a fix, a refactoring candidate, the gate pass of a stage's refactoring branch); the merge gate's conditions (step 8) belong to the core and offer no point, and a CI check a conditional workflow needs is added at `configuration.items`. With no qualifier left on either point, the placement class of rounds 2 to 5 is closed.
+- "Of the diff" narrowed the inspect point (Review A Consider): dropped; the triage of the builder's assumptions, the secret scan and the dependency admission are named there.
+- "Today both sit inside step 4" contradicted the new definition (Review A Consider): replaced by where an addition is placed (at the step that runs it).
+- The pin of round 2's correction was lost in round 5's rewrite (Review A Consider): "step 6 runs no tests of its own, the tests having run in step 4" is pinned again.
+- Where the confirmed kind's key is recorded (Review A Consider) is a later increment's design: → TASK-006's and TASK-011's briefs.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
