@@ -78,6 +78,7 @@ jobs:
       - name: Socket
         env:
           SOCKET_CLI_API_TOKEN: ${{ secrets.SOCKET_SECURITY_API_KEY }}
+          SOCKET_CLI_ORG_SLUG: ${{ vars.SOCKET_ORG_SLUG }}
         run: |
-          npm install -g @socketsecurity/cli@2.1.0
+          npm install -g @socketsecurity/cli@1.7.0
           socket ci
