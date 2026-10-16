@@ -33,12 +33,14 @@ folder under a root that cannot be listed, an open list, registry, or status fil
 exist or cannot be read as UTF-8, a required heading or required column missing, a table with
 no separator row, or a table row whose cell count differs from its header. On exit 2 the
 program prints ERROR lines and RESULT: not checked, and no traceback. A command-line usage
-error also exits 2; argparse's message stays on standard error and the last line on standard
-output is RESULT: not checked.
+error also exits 2; the usage line argparse prints stays as it is, argparse's message is
+escaped the same way as a printed field, and the last line on standard output is
+RESULT: not checked.
 """
 import argparse
 import os
 import re
+import stat
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -63,13 +65,16 @@ ADD_FOR = re.compile(r"^## Add at (\S+) for (\S+)$")
 ADD_AT = re.compile(r"^## Add at (\S+)$")
 SET_AT = re.compile(r"^## Set at (\S+)$")
 REPLACE = re.compile(r"^## Replace (\S+)$")
-# A change heading's first word, compared case-insensitively (R2-1). "at" as the second word
-# is the other way in.
+# A change heading's first word, compared case-insensitively after trailing punctuation is
+# stripped (R2-1, R3-4). "at" as the second word is the other way in.
 CHANGE_FIRST = frozenset({
-    "add", "adds", "added",
-    "set", "sets",
+    "add", "adds", "added", "adding",
+    "set", "sets", "setting",
     "replace", "replaces", "replaced", "replacing",
 })
+TRAILING_PUNCT = ":;,.-"
+# Up to three leading spaces, two hashes, then a space or a tab (R3-6).
+HEADING_CANDIDATE = re.compile(r"^ {0,3}##[ \t](.*)$")
 TRAITS_MARK = "; traits: "
 
 
@@ -121,16 +126,27 @@ def escape_field(value):
 
 
 def is_link(path):
-    """A symbolic link, or a Windows junction where this Python can see one."""
+    """A symbolic link, or on Windows a junction or any other reparse point.
+
+    Where os.path.isjunction does not exist and the system is Windows, the reparse point is
+    read from os.lstat (stat.FILE_ATTRIBUTE_REPARSE_POINT). An OSError from that lstat counts
+    as a link, so the check never falls back to an ordinary path in silence.
+    """
     if os.path.islink(path):
         return True
     isjunction = getattr(os.path, "isjunction", None)
-    if isjunction is None:
+    if isjunction is not None:
+        try:
+            return bool(isjunction(path))
+        except OSError:
+            return False
+    if os.name != "nt":
         return False
     try:
-        return bool(isjunction(path))
+        attributes = os.lstat(path).st_file_attributes
     except OSError:
-        return False
+        return True
+    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 def is_separator_cell(cell):
@@ -143,9 +159,10 @@ def is_separator_cell(cell):
     return bool(text) and set(text) == {"-"}
 
 
-def is_separator_row(line):
+def is_separator_row(line, width):
+    """The separator has exactly the header's cell count, and every cell is dashes."""
     cells = cells_of(line)
-    return bool(cells) and all(is_separator_cell(cell) for cell in cells)
+    return len(cells) == width and bool(cells) and all(is_separator_cell(cell) for cell in cells)
 
 
 def cells_of(line):
@@ -176,9 +193,11 @@ def parse_table(text, path, heading, required):
         if not line.startswith("|"):
             break
         table.append(line)
-    if len(table) < 2 or not is_separator_row(table[1]):
+    if len(table) < 2:
         return None, "table after %s has no separator row" % heading
     header = cells_of(table[0])
+    if not is_separator_row(table[1], len(header)):
+        return None, "table after %s has no separator row" % heading
     for column in required:
         if column not in header:
             return None, "missing column %s" % column
@@ -256,10 +275,12 @@ def collect(root, product_keys):
 
     for layer in ("types", "traits"):
         base = os.path.join(root, layer)
-        if not os.path.isdir(base):
-            continue
+        # Test the link before testing whether the path is a folder, so a dangling link
+        # is reported and never walked.
         if is_link(base):
             found.append((layer, "link"))
+            continue
+        if not os.path.isdir(base):
             continue
         for dirpath, dirnames, filenames in os.walk(base, followlinks=False, onerror=onerror):
             rel_dir = os.path.relpath(dirpath, root).replace("\\", "/")
@@ -287,7 +308,9 @@ def collect(root, product_keys):
     for rel, kind in found:
         parts = rel.split("/")
         if parts[0] == "types" and len(parts) >= 2 and parts[1] in unknown_types:
-            if kind == "dir" and len(parts) == 2:
+            if kind == "link":
+                items.append({"rel": rel, "action": "form-path", "name": parts[-1]})
+            elif kind == "dir" and len(parts) == 2:
                 items.append({"rel": rel, "action": "d-folder", "name": parts[1]})
             continue
         if kind == "link":
@@ -310,13 +333,22 @@ def collect(root, product_keys):
 
 
 def is_change_heading(line):
-    """True when the line is a change heading, including a misspelt one (R2-1)."""
-    if not line.startswith("## "):
+    """True when the line is a change heading, including a misspelt or punctuated one.
+
+    A heading candidate has up to three leading spaces, then ## and a space or tab (R3-6).
+    Trailing punctuation in `:;,.-` is stripped from the first word before it is compared
+    with the change words (R3-4).
+    """
+    match = HEADING_CANDIDATE.match(line)
+    if match is None:
         return False
-    words = line[3:].split()
+    words = match.group(1).split()
     if not words:
         return False
-    if words[0].casefold() in CHANGE_FIRST:
+    first = words[0]
+    while first and first[-1] in TRAILING_PUNCT:
+        first = first[:-1]
+    if first.casefold() in CHANGE_FIRST:
         return True
     return len(words) >= 2 and words[1].casefold() == "at"
 
@@ -341,7 +373,9 @@ def parse_heading(line):
 def heading_spans(text):
     """Change headings outside fences, each with the raw lines of its section.
 
-    Each section ends at the next heading's index, so the walk is linear in the file.
+    A heading candidate matches ^ {0,3}##[ \\t]. Each section ends at the next candidate's
+    index, so the walk is linear in the file. The second value is True when a fence is
+    still open at the end of the file (R3-6).
     """
     lines = text.splitlines()
     fence = False
@@ -352,7 +386,7 @@ def heading_spans(text):
             continue
         if fence:
             continue
-        if line.startswith("## "):
+        if HEADING_CANDIDATE.match(line):
             marks.append(index)
     spans = []
     last = len(marks) - 1
@@ -363,7 +397,7 @@ def heading_spans(text):
             continue
         end = marks[position + 1] if position < last else total
         spans.append((line, lines[index + 1:end]))
-    return spans
+    return spans, fence
 
 
 def first_nonblank(body):
@@ -387,7 +421,10 @@ def check_changes(text, layer, tables):
     seen_replace = set()
     points = tables["point_changes"]
     modules = tables["module_replaceable"]
-    for line, body in heading_spans(text):
+    spans, unclosed = heading_spans(text)
+    if unclosed:
+        findings.append(("form", "-", "fenced code block is still open at the end of the file"))
+    for line, body in spans:
         parsed = parse_heading(line)
         if parsed is None:
             findings.append(("form", "-", "change heading is not one of the four forms"))
@@ -484,7 +521,7 @@ def prefix_of(rest, multi):
         return None, rest, None
     cut = head.find(": ")
     part = head[:cut]
-    invalid = part == "" or ";" in part or "→" in part or ":" in part
+    invalid = part == "" or part != part.strip() or ";" in part or "→" in part or ":" in part
     if (not multi) or invalid:
         return None, None, part or "-"
     return part, head[cut + 2:] + tail, None
@@ -616,7 +653,7 @@ def print_findings(findings):
 class CheckArgumentParser(argparse.ArgumentParser):
     def error(self, message):
         self.print_usage(sys.stderr)
-        sys.stderr.write("%s: error: %s\n" % (self.prog, message))
+        sys.stderr.write("%s: error: %s\n" % (self.prog, escape_field(message)))
         print("RESULT: not checked")
         sys.stdout.flush()
         self.exit(2)
