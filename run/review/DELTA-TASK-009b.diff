@@ -1,0 +1,141 @@
+diff --git a/bridge/cursor-bridge/Glossary.md b/bridge/cursor-bridge/Glossary.md
+index e081fbf..3dbb7bc 100644
+--- a/bridge/cursor-bridge/Glossary.md
++++ b/bridge/cursor-bridge/Glossary.md
+@@ -24,7 +24,7 @@ One term per thing. The supervisor, the subagents, and every brief use these ter
+ 
+ | Term | Meaning |
+ |---|---|
+-| **Phase** | One of the values of the status file's `Phase:` line: intake, design, mockups, planning, configuration, building, done, changing. The first six are the workflow's phases in order; done is a finished project and changing a change cycle on one. This is the only meaning of "phase". |
++| **Phase** | One of the values of the status file's `Phase:` line: intake, design, mockups, planning, configuration, building, done, changing. The first six are the workflow's phases in order; done is a finished project and changing a change cycle on one. This is the only meaning of "phase" on its own; the procedure a phase follows lives in one or more **phase modules**, which are named as such. |
+ | **Stage** | A section of the build plan; a **vertical slice** that works end to end and can be demonstrated. The owner's DPP "phases" are stages. |
+ | **Increment** | One delegable task with a stable ID (`TASK-nnn`), built in one builder run and passed through the gate. The owner's DPP "tasks" are increments; a DPP parent task is a **group** increment whose children are increments. |
+ | **Vertical slice** | A stage that crosses the layers a feature needs (interface, logic, storage) so the parts are proven to work together and the owner sees something run. Its opposite, a **horizontal** stage (one layer across many features), is rejected. |
+@@ -39,24 +39,24 @@ One term per thing. The supervisor, the subagents, and every brief use these ter
+ 
+ | Term | Meaning |
+ |---|---|
+-| **Main workflow core** | The part of the main workflow every project reads whole, at every start, resume and calibration: the roles and the division of labour, the founding rules, the loop's shape, escalation and reporting, project state, and the standing rules that hold in every phase. It is not an extension point; no conditional workflow changes it. Today it is `supervisor.md` itself. |
+-| **Phase module** | The procedure for one phase of the main workflow (intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end), read whole on entering its phase and at every calibration. Until a phase is moved into a file of its own under `workflow/phases/`, its section of `supervisor.md` is its phase module. |
+-| **Extension point** | A named place in a phase module where a conditional workflow may change the procedure, and the only such place. Each is declared by its phase module and listed, with the kinds of change it accepts, in the extension-point registry (`workflow/extension-points.md`). |
++| **Main workflow core** | The part of the main workflow every project reads whole, at every start, resume and calibration: the roles and the division of labour, the founding rules, the loop's shape, escalation and reporting, project state, and the standing rules that hold in every phase. It is not an extension point; no conditional workflow changes it. Today it is the sections of `supervisor.md` other than its phase sections. |
++| **Phase module** | A procedure file of the main workflow, listed in the extension-point registry: intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end. A phase's value selects its module or modules (planning and building each take two), read whole on entering the phase and at every calibration. Until a module is moved into a file of its own under `workflow/phases/`, its section of `supervisor.md` is the module. |
++| **Extension point** | A named place in a phase module where a conditional workflow may add or set, declared by its module and listed with the kinds of change it accepts in the extension-point registry (`workflow/extension-points.md`). A replacement targets a whole module instead, and only one the registry marks replaceable. |
+ | **Product type** | How a product reaches its user: where it runs, how it is delivered, and what its main interface is (a web app, a video game, a host extension). Each part has exactly one, fixed at intake, from the open list. |
+-| **Sub-type** | A narrower product type within one product type (a Roblox game within video games; a Claude Code extension within host extensions), with a workflow of its own because it changes a phase, a gate, a check or the tooling. A part has at most one sub-type, of its own product type. |
++| **Sub-type** | A narrower kind within one product type (a Roblox game within video games; a Claude Code extension within host extensions), with a workflow of its own because it changes a phase, a gate, a check or the tooling. A part has at most one sub-type, of its own product type. |
+ | **Trait** | A property that adds work whatever the product type (has screens, installable, spends money). A part may have any number, proposed at intake and settled at the design gate, from the open list. |
+ | **Conditional workflow** | The collective name for a type workflow, a sub-workflow or a trait addition: a small file that changes the main workflow only at extension points; everything it does not mention is inherited. It can never remove a founding rule, weaken the merge gate, or skip the requirements register, the inventory or the reviews. |
+ | **Type workflow** | The main workflow adapted to one product type: its changes at named extension points (`workflow/types/<type>.md`). It may add, replace and set. |
+ | **Sub-workflow** | A more detailed version of a type workflow for one sub-type (`workflow/types/<type>/<sub-type>.md`): it inherits its type workflow and changes only what differs, at the same extension points, and may override its type workflow's replacement or setting. |
+ | **Trait addition** | What one trait adds to the procedure (`workflow/traits/<trait>.md`), whatever the product type. A trait addition may only add, never replace or set, so any combination of traits composes. |
+-| **Add** | A change that puts extra content at an extension point (questions, sections, diagram kinds, checks, brief constraints, stages, completion conditions, reflection items) beside what is already there. Additions from several conditional workflows apply together, in the order the core states. |
+-| **Replace** | A change that substitutes a whole phase module, only where the phase is declared replaceable in the registry; only a type workflow or a sub-workflow may replace. |
+-| **Set** | A change that fixes a value the main workflow leaves open at an extension point (the kind of performance budget, the delivery kind); only a type workflow or a sub-workflow may set. |
+-| **Open list** | Every product type, sub-type and trait, each with its definition, default traits, workflow name and Written flag, against which projects are classified (`workflow/open-list.md`). Open to new entries by its own procedure; it also fixes the order trait additions apply in. |
++| **Add** | As a kind of change a conditional workflow makes: extra content at an extension point (questions, sections, diagram kinds, checks, brief constraints, stages, completion conditions, reflection items) beside what is already there. Additions from several conditional workflows apply together, in the order the core states. |
++| **Replace** | As a kind of change a conditional workflow makes: a whole phase module substituted, only where the registry marks the module replaceable; only a type workflow or a sub-workflow may replace. |
++| **Set** | As a kind of change a conditional workflow makes: a value the main workflow leaves open at an extension point fixed (the kind of performance budget, the delivery kind); only a type workflow or a sub-workflow may set. |
++| **Open list** | Every product type, sub-type and trait, against which projects are classified (`workflow/open-list.md`): each entry with its key, name, definition and Written flag; product types and sub-types also with their default traits and their workflow name or sub-workflow name. Open to new entries by its own procedure; it also fixes the order trait additions apply in. |
+ | **Workflow name** | A product type's workflow named as the work rather than the product (`Host Extension Development`, `Game Development`), fixed in the open list and used in the status file's `Workflows:` line. |
+-| **Sub-workflow name** | A sub-type's workflow named the same way (`Claude Code Extension`, `Roblox Game`), fixed in the open list and written after the workflow name and an arrow in the `Workflows:` line. |
++| **Sub-workflow name** | A sub-type's workflow named for the kind of product its sub-type makes (`Claude Code Extension`, `Roblox Game`), as the open list fixes it, and written after the workflow name and an arrow in the `Workflows:` line. |
+ | **Workflow check** | `workflow-check.py`: the one-shot program that checks every conditional workflow against the open list and the extension-point registry, and a status file's `Workflows:` lines against the open list; `inventory-check.py` and `conformance-check.py` use it to judge a project's `Workflows:` line. An unwritten product type or sub-type fails; an unwritten trait is flagged and the work continues. |
+-| **Compaction-survival list** | The short list a phase module opens with, naming what a session must re-read after a compaction or a resume before its next action in that phase; the session-start hook names the current phase's module and its list. |
++| **Compaction-survival list** | The short list a phase module opens with, naming what a session in that phase must re-read after a compaction or a resume before its next action. The phase modules written in release B each open with one. |
+ 
+ ## Roles
+ 
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 835eb04..923c155 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-17 00:47",
++  "generated": "2026-10-17 00:59",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -20,7 +20,7 @@
+     "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
+     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
+     "cursor-bridge/Diagram-Planning-Conventions.md": "f8e3b7839c7c7466b6bb9654f51bf9d9249973ab5ed9f8e10901ce4392f9cc4d",
+-    "cursor-bridge/Glossary.md": "7494ac08b3641bf74ac946be4d4209c7fff5d4f275654d27a8c20bc162a93c6d",
++    "cursor-bridge/Glossary.md": "6bc7b0bdabe555c7930b7a41022543acf03a83d5de19f7c4e9bcc2e4be8e6b97",
+     "cursor-bridge/Known-Pitfalls.md": "fbbc6afde8d087c6b22cb90f08e99b430fb68eec56e622a07054a7e41c435bf5",
+     "cursor-bridge/Merge-Verification-Policy.md": "9d2668b86b9a694516fe5c352869105115dfb7ac6b3efd5e3bba0e51bd0c0d62",
+     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index c2cac6b..79d546c 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -463,6 +463,8 @@ Every round-4 finding was confirmed settled by probes, R5-3 against a CommonMark
+ | TASK-008 | 2 | Review A | 0 | 2 | 3 | APPROVE; all five are the supervisor's tests, added on task-009 |
+ | TASK-008 | 2 | Review B | 0 | 0 | 0 | — |
+ | TASK-008 | 2 | security auditor | 0 | 0 | — | — |
++| TASK-009 | 1 | Review A | 3 | 2 | 5 | REJECT; all ten taken in round 2 |
++| TASK-009 | 1 | Review B | 2 | 2 | 0 | REJECT; all four taken in round 2 (each converges with Review A) |
+ 
+ ### TASK-006 round 6 — disposition (PR #23, merged)
+ All three approved; R6-1 and R6-2 were confirmed by probes at every site, against a CommonMark reference. The remaining findings are the long tail of reading Markdown-like text, in files only the maintainer and the supervisor write, and the by-class line drawn at round 3 holds: Review A's Consider (a heading or `Workflows:` line after a form feed or line separator is now invisible to the check, as to Markdown, though a raw-text reader would see it) and the auditor's two advisories (cells trimmed of any Unicode whitespace rather than spaces and tabs, so a separator followed by such a character is accepted where Markdown shows no table; an escaped pipe inside a cell split as a boundary) are recorded in HARDENING. They are different defects, not one named twice, so convergence does not apply. Carried to TASK-008's brief: any reader of the `Workflows:` line splits lines exactly as `workflow-check.py`'s `file_lines` does.
+@@ -473,6 +475,9 @@ Review B approved; the security auditor passed with four advisories; Review A re
+ ### TASK-008 round 2 — disposition (PR #24, merged as bcd3bb4)
+ All three approved; R2-1 to R2-4 confirmed in both programs, byte-identical. CI green on the pushed head (ubuntu 1113 passed, 26 skipped; windows 1117 passed, 22 skipped); R2-2, whose tests skip on Windows without the link privilege, was observed under Linux (WSL Ubuntu 24.04) on the merged head: through a link, the real code loads the checker beside its real file and an abspath mutant loads the one beside the link. Review A's five remaining items were all gaps in the supervisor's tests, not the code, so they did not hold the merge; they are added on task-009 and reviewed in its gate: the no-bytecode test also drops PYTHONPYCACHEPREFIX, checks that each run judged the line, and carries a positive control; a check that exits after a successful load is a not-loadable case; the no-escape-field cause names AttributeError; the symlink test fails on a crash; the bytecode switch's restore is tested in-process. The driver gained the two mutants Review A named (SystemExit after load, the switch not restored).
+ 
++### TASK-009 round 1 — disposition (PR #25)
++Both reviewers rejected; no security auditor (glossary text and tests, no program logic). Four items converged: the Sub-workflow name entry contradicted open-list.md's Names (a sub-workflow is named for the kind of product, not the work); the Open list entry gave traits default traits and a workflow name; the glossary test's own-term check compared one word against multi-word terms; the no-bytecode test's inventory half could pass on a run that never judged the line. Review A's other blocking items: Phase (the status value, "the only meaning") collided with Phase module (ten procedure files, several not Phase values) against the glossary's one-term rule, now the Phase entry points to phase modules and Phase module is a registry-listed procedure file selected by the phase's value; Main workflow core is today the non-phase sections of supervisor.md, not the whole file. Its should-fix (the compaction-survival list claimed what the hook names) and considers (Phase list bound both ways to the template, Sub-type as a narrower kind, Extension point vs replacement, add/replace/set scoped as kinds of change) were all taken; none needed a resolution round. Probes after the fix: a multi-word tautology, a ninth phase value and a reordered list each fail the glossary test.
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/tests/test_glossary_terms.py b/tests/test_glossary_terms.py
+index f5191c7..206ecf6 100644
+--- a/tests/test_glossary_terms.py
++++ b/tests/test_glossary_terms.py
+@@ -41,15 +41,17 @@ def test_r028_each_term_has_one_definition(term):
+     assert len(meanings) == 1, "%r must be defined exactly once, found %d" % (term, len(meanings))
+     words = meanings[0].split()
+     assert len(words) >= 8, "%r needs a definition, not a label: %r" % (term, meanings[0])
+-    assert term.lower() not in {w.strip(".,;:").lower() for w in words[:1]}, "a definition does not open with its own term"
++    opening = [w.strip(".,;:").lower() for w in words[:len(term.split())]]
++    assert opening != term.lower().split(), "a definition does not open with its own term: %r" % meanings[0]
+ 
+ 
+ def test_r028_phase_lists_all_eight_template_values():
++    """The Phase entry's list is exactly the eight values, in the template's order: nothing missing, nothing added."""
+     meanings = [meaning for t, meaning in entries() if t == "Phase"]
+     assert len(meanings) == 1
+-    listed = re.findall(r"[a-z]+", meanings[0].split(".")[0])
+-    for phase in PHASES:
+-        assert phase in listed, "the Phase entry's first sentence must list %r: %r" % (phase, meanings[0])
++    m = re.search(r"`Phase:` line: ([^.]+)\.", meanings[0])
++    assert m, "the Phase entry lists the values after \"`Phase:` line: \": %r" % meanings[0]
++    assert [v.strip() for v in m.group(1).split(",")] == PHASES, m.group(1)
+ 
+ 
+ def test_r028_phase_values_match_the_status_template():
+@@ -58,4 +60,4 @@ def test_r028_phase_values_match_the_status_template():
+     m = re.search(r"^Phase: <([^>]+)>", core, re.M)
+     assert m, "the status template's Phase line"
+     template = [v.strip() for v in m.group(1).split("|")]
+-    assert sorted(template) == sorted(PHASES), template
++    assert template == PHASES, template
+diff --git a/tests/test_workflows_line_check.py b/tests/test_workflows_line_check.py
+index a16e6bc..461210a 100644
+--- a/tests/test_workflows_line_check.py
++++ b/tests/test_workflows_line_check.py
+@@ -284,9 +284,10 @@ def test_r015_loading_the_checker_writes_no_bytecode(tmp_path):
+     """R2-1: neither program leaves a __pycache__ beside itself (inventory-check reads only; conformance-check never writes)."""
+     folder = _bridge_copy(tmp_path)
+     status = tmp_path / "PROJECT_STATUS.md"
+-    write_status(status, VALID["not-yet-classified"])
++    write_status(status, MALFORMED["no-traits"][0])
+     rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
+-    assert "Traceback" not in err and workflows_lines(lines) == [], (lines, err)
++    assert "Traceback" not in err, err
++    assert any(line.startswith("WORKFLOWS LINE: malformed: ") for line in lines), "the run must have judged the line: %r" % lines
+     rc, out, err = conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
+     assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
+     assert not (folder / "__pycache__").exists(), sorted(p.name for p in (folder / "__pycache__").iterdir())
