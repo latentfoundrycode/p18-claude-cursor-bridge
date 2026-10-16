@@ -1,0 +1,557 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 9cbae90..4390d7b 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-16 22:16",
++  "generated": "2026-10-16 22:41",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -102,7 +102,7 @@
+     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+-    "cursor-bridge/workflow-check.py": "a6219d905988b6e5c04031454fec5da33b835ff7c656cb523be693bf1d100662",
++    "cursor-bridge/workflow-check.py": "fd3313dc95ecaf8fd6bda61496c6dd70bcca737b6dcd882dcccddeac480c9172",
+     "cursor-bridge/workflow/extension-points.md": "0ebf6901c91d35a36d89151199603e0beefe11e32f171ea6caaba994eed50892",
+     "cursor-bridge/workflow/open-list.md": "00528622752d2732cedce48a1f2db09745be7ee1b9475986a161f084391b3cdd",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+diff --git a/bridge/cursor-bridge/workflow-check.py b/bridge/cursor-bridge/workflow-check.py
+index d5f5d40..733bd5e 100644
+--- a/bridge/cursor-bridge/workflow-check.py
++++ b/bridge/cursor-bridge/workflow-check.py
+@@ -29,7 +29,8 @@ Finding lines, then one RESULT line:
+ 
+ Exit 0 when no FAIL line was printed (FLAG lines may have been printed). Exit 1 when at least
+ one FAIL line was printed. Exit 2 when the check cannot run: a ROOT that is not a folder, a
+-folder under a root that cannot be listed, an open list, registry, or status file that does not
++folder under a root that cannot be listed, a types/ or traits/ path that cannot be examined,
++an open list, registry, or status file that does not
+ exist or cannot be read as UTF-8, a required heading or required column missing, a table with
+ no separator row, or a table row whose cell count differs from its header. On exit 2 the
+ program prints ERROR lines and RESULT: not checked, and no traceback. A command-line usage
+@@ -75,9 +76,11 @@ CHANGE_FIRST = frozenset({
+ TRAILING_PUNCT = ":;,.-"
+ # Up to three leading spaces, two hashes, then a space or a tab (R3-6).
+ HEADING_CANDIDATE = re.compile(r"^ {0,3}##[ \t](.*)$")
+-# Up to three leading spaces, then three backticks (R4-3). Four spaces is an indented
+-# code block, not a fence. A longer run still begins with three backticks.
+-FENCE_LINE = re.compile(r"^ {0,3}```")
++# An opening fence: zero to three spaces, then a run of at least three backticks or
++# tildes, then the info string (R5-3). A closing fence is matched separately, because
++# its run must be at least as long as the opening run and the rest of the line is blank.
++FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
++FENCE_CLOSE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+ TRAITS_MARK = "; traits: "
+ 
+ 
+@@ -131,30 +134,22 @@ def escape_field(value):
+ def is_link(path):
+     """A symbolic link, or on Windows a junction or any other reparse point.
+ 
+-    Where os.path.isjunction does not exist and the system is Windows, the reparse point is
+-    read from os.lstat (stat.FILE_ATTRIBUTE_REPARSE_POINT). On both branches a missing path
+-    (FileNotFoundError, NotADirectoryError) is not a link. Any other OSError counts as a
+-    link, so a path the check cannot classify is not walked (R4-1, R4-2).
++    One os.lstat on every Python (R5-2). FileNotFoundError and NotADirectoryError are not a
++    link. Any other OSError is a link, so a path the check cannot classify is not walked.
++    Otherwise the path is a link when stat.S_ISLNK(st_mode) is true, or, on Windows, when
++    st_file_attributes includes stat.FILE_ATTRIBUTE_REPARSE_POINT.
+     """
+-    if os.path.islink(path):
+-        return True
+-    isjunction = getattr(os.path, "isjunction", None)
+-    if isjunction is not None:
+-        try:
+-            return bool(isjunction(path))
+-        except (FileNotFoundError, NotADirectoryError):
+-            return False
+-        except OSError:
+-            return True
+-    if os.name != "nt":
+-        return False
+     try:
+-        attributes = os.lstat(path).st_file_attributes
++        st = os.lstat(path)
+     except (FileNotFoundError, NotADirectoryError):
+         return False
+     except OSError:
+         return True
+-    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
++    if stat.S_ISLNK(st.st_mode):
++        return True
++    if os.name == "nt" and st.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
++        return True
++    return False
+ 
+ 
+ def is_separator_cell(cell):
+@@ -271,7 +266,8 @@ def collect(root, product_keys):
+     """Files and the folders Requirement 6 reports, plus links and listing errors.
+ 
+     Returns (items, errors). A symbolic link or junction is recorded and not opened or
+-    entered. errors are (path, reason) for a folder that cannot be listed.
++    entered. errors are (path, reason) for a layer path that cannot be examined or a folder
++    that cannot be listed.
+     """
+     found = []
+     errors = []
+@@ -283,9 +279,14 @@ def collect(root, product_keys):
+ 
+     for layer in ("types", "traits"):
+         base = os.path.join(root, layer)
+-        # Nothing at this path: do not walk it and do not report it. lexists is true for a
+-        # dangling link or junction, so those still reach the link test (R4-1, R3-3).
+-        if not os.path.lexists(base):
++        # Nothing at this path: do not walk it and do not report it. lstat succeeds for a
++        # dangling link or junction, so those still reach the link test (R5-1, R3-3).
++        try:
++            os.lstat(base)
++        except (FileNotFoundError, NotADirectoryError):
++            continue
++        except OSError as err:
++            errors.append((slash(base), err.strerror or "cannot be examined"))
+             continue
+         # Test the link before testing whether the path is a folder, so a dangling link
+         # is reported and never walked.
+@@ -382,22 +383,57 @@ def parse_heading(line):
+     return None
+ 
+ 
++def opening_fence(line):
++    """Return (marker, length) for an opening fence, or None.
++
++    Zero to three spaces, then at least three backticks or at least three tildes, then the
++    info string. A backtick run whose info string contains a backtick is not a fence (R5-3).
++    """
++    match = FENCE_OPEN.match(line)
++    if match is None:
++        return None
++    marker, info = match.group(1), match.group(2)
++    if marker[0] == "`" and "`" in info:
++        return None
++    return marker[0], len(marker)
++
++
++def closing_fence(line, char, length):
++    """True when the line closes a fence opened with char for length characters.
++
++    Zero to three spaces, then a run of that character at least as long as the opening run,
++    then only spaces or tabs (R5-3). A shorter run, the other character, or text after the
++    run is content.
++    """
++    match = FENCE_CLOSE.match(line)
++    if match is None:
++        return False
++    marker = match.group(1)
++    return marker[0] == char and len(marker) >= length
++
++
+ def heading_spans(text):
+     """Change headings outside fences, each with the raw lines of its section.
+ 
+-    A heading candidate matches ^ {0,3}##[ \\t]. A fence line matches ^ {0,3} followed by
+-    three backticks; an opening fence is closed by the next such line (R4-3). Each section
+-    ends at the next candidate's index, so the walk is linear in the file. The second value
+-    is True when a fence is still open at the end of the file (R3-6).
++    A heading candidate matches ^ {0,3}##[ \\t]. Fences are read as CommonMark reads them
++    (R5-3): the closing run is the opening character and at least as long, with nothing
++    after it but spaces or tabs. Each section ends at the next candidate's index, so the
++    walk is linear in the file. The second value is True when a fence is still open at the
++    end of the file (R3-6).
+     """
+     lines = text.splitlines()
+-    fence = False
++    fence = None
+     marks = []
+     for index, line in enumerate(lines):
+-        if FENCE_LINE.match(line):
+-            fence = not fence
++        if fence is None:
++            opened = opening_fence(line)
++            if opened is not None:
++                fence = opened
++                continue
++        elif closing_fence(line, fence[0], fence[1]):
++            fence = None
+             continue
+-        if fence:
++        else:
+             continue
+         if HEADING_CANDIDATE.match(line):
+             marks.append(index)
+@@ -410,7 +446,7 @@ def heading_spans(text):
+             continue
+         end = marks[position + 1] if position < last else total
+         spans.append((line, lines[index + 1:end]))
+-    return spans, fence
++    return spans, fence is not None
+ 
+ 
+ def first_nonblank(body):
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index dcc75a5..cd50a05 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -13,3 +13,5 @@
+ 2026-10-16 TASK-006: `tests/test_workflow_check.py::test_r014_registry_heading_missing` replaces the first `## Extension points` in `extension-points.md`, which is the prose citation on the "How this file is read" line, not the heading on its own line, so a heading-line parser still sees the table and exits 0.
+ 
+ 2026-10-16 TASK-006-r4: a missing `types/` or `traits/` is skipped with `os.path.lexists` before `is_link`. On both the `os.path.isjunction` branch and the Windows `lstat` fallback, `FileNotFoundError` and `NotADirectoryError` are not links; any other `OSError` is a link. A fence is zero to three leading spaces then three backticks; four spaces is not a fence.
++
++2026-10-16 TASK-006-r5: a `types/` or `traits/` path is examined with `os.lstat` (missing means skip; any other `OSError` is `ERROR` and exit 2). `is_link` uses one `os.lstat` on every Python: `S_ISLNK`, or on Windows `FILE_ATTRIBUTE_REPARSE_POINT`. A fence is a CommonMark opening run of backticks or tildes, closed only by an equal or longer run of the same character with nothing after it but spaces or tabs.
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 14e38f6..3d28df1 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -434,6 +434,15 @@ Every round-1 finding was confirmed settled by probes (Review A, Review B and th
+ ### TASK-006 round 3 — disposition (PR #23)
+ Review B approved with no findings; every round-2 finding was confirmed settled by the three reviewers' own probes. Review A blocked, and the auditor's first advisory named the same defect (convergence, so blocking): R3-7's fallback, as the brief worded it, counted a path that does not exist as a link, so on a Windows Python without `os.path.isjunction` a root lacking `types/` or `traits/` (the bridge's own workflow folder) failed as `form`. The cause was the brief (R3-3's link-before-folder order with R3-7's every-OSError-is-a-link), and the supervisor's test called `is_link` only on paths that exist. Taken in round 4: a missing layer path is skipped and a missing path is not a link on either branch (R4-1); the isjunction branch follows the same error rule (R4-2, the auditor's second advisory); fences indented up to three spaces are fences, so a trait's `## Set` can no longer escape between indented fences (R4-3, Review A Consider 1). On the supervisor's side: tests that run `main()` in-process with isjunction removed over the bridge's own folder and a root without `traits/`, error-policy tests for both branches, four fence fixtures, and driver mutants for each rule. Not taken, recorded in HARDENING by the by-class line (the long tail of heading parsing; the core is correct): change words wrapped in markup (Review A Consider 2); reparse-point results that differ by Python version (Review A Consider 3).
+ 
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| TASK-006 | 4 | Review A | 0 | 0 | 2 | yes — round 5 (handoff/TASK-006-r5.md) |
++| TASK-006 | 4 | Review B | 0 | 0 | 0 | — |
++| TASK-006 | 4 | security auditor | 0 | 2 advisory | — | yes — round 5 |
++
++### TASK-006 round 4 — disposition (PR #23)
++All three approved, and every round-3 finding was confirmed settled by probes. Review A's Consider 1 and the auditor's second advisory named the same defect independently, so it blocked (convergence): the fence rule toggled on any fence-like line, so a four-backtick fence closed on a line of three, a backtick line with text after it closed a fence, and tilde fences were not fences, which let a trait's `## Set` sit between two such lines unseen (the case existed before round 4; R4-3 widened it slightly). Taken in round 5: fences as CommonMark reads them (R5-3). Also taken, since round 5 runs anyway: the auditor's first advisory, that R4-2's error rule on the `os.path.isjunction` branch can never run (CPython's `isjunction` catches its own errors), by one `os.lstat` rule on every Python (R5-2), which also ends round 3's Consider 3 (results that differed by Python version); and Review A's Consider 2, that on POSIX a root whose layer folders cannot be examined was checked as empty and passed, by examining each layer with `os.lstat` and stopping the check on an error other than a missing path (R5-1), which replaces the round-4 HARDENING line about `lexists`. Not taken, recorded in HARDENING: a fence inside an HTML `<pre>` block (the auditor).
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 54e07a8..ede5823 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -25,5 +25,5 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ 
+ ## Stage B2 — TASK-006, the workflow check (by-class line, review round 3)
+ - A change word wrapped in markup or joined by another character is still prose: `## **Set** intake.x`, `` ## `Replace` design ``, `## Set:at intake.x`, `## Set` with an em dash. Strip leading and trailing `*`, `_`, backticks and any dash before the comparison (Review A, round 3 Consider 2; the tail of heading parsing, low likelihood).
+-- With `os.path.isjunction` (Python 3.12+) only symbolic links and junctions count as links; without it every reparse point does (OneDrive placeholders, deduplicated files), so one tree can pass on 3.12 and fail as `form` on 3.11. Fail-closed by design; CI pins 3.12; say so where the supported Pythons are described (Review A, round 3 Consider 3).
+-- `os.path.lexists` is false on any `lstat` error, not only on a missing path, so a layer path the check cannot `lstat` at all (a permission error on `ROOT/types`) is skipped as absent rather than reported. Nothing is walked, so no link is followed; only the report is lost. Distinguish with a direct `os.lstat` if it matters (supervisor, round 4 inspection).
++- Every reparse point counts as a link on Windows (one `os.lstat` rule on every Python since round 5): OneDrive placeholders and deduplicated files under `types/` or `traits/` fail as `form`. Fail-closed by design; a workflow folder is not expected in a synced folder (Review A, round 3 Consider 3, settled for version dependence by R5-2).
++- A code fence inside an HTML block (`<pre>`) is read as a fence, though Markdown shows the block as HTML; a backtick line there can leave the check inside a fence Markdown never opened (the security auditor, round 4; the tail of heading parsing).
+diff --git a/handoff/TASK-006-r5-report.md b/handoff/TASK-006-r5-report.md
+new file mode 100644
+index 0000000..9128220
+--- /dev/null
++++ b/handoff/TASK-006-r5-report.md
+@@ -0,0 +1,75 @@
++# TASK-006 round 5 report
++
++## Files changed
++
++- `bridge/cursor-bridge/workflow-check.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated; `generated` stamp and the `workflow-check.py` hash)
++- `docs/BUILDER_NOTES.md`
++- `handoff/TASK-006-r5-report.md` (this report)
++
++## Summary
++
++Round 5 corrects `workflow-check.py` so `collect` examines `types/` and `traits/` with `os.lstat` (a missing path is skipped; any other `OSError` is an `ERROR` line and exit 2), `is_link` classifies a path from one `os.lstat` on every Python (`S_ISLNK`, or on Windows `FILE_ATTRIBUTE_REPARSE_POINT`, failing closed on any `OSError` other than a missing path), and fences follow CommonMark: an opening run of at least three backticks or tildes, closed only by an equal or longer run of the same character with nothing after it but spaces or tabs. The manifest is regenerated after the last edit under `bridge/`.
++
++## What changed
++
++- R5-1. In `collect`, `os.lstat` on `ROOT/types` and `ROOT/traits` replaces `os.path.lexists`. `FileNotFoundError` and `NotADirectoryError` skip the layer. Any other `OSError` is recorded as `(path, strerror or "cannot be examined")` and the run ends `RESULT: not checked` with exit 2. A path `lstat` can see still goes to the link test.
++- R5-2. `is_link` no longer calls `os.path.isjunction` or `os.path.islink`. It calls `os.lstat` once: missing path → `False`; other `OSError` → `True`; else `stat.S_ISLNK`, or on Windows a non-zero `st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT`.
++- R5-3. `opening_fence` / `closing_fence` replace the three-backtick toggle. A backtick opening whose info string contains a backtick is not a fence. Inside a fence, a shorter run, the other character, or a run with text after it is content. An unclosed fence is still one `form` finding (R3-6).
++
++## Commands
++
++A preliminary `python tools/make-manifest.py` (exit 0: version 2026.10.11d, 107 files hashed) was run after the last edit under `bridge/` and before command 3, so the suite would see the new `workflow-check.py` hash. Command 5 ran it again and set `generated` to `2026-10-16 22:41`. The hash of `workflow-check.py` (`fd3313dc95ecaf8fd6bda61496c6dd70bcca737b6dcd882dcccddeac480c9172`) did not change between the passing run and that stamp. The suite was not started again after that stamp.
++
++1. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` — exit 0
++
++```
++RESULT: OK
++```
++
++2. `python -m pytest tests/test_workflow_check.py -q` — exit 0
++
++```
++112 passed, 1 skipped in 12.86s
++```
++
++The skip is `test_r014_unreadable_folder_stops_the_check` (Windows; the test requires a non-root POSIX user).
++
++3. `python -m pytest tests -q` — exit 0
++
++```
++1064 passed, 21 skipped in 238.67s (0:03:58)
++```
++
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` — exit 0
++
++```
++windowless-check: 30 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++5. `python tools/make-manifest.py` — exit 0
++
++```
++make-manifest: version 2026.10.11d, 107 files hashed, VERSION + MANIFEST.json written
++```
++
++`python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0
++
++```
++bridge-check: version 2026.10.11d (2026-10-16 22:41) at E:\p18-claude-cursor-bridge\Workspace\bridge
++bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.10.11d
++```
++
++6. `git diff --stat` — exit 0. The report is untracked, so it is absent here; `git status --short` also shows `?? handoff/TASK-006-r5-report.md`.
++
++```
++ bridge/cursor-bridge/MANIFEST.json     |   4 +-
++ bridge/cursor-bridge/workflow-check.py | 106 ++++++++++++++++++++++-----------
++ docs/BUILDER_NOTES.md                  |   2 +
++ 3 files changed, 75 insertions(+), 37 deletions(-)
++```
++
++## Assumed, not verified
++
++Assumed, not verified: none
+diff --git a/handoff/TASK-006-r5.md b/handoff/TASK-006-r5.md
+new file mode 100644
+index 0000000..5a032f0
+--- /dev/null
++++ b/handoff/TASK-006-r5.md
+@@ -0,0 +1,48 @@
++# TASK-006 round 5: the workflow check — the fourth review's corrections
++
++## Objective
++Round 4 (`handoff/TASK-006-r4-report.md`) settled the third review. In the fourth review, Review A and the security auditor independently found that the check reads code fences more simply than Markdown does: a fence opened with four backticks is closed by a line of three, and a backtick line with text after it closes a fence, so a heading Markdown displays (a trait's `## Set`) can sit unseen between two such tricks. The auditor also found that R4-2's error rule on the `os.path.isjunction` branch can never run (CPython's `isjunction` catches its own errors), and Review A that a root whose layer folders cannot be examined is checked as empty. This round corrects all three. **`handoff/TASK-006.md`, `-r2.md`, `-r3.md` and `-r4.md` still hold in full**; this file changes only what it says, and where they differ this file wins.
++
++Satisfies: R-014, R-033 (unchanged).
++
++## Scope
++Files you may modify:
++- bridge/cursor-bridge/workflow-check.py
++- bridge/cursor-bridge/MANIFEST.json (regenerated with `python tools/make-manifest.py` after your last edit under `bridge/`)
++- docs/BUILDER_NOTES.md
++- handoff/TASK-006-r5-report.md
++
++Do not modify anything else; `.github/workflows/tests.yml` does not change.
++
++## Written by the supervisor; do not edit
++`tests/test_workflow_check.py` and everything under `tests/fixtures/workflows/` were extended for this round and are committed with this file. Do not edit, move, rename or add to them, nor `tests/test_release_b_ci_floor.py`. If a supervisor test contradicts a brief, stop, change no test, and report the contradiction.
++
++## Corrections (each is a requirement)
++
++### R5-1. A layer path is examined with os.lstat (replaces R4-1's `os.path.lexists`)
++In `collect`, `os.lstat(ROOT/types)` and `os.lstat(ROOT/traits)` decide: `FileNotFoundError` or `NotADirectoryError` means nothing is there, and the layer is skipped with nothing reported; any other `OSError` is an input the check cannot read, reported as an `ERROR:` line for that path (the reason is the error's `strerror`, or `cannot be examined`), so the run ends `RESULT: not checked` with exit 2 like any unreadable input. A path that `lstat` succeeds on goes on to the link test as before (R3-3: a dangling link is reported, never walked).
++
++### R5-2. One link rule on every Python (replaces R3-7 and R4-2)
++`is_link(path)` no longer uses `os.path.isjunction`. It calls `os.lstat(path)` once: `FileNotFoundError` or `NotADirectoryError` → `False`; any other `OSError` → `True` (fail closed); otherwise `True` when `stat.S_ISLNK(st_mode)` is true, or, on Windows, when `st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT` is non-zero; else `False`. The result is then the same on Python 3.11 and 3.12. Every caller of `is_link` keeps its place.
++
++### R5-3. Fences as CommonMark reads them (replaces R4-3)
++- An **opening fence** is a line of zero to three spaces, then a run of at least three backticks or at least three tildes, then anything (the info string). For a backtick run, the info string must not contain a backtick, or the line is not a fence.
++- Inside an open fence, a **closing fence** is a line of zero to three spaces, then a run of the opening fence's character, at least as long as the opening run, then only spaces or tabs to the end of the line. Every other line inside the fence, a shorter run, the other character, or a run with text after it included, is content and changes nothing.
++- R3-6 stands: a fence still open at the end of the file is one `form` finding, and every heading after its opening is hidden.
++
++## Acceptance criteria
++- [ ] `python -m pytest tests/test_workflow_check.py -q` passes (the supervisor's tests, extended for every correction above).
++- [ ] `python -m pytest tests -q` passes in full.
++- [ ] `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` exits 0 with `RESULT: OK`.
++- [ ] `windowless-check.py` and `bridge-check.py --sources` pass.
++
++## Done
++Run each from the repository root, in this order, and paste each command with its exit code and the relevant output into your report:
++1. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass`
++2. `python -m pytest tests/test_workflow_check.py -q`
++3. `python -m pytest tests -q`
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++5. `python tools/make-manifest.py`, then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++6. `git diff --stat`
++
++Your report is the file `handoff/TASK-006-r5-report.md`, written as you go, in the form `TASK-006.md`'s Done section describes, with a section headed exactly `Assumed, not verified` (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`). Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/tests/fixtures/workflows/fail/fence-backtick-in-info/traits/installable.md b/tests/fixtures/workflows/fail/fence-backtick-in-info/traits/installable.md
+new file mode 100644
+index 0000000..b341f8c
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/fence-backtick-in-info/traits/installable.md
+@@ -0,0 +1,8 @@
++## Add at intake.questions
++
++q
++
++```x`y
++## Set at intake.delivery-kind
++
++installer
+diff --git a/tests/fixtures/workflows/fail/fence-close-trailing-space/traits/installable.md b/tests/fixtures/workflows/fail/fence-close-trailing-space/traits/installable.md
+new file mode 100644
+index 0000000..225b60c
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/fence-close-trailing-space/traits/installable.md
+@@ -0,0 +1,11 @@
++## Add at intake.questions
++
++q
++
++```
++x
++```   
++
++## Set at intake.delivery-kind
++
++installer
+diff --git a/tests/fixtures/workflows/fail/fence-info-string-not-closing/traits/installable.md b/tests/fixtures/workflows/fail/fence-info-string-not-closing/traits/installable.md
+new file mode 100644
+index 0000000..8837165
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/fence-info-string-not-closing/traits/installable.md
+@@ -0,0 +1,11 @@
++## Add at intake.questions
++
++q
++
++```
++```python
++```
++
++## Set at intake.delivery-kind
++
++installer
+diff --git a/tests/fixtures/workflows/fail/fence-longer-opening/traits/installable.md b/tests/fixtures/workflows/fail/fence-longer-opening/traits/installable.md
+new file mode 100644
+index 0000000..19961bf
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/fence-longer-opening/traits/installable.md
+@@ -0,0 +1,11 @@
++## Add at intake.questions
++
++q
++
++````
++```
++````
++
++## Set at intake.delivery-kind
++
++installer
+diff --git a/tests/fixtures/workflows/pass/README.md b/tests/fixtures/workflows/pass/README.md
+index 810cc8a..95203e0 100644
+--- a/tests/fixtures/workflows/pass/README.md
++++ b/tests/fixtures/workflows/pass/README.md
+@@ -1 +1 @@
+-A passing workflow folder for workflow-check.py (TASK-006): every layer, a replaced module whose point a trait and a sub-workflow still add at, a sub-workflow overriding its type workflow's setting, delivery additions for two kinds, a change heading inside a code fence (one pair at column 0, one pair indented up to three spaces) and prose headings, all of which pass. Nothing outside types/ and traits/ is read.
++A passing workflow folder for workflow-check.py (TASK-006): every layer, a replaced module whose point a trait and a sub-workflow still add at, a sub-workflow overriding its type workflow's setting, delivery additions for two kinds, a change heading inside a code fence (one pair at column 0, one pair indented up to three spaces, and in the trait file tilde fences, one of them holding a four-backtick line and a shorter tilde line) and prose headings, all of which pass. Nothing outside types/ and traits/ is read.
+diff --git a/tests/fixtures/workflows/pass/traits/installable.md b/tests/fixtures/workflows/pass/traits/installable.md
+index a984d83..21f10a4 100644
+--- a/tests/fixtures/workflows/pass/traits/installable.md
++++ b/tests/fixtures/workflows/pass/traits/installable.md
+@@ -15,3 +15,13 @@ Where does the user's data live?
+ ## Add at intake.questions
+ 
+ What does uninstalling keep?
++
++~~~
++## Set at intake.delivery-kind
++~~~
++
++~~~~
++````
++## Replace design
++~~~
++~~~~
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index 3f28a76..9d88e9d 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -523,30 +523,78 @@ def test_r014_is_link_false_for_a_path_that_does_not_exist(tmp_path, monkeypatch
+     assert not mod.is_link(str(afile / "below-a-file"))
+ 
+ 
++@pytest.mark.parametrize("isjunction", ["present", "absent"])
+ @pytest.mark.parametrize("error,expected", [(PermissionError, True), (OSError, True), (FileNotFoundError, False), (NotADirectoryError, False)])
+-def test_r014_isjunction_error_follows_one_rule(tmp_path, monkeypatch, program, error, expected):
+-    """R4-2: on the isjunction branch an OSError is a link (fail closed); a missing path is not."""
++def test_r014_lstat_error_follows_one_rule(tmp_path, monkeypatch, program, error, expected, isjunction):
++    """R5-2 (replacing R4-2's two branches): is_link reads os.lstat once on every Python and platform; an error other
++    than a missing path is a link (fail closed), a missing path is not."""
+     mod = program("workflow-check")
+ 
+-    def raises(path):
++    def raises(path, *a, **k):
+         raise error("probe")
+ 
+-    monkeypatch.setattr(os.path, "isjunction", raises, raising=False)
++    if isjunction == "absent":
++        monkeypatch.delattr(os.path, "isjunction", raising=False)
++    monkeypatch.setattr(os, "lstat", raises)
+     assert mod.is_link(str(tmp_path / "probe")) is expected
+ 
+ 
+-@pytest.mark.skipif(os.name != "nt", reason="the lstat fallback runs only on Windows")
+-@pytest.mark.parametrize("error,expected", [(PermissionError, True), (OSError, True), (FileNotFoundError, False), (NotADirectoryError, False)])
+-def test_r014_fallback_error_follows_one_rule(tmp_path, monkeypatch, program, error, expected):
+-    """R4-1: in the Windows fallback an lstat error other than a missing path is a link (fail closed)."""
++def test_r014_is_link_does_not_use_isjunction(tmp_path, monkeypatch, program):
++    """R5-2: os.path.isjunction no longer decides; an isjunction that calls every path a junction changes nothing."""
+     mod = program("workflow-check")
++    plain = tmp_path / "plain"
++    plain.mkdir()
++    monkeypatch.setattr(os.path, "isjunction", lambda path: True, raising=False)
++    assert not mod.is_link(str(plain))
++    assert not mod.is_link(str(tmp_path / "nothing-here"))
+ 
+-    def raises(path, *a, **k):
+-        raise error("probe")
+ 
+-    monkeypatch.delattr(os.path, "isjunction", raising=False)
+-    monkeypatch.setattr(os, "lstat", raises)
+-    assert mod.is_link(str(tmp_path / "probe")) is expected
++# --- round 5: the fourth review's corrections (handoff/TASK-006-r5.md) --------------------------------------------
++
++@pytest.mark.parametrize("layer", ["types", "traits"])
++def test_r014_layer_that_cannot_be_examined_stops_the_check(tmp_path, monkeypatch, capsys, program, layer):
++    """R5-1: an lstat error on ROOT/types or ROOT/traits other than a missing path is an input the check cannot read:
++    an ERROR line for that path and `RESULT: not checked`, exit 2; never an empty root that passes."""
++    mod = program("workflow-check")
++    root = tmp_path / "root"
++    (root / "types").mkdir(parents=True)
++    (root / "traits").mkdir()
++    real = os.lstat
++
++    def lstat(path, *a, **k):
++        if os.path.basename(os.fspath(path)) == layer:
++            raise PermissionError(13, "Permission denied", os.fspath(path))
++        return real(path, *a, **k)
++
++    monkeypatch.setattr(os, "lstat", lstat)
++    code, lines = _main_in_process(mod, str(root), capsys=capsys)
++    assert code == 2, lines
++    assert lines[-1] == "RESULT: not checked", lines
++    shown = str(root).replace("\\", "/")
++    assert any(line.startswith("ERROR: ") and f"{shown}/{layer}" in line.replace("\\", "/") for line in lines), lines
++
++
++def test_r014_tilde_fences_and_longer_runs_hide_headings():
++    """R5-3: in the pass root's trait file a tilde fence hides a trait's `## Set` (b), and a four-tilde fence holding a
++    four-backtick line (the other character, long enough) and a shorter tilde line hides `## Replace design` (b) until
++    its own four-tilde close."""
++    text = (REPO / FIX / "pass/traits/installable.md").read_text(encoding="utf-8")
++    assert "\n~~~\n## Set at intake.delivery-kind\n~~~\n" in text, "precondition: a tilde fence hides a Set"
++    assert "\n~~~~\n````\n## Replace design\n~~~\n~~~~" in text, "precondition: a longer tilde fence hides a Replace"
++    rc, lines, err = run(f"{FIX}/pass")
++    assert rc == 0 and lines[-1] == "RESULT: OK", lines
++
++
++@pytest.mark.parametrize("case", ["fence-longer-opening", "fence-info-string-not-closing", "fence-backtick-in-info", "fence-close-trailing-space"])
++def test_r014_commonmark_fence_cases_read_the_set(case):
++    """R5-3: a shorter run does not close a longer fence; a backtick line with text after it does not close; a backtick
++    line whose info string holds a backtick does not open; a closing run followed only by spaces closes. In each the
++    trait's `## Set` is read and is the one (b), with no open fence left."""
++    root = f"{FIX}/fail/{case}"
++    rc, lines, err = run(root)
++    assert_clean_end(lines, err)
++    assert rc == 1
++    assert fails(lines) == [f"FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
+ 
+ 
+ def test_r014_indented_fence_pair_hides_a_heading():
