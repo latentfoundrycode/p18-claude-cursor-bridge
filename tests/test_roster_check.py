@@ -30,7 +30,10 @@ def run(roster_path, *args, now=None):
     env = dict(os.environ)
     if now:
         env["ROSTER_NOW"] = now
-    p = subprocess.run([sys.executable, PROG, roster_path] + list(args), capture_output=True, text=True, env=env)
+    # run from the roster's folder: the default run log (run/launcher/runs.jsonl) is relative to the working folder, and
+    # the Workspace's own log names the last builder's family, which changes which profile resolves (BUG-001's suite run)
+    cwd = os.path.dirname(os.path.abspath(roster_path))
+    p = subprocess.run([sys.executable, PROG, roster_path] + list(args), capture_output=True, text=True, env=env, cwd=cwd)
     return p.returncode, p.stdout + p.stderr
 
 
