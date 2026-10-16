@@ -26,6 +26,8 @@ jobs:
         run: python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge
       - name: the manifest matches the tree
         run: python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet
+      - name: workflow check over the bridge's workflow files and the sample fixtures
+        run: python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass
   security-floor:
     name: security floor
     runs-on: ubuntu-latest

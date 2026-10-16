@@ -393,6 +393,65 @@ Both APPROVE; Review A confirmed `WORKFLOW_PIN` equals the committed workflow an
 ### BUG-001 follow-up round 1 — disposition (PR #22)
 Both APPROVE; both named the status file's stale Remote sync line (converged, so blocking): fixed. Review A's Considers: the bridge's own Semgrep rules file added to the scanner-configuration lead; a new lead that the structural tests guard the merge and not a pull request's own CI run (the key in a GitHub Environment, or on pushes to main only), and round 6's disposition reworded so it does not read as preventing that.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 follow-up (PR #22) | 2 | Review A | 0 | 0 | 1 | yes — on TASK-006's branch (HARDENING) |
+| BUG-001 follow-up (PR #22) | 2 | Review B | 0 | 0 | 0 | — |
+
+### BUG-001 follow-up round 2 — disposition (PR #22, merged 4d0f77b)
+Both APPROVE. Review A's Consider (the HARDENING lead on the key's reach should state what each remedy costs the owner) is written on TASK-006's branch.
+
+### TASK-006 — the brief's decisions (the supervisor, 2026-10-16)
+- Carry item 5 (where a part's delivery kind is recorded so a check can read it): no as-built text records it in a readable form, and none of the check's rules needs it; out of TASK-006's scope, carried to TASK-011's brief (intake), where the kind is confirmed.
+- Carry item 4 read with the registry: an addition at `project-end.delivery` must name its kind (`## Add at project-end.delivery for <kind>`); the kind confirmed at intake is a part's kind where no workflow sets one, never an addition's.
+- A type or sub-workflow's statement of its default traits has no form yet, so it is not checked (the open list's promise stands for the increment that gives it a form); the guard against a conditional workflow's sentence contradicting the core is a reading, not a check: it is the reviewers' (both reviewers of every increment that writes a conditional workflow).
+- The tests and the fixtures are the supervisor's, written before the delegation from the brief's interface; the builder's report found one test that renamed the prose citation of a heading rather than the heading, fixed by the supervisor; the mutation driver (30 mutants) found the missing-kind test not naming its offending name, tightened.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-006 | 1 | Review A | 1 | 1 | 8 | yes — round 2 (handoff/TASK-006-r2.md) |
+| TASK-006 | 1 | Review B | 2 | 1 | 1 | yes — round 2 |
+| TASK-006 | 1 | security auditor | 0 | 5 advisory | — | yes — round 2 |
+
+### TASK-006 round 1 — disposition (PR #23)
+Converged, so blocking: a misspelt change word (`## Adds at`) read as prose, so the change silently did nothing (Review A and Review B; the brief contradicted itself, its example right and its definition wrong: the definition now names the change words case-insensitively, or `at` as the second word); a trait list without its `, ` separator accepted (Review B blocking, Review A Consider); an unreadable folder skipped silently (all three). Also taken in round 2: a byte-order mark hid a first-line heading, so a trait's set escaped (b) (Review A Should fix); an invalid single-line prefix checked further (Review B Should fix); links and junctions followed out of the root, control characters printed raw (a newline in a file name could start a GitHub workflow command), quadratic section search, a docstring slip (the auditor); the separator row unchecked, a repeated unwritten trait flagged twice, an empty head name reported as unknown, a usage error without its RESULT line (Review A Considers); the constraint on hard-coded keys now names the two delivery point keys. The supervisor's side: the usage test now looks for each code as printed; the mutation driver gained the rules it lacked (Review A C8) and round 2's, 49 mutants, all killed.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-006 | 2 | Review A | 0 | 2 | 4 | yes — round 3 (handoff/TASK-006-r3.md) |
+| TASK-006 | 2 | Review B | 1 | 2 | 0 | yes — round 3 |
+| TASK-006 | 2 | security auditor | 0 | 2 advisory | — | yes — round 3 |
+
+### TASK-006 round 2 — disposition (PR #23)
+Every round-1 finding was confirmed settled by probes (Review A, Review B and the auditor each ran their own). Review B blocked on the usage error's message, written to standard error unescaped (an argument holding a newline could start a GitHub workflow command): escaped (R3-1). Also taken, each a remaining way for input to pass unseen: a separator row with the wrong cell count (Review B); a link inside an unknown type folder, and a dangling or top-level link at `types`/`traits` (Review B, the auditor); a change word with punctuation attached (`## Set:`, so a trait's set escaped again) and `adding`/`setting` (Review A); whitespace around a part name, so `app` and `app ` counted as two parts (Review A; round 2's rewrite had dropped round 1's check); an unclosed fence hiding every later heading, and headings indented up to three spaces or with a tab (Review A Consider); junctions unseen on a Python without `os.path.isjunction` (the auditor). On the supervisor's side: a negative test without its precondition replaced by one that would fail if the misspelt section were read (Review A Consider), tests for links at the top level and under an unknown folder, and the driver's mutants for round 3's rules (59, all killed). Not taken, recorded: prose headings that R2-1 now fails (`## Set up the host`, `## Notes at intake`) fail loudly, the safe direction; the authors of the first written type and trait workflows are told by the registry's naming section when they are written (the increments that write them).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-006 | 3 | Review A | 1 | 0 | 3 | yes — round 4 (handoff/TASK-006-r4.md); one Consider to HARDENING |
+| TASK-006 | 3 | Review B | 0 | 0 | 0 | — |
+| TASK-006 | 3 | security auditor | 0 | 2 advisory | — | yes — round 4 |
+
+### TASK-006 round 3 — disposition (PR #23)
+Review B approved with no findings; every round-2 finding was confirmed settled by the three reviewers' own probes. Review A blocked, and the auditor's first advisory named the same defect (convergence, so blocking): R3-7's fallback, as the brief worded it, counted a path that does not exist as a link, so on a Windows Python without `os.path.isjunction` a root lacking `types/` or `traits/` (the bridge's own workflow folder) failed as `form`. The cause was the brief (R3-3's link-before-folder order with R3-7's every-OSError-is-a-link), and the supervisor's test called `is_link` only on paths that exist. Taken in round 4: a missing layer path is skipped and a missing path is not a link on either branch (R4-1); the isjunction branch follows the same error rule (R4-2, the auditor's second advisory); fences indented up to three spaces are fences, so a trait's `## Set` can no longer escape between indented fences (R4-3, Review A Consider 1). On the supervisor's side: tests that run `main()` in-process with isjunction removed over the bridge's own folder and a root without `traits/`, error-policy tests for both branches, four fence fixtures, and driver mutants for each rule. Not taken, recorded in HARDENING by the by-class line (the long tail of heading parsing; the core is correct): change words wrapped in markup (Review A Consider 2); reparse-point results that differ by Python version (Review A Consider 3).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-006 | 4 | Review A | 0 | 0 | 2 | yes — round 5 (handoff/TASK-006-r5.md) |
+| TASK-006 | 4 | Review B | 0 | 0 | 0 | — |
+| TASK-006 | 4 | security auditor | 0 | 2 advisory | — | yes — round 5 |
+
+### TASK-006 round 4 — disposition (PR #23)
+All three approved, and every round-3 finding was confirmed settled by probes. Review A's Consider 1 and the auditor's second advisory named the same defect independently, so it blocked (convergence): the fence rule toggled on any fence-like line, so a four-backtick fence closed on a line of three, a backtick line with text after it closed a fence, and tilde fences were not fences, which let a trait's `## Set` sit between two such lines unseen (the case existed before round 4; R4-3 widened it slightly). Taken in round 5: fences as CommonMark reads them (R5-3). Also taken, since round 5 runs anyway: the auditor's first advisory, that R4-2's error rule on the `os.path.isjunction` branch can never run (CPython's `isjunction` catches its own errors), by one `os.lstat` rule on every Python (R5-2), which also ends round 3's Consider 3 (results that differed by Python version); and Review A's Consider 2, that on POSIX a root whose layer folders cannot be examined was checked as empty and passed, by examining each layer with `os.lstat` and stopping the check on an error other than a missing path (R5-1), which replaces the round-4 HARDENING line about `lexists`. Not taken, recorded in HARDENING: a fence inside an HTML `<pre>` block (the auditor).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-006 | 5 | Review A | 0 | 0 | 3 | partly — round 6 (handoff/TASK-006-r6.md); one to HARDENING |
+| TASK-006 | 5 | Review B | 1 | 0 | 0 | yes — round 6 |
+| TASK-006 | 5 | security auditor | 0 | 4 advisory | — | partly — round 6; three to HARDENING |
+
+### TASK-006 round 5 — disposition (PR #23)
+Every round-4 finding was confirmed settled by probes, R5-3 against a CommonMark reference (markdown-it). Review B blocked: `cells_of` stripped every pipe at a row's ends, so a row ending `||` lost an empty cell and a row with the wrong cell count passed (R6-1). Review A's Consider 1 and the auditor's first advisory named the same defect, so it blocked (convergence): lines were split at form feed, vertical tab, NEL, U+2028 and other characters Markdown does not end a line at, so two fence lines joined to text by one could hide a heading (R6-2). On the supervisor's side: a pass-root block pinning that a backtick in a tilde fence's info string still opens the fence (Review A's test gap; the other two gaps it named are cosmetic or unreachable). Review A's Consider 2 and the auditor's second advisory also named one class together, fences and headings inside container blocks (list items, block quotes): both graded it for recording by class rather than a fix, and the supervisor agrees: it is the tail of heading parsing the by-class line was drawn under at round 3, files under `types/` and `traits/` are written by the bridge's own maintainer and supervisor, and modelling CommonMark's containers is a parser, not a check; recorded in HARDENING with the auditor's third and fourth advisories (headings inside containers; any HTML block, not only `<pre>`).
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
