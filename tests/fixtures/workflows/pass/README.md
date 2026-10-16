@@ -1,0 +1,1 @@
+A passing workflow folder for workflow-check.py (TASK-006): every layer, a replaced module whose point a trait and a sub-workflow still add at, a sub-workflow overriding its type workflow's setting, delivery additions for two kinds, a change heading inside a code fence and prose headings, all of which pass. Nothing outside types/ and traits/ is read.
