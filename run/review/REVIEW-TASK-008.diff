@@ -1,0 +1,952 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 6784c8f..a082a65 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-16 23:12",
++  "generated": "2026-10-16 23:55",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -35,7 +35,7 @@
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+     "cursor-bridge/bridge_env.py": "7fe536ff12e72406a84efa59d2e74788d174092f524ae0438d38169aa99b7d53",
+     "cursor-bridge/completion-check.py": "b95fb31a10082f91ee01eb3ae2bef981a71bddef0ca6ea23f72e60d7b75acd03",
+-    "cursor-bridge/conformance-check.py": "f58877bc0366f9c853c49a622e9698b4fee0c750c6f22e7fd266f156a0abde31",
++    "cursor-bridge/conformance-check.py": "2b8f8ea02ecce2d833bb39aaaa2d42d924789f0a59fbdb0c7c9761c11925e054",
+     "cursor-bridge/cursor-agent.shim": "913f3a0214b76c5a92fca21b8bfe8f9ea63979af412df30dc47509a0accbf8e2",
+     "cursor-bridge/design-seeds/airbnb/DESIGN.md": "add34130d67209ad105346d60fe2b290728b9711683969db4b7760e29477a5fe",
+     "cursor-bridge/design-seeds/airbnb/README.md": "9ecfc8b2441c9d0e483e82c60cc9948d4c0abefe66beaeb08e674eb5ad11248d",
+@@ -80,7 +80,7 @@
+     "cursor-bridge/diagram-check.py": "2e69b065a326380f025c7839636228aafa47fad9cffae60e024088adf3a77b13",
+     "cursor-bridge/evaluate-reports.py": "085c3562df202957c2affa5fe48876959b38fa078a41303379b32c34f130eba8",
+     "cursor-bridge/installer-check.ps1": "a662ab0f1d707234d5b1b58de7584b812099cddcec78274b8f15599a3e026cb5",
+-    "cursor-bridge/inventory-check.py": "6882c50b084dea4f613c8d4470dda54cb151f591b46e01cdfb1d7a04bab6e28d",
++    "cursor-bridge/inventory-check.py": "1b067d118e66cb4a0722aeee9e2419fe02fffb4b818af451575f790394ac605c",
+     "cursor-bridge/invisible-check.py": "9fb2ef762440b81d03983770cbe9031dfabba1a9f4837c7b68da369c6c78f732",
+     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
+     "cursor-bridge/loop-guard.py": "929f2c0761fe5855affed9cada3269827aec5dda1131924d8c480b6733fe9fbf",
+@@ -102,7 +102,7 @@
+     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+-    "cursor-bridge/workflow-check.py": "d36e929a2a1bb29becd88543ca66d8ef8c2aae371246470a409b7f1bfc6432dc",
++    "cursor-bridge/workflow-check.py": "4d5aae831b6a5404bdafcd870a53a5867b8a6767cf858356f24235b907d2cb2d",
+     "cursor-bridge/workflow/extension-points.md": "0ebf6901c91d35a36d89151199603e0beefe11e32f171ea6caaba994eed50892",
+     "cursor-bridge/workflow/open-list.md": "00528622752d2732cedce48a1f2db09745be7ee1b9475986a161f084391b3cdd",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+diff --git a/bridge/cursor-bridge/conformance-check.py b/bridge/cursor-bridge/conformance-check.py
+index 7f6a4e5..4b26f8e 100644
+--- a/bridge/cursor-bridge/conformance-check.py
++++ b/bridge/cursor-bridge/conformance-check.py
+@@ -28,6 +28,8 @@ What it checks, with the file it reads (the 0b review corrected several of these
+   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,
+     ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and
+     docs/diagrams/INDEX.md (missing = a diagram retrofit item);
++  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or not right after
++    Phase: is MISSING (R-015);
+   - with --screens (or a docs/mockups folder): the design detector in the gate;
+   - release A1b: a spending limit recorded for every key, account or provider that can charge
+     (the inventory's Resources rows); the inventory's `Development data:` decision; every
+@@ -54,6 +56,7 @@ ASCII-only on purpose (cp1252 consoles). Never writes.
+ """
+ import datetime
+ import glob
++import importlib.util
+ import json
+ import os
+ import re
+@@ -285,6 +288,56 @@ def memory_dirs(ws):
+     return out
+ 
+ 
++def judge_workflows_line(path, text):
++    """Judge one status file's Workflows lines (R-015).
++
++    Returns (outcome, rows). outcome is valid, missing, malformed, or not-checked.
++    rows is empty for valid and missing. For malformed, each row is an ASCII
++    (name, reason). For not-checked, each row is an ASCII reason. The grammar is
++    workflow-check.py's check_status; placement is its check_placement. Codes f and
++    FLAG are dropped. Nothing runs at import time.
++    """
++    def ascii_text(value):
++        return ("" if value is None else str(value)).encode("ascii", "backslashreplace").decode("ascii")
++
++    def field(mod, value):
++        escape = getattr(mod, "escape_field", None)
++        return ascii_text(escape(value) if escape is not None else value)
++
++    checker = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflow-check.py")
++    shown = checker.replace("\\", "/")
++    try:
++        spec = importlib.util.spec_from_file_location("workflow_check", checker)
++        if spec is None or spec.loader is None:
++            raise ImportError("no loader")
++        mod = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(mod)
++    except Exception as err:
++        return "not-checked", [ascii_text("%s: cannot be loaded (%s)" % (shown, type(err).__name__))]
++    try:
++        causes = []
++        open_text, open_shown, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
++        reg_text, reg_shown, reg_err = mod.read_utf8(mod.DEFAULT_REGISTRY)
++        if open_err:
++            causes.append("%s: %s" % (open_shown, open_err))
++        if reg_err:
++            causes.append("%s: %s" % (reg_shown, reg_err))
++        if causes:
++            return "not-checked", [field(mod, cause) for cause in causes]
++        tables, errors = mod.load_tables(open_text, mod.DEFAULT_OPEN, reg_text, mod.DEFAULT_REGISTRY)
++        if errors:
++            return "not-checked", [field(mod, "%s: %s" % (item_path, reason)) for item_path, reason in errors]
++        findings = [item for item in mod.check_status(path, text, tables) if item[0] not in ("f", "FLAG")]
++        if any(item[3] == "status file has no Workflows line" for item in findings):
++            return "missing", []
++        findings.extend(mod.check_placement(path, text))
++        if findings:
++            return "malformed", [(field(mod, item[2]), field(mod, item[3])) for item in findings]
++        return "valid", []
++    except Exception as err:
++        return "not-checked", [field(mod, "%s: %s" % (shown, type(err).__name__))]
++
++
+ def main():
+     argv = sys.argv[1:]
+     quiet = "--quiet" in argv
+@@ -430,6 +483,19 @@ def main():
+             add("MISSING", rel, "exists but is gitignored: the records are versioned, a reviewer's change to an ignored record leaves no trace and no history (0b review, S3)")
+             continue
+         add("OK" if ok else "MISSING", rel, "" if ok else detail)
++    status_path = os.path.join(ws, "docs", "PROJECT_STATUS.md")
++    if os.path.isfile(status_path):
++        status_text = read(status_path)
++        outcome, rows = judge_workflows_line(status_path, "" if status_text is None else status_text)
++        if outcome == "valid":
++            add("OK", "Workflows line")
++        elif outcome == "missing":
++            add("MISSING", "Workflows line", "missing: docs/PROJECT_STATUS.md has no Workflows line")
++        elif outcome == "malformed":
++            detail = "; ".join("%s - %s" % (name, reason) for name, reason in rows)
++            add("MISSING", "Workflows line", "malformed: " + detail)
++        else:
++            add("MISSING", "Workflows line", "not checked: " + "; ".join(rows))
+     if os.path.isfile(os.path.join(ws, "project.json")):
+         try:
+             pj = json.loads(read(os.path.join(ws, "project.json")) or "")
+diff --git a/bridge/cursor-bridge/inventory-check.py b/bridge/cursor-bridge/inventory-check.py
+index 90ad8c8..de86b9b 100644
+--- a/bridge/cursor-bridge/inventory-check.py
++++ b/bridge/cursor-bridge/inventory-check.py
+@@ -19,11 +19,16 @@ Run from the Workspace root. Deterministic; reads only. Checks:
+                       Resources table does not name. OS / CI / toolchain variables are ignored.
+  5. SECRET VALUE      a Resources cell holds something that looks like a secret value. The
+                       inventory names secrets and says where they live; it never holds one.
++ 6. WORKFLOWS LINE    the status file's Workflows: line is present, well formed, and directly
++                      after Phase: (missing, malformed, or not right after Phase:; R-015). The
++                      grammar is workflow-check.py's; unwritten types and traits are that
++                      program's concern, not a failure here.
+ 
+ Notes (never fail): a Resources name that no code reads (fine for an account or a tool; stale
+ otherwise). Exit 0 = OK, 1 = at least one failure. ASCII output only.
+ """
+ import argparse
++import importlib.util
+ import os
+ import re
+ import subprocess
+@@ -174,6 +179,56 @@ def env_reads(files):
+     return found
+ 
+ 
++def judge_workflows_line(path, text):
++    """Judge one status file's Workflows lines (R-015).
++
++    Returns (outcome, rows). outcome is valid, missing, malformed, or not-checked.
++    rows is empty for valid and missing. For malformed, each row is an ASCII
++    (name, reason). For not-checked, each row is an ASCII reason. The grammar is
++    workflow-check.py's check_status; placement is its check_placement. Codes f and
++    FLAG are dropped. Nothing runs at import time.
++    """
++    def ascii_text(value):
++        return ("" if value is None else str(value)).encode("ascii", "backslashreplace").decode("ascii")
++
++    def field(mod, value):
++        escape = getattr(mod, "escape_field", None)
++        return ascii_text(escape(value) if escape is not None else value)
++
++    checker = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflow-check.py")
++    shown = checker.replace("\\", "/")
++    try:
++        spec = importlib.util.spec_from_file_location("workflow_check", checker)
++        if spec is None or spec.loader is None:
++            raise ImportError("no loader")
++        mod = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(mod)
++    except Exception as err:
++        return "not-checked", [ascii_text("%s: cannot be loaded (%s)" % (shown, type(err).__name__))]
++    try:
++        causes = []
++        open_text, open_shown, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
++        reg_text, reg_shown, reg_err = mod.read_utf8(mod.DEFAULT_REGISTRY)
++        if open_err:
++            causes.append("%s: %s" % (open_shown, open_err))
++        if reg_err:
++            causes.append("%s: %s" % (reg_shown, reg_err))
++        if causes:
++            return "not-checked", [field(mod, cause) for cause in causes]
++        tables, errors = mod.load_tables(open_text, mod.DEFAULT_OPEN, reg_text, mod.DEFAULT_REGISTRY)
++        if errors:
++            return "not-checked", [field(mod, "%s: %s" % (item_path, reason)) for item_path, reason in errors]
++        findings = [item for item in mod.check_status(path, text, tables) if item[0] not in ("f", "FLAG")]
++        if any(item[3] == "status file has no Workflows line" for item in findings):
++            return "missing", []
++        findings.extend(mod.check_placement(path, text))
++        if findings:
++            return "malformed", [(field(mod, item[2]), field(mod, item[3])) for item in findings]
++        return "valid", []
++    except Exception as err:
++        return "not-checked", [field(mod, "%s: %s" % (shown, type(err).__name__))]
++
++
+ def main():
+     ap = argparse.ArgumentParser(description="Check the project's current-state record.")
+     ap.add_argument("--inventory", default="docs/INVENTORY.md")
+@@ -194,6 +249,17 @@ def main():
+                          "docs/archive/." % (a.status, n_lines, n_chars, a.max_lines, a.max_chars))
+         else:
+             notes.append("status: %d lines / %d chars (cap %d / %d)" % (n_lines, n_chars, a.max_lines, a.max_chars))
++        # 6. Workflows line (R-015), after the length cap and before SHAPE.
++        outcome, rows = judge_workflows_line(a.status, st)
++        if outcome == "missing":
++            shown = a.status.replace("\\", "/")
++            fails.append(("WORKFLOWS LINE: missing: %s has no Workflows line" % shown).encode("ascii", "backslashreplace").decode("ascii"))
++        elif outcome == "malformed":
++            for name, reason in rows:
++                fails.append("WORKFLOWS LINE: malformed: %s - %s" % (name, reason))
++        elif outcome == "not-checked":
++            for reason in rows:
++                fails.append("WORKFLOWS LINE: not checked: %s" % reason)
+     else:
+         notes.append("status: %s not found (skipped)" % a.status)
+ 
+diff --git a/bridge/cursor-bridge/workflow-check.py b/bridge/cursor-bridge/workflow-check.py
+index 588c092..ebba41d 100644
+--- a/bridge/cursor-bridge/workflow-check.py
++++ b/bridge/cursor-bridge/workflow-check.py
+@@ -704,6 +704,37 @@ def check_status(path, text, tables):
+     return findings
+ 
+ 
++def check_placement(path, text):
++    """Where the Workflows lines stand beside Phase (R-015).
++
++    A Workflows line starts with exactly `Workflows: `. The Phase line is the first
++    line that starts with exactly `Phase: `. Text is split only at a line feed, as
++    file_lines does. No Workflows line: no finding (a missing line belongs to
++    check_status). Workflows lines and no Phase line: one finding, `status file has
++    no Phase line`. Otherwise, with the Phase line at index p and k Workflows lines
++    in the file, the lines at indexes p+1 through p+k must all be Workflows lines.
++    When they are, no finding. When they are not, one finding: `Workflows lines do
++    not stand together right after the Phase line`.
++    """
++    shown = slash(path)
++    lines = file_lines(text)
++    workflows = [index for index, line in enumerate(lines) if line.startswith("Workflows: ")]
++    if not workflows:
++        return []
++    phase = None
++    for index, line in enumerate(lines):
++        if line.startswith("Phase: "):
++            phase = index
++            break
++    if phase is None:
++        return [("place", shown, "-", "status file has no Phase line")]
++    k = len(workflows)
++    run = lines[phase + 1:phase + 1 + k]
++    if len(run) == k and all(line.startswith("Workflows: ") for line in run):
++        return []
++    return [("place", shown, "-", "Workflows lines do not stand together right after the Phase line")]
++
++
+ def print_findings(findings):
+     problems = 0
+     for code, path, name, reason in findings:
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index b3dbf95..1a4e670 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -17,3 +17,5 @@
+ 2026-10-16 TASK-006-r5: a `types/` or `traits/` path is examined with `os.lstat` (missing means skip; any other `OSError` is `ERROR` and exit 2). `is_link` uses one `os.lstat` on every Python: `S_ISLNK`, or on Windows `FILE_ATTRIBUTE_REPARSE_POINT`. A fence is a CommonMark opening run of backticks or tildes, closed only by an equal or longer run of the same character with nothing after it but spaces or tabs.
+ 
+ 2026-10-16 TASK-006-r6: `cells_of` removes one leading `|` and one trailing `|`, so a row ending or starting `||` keeps its empty cell. File text is split only at `\n` (`file_lines`); a final line feed does not add an empty line. Form feed, vertical tab, and the other `splitlines` breaks stay inside the line.
++
++2026-10-16 TASK-008: Done runs `python -m pytest tests -q` before `python tools/make-manifest.py`, and the install and rollback tests refuse a bridge tree whose edited programs do not match MANIFEST.json, so that ordered run exits 1 until the manifest is regenerated and the suite is run again.
+diff --git a/docs/BUILD_PLAN.md b/docs/BUILD_PLAN.md
+index 80977cc..bab58c0 100644
+--- a/docs/BUILD_PLAN.md
++++ b/docs/BUILD_PLAN.md
+@@ -99,7 +99,7 @@ Parent: none
+ Depends on: TASK-007
+ Parallel: no
+ Diagrams: none
+-Scope: bridge/cursor-bridge/inventory-check.py; bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_workflows_line_check.py
++Scope: bridge/cursor-bridge/inventory-check.py; bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/workflow-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_workflows_line_check.py; tests/test_conformance_check.py
+ Satisfies: R-015
+ Done when: `inventory-check.py`/`conformance-check.py` read the `Workflows:` line and report a malformed or missing one; `test_workflows_line_check.py` (names R-015) covers valid, missing, malformed.
+ 
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 1b6b5fc..e316d7a 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -452,6 +452,15 @@ All three approved, and every round-3 finding was confirmed settled by probes. R
+ ### TASK-006 round 5 — disposition (PR #23)
+ Every round-4 finding was confirmed settled by probes, R5-3 against a CommonMark reference (markdown-it). Review B blocked: `cells_of` stripped every pipe at a row's ends, so a row ending `||` lost an empty cell and a row with the wrong cell count passed (R6-1). Review A's Consider 1 and the auditor's first advisory named the same defect, so it blocked (convergence): lines were split at form feed, vertical tab, NEL, U+2028 and other characters Markdown does not end a line at, so two fence lines joined to text by one could hide a heading (R6-2). On the supervisor's side: a pass-root block pinning that a backtick in a tilde fence's info string still opens the fence (Review A's test gap; the other two gaps it named are cosmetic or unreachable). Review A's Consider 2 and the auditor's second advisory also named one class together, fences and headings inside container blocks (list items, block quotes): both graded it for recording by class rather than a fix, and the supervisor agrees: it is the tail of heading parsing the by-class line was drawn under at round 3, files under `types/` and `traits/` are written by the bridge's own maintainer and supervisor, and modelling CommonMark's containers is a parser, not a check; recorded in HARDENING with the auditor's third and fourth advisories (headings inside containers; any HTML block, not only `<pre>`).
+ 
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| TASK-006 | 6 | Review A | 0 | 0 | 1 | to HARDENING (by-class line) |
++| TASK-006 | 6 | Review B | 0 | 0 | 0 | — |
++| TASK-006 | 6 | security auditor | 0 | 2 advisory | — | to HARDENING (by-class line) |
++
++### TASK-006 round 6 — disposition (PR #23, merged)
++All three approved; R6-1 and R6-2 were confirmed by probes at every site, against a CommonMark reference. The remaining findings are the long tail of reading Markdown-like text, in files only the maintainer and the supervisor write, and the by-class line drawn at round 3 holds: Review A's Consider (a heading or `Workflows:` line after a form feed or line separator is now invisible to the check, as to Markdown, though a raw-text reader would see it) and the auditor's two advisories (cells trimmed of any Unicode whitespace rather than spaces and tabs, so a separator followed by such a character is accepted where Markdown shows no table; an escaped pipe inside a cell split as a boundary) are recorded in HARDENING. They are different defects, not one named twice, so convergence does not apply. Carried to TASK-008's brief: any reader of the `Workflows:` line splits lines exactly as `workflow-check.py`'s `file_lines` does.
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 4b1e712..280ec67 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -27,3 +27,10 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ - A change word wrapped in markup or joined by another character is still prose: `## **Set** intake.x`, `` ## `Replace` design ``, `## Set:at intake.x`, `## Set` with an em dash. Strip leading and trailing `*`, `_`, backticks and any dash before the comparison (Review A, round 3 Consider 2; the tail of heading parsing, low likelihood).
+ - Every reparse point counts as a link on Windows (one `os.lstat` rule on every Python since round 5): OneDrive placeholders and deduplicated files under `types/` or `traits/` fail as `form`. Fail-closed by design; a workflow folder is not expected in a synced folder (Review A, round 3 Consider 3, settled for version dependence by R5-2).
+ - Container blocks are not modelled: a fence opened inside a list item stays open for the check after Markdown ends the item, a heading inside a block quote or list item (`> ## Set at x`, `- ## Set at x`) is not a heading candidate, and a fence line inside any HTML block (types 1 to 7: `<pre>`, `<div>`, `<!-- -->`) is read as a fence; each can hide a change heading Markdown displays. A fail-closed rule (a container marker before `##`, or an indented fence followed by a less-indented line, as `form`) would close most of it (the security auditor rounds 4 and 5, Review A round 5 Consider 2; converged, and both graded it for recording; the tail of heading parsing).
++- Line-break characters Markdown does not end a line at (vertical tab, form feed, `\x1c` to `\x1e`, NEL, U+2028, U+2029) are now inside a line for the check, as for Markdown, so `prose<FF>## Set at x` or `note<FF>Workflows: …` is not read, where a raw-text reader would see a line; reporting any such character in a types/, traits/ or status file as `form` would close it both ways (Review A, round 6 Consider).
++- Table cells are trimmed with `str.strip()` (any Unicode whitespace); Markdown trims spaces and tabs only, so a separator followed by a form feed, NEL, U+2028 or a no-break space is accepted where Markdown shows no table; trim `" \t"` only (the security auditor, round 6).
++- An escaped pipe (`\|`) inside a cell is split as a cell boundary; the tables' own rule says no cell contains a pipe, which the check does not enforce (the security auditor, round 6).
++
++## Stage B2 — TASK-008, the Workflows line enforced
++- conformance-check.py reads an existing but unreadable docs/PROJECT_STATUS.md as empty text, so its Workflows line row says "missing" where "not checked" would be exact; the row is MISSING either way and the verdict is the same (the builder's assumption, accepted at the accept commit).
++- `judge_workflows_line` is written twice, identically, in inventory-check.py and conformance-check.py; a lead for stage B2's refactoring pass (one shared helper beside workflow-check.py).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 91379ed..10df35e 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -1,6 +1,6 @@
+ # Inventory — Claude-Cursor Bridge
+ Reflected through: none
+-Updated: 2026-10-16
++Updated: 2026-10-17
+ 
+ The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
+ 
+@@ -16,7 +16,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The extension-point registry | Every phase module with its replaceable flag, and every point a conditional workflow may change, each with its declaring module, the kinds of change it accepts and whether it applies per part or per project; how a conditional workflow names a point | bridge/cursor-bridge/workflow/extension-points.md | tests/test_extension_points.py | release B (TASK-005) |
+ | The CI security floor | Semgrep (OSS engine, explicit rulesets, diff-aware), OSV-Scanner and Socket run in the `security floor` job beside the tests; the tests install from a committed lockfile; every action pinned by commit SHA, checkouts without persisted credentials, secrets only in step-level env | .github/workflows/tests.yml; requirements.lock; .semgrep.yml; osv-scanner.toml; socket.yml | tests/test_release_b_ci_floor.py | release B (TASK-002) |
+ | The workflow check | Checks every conditional workflow (types/, traits/) against the open list and the extension-point registry, and a status file's `Workflows:` lines against the open list; an unwritten type or sub-type fails, an unwritten trait is flagged; runs in CI over the bridge's workflow folder and the sample fixtures | bridge/cursor-bridge/workflow-check.py; .github/workflows/tests.yml (bridge programs job) | tests/test_workflow_check.py | release B (TASK-006) |
+-| The `Workflows:` status line | One line per part beside `Phase:`, naming the part's product type, sub-type and traits by the open list's workflow and trait names, in a stated grammar; `not yet classified` before intake | bridge/commands/supervisor.md, "Project state" | tests/test_workflows_line_text.py | release B (TASK-007) |
++| The `Workflows:` status line | One line per part beside `Phase:`, naming the part's product type, sub-type and traits by the open list's workflow and trait names, in a stated grammar; `not yet classified` before intake. inventory-check.py and conformance-check.py fail a missing line, a malformed one (judged by workflow-check.py's check_status), lines that do not stand together right after `Phase:` (its check_placement), and rule files that cannot be loaded | bridge/commands/supervisor.md, "Project state"; bridge/cursor-bridge/inventory-check.py, conformance-check.py, workflow-check.py | tests/test_workflows_line_text.py; tests/test_workflows_line_check.py | release B (TASK-007; enforced since TASK-008) |
+ 
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 913e8b0..07516f2 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -1,13 +1,13 @@
+ # Project Status
+-Last updated: 2026-10-16
++Last updated: 2026-10-17
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: TASK-006 — the workflow check (branch task-006): workflow-check.py, its CI step, the supervisor's tests and fixtures
+-Last accepted: BUG-001's follow-up at commit 4d0f77b (merged to main 2026-10-16, PR #22; BUG-001 itself 6743b25, PR #21); main holds TASK-001 to TASK-005, TASK-007, TASK-002 and BUG-001
++Increment: TASK-008 — the Workflows status line enforced (branch task-008): accepted at 825b905 (builder run 2026-10-16T21:46:53Z; scope clean; suite 1107 passed, 21 skipped; driver 21/21; sentinel clear); the gate (Review A, the security auditor, Review B, CI) follows
++Last accepted: TASK-006, the workflow check, at commit e2a7f9f (merged to main 2026-10-16, PR #23, after six review rounds; the long tail of Markdown parsing recorded by class in HARDENING); main holds TASK-001 to TASK-007, and BUG-001
+ Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
+ Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
+-Next: TASK-006 through the gate; then TASK-008, TASK-009 and stage B3's TASK-016 as plan-check orders them; once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
++Next: TASK-008 through the gate (its brief carries TASK-006's lesson: readers of the Workflows line split lines as workflow-check.py's file_lines does); then TASK-009 and stage B3's TASK-016 as plan-check orders them; once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
+ Software name: Claude-Cursor Bridge
+@@ -16,7 +16,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation driver mutate_ci_floor.py, drafts/, in-flight.md as a scratch log while a review runs)
+ Delegated gates: none
+-Remote sync: main at 4d0f77b, in sync 2026-10-16; branch task-006 pushed as PR #23 (TASK-006)
++Remote sync: main at e2a7f9f, in sync 2026-10-16; branch task-008 started from origin/main
+ Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
+ Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25)
+ Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index ad6a4ab..0791560 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -18,7 +18,7 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-012 | The interface-phase variants are declared once in the main workflow's interface module (mockups for screens, command design, contract design, playable prototype), each variant's text in one place. | DESIGN §6.4, §6.9 | planned | — |
+ | R-013 | A part that fits no product type, two equally, or one defined-but-unwritten pauses the project at intake and sends the owner to the maintainer. | DESIGN §6.7 | planned | — |
+ | R-014 | `workflow-check.py` verifies: every change targets an existing extension point; replace/set appears only in a type or sub-workflow and replace only on a replaceable phase; trait additions only add; every sub-workflow names an existing type workflow; every project's `Workflows:` line names, per part, exactly one product type, at most one sub-type of that type, and traits, all in the open list — an unwritten type or sub-type fails (pauses the project), an unwritten trait is flagged, non-fatal (§6.7). | DESIGN §6.6, §6.7 | built | tests/test_workflow_check.py (TASK-006) |
+-| R-015 | The status file records a `Workflows:` line per part (product type, sub-type, traits) beside the `Phase:` line. | DESIGN §6.2 | planned | the template and grammar: tests/test_workflows_line_text.py (TASK-007); the check of the line follows in TASK-008 |
++| R-015 | The status file records a `Workflows:` line per part (product type, sub-type, traits) beside the `Phase:` line. | DESIGN §6.2 | built | the template and grammar: tests/test_workflows_line_text.py (TASK-007); the check of the line by inventory-check.py and conformance-check.py: tests/test_workflows_line_check.py (TASK-008) |
+ | R-016 | Trait *has screens* written: it activates the mockup variant and adds its design tooling, the frozen interface rules, the design auditor, the observability tests of the running interface. | DESIGN §6.8 | planned | — |
+ | R-017 | Trait *installable* written: the delivery conventions — installers, install scripts, the command reference, the packaging stage, installer verification. | DESIGN §6.8 | planned | — |
+ | R-018 | Trait *performance budgets* written: budgets at intake, their mechanisms in the design, benchmarks, the benchmark floor, the performance lens. | DESIGN §6.8 | planned | — |
+diff --git a/handoff/TASK-008-r1-report.md b/handoff/TASK-008-r1-report.md
+new file mode 100644
+index 0000000..2cc7e8e
+--- /dev/null
++++ b/handoff/TASK-008-r1-report.md
+@@ -0,0 +1,62 @@
++# TASK-008 r1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/workflow-check.py` — added `check_placement` only.
++- `bridge/cursor-bridge/inventory-check.py` — check 6, `WORKFLOWS LINE`, after the status-length cap.
++- `bridge/cursor-bridge/conformance-check.py` — one `Workflows line` row after the records-file loop.
++- `bridge/cursor-bridge/MANIFEST.json` — regenerated; the three program hashes and the `generated` stamp.
++- `docs/BUILDER_NOTES.md` — one dated line on the Done order and the stamp check.
++- `handoff/TASK-008-r1-report.md` — this report.
++
++`bridge/cursor-bridge/VERSION` was rewritten by `tools/make-manifest.py` and is not in the diff.
++
++## Summary
++
++`check_placement` in `workflow-check.py` reports one `place` finding when Workflows lines are not one unbroken run directly after the first `Phase: ` line, and reports nothing when the line is missing. `inventory-check.py` and `conformance-check.py` each load `workflow-check.py` from their own folder, build its tables, and call `check_status` and `check_placement`. Findings whose code is `f` or `FLAG` are dropped, so an unwritten type or trait is valid. A missing line, a malformed line, a misplaced line, and a checker or rule file that cannot be loaded are failures; printed names and reasons go through `escape_field` and then ASCII backslashreplace.
++
++## Commands
++
++Run from the repository root, in the Done order. Step 4 exited 1 because the manifest still described the previous program bytes. Step 6 regenerated it. The suite was then run again and exited 0. That second run is recorded after the ordered commands.
++
++1. `python bridge/cursor-bridge/inventory-check.py` — exit 0. No `WORKFLOWS LINE:` line.
++
++```
++note: status: 36 lines / 5147 chars (cap 120 / 12000)
++note: changes: docs/CHANGES.md not found (absorption not checked)
++note: resources listed but read by no tracked code (fine for accounts/tools): CLI, OSV, SEMGREP_APP_TOKEN, SOCKET_CLI_ORG_SLUG, SOCKET_ORG_SLUG
++RESULT: OK
++```
++
++2. `python -m pytest tests/test_workflows_line_check.py -q` — exit 0. `30 passed in 5.39s`.
++
++3. `python -m pytest tests/test_workflow_check.py tests/test_conformance_check.py -q` — exit 0. `142 passed, 1 skipped in 15.36s`.
++
++4. `python -m pytest tests -q` — exit 1. `38 failed, 1060 passed, 21 skipped, 9 errors in 168.64s`. Every failure and error was an install or rollback test refusing the tree as not release `2026.10.11d` as stamped, naming `conformance-check.py`, `inventory-check.py`, and `workflow-check.py` changed, or `bridge-check` reporting those three files `STALE`.
++
++5. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` — exit 0. `windowless-check: 30 file(s) scanned, 0 FAIL, 0 NOTE`.
++
++6. `python tools/make-manifest.py` — exit 0. `make-manifest: version 2026.10.11d, 107 files hashed, VERSION + MANIFEST.json written`. Then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0. `RESULT: SOURCES MATCH bridge 2026.10.11d` (`107 OK, 0 STALE, 0 MISSING, 0 EXTRA`).
++
++7. `git diff --stat` — exit 0. Taken before this report and `docs/BUILDER_NOTES.md` existed:
++
++```
++ bridge/cursor-bridge/MANIFEST.json        |  8 ++--
++ bridge/cursor-bridge/conformance-check.py | 66 +++++++++++++++++++++++++++++++
++ bridge/cursor-bridge/inventory-check.py   | 66 +++++++++++++++++++++++++++++++
++ bridge/cursor-bridge/workflow-check.py    | 31 +++++++++++++++
++ 4 files changed, 167 insertions(+), 4 deletions(-)
++```
++
++After `docs/BUILDER_NOTES.md` was written, `git diff --stat` was exit 0 and listed those four files plus `docs/BUILDER_NOTES.md` (`5 files changed, 169 insertions(+), 4 deletions(-)`). This report is untracked, so it does not appear in `git diff --stat`; `git status --short` shows `?? handoff/TASK-008-r1-report.md`.
++
++After step 6, `python -m pytest tests -q` — exit 0. `1107 passed, 21 skipped in 233.79s`.
++
++## Assumed, not verified
++
++- The `Workflows line` row is the first row after the records-file loop and before the `project.json` content checks. · The brief says "among the records rows (after the loop over the record files)" and does not name the `project.json` block that follows. · A test that asserts that row's position in the printed list, not only the floor name.
++- Any exception while loading `workflow-check.py` is reported as `cannot be loaded (<type(err).__name__>)`, including `FileNotFoundError` from `exec_module` on a missing file and `ImportError` when the spec or its loader is missing. · The brief says "absent or raises while loading" and to print the exception class name, without listing the classes. · The not-checked line for a missing `workflow-check.py`, reading the class name in parentheses; the supervisor test only requires the words `cannot be loaded`.
++- When `workflow-check.py` cannot be loaded, that reason is not passed through `escape_field`, only through ASCII `backslashreplace`. · `escape_field` belongs to the module that failed to load. · A load-failure path or exception class that contains a non-ASCII character, compared with `escape_field` then `backslashreplace`.
++- An exception after a successful load is a not-checked reason `<path to workflow-check.py>: <exception class name>`, without the words `cannot be loaded`. · The brief reserves `cannot be loaded` for the load itself, and says no exception may escape. · A `workflow-check.py` that loads and whose `check_status` raises.
++- If `conformance-check.py`'s `read` of an existing `docs/PROJECT_STATUS.md` returns `None`, the text judged is empty, so the outcome is missing. · `read` returns `None` on `OSError` and no reason, and the brief's not-checked causes are the checker and the rule files. · A `PROJECT_STATUS.md` that `os.path.isfile` accepts and that `open` raises `OSError` for.
++- The inventory missing line encodes the slash-normalized `--status` argument with ASCII `backslashreplace`. · Acceptance requires ASCII output, and the brief's missing line is that argument with `\` turned into `/`. · A `--status` path containing a non-ASCII character; an ASCII path is unchanged, which is what the supervisor test compares.
+diff --git a/handoff/TASK-008.md b/handoff/TASK-008.md
+new file mode 100644
+index 0000000..4216fcf
+--- /dev/null
++++ b/handoff/TASK-008.md
+@@ -0,0 +1,222 @@
++# TASK-008: The Workflows status line: enforced
++
++## Objective
++Every project's status file (`docs/PROJECT_STATUS.md`) now carries a `Workflows:` line per part, beside `Phase:`. It names the part's product type, sub-type and traits, in a grammar the supervisor's instructions define. `bridge/cursor-bridge/workflow-check.py` (TASK-006) already validates those lines against the open list. This increment makes the two programs the supervisor runs on every project's records enforce the line too: `inventory-check.py` (run at every accepted increment) and `conformance-check.py` (run at every calibration and reflection point). Each reports a missing line, a malformed line, and lines that do not stand together right after the `Phase:` line. One rule lives in one place. So both programs judge the grammar by loading `workflow-check.py` and calling its existing `check_status`. The placement rule is one new function in `workflow-check.py`, called only by these two programs. `workflow-check.py`'s own command-line behaviour does not change.
++
++Satisfies:
++- R-015 — The status file records a `Workflows:` line per part (product type, sub-type, traits) beside the `Phase:` line.
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/inventory-check.py
++- bridge/cursor-bridge/conformance-check.py
++- bridge/cursor-bridge/workflow-check.py (only to add the one function of Requirement 1; nothing else in it changes)
++- bridge/cursor-bridge/MANIFEST.json (regenerated with `python tools/make-manifest.py` after your last edit under `bridge/`)
++- docs/BUILDER_NOTES.md
++- handoff/TASK-008-r1-report.md
++
++Do not modify anything else.
++
++## Written by the supervisor; do not edit
++These files are committed with this brief. Do not edit, move, rename or add to them:
++- `tests/test_workflows_line_check.py` (names R-015). It covers a valid line, a missing line, a malformed line and a misplaced line, through both programs. It also calls `check_placement` directly, loading `workflow-check.py` through `tests/conftest.py`'s `load_program`.
++- `tests/test_conformance_check.py`. Its `make_workspace` status file now carries `Workflows: not yet classified`, so the conformant workspace stays conformant.
++- `tests/test_workflow_check.py` and everything under `tests/fixtures/workflows/`. They must pass unchanged. That is how `workflow-check.py`'s behaviour is shown to be unchanged.
++
++Suppose a supervisor test contradicts this brief, or cannot pass without breaking a requirement below. Then stop, change no test, and report the contradiction: the test name, the brief requirement, and what each says.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration (`.github/workflows/`)
++- docs/ and handoff/, except the files the Scope section names
++- Everything under `bridge/` except the four files in Scope. In particular these stay unedited: `bridge/commands/supervisor.md`, `workflow/open-list.md`, `workflow/extension-points.md`, `CHANGELOG.md`, `VERSION`.
++- In `workflow-check.py`, everything except adding `check_placement`: its module docstring (which is its `--help` text), `main`, `check_status`, every other function, its finding codes, its output and its exit codes.
++- The other checks of `inventory-check.py` and `conformance-check.py`. That includes `inventory-check.py`'s status-length cap, which counts lines with `str.splitlines()` and stays as it is: it does not read the `Workflows:` line.
++- Checking that several parts' lines come "in the order of the project's parts". Nothing records that order elsewhere, so it is not checkable.
++
++## Context
++The repository root is the folder you were started in. Paths are relative to it.
++
++**The line's grammar.** Quoted from `bridge/commands/supervisor.md`, section "Project state", lines 1817–1828:
++
++`Workflows: [<part>: ]<Workflow name>[ → <Sub-workflow name>]; traits: <Trait name>[, <Trait name>…]`
++
++- "the product type is named by its **Workflow name**, the sub-type by its **Sub-workflow name** and each trait by its **Name**, spelled exactly as `~/.claude/cursor-bridge/workflow/open-list.md` spells them; every name on the line is in the open list;"
++- "exactly one product type and at most one of its sub-types; ` → <Sub-workflow name>` (the arrow is `→`) is left out when the part has no sub-type;"
++- "the traits follow `; traits: `, separated by a comma and a space, in the order the open list gives them; a part with no trait reads `; traits: none`;"
++- "`<part>: `, the part's name and a colon, follows `Workflows: ` only when the project has more than one part; a project with one part has one line without it; a part's name contains no `:`, `;` or `→`;"
++- "with several parts, the lines stand together right after `Phase:`, one per part, in the order of the project's parts;"
++- "until intake has classified a part, its line reads `not yet classified` in place of the names (`Workflows: not yet classified` in a project with one part)."
++
++In the template (`supervisor.md` lines 1788–1791) the line follows `Phase: <…>` directly. Example, the bridge itself: `Workflows: Host Extension Development → Claude Code Extension; traits: Installable`.
++
++**What `workflow-check.py` already provides.** These are module-level names in `bridge/cursor-bridge/workflow-check.py`, quoted. Importing the file runs no check: its `main` runs only under `if __name__ == "__main__":`.
++- `HERE = os.path.dirname(os.path.abspath(__file__))`, `DEFAULT_OPEN = os.path.join(HERE, "workflow", "open-list.md")`, `DEFAULT_REGISTRY = os.path.join(HERE, "workflow", "extension-points.md")`.
++- `def file_lines(text):` splits text only at a line feed. A final line feed adds no empty line. Form feed, vertical tab, `\x1c`–`\x1e`, NEL, U+2028 and U+2029 stay inside a line.
++- `def read_utf8(path):` returns `(text, shown_path, reason)`. `reason` is `None` on success. Otherwise `text` is `None` and `reason` is plain language.
++- `def load_tables(open_text, open_path, reg_text, reg_path):` returns `(tables, errors)`. `errors` is a list of `(path, reason)`. `tables` is `None` when `errors` is non-empty.
++- `def check_status(path, text, tables):` returns findings, each a 4-tuple `(code, shown_path, name, reason)`. These are its exact reason strings, with the code each carries:
++  - `form`, name `-`: `status file has no Workflows line`. This one means the line is **missing**.
++  - `form`: `Workflows line breaks the part-prefix rule`
++  - `e`: `two Workflows lines name the same part`
++  - `form`: `Workflows line must contain '; traits: ' exactly once`
++  - `form`: `empty name in the Workflows head`
++  - `unknown`: `name is not in the open list`
++  - `e`: `part must name exactly one product type`
++  - `e`: `part must name at most one sub-type`
++  - `e`: `sub-type is not of the line's product type`
++  - `form`: `Workflows head is not the product type, then at most its sub-type`
++  - `form`: `traits are not joined by a comma and one space`
++  - `unknown`: `not a trait name`
++  - `form`: `trait repeated`
++  - `form`: `traits are not in the open list's order`
++  - `f`: `product type is not written` and `sub-type is not written`
++  - `FLAG`: `trait not yet written; flagged, work continues (non-fatal)`
++- `def escape_field(value):` keeps printable characters and turns every other character into `\xNN`, `\uNNNN` or `\UNNNNNNNN`.
++- `def slash(path):` turns `\` into `/`.
++
++`tests/conftest.py` shows the loading pattern, quoted:
++
++```python
++spec = importlib.util.spec_from_file_location(name.replace("-", "_"), path)
++mod = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(mod)
++```
++
++**Why codes `f` and `FLAG` are not "malformed".** An unwritten product type or sub-type (`f`) is `workflow-check.py`'s "pause the project at intake" rule, and an unwritten trait (`FLAG`) is a non-fatal flag. Neither is a fault in the line's form. Today every type, sub-type and trait in the open list is unwritten. So the bridge's own line, `Workflows: Host Extension Development → Claude Code Extension; traits: Installable`, produces two `f` findings and one `FLAG`, and it must count as **valid** here.
++
++**TASK-006's review lesson (binding).** Any code that reads the `Workflows:` or `Phase:` line splits a status file's text into lines exactly as `file_lines` does: only at a line feed, with the file read using universal newlines. Never use `str.splitlines()` for this. A line that holds a form feed or U+2028 is one line.
++
++**The two programs today.**
++- `inventory-check.py`: command line `python inventory-check.py [--inventory docs/INVENTORY.md] [--status docs/PROJECT_STATUS.md] [--changes docs/CHANGES.md] [--max-lines 120] [--max-chars 12000]`, run from the Workspace root.
++  - It reads files with its own `read(path)`: `open(path, encoding="utf-8-sig", errors="replace")`. That is universal newlines, with any byte-order mark dropped.
++  - It collects failure strings in `fails` and notes in `notes`. It prints `note: …` lines first, then each failure.
++  - The last line is `RESULT: OK` or `RESULT: <n> problem(s)`, where `<n>` counts the failure lines that do not start with four spaces.
++  - It exits `0`, or `1` when there is any failure.
++  - When the status file does not exist it adds the note `status: <path> not found (skipped)`.
++  - `tests/test_text_consistency.py` imports this file as a module (for `looks_secret`), so nothing new may run at import time.
++- `conformance-check.py`: command line `python conformance-check.py [<project root or Workspace>] [--screens] [--installable] [--offline] [--quiet]`.
++  - It resolves the Workspace `ws` and collects rows with `add(verdict, floor, detail="")`, where `verdict` is `OK`, `MISSING` or `NOTE`.
++  - It prints each row as `"  %-8s %s%s" % (verdict, floor, ("  - " + detail) if detail else "")`. `--quiet` hides `OK` rows.
++  - It exits `1` when any row is `MISSING` (last line `RESULT: <n> floor(s) missing - …`), otherwise `0` (`RESULT: CONFORMANT`). It exits `2` for "not a workspace".
++  - Its `read(path)` is like inventory-check's but returns `None` on `OSError`. The records section (lines 419–432) checks `docs/PROJECT_STATUS.md` among the records.
++  - Its docstring says "ASCII-only on purpose (cp1252 consoles). Never writes." The tests run it with `--offline` (`tests/test_conformance_check.py`, `run()`).
++- Both programs already define `NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0` and pass it to every `subprocess.run`. This increment launches no new process.
++
++**Where the rule files are.** `workflow-check.py`, `workflow/open-list.md` and `workflow/extension-points.md` sit beside `inventory-check.py` and `conformance-check.py`, in `bridge/cursor-bridge/` and in the installed `~/.claude/cursor-bridge/`. All three are in `MANIFEST.json`, so they install together. Each program finds them beside itself (`os.path.dirname(os.path.abspath(__file__))`), never in the checked project.
++
++**The manifest.** Any change under `bridge/` regenerates `bridge/cursor-bridge/MANIFEST.json` with `python tools/make-manifest.py`, run after your last edit under `bridge/`. It takes the version from the newest heading in `bridge/cursor-bridge/CHANGELOG.md`, so `VERSION` is rewritten unchanged. CI's `bridge-check.py --root bridge --sources --quiet` fails if the manifest does not match the tree. Loading `workflow-check.py` writes a `__pycache__` beside it. make-manifest skips `__pycache__`, and so does the install check.
++
++**Security context.** The surface is reading local Markdown files: the project's status file and the bridge's own open list and registry. There is no network access, no secret and no write.
++- Trust boundary: the status file is project-authored text. It is never executed, imported or evaluated.
++- The only code loaded is `workflow-check.py` from the program's own folder (the bridge's own source). It is never loaded from the checked project.
++- A bad input never causes a traceback.
++- No ASVS level is recorded for the bridge. There is no `.cursor/rules/` folder in this repository, so the constraints below are the whole set.
++
++**Development data** (copied from `docs/INVENTORY.md` Decisions): "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet." For this increment, run the programs and tests from this repository's sources only, never from `~/.claude` and never on another project. The one read of this repository's own records is the read-only `inventory-check.py` run in Done step 1. `tests/conftest.py` already redirects `HOME`/`USERPROFILE` for every test.
++
++## Diagrams
++None. The build plan names no diagram for this increment (INVENTORY Decisions: no diagram index for release B).
++
++## Requirements
++
++### workflow-check.py: one new function
++1. Add exactly one module-level function to `bridge/cursor-bridge/workflow-check.py`:
++
++   `def check_placement(path, text):`
++
++   - `path` is the status file's path (a string). `text` is its contents, already read.
++   - It returns a list of findings in `check_status`'s shape. Each is a 4-tuple `("place", slash(path), "-", reason)`.
++   - It splits `text` with `file_lines`.
++   - A **Workflows line** is a line that starts with exactly `Workflows: `, as in `check_status`.
++   - The **Phase line** is the first line that starts with exactly `Phase: `.
++   - The rules, in this order:
++     1. No Workflows line: return `[]`. The missing line is `check_status`'s finding, not this one's.
++     2. Workflows lines but no Phase line: return exactly `[("place", slash(path), "-", "status file has no Phase line")]`.
++     3. With the Phase line at index `p` and `k` Workflows lines in the file, the lines at indexes `p+1` to `p+k` must all be Workflows lines. Equivalently, every Workflows line stands in one unbroken run directly after the Phase line. If so, return `[]`. Otherwise return exactly `[("place", slash(path), "-", "Workflows lines do not stand together right after the Phase line")]`. That is one finding per file, however many lines are out of place.
++
++   `check_placement` has a docstring stating that rule and naming R-015. It is called by `inventory-check.py` and `conformance-check.py` only. `workflow-check.py`'s `main`, its module docstring and every existing function stay byte-for-byte as they are. `tests/test_workflow_check.py` passes unchanged.
++
++### The shared judgement (both programs)
++2. Each program judges the status file in this order:
++   1. Load `workflow-check.py` from its own folder with `importlib.util.spec_from_file_location`, inside the check and never at import time.
++   2. Read the open list and registry at that module's `DEFAULT_OPEN` and `DEFAULT_REGISTRY` with its `read_utf8`.
++   3. Build the tables with its `load_tables`.
++   4. Run its `check_status(path, text, tables)` and its `check_placement(path, text)` on the status text.
++
++   The status text is the text the program already reads with its own `read` (universal newlines, BOM dropped). The outcome is exactly one of four:
++   - **not checked**: `workflow-check.py` is absent or raises while loading, the open list or registry cannot be read, or `load_tables` returns errors. This is a failure, never a note and never silence. No exception escapes and no traceback is printed.
++   - **missing**: no line of `file_lines(text)` starts with `Workflows: `, which is exactly when `check_status` returns its `status file has no Workflows line` finding.
++   - **malformed**: otherwise, if any finding remains after dropping every `check_status` finding whose code is `f` or `FLAG`. The remaining `check_status` findings come first, in their order, then `check_placement`'s finding if any.
++   - **valid**: no finding remains.
++3. Every field printed from a finding (`name`, `reason`) and every reason in a not-checked line goes through `workflow-check.py`'s `escape_field`. Then each non-ASCII character becomes its backslash escape (`\xNN`, `\uNNNN`, `\UNNNNNNNN`, as Python's `"backslashreplace"` error handler writes it). Both programs' output stays ASCII.
++4. When the status file does not exist, neither program checks the line or prints anything about it. inventory-check keeps its existing note. conformance-check's records row already reports the missing file.
++
++### inventory-check.py
++5. The check runs right after the status-length cap (check 1) and before SHAPE, whenever the `--status` file exists. Each line below is one entry of `fails`, so it counts as one problem in the `RESULT:` line and makes the exit code `1`:
++   - missing: `WORKFLOWS LINE: missing: <status> has no Workflows line`. Here `<status>` is the `--status` argument as given, with `\` turned into `/`.
++   - malformed: one line per remaining finding: `WORKFLOWS LINE: malformed: <name> - <reason>`.
++   - not checked: one line per cause: `WORKFLOWS LINE: not checked: <reason>`. For a `read_utf8` or `load_tables` error, `<reason>` is `<path>: <reason>`. For a module that cannot be loaded, it is `<path to workflow-check.py>: cannot be loaded (<exception class name>)`.
++   - valid: no `WORKFLOWS LINE:` line at all.
++6. The module docstring (the usage text) gains a numbered check, `6. WORKFLOWS LINE`, stating in one or two lines what it checks (missing, malformed, not right after `Phase:`; R-015). It also says the grammar is `workflow-check.py`'s, and that unwritten types and traits are that program's concern, not a failure here. Nothing else in the existing checks, options, output or exit codes changes.
++
++### conformance-check.py
++7. When `docs/PROJECT_STATUS.md` exists in the Workspace, add exactly one row with floor name `Workflows line`, among the records rows (after the loop over the record files):
++   - valid: `add("OK", "Workflows line")`
++   - missing: `add("MISSING", "Workflows line", "missing: docs/PROJECT_STATUS.md has no Workflows line")`
++   - malformed: `add("MISSING", "Workflows line", "malformed: " + "; ".join(<"<name> - <reason>" for each remaining finding>))`
++   - not checked: `add("MISSING", "Workflows line", "not checked: " + "; ".join(<each cause, worded as in Requirement 5>))`
++
++   So the printed line begins `  MISSING  Workflows line  - missing: `, `  MISSING  Workflows line  - malformed: ` or `  MISSING  Workflows line  - not checked: `, or reads `  OK       Workflows line`. Exit codes, the summary line and `--quiet` behave as for every other row.
++8. The module docstring's list of what it checks gains one item for the `Workflows:` line in `docs/PROJECT_STATUS.md`: missing, malformed, or not right after `Phase:` is MISSING (R-015). Nothing else in the program changes.
++
++### The manifest
++9. `bridge/cursor-bridge/MANIFEST.json` is regenerated with `python tools/make-manifest.py` after your last edit under `bridge/`. Its only changes are the three program hashes and the `generated` stamp.
++
++## Acceptance criteria
++- [ ] `python -m pytest tests/test_workflows_line_check.py -q` passes (the supervisor's tests, which name R-015).
++- [ ] `python -m pytest tests/test_workflow_check.py tests/test_conformance_check.py -q` passes. `workflow-check.py`'s command-line behaviour is unchanged, and the conformant workspace stays conformant.
++- [ ] `python -m pytest tests -q` passes in full.
++- [ ] Against today's open list, a status file whose line is `Workflows: Host Extension Development → Claude Code Extension; traits: Installable` or `Workflows: not yet classified`, directly after `Phase: building`, is valid in both programs.
++- [ ] A status file with no `Workflows:` line gives `WORKFLOWS LINE: missing: …` (inventory-check, exit 1) and `MISSING  Workflows line  - missing: …` (conformance-check, exit 1).
++- [ ] A malformed line (for example one without `; traits: `, or naming a name not in the open list) gives `WORKFLOWS LINE: malformed: …` and `MISSING  Workflows line  - malformed: …`.
++- [ ] A line not directly after `Phase:` (another line in between, or above `Phase:`) gives the malformed output with the reason `Workflows lines do not stand together right after the Phase line`. A status file with Workflows lines and no Phase line gives `status file has no Phase line`.
++- [ ] A line separated from `Phase:` only by a form feed or U+2028 inside one line is judged with `file_lines` (the TASK-006 lesson). No new code splits a status file with `str.splitlines()`.
++- [ ] If `workflow-check.py` or a rule file cannot be loaded, the check fails with a `not checked:` line or row. There is no traceback.
++- [ ] Both programs' output stays ASCII.
++- [ ] `windowless-check.py` and `bridge-check.py --sources` pass.
++- [ ] R-015 is fully met: no stand-in, placeholder or "arrives in a later stage" text. The supervisor's test names R-015, and the new docstrings name it too.
++
++## Constraints
++- Do not add dependencies: standard library only.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
++- If the brief, the rules, or the tooling got in your way, append one dated line describing it to `docs/BUILDER_NOTES.md`. That covers an instruction that contradicted another, a check that fired wrongly, or a step that cost time for no reason. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW`, `0` elsewhere; both programs already define `NO_WINDOW`). This increment should launch none.
++- Never start a server, a watcher or a daemon that outlives a test.
++- Do not refactor code outside the scope, even if it looks wrong. That includes the existing `splitlines()` uses in both programs that do not read the `Workflows:` or `Phase:` line.
++- Never run the product, a migration, a seed or a test against the owner's live data. See the Development data paragraph in Context. Never run a program against `~/.claude` or another project.
++- Follow existing conventions in the files you touch: the house style of each program, ASCII output, a final `RESULT:` line, and `backslashreplace` on stdout/stderr.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff` and `git log` only.
++- One rule, one place. The grammar is judged only by `workflow-check.py`'s `check_status`, and the placement only by the new `check_placement`. Neither program re-implements any part of either. If reuse turns out to need any other change to `workflow-check.py`, stop and report it rather than making it.
++- No number is parsed from any input. The status file's content is never executed, imported or evaluated.
++- Do not edit `tests/test_workflows_line_check.py`, `tests/test_conformance_check.py`, `tests/test_workflow_check.py` or anything under `tests/fixtures/workflows/` (see "Written by the supervisor; do not edit").
++- Every verification command the Done section asks you to run is written there in full. Run exactly those.
++- Prefer reuse over new code (the functions of `workflow-check.py` quoted in Context, the standard library), and write the minimum that meets the acceptance criteria.
++
++## Done
++Run each of these from the repository root (the folder you were started in), in this order. Paste each command with its exit code and the relevant output lines into your report:
++1. `python bridge/cursor-bridge/inventory-check.py` (read-only, on this repository's own records). Expected: no `WORKFLOWS LINE:` line. Report its exit code and `RESULT:` line whatever they are, and do not change any record to alter them.
++2. `python -m pytest tests/test_workflows_line_check.py -q`
++3. `python -m pytest tests/test_workflow_check.py tests/test_conformance_check.py -q`
++4. `python -m pytest tests -q`
++5. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++6. `python tools/make-manifest.py`, then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++7. `git diff --stat`. Expected files: the three programs, the manifest, your report, and possibly `docs/BUILDER_NOTES.md`.
++
++Your report is the file `handoff/TASK-008-r1-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, and what you could not do. That way nothing of it is lost when your run ends early. When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- a section headed exactly `Assumed, not verified`. List every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: how you placed the new row among conformance-check's records rows, the exception classes you treat as "cannot be loaded", or a platform behaviour you expected. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_conformance_check.py b/tests/test_conformance_check.py
+index c7d01aa..9e0d494 100644
+--- a/tests/test_conformance_check.py
++++ b/tests/test_conformance_check.py
+@@ -66,7 +66,7 @@ def make_workspace(root, conformant=True):
+     for name in ("PROJECT_STATUS.md", "INVENTORY.md", "REQUIREMENTS.md", "RUN_PARAMETERS.md", "ROSTER.json", "DESIGN.md"):
+         (root / "docs" / name).write_text("x\n", encoding="utf-8")
+     (root / "docs" / "INVENTORY.md").write_text(INVENTORY, encoding="utf-8")
+-    (root / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nBridge version: %s\nPhase: building\n" % VERSION, encoding="utf-8")
++    (root / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nBridge version: %s\nPhase: building\nWorkflows: not yet classified\n" % VERSION, encoding="utf-8")
+     (root / "docs" / "diagrams" / "INDEX.md").write_text("# Diagrams\n", encoding="utf-8")
+     (root / "project.json").write_text('{"name": "Thing", "purpose": "finds things", "kind": "private", "version": "0.0.0", "state": {"phase": "building", "stage": "Stage 1", "bridge": "%s", "updated": "2026-10-10"}}' % VERSION, encoding="utf-8")
+     (root / ".cursor" / "rules" / "workspace-boundary.mdc").write_text("rule\n", encoding="utf-8")
+diff --git a/tests/test_workflows_line_check.py b/tests/test_workflows_line_check.py
+new file mode 100644
+index 0000000..c8209d4
+--- /dev/null
++++ b/tests/test_workflows_line_check.py
+@@ -0,0 +1,239 @@
++"""The Workflows status line enforced (TASK-008), the supervisor's tests, written from handoff/TASK-008.md before the
++delegation.
++
++enforces: docs/REQUIREMENTS.md R-015 (the status file records a `Workflows:` line per part, beside the `Phase:` line):
++inventory-check.py and conformance-check.py report a missing line, a malformed line and lines that do not stand together
++right after `Phase:`, judging the grammar by workflow-check.py's check_status and the placement by its new
++check_placement; a rule file that cannot be loaded is a failure; output stays ASCII; lines are split only at a line feed
++(TASK-006's lesson). Special characters are built with chr() so no editing tool can turn an escape into the character.
++"""
++import os
++import pathlib
++import shutil
++import subprocess
++import sys
++
++import pytest
++
++from test_conformance_check import VERSION, make_workspace, verdict
++
++REPO = pathlib.Path(__file__).resolve().parent.parent
++BRIDGE = REPO / "bridge" / "cursor-bridge"
++INVENTORY_CHECK = BRIDGE / "inventory-check.py"
++CONFORMANCE_CHECK = BRIDGE / "conformance-check.py"
++FF = chr(12)
++LSEP = chr(0x2028)
++ARROW = chr(0x2192)
++
++HEAD = "# Project Status\nBridge version: %s\nPhase: building\n" % VERSION
++BRIDGE_LINE = "Workflows: Host Extension Development " + ARROW + " Claude Code Extension; traits: Installable\n"
++UNCLASSIFIED = "Workflows: not yet classified\n"
++
++VALID = {
++    "bridge-line": HEAD + BRIDGE_LINE,
++    "not-yet-classified": HEAD + UNCLASSIFIED,
++}
++MISSING = {
++    "no-line": HEAD,
++    "joined-by-form-feed": HEAD.rstrip("\n") + FF + UNCLASSIFIED,
++    "joined-by-line-separator": HEAD.rstrip("\n") + LSEP + UNCLASSIFIED,
++}
++MALFORMED = {
++    # (status text, the reason that must be named)
++    "no-traits": (HEAD + "Workflows: Host Extension Development\n", "Workflows line must contain '; traits: ' exactly once"),
++    "unknown-name": (HEAD + "Workflows: Nonexistent Development; traits: none\n", "name is not in the open list"),
++    "line-between": ("# Project Status\nPhase: building\nBridge version: %s\n" % VERSION + UNCLASSIFIED,
++                     "Workflows lines do not stand together right after the Phase line"),
++    "above-phase": ("# Project Status\nBridge version: %s\n" % VERSION + UNCLASSIFIED + "Phase: building\n",
++                    "Workflows lines do not stand together right after the Phase line"),
++    "no-phase-line": ("# Project Status\nBridge version: %s\n" % VERSION + UNCLASSIFIED, "status file has no Phase line"),
++}
++
++
++def write_status(path, text):
++    path.write_text(text, encoding="utf-8", newline="\n")
++
++
++def inventory(cwd, status, program=INVENTORY_CHECK):
++    """inventory-check.py on one status file, with no inventory or change log, from a folder of its own."""
++    p = subprocess.run([sys.executable, str(program), "--inventory", "absent-inventory.md", "--changes", "absent-changes.md",
++                        "--status", str(status)], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
++                       errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
++    return p.returncode, p.stdout.splitlines(), p.stdout, p.stderr
++
++
++def workflows_lines(lines):
++    return [line for line in lines if line.startswith("WORKFLOWS LINE:")]
++
++
++def conformance(root, program=CONFORMANCE_CHECK):
++    p = subprocess.run([sys.executable, str(program), str(root), "--offline"], capture_output=True, text=True, encoding="utf-8",
++                       errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
++    return p.returncode, p.stdout, p.stderr
++
++
++def workspace(tmp_path, status_text):
++    root = tmp_path / "proj"
++    root.mkdir()
++    make_workspace(root)
++    write_status(root / "docs" / "PROJECT_STATUS.md", status_text)
++    return root
++
++
++# --- check_placement, the one new function in workflow-check.py --------------------------------------------------
++
++def test_r015_placement_function(program):
++    mod = program("workflow-check")
++    assert mod.check_placement("s.md", HEAD) == [], "no Workflows line: missing is check_status's finding"
++    assert mod.check_placement("s.md", HEAD + UNCLASSIFIED) == []
++    two = "Phase: building\nWorkflows: app: not yet classified\nWorkflows: site: not yet classified\nOther: x\n"
++    assert mod.check_placement("s.md", two) == []
++    apart = "Phase: building\nWorkflows: app: not yet classified\nOther: x\nWorkflows: site: not yet classified\n"
++    assert mod.check_placement("d\\s.md", apart) == [("place", "d/s.md", "-", "Workflows lines do not stand together right after the Phase line")]
++    assert mod.check_placement("s.md", "Workflows: not yet classified\n") == [("place", "s.md", "-", "status file has no Phase line")]
++    assert mod.check_placement("s.md", "Phase: building" + FF + "x\n" + UNCLASSIFIED) == [], "a form feed does not end the Phase line"
++    assert mod.check_placement("s.md", "Phase: a\nPhase: b\n" + UNCLASSIFIED) == [("place", "s.md", "-", "Workflows lines do not stand together right after the Phase line")], "the first Phase line counts"
++
++
++# --- inventory-check.py --------------------------------------------------------------------------------------------
++
++@pytest.mark.parametrize("case", sorted(VALID))
++def test_r015_inventory_valid_line_reports_nothing(tmp_path, case):
++    status = tmp_path / "PROJECT_STATUS.md"
++    write_status(status, VALID[case])
++    rc, lines, out, err = inventory(tmp_path, status)
++    assert "Traceback" not in err, err
++    assert workflows_lines(lines) == [], lines
++
++
++@pytest.mark.parametrize("case", sorted(MISSING))
++def test_r015_inventory_missing_line(tmp_path, case):
++    status = tmp_path / "PROJECT_STATUS.md"
++    write_status(status, MISSING[case])
++    rc, lines, out, err = inventory(tmp_path, status)
++    assert rc == 1, lines
++    shown = str(status).replace("\\", "/")
++    assert workflows_lines(lines) == [f"WORKFLOWS LINE: missing: {shown} has no Workflows line"], lines
++
++
++@pytest.mark.parametrize("case", sorted(MALFORMED))
++def test_r015_inventory_malformed_line(tmp_path, case):
++    text, reason = MALFORMED[case]
++    status = tmp_path / "PROJECT_STATUS.md"
++    write_status(status, text)
++    rc, lines, out, err = inventory(tmp_path, status)
++    assert rc == 1, lines
++    found = workflows_lines(lines)
++    assert found and all(line.startswith("WORKFLOWS LINE: malformed: ") for line in found), lines
++    assert any(line.endswith(" - " + reason) for line in found), lines
++
++
++def test_r015_inventory_unwritten_types_are_not_malformed(tmp_path):
++    """Codes f and FLAG (unwritten type, sub-type, trait) are workflow-check.py's concern, not a failure here."""
++    status = tmp_path / "PROJECT_STATUS.md"
++    write_status(status, VALID["bridge-line"])
++    rc, lines, out, err = inventory(tmp_path, status)
++    assert not [line for line in lines if "not written" in line], lines
++
++
++def test_r015_inventory_counts_each_finding_as_a_problem(tmp_path):
++    """A malformed line is a failure line, counted in RESULT."""
++    status = tmp_path / "PROJECT_STATUS.md"
++    write_status(status, VALID["not-yet-classified"])
++    rc_ok, lines_ok, *_ = inventory(tmp_path, status)
++    write_status(status, MALFORMED["no-traits"][0])
++    rc_bad, lines_bad, *_ = inventory(tmp_path, status)
++
++    def count(lines):
++        last = lines[-1]
++        return 0 if last == "RESULT: OK" else int(last.split()[1])
++
++    assert workflows_lines(lines_bad), lines_bad
++    assert count(lines_bad) == count(lines_ok) + len(workflows_lines(lines_bad)), (lines_ok, lines_bad)
++
++
++def test_r015_inventory_output_is_ascii(tmp_path):
++    status = tmp_path / "PROJECT_STATUS.md"
++    write_status(status, HEAD + "Workflows: " + chr(0xDC) + "nknown" + chr(0x1B) + "[31m; traits: none\n")
++    rc, lines, out, err = inventory(tmp_path, status)
++    assert rc == 1
++    assert out.isascii(), repr(out)
++    assert "\\xdc" in out and "\\x1b" in out, out
++
++
++def test_r015_inventory_no_status_file_no_check(tmp_path):
++    rc, lines, out, err = inventory(tmp_path, tmp_path / "absent-status.md")
++    assert workflows_lines(lines) == [], lines
++
++
++def _bridge_copy(tmp_path, with_checker=True, with_rules=True):
++    """The two programs, in a folder of their own, with or without workflow-check.py and its rule files."""
++    folder = tmp_path / "bin"
++    folder.mkdir()
++    for name in ("inventory-check.py", "conformance-check.py"):
++        shutil.copyfile(BRIDGE / name, folder / name)
++    if with_checker:
++        shutil.copyfile(BRIDGE / "workflow-check.py", folder / "workflow-check.py")
++    if with_rules:
++        shutil.copytree(BRIDGE / "workflow", folder / "workflow")
++    return folder
++
++
++@pytest.mark.parametrize("missing", ["checker", "rules"])
++def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, missing):
++    folder = _bridge_copy(tmp_path, with_checker=(missing != "checker"), with_rules=(missing != "rules"))
++    status = tmp_path / "PROJECT_STATUS.md"
++    write_status(status, VALID["not-yet-classified"])
++    rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
++    assert "Traceback" not in err and "Traceback" not in out, (out, err)
++    assert rc == 1, lines
++    found = workflows_lines(lines)
++    assert found and all(line.startswith("WORKFLOWS LINE: not checked: ") for line in found), lines
++    if missing == "checker":
++        assert any("cannot be loaded" in line for line in found), lines
++    else:
++        assert any("open-list.md" in line for line in found), "the cause names the rule file that cannot be read"
++
++
++# --- conformance-check.py ------------------------------------------------------------------------------------------
++
++@pytest.mark.parametrize("case", sorted(VALID))
++def test_r015_conformance_valid_line_is_ok(tmp_path, case):
++    rc, out, err = conformance(workspace(tmp_path, VALID[case]))
++    assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
++    assert rc == 0 and "RESULT: CONFORMANT" in out, out
++
++
++@pytest.mark.parametrize("case", sorted(MISSING))
++def test_r015_conformance_missing_line(tmp_path, case):
++    rc, out, err = conformance(workspace(tmp_path, MISSING[case]))
++    v, text = verdict(out, "Workflows line")
++    assert v == "MISSING" and text == "Workflows line  - missing: docs/PROJECT_STATUS.md has no Workflows line", out
++    assert rc == 1
++
++
++@pytest.mark.parametrize("case", sorted(MALFORMED))
++def test_r015_conformance_malformed_line(tmp_path, case):
++    text_in, reason = MALFORMED[case]
++    rc, out, err = conformance(workspace(tmp_path, text_in))
++    v, text = verdict(out, "Workflows line")
++    assert v == "MISSING" and text.startswith("Workflows line  - malformed: "), out
++    assert reason in text, out
++    assert rc == 1
++
++
++def test_r015_conformance_output_is_ascii(tmp_path):
++    rc, out, err = conformance(workspace(tmp_path, HEAD + "Workflows: " + chr(0xDC) + "nknown; traits: none\n"))
++    assert rc == 1 and out.isascii(), repr(out)
++    assert "\\xdc" in out, out
++
++
++@pytest.mark.parametrize("missing", ["checker", "rules"])
++def test_r015_conformance_rule_files_not_loadable_is_missing(tmp_path, missing):
++    folder = _bridge_copy(tmp_path, with_checker=(missing != "checker"), with_rules=(missing != "rules"))
++    rc, out, err = conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
++    assert "Traceback" not in err and "Traceback" not in out, (out, err)
++    v, text = verdict(out, "Workflows line")
++    assert v == "MISSING" and text.startswith("Workflows line  - not checked: "), out
++    if missing == "rules":
++        assert "open-list.md" in text, "the cause names the rule file that cannot be read"
