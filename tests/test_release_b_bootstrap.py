@@ -10,6 +10,7 @@ docs/RUN_PARAMETERS.md.
 """
 import json
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
@@ -36,7 +37,7 @@ def test_r001_records_exist():
 
 
 def test_r001_project_json_wellformed():
-    """R-001: project.json parses and carries the fundamentals; phase matches state."""
+    """R-001: project.json parses and carries the fundamentals."""
     pj = json.loads(_read("project.json"))
     for key in ("name", "purpose", "kind", "version", "state"):
         assert key in pj, f"R-001: project.json lacks {key}"
@@ -60,15 +61,41 @@ def test_r001_inventory_decisions_recorded():
     assert "aseline measurement" in inv, "R-001: baseline precondition not recorded"
 
 
-def test_r001_no_open_deferred_contradicts_a_decision():
-    """R-001: the Deferred table carries no open row (the R-038 question was settled)."""
-    inv = _read("docs/INVENTORY.md")
-    deferred = inv.split("## Deferred", 1)[1] if "## Deferred" in inv else ""
-    # the only table row is the "(none)" placeholder
-    assert "owner decision needed" not in deferred.lower() or "(none)" in deferred, \
-        "R-001: an open Deferred row remains"
-    assert "second checkout" not in deferred.lower() or "none" in deferred.lower(), \
-        "R-001: the settled R-038 item still sits in Deferred"
+SETTLED_ELSEWHERE = ("r-038", "second checkout", "second-checkout")
+
+
+def _deferred_rows(inv):
+    """The Deferred table's rows below its header, the "(none)" placeholder left out."""
+    assert "## Deferred" in inv, "R-001: INVENTORY.md has no Deferred section"
+    section = inv.split("## Deferred", 1)[1].split("\n## ", 1)[0]
+    rows = [line.strip() for line in section.splitlines() if line.strip().startswith("|")]
+    assert len(rows) >= 2 and "Item" in rows[0], "R-001: the Deferred table has no header row"
+    cells = [[c.strip() for c in r.strip("|").split("|")] for r in rows[2:]]
+    return [c for c in cells if c and c[0] != "(none)"]
+
+
+def test_r001_deferred_rows_parse():
+    """R-001: the row parser reads a real row and skips the placeholder (a negative test must show its precondition)."""
+    table = "## Deferred\n| Item | Why deferred | Since | Owner decision needed |\n|---|---|---|---|\n| (none) | — | — | — |\n| R-038 install | x | 2026-10-11 | yes |\n"
+    assert _deferred_rows(table) == [["R-038 install", "x", "2026-10-11", "yes"]]
+
+
+def test_r001_no_deferred_row_reopens_a_settled_decision():
+    """R-001 (docs/BUILD_PLAN.md TASK-001 Done when: no Deferred row contradicts a Decision): no Deferred row is about a
+    question the Decisions table settled (R-038, the second-checkout question), and every real deferral carries the
+    owner's dated approval (supervisor.md rule 44; TASK-027 plans one at B6)."""
+    for cells in _deferred_rows(_read("docs/INVENTORY.md")):
+        item = cells[0].lower()
+        assert not any(s in item for s in SETTLED_ELSEWHERE), f"R-001: a settled decision sits in Deferred: {cells[0]!r}"
+        assert re.search(r"\b\d{4}-\d{2}-\d{2}\b", " ".join(cells[1:])), f"R-001: a deferral without a dated owner approval: {cells[0]!r}"
+
+
+def test_r001_phase_matches_status():
+    """R-001: project.json's state.phase is the phase the status file states."""
+    pj = json.loads(_read("project.json"))
+    m = re.search(r"^Phase:\s*(\S+)", _read("docs/PROJECT_STATUS.md"), re.M)
+    assert m, "R-001: PROJECT_STATUS.md has no Phase: line"
+    assert m.group(1) == pj["state"]["phase"], f"R-001: project.json phase {pj['state']['phase']!r} differs from the status file's {m.group(1)!r}"
 
 
 def test_r001_run_parameters_authoritative():

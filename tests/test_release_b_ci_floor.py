@@ -23,7 +23,8 @@ SEMGREP = re.compile(r"\bsemgrep\b", re.I)
 OSV = re.compile(r"osv-scanner", re.I)
 SOCKET = re.compile(r"\bsocket(?:security)?\b", re.I)
 SCANNERS = (("semgrep", SEMGREP), ("osv-scanner", OSV), ("socket", SOCKET))
-DISABLERS = re.compile(r"\|\|\s*(?:true\b|exit\s+0\b|:(?=\s|$|;)|echo\b)")
+DISABLERS = re.compile(r"(?:\|\||;)\s*(?:true\b|exit\s+0\b|:(?=\s|$|;)|echo\b)")
+LOCK_CLOSURE = {"pytest", "pyyaml", "colorama", "iniconfig", "packaging", "pluggy", "pygments"}
 
 
 def _text():
@@ -60,9 +61,9 @@ def _semgrep_step(data):
 
 def test_r002_disabler_pattern_catches_the_idioms():
     """R-002: the guard this test relies on catches the usual exit-status swallowers (a negative test must show its precondition)."""
-    for bad in ("socket ci || true", "socket ci || :", "x || exit 0", "x || echo skipped", "x ||:;"):
+    for bad in ("socket ci || true", "socket ci || :", "x || exit 0", "x || echo skipped", "x ||:;", "socket ci; true", "x; exit 0"):
         assert DISABLERS.search(bad), bad
-    for ok in ("a && b", "set -euo pipefail", "exit \"$code\""):
+    for ok in ("a && b", "set -euo pipefail", "exit \"$code\"", "if [ \"$code\" -eq 0 ]; then"):
         assert not DISABLERS.search(ok), ok
 
 
@@ -70,6 +71,84 @@ def test_r002_workflow_parses():
     """R-002: the workflow is valid YAML with jobs."""
     data = _data()
     assert isinstance(data, dict) and _jobs(data)
+
+
+def _on(data):
+    # YAML 1.1 reads the bare key `on` as the boolean True
+    return data.get("on", data.get(True))
+
+
+def _lines(step):
+    return [s.strip() for s in str(step.get("run") or "").splitlines() if s.strip() and not s.strip().startswith("#")]
+
+
+def _floor_step(data, pattern):
+    for job in _ubuntu_jobs(data).values():
+        for step in _steps(job):
+            if any(pattern.search(line) for line in _lines(step)):
+                return job, step
+    raise AssertionError(f"R-002: no ubuntu step runs {pattern.pattern!r}")
+
+
+def test_r002_runs_on_pull_request_and_push_to_main():
+    """R-002 (docs/BUILD_PLAN.md stage B1 Demonstration: the full gate runs on a PR and on a push to main): the workflow runs on
+    every pull request and on every push to main, and no path or branch filter can leave a change unscanned."""
+    on = _on(_data())
+    assert isinstance(on, dict), "R-002: the workflow's `on:` must be a mapping naming its events"
+    assert "pull_request" in on, "R-002: the workflow must run on pull_request"
+    push = on.get("push")
+    assert isinstance(push, dict) and "main" in (push.get("branches") or []), "R-002: the workflow must run on push to main"
+    for event in ("pull_request", "push"):
+        spec = on.get(event) or {}
+        for key in ("paths", "paths-ignore", "branches-ignore"):
+            assert key not in spec, f"R-002: {event} carries a {key} filter"
+    pr_branches = (on.get("pull_request") or {}).get("branches")
+    assert pr_branches is None or "main" in pr_branches, "R-002: pull_request must cover pull requests into main"
+
+
+def test_r002_each_scanner_decides_its_step():
+    """R-002: each scanner's own exit status is its step's result, so a finding fails the floor: the Semgrep step runs
+    under `set -euo pipefail` and ends with the pinned Semgrep call; OSV-Scanner reads requirements.lock, its status is
+    taken at once, `exit 0` appears only under the clean-status branch, and the step ends with `exit "$code"`; the
+    step holding the Socket key runs only `socket ci --no-banner` (a name merely echoed is no scanner)."""
+    data = _data()
+    _, semgrep = _floor_step(data, re.compile(r"^pipx run semgrep=="))
+    lines = _lines(semgrep)
+    assert lines[0] == "set -euo pipefail", "R-002: the Semgrep step must start with set -euo pipefail"
+    assert re.fullmatch(r'pipx run semgrep==\d+\.\d+\.\d+ "\$\{ARGS\[@\]\}" \.', lines[-1]), "R-002: the Semgrep step must end with the pinned Semgrep call"
+
+    _, osv = _floor_step(data, re.compile(r"^\./osv-scanner scan source\b"))
+    lines = _lines(osv)
+    call = next(i for i, s in enumerate(lines) if s.startswith("./osv-scanner scan source"))
+    assert "--lockfile='requirements.txt:requirements.lock'" in lines[call], "R-002: OSV-Scanner must read requirements.lock"
+    assert lines[call + 1] == "code=$?", "R-002: OSV-Scanner's status must be taken on the next line"
+    for i, s in enumerate(lines):
+        if s == "exit 0":
+            assert lines[i - 1] == 'if [ "$code" -eq 0 ]; then', "R-002: exit 0 outside the clean-status branch"
+    assert lines[-1] == 'exit "$code"', 'R-002: the OSV step must end with exit "$code"'
+
+    _, socket = _floor_step(data, re.compile(r"(?:^|\s)socket\s+ci\b"))
+    assert _lines(socket) == ["socket ci --no-banner"], "R-002: the step that holds the Socket key runs only `socket ci --no-banner`"
+
+
+def test_r002_no_install_runs_beside_a_secret():
+    """R-002 (secure-coding.snapshot.md V14, never expose secrets; the brief: no secret on a scanner's path beyond its own
+    token): no step that carries a secret installs anything, every npm install skips lifecycle scripts, and the Socket CLI
+    is installed at its pinned version in a step of the floor's job before the scan."""
+    installs = re.compile(r"\b(?:npm|pnpm|yarn)\s+(?:install|add|i)\b|\bpip\s+install\b|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
+    for name, job in _jobs(_data()).items():
+        for step in _steps(job):
+            if "secrets." in str(step.get("env") or {}):
+                for s in _lines(step):
+                    assert not installs.search(s), f"R-002: a step holding a secret installs or fetches ({name}): {s!r}"
+            for s in _lines(step):
+                if re.search(r"\bnpm\s+(?:install|i)\b", s):
+                    assert "--ignore-scripts" in s, f"R-002: npm install without --ignore-scripts: {s!r}"
+    job, socket = _floor_step(_data(), re.compile(r"(?:^|\s)socket\s+ci\b"))
+    steps = _steps(job)
+    before = steps[: steps.index(socket)]
+    assert any(re.search(r"\bnpm\s+install\b.*@socketsecurity/cli@\d+\.\d+\.\d+\b", s) for st in before for s in _lines(st)), \
+        "R-002: the Socket CLI is not installed at a pinned version before the scan"
 
 
 def test_r002_three_scanners_unguarded_on_ubuntu():
@@ -152,22 +231,25 @@ def test_r002_pip_installs_only_from_lockfile():
 
 
 def test_r002_lockfile_pins_closure():
-    """R-002: requirements.lock pins pytest, pyyaml, and every requirement line with ==."""
+    """R-002: requirements.lock pins pytest 9.1.1, pyyaml 6.0.3 and their closure, every line with ==, and holds exactly
+    the admitted set of packages (a new name is a new dependency: the admission gate, supervisor.md step 5b, then this set)."""
     text = LOCKFILE.read_text(encoding="utf-8")
     low = text.lower()
     assert "pytest==9.1.1" in low and "pyyaml==6.0.3" in low
+    names = set()
     for line in text.splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
         assert "==" in s, f"R-002: unpinned requirement line: {s!r}"
+        names.add(s.split("==", 1)[0].strip().lower())
+    assert names == LOCK_CLOSURE, f"R-002: the lock's packages differ from the admitted closure: {sorted(names ^ LOCK_CLOSURE)}"
 
 
 def test_r002_secrets_only_in_step_env():
     """R-002: `secrets.` appears only inside a step's env: mapping (never in run/with/uses, job- or workflow-level keys), and Socket is authenticated by its repo secret."""
     data = _data()
     assert "secrets." not in str({k: v for k, v in data.items() if k != "jobs"}), "R-002: secret at workflow level"
-    socket_authenticated = False
     for name, job in _jobs(data).items():
         assert "secrets." not in str({k: v for k, v in job.items() if k != "steps"}), f"R-002: secret at job level in {name}"
         for step in _steps(job):
@@ -175,29 +257,25 @@ def test_r002_secrets_only_in_step_env():
                 if key == "env":
                     continue
                 assert "secrets." not in str(value), f"R-002: secret outside step env ({key}) in {name}"
-            if SOCKET.search(_body(step)) and "run" in step:
-                socket_authenticated = "secrets.SOCKET_SECURITY_API_KEY" in str(step.get("env") or {})
+    _, step = _floor_step(data, re.compile(r"(?:^|\s)socket\s+ci\b"))
+    socket_authenticated = "secrets.SOCKET_SECURITY_API_KEY" in str(step.get("env") or {})
     assert socket_authenticated, "R-002: the Socket step is not authenticated by secrets.SOCKET_SECURITY_API_KEY in its env"
 
 
 def test_r002_socket_names_its_organization():
     """R-002: the Socket step names its organization through SOCKET_CLI_ORG_SLUG from the repository variable SOCKET_ORG_SLUG (without it the Socket API answers 404 Organization not found, observed on PR #16)."""
-    for job in _ubuntu_jobs(_data()).values():
-        for step in _steps(job):
-            if SOCKET.search(_body(step)) and "run" in step:
-                env = step.get("env") or {}
-                value = re.sub(r"\s+", "", str(env.get("SOCKET_CLI_ORG_SLUG", "")))
-                assert value == "${{vars.SOCKET_ORG_SLUG}}", "R-002: Socket step must set exactly SOCKET_CLI_ORG_SLUG: ${{ vars.SOCKET_ORG_SLUG }}"
-                return
-    raise AssertionError("R-002: no Socket step found on ubuntu-latest")
+    _, step = _floor_step(_data(), re.compile(r"(?:^|\s)socket\s+ci\b"))
+    value = re.sub(r"\s+", "", str((step.get("env") or {}).get("SOCKET_CLI_ORG_SLUG", "")))
+    assert value == "${{vars.SOCKET_ORG_SLUG}}", "R-002: Socket step must set exactly SOCKET_CLI_ORG_SLUG: ${{ vars.SOCKET_ORG_SLUG }}"
 
 
 def test_r002_socket_prints_no_banner():
-    """R-002 / Merge-Verification-Policy §Security (no secret in a log): every `socket ci` call runs with --no-banner. The CLI's
-    banner prints the first characters of its API token ("token: <5 chars>*** (env)"); GitHub masks only a whole secret, and
-    the repository is public, so the banner put part of the key into public logs (PR #16, 2026-10-12)."""
+    """R-002 / secure-coding.snapshot.md V14 (never log secrets, credentials or tokens): every `socket ci` call, in every job,
+    runs with --no-banner. The CLI's banner prints the first characters of its API token ("token: <5 chars>*** (env)");
+    GitHub masks only a whole secret, and the repository is public, so the banner put part of the key into public logs
+    (PR #16, 2026-10-12)."""
     calls = 0
-    for job in _ubuntu_jobs(_data()).values():
+    for job in _jobs(_data()).values():
         for step in _steps(job):
             for line in str(step.get("run") or "").splitlines():
                 if re.search(r"(?:^|\s)socket\s+ci\b", line):
