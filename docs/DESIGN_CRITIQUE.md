@@ -312,6 +312,31 @@ Both APPROVE; round 1's fixes confirmed by both (each ran the round-2 test again
 - "At intake" names only one of the times a pause can happen: the workflow check also fails a line at a release and at a calibration (§6.6, §6.8) (Review A) → TASK-006's and TASK-024's briefs.
 - a change cycle that changes a part's traits, or adds a part, rewrites the line, which the paragraph does not say (Review A) → the brief of the increment that writes the change-cycle module.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-002 | re-review 002c (main merged in) | Review A | 0 | 2 | 4 | yes — round 6 (see below) |
+| TASK-002 | re-review 002c (main merged in) | Review B | 0 | 1 | 2 | yes — on the same branch |
+| TASK-002 | 6 | Review A | 0 | 2 | 2 | routed (see below) |
+| TASK-002 | 6 | Review B | 0 | 0 | 0 | — |
+
+### TASK-002 — disposition of its last rounds
+Rounds 1 to 5 and why the floor took six builder rounds are in the Issues document (ISS-002, ISS-005). The re-review of the head that took main in (002c): both APPROVE. Review A's Should fix, the Socket CLI's banner printing 5 characters of the key into CI logs, was raised to Blocking because the repository is public → round 6 (`socket ci --no-banner`, the supervisor's test `test_r002_socket_prints_no_banner`); Review B's Should fix, the inventory's spending-limit wording, fixed on the branch. Round 6: both APPROVE. Review A's two Should fix (the test's docstring citation; the inventory's reword of what the 5 characters are and the remedy) and its Considers (the guard over every job; a stale working file) went to stage B1's close, where they were taken (BUG-001). Merged as fba63bc (2026-10-13).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| Stage B1 | 1 | Review A | 2 | 5 | 5 | BUG-001 and the owner's run sheet (see below) |
+| Stage B1 | 1 | Review B | 1 | 3 | 1 | BUG-001 (see below) |
+
+### Stage B1 review round 1 — disposition (2026-10-16)
+Both REJECT. Converged (both reviewers): the status file on main was stale, describing PR #16 as unmerged; the stage tests were weak (the Deferred check, no trigger check); the Socket key was in the environment while npm installed the CLI (Review A Should fix, Review B Consider: blocking by convergence). Taken in BUG-001:
+- **The status file and the inventory** (both, Blocking): the status file is current and self-sufficient; the inventory records the required check, the Socket file coverage, the full-tree audit and the fork rule.
+- **Three logs still show part of the key** (Review A, Blocking; confirmed by a count over every run since 2026-10-12, no characters printed): runs 38241764324, 38244794839 and 38309209568 survived the owner's deletion of 2026-10-13. Deleting them and replacing the key are the owner's; asked with a run sheet 2026-10-16. The stage's review is repeated after the owner reports back.
+- **The key beside npm install** (converged): the CLI is installed in a step without the key, with `--ignore-scripts` (builder, BUG-001); the supervisor's tests pin it.
+- **The stage tests** (both): the Deferred check parses rows (fails on a settled decision or an undated deferral, allows TASK-027's dated one); the phase is compared with project.json; the triggers, each scanner's exit deciding its step, the OSV lockfile argument, the lock's exact closure, `; true` in the disabler guard, --no-banner in every job are pinned.
+- **No full-tree Semgrep scan** (Review A Should fix): run once on 2026-10-16 with CI's rulesets — one finding, the shim's `chmod 0o755`, accepted with its reason; re-run at each release (INVENTORY Decisions).
+- **Does Socket read requirements.lock** (Review A Should fix): Socket's supported-file list matches `requirements{.bazel,}.lock` for PyPI; the dashboard listing is a least-confident check in docs/HARDENING.md.
+- Considers: the unpinned Semgrep rule packs and the unused Semgrep token → docs/HARDENING.md leads; forks get no secrets → a Decision; the stale mutation driver → updated (run/supervisor/mutate_ci_floor.py); the stage label and R-002's merge commit → project.json and the register.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
