@@ -75,6 +75,9 @@ CHANGE_FIRST = frozenset({
 TRAILING_PUNCT = ":;,.-"
 # Up to three leading spaces, two hashes, then a space or a tab (R3-6).
 HEADING_CANDIDATE = re.compile(r"^ {0,3}##[ \t](.*)$")
+# Up to three leading spaces, then three backticks (R4-3). Four spaces is an indented
+# code block, not a fence. A longer run still begins with three backticks.
+FENCE_LINE = re.compile(r"^ {0,3}```")
 TRAITS_MARK = "; traits: "
 
 
@@ -129,8 +132,9 @@ def is_link(path):
     """A symbolic link, or on Windows a junction or any other reparse point.
 
     Where os.path.isjunction does not exist and the system is Windows, the reparse point is
-    read from os.lstat (stat.FILE_ATTRIBUTE_REPARSE_POINT). An OSError from that lstat counts
-    as a link, so the check never falls back to an ordinary path in silence.
+    read from os.lstat (stat.FILE_ATTRIBUTE_REPARSE_POINT). On both branches a missing path
+    (FileNotFoundError, NotADirectoryError) is not a link. Any other OSError counts as a
+    link, so a path the check cannot classify is not walked (R4-1, R4-2).
     """
     if os.path.islink(path):
         return True
@@ -138,12 +142,16 @@ def is_link(path):
     if isjunction is not None:
         try:
             return bool(isjunction(path))
-        except OSError:
+        except (FileNotFoundError, NotADirectoryError):
             return False
+        except OSError:
+            return True
     if os.name != "nt":
         return False
     try:
         attributes = os.lstat(path).st_file_attributes
+    except (FileNotFoundError, NotADirectoryError):
+        return False
     except OSError:
         return True
     return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
@@ -275,6 +283,10 @@ def collect(root, product_keys):
 
     for layer in ("types", "traits"):
         base = os.path.join(root, layer)
+        # Nothing at this path: do not walk it and do not report it. lexists is true for a
+        # dangling link or junction, so those still reach the link test (R4-1, R3-3).
+        if not os.path.lexists(base):
+            continue
         # Test the link before testing whether the path is a folder, so a dangling link
         # is reported and never walked.
         if is_link(base):
@@ -373,15 +385,16 @@ def parse_heading(line):
 def heading_spans(text):
     """Change headings outside fences, each with the raw lines of its section.
 
-    A heading candidate matches ^ {0,3}##[ \\t]. Each section ends at the next candidate's
-    index, so the walk is linear in the file. The second value is True when a fence is
-    still open at the end of the file (R3-6).
+    A heading candidate matches ^ {0,3}##[ \\t]. A fence line matches ^ {0,3} followed by
+    three backticks; an opening fence is closed by the next such line (R4-3). Each section
+    ends at the next candidate's index, so the walk is linear in the file. The second value
+    is True when a fence is still open at the end of the file (R3-6).
     """
     lines = text.splitlines()
     fence = False
     marks = []
     for index, line in enumerate(lines):
-        if line.startswith("```"):
+        if FENCE_LINE.match(line):
             fence = not fence
             continue
         if fence:
