@@ -324,6 +324,14 @@ def test_r002_workflow_is_the_pinned_one():
     assert _data() == WORKFLOW_PIN, "R-002: the workflow differs from the pinned one"
 
 
+def test_r002_workflow_is_the_only_one():
+    """R-002 (BUG-001 round 6, Review A): the pin and the one-secret rule read one file, so the workflow folder holds
+    that file alone; a second workflow (handing a secret to an install, or running on `pull_request_target`) fails
+    here and must widen these tests in the same diff."""
+    names = sorted(p.name for p in WORKFLOW.parent.iterdir())
+    assert names == [WORKFLOW.name], f"R-002: the workflow folder holds {names}, not the pinned workflow alone"
+
+
 def test_r002_one_step_holds_a_secret():
     """R-002 (secure-coding.snapshot.md V14; the brief: no secret on a scanner's path beyond its own token): in the whole
     workflow exactly one step refers to a repository secret, in any key — the Socket scan, which runs only
