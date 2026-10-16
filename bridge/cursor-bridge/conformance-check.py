@@ -301,19 +301,22 @@ def judge_workflows_line(path, text):
         return ("" if value is None else str(value)).encode("ascii", "backslashreplace").decode("ascii")
 
     def field(mod, value):
-        escape = getattr(mod, "escape_field", None)
-        return ascii_text(escape(value) if escape is not None else value)
+        return ascii_text(mod.escape_field(value))
 
-    checker = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflow-check.py")
+    checker = os.path.join(os.path.dirname(os.path.realpath(__file__)), "workflow-check.py")
     shown = checker.replace("\\", "/")
+    previous_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
     try:
         spec = importlib.util.spec_from_file_location("workflow_check", checker)
         if spec is None or spec.loader is None:
             raise ImportError("no loader")
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-    except Exception as err:
+    except (Exception, SystemExit) as err:
         return "not-checked", [ascii_text("%s: cannot be loaded (%s)" % (shown, type(err).__name__))]
+    finally:
+        sys.dont_write_bytecode = previous_bytecode
     try:
         causes = []
         open_text, open_shown, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
@@ -334,8 +337,8 @@ def judge_workflows_line(path, text):
         if findings:
             return "malformed", [(field(mod, item[2]), field(mod, item[3])) for item in findings]
         return "valid", []
-    except Exception as err:
-        return "not-checked", [field(mod, "%s: %s" % (shown, type(err).__name__))]
+    except (Exception, SystemExit) as err:
+        return "not-checked", [ascii_text("%s: %s" % (shown, type(err).__name__))]
 
 
 def main():

@@ -1,6 +1,6 @@
 {
   "version": "2026.10.11d",
-  "generated": "2026-10-16 23:55",
+  "generated": "2026-10-17 00:24",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -35,7 +35,7 @@
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
     "cursor-bridge/bridge_env.py": "7fe536ff12e72406a84efa59d2e74788d174092f524ae0438d38169aa99b7d53",
     "cursor-bridge/completion-check.py": "b95fb31a10082f91ee01eb3ae2bef981a71bddef0ca6ea23f72e60d7b75acd03",
-    "cursor-bridge/conformance-check.py": "2b8f8ea02ecce2d833bb39aaaa2d42d924789f0a59fbdb0c7c9761c11925e054",
+    "cursor-bridge/conformance-check.py": "e0fcc011abb2b39af514942ba0409f79c501fd83f7daddaf35fd923143a8180c",
     "cursor-bridge/cursor-agent.shim": "913f3a0214b76c5a92fca21b8bfe8f9ea63979af412df30dc47509a0accbf8e2",
     "cursor-bridge/design-seeds/airbnb/DESIGN.md": "add34130d67209ad105346d60fe2b290728b9711683969db4b7760e29477a5fe",
     "cursor-bridge/design-seeds/airbnb/README.md": "9ecfc8b2441c9d0e483e82c60cc9948d4c0abefe66beaeb08e674eb5ad11248d",
@@ -80,7 +80,7 @@
     "cursor-bridge/diagram-check.py": "2e69b065a326380f025c7839636228aafa47fad9cffae60e024088adf3a77b13",
     "cursor-bridge/evaluate-reports.py": "085c3562df202957c2affa5fe48876959b38fa078a41303379b32c34f130eba8",
     "cursor-bridge/installer-check.ps1": "a662ab0f1d707234d5b1b58de7584b812099cddcec78274b8f15599a3e026cb5",
-    "cursor-bridge/inventory-check.py": "1b067d118e66cb4a0722aeee9e2419fe02fffb4b818af451575f790394ac605c",
+    "cursor-bridge/inventory-check.py": "ab837d7f64ed45c888cd932f1f20c82e1c460146d303c391dc62cfce3f69fc45",
     "cursor-bridge/invisible-check.py": "9fb2ef762440b81d03983770cbe9031dfabba1a9f4837c7b68da369c6c78f732",
     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
     "cursor-bridge/loop-guard.py": "929f2c0761fe5855affed9cada3269827aec5dda1131924d8c480b6733fe9fbf",
