@@ -24,6 +24,9 @@ OSV = re.compile(r"osv-scanner", re.I)
 SOCKET = re.compile(r"\bsocket(?:security)?\b", re.I)
 SCANNERS = (("semgrep", SEMGREP), ("osv-scanner", OSV), ("socket", SOCKET))
 DISABLERS = re.compile(r"(?:\|\||;)\s*(?:true\b|exit\s+0\b|:(?=\s|$|;)|echo\b)")
+SECRET_REF = re.compile(r"\bsecrets\s*(?:\.|\[)")
+INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn)\s+(?:install|add|i|ci)\b|\bnpx\b|\bpip3?\s+install\b|\buv\s+(?:pip|tool|add|sync|run)\b"
+                      r"|\bgo\s+install\b|\bgem\s+install\b|\bcargo\s+install\b|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
 LOCK_CLOSURE = {"pytest", "pyyaml", "colorama", "iniconfig", "packaging", "pluggy", "pygments"}
 
 
@@ -104,6 +107,9 @@ def test_r002_runs_on_pull_request_and_push_to_main():
             assert key not in spec, f"R-002: {event} carries a {key} filter"
     pr_branches = (on.get("pull_request") or {}).get("branches")
     assert pr_branches is None or "main" in pr_branches, "R-002: pull_request must cover pull requests into main"
+    pr_types = (on.get("pull_request") or {}).get("types")
+    assert pr_types is None or {"opened", "synchronize", "reopened"} <= set(pr_types), \
+        "R-002: pull_request must run when a pull request opens, updates or reopens"
 
 
 def test_r002_each_scanner_decides_its_step():
@@ -133,22 +139,22 @@ def test_r002_each_scanner_decides_its_step():
 
 def test_r002_no_install_runs_beside_a_secret():
     """R-002 (secure-coding.snapshot.md V14, never expose secrets; the brief: no secret on a scanner's path beyond its own
-    token): no step that carries a secret installs anything, every npm install skips lifecycle scripts, and the Socket CLI
-    is installed at its pinned version in a step of the floor's job before the scan."""
-    installs = re.compile(r"\b(?:npm|pnpm|yarn)\s+(?:install|add|i)\b|\bpip\s+install\b|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
+    token): no step that carries a secret (in any expression form) installs or fetches anything, every npm install skips
+    lifecycle scripts (the flag itself, never `--ignore-scripts=false`), and the Socket CLI is installed at the version the
+    inventory records (1.7.0; a bump is an admission, supervisor.md rule 14) in a step of the floor's job before the scan."""
     for name, job in _jobs(_data()).items():
         for step in _steps(job):
-            if "secrets." in str(step.get("env") or {}):
+            if SECRET_REF.search(str(step.get("env") or {})):
                 for s in _lines(step):
-                    assert not installs.search(s), f"R-002: a step holding a secret installs or fetches ({name}): {s!r}"
+                    assert not INSTALLS.search(s), f"R-002: a step holding a secret installs or fetches ({name}): {s!r}"
             for s in _lines(step):
-                if re.search(r"\bnpm\s+(?:install|i)\b", s):
-                    assert "--ignore-scripts" in s, f"R-002: npm install without --ignore-scripts: {s!r}"
+                if re.search(r"\bnpm\s+(?:install|i|ci)\b", s):
+                    assert re.search(r"(?:^|\s)--ignore-scripts(?=\s|$)", s), f"R-002: npm install without --ignore-scripts: {s!r}"
     job, socket = _floor_step(_data(), re.compile(r"(?:^|\s)socket\s+ci\b"))
     steps = _steps(job)
     before = steps[: steps.index(socket)]
-    assert any(re.search(r"\bnpm\s+install\b.*@socketsecurity/cli@\d+\.\d+\.\d+\b", s) for st in before for s in _lines(st)), \
-        "R-002: the Socket CLI is not installed at a pinned version before the scan"
+    assert any(re.search(r"\bnpm\s+install\b.*\s@socketsecurity/cli@1\.7\.0(?:\s|$)", s) for st in before for s in _lines(st)), \
+        "R-002: the Socket CLI is not installed at its recorded version (1.7.0) before the scan"
 
 
 def test_r002_three_scanners_unguarded_on_ubuntu():
@@ -249,14 +255,14 @@ def test_r002_lockfile_pins_closure():
 def test_r002_secrets_only_in_step_env():
     """R-002: `secrets.` appears only inside a step's env: mapping (never in run/with/uses, job- or workflow-level keys), and Socket is authenticated by its repo secret."""
     data = _data()
-    assert "secrets." not in str({k: v for k, v in data.items() if k != "jobs"}), "R-002: secret at workflow level"
+    assert not SECRET_REF.search(str({k: v for k, v in data.items() if k != "jobs"})), "R-002: secret at workflow level"
     for name, job in _jobs(data).items():
-        assert "secrets." not in str({k: v for k, v in job.items() if k != "steps"}), f"R-002: secret at job level in {name}"
+        assert not SECRET_REF.search(str({k: v for k, v in job.items() if k != "steps"})), f"R-002: secret at job level in {name}"
         for step in _steps(job):
             for key, value in step.items():
                 if key == "env":
                     continue
-                assert "secrets." not in str(value), f"R-002: secret outside step env ({key}) in {name}"
+                assert not SECRET_REF.search(str(value)), f"R-002: secret outside step env ({key}) in {name}"
     _, step = _floor_step(data, re.compile(r"(?:^|\s)socket\s+ci\b"))
     socket_authenticated = "secrets.SOCKET_SECURITY_API_KEY" in str(step.get("env") or {})
     assert socket_authenticated, "R-002: the Socket step is not authenticated by secrets.SOCKET_SECURITY_API_KEY in its env"
