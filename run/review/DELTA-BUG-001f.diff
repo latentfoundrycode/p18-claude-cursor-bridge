@@ -1,0 +1,220 @@
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 72af276..4e4216c 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -369,6 +369,14 @@ Review A APPROVE, Review B REJECT; both blocking items converged with Review A's
+ ### BUG-001 round 4 — disposition (PR #21)
+ Review A APPROVE (nothing weaker than on main); Review B REJECT with four new bypasses of the structural test: an early `exit 0` in the Semgrep step, `code=0` after OSV's status, a secret handed to a third-party action step, `npm --prefix /x install` in the step holding the key. **REVIEWERS DISAGREE** on whether further bypasses of the structural test block (Review A: tail; Review B: blocking) — a correctness crux, settled by the supervisor. Every round since stage B1's review has found new ways past pattern checks of shell inside YAML while the CI change itself has been approved in every round: the tail of one hard subsystem, and a pattern check of it never ends. Decision: stop pattern-matching the floor and pin it. `test_r002_floor_job_is_the_pinned_one` compares the `security floor` job, every step verbatim, with a committed copy, so a skipped scanner, an overwritten status or an added step fails unless the same diff changes the pin, where both reviewers read it (§Anti-gaming); `test_r002_one_step_holds_a_secret` allows exactly one step in the whole workflow to refer to a repository secret, the Socket scan. These close all four of Review B's findings and Review A's chained second install. The pattern checks stay as a second line for the other job and later steps, tightened where cheap: chained commands split at `&&`, `||`, `;`, `|`; npm options with a separate value (`--prefix /x`), `cit`, `update`; expression names case-insensitive, `github['token']`; the job token kept apart from the step-env rule, so `with: token: ${{ github.token }}` stays allowed (Review A Should fix); a deferral names the owner and a date in either order; the env docstring says `true` or `1`. The mutation driver now counts a kill only when the named assertion fired (three mutants had been killed by the version pin, Review A Should fix; they now add a line beside the intact pinned install); 53 mutants, all killed. The remaining forms the patterns do not model (installs by pnpm or yarn without a script check) are moot for the pinned job and recorded in docs/HARDENING.md.
+ 
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| BUG-001 | 5 | Review A | 0 | 1 | 3 | yes — on the branch (see below) |
++| BUG-001 | 5 | Review B | 2 | 0 | 0 | yes — on the branch (see below) |
++
++### BUG-001 round 5 — disposition (PR #21)
++Review A APPROVE, Review B REJECT, on the same two gaps (converged): the job pin did not cover the workflow's top level, so a workflow-level `defaults: run: shell: "true {0}"` skipped the Socket step with every test green (and a workflow `env:` could set a registry, NODE_OPTIONS or BASH_ENV); and a reusable-workflow job with `secrets: inherit` passed the one-secret rule. FIX: `test_r002_workflow_is_the_pinned_one` pins the whole workflow verbatim (every top-level key and every job), so any change to `.github/workflows/tests.yml` must change the pin in the same diff; the one-secret rule also refuses a job that passes secrets on. Considers: the round-5 SCOPE file's stale count (replaced by round 6's); the deferral docstring says the either-order rule differs from completion-check's register convention. Driver: 56 mutants, all killed by the named assertion. **Consequence for later increments:** an increment that changes the workflow (TASK-006 adds the workflow check to CI) regenerates `WORKFLOW_PIN` in the same diff; its brief says so, and the reviewers read the pin's change as the workflow's.
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index e62d53a..e3d4e8b 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -12,7 +12,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ ### Leads (stage B1's review, 2026-10-16)
+ - The Semgrep rule packs `p/python` and `p/secrets` are fetched from the registry on every run; only the engine is pinned. An upstream rule change can turn an unrelated pull request red or drop coverage unseen. Settle: vendor a dated copy of the two packs into the repository, or accept the drift as a Decision.
+ - `npm install -g` of the Socket CLI resolves its transitive dependencies afresh on each run (24 packages, no lockfile for a global install). BUG-001 closed the install-time exposure only: whatever of them the CLI loads runs inside `socket ci`, with `SOCKET_CLI_API_TOKEN` in that process's environment, so an unpinned dependency is a risk of BUG-001's kind at scan time. Settle: install the CLI from a committed package-lock in a tool folder (`npm ci --ignore-scripts`), or record the drift as an accepted Decision with its reason; the first changes `test_r002_no_install_runs_beside_a_secret`'s pin, which reads the version on the install line, in the same increment.
+-- The structural CI test pins the `security floor` job verbatim (BUG-001 round 5); its pattern checks remain only as a second line for the tests job and later steps, and do not model every install form (pnpm or yarn installs have no script check; an npm option whose value starts with `-`). Settle when another job gains an install or a secret: pin that job as well rather than widen the patterns.
++- The structural CI test pins the whole workflow verbatim (BUG-001 rounds 5 and 6); its pattern checks remain as a second line that explains what a change breaks, and do not model every install form (pnpm or yarn installs have no script check; an npm option whose value starts with `-`). They matter only when the pin is regenerated: the reviewers of that diff read the workflow change itself.
+ - The full-tree Semgrep audit (2026-10-16, one accepted finding) is a point-in-time result; diff-aware scans never see code a pull request does not touch. Re-run it at each release (recorded in INVENTORY Decisions).
+ - The repository secret SEMGREP_APP_TOKEN is stored but unused (OSS engine); the owner could delete it and revoke the token (least privilege; not a defect).
+ 
+diff --git a/tests/test_release_b_bootstrap.py b/tests/test_release_b_bootstrap.py
+index 174f9c4..419394e 100644
+--- a/tests/test_release_b_bootstrap.py
++++ b/tests/test_release_b_bootstrap.py
+@@ -111,8 +111,9 @@ def test_r001_deferred_rows_parse():
+ def test_r001_no_deferred_row_reopens_a_settled_decision():
+     """R-001 (docs/BUILD_PLAN.md TASK-001 Done when: no Deferred row contradicts a Decision): no Deferred row is about a
+     question the Decisions table settled (R-038, the second-checkout question), and every row is a deferral the owner
+-    has made — its decision cell begins `no` and the row names the owner with a date (supervisor.md rule 44;
+-    completion-check's owner-dated convention; TASK-027 plans one at B6). This project narrows the template's
++    has made — its decision cell begins `no` and the row names the owner and a date, in either order (supervisor.md
++    rule 44; TASK-027 plans one at B6; completion-check.py reads the register, not this table, and wants the owner
++    before the date there). This project narrows the template's
+     `<yes — the question · no>`: an open owner question waits on the status file's Awaiting line, not in Deferred."""
+     for cells in _deferred_rows(_read("docs/INVENTORY.md")):
+         fault = _deferral_fault(cells)
+diff --git a/tests/test_release_b_ci_floor.py b/tests/test_release_b_ci_floor.py
+index aa850f6..4294b0e 100644
+--- a/tests/test_release_b_ci_floor.py
++++ b/tests/test_release_b_ci_floor.py
+@@ -36,61 +36,87 @@ INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:-{1,2}[\w-]+(?:=\S+|\s+[^-\
+ # npm's install and clean-install commands with their aliases (npm help install, npm help ci)
+ NPM_INSTALL = re.compile(r"\bnpm\s+(?:-{1,2}[\w-]+(?:=\S+|\s+[^-\s]\S*)?\s+)*?(?:install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add|ci"
+                          r"|clean-install|ic|install-clean|isntall-clean|it|cit|install-test|install-ci-test|update|up|upgrade)\b")
+-# The security floor job as committed, step by step, verbatim (the supervisor's pin, BUG-001 round 5): a change to
+-# any scanner step, its order, its inputs or its environment fails here and must change this pin in the same diff,
+-# where both reviewers read it (Merge-Verification-Policy §Anti-gaming). Regenerate it from the workflow only for a
+-# change the gate approves.
+-FLOOR_JOB = {'name': 'security floor',
+-     'runs-on': 'ubuntu-latest',
+-     'steps': [{'uses': 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09',
+-                'with': {'fetch-depth': 0, 'persist-credentials': False}},
+-               {'env': {'GITHUB_EVENT_BEFORE': '${{ github.event.before }}',
+-                        'GITHUB_EVENT_NAME': '${{ github.event_name }}',
+-                        'GITHUB_EVENT_PULL_REQUEST_BASE_SHA': '${{ github.event.pull_request.base.sha }}',
+-                        'GITHUB_SHA': '${{ github.sha }}'},
+-                'name': 'Semgrep',
+-                'run': 'set -euo pipefail\n'
+-                       'ARGS=(scan --config p/python --config p/secrets --config .semgrep.yml --config '
+-                       'bridge/cursor-bridge/semgrep-bridge-rules.yml --error)\n'
+-                       'if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then\n'
+-                       '  BASELINE="$(git merge-base "${GITHUB_EVENT_PULL_REQUEST_BASE_SHA}" "${GITHUB_SHA}")"\n'
+-                       '  ARGS+=(--baseline-commit "$BASELINE")\n'
+-                       'elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then\n'
+-                       '  BEFORE="${GITHUB_EVENT_BEFORE}"\n'
+-                       '  if [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then\n'
+-                       '    ARGS+=(--baseline-commit "$BEFORE")\n'
+-                       '  fi\n'
+-                       'fi\n'
+-                       'pipx run semgrep==1.176.1 "${ARGS[@]}" .\n',
+-                'shell': 'bash'},
+-               {'name': 'OSV-Scanner',
+-                'run': 'curl -fsSL -o osv-scanner '
+-                       '"https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"\n'
+-                       'echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner" | '
+-                       'sha256sum -c -\n'
+-                       'chmod +x osv-scanner\n'
+-                       'set +e\n'
+-                       './osv-scanner scan source --config=osv-scanner.toml '
+-                       "--lockfile='requirements.txt:requirements.lock'\n"
+-                       'code=$?\n'
+-                       'set -e\n'
+-                       'if [ "$code" -eq 0 ]; then\n'
+-                       '  exit 0\n'
+-                       'fi\n'
+-                       'if [ "$code" -eq 128 ]; then\n'
+-                       '  echo "OSV-Scanner exit 128: requirements.lock was not read"\n'
+-                       '  exit 128\n'
+-                       'fi\n'
+-                       'exit "$code"\n',
+-                'shell': 'bash'},
+-               {'uses': 'actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444',
+-                'with': {'node-version': '22'}},
+-               {'name': 'Install the Socket CLI',
+-                'run': 'npm install -g --ignore-scripts @socketsecurity/cli@1.7.0'},
+-               {'env': {'SOCKET_CLI_API_TOKEN': '${{ secrets.SOCKET_SECURITY_API_KEY }}',
+-                        'SOCKET_CLI_ORG_SLUG': '${{ vars.SOCKET_ORG_SLUG }}'},
+-                'name': 'Socket',
+-                'run': 'socket ci --no-banner'}]}
++# The whole workflow as committed, verbatim — every top-level key (triggers, permissions, any env or defaults) and
++# every job and step (the supervisor's pin, BUG-001 rounds 5 and 6): a change anywhere in the workflow fails here and
++# must change this pin in the same diff, where both reviewers read it (Merge-Verification-Policy §Anti-gaming).
++# Regenerate it from the workflow only for a change the gate approves. (`on` reads back as the key True, YAML 1.1.)
++WORKFLOW_PIN = {True: {'pull_request': None, 'push': {'branches': ['main']}},
++     'jobs': {'security-floor': {'name': 'security floor',
++                                 'runs-on': 'ubuntu-latest',
++                                 'steps': [{'uses': 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09',
++                                            'with': {'fetch-depth': 0, 'persist-credentials': False}},
++                                           {'env': {'GITHUB_EVENT_BEFORE': '${{ github.event.before }}',
++                                                    'GITHUB_EVENT_NAME': '${{ github.event_name }}',
++                                                    'GITHUB_EVENT_PULL_REQUEST_BASE_SHA': '${{ '
++                                                                                          'github.event.pull_request.base.sha '
++                                                                                          '}}',
++                                                    'GITHUB_SHA': '${{ github.sha }}'},
++                                            'name': 'Semgrep',
++                                            'run': 'set -euo pipefail\n'
++                                                   'ARGS=(scan --config p/python --config p/secrets --config '
++                                                   '.semgrep.yml --config '
++                                                   'bridge/cursor-bridge/semgrep-bridge-rules.yml --error)\n'
++                                                   'if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then\n'
++                                                   '  BASELINE="$(git merge-base '
++                                                   '"${GITHUB_EVENT_PULL_REQUEST_BASE_SHA}" "${GITHUB_SHA}")"\n'
++                                                   '  ARGS+=(--baseline-commit "$BASELINE")\n'
++                                                   'elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then\n'
++                                                   '  BEFORE="${GITHUB_EVENT_BEFORE}"\n'
++                                                   '  if [ "$BEFORE" != '
++                                                   '"0000000000000000000000000000000000000000" ]; then\n'
++                                                   '    ARGS+=(--baseline-commit "$BEFORE")\n'
++                                                   '  fi\n'
++                                                   'fi\n'
++                                                   'pipx run semgrep==1.176.1 "${ARGS[@]}" .\n',
++                                            'shell': 'bash'},
++                                           {'name': 'OSV-Scanner',
++                                            'run': 'curl -fsSL -o osv-scanner '
++                                                   '"https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"\n'
++                                                   'echo '
++                                                   '"160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  '
++                                                   'osv-scanner" | sha256sum -c -\n'
++                                                   'chmod +x osv-scanner\n'
++                                                   'set +e\n'
++                                                   './osv-scanner scan source --config=osv-scanner.toml '
++                                                   "--lockfile='requirements.txt:requirements.lock'\n"
++                                                   'code=$?\n'
++                                                   'set -e\n'
++                                                   'if [ "$code" -eq 0 ]; then\n'
++                                                   '  exit 0\n'
++                                                   'fi\n'
++                                                   'if [ "$code" -eq 128 ]; then\n'
++                                                   '  echo "OSV-Scanner exit 128: requirements.lock was not '
++                                                   'read"\n'
++                                                   '  exit 128\n'
++                                                   'fi\n'
++                                                   'exit "$code"\n',
++                                            'shell': 'bash'},
++                                           {'uses': 'actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444',
++                                            'with': {'node-version': '22'}},
++                                           {'name': 'Install the Socket CLI',
++                                            'run': 'npm install -g --ignore-scripts @socketsecurity/cli@1.7.0'},
++                                           {'env': {'SOCKET_CLI_API_TOKEN': '${{ secrets.SOCKET_SECURITY_API_KEY '
++                                                                            '}}',
++                                                    'SOCKET_CLI_ORG_SLUG': '${{ vars.SOCKET_ORG_SLUG }}'},
++                                            'name': 'Socket',
++                                            'run': 'socket ci --no-banner'}]},
++              'tests': {'name': 'bridge programs (${{ matrix.os }})',
++                        'runs-on': '${{ matrix.os }}',
++                        'steps': [{'uses': 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09',
++                                   'with': {'persist-credentials': False}},
++                                  {'uses': 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1',
++                                   'with': {'python-version': '3.12'}},
++                                  {'run': 'python -m pip install -r requirements.lock'},
++                                  {'run': 'python -m pytest tests -q'},
++                                  {'name': "windowless check over the bridge's programs",
++                                   'run': 'python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge'},
++                                  {'name': 'the manifest matches the tree',
++                                   'run': 'python bridge/cursor-bridge/bridge-check.py --root bridge --sources '
++                                          '--quiet'}],
++                        'strategy': {'fail-fast': False, 'matrix': {'os': ['windows-latest', 'ubuntu-latest']}}}},
++     'name': 'tests',
++     'permissions': {'contents': 'read'}}
++FLOOR_JOB = WORKFLOW_PIN["jobs"]["security-floor"]
+ LOCK_CLOSURE = {"pytest", "pyyaml", "colorama", "iniconfig", "packaging", "pluggy", "pygments"}
+ 
+ 
+@@ -291,11 +317,22 @@ def test_r002_floor_job_is_the_pinned_one():
+     assert data["jobs"].get("security-floor") == FLOOR_JOB, "R-002: the security floor job differs from the pinned one"
+ 
+ 
++def test_r002_workflow_is_the_pinned_one():
++    """R-002 (the stage B1 review, BUG-001 round 6): the whole workflow is exactly the committed one, so a workflow-level
++    `env:` or `defaults:` (a `run.shell` that skips every step, a registry, NODE_OPTIONS, BASH_ENV), a new job or a
++    changed trigger cannot change how the floor runs without this pin changing in the same diff."""
++    assert _data() == WORKFLOW_PIN, "R-002: the workflow differs from the pinned one"
++
++
+ def test_r002_one_step_holds_a_secret():
+     """R-002 (secure-coding.snapshot.md V14; the brief: no secret on a scanner's path beyond its own token): in the whole
+     workflow exactly one step refers to a repository secret, in any key — the Socket scan, which runs only
+-    `socket ci --no-banner` — so no action, install or other command is handed one."""
+-    holders = [(name, step.get("name")) for name, job in _jobs(_data()).items() for step in _steps(job)
++    `socket ci --no-banner` — so no action, install or other command is handed one; and no job passes secrets on
++    (a reusable-workflow call with `secrets:`, `secrets: inherit` included)."""
++    data = _data()
++    for name, job in _jobs(data).items():
++        assert "secrets" not in job, f"R-002: job {name} passes secrets on"
++    holders = [(name, step.get("name")) for name, job in _jobs(data).items() for step in _steps(job)
+                if SECRET_CTX.search(str(step))]
+     assert holders == [("security-floor", "Socket")], f"R-002: the steps referring to a secret are {holders}"
+ 
