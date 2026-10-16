@@ -16,7 +16,7 @@ Worktrees: none
 In flight: none
 Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation driver mutate_ci_floor.py, drafts/, in-flight.md as a scratch log while a review runs)
 Delegated gates: none
-Remote sync: main at 4d0f77b, in sync 2026-10-16; branch task-006 to be pushed as a pull request (TASK-006)
+Remote sync: main at 4d0f77b, in sync 2026-10-16; branch task-006 pushed as PR #23 (TASK-006)
 Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
 Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25)
 Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
