@@ -99,7 +99,7 @@ Parent: none
 Depends on: TASK-007
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/inventory-check.py; bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_workflows_line_check.py
+Scope: bridge/cursor-bridge/inventory-check.py; bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/workflow-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_workflows_line_check.py; tests/test_conformance_check.py
 Satisfies: R-015
 Done when: `inventory-check.py`/`conformance-check.py` read the `Workflows:` line and report a malformed or missing one; `test_workflows_line_check.py` (names R-015) covers valid, missing, malformed.
 

@@ -19,11 +19,16 @@ Run from the Workspace root. Deterministic; reads only. Checks:
                       Resources table does not name. OS / CI / toolchain variables are ignored.
  5. SECRET VALUE      a Resources cell holds something that looks like a secret value. The
                       inventory names secrets and says where they live; it never holds one.
+ 6. WORKFLOWS LINE    the status file's Workflows: line is present, well formed, and directly
+                      after Phase: (missing, malformed, or not right after Phase:; R-015). The
+                      grammar is workflow-check.py's; unwritten types and traits are that
+                      program's concern, not a failure here.
 
 Notes (never fail): a Resources name that no code reads (fine for an account or a tool; stale
 otherwise). Exit 0 = OK, 1 = at least one failure. ASCII output only.
 """
 import argparse
+import importlib.util
 import os
 import re
 import subprocess
@@ -174,6 +179,59 @@ def env_reads(files):
     return found
 
 
+def judge_workflows_line(path, text):
+    """Judge one status file's Workflows lines (R-015).
+
+    Returns (outcome, rows). outcome is valid, missing, malformed, or not-checked.
+    rows is empty for valid and missing. For malformed, each row is an ASCII
+    (name, reason). For not-checked, each row is an ASCII reason. The grammar is
+    workflow-check.py's check_status; placement is its check_placement. Codes f and
+    FLAG are dropped. Nothing runs at import time.
+    """
+    def ascii_text(value):
+        return ("" if value is None else str(value)).encode("ascii", "backslashreplace").decode("ascii")
+
+    def field(mod, value):
+        return ascii_text(mod.escape_field(value))
+
+    checker = os.path.join(os.path.dirname(os.path.realpath(__file__)), "workflow-check.py")
+    shown = checker.replace("\\", "/")
+    previous_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec = importlib.util.spec_from_file_location("workflow_check", checker)
+        if spec is None or spec.loader is None:
+            raise ImportError("no loader")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except (Exception, SystemExit) as err:
+        return "not-checked", [ascii_text("%s: cannot be loaded (%s)" % (shown, type(err).__name__))]
+    finally:
+        sys.dont_write_bytecode = previous_bytecode
+    try:
+        causes = []
+        open_text, open_shown, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
+        reg_text, reg_shown, reg_err = mod.read_utf8(mod.DEFAULT_REGISTRY)
+        if open_err:
+            causes.append("%s: %s" % (open_shown, open_err))
+        if reg_err:
+            causes.append("%s: %s" % (reg_shown, reg_err))
+        if causes:
+            return "not-checked", [field(mod, cause) for cause in causes]
+        tables, errors = mod.load_tables(open_text, mod.DEFAULT_OPEN, reg_text, mod.DEFAULT_REGISTRY)
+        if errors:
+            return "not-checked", [field(mod, "%s: %s" % (item_path, reason)) for item_path, reason in errors]
+        findings = [item for item in mod.check_status(path, text, tables) if item[0] not in ("f", "FLAG")]
+        if any(item[3] == "status file has no Workflows line" for item in findings):
+            return "missing", []
+        findings.extend(mod.check_placement(path, text))
+        if findings:
+            return "malformed", [(field(mod, item[2]), field(mod, item[3])) for item in findings]
+        return "valid", []
+    except (Exception, SystemExit) as err:
+        return "not-checked", [ascii_text("%s: %s" % (shown, type(err).__name__))]
+
+
 def main():
     ap = argparse.ArgumentParser(description="Check the project's current-state record.")
     ap.add_argument("--inventory", default="docs/INVENTORY.md")
@@ -194,6 +252,17 @@ def main():
                          "docs/archive/." % (a.status, n_lines, n_chars, a.max_lines, a.max_chars))
         else:
             notes.append("status: %d lines / %d chars (cap %d / %d)" % (n_lines, n_chars, a.max_lines, a.max_chars))
+        # 6. Workflows line (R-015), after the length cap and before SHAPE.
+        outcome, rows = judge_workflows_line(a.status, st)
+        if outcome == "missing":
+            shown = a.status.replace("\\", "/")
+            fails.append(("WORKFLOWS LINE: missing: %s has no Workflows line" % shown).encode("ascii", "backslashreplace").decode("ascii"))
+        elif outcome == "malformed":
+            for name, reason in rows:
+                fails.append("WORKFLOWS LINE: malformed: %s - %s" % (name, reason))
+        elif outcome == "not-checked":
+            for reason in rows:
+                fails.append("WORKFLOWS LINE: not checked: %s" % reason)
     else:
         notes.append("status: %s not found (skipped)" % a.status)
 
