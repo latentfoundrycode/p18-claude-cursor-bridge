@@ -3,7 +3,7 @@ Last updated: 2026-10-17
 Phase: building
 Workflows: Host Extension Development → Claude Code Extension; traits: Installable
 Change cycle: none
-Increment: TASK-008 — the Workflows status line enforced (branch task-008): accepted at 825b905 (builder run 2026-10-16T21:46:53Z; scope clean; suite 1107 passed, 21 skipped; driver 21/21; sentinel clear); the gate (Review A, the security auditor, Review B, CI) follows
+Increment: TASK-008 — the Workflows status line enforced (branch task-008, PR #24): round 1 Review B APPROVE, Review A REJECT (the supervisor's tests) and a convergent finding (bytecode written by the load); round 2 accepted (builder run 2026-10-16T22:21:49Z; suite 1116 passed, 23 skipped; driver 31/31; sentinel clear); round 2's gate follows
 Last accepted: TASK-006, the workflow check, at commit e2a7f9f (merged to main 2026-10-16, PR #23, after six review rounds; the long tail of Markdown parsing recorded by class in HARDENING); main holds TASK-001 to TASK-007, and BUG-001
 Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
 Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
