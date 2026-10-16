@@ -3,11 +3,11 @@ Last updated: 2026-10-16
 Phase: building
 Workflows: Host Extension Development → Claude Code Extension; traits: Installable
 Change cycle: none
-Increment: BUG-001 — stage B1's review fixes (branch stage-b1-close): the supervisor's tightened stage tests, the Socket CLI installed in a step without the key, and these records
-Last accepted: TASK-002 at commit fba63bc (merged to main 2026-10-13); main holds TASK-001 to TASK-005, TASK-007 and TASK-002
+Increment: BUG-001 follow-up (branch b1-followup): the supervisor's test that the workflow folder holds the pinned workflow alone (Review A's round-6 Should fix), and the round-6 records
+Last accepted: BUG-001 at commit 6743b25 (merged to main 2026-10-16, PR #21, six rounds); main holds TASK-001 to TASK-005, TASK-007, TASK-002 and BUG-001
 Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
 Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
-Next: BUG-001 through the gate (snapshot, Review A + Review B, CI, premerge, merge); then, once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc and BUG-001's squash), then the reflection items; meanwhile stage B2's TASK-006, TASK-008, TASK-009 and stage B3's TASK-016 as plan-check orders them.
+Next: this follow-up through the gate; then, once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25 and this follow-up's squash), then the reflection items; meanwhile stage B2's TASK-006, TASK-008, TASK-009 and stage B3's TASK-016 as plan-check orders them.
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
 Software name: Claude-Cursor Bridge
@@ -16,9 +16,9 @@ Worktrees: none
 In flight: none
 Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation driver mutate_ci_floor.py, drafts/, in-flight.md as a scratch log while a review runs)
 Delegated gates: none
-Remote sync: main at fba63bc, in sync 2026-10-16; branch stage-b1-close pushed as PR #21 (BUG-001)
+Remote sync: main at 6743b25, in sync 2026-10-16; branch b1-followup to be pushed as a pull request
 Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
-Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed on this branch)
+Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25)
 Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
 Bridge version: 2026.10.11d
 Calibrated: n/a — the bridge runs the installed 2026.10.11d it is the source of; intake 2026-10-11
