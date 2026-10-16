@@ -22,3 +22,8 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 ## Stage B2 — carried to its close (test lane)
 - tests/test_open_list.py: pin "filled, including"; fix the stale comment at :25 (TASK-004 r3 Consider).
 - tests/test_extension_points.py: pin the configuration.items CI route, the inspect step's members, and the placement sentence (TASK-005 r6 Consider).
+
+## Stage B2 — TASK-006, the workflow check (by-class line, review round 3)
+- A change word wrapped in markup or joined by another character is still prose: `## **Set** intake.x`, `` ## `Replace` design ``, `## Set:at intake.x`, `## Set` with an em dash. Strip leading and trailing `*`, `_`, backticks and any dash before the comparison (Review A, round 3 Consider 2; the tail of heading parsing, low likelihood).
+- With `os.path.isjunction` (Python 3.12+) only symbolic links and junctions count as links; without it every reparse point does (OneDrive placeholders, deduplicated files), so one tree can pass on 3.12 and fail as `form` on 3.11. Fail-closed by design; CI pins 3.12; say so where the supported Pythons are described (Review A, round 3 Consider 3).
+- `os.path.lexists` is false on any `lstat` error, not only on a missing path, so a layer path the check cannot `lstat` at all (a permission error on `ROOT/types`) is skipped as absent rather than reported. Nothing is walked, so no link is followed; only the report is lost. Distinguish with a direct `os.lstat` if it matters (supervisor, round 4 inspection).
