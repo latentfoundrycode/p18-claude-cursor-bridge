@@ -1,0 +1,48 @@
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 518e44d..759a26f 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -383,7 +383,15 @@ Review A APPROVE, Review B REJECT, on the same two gaps (converged): the job pin
+ | BUG-001 | 6 | Review B | 0 | 0 | 0 | — |
+ 
+ ### BUG-001 round 6 — disposition (PR #21, merged 6743b25)
+-Both APPROVE; Review A confirmed `WORKFLOW_PIN` equals the committed workflow and nothing is weaker than on main. Should fix (Review A alone, not converged): the pin and the one-secret rule read `tests.yml` only, so a second file under `.github/workflows/` could hand the key to an install with every test green — the edge of what the pin covers, not a bypass of it, and a new file that scope-check lists and every reviewer reads. By-class line: merged, and fixed on the follow-up branch before stage B1's review runs again: `test_r002_workflow_is_the_only_one` requires the workflow folder to hold the pinned workflow alone (driver mutant: a second workflow beside it; 57 mutants, all killed). Considers, to docs/HARDENING.md: PyYAML (YAML 1.1) and GitHub's parser read some spellings differently; the scanners' own configuration files sit outside the pin.
++Both APPROVE; Review A confirmed `WORKFLOW_PIN` equals the committed workflow and nothing is weaker than on main. Should fix (Review A alone, not converged): the pin and the one-secret rule read `tests.yml` only, so a second file under `.github/workflows/` could hand the key to an install and still merge with every test green (the tests guard the merge, not that pull request's own CI run; HARDENING) — the edge of what the pin covers, not a bypass of it, and a new file that scope-check lists and every reviewer reads. By-class line: merged, and fixed on the follow-up branch before stage B1's review runs again: `test_r002_workflow_is_the_only_one` requires the workflow folder to hold the pinned workflow alone (driver mutant: a second workflow beside it; 57 mutants, all killed). Considers, to docs/HARDENING.md: PyYAML (YAML 1.1) and GitHub's parser read some spellings differently; the scanners' own configuration files sit outside the pin.
++
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| BUG-001 follow-up (PR #22) | 1 | Review A | 0 | 1 | 2 | yes — on the branch |
++| BUG-001 follow-up (PR #22) | 1 | Review B | 0 | 0 | 1 | yes — on the branch |
++
++### BUG-001 follow-up round 1 — disposition (PR #22)
++Both APPROVE; both named the status file's stale Remote sync line (converged, so blocking): fixed. Review A's Considers: the bridge's own Semgrep rules file added to the scanner-configuration lead; a new lead that the structural tests guard the merge and not a pull request's own CI run (the key in a GitHub Environment, or on pushes to main only), and round 6's disposition reworded so it does not read as preventing that.
+ 
+ ## Resolution
+ | Question | Settled | How |
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 1deabb0..bb5846d 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -14,7 +14,8 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ - `npm install -g` of the Socket CLI resolves its transitive dependencies afresh on each run (24 packages, no lockfile for a global install). BUG-001 closed the install-time exposure only: whatever of them the CLI loads runs inside `socket ci`, with `SOCKET_CLI_API_TOKEN` in that process's environment, so an unpinned dependency is a risk of BUG-001's kind at scan time. Settle: install the CLI from a committed package-lock in a tool folder (`npm ci --ignore-scripts`), or record the drift as an accepted Decision with its reason; the first changes `test_r002_no_install_runs_beside_a_secret`'s pin, which reads the version on the install line, in the same increment.
+ - The structural CI test pins the whole workflow verbatim (BUG-001 rounds 5 and 6); its pattern checks remain as a second line that explains what a change breaks, and do not model every install form (pnpm or yarn installs have no script check; an npm option whose value starts with `-`). They matter only when the pin is regenerated: the reviewers of that diff read the workflow change itself.
+ - The workflow pin is compared through PyYAML, which reads YAML 1.1; GitHub's parser differs on some spellings (`true:`/`yes:`/`On:` for `on:`, a `<<:` merge key, a duplicated key, `off`/`no` for a boolean, `00` for a number), which parse to the pinned values here (BUG-001 round 6, Review A). In each case worked through, the scanners behave the same or GitHub refuses the workflow, so the required checks never report and the merge is blocked. Settle: a throwaway pull request with each spelling, closed unmerged; or compare the raw text as well as the parsed form.
+-- The scanners' own configuration files (`osv-scanner.toml`, `socket.yml`, `.semgrep.yml`, a new `.semgrepignore`) sit outside the workflow pin; any could narrow a scanner to nothing with every test green (BUG-001 round 6, Review A; main has the same gap). Settle: pin their hashes in the structural test, so a change to one changes the test in the same diff.
++- The scanners' own configuration files (`osv-scanner.toml`, `socket.yml`, `.semgrep.yml`, `bridge/cursor-bridge/semgrep-bridge-rules.yml`, which the workflow passes to Semgrep with `--config`, a new `.semgrepignore`) sit outside the workflow pin; any could narrow a scanner to nothing with every test green (BUG-001 round 6, Review A; main has the same gap). Settle: pin their hashes in the structural test, so a change to one changes the test in the same diff.
++- The structural tests guard the merge, not the run: a same-repository pull request that adds a workflow or edits `tests.yml` runs it on its own CI run, with the repository's secrets available, before any test can fail (PR #22, Review A; true on main before). Settle: put SOCKET_SECURITY_API_KEY in a GitHub Environment with required reviewers, or supply it only on pushes to main; either is a change to how the owner's key is reached, so it comes with its run sheet.
+ - The full-tree Semgrep audit (2026-10-16, one accepted finding) is a point-in-time result; diff-aware scans never see code a pull request does not touch. Re-run it at each release (recorded in INVENTORY Decisions).
+ - The repository secret SEMGREP_APP_TOKEN is stored but unused (OSS engine); the owner could delete it and revoke the token (least privilege; not a defect).
+ 
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 1415a59..8c4b6e9 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -16,7 +16,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation driver mutate_ci_floor.py, drafts/, in-flight.md as a scratch log while a review runs)
+ Delegated gates: none
+-Remote sync: main at 6743b25, in sync 2026-10-16; branch b1-followup to be pushed as a pull request
++Remote sync: main at 6743b25, in sync 2026-10-16; branch b1-followup pushed as PR #22 (BUG-001 follow-up)
+ Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
+ Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25)
+ Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
