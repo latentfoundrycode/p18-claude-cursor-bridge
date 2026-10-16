@@ -1,0 +1,165 @@
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 5d956e3..df475b7 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -345,6 +345,14 @@ Both REJECT. Converged (both reviewers): the status file on main was stale, desc
+ ### BUG-001 round 1 — disposition (PR #21)
+ Both APPROVE; the builder's change matches the brief; CI on the head shows the CLI installed without scripts (24 packages), the scan run, no banner. Converged, so taken as blocking: `--ignore-scripts` matched as a substring (`--ignore-scripts=false` passed; Review B Should fix, Review A Consider) and a deferral passed on any date in its row (Review B Should fix, Review A Consider). FIX in the supervisor's tests: the flag matched whole; a secret found in any expression form (`secrets.X` and `secrets['X']`, Review B); the install pattern widened to `npm ci`, `npx`, `pip3`, `uv`, `go`/`gem`/`cargo install` (Review A); the CLI held at its recorded 1.7.0 (Review A); `pull_request` must run on open, update and reopen (`types: [closed]` passed, Review B); a deferral needs the owner named with a date in its decision cell. Driver: 35 mutants, all killed, the six new ones among them. Records: HARDENING's npm lead said the dependencies run "without the key in reach", true at install only — reworded for scan time (Review A Should fix); the runner-image date marked unconfirmed (Review A); the status file names PR #21 and what lives in `run/supervisor/` (Review A); this record's wording on the three logs (Review B). The bridge's own CI guidance lacking `--no-banner` and the keyless install (Review A Consider) → FB-007, widened. The diff file's trailing whitespace (Review B Consider) is the diff's own content, not taken.
+ 
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| BUG-001 | 2 | Review A | 0 | 2 | 5 | yes — on the branch (see below) |
++| BUG-001 | 2 | Review B | 1 | 0 | 0 | yes — on the branch (see below) |
++
++### BUG-001 round 2 — disposition (PR #21)
++Review A APPROVE, Review B REJECT. Converged (Review B Blocking, Review A Consider): `--ignore-scripts --ignore-scripts=false` passed while npm takes the last setting. FIX: an npm install line's one mention of the setting must be the bare `--ignore-scripts`; no env at any level sets npm's ignore-scripts config; npm's install and clean-install aliases (`add`, `isntall`, `clean-install`, …) are all checked. Review A's Should fix: an open "yes" naming the owner and a date passed — the row rule now follows the template (`<yes — the question · no>`) and completion-check's owner-dated convention: a deferral reads `no` in its decision cell and names the owner with a date in the row, and an open question waits on the status file's Awaiting line (this also answers Review A's Consider that a template row failed); `${{ toJSON(secrets) }}` passed — the secret pattern now matches any expression reading the secrets context. Considers taken: `uvx`, `pnpm dlx`, `yarn dlx`, `bunx` in the install pattern; a self-test of the secret and install patterns; HARDENING's npm lead says its settle changes the pin test. The driver counts only an assertion as a kill (a crash is reported), and holds 41 mutants, all killed; the round-2 SCOPE file's stale count is replaced by round 3's.
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 585204d..8db323b 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -11,7 +11,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ 
+ ### Leads (stage B1's review, 2026-10-16)
+ - The Semgrep rule packs `p/python` and `p/secrets` are fetched from the registry on every run; only the engine is pinned. An upstream rule change can turn an unrelated pull request red or drop coverage unseen. Settle: vendor a dated copy of the two packs into the repository, or accept the drift as a Decision.
+-- `npm install -g` of the Socket CLI resolves its transitive dependencies afresh on each run (24 packages, no lockfile for a global install). BUG-001 closed the install-time exposure only: whatever of them the CLI loads runs inside `socket ci`, with `SOCKET_CLI_API_TOKEN` in that process's environment, so an unpinned dependency is a risk of BUG-001's kind at scan time. Settle: install the CLI from a committed package-lock in a tool folder (`npm ci --ignore-scripts`), or record the drift as an accepted Decision with its reason.
++- `npm install -g` of the Socket CLI resolves its transitive dependencies afresh on each run (24 packages, no lockfile for a global install). BUG-001 closed the install-time exposure only: whatever of them the CLI loads runs inside `socket ci`, with `SOCKET_CLI_API_TOKEN` in that process's environment, so an unpinned dependency is a risk of BUG-001's kind at scan time. Settle: install the CLI from a committed package-lock in a tool folder (`npm ci --ignore-scripts`), or record the drift as an accepted Decision with its reason; the first changes `test_r002_no_install_runs_beside_a_secret`'s pin, which reads the version on the install line, in the same increment.
+ - The full-tree Semgrep audit (2026-10-16, one accepted finding) is a point-in-time result; diff-aware scans never see code a pull request does not touch. Re-run it at each release (recorded in INVENTORY Decisions).
+ - The repository secret SEMGREP_APP_TOKEN is stored but unused (OSS engine); the owner could delete it and revoke the token (least privilege; not a defect).
+ 
+diff --git a/tests/test_release_b_bootstrap.py b/tests/test_release_b_bootstrap.py
+index 5b742ae..aa5c033 100644
+--- a/tests/test_release_b_bootstrap.py
++++ b/tests/test_release_b_bootstrap.py
+@@ -74,24 +74,46 @@ def _deferred_rows(inv):
+     return [c for c in cells if c and c[0] != "(none)"]
+ 
+ 
++OWNER_DATED = re.compile(r"\bowner\b.*\b\d{4}-\d{2}-\d{2}\b", re.I)  # completion-check.py's convention
++
++
++def _deferral_fault(cells):
++    """Why a Deferred row is not a settled owner deferral, or None. The template's last cell is
++    `<yes — the question · no>`: a deferral the owner made reads `no` there and names the owner with a date in the row."""
++    item = cells[0].lower()
++    if any(s in item for s in SETTLED_ELSEWHERE):
++        return "a settled decision sits in Deferred"
++    if cells[-1].strip().lower() != "no":
++        return "an owner decision is still open on it"
++    if not OWNER_DATED.search(" | ".join(cells[1:-1])):
++        return "the row does not name the owner with a date"
++    return None
++
++
+ def test_r001_deferred_rows_parse():
+-    """R-001: the row parser reads a real row and skips the placeholder (a negative test must show its precondition)."""
++    """R-001: the row parser reads a real row and skips the placeholder, and the row rule accepts a deferral written to
++    the template and refuses the open forms (a negative test must show its precondition)."""
+     table = "## Deferred\n| Item | Why deferred | Since | Owner decision needed |\n|---|---|---|---|\n| (none) | — | — | — |\n| R-038 install | x | 2026-10-11 | yes |\n"
+     assert _deferred_rows(table) == [["R-038 install", "x", "2026-10-11", "yes"]]
+     assert _deferred_rows(table.split("| R-038")[0]) == []
++    assert _deferral_fault(["a later feature", "deferred by the owner", "2026-11-01", "no"]) is None
++    for row in (["a later feature", "not yet", "2026-10-16", "yes"],
++                ["a later feature", "not yet", "2026-10-16", "yes — the owner asked 2026-10-16"],
++                ["a later feature", "not yet", "2026-10-16", "yes — does the owner defer it? (asked 2026-10-16)"],
++                ["a later feature", "not yet", "2026-10-16", "no"],
++                ["R-038 second checkout", "deferred by the owner", "2026-10-11", "no"]):
++        assert _deferral_fault(row), row
+ 
+ 
+ def test_r001_no_deferred_row_reopens_a_settled_decision():
+     """R-001 (docs/BUILD_PLAN.md TASK-001 Done when: no Deferred row contradicts a Decision): no Deferred row is about a
+-    question the Decisions table settled (R-038, the second-checkout question), and every real deferral carries the
+-    owner's dated approval in its decision cell — the owner named with a date, never an open "yes" (supervisor.md rule 44;
+-    TASK-027 plans one at B6)."""
++    question the Decisions table settled (R-038, the second-checkout question), and every row is a deferral the owner
++    has made — its decision cell reads `no` and the row names the owner with a date (supervisor.md rule 44; the
++    template's `<yes — the question · no>`; completion-check's owner-dated convention; TASK-027 plans one at B6).
++    An open owner question waits on the status file's Awaiting line, not here."""
+     for cells in _deferred_rows(_read("docs/INVENTORY.md")):
+-        item = cells[0].lower()
+-        assert not any(s in item for s in SETTLED_ELSEWHERE), f"R-001: a settled decision sits in Deferred: {cells[0]!r}"
+-        decision = cells[-1].lower()
+-        assert "owner" in decision and re.search(r"\b\d{4}-\d{2}-\d{2}\b", decision), \
+-            f"R-001: a deferral without the owner's dated approval in its decision cell: {cells[0]!r}"
++        fault = _deferral_fault(cells)
++        assert fault is None, f"R-001: {fault}: {cells[0]!r}"
+ 
+ 
+ def test_r001_phase_matches_status():
+diff --git a/tests/test_release_b_ci_floor.py b/tests/test_release_b_ci_floor.py
+index 3c3ef84..dcbdfd6 100644
+--- a/tests/test_release_b_ci_floor.py
++++ b/tests/test_release_b_ci_floor.py
+@@ -24,9 +24,14 @@ OSV = re.compile(r"osv-scanner", re.I)
+ SOCKET = re.compile(r"\bsocket(?:security)?\b", re.I)
+ SCANNERS = (("semgrep", SEMGREP), ("osv-scanner", OSV), ("socket", SOCKET))
+ DISABLERS = re.compile(r"(?:\|\||;)\s*(?:true\b|exit\s+0\b|:(?=\s|$|;)|echo\b)")
+-SECRET_REF = re.compile(r"\bsecrets\s*(?:\.|\[)")
+-INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn)\s+(?:install|add|i|ci)\b|\bnpx\b|\bpip3?\s+install\b|\buv\s+(?:pip|tool|add|sync|run)\b"
+-                      r"|\bgo\s+install\b|\bgem\s+install\b|\bcargo\s+install\b|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
++# any expression that reads the secrets context: secrets.X, secrets['X'], toJSON(secrets)
++SECRET_REF = re.compile(r"\$\{\{[^}]*\bsecrets\b")
++INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:install|add|i|ci|dlx|x)\b|\b(?:npx|bunx|uvx)\b|\bpip3?\s+install\b"
++                      r"|\buv\s+(?:pip|tool|add|sync|run)\b|\bgo\s+install\b|\bgem\s+install\b|\bcargo\s+install\b"
++                      r"|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
++# npm's install and clean-install commands with their aliases (npm help install, npm help ci)
++NPM_INSTALL = re.compile(r"\bnpm\s+(?:install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add|ci|clean-install"
++                         r"|ic|install-clean|isntall-clean)\b")
+ LOCK_CLOSURE = {"pytest", "pyyaml", "colorama", "iniconfig", "packaging", "pluggy", "pygments"}
+ 
+ 
+@@ -70,6 +75,19 @@ def test_r002_disabler_pattern_catches_the_idioms():
+         assert not DISABLERS.search(ok), ok
+ 
+ 
++def test_r002_secret_and_install_patterns_catch_their_forms():
++    """R-002: the patterns the secret and install checks rely on match each form they claim (a negative test must show its precondition)."""
++    for bad in ("${{ secrets.X }}", "${{ secrets['X'] }}", "${{ toJSON(secrets) }}", "${{secrets.X}}"):
++        assert SECRET_REF.search(bad), bad
++    for ok in ("${{ vars.SOCKET_ORG_SLUG }}", "${{ github.sha }}", "secrets/ folder"):
++        assert not SECRET_REF.search(ok), ok
++    for bad in ("npm install x", "npm ci", "npx x", "pnpm dlx x", "yarn dlx x", "bunx x", "uvx x", "uv tool run x",
++                "pip3 install x", "go install x", "curl -fsSL x"):
++        assert INSTALLS.search(bad), bad
++    for bad in ("npm i -g x", "npm add x", "npm isntall x", "npm clean-install"):
++        assert NPM_INSTALL.search(bad), bad
++
++
+ def test_r002_workflow_parses():
+     """R-002: the workflow is valid YAML with jobs."""
+     data = _data()
+@@ -139,17 +157,24 @@ def test_r002_each_scanner_decides_its_step():
+ 
+ def test_r002_no_install_runs_beside_a_secret():
+     """R-002 (secure-coding.snapshot.md V14, never expose secrets; the brief: no secret on a scanner's path beyond its own
+-    token): no step that carries a secret (in any expression form) installs or fetches anything, every npm install skips
+-    lifecycle scripts (the flag itself, never `--ignore-scripts=false`), and the Socket CLI is installed at the version the
+-    inventory records (1.7.0; a bump is an admission, supervisor.md rule 14) in a step of the floor's job before the scan."""
+-    for name, job in _jobs(_data()).items():
++    token): no step that carries a secret (any expression reading the secrets context) installs or fetches anything;
++    every npm install skips lifecycle scripts — the line's one mention of the setting is the bare `--ignore-scripts`
++    (npm takes the last of several, so `--ignore-scripts --ignore-scripts=false` runs scripts), and no env at any level
++    sets npm's ignore-scripts config; and the Socket CLI is installed at the version the inventory records (1.7.0; a
++    bump is an admission, supervisor.md rule 14) in a step of the floor's job before the scan."""
++    data = _data()
++    envs = [data.get("env")] + [j.get("env") for j in _jobs(data).values()] + [s.get("env") for j in _jobs(data).values() for s in _steps(j)]
++    for env in envs:
++        assert "ignore_scripts" not in str(env or {}).lower().replace("-", "_"), f"R-002: an env sets npm's ignore-scripts config: {env!r}"
++    for name, job in _jobs(data).items():
+         for step in _steps(job):
+             if SECRET_REF.search(str(step.get("env") or {})):
+                 for s in _lines(step):
+                     assert not INSTALLS.search(s), f"R-002: a step holding a secret installs or fetches ({name}): {s!r}"
+             for s in _lines(step):
+-                if re.search(r"\bnpm\s+(?:install|i|ci)\b", s):
+-                    assert re.search(r"(?:^|\s)--ignore-scripts(?=\s|$)", s), f"R-002: npm install without --ignore-scripts: {s!r}"
++                if NPM_INSTALL.search(s):
++                    mentions = [t for t in s.split() if "ignore-scripts" in t.lower() or "ignore_scripts" in t.lower()]
++                    assert mentions == ["--ignore-scripts"], f"R-002: npm install must carry exactly one bare --ignore-scripts: {s!r}"
+     job, socket = _floor_step(_data(), re.compile(r"(?:^|\s)socket\s+ci\b"))
+     steps = _steps(job)
+     before = steps[: steps.index(socket)]
