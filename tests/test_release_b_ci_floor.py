@@ -112,7 +112,11 @@ WORKFLOW_PIN = {True: {'pull_request': None, 'push': {'branches': ['main']}},
                                    'run': 'python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge'},
                                   {'name': 'the manifest matches the tree',
                                    'run': 'python bridge/cursor-bridge/bridge-check.py --root bridge --sources '
-                                          '--quiet'}],
+                                          '--quiet'},
+                                  {'name': "workflow check over the bridge's workflow files and the sample "
+                                           'fixtures',
+                                   'run': 'python bridge/cursor-bridge/workflow-check.py '
+                                          'bridge/cursor-bridge/workflow tests/fixtures/workflows/pass'}],
                         'strategy': {'fail-fast': False, 'matrix': {'os': ['windows-latest', 'ubuntu-latest']}}}},
      'name': 'tests',
      'permissions': {'contents': 'read'}}

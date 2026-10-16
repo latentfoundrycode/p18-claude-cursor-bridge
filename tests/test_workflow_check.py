@@ -80,7 +80,7 @@ FILE_CASES = [
     ("d-sub-type-of-another", "d", "types/web-app/claude-code-extension.md", None),
     ("d-unknown-type-folder", "d", "types/not-a-type", None),
     ("set-point-without-set", "set", "types/host-extension.md", "intake.questions"),
-    ("kind-missing", "kind", "types/host-extension.md", None),
+    ("kind-missing", "kind", "types/host-extension.md", ("project-end.delivery", "-")),
     ("kind-unlisted", "kind", "traits/installable.md", "docker-image"),
     ("kind-on-another-point", "kind", "types/host-extension.md", None),
     ("kind-set-value", "kind", "types/host-extension.md", "deployment"),
@@ -105,7 +105,8 @@ def test_r014_file_case_fails(case, code, inner, name):
     hits = [line for line in fails(lines) if line.startswith(prefix)]
     assert hits, f"no line starting {prefix!r} in {lines}"
     if name is not None:
-        assert any(line.startswith(f"{prefix}: {name} - ") for line in hits), f"name {name!r} not the offending name: {hits}"
+        names = name if isinstance(name, tuple) else (name,)
+        assert any(line.startswith(f"{prefix}: {n} - ") for n in names for line in hits), f"name {name!r} not the offending name: {hits}"
     assert lines[-1] == f"RESULT: {len(fails(lines))} problem(s)"
 
 
@@ -233,7 +234,8 @@ def test_r014_row_cell_count_differs(tmp_path):
 def test_r014_registry_heading_missing(tmp_path):
     reg = (REPO / "bridge/cursor-bridge/workflow/extension-points.md").read_text(encoding="utf-8")
     broken = tmp_path / "extension-points.md"
-    broken.write_text(reg.replace("## Extension points", "## Points", 1), encoding="utf-8")
+    assert reg.count("\n## Extension points\n") == 1, "the heading line, not its citation in the prose"
+    broken.write_text(reg.replace("\n## Extension points\n", "\n## Points\n", 1), encoding="utf-8")
     assert_not_checked(*run("--registry", str(broken), f"{FIX}/pass"))
 
 
