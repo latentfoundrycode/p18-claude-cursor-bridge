@@ -24,9 +24,14 @@ OSV = re.compile(r"osv-scanner", re.I)
 SOCKET = re.compile(r"\bsocket(?:security)?\b", re.I)
 SCANNERS = (("semgrep", SEMGREP), ("osv-scanner", OSV), ("socket", SOCKET))
 DISABLERS = re.compile(r"(?:\|\||;)\s*(?:true\b|exit\s+0\b|:(?=\s|$|;)|echo\b)")
-SECRET_REF = re.compile(r"\bsecrets\s*(?:\.|\[)")
-INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn)\s+(?:install|add|i|ci)\b|\bnpx\b|\bpip3?\s+install\b|\buv\s+(?:pip|tool|add|sync|run)\b"
-                      r"|\bgo\s+install\b|\bgem\s+install\b|\bcargo\s+install\b|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
+# any expression that reads the secrets context: secrets.X, secrets['X'], toJSON(secrets)
+SECRET_REF = re.compile(r"\$\{\{[^}]*\bsecrets\b")
+INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:install|add|i|ci|dlx|x)\b|\b(?:npx|bunx|uvx)\b|\bpip3?\s+install\b"
+                      r"|\buv\s+(?:pip|tool|add|sync|run)\b|\bgo\s+install\b|\bgem\s+install\b|\bcargo\s+install\b"
+                      r"|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
+# npm's install and clean-install commands with their aliases (npm help install, npm help ci)
+NPM_INSTALL = re.compile(r"\bnpm\s+(?:install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add|ci|clean-install"
+                         r"|ic|install-clean|isntall-clean)\b")
 LOCK_CLOSURE = {"pytest", "pyyaml", "colorama", "iniconfig", "packaging", "pluggy", "pygments"}
 
 
@@ -68,6 +73,19 @@ def test_r002_disabler_pattern_catches_the_idioms():
         assert DISABLERS.search(bad), bad
     for ok in ("a && b", "set -euo pipefail", "exit \"$code\"", "if [ \"$code\" -eq 0 ]; then"):
         assert not DISABLERS.search(ok), ok
+
+
+def test_r002_secret_and_install_patterns_catch_their_forms():
+    """R-002: the patterns the secret and install checks rely on match each form they claim (a negative test must show its precondition)."""
+    for bad in ("${{ secrets.X }}", "${{ secrets['X'] }}", "${{ toJSON(secrets) }}", "${{secrets.X}}"):
+        assert SECRET_REF.search(bad), bad
+    for ok in ("${{ vars.SOCKET_ORG_SLUG }}", "${{ github.sha }}", "secrets/ folder"):
+        assert not SECRET_REF.search(ok), ok
+    for bad in ("npm install x", "npm ci", "npx x", "pnpm dlx x", "yarn dlx x", "bunx x", "uvx x", "uv tool run x",
+                "pip3 install x", "go install x", "curl -fsSL x"):
+        assert INSTALLS.search(bad), bad
+    for bad in ("npm i -g x", "npm add x", "npm isntall x", "npm clean-install"):
+        assert NPM_INSTALL.search(bad), bad
 
 
 def test_r002_workflow_parses():
@@ -139,17 +157,24 @@ def test_r002_each_scanner_decides_its_step():
 
 def test_r002_no_install_runs_beside_a_secret():
     """R-002 (secure-coding.snapshot.md V14, never expose secrets; the brief: no secret on a scanner's path beyond its own
-    token): no step that carries a secret (in any expression form) installs or fetches anything, every npm install skips
-    lifecycle scripts (the flag itself, never `--ignore-scripts=false`), and the Socket CLI is installed at the version the
-    inventory records (1.7.0; a bump is an admission, supervisor.md rule 14) in a step of the floor's job before the scan."""
-    for name, job in _jobs(_data()).items():
+    token): no step that carries a secret (any expression reading the secrets context) installs or fetches anything;
+    every npm install skips lifecycle scripts — the line's one mention of the setting is the bare `--ignore-scripts`
+    (npm takes the last of several, so `--ignore-scripts --ignore-scripts=false` runs scripts), and no env at any level
+    sets npm's ignore-scripts config; and the Socket CLI is installed at the version the inventory records (1.7.0; a
+    bump is an admission, supervisor.md rule 14) in a step of the floor's job before the scan."""
+    data = _data()
+    envs = [data.get("env")] + [j.get("env") for j in _jobs(data).values()] + [s.get("env") for j in _jobs(data).values() for s in _steps(j)]
+    for env in envs:
+        assert "ignore_scripts" not in str(env or {}).lower().replace("-", "_"), f"R-002: an env sets npm's ignore-scripts config: {env!r}"
+    for name, job in _jobs(data).items():
         for step in _steps(job):
             if SECRET_REF.search(str(step.get("env") or {})):
                 for s in _lines(step):
                     assert not INSTALLS.search(s), f"R-002: a step holding a secret installs or fetches ({name}): {s!r}"
             for s in _lines(step):
-                if re.search(r"\bnpm\s+(?:install|i|ci)\b", s):
-                    assert re.search(r"(?:^|\s)--ignore-scripts(?=\s|$)", s), f"R-002: npm install without --ignore-scripts: {s!r}"
+                if NPM_INSTALL.search(s):
+                    mentions = [t for t in s.split() if "ignore-scripts" in t.lower() or "ignore_scripts" in t.lower()]
+                    assert mentions == ["--ignore-scripts"], f"R-002: npm install must carry exactly one bare --ignore-scripts: {s!r}"
     job, socket = _floor_step(_data(), re.compile(r"(?:^|\s)socket\s+ci\b"))
     steps = _steps(job)
     before = steps[: steps.index(socket)]

@@ -74,24 +74,46 @@ def _deferred_rows(inv):
     return [c for c in cells if c and c[0] != "(none)"]
 
 
+OWNER_DATED = re.compile(r"\bowner\b.*\b\d{4}-\d{2}-\d{2}\b", re.I)  # completion-check.py's convention
+
+
+def _deferral_fault(cells):
+    """Why a Deferred row is not a settled owner deferral, or None. The template's last cell is
+    `<yes — the question · no>`: a deferral the owner made reads `no` there and names the owner with a date in the row."""
+    item = cells[0].lower()
+    if any(s in item for s in SETTLED_ELSEWHERE):
+        return "a settled decision sits in Deferred"
+    if cells[-1].strip().lower() != "no":
+        return "an owner decision is still open on it"
+    if not OWNER_DATED.search(" | ".join(cells[1:-1])):
+        return "the row does not name the owner with a date"
+    return None
+
+
 def test_r001_deferred_rows_parse():
-    """R-001: the row parser reads a real row and skips the placeholder (a negative test must show its precondition)."""
+    """R-001: the row parser reads a real row and skips the placeholder, and the row rule accepts a deferral written to
+    the template and refuses the open forms (a negative test must show its precondition)."""
     table = "## Deferred\n| Item | Why deferred | Since | Owner decision needed |\n|---|---|---|---|\n| (none) | — | — | — |\n| R-038 install | x | 2026-10-11 | yes |\n"
     assert _deferred_rows(table) == [["R-038 install", "x", "2026-10-11", "yes"]]
     assert _deferred_rows(table.split("| R-038")[0]) == []
+    assert _deferral_fault(["a later feature", "deferred by the owner", "2026-11-01", "no"]) is None
+    for row in (["a later feature", "not yet", "2026-10-16", "yes"],
+                ["a later feature", "not yet", "2026-10-16", "yes — the owner asked 2026-10-16"],
+                ["a later feature", "not yet", "2026-10-16", "yes — does the owner defer it? (asked 2026-10-16)"],
+                ["a later feature", "not yet", "2026-10-16", "no"],
+                ["R-038 second checkout", "deferred by the owner", "2026-10-11", "no"]):
+        assert _deferral_fault(row), row
 
 
 def test_r001_no_deferred_row_reopens_a_settled_decision():
     """R-001 (docs/BUILD_PLAN.md TASK-001 Done when: no Deferred row contradicts a Decision): no Deferred row is about a
-    question the Decisions table settled (R-038, the second-checkout question), and every real deferral carries the
-    owner's dated approval in its decision cell — the owner named with a date, never an open "yes" (supervisor.md rule 44;
-    TASK-027 plans one at B6)."""
+    question the Decisions table settled (R-038, the second-checkout question), and every row is a deferral the owner
+    has made — its decision cell reads `no` and the row names the owner with a date (supervisor.md rule 44; the
+    template's `<yes — the question · no>`; completion-check's owner-dated convention; TASK-027 plans one at B6).
+    An open owner question waits on the status file's Awaiting line, not here."""
     for cells in _deferred_rows(_read("docs/INVENTORY.md")):
-        item = cells[0].lower()
-        assert not any(s in item for s in SETTLED_ELSEWHERE), f"R-001: a settled decision sits in Deferred: {cells[0]!r}"
-        decision = cells[-1].lower()
-        assert "owner" in decision and re.search(r"\b\d{4}-\d{2}-\d{2}\b", decision), \
-            f"R-001: a deferral without the owner's dated approval in its decision cell: {cells[0]!r}"
+        fault = _deferral_fault(cells)
+        assert fault is None, f"R-001: {fault}: {cells[0]!r}"
 
 
 def test_r001_phase_matches_status():
