@@ -148,6 +148,7 @@ def test_r015_inventory_counts_each_finding_as_a_problem(tmp_path):
         last = lines[-1]
         return 0 if last == "RESULT: OK" else int(last.split()[1])
 
+    assert workflows_lines(lines_bad), lines_bad
     assert count(lines_bad) == count(lines_ok) + len(workflows_lines(lines_bad)), (lines_ok, lines_bad)
 
 
@@ -190,6 +191,8 @@ def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, missing):
     assert found and all(line.startswith("WORKFLOWS LINE: not checked: ") for line in found), lines
     if missing == "checker":
         assert any("cannot be loaded" in line for line in found), lines
+    else:
+        assert any("open-list.md" in line for line in found), "the cause names the rule file that cannot be read"
 
 
 # --- conformance-check.py ------------------------------------------------------------------------------------------
@@ -232,3 +235,5 @@ def test_r015_conformance_rule_files_not_loadable_is_missing(tmp_path, missing):
     assert "Traceback" not in err and "Traceback" not in out, (out, err)
     v, text = verdict(out, "Workflows line")
     assert v == "MISSING" and text.startswith("Workflows line  - not checked: "), out
+    if missing == "rules":
+        assert "open-list.md" in text, "the cause names the rule file that cannot be read"
