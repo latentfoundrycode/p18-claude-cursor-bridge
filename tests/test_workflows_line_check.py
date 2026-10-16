@@ -284,9 +284,10 @@ def test_r015_loading_the_checker_writes_no_bytecode(tmp_path):
     """R2-1: neither program leaves a __pycache__ beside itself (inventory-check reads only; conformance-check never writes)."""
     folder = _bridge_copy(tmp_path)
     status = tmp_path / "PROJECT_STATUS.md"
-    write_status(status, VALID["not-yet-classified"])
+    write_status(status, MALFORMED["no-traits"][0])
     rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
-    assert "Traceback" not in err and workflows_lines(lines) == [], (lines, err)
+    assert "Traceback" not in err, err
+    assert any(line.startswith("WORKFLOWS LINE: malformed: ") for line in lines), "the run must have judged the line: %r" % lines
     rc, out, err = conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
     assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
     assert not (folder / "__pycache__").exists(), sorted(p.name for p in (folder / "__pycache__").iterdir())

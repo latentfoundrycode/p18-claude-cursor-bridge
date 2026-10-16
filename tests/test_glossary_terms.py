@@ -41,15 +41,17 @@ def test_r028_each_term_has_one_definition(term):
     assert len(meanings) == 1, "%r must be defined exactly once, found %d" % (term, len(meanings))
     words = meanings[0].split()
     assert len(words) >= 8, "%r needs a definition, not a label: %r" % (term, meanings[0])
-    assert term.lower() not in {w.strip(".,;:").lower() for w in words[:1]}, "a definition does not open with its own term"
+    opening = [w.strip(".,;:").lower() for w in words[:len(term.split())]]
+    assert opening != term.lower().split(), "a definition does not open with its own term: %r" % meanings[0]
 
 
 def test_r028_phase_lists_all_eight_template_values():
+    """The Phase entry's list is exactly the eight values, in the template's order: nothing missing, nothing added."""
     meanings = [meaning for t, meaning in entries() if t == "Phase"]
     assert len(meanings) == 1
-    listed = re.findall(r"[a-z]+", meanings[0].split(".")[0])
-    for phase in PHASES:
-        assert phase in listed, "the Phase entry's first sentence must list %r: %r" % (phase, meanings[0])
+    m = re.search(r"`Phase:` line: ([^.]+)\.", meanings[0])
+    assert m, "the Phase entry lists the values after \"`Phase:` line: \": %r" % meanings[0]
+    assert [v.strip() for v in m.group(1).split(",")] == PHASES, m.group(1)
 
 
 def test_r028_phase_values_match_the_status_template():
@@ -58,4 +60,4 @@ def test_r028_phase_values_match_the_status_template():
     m = re.search(r"^Phase: <([^>]+)>", core, re.M)
     assert m, "the status template's Phase line"
     template = [v.strip() for v in m.group(1).split("|")]
-    assert sorted(template) == sorted(PHASES), template
+    assert template == PHASES, template
