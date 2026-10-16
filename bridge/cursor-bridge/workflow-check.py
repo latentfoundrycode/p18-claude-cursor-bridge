@@ -28,10 +28,13 @@ Finding lines, then one RESULT line:
   FLAG (trait)    a trait on a Workflows line is not yet written; flagged, work continues (non-fatal)
 
 Exit 0 when no FAIL line was printed (FLAG lines may have been printed). Exit 1 when at least
-one FAIL line was printed. Exit 2 when the check cannot run: a ROOT that is not a folder, an
-open list, registry, or status file that does not exist or cannot be read as UTF-8, a required
-heading or required column missing, or a table row whose cell count differs from its header.
-On exit 2 the program prints ERROR lines and RESULT: not checked, and no traceback.
+one FAIL line was printed. Exit 2 when the check cannot run: a ROOT that is not a folder, a
+folder under a root that cannot be listed, an open list, registry, or status file that does not
+exist or cannot be read as UTF-8, a required heading or required column missing, a table with
+no separator row, or a table row whose cell count differs from its header. On exit 2 the
+program prints ERROR lines and RESULT: not checked, and no traceback. A command-line usage
+error also exits 2; argparse's message stays on standard error and the last line on standard
+output is RESULT: not checked.
 """
 import argparse
 import os
@@ -60,7 +63,13 @@ ADD_FOR = re.compile(r"^## Add at (\S+) for (\S+)$")
 ADD_AT = re.compile(r"^## Add at (\S+)$")
 SET_AT = re.compile(r"^## Set at (\S+)$")
 REPLACE = re.compile(r"^## Replace (\S+)$")
-CHANGE_WORDS = ("Add", "Set", "Replace")
+# A change heading's first word, compared case-insensitively (R2-1). "at" as the second word
+# is the other way in.
+CHANGE_FIRST = frozenset({
+    "add", "adds", "added",
+    "set", "sets",
+    "replace", "replaces", "replaced", "replacing",
+})
 TRAITS_MARK = "; traits: "
 
 
@@ -73,19 +82,70 @@ def joined(root, rel):
 
 
 def read_utf8(path):
-    """Return (text, None) or (None, reason). Reason is plain language, never a traceback."""
+    """Return three values (text, shown path, reason).
+
+    text is the file contents and reason is None when the read succeeded. text is None and
+    reason is plain language when it did not. A leading UTF-8 byte-order mark is dropped.
+    Never a traceback.
+    """
     shown = slash(path)
     if not os.path.isfile(path):
         if os.path.exists(path):
             return None, shown, "cannot be read"
         return None, shown, "does not exist"
     try:
-        with open(path, encoding="utf-8") as handle:
+        with open(path, encoding="utf-8-sig") as handle:
             return handle.read(), shown, None
     except UnicodeDecodeError:
         return None, shown, "cannot be read as UTF-8"
     except OSError as err:
         return None, shown, "cannot be read (%s)" % (err.strerror or err)
+
+
+def escape_field(value):
+    """Printable characters stay; every other character becomes \\xNN, \\uNNNN, or \\UNNNNNNNN."""
+    text = "" if value is None else str(value)
+    parts = []
+    for char in text:
+        if char.isprintable():
+            parts.append(char)
+            continue
+        code = ord(char)
+        if code < 256:
+            parts.append("\\x%02x" % code)
+        elif code <= 0xFFFF:
+            parts.append("\\u%04x" % code)
+        else:
+            parts.append("\\U%08x" % code)
+    return "".join(parts)
+
+
+def is_link(path):
+    """A symbolic link, or a Windows junction where this Python can see one."""
+    if os.path.islink(path):
+        return True
+    isjunction = getattr(os.path, "isjunction", None)
+    if isjunction is None:
+        return False
+    try:
+        return bool(isjunction(path))
+    except OSError:
+        return False
+
+
+def is_separator_cell(cell):
+    """Dashes, with an optional colon at either end, and at least one dash."""
+    text = cell.strip()
+    if text.startswith(":"):
+        text = text[1:]
+    if text.endswith(":"):
+        text = text[:-1]
+    return bool(text) and set(text) == {"-"}
+
+
+def is_separator_row(line):
+    cells = cells_of(line)
+    return bool(cells) and all(is_separator_cell(cell) for cell in cells)
 
 
 def cells_of(line):
@@ -116,20 +176,19 @@ def parse_table(text, path, heading, required):
         if not line.startswith("|"):
             break
         table.append(line)
-    if len(table) < 2:
+    if len(table) < 2 or not is_separator_row(table[1]):
         return None, "table after %s has no separator row" % heading
     header = cells_of(table[0])
     for column in required:
         if column not in header:
             return None, "missing column %s" % column
     body = []
-    for line in table[1:]:
+    for line in table[2:]:
         row = cells_of(line)
         if len(row) != len(header):
             return None, "table row cell count differs from its header"
         body.append(dict(zip(header, row)))
-    # The second table line is the separator, not a record.
-    return body[1:], None
+    return body, None
 
 
 def index_first(rows, column):
@@ -182,31 +241,59 @@ def allows_set(cell):
 
 
 def collect(root, product_keys):
-    """Files and the folders Requirement 6 reports, in sorted relative-path order."""
+    """Files and the folders Requirement 6 reports, plus links and listing errors.
+
+    Returns (items, errors). A symbolic link or junction is recorded and not opened or
+    entered. errors are (path, reason) for a folder that cannot be listed.
+    """
     found = []
+    errors = []
+
+    def onerror(err):
+        filename = getattr(err, "filename", None) or root
+        reason = getattr(err, "strerror", None) or "cannot be listed"
+        errors.append((slash(str(filename)), reason))
+
     for layer in ("types", "traits"):
         base = os.path.join(root, layer)
         if not os.path.isdir(base):
             continue
-        for dirpath, dirnames, filenames in os.walk(base):
+        if is_link(base):
+            found.append((layer, "link"))
+            continue
+        for dirpath, dirnames, filenames in os.walk(base, followlinks=False, onerror=onerror):
             rel_dir = os.path.relpath(dirpath, root).replace("\\", "/")
+            kept = []
             for name in dirnames:
-                found.append((rel_dir + "/" + name, True))
+                rel = rel_dir + "/" + name
+                if is_link(os.path.join(dirpath, name)):
+                    found.append((rel, "link"))
+                else:
+                    found.append((rel, "dir"))
+                    kept.append(name)
+            dirnames[:] = kept
             for name in filenames:
-                found.append((rel_dir + "/" + name, False))
+                rel = rel_dir + "/" + name
+                if is_link(os.path.join(dirpath, name)):
+                    found.append((rel, "link"))
+                else:
+                    found.append((rel, "file"))
     unknown_types = set()
-    for rel, is_dir in found:
+    for rel, kind in found:
         parts = rel.split("/")
-        if is_dir and len(parts) == 2 and parts[0] == "types" and parts[1] not in product_keys:
+        if kind == "dir" and len(parts) == 2 and parts[0] == "types" and parts[1] not in product_keys:
             unknown_types.add(parts[1])
     items = []
-    for rel, is_dir in found:
+    for rel, kind in found:
         parts = rel.split("/")
         if parts[0] == "types" and len(parts) >= 2 and parts[1] in unknown_types:
-            if is_dir and len(parts) == 2:
+            if kind == "dir" and len(parts) == 2:
                 items.append({"rel": rel, "action": "d-folder", "name": parts[1]})
             continue
-        if is_dir:
+        if kind == "link":
+            items.append({"rel": rel, "action": "form-path", "name": parts[-1]})
+            continue
+        if kind == "dir":
             if (parts[0] == "traits" and len(parts) >= 2) or (parts[0] == "types" and len(parts) > 2):
                 items.append({"rel": rel, "action": "form-path", "name": parts[-1]})
             continue
@@ -219,16 +306,19 @@ def collect(root, product_keys):
         else:
             items.append({"rel": rel, "action": "form-path", "name": parts[-1]})
     items.sort(key=lambda item: item["rel"])
-    return items
+    return items, errors
 
 
-def change_word(line):
+def is_change_heading(line):
+    """True when the line is a change heading, including a misspelt one (R2-1)."""
     if not line.startswith("## "):
-        return None
+        return False
     words = line[3:].split()
-    if not words or words[0] not in CHANGE_WORDS:
-        return None
-    return words[0]
+    if not words:
+        return False
+    if words[0].casefold() in CHANGE_FIRST:
+        return True
+    return len(words) >= 2 and words[1].casefold() == "at"
 
 
 def parse_heading(line):
@@ -249,7 +339,10 @@ def parse_heading(line):
 
 
 def heading_spans(text):
-    """Change headings outside fences, each with the raw lines of its section."""
+    """Change headings outside fences, each with the raw lines of its section.
+
+    Each section ends at the next heading's index, so the walk is linear in the file.
+    """
     lines = text.splitlines()
     fence = False
     marks = []
@@ -262,15 +355,13 @@ def heading_spans(text):
         if line.startswith("## "):
             marks.append(index)
     spans = []
-    for index in marks:
+    last = len(marks) - 1
+    total = len(lines)
+    for position, index in enumerate(marks):
         line = lines[index]
-        if change_word(line) is None:
+        if not is_change_heading(line):
             continue
-        end = len(lines)
-        for later in marks:
-            if later > index:
-                end = later
-                break
+        end = marks[position + 1] if position < last else total
         spans.append((line, lines[index + 1:end]))
     return spans
 
@@ -374,15 +465,29 @@ def check_item(root, item, tables):
     return findings
 
 
-def split_part(rest):
-    """Return (part, body) when rest begins with a part prefix, else (None, rest)."""
-    index = rest.find(": ")
-    if index <= 0:
-        return None, rest
-    part = rest[:index]
-    if not part or part != part.strip() or ";" in part or "→" in part or ":" in part:
-        return None, rest
-    return part, rest[index + 2:]
+def prefix_of(rest, multi):
+    """Return (part or None, body, bad).
+
+    bad is the part text (or '-') when the prefix rule fails and the line stops there.
+    The prefix is looked for only in the head, the text before the first traits marker.
+    """
+    mark_at = rest.find(TRAITS_MARK)
+    if mark_at == -1:
+        head = rest
+        tail = ""
+    else:
+        head = rest[:mark_at]
+        tail = rest[mark_at:]
+    if ": " not in head:
+        if multi:
+            return None, None, "-"
+        return None, rest, None
+    cut = head.find(": ")
+    part = head[:cut]
+    invalid = part == "" or ";" in part or "→" in part or ":" in part
+    if (not multi) or invalid:
+        return None, None, part or "-"
+    return part, head[cut + 2:] + tail, None
 
 
 def check_head(head, path, tables, findings):
@@ -393,6 +498,9 @@ def check_head(head, path, tables, findings):
     traits_in_head = []
     for names in names_by_seg:
         for name in names:
+            if name == "":
+                findings.append(("form", path, "-", "empty name in the Workflows head"))
+                continue
             if name in tables["workflow_by_name"]:
                 types_found.append(tables["workflow_by_name"][name])
             elif name in tables["sub_by_name"]:
@@ -400,7 +508,7 @@ def check_head(head, path, tables, findings):
             elif name in tables["trait_by_name"]:
                 traits_in_head.append(name)
             else:
-                findings.append(("unknown", path, name or "-", "name is not in the open list"))
+                findings.append(("unknown", path, name, "name is not in the open list"))
     if len(types_found) != 1:
         findings.append(("e", path, "-", "part must name exactly one product type"))
     if len(subs_found) > 1:
@@ -429,27 +537,28 @@ def check_head(head, path, tables, findings):
 
 
 def check_traits(text, path, tables, findings):
-    if text.strip() == "none":
-        return
-    if text.strip() == "":
-        findings.append(("form", path, "-", "traits list is empty"))
+    """Traits text is `none` or names joined by exactly `, `. It is not stripped."""
+    if text == "none":
         return
     last = None
     seen = set()
-    for name in [part.strip() for part in text.split(",")]:
+    for name in text.split(", "):
+        if name == "" or name != name.strip() or "," in name:
+            findings.append(("form", path, name or "-", "traits are not joined by a comma and one space"))
+            continue
         trait = tables["trait_by_name"].get(name)
-        if not name or trait is None:
-            findings.append(("unknown", path, name or "-", "not a trait name"))
+        if trait is None:
+            findings.append(("unknown", path, name, "not a trait name"))
             continue
         if name in seen:
             findings.append(("form", path, name, "trait repeated"))
-        else:
-            index = tables["trait_order"][name]
-            if last is not None and index < last:
-                findings.append(("form", path, name, "traits are not in the open list's order"))
-            if last is None or index > last:
-                last = index
-            seen.add(name)
+            continue
+        index = tables["trait_order"][name]
+        if last is not None and index < last:
+            findings.append(("form", path, name, "traits are not in the open list's order"))
+        if last is None or index > last:
+            last = index
+        seen.add(name)
         if trait["Written"] != "yes":
             findings.append((
                 "FLAG", path, name,
@@ -467,19 +576,14 @@ def check_status(path, text, tables):
     seen_parts = {}
     for line in lines:
         rest = line[len("Workflows: "):]
-        part, body = split_part(rest)
-        if multi:
-            if part is None:
-                findings.append(("form", shown, "-", "a Workflows line in a multi-part file has no part prefix"))
-                continue
+        part, body, bad = prefix_of(rest, multi)
+        if bad is not None:
+            findings.append(("form", shown, bad, "Workflows line breaks the part-prefix rule"))
+            continue
+        if part is not None:
             seen_parts[part] = seen_parts.get(part, 0) + 1
             if seen_parts[part] == 2:
                 findings.append(("e", shown, part, "two Workflows lines name the same part"))
-        elif part is not None:
-            findings.append(("form", shown, part, "the only Workflows line must not carry a part prefix"))
-            continue
-        else:
-            body = rest
         if body == "not yet classified":
             continue
         if body.count(TRAITS_MARK) != 1:
@@ -494,6 +598,9 @@ def check_status(path, text, tables):
 def print_findings(findings):
     problems = 0
     for code, path, name, reason in findings:
+        path = escape_field(path)
+        name = escape_field(name)
+        reason = escape_field(reason)
         if code == "FLAG":
             print("FLAG (trait) %s: %s - %s" % (path, name, reason))
         else:
@@ -506,8 +613,17 @@ def print_findings(findings):
     return 1
 
 
+class CheckArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        sys.stderr.write("%s: error: %s\n" % (self.prog, message))
+        print("RESULT: not checked")
+        sys.stdout.flush()
+        self.exit(2)
+
+
 def build_parser():
-    parser = argparse.ArgumentParser(
+    parser = CheckArgumentParser(
         prog="workflow-check.py",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -543,7 +659,8 @@ def main(argv=None):
             continue
         if tables is None:
             continue
-        items = collect(root, set(tables["product_by_key"]))
+        items, walk_errors = collect(root, set(tables["product_by_key"]))
+        errors.extend(walk_errors)
         for item in items:
             if item["action"] in ("d-folder", "form-path"):
                 continue
@@ -563,7 +680,7 @@ def main(argv=None):
             status_texts.append((status, text))
     if errors:
         for path, reason in errors:
-            print("ERROR: %s: %s" % (path, reason))
+            print("ERROR: %s: %s" % (escape_field(path), escape_field(reason)))
         print("RESULT: not checked")
         return 2
     findings = []
