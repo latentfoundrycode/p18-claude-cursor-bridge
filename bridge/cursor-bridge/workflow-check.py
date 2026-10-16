@@ -92,6 +92,19 @@ def joined(root, rel):
     return slash(root).rstrip("/") + "/" + rel
 
 
+def file_lines(text):
+    """Split file text only at a line feed (R6-2).
+
+    `read_utf8` uses universal newlines, so a carriage return is already a line feed.
+    A form feed, vertical tab, file/group/record separator, NEL, U+2028, or U+2029
+    stays inside the line. A final line feed does not add an empty line.
+    """
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        del lines[-1]
+    return lines
+
+
 def read_utf8(path):
     """Return three values (text, shown path, reason).
 
@@ -169,12 +182,22 @@ def is_separator_row(line, width):
 
 
 def cells_of(line):
-    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+    """Strip the line, drop one leading `|` and one trailing `|`, then split on `|`.
+
+    A row such as `| a | b ||` keeps the empty last cell, and `|| a | b |` keeps the
+    empty first cell (R6-1). The same rule applies to the header and the separator.
+    """
+    text = line.strip()
+    if text.startswith("|"):
+        text = text[1:]
+    if text.endswith("|"):
+        text = text[:-1]
+    return [cell.strip() for cell in text.split("|")]
 
 
 def parse_table(text, path, heading, required):
     """The first Markdown table after heading. Returns (rows, error reason or None)."""
-    lines = text.splitlines()
+    lines = file_lines(text)
     start_heading = None
     for index, line in enumerate(lines):
         if line == heading:
@@ -421,7 +444,7 @@ def heading_spans(text):
     walk is linear in the file. The second value is True when a fence is still open at the
     end of the file (R3-6).
     """
-    lines = text.splitlines()
+    lines = file_lines(text)
     fence = None
     marks = []
     for index, line in enumerate(lines):
@@ -654,7 +677,7 @@ def check_traits(text, path, tables, findings):
 
 def check_status(path, text, tables):
     shown = slash(path)
-    lines = [line for line in text.splitlines() if line.startswith("Workflows: ")]
+    lines = [line for line in file_lines(text) if line.startswith("Workflows: ")]
     if not lines:
         return [("form", shown, "-", "status file has no Workflows line")]
     multi = len(lines) > 1
