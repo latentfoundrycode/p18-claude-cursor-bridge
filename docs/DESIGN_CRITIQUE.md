@@ -452,6 +452,15 @@ All three approved, and every round-3 finding was confirmed settled by probes. R
 ### TASK-006 round 5 — disposition (PR #23)
 Every round-4 finding was confirmed settled by probes, R5-3 against a CommonMark reference (markdown-it). Review B blocked: `cells_of` stripped every pipe at a row's ends, so a row ending `||` lost an empty cell and a row with the wrong cell count passed (R6-1). Review A's Consider 1 and the auditor's first advisory named the same defect, so it blocked (convergence): lines were split at form feed, vertical tab, NEL, U+2028 and other characters Markdown does not end a line at, so two fence lines joined to text by one could hide a heading (R6-2). On the supervisor's side: a pass-root block pinning that a backtick in a tilde fence's info string still opens the fence (Review A's test gap; the other two gaps it named are cosmetic or unreachable). Review A's Consider 2 and the auditor's second advisory also named one class together, fences and headings inside container blocks (list items, block quotes): both graded it for recording by class rather than a fix, and the supervisor agrees: it is the tail of heading parsing the by-class line was drawn under at round 3, files under `types/` and `traits/` are written by the bridge's own maintainer and supervisor, and modelling CommonMark's containers is a parser, not a check; recorded in HARDENING with the auditor's third and fourth advisories (headings inside containers; any HTML block, not only `<pre>`).
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-006 | 6 | Review A | 0 | 0 | 1 | to HARDENING (by-class line) |
+| TASK-006 | 6 | Review B | 0 | 0 | 0 | — |
+| TASK-006 | 6 | security auditor | 0 | 2 advisory | — | to HARDENING (by-class line) |
+
+### TASK-006 round 6 — disposition (PR #23, merged)
+All three approved; R6-1 and R6-2 were confirmed by probes at every site, against a CommonMark reference. The remaining findings are the long tail of reading Markdown-like text, in files only the maintainer and the supervisor write, and the by-class line drawn at round 3 holds: Review A's Consider (a heading or `Workflows:` line after a form feed or line separator is now invisible to the check, as to Markdown, though a raw-text reader would see it) and the auditor's two advisories (cells trimmed of any Unicode whitespace rather than spaces and tabs, so a separator followed by such a character is accepted where Markdown shows no table; an escaped pipe inside a cell split as a boundary) are recorded in HARDENING. They are different defects, not one named twice, so convergence does not apply. Carried to TASK-008's brief: any reader of the `Workflows:` line splits lines exactly as `workflow-check.py`'s `file_lines` does.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|

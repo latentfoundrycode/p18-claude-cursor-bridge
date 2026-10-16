@@ -3,11 +3,11 @@ Last updated: 2026-10-16
 Phase: building
 Workflows: Host Extension Development → Claude Code Extension; traits: Installable
 Change cycle: none
-Increment: TASK-006 — the workflow check (branch task-006): workflow-check.py, its CI step, the supervisor's tests and fixtures
-Last accepted: BUG-001's follow-up at commit 4d0f77b (merged to main 2026-10-16, PR #22; BUG-001 itself 6743b25, PR #21); main holds TASK-001 to TASK-005, TASK-007, TASK-002 and BUG-001
+Increment: TASK-008 — the Workflows status line enforced (branch task-008): inventory-check.py and conformance-check.py read the line; its first commit carries TASK-006 round 6's records
+Last accepted: TASK-006, the workflow check, at commit e2a7f9f (merged to main 2026-10-16, PR #23, after six review rounds; the long tail of Markdown parsing recorded by class in HARDENING); main holds TASK-001 to TASK-007, and BUG-001
 Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
 Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
-Next: TASK-006 through the gate; then TASK-008, TASK-009 and stage B3's TASK-016 as plan-check orders them; once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
+Next: TASK-008 through the gate (its brief carries TASK-006's lesson: readers of the Workflows line split lines as workflow-check.py's file_lines does); then TASK-009 and stage B3's TASK-016 as plan-check orders them; once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
 Deviations accepted: none
 Terms fixed: conditional workflow — a type/sub-type/trait file that changes the main workflow only at extension points — New; extension point — the one named place a conditional workflow may change a phase — New; phase module — one file holding one phase's whole procedure — New
 Software name: Claude-Cursor Bridge
@@ -16,7 +16,7 @@ Worktrees: none
 In flight: none
 Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation driver mutate_ci_floor.py, drafts/, in-flight.md as a scratch log while a review runs)
 Delegated gates: none
-Remote sync: main at 4d0f77b, in sync 2026-10-16; branch task-006 pushed as PR #23 (TASK-006)
+Remote sync: main at e2a7f9f, in sync 2026-10-16; branch task-008 started from origin/main
 Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
 Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25)
 Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
