@@ -502,6 +502,15 @@ def test_r014_missing_layer_folder_is_not_a_link(tmp_path, monkeypatch, capsys, 
         assert code == 0 and lines[-1] == "RESULT: OK", (target, lines)
 
 
+def test_r014_missing_layer_is_skipped_before_the_link_test(monkeypatch, capsys, program):
+    """R4-1: a layer path that does not exist is skipped before it is classified, so even a classifier that calls
+    everything a link reports nothing for the bridge's own folder, which has neither types/ nor traits/."""
+    mod = program("workflow-check")
+    monkeypatch.setattr(mod, "is_link", lambda path: True)
+    code, lines = _main_in_process(mod, str(REPO / "bridge" / "cursor-bridge" / "workflow"), capsys=capsys)
+    assert code == 0 and lines[-1] == "RESULT: OK", lines
+
+
 @pytest.mark.parametrize("isjunction", ["present", "absent"])
 def test_r014_is_link_false_for_a_path_that_does_not_exist(tmp_path, monkeypatch, program, isjunction):
     """R4-1, R4-2: nothing there, and a path below a file, are not links on either branch."""
