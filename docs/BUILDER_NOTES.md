@@ -9,3 +9,5 @@
 2026-10-12 TASK-002-r5: Pin `@socketsecurity/cli@1.7.0` (npm `latest`, not deprecated; 2.1.0 is a deprecated bad build). Set `SOCKET_CLI_ORG_SLUG` from `vars.SOCKET_ORG_SLUG` so `socket ci` can resolve the org (404 without it on PR #16).
 
 2026-10-12 TASK-002-r6: Run `socket ci --no-banner` so the CLI compact header does not print the first five characters of `SOCKET_CLI_API_TOKEN` (GitHub masks only whole secrets; the repo is public).
+
+2026-10-16 TASK-006: `tests/test_workflow_check.py::test_r014_registry_heading_missing` replaces the first `## Extension points` in `extension-points.md`, which is the prose citation on the "How this file is read" line, not the heading on its own line, so a heading-line parser still sees the table and exits 0.
