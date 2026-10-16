@@ -29,7 +29,8 @@ Finding lines, then one RESULT line:
 
 Exit 0 when no FAIL line was printed (FLAG lines may have been printed). Exit 1 when at least
 one FAIL line was printed. Exit 2 when the check cannot run: a ROOT that is not a folder, a
-folder under a root that cannot be listed, an open list, registry, or status file that does not
+folder under a root that cannot be listed, a types/ or traits/ path that cannot be examined,
+an open list, registry, or status file that does not
 exist or cannot be read as UTF-8, a required heading or required column missing, a table with
 no separator row, or a table row whose cell count differs from its header. On exit 2 the
 program prints ERROR lines and RESULT: not checked, and no traceback. A command-line usage
@@ -75,9 +76,11 @@ CHANGE_FIRST = frozenset({
 TRAILING_PUNCT = ":;,.-"
 # Up to three leading spaces, two hashes, then a space or a tab (R3-6).
 HEADING_CANDIDATE = re.compile(r"^ {0,3}##[ \t](.*)$")
-# Up to three leading spaces, then three backticks (R4-3). Four spaces is an indented
-# code block, not a fence. A longer run still begins with three backticks.
-FENCE_LINE = re.compile(r"^ {0,3}```")
+# An opening fence: zero to three spaces, then a run of at least three backticks or
+# tildes, then the info string (R5-3). A closing fence is matched separately, because
+# its run must be at least as long as the opening run and the rest of the line is blank.
+FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+FENCE_CLOSE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
 TRAITS_MARK = "; traits: "
 
 
@@ -131,30 +134,22 @@ def escape_field(value):
 def is_link(path):
     """A symbolic link, or on Windows a junction or any other reparse point.
 
-    Where os.path.isjunction does not exist and the system is Windows, the reparse point is
-    read from os.lstat (stat.FILE_ATTRIBUTE_REPARSE_POINT). On both branches a missing path
-    (FileNotFoundError, NotADirectoryError) is not a link. Any other OSError counts as a
-    link, so a path the check cannot classify is not walked (R4-1, R4-2).
+    One os.lstat on every Python (R5-2). FileNotFoundError and NotADirectoryError are not a
+    link. Any other OSError is a link, so a path the check cannot classify is not walked.
+    Otherwise the path is a link when stat.S_ISLNK(st_mode) is true, or, on Windows, when
+    st_file_attributes includes stat.FILE_ATTRIBUTE_REPARSE_POINT.
     """
-    if os.path.islink(path):
-        return True
-    isjunction = getattr(os.path, "isjunction", None)
-    if isjunction is not None:
-        try:
-            return bool(isjunction(path))
-        except (FileNotFoundError, NotADirectoryError):
-            return False
-        except OSError:
-            return True
-    if os.name != "nt":
-        return False
     try:
-        attributes = os.lstat(path).st_file_attributes
+        st = os.lstat(path)
     except (FileNotFoundError, NotADirectoryError):
         return False
     except OSError:
         return True
-    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    if stat.S_ISLNK(st.st_mode):
+        return True
+    if os.name == "nt" and st.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+        return True
+    return False
 
 
 def is_separator_cell(cell):
@@ -271,7 +266,8 @@ def collect(root, product_keys):
     """Files and the folders Requirement 6 reports, plus links and listing errors.
 
     Returns (items, errors). A symbolic link or junction is recorded and not opened or
-    entered. errors are (path, reason) for a folder that cannot be listed.
+    entered. errors are (path, reason) for a layer path that cannot be examined or a folder
+    that cannot be listed.
     """
     found = []
     errors = []
@@ -283,9 +279,14 @@ def collect(root, product_keys):
 
     for layer in ("types", "traits"):
         base = os.path.join(root, layer)
-        # Nothing at this path: do not walk it and do not report it. lexists is true for a
-        # dangling link or junction, so those still reach the link test (R4-1, R3-3).
-        if not os.path.lexists(base):
+        # Nothing at this path: do not walk it and do not report it. lstat succeeds for a
+        # dangling link or junction, so those still reach the link test (R5-1, R3-3).
+        try:
+            os.lstat(base)
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        except OSError as err:
+            errors.append((slash(base), err.strerror or "cannot be examined"))
             continue
         # Test the link before testing whether the path is a folder, so a dangling link
         # is reported and never walked.
@@ -382,22 +383,57 @@ def parse_heading(line):
     return None
 
 
+def opening_fence(line):
+    """Return (marker, length) for an opening fence, or None.
+
+    Zero to three spaces, then at least three backticks or at least three tildes, then the
+    info string. A backtick run whose info string contains a backtick is not a fence (R5-3).
+    """
+    match = FENCE_OPEN.match(line)
+    if match is None:
+        return None
+    marker, info = match.group(1), match.group(2)
+    if marker[0] == "`" and "`" in info:
+        return None
+    return marker[0], len(marker)
+
+
+def closing_fence(line, char, length):
+    """True when the line closes a fence opened with char for length characters.
+
+    Zero to three spaces, then a run of that character at least as long as the opening run,
+    then only spaces or tabs (R5-3). A shorter run, the other character, or text after the
+    run is content.
+    """
+    match = FENCE_CLOSE.match(line)
+    if match is None:
+        return False
+    marker = match.group(1)
+    return marker[0] == char and len(marker) >= length
+
+
 def heading_spans(text):
     """Change headings outside fences, each with the raw lines of its section.
 
-    A heading candidate matches ^ {0,3}##[ \\t]. A fence line matches ^ {0,3} followed by
-    three backticks; an opening fence is closed by the next such line (R4-3). Each section
-    ends at the next candidate's index, so the walk is linear in the file. The second value
-    is True when a fence is still open at the end of the file (R3-6).
+    A heading candidate matches ^ {0,3}##[ \\t]. Fences are read as CommonMark reads them
+    (R5-3): the closing run is the opening character and at least as long, with nothing
+    after it but spaces or tabs. Each section ends at the next candidate's index, so the
+    walk is linear in the file. The second value is True when a fence is still open at the
+    end of the file (R3-6).
     """
     lines = text.splitlines()
-    fence = False
+    fence = None
     marks = []
     for index, line in enumerate(lines):
-        if FENCE_LINE.match(line):
-            fence = not fence
+        if fence is None:
+            opened = opening_fence(line)
+            if opened is not None:
+                fence = opened
+                continue
+        elif closing_fence(line, fence[0], fence[1]):
+            fence = None
             continue
-        if fence:
+        else:
             continue
         if HEADING_CANDIDATE.match(line):
             marks.append(index)
@@ -410,7 +446,7 @@ def heading_spans(text):
             continue
         end = marks[position + 1] if position < last else total
         spans.append((line, lines[index + 1:end]))
-    return spans, fence
+    return spans, fence is not None
 
 
 def first_nonblank(body):
