@@ -83,9 +83,9 @@ def _deferral_fault(cells):
     item = cells[0].lower()
     if any(s in item for s in SETTLED_ELSEWHERE):
         return "a settled decision sits in Deferred"
-    if cells[-1].strip().lower() != "no":
+    if not re.match(r"no\b", cells[-1].strip().lower()):
         return "an owner decision is still open on it"
-    if not OWNER_DATED.search(" | ".join(cells[1:-1])):
+    if not OWNER_DATED.search(" | ".join(cells[1:])):
         return "the row does not name the owner with a date"
     return None
 
@@ -97,6 +97,7 @@ def test_r001_deferred_rows_parse():
     assert _deferred_rows(table) == [["R-038 install", "x", "2026-10-11", "yes"]]
     assert _deferred_rows(table.split("| R-038")[0]) == []
     assert _deferral_fault(["a later feature", "deferred by the owner", "2026-11-01", "no"]) is None
+    assert _deferral_fault(["a later feature", "not needed for B", "2026-11-01", "no — the owner, 2026-11-01"]) is None
     for row in (["a later feature", "not yet", "2026-10-16", "yes"],
                 ["a later feature", "not yet", "2026-10-16", "yes — the owner asked 2026-10-16"],
                 ["a later feature", "not yet", "2026-10-16", "yes — does the owner defer it? (asked 2026-10-16)"],
@@ -108,9 +109,9 @@ def test_r001_deferred_rows_parse():
 def test_r001_no_deferred_row_reopens_a_settled_decision():
     """R-001 (docs/BUILD_PLAN.md TASK-001 Done when: no Deferred row contradicts a Decision): no Deferred row is about a
     question the Decisions table settled (R-038, the second-checkout question), and every row is a deferral the owner
-    has made — its decision cell reads `no` and the row names the owner with a date (supervisor.md rule 44; the
-    template's `<yes — the question · no>`; completion-check's owner-dated convention; TASK-027 plans one at B6).
-    An open owner question waits on the status file's Awaiting line, not here."""
+    has made — its decision cell begins `no` and the row names the owner with a date (supervisor.md rule 44;
+    completion-check's owner-dated convention; TASK-027 plans one at B6). This project narrows the template's
+    `<yes — the question · no>`: an open owner question waits on the status file's Awaiting line, not in Deferred."""
     for cells in _deferred_rows(_read("docs/INVENTORY.md")):
         fault = _deferral_fault(cells)
         assert fault is None, f"R-001: {fault}: {cells[0]!r}"

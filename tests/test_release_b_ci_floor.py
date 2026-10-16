@@ -24,14 +24,15 @@ OSV = re.compile(r"osv-scanner", re.I)
 SOCKET = re.compile(r"\bsocket(?:security)?\b", re.I)
 SCANNERS = (("semgrep", SEMGREP), ("osv-scanner", OSV), ("socket", SOCKET))
 DISABLERS = re.compile(r"(?:\|\||;)\s*(?:true\b|exit\s+0\b|:(?=\s|$|;)|echo\b)")
-# any expression that reads the secrets context: secrets.X, secrets['X'], toJSON(secrets)
-SECRET_REF = re.compile(r"\$\{\{[^}]*\bsecrets\b")
-INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:install|add|i|ci|dlx|x)\b|\b(?:npx|bunx|uvx)\b|\bpip3?\s+install\b"
+# a secret in any form: any `${{ }}` expression reading the secrets context (up to its closing `}}`, so
+# format('{0}', secrets.X) and toJSON(secrets) count), a bare secrets.X / secrets['X'], and the job's github.token
+SECRET_REF = re.compile(r"\$\{\{(?:(?!\}\}).)*?\bsecrets\b|\bsecrets\s*[.\[]|\bgithub\.token\b", re.S)
+INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:-{1,2}\S+\s+)*(?:install|add|i|it|ci|dlx|x|exec)\b|\b(?:npx|bunx|uvx)\b|\bpip3?\s+install\b"
                       r"|\buv\s+(?:pip|tool|add|sync|run)\b|\bgo\s+install\b|\bgem\s+install\b|\bcargo\s+install\b"
                       r"|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
 # npm's install and clean-install commands with their aliases (npm help install, npm help ci)
-NPM_INSTALL = re.compile(r"\bnpm\s+(?:install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add|ci|clean-install"
-                         r"|ic|install-clean|isntall-clean)\b")
+NPM_INSTALL = re.compile(r"\bnpm\s+(?:-{1,2}\S+\s+)*(?:install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add|ci"
+                         r"|clean-install|ic|install-clean|isntall-clean|it|install-test)\b")
 LOCK_CLOSURE = {"pytest", "pyyaml", "colorama", "iniconfig", "packaging", "pluggy", "pygments"}
 
 
@@ -77,15 +78,22 @@ def test_r002_disabler_pattern_catches_the_idioms():
 
 def test_r002_secret_and_install_patterns_catch_their_forms():
     """R-002: the patterns the secret and install checks rely on match each form they claim (a negative test must show its precondition)."""
-    for bad in ("${{ secrets.X }}", "${{ secrets['X'] }}", "${{ toJSON(secrets) }}", "${{secrets.X}}"):
+    for bad in ("${{ secrets.X }}", "${{ secrets['X'] }}", "${{ toJSON(secrets) }}", "${{secrets.X}}",
+                "${{ format('{0}', secrets.X) }}", "${{ github.token }}"):
         assert SECRET_REF.search(bad), bad
     for ok in ("${{ vars.SOCKET_ORG_SLUG }}", "${{ github.sha }}", "secrets/ folder"):
         assert not SECRET_REF.search(ok), ok
-    for bad in ("npm install x", "npm ci", "npx x", "pnpm dlx x", "yarn dlx x", "bunx x", "uvx x", "uv tool run x",
+    for bad in ("npm install x", "npm ci", "npm exec x", "npm --global i x", "npx x", "pnpm dlx x", "yarn dlx x", "bunx x", "uvx x", "uv tool run x",
                 "pip3 install x", "go install x", "curl -fsSL x"):
         assert INSTALLS.search(bad), bad
-    for bad in ("npm i -g x", "npm add x", "npm isntall x", "npm clean-install"):
+    for bad in ("npm i -g x", "npm add x", "npm isntall x", "npm clean-install", "npm -g install x", "npm --global i x", "npm it"):
         assert NPM_INSTALL.search(bad), bad
+
+
+def test_r002_lines_join_continuations():
+    """R-002: a backslash-continued command is read as one line, so a flag on a continuation counts (a negative test must show its precondition)."""
+    step = {"run": "# c\nnpm install -g \\\n  --ignore-scripts \\\n  --ignore-scripts=false pkg\nsocket ci --no-banner\n"}
+    assert _lines(step) == ["npm install -g --ignore-scripts --ignore-scripts=false pkg", "socket ci --no-banner"]
 
 
 def test_r002_workflow_parses():
@@ -100,7 +108,20 @@ def _on(data):
 
 
 def _lines(step):
-    return [s.strip() for s in str(step.get("run") or "").splitlines() if s.strip() and not s.strip().startswith("#")]
+    """The step's commands, one per entry: comments dropped, backslash-continued lines joined into their command."""
+    out, held = [], ""
+    for raw in str(step.get("run") or "").splitlines():
+        s = raw.strip()
+        if not held and (not s or s.startswith("#")):
+            continue
+        if s.endswith("\\"):
+            held += s[:-1].strip() + " "
+            continue
+        out.append((held + s).strip())
+        held = ""
+    if held.strip():
+        out.append(held.strip())
+    return out
 
 
 def _floor_step(data, pattern):
@@ -165,7 +186,9 @@ def test_r002_no_install_runs_beside_a_secret():
     data = _data()
     envs = [data.get("env")] + [j.get("env") for j in _jobs(data).values()] + [s.get("env") for j in _jobs(data).values() for s in _steps(j)]
     for env in envs:
-        assert "ignore_scripts" not in str(env or {}).lower().replace("-", "_"), f"R-002: an env sets npm's ignore-scripts config: {env!r}"
+        for key, value in (env or {}).items():
+            if "ignore_scripts" in str(key).lower().replace("-", "_"):
+                assert str(value).strip().lower() in ("true", "1"), f"R-002: an env sets npm's ignore-scripts config to {value!r}"
     for name, job in _jobs(data).items():
         for step in _steps(job):
             if SECRET_REF.search(str(step.get("env") or {})):
@@ -173,8 +196,11 @@ def test_r002_no_install_runs_beside_a_secret():
                     assert not INSTALLS.search(s), f"R-002: a step holding a secret installs or fetches ({name}): {s!r}"
             for s in _lines(step):
                 if NPM_INSTALL.search(s):
-                    mentions = [t for t in s.split() if "ignore-scripts" in t.lower() or "ignore_scripts" in t.lower()]
-                    assert mentions == ["--ignore-scripts"], f"R-002: npm install must carry exactly one bare --ignore-scripts: {s!r}"
+                    tokens = s.split()
+                    mentions = [i for i, t in enumerate(tokens) if "ignore-scripts" in t.lower() or "ignore_scripts" in t.lower()]
+                    assert [tokens[i] for i in mentions] == ["--ignore-scripts"], f"R-002: npm install must carry exactly one bare --ignore-scripts: {s!r}"
+                    after = tokens[mentions[0] + 1].lower() if mentions[0] + 1 < len(tokens) else ""
+                    assert after not in ("true", "false", "0", "1"), f"R-002: --ignore-scripts given a value ({after}) npm would read: {s!r}"
     job, socket = _floor_step(_data(), re.compile(r"(?:^|\s)socket\s+ci\b"))
     steps = _steps(job)
     before = steps[: steps.index(socket)]
