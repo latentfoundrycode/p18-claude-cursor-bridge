@@ -30,3 +30,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 - Line-break characters Markdown does not end a line at (vertical tab, form feed, `\x1c` to `\x1e`, NEL, U+2028, U+2029) are now inside a line for the check, as for Markdown, so `prose<FF>## Set at x` or `note<FF>Workflows: …` is not read, where a raw-text reader would see a line; reporting any such character in a types/, traits/ or status file as `form` would close it both ways (Review A, round 6 Consider).
 - Table cells are trimmed with `str.strip()` (any Unicode whitespace); Markdown trims spaces and tabs only, so a separator followed by a form feed, NEL, U+2028 or a no-break space is accepted where Markdown shows no table; trim `" \t"` only (the security auditor, round 6).
 - An escaped pipe (`\|`) inside a cell is split as a cell boundary; the tables' own rule says no cell contains a pipe, which the check does not enforce (the security auditor, round 6).
+
+## Stage B2 — TASK-008, the Workflows line enforced
+- conformance-check.py reads an existing but unreadable docs/PROJECT_STATUS.md as empty text, so its Workflows line row says "missing" where "not checked" would be exact; the row is MISSING either way and the verdict is the same (the builder's assumption, accepted at the accept commit).
+- `judge_workflows_line` is written twice, identically, in inventory-check.py and conformance-check.py; a lead for stage B2's refactoring pass (one shared helper beside workflow-check.py).

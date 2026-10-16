@@ -1,6 +1,6 @@
 # Inventory — Claude-Cursor Bridge
 Reflected through: none
-Updated: 2026-10-16
+Updated: 2026-10-17
 
 The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
 
@@ -16,7 +16,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
 | The extension-point registry | Every phase module with its replaceable flag, and every point a conditional workflow may change, each with its declaring module, the kinds of change it accepts and whether it applies per part or per project; how a conditional workflow names a point | bridge/cursor-bridge/workflow/extension-points.md | tests/test_extension_points.py | release B (TASK-005) |
 | The CI security floor | Semgrep (OSS engine, explicit rulesets, diff-aware), OSV-Scanner and Socket run in the `security floor` job beside the tests; the tests install from a committed lockfile; every action pinned by commit SHA, checkouts without persisted credentials, secrets only in step-level env | .github/workflows/tests.yml; requirements.lock; .semgrep.yml; osv-scanner.toml; socket.yml | tests/test_release_b_ci_floor.py | release B (TASK-002) |
 | The workflow check | Checks every conditional workflow (types/, traits/) against the open list and the extension-point registry, and a status file's `Workflows:` lines against the open list; an unwritten type or sub-type fails, an unwritten trait is flagged; runs in CI over the bridge's workflow folder and the sample fixtures | bridge/cursor-bridge/workflow-check.py; .github/workflows/tests.yml (bridge programs job) | tests/test_workflow_check.py | release B (TASK-006) |
-| The `Workflows:` status line | One line per part beside `Phase:`, naming the part's product type, sub-type and traits by the open list's workflow and trait names, in a stated grammar; `not yet classified` before intake | bridge/commands/supervisor.md, "Project state" | tests/test_workflows_line_text.py | release B (TASK-007) |
+| The `Workflows:` status line | One line per part beside `Phase:`, naming the part's product type, sub-type and traits by the open list's workflow and trait names, in a stated grammar; `not yet classified` before intake. inventory-check.py and conformance-check.py fail a missing line, a malformed one (judged by workflow-check.py's check_status), lines that do not stand together right after `Phase:` (its check_placement), and rule files that cannot be loaded | bridge/commands/supervisor.md, "Project state"; bridge/cursor-bridge/inventory-check.py, conformance-check.py, workflow-check.py | tests/test_workflows_line_text.py; tests/test_workflows_line_check.py | release B (TASK-007; enforced since TASK-008) |
 
 ## Resources
 | Name | Kind | Where it lives | Used by | Provided |
