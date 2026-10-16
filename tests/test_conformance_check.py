@@ -66,7 +66,7 @@ def make_workspace(root, conformant=True):
     for name in ("PROJECT_STATUS.md", "INVENTORY.md", "REQUIREMENTS.md", "RUN_PARAMETERS.md", "ROSTER.json", "DESIGN.md"):
         (root / "docs" / name).write_text("x\n", encoding="utf-8")
     (root / "docs" / "INVENTORY.md").write_text(INVENTORY, encoding="utf-8")
-    (root / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nBridge version: %s\nPhase: building\n" % VERSION, encoding="utf-8")
+    (root / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nBridge version: %s\nPhase: building\nWorkflows: not yet classified\n" % VERSION, encoding="utf-8")
     (root / "docs" / "diagrams" / "INDEX.md").write_text("# Diagrams\n", encoding="utf-8")
     (root / "project.json").write_text('{"name": "Thing", "purpose": "finds things", "kind": "private", "version": "0.0.0", "state": {"phase": "building", "stage": "Stage 1", "bridge": "%s", "updated": "2026-10-10"}}' % VERSION, encoding="utf-8")
     (root / ".cursor" / "rules" / "workspace-boundary.mdc").write_text("rule\n", encoding="utf-8")
