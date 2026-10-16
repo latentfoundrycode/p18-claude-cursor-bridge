@@ -581,6 +581,7 @@ def test_r014_tilde_fences_and_longer_runs_hide_headings():
     text = (REPO / FIX / "pass/traits/installable.md").read_text(encoding="utf-8")
     assert "\n~~~\n## Set at intake.delivery-kind\n~~~\n" in text, "precondition: a tilde fence hides a Set"
     assert "\n~~~~\n````\n## Replace design\n~~~\n~~~~" in text, "precondition: a longer tilde fence hides a Replace"
+    assert "\n~~~a`b\n## Set at intake.delivery-kind\n~~~" in text, "precondition: a backtick in a tilde info string still opens"
     rc, lines, err = run(f"{FIX}/pass")
     assert rc == 0 and lines[-1] == "RESULT: OK", lines
 
@@ -629,6 +630,48 @@ def test_r014_unclosed_indented_fence_is_form():
     rc, lines, err = run(root)
     assert rc == 1
     assert fails(lines) == [f"FAIL (form) {root}/types/host-extension.md: - - fenced code block is still open at the end of the file"], lines
+
+
+# --- round 6: the fifth review's corrections (handoff/TASK-006-r6.md) ---------------------------------------------
+
+LIBRARY_ROW = "| library | Library | Included by other programs | Library Development | — | no | — |"
+
+
+@pytest.mark.parametrize("row", [LIBRARY_ROW + "|", "|" + LIBRARY_ROW], ids=["trailing-double-pipe", "leading-double-pipe"])
+def test_r014_double_pipe_row_is_a_cell_count_error(tmp_path, row):
+    """R6-1: a row ending or starting `||` keeps its empty cell, so its count differs from the header's: exit 2."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    assert "\n" + LIBRARY_ROW + "\n" in text, "precondition: the row the test breaks"
+    broken = tmp_path / "open-list.md"
+    broken.write_text(text.replace("\n" + LIBRARY_ROW + "\n", "\n" + row + "\n", 1), encoding="utf-8")
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert_not_checked(rc, lines, err)
+    assert any("table row cell count differs from its header" in line for line in lines), lines
+
+
+def test_r014_separator_with_double_pipe_is_not_a_separator(tmp_path):
+    """R6-1 with R3-2: a separator ending `||` has one cell too many."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    good = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
+    assert good in text
+    broken = tmp_path / "open-list.md"
+    broken.write_text(text.replace(good, good.rstrip("\n") + "|\n", 1), encoding="utf-8")
+    assert_not_checked(*run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md"))
+
+
+@pytest.mark.parametrize("sep", ["\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", " ", " "],
+                         ids=["vt", "ff", "fs", "gs", "rs", "nel", "ls", "ps"])
+def test_r014_lines_end_only_at_line_feeds(tmp_path, sep):
+    """R6-2: two lines joined to text by a character Markdown does not end a line at are not fences, so the trait's
+    `## Set` between them is read and is the one (b)."""
+    root = tmp_path / "root"
+    (root / "traits").mkdir(parents=True)
+    body = f"## Add at intake.questions\n\nq\n\na{sep}```\n\n## Set at intake.delivery-kind\n\ninstaller\n\nb{sep}```\n"
+    (root / "traits" / "installable.md").write_text(body, encoding="utf-8", newline="\n")
+    rc, lines, err = run(str(root))
+    shown = str(root).replace("\\", "/")
+    assert rc == 1, lines
+    assert fails(lines) == [f"FAIL (b) {shown}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
 
 
 # --- the CI step (R-033) ------------------------------------------------------------------------------------------
