@@ -36,61 +36,87 @@ INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:-{1,2}[\w-]+(?:=\S+|\s+[^-\
 # npm's install and clean-install commands with their aliases (npm help install, npm help ci)
 NPM_INSTALL = re.compile(r"\bnpm\s+(?:-{1,2}[\w-]+(?:=\S+|\s+[^-\s]\S*)?\s+)*?(?:install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add|ci"
                          r"|clean-install|ic|install-clean|isntall-clean|it|cit|install-test|install-ci-test|update|up|upgrade)\b")
-# The security floor job as committed, step by step, verbatim (the supervisor's pin, BUG-001 round 5): a change to
-# any scanner step, its order, its inputs or its environment fails here and must change this pin in the same diff,
-# where both reviewers read it (Merge-Verification-Policy §Anti-gaming). Regenerate it from the workflow only for a
-# change the gate approves.
-FLOOR_JOB = {'name': 'security floor',
-     'runs-on': 'ubuntu-latest',
-     'steps': [{'uses': 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09',
-                'with': {'fetch-depth': 0, 'persist-credentials': False}},
-               {'env': {'GITHUB_EVENT_BEFORE': '${{ github.event.before }}',
-                        'GITHUB_EVENT_NAME': '${{ github.event_name }}',
-                        'GITHUB_EVENT_PULL_REQUEST_BASE_SHA': '${{ github.event.pull_request.base.sha }}',
-                        'GITHUB_SHA': '${{ github.sha }}'},
-                'name': 'Semgrep',
-                'run': 'set -euo pipefail\n'
-                       'ARGS=(scan --config p/python --config p/secrets --config .semgrep.yml --config '
-                       'bridge/cursor-bridge/semgrep-bridge-rules.yml --error)\n'
-                       'if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then\n'
-                       '  BASELINE="$(git merge-base "${GITHUB_EVENT_PULL_REQUEST_BASE_SHA}" "${GITHUB_SHA}")"\n'
-                       '  ARGS+=(--baseline-commit "$BASELINE")\n'
-                       'elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then\n'
-                       '  BEFORE="${GITHUB_EVENT_BEFORE}"\n'
-                       '  if [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then\n'
-                       '    ARGS+=(--baseline-commit "$BEFORE")\n'
-                       '  fi\n'
-                       'fi\n'
-                       'pipx run semgrep==1.176.1 "${ARGS[@]}" .\n',
-                'shell': 'bash'},
-               {'name': 'OSV-Scanner',
-                'run': 'curl -fsSL -o osv-scanner '
-                       '"https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"\n'
-                       'echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner" | '
-                       'sha256sum -c -\n'
-                       'chmod +x osv-scanner\n'
-                       'set +e\n'
-                       './osv-scanner scan source --config=osv-scanner.toml '
-                       "--lockfile='requirements.txt:requirements.lock'\n"
-                       'code=$?\n'
-                       'set -e\n'
-                       'if [ "$code" -eq 0 ]; then\n'
-                       '  exit 0\n'
-                       'fi\n'
-                       'if [ "$code" -eq 128 ]; then\n'
-                       '  echo "OSV-Scanner exit 128: requirements.lock was not read"\n'
-                       '  exit 128\n'
-                       'fi\n'
-                       'exit "$code"\n',
-                'shell': 'bash'},
-               {'uses': 'actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444',
-                'with': {'node-version': '22'}},
-               {'name': 'Install the Socket CLI',
-                'run': 'npm install -g --ignore-scripts @socketsecurity/cli@1.7.0'},
-               {'env': {'SOCKET_CLI_API_TOKEN': '${{ secrets.SOCKET_SECURITY_API_KEY }}',
-                        'SOCKET_CLI_ORG_SLUG': '${{ vars.SOCKET_ORG_SLUG }}'},
-                'name': 'Socket',
-                'run': 'socket ci --no-banner'}]}
+# The whole workflow as committed, verbatim — every top-level key (triggers, permissions, any env or defaults) and
+# every job and step (the supervisor's pin, BUG-001 rounds 5 and 6): a change anywhere in the workflow fails here and
+# must change this pin in the same diff, where both reviewers read it (Merge-Verification-Policy §Anti-gaming).
+# Regenerate it from the workflow only for a change the gate approves. (`on` reads back as the key True, YAML 1.1.)
+WORKFLOW_PIN = {True: {'pull_request': None, 'push': {'branches': ['main']}},
+     'jobs': {'security-floor': {'name': 'security floor',
+                                 'runs-on': 'ubuntu-latest',
+                                 'steps': [{'uses': 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09',
+                                            'with': {'fetch-depth': 0, 'persist-credentials': False}},
+                                           {'env': {'GITHUB_EVENT_BEFORE': '${{ github.event.before }}',
+                                                    'GITHUB_EVENT_NAME': '${{ github.event_name }}',
+                                                    'GITHUB_EVENT_PULL_REQUEST_BASE_SHA': '${{ '
+                                                                                          'github.event.pull_request.base.sha '
+                                                                                          '}}',
+                                                    'GITHUB_SHA': '${{ github.sha }}'},
+                                            'name': 'Semgrep',
+                                            'run': 'set -euo pipefail\n'
+                                                   'ARGS=(scan --config p/python --config p/secrets --config '
+                                                   '.semgrep.yml --config '
+                                                   'bridge/cursor-bridge/semgrep-bridge-rules.yml --error)\n'
+                                                   'if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then\n'
+                                                   '  BASELINE="$(git merge-base '
+                                                   '"${GITHUB_EVENT_PULL_REQUEST_BASE_SHA}" "${GITHUB_SHA}")"\n'
+                                                   '  ARGS+=(--baseline-commit "$BASELINE")\n'
+                                                   'elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then\n'
+                                                   '  BEFORE="${GITHUB_EVENT_BEFORE}"\n'
+                                                   '  if [ "$BEFORE" != '
+                                                   '"0000000000000000000000000000000000000000" ]; then\n'
+                                                   '    ARGS+=(--baseline-commit "$BEFORE")\n'
+                                                   '  fi\n'
+                                                   'fi\n'
+                                                   'pipx run semgrep==1.176.1 "${ARGS[@]}" .\n',
+                                            'shell': 'bash'},
+                                           {'name': 'OSV-Scanner',
+                                            'run': 'curl -fsSL -o osv-scanner '
+                                                   '"https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"\n'
+                                                   'echo '
+                                                   '"160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  '
+                                                   'osv-scanner" | sha256sum -c -\n'
+                                                   'chmod +x osv-scanner\n'
+                                                   'set +e\n'
+                                                   './osv-scanner scan source --config=osv-scanner.toml '
+                                                   "--lockfile='requirements.txt:requirements.lock'\n"
+                                                   'code=$?\n'
+                                                   'set -e\n'
+                                                   'if [ "$code" -eq 0 ]; then\n'
+                                                   '  exit 0\n'
+                                                   'fi\n'
+                                                   'if [ "$code" -eq 128 ]; then\n'
+                                                   '  echo "OSV-Scanner exit 128: requirements.lock was not '
+                                                   'read"\n'
+                                                   '  exit 128\n'
+                                                   'fi\n'
+                                                   'exit "$code"\n',
+                                            'shell': 'bash'},
+                                           {'uses': 'actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444',
+                                            'with': {'node-version': '22'}},
+                                           {'name': 'Install the Socket CLI',
+                                            'run': 'npm install -g --ignore-scripts @socketsecurity/cli@1.7.0'},
+                                           {'env': {'SOCKET_CLI_API_TOKEN': '${{ secrets.SOCKET_SECURITY_API_KEY '
+                                                                            '}}',
+                                                    'SOCKET_CLI_ORG_SLUG': '${{ vars.SOCKET_ORG_SLUG }}'},
+                                            'name': 'Socket',
+                                            'run': 'socket ci --no-banner'}]},
+              'tests': {'name': 'bridge programs (${{ matrix.os }})',
+                        'runs-on': '${{ matrix.os }}',
+                        'steps': [{'uses': 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09',
+                                   'with': {'persist-credentials': False}},
+                                  {'uses': 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1',
+                                   'with': {'python-version': '3.12'}},
+                                  {'run': 'python -m pip install -r requirements.lock'},
+                                  {'run': 'python -m pytest tests -q'},
+                                  {'name': "windowless check over the bridge's programs",
+                                   'run': 'python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge'},
+                                  {'name': 'the manifest matches the tree',
+                                   'run': 'python bridge/cursor-bridge/bridge-check.py --root bridge --sources '
+                                          '--quiet'}],
+                        'strategy': {'fail-fast': False, 'matrix': {'os': ['windows-latest', 'ubuntu-latest']}}}},
+     'name': 'tests',
+     'permissions': {'contents': 'read'}}
+FLOOR_JOB = WORKFLOW_PIN["jobs"]["security-floor"]
 LOCK_CLOSURE = {"pytest", "pyyaml", "colorama", "iniconfig", "packaging", "pluggy", "pygments"}
 
 
@@ -291,11 +317,22 @@ def test_r002_floor_job_is_the_pinned_one():
     assert data["jobs"].get("security-floor") == FLOOR_JOB, "R-002: the security floor job differs from the pinned one"
 
 
+def test_r002_workflow_is_the_pinned_one():
+    """R-002 (the stage B1 review, BUG-001 round 6): the whole workflow is exactly the committed one, so a workflow-level
+    `env:` or `defaults:` (a `run.shell` that skips every step, a registry, NODE_OPTIONS, BASH_ENV), a new job or a
+    changed trigger cannot change how the floor runs without this pin changing in the same diff."""
+    assert _data() == WORKFLOW_PIN, "R-002: the workflow differs from the pinned one"
+
+
 def test_r002_one_step_holds_a_secret():
     """R-002 (secure-coding.snapshot.md V14; the brief: no secret on a scanner's path beyond its own token): in the whole
     workflow exactly one step refers to a repository secret, in any key — the Socket scan, which runs only
-    `socket ci --no-banner` — so no action, install or other command is handed one."""
-    holders = [(name, step.get("name")) for name, job in _jobs(_data()).items() for step in _steps(job)
+    `socket ci --no-banner` — so no action, install or other command is handed one; and no job passes secrets on
+    (a reusable-workflow call with `secrets:`, `secrets: inherit` included)."""
+    data = _data()
+    for name, job in _jobs(data).items():
+        assert "secrets" not in job, f"R-002: job {name} passes secrets on"
+    holders = [(name, step.get("name")) for name, job in _jobs(data).items() for step in _steps(job)
                if SECRET_CTX.search(str(step))]
     assert holders == [("security-floor", "Socket")], f"R-002: the steps referring to a secret are {holders}"
 

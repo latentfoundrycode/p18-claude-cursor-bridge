@@ -111,8 +111,9 @@ def test_r001_deferred_rows_parse():
 def test_r001_no_deferred_row_reopens_a_settled_decision():
     """R-001 (docs/BUILD_PLAN.md TASK-001 Done when: no Deferred row contradicts a Decision): no Deferred row is about a
     question the Decisions table settled (R-038, the second-checkout question), and every row is a deferral the owner
-    has made — its decision cell begins `no` and the row names the owner with a date (supervisor.md rule 44;
-    completion-check's owner-dated convention; TASK-027 plans one at B6). This project narrows the template's
+    has made — its decision cell begins `no` and the row names the owner and a date, in either order (supervisor.md
+    rule 44; TASK-027 plans one at B6; completion-check.py reads the register, not this table, and wants the owner
+    before the date there). This project narrows the template's
     `<yes — the question · no>`: an open owner question waits on the status file's Awaiting line, not in Deferred."""
     for cells in _deferred_rows(_read("docs/INVENTORY.md")):
         fault = _deferral_fault(cells)
