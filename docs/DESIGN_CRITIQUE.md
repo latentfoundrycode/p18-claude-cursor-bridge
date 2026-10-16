@@ -312,6 +312,71 @@ Both APPROVE; round 1's fixes confirmed by both (each ran the round-2 test again
 - "At intake" names only one of the times a pause can happen: the workflow check also fails a line at a release and at a calibration (§6.6, §6.8) (Review A) → TASK-006's and TASK-024's briefs.
 - a change cycle that changes a part's traits, or adds a part, rewrites the line, which the paragraph does not say (Review A) → the brief of the increment that writes the change-cycle module.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-002 | re-review 002c (main merged in) | Review A | 0 | 2 | 4 | yes — round 6 (see below) |
+| TASK-002 | re-review 002c (main merged in) | Review B | 0 | 1 | 2 | yes — on the same branch |
+| TASK-002 | 6 | Review A | 0 | 2 | 2 | routed (see below) |
+| TASK-002 | 6 | Review B | 0 | 0 | 0 | — |
+
+### TASK-002 — disposition of its last rounds
+Rounds 1 to 5 and why the floor took six builder rounds are in the Issues document (ISS-002, ISS-005). The re-review of the head that took main in (002c): both APPROVE. Review A's Should fix, the Socket CLI's banner printing 5 characters of the key into CI logs, was raised to Blocking because the repository is public → round 6 (`socket ci --no-banner`, the supervisor's test `test_r002_socket_prints_no_banner`); Review B's Should fix, the inventory's spending-limit wording, fixed on the branch. Round 6: both APPROVE. Review A's two Should fix (the test's docstring citation; the inventory's reword of what the 5 characters are and the remedy) and its Considers (the guard over every job; a stale working file) went to stage B1's close, where they were taken (BUG-001). Merged as fba63bc (2026-10-13).
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| Stage B1 | 1 | Review A | 2 | 5 | 5 | BUG-001 and the owner's run sheet (see below) |
+| Stage B1 | 1 | Review B | 1 | 3 | 1 | BUG-001 (see below) |
+
+### Stage B1 review round 1 — disposition (2026-10-16)
+Both REJECT. Converged (both reviewers): the status file on main was stale, describing PR #16 as unmerged; the stage tests were weak (the Deferred check, no trigger check); the Socket key was in the environment while npm installed the CLI (Review A Should fix, Review B Consider: blocking by convergence). Taken in BUG-001:
+- **The status file and the inventory** (both, Blocking): the status file is current and self-sufficient; the inventory records the required check, the Socket file coverage, the full-tree audit and the fork rule.
+- **Three logs still show part of the key** (Review A, Blocking): runs 38241764324, 38244794839 and 38309209568 survived the owner's deletion of 2026-10-13. The supervisor counted the banner lines in the logs of every run since 2026-10-12 without printing them: these three hold one each, no other run holds any. Deleting them and replacing the key are the owner's; asked with a run sheet 2026-10-16. The stage's review is repeated after the owner reports back.
+- **The key beside npm install** (converged): the CLI is installed in a step without the key, with `--ignore-scripts` (builder, BUG-001); the supervisor's tests pin it.
+- **The stage tests** (both): the Deferred check parses rows (fails on a settled decision or an undated deferral, allows TASK-027's dated one); the phase is compared with project.json; the triggers, each scanner's exit deciding its step, the OSV lockfile argument, the lock's exact closure, `; true` in the disabler guard, --no-banner in every job are pinned.
+- **No full-tree Semgrep scan** (Review A Should fix): run once on 2026-10-16 with CI's rulesets — one finding, the shim's `chmod 0o755`, accepted with its reason; re-run at each release (INVENTORY Decisions).
+- **Does Socket read requirements.lock** (Review A Should fix): Socket's supported-file list matches `requirements{.bazel,}.lock` for PyPI; the dashboard listing is a least-confident check in docs/HARDENING.md.
+- Considers: the unpinned Semgrep rule packs and the unused Semgrep token → docs/HARDENING.md leads; forks get no secrets → a Decision; the stale mutation driver → updated (run/supervisor/mutate_ci_floor.py); the stage label and R-002's merge commit → project.json and the register.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 | 1 | Review A | 0 | 1 | 6 | yes — on the branch (see below) |
+| BUG-001 | 1 | Review B | 0 | 4 | 1 | yes — on the branch (see below) |
+
+### BUG-001 round 1 — disposition (PR #21)
+Both APPROVE; the builder's change matches the brief; CI on the head shows the CLI installed without scripts (24 packages), the scan run, no banner. Converged, so taken as blocking: `--ignore-scripts` matched as a substring (`--ignore-scripts=false` passed; Review B Should fix, Review A Consider) and a deferral passed on any date in its row (Review B Should fix, Review A Consider). FIX in the supervisor's tests: the flag matched whole; a secret found in any expression form (`secrets.X` and `secrets['X']`, Review B); the install pattern widened to `npm ci`, `npx`, `pip3`, `uv`, `go`/`gem`/`cargo install` (Review A); the CLI held at its recorded 1.7.0 (Review A); `pull_request` must run on open, update and reopen (`types: [closed]` passed, Review B); a deferral needs the owner named with a date in its decision cell. Driver: 35 mutants, all killed, the six new ones among them. Records: HARDENING's npm lead said the dependencies run "without the key in reach", true at install only — reworded for scan time (Review A Should fix); the runner-image date marked unconfirmed (Review A); the status file names PR #21 and what lives in `run/supervisor/` (Review A); this record's wording on the three logs (Review B). The bridge's own CI guidance lacking `--no-banner` and the keyless install (Review A Consider) → FB-007, widened. The diff file's trailing whitespace (Review B Consider) is the diff's own content, not taken.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 | 2 | Review A | 0 | 2 | 5 | yes — on the branch (see below) |
+| BUG-001 | 2 | Review B | 1 | 0 | 0 | yes — on the branch (see below) |
+
+### BUG-001 round 2 — disposition (PR #21)
+Review A APPROVE, Review B REJECT. Converged (Review B Blocking, Review A Consider): `--ignore-scripts --ignore-scripts=false` passed while npm takes the last setting. FIX: an npm install line's one mention of the setting must be the bare `--ignore-scripts`; no env at any level sets npm's ignore-scripts config; npm's install and clean-install aliases (`add`, `isntall`, `clean-install`, …) are all checked. Review A's Should fix: an open "yes" naming the owner and a date passed — the row rule now follows the template (`<yes — the question · no>`) and completion-check's owner-dated convention: a deferral reads `no` in its decision cell and names the owner with a date in the row, and an open question waits on the status file's Awaiting line (this also answers Review A's Consider that a template row failed); `${{ toJSON(secrets) }}` passed — the secret pattern now matches any expression reading the secrets context. Considers taken: `uvx`, `pnpm dlx`, `yarn dlx`, `bunx` in the install pattern; a self-test of the secret and install patterns; HARDENING's npm lead says its settle changes the pin test. The driver counts only an assertion as a kill (a crash is reported), and holds 41 mutants, all killed; the round-2 SCOPE file's stale count is replaced by round 3's.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 | 3 | Review A | 0 | 3 | 4 | yes — on the branch (see below) |
+| BUG-001 | 3 | Review B | 2 | 0 | 0 | yes — on the branch (see below) |
+
+### BUG-001 round 3 — disposition (PR #21)
+Review A APPROVE, Review B REJECT; both blocking items converged with Review A's own findings. **A weakening:** round 3's secret pattern stopped at the first `}`, so `${{ format('{0}', secrets.X) }}` passed where the substring check on main had caught it (Review B Blocking, Review A Should fix). FIX: the pattern reads each expression to its closing `}}`, keeps the bare `secrets.X` / `secrets['X']` form, and adds `github.token`. **A continuation:** `--ignore-scripts` followed by `--ignore-scripts=false` on a backslash-continued line passed (Review B Blocking, Review A Consider). FIX: commands are read with their continuations joined. Review A's other findings: `--ignore-scripts false` (npm reads a bare value after a boolean flag) is refused; a deferral's decision cell may read `no — the owner, <date>` (it begins `no`, and the owner and date are looked for across the row); the records no longer say a template row passes — this project narrows the template's `<yes — the question · no>`, an open question waits on the status file's Awaiting line (the round-2 disposition's "also answers Review A's Consider" overstated it); the env check refuses only a value that is not `true`, so a workflow-level `npm_config_ignore_scripts: 'true'` passes, and its mutant is named for what it proves; the undated-row mutant now reaches the owner-and-date check; npm options before the command (`npm -g install`), `npm exec`, `npm it`. Driver: 47 mutants, all killed by an assertion; stage tests 26.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 | 4 | Review A | 0 | 3 | 5 | yes — on the branch (see below) |
+| BUG-001 | 4 | Review B | 4 | 0 | 0 | yes — on the branch (see below) |
+
+### BUG-001 round 4 — disposition (PR #21)
+Review A APPROVE (nothing weaker than on main); Review B REJECT with four new bypasses of the structural test: an early `exit 0` in the Semgrep step, `code=0` after OSV's status, a secret handed to a third-party action step, `npm --prefix /x install` in the step holding the key. **REVIEWERS DISAGREE** on whether further bypasses of the structural test block (Review A: tail; Review B: blocking) — a correctness crux, settled by the supervisor. Every round since stage B1's review has found new ways past pattern checks of shell inside YAML while the CI change itself has been approved in every round: the tail of one hard subsystem, and a pattern check of it never ends. Decision: stop pattern-matching the floor and pin it. `test_r002_floor_job_is_the_pinned_one` compares the `security floor` job, every step verbatim, with a committed copy, so a skipped scanner, an overwritten status or an added step fails unless the same diff changes the pin, where both reviewers read it (§Anti-gaming); `test_r002_one_step_holds_a_secret` allows exactly one step in the whole workflow to refer to a repository secret, the Socket scan. These close all four of Review B's findings and Review A's chained second install. The pattern checks stay as a second line for the other job and later steps, tightened where cheap: chained commands split at `&&`, `||`, `;`, `|`; npm options with a separate value (`--prefix /x`), `cit`, `update`; expression names case-insensitive, `github['token']`; the job token kept apart from the step-env rule, so `with: token: ${{ github.token }}` stays allowed (Review A Should fix); a deferral names the owner and a date in either order; the env docstring says `true` or `1`. The mutation driver now counts a kill only when the named assertion fired (three mutants had been killed by the version pin, Review A Should fix; they now add a line beside the intact pinned install); 53 mutants, all killed. The remaining forms the patterns do not model (installs by pnpm or yarn without a script check) are moot for the pinned job and recorded in docs/HARDENING.md.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 | 5 | Review A | 0 | 1 | 3 | yes — on the branch (see below) |
+| BUG-001 | 5 | Review B | 2 | 0 | 0 | yes — on the branch (see below) |
+
+### BUG-001 round 5 — disposition (PR #21)
+Review A APPROVE, Review B REJECT, on the same two gaps (converged): the job pin did not cover the workflow's top level, so a workflow-level `defaults: run: shell: "true {0}"` skipped the Socket step with every test green (and a workflow `env:` could set a registry, NODE_OPTIONS or BASH_ENV); and a reusable-workflow job with `secrets: inherit` passed the one-secret rule. FIX: `test_r002_workflow_is_the_pinned_one` pins the whole workflow verbatim (every top-level key and every job), so any change to `.github/workflows/tests.yml` must change the pin in the same diff; the one-secret rule also refuses a job that passes secrets on. Considers: the round-5 SCOPE file's stale count (replaced by round 6's); the deferral docstring says the either-order rule differs from completion-check's register convention. Driver: 56 mutants, all killed by the named assertion. **Consequence for later increments:** an increment that changes the workflow (TASK-006 adds the workflow check to CI) regenerates `WORKFLOW_PIN` in the same diff; its brief says so, and the reviewers read the pin's change as the workflow's.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
