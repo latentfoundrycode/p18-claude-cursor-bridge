@@ -576,10 +576,11 @@ def test_r014_layer_that_cannot_be_examined_stops_the_check(tmp_path, monkeypatc
 
 def test_r014_tilde_fences_and_longer_runs_hide_headings():
     """R5-3: in the pass root's trait file a tilde fence hides a trait's `## Set` (b), and a four-tilde fence holding a
-    backtick line and a shorter tilde line hides `## Replace design` (b) until its own four-tilde close."""
+    four-backtick line (the other character, long enough) and a shorter tilde line hides `## Replace design` (b) until
+    its own four-tilde close."""
     text = (REPO / FIX / "pass/traits/installable.md").read_text(encoding="utf-8")
     assert "\n~~~\n## Set at intake.delivery-kind\n~~~\n" in text, "precondition: a tilde fence hides a Set"
-    assert "\n~~~~\n```\n## Replace design\n~~~\n~~~~" in text, "precondition: a longer tilde fence hides a Replace"
+    assert "\n~~~~\n````\n## Replace design\n~~~\n~~~~" in text, "precondition: a longer tilde fence hides a Replace"
     rc, lines, err = run(f"{FIX}/pass")
     assert rc == 0 and lines[-1] == "RESULT: OK", lines
 

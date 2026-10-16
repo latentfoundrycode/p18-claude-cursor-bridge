@@ -21,7 +21,7 @@ What does uninstalling keep?
 ~~~
 
 ~~~~
-```
+````
 ## Replace design
 ~~~
 ~~~~
