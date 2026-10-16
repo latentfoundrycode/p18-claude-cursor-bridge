@@ -11,6 +11,8 @@ per entry, cells split on `|`, columns found by their header names.
 import os
 import re
 
+from test_open_list import table as open_list_table
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 EP = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "workflow", "extension-points.md")
 TEXT = open(EP, encoding="utf-8").read()
@@ -63,25 +65,8 @@ PROJECT_WIDE = {"design.diagram-catalogue", "planning.critic-lenses", "run-param
 
 
 def table(heading):
-    """The first Markdown table after `heading`, to the first non-table line: (header cells, rows)."""
-    a = TEXT.index("\n" + heading + "\n")
-    b = TEXT.find("\n## ", a + 1)
-    section = TEXT[a:b if b != -1 else len(TEXT)].split("\n")
-    start = next(i for i, l in enumerate(section) if l.startswith("|"))
-    lines = []
-    for l in section[start:]:
-        if not l.startswith("|"):
-            break
-        lines.append(l)
-    cells = [[c.strip() for c in l.strip().strip("|").split("|")] for l in lines]
-    head, sep, body = cells[0], cells[1], cells[2:]
-    assert all(set(c) <= set("-:") and c for c in sep), "the second table line is the separator"
-    assert len(sep) == len(head), "the separator has one cell per column"
-    rows = []
-    for r in body:
-        assert len(r) == len(head), "every row has one cell per column: %r" % (r,)
-        rows.append(dict(zip(head, r)))
-    return head, rows
+    """The first Markdown table after `heading` in the registry, parsed as test_open_list parses the open list's."""
+    return open_list_table(heading, TEXT)
 
 
 def modules():

@@ -84,11 +84,12 @@ SUB_WORKFLOW_NAMES = {
 WF = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "workflow")
 
 
-def table(heading):
-    """The first Markdown table after `heading`, to the first non-table line: (header cells, rows)."""
-    a = TEXT.index("\n" + heading + "\n")
-    b = TEXT.find("\n## ", a + 1)
-    section = TEXT[a:b if b != -1 else len(TEXT)].split("\n")
+def table(heading, text=TEXT):
+    """The first Markdown table after `heading` in `text` (the open list unless another file's text is
+    given), to the first non-table line: (header cells, rows)."""
+    a = text.index("\n" + heading + "\n")
+    b = text.find("\n## ", a + 1)
+    section = text[a:b if b != -1 else len(text)].split("\n")
     start = next(i for i, l in enumerate(section) if l.startswith("|"))
     lines = []
     for l in section[start:]:
