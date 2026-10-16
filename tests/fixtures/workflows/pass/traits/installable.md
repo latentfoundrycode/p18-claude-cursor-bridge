@@ -15,3 +15,13 @@ Where does the user's data live?
 ## Add at intake.questions
 
 What does uninstalling keep?
+
+~~~
+## Set at intake.delivery-kind
+~~~
+
+~~~~
+```
+## Replace design
+~~~
+~~~~

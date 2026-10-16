@@ -523,30 +523,77 @@ def test_r014_is_link_false_for_a_path_that_does_not_exist(tmp_path, monkeypatch
     assert not mod.is_link(str(afile / "below-a-file"))
 
 
+@pytest.mark.parametrize("isjunction", ["present", "absent"])
 @pytest.mark.parametrize("error,expected", [(PermissionError, True), (OSError, True), (FileNotFoundError, False), (NotADirectoryError, False)])
-def test_r014_isjunction_error_follows_one_rule(tmp_path, monkeypatch, program, error, expected):
-    """R4-2: on the isjunction branch an OSError is a link (fail closed); a missing path is not."""
-    mod = program("workflow-check")
-
-    def raises(path):
-        raise error("probe")
-
-    monkeypatch.setattr(os.path, "isjunction", raises, raising=False)
-    assert mod.is_link(str(tmp_path / "probe")) is expected
-
-
-@pytest.mark.skipif(os.name != "nt", reason="the lstat fallback runs only on Windows")
-@pytest.mark.parametrize("error,expected", [(PermissionError, True), (OSError, True), (FileNotFoundError, False), (NotADirectoryError, False)])
-def test_r014_fallback_error_follows_one_rule(tmp_path, monkeypatch, program, error, expected):
-    """R4-1: in the Windows fallback an lstat error other than a missing path is a link (fail closed)."""
+def test_r014_lstat_error_follows_one_rule(tmp_path, monkeypatch, program, error, expected, isjunction):
+    """R5-2 (replacing R4-2's two branches): is_link reads os.lstat once on every Python and platform; an error other
+    than a missing path is a link (fail closed), a missing path is not."""
     mod = program("workflow-check")
 
     def raises(path, *a, **k):
         raise error("probe")
 
-    monkeypatch.delattr(os.path, "isjunction", raising=False)
+    if isjunction == "absent":
+        monkeypatch.delattr(os.path, "isjunction", raising=False)
     monkeypatch.setattr(os, "lstat", raises)
     assert mod.is_link(str(tmp_path / "probe")) is expected
+
+
+def test_r014_is_link_does_not_use_isjunction(tmp_path, monkeypatch, program):
+    """R5-2: os.path.isjunction no longer decides; an isjunction that calls every path a junction changes nothing."""
+    mod = program("workflow-check")
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    monkeypatch.setattr(os.path, "isjunction", lambda path: True, raising=False)
+    assert not mod.is_link(str(plain))
+    assert not mod.is_link(str(tmp_path / "nothing-here"))
+
+
+# --- round 5: the fourth review's corrections (handoff/TASK-006-r5.md) --------------------------------------------
+
+@pytest.mark.parametrize("layer", ["types", "traits"])
+def test_r014_layer_that_cannot_be_examined_stops_the_check(tmp_path, monkeypatch, capsys, program, layer):
+    """R5-1: an lstat error on ROOT/types or ROOT/traits other than a missing path is an input the check cannot read:
+    an ERROR line for that path and `RESULT: not checked`, exit 2; never an empty root that passes."""
+    mod = program("workflow-check")
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "traits").mkdir()
+    real = os.lstat
+
+    def lstat(path, *a, **k):
+        if os.path.basename(os.fspath(path)) == layer:
+            raise PermissionError(13, "Permission denied", os.fspath(path))
+        return real(path, *a, **k)
+
+    monkeypatch.setattr(os, "lstat", lstat)
+    code, lines = _main_in_process(mod, str(root), capsys=capsys)
+    assert code == 2, lines
+    assert lines[-1] == "RESULT: not checked", lines
+    shown = str(root).replace("\\", "/")
+    assert any(line.startswith("ERROR: ") and f"{shown}/{layer}" in line.replace("\\", "/") for line in lines), lines
+
+
+def test_r014_tilde_fences_and_longer_runs_hide_headings():
+    """R5-3: in the pass root's trait file a tilde fence hides a trait's `## Set` (b), and a four-tilde fence holding a
+    backtick line and a shorter tilde line hides `## Replace design` (b) until its own four-tilde close."""
+    text = (REPO / FIX / "pass/traits/installable.md").read_text(encoding="utf-8")
+    assert "\n~~~\n## Set at intake.delivery-kind\n~~~\n" in text, "precondition: a tilde fence hides a Set"
+    assert "\n~~~~\n```\n## Replace design\n~~~\n~~~~" in text, "precondition: a longer tilde fence hides a Replace"
+    rc, lines, err = run(f"{FIX}/pass")
+    assert rc == 0 and lines[-1] == "RESULT: OK", lines
+
+
+@pytest.mark.parametrize("case", ["fence-longer-opening", "fence-info-string-not-closing", "fence-backtick-in-info", "fence-close-trailing-space"])
+def test_r014_commonmark_fence_cases_read_the_set(case):
+    """R5-3: a shorter run does not close a longer fence; a backtick line with text after it does not close; a backtick
+    line whose info string holds a backtick does not open; a closing run followed only by spaces closes. In each the
+    trait's `## Set` is read and is the one (b), with no open fence left."""
+    root = f"{FIX}/fail/{case}"
+    rc, lines, err = run(root)
+    assert_clean_end(lines, err)
+    assert rc == 1
+    assert fails(lines) == [f"FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
 
 
 def test_r014_indented_fence_pair_hides_a_heading():
