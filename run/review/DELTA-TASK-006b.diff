@@ -1,0 +1,903 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index f6947f1..cf4116d 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-16 20:40",
++  "generated": "2026-10-16 21:17",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -102,7 +102,7 @@
+     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+-    "cursor-bridge/workflow-check.py": "d6c67ab6da40df4284a1226b2a8d2a6a04e2a5bf7c27cefc2b9759540364c2bd",
++    "cursor-bridge/workflow-check.py": "2d2c467284c9d8947c0c8ea100727e902bbf47127df7b6199a21f33524656180",
+     "cursor-bridge/workflow/extension-points.md": "0ebf6901c91d35a36d89151199603e0beefe11e32f171ea6caaba994eed50892",
+     "cursor-bridge/workflow/open-list.md": "00528622752d2732cedce48a1f2db09745be7ee1b9475986a161f084391b3cdd",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+diff --git a/bridge/cursor-bridge/workflow-check.py b/bridge/cursor-bridge/workflow-check.py
+index ef3c167..4d566a5 100644
+--- a/bridge/cursor-bridge/workflow-check.py
++++ b/bridge/cursor-bridge/workflow-check.py
+@@ -28,10 +28,13 @@ Finding lines, then one RESULT line:
+   FLAG (trait)    a trait on a Workflows line is not yet written; flagged, work continues (non-fatal)
+ 
+ Exit 0 when no FAIL line was printed (FLAG lines may have been printed). Exit 1 when at least
+-one FAIL line was printed. Exit 2 when the check cannot run: a ROOT that is not a folder, an
+-open list, registry, or status file that does not exist or cannot be read as UTF-8, a required
+-heading or required column missing, or a table row whose cell count differs from its header.
+-On exit 2 the program prints ERROR lines and RESULT: not checked, and no traceback.
++one FAIL line was printed. Exit 2 when the check cannot run: a ROOT that is not a folder, a
++folder under a root that cannot be listed, an open list, registry, or status file that does not
++exist or cannot be read as UTF-8, a required heading or required column missing, a table with
++no separator row, or a table row whose cell count differs from its header. On exit 2 the
++program prints ERROR lines and RESULT: not checked, and no traceback. A command-line usage
++error also exits 2; argparse's message stays on standard error and the last line on standard
++output is RESULT: not checked.
+ """
+ import argparse
+ import os
+@@ -60,7 +63,13 @@ ADD_FOR = re.compile(r"^## Add at (\S+) for (\S+)$")
+ ADD_AT = re.compile(r"^## Add at (\S+)$")
+ SET_AT = re.compile(r"^## Set at (\S+)$")
+ REPLACE = re.compile(r"^## Replace (\S+)$")
+-CHANGE_WORDS = ("Add", "Set", "Replace")
++# A change heading's first word, compared case-insensitively (R2-1). "at" as the second word
++# is the other way in.
++CHANGE_FIRST = frozenset({
++    "add", "adds", "added",
++    "set", "sets",
++    "replace", "replaces", "replaced", "replacing",
++})
+ TRAITS_MARK = "; traits: "
+ 
+ 
+@@ -73,14 +82,19 @@ def joined(root, rel):
+ 
+ 
+ def read_utf8(path):
+-    """Return (text, None) or (None, reason). Reason is plain language, never a traceback."""
++    """Return three values (text, shown path, reason).
++
++    text is the file contents and reason is None when the read succeeded. text is None and
++    reason is plain language when it did not. A leading UTF-8 byte-order mark is dropped.
++    Never a traceback.
++    """
+     shown = slash(path)
+     if not os.path.isfile(path):
+         if os.path.exists(path):
+             return None, shown, "cannot be read"
+         return None, shown, "does not exist"
+     try:
+-        with open(path, encoding="utf-8") as handle:
++        with open(path, encoding="utf-8-sig") as handle:
+             return handle.read(), shown, None
+     except UnicodeDecodeError:
+         return None, shown, "cannot be read as UTF-8"
+@@ -88,6 +102,52 @@ def read_utf8(path):
+         return None, shown, "cannot be read (%s)" % (err.strerror or err)
+ 
+ 
++def escape_field(value):
++    """Printable characters stay; every other character becomes \\xNN, \\uNNNN, or \\UNNNNNNNN."""
++    text = "" if value is None else str(value)
++    parts = []
++    for char in text:
++        if char.isprintable():
++            parts.append(char)
++            continue
++        code = ord(char)
++        if code < 256:
++            parts.append("\\x%02x" % code)
++        elif code <= 0xFFFF:
++            parts.append("\\u%04x" % code)
++        else:
++            parts.append("\\U%08x" % code)
++    return "".join(parts)
++
++
++def is_link(path):
++    """A symbolic link, or a Windows junction where this Python can see one."""
++    if os.path.islink(path):
++        return True
++    isjunction = getattr(os.path, "isjunction", None)
++    if isjunction is None:
++        return False
++    try:
++        return bool(isjunction(path))
++    except OSError:
++        return False
++
++
++def is_separator_cell(cell):
++    """Dashes, with an optional colon at either end, and at least one dash."""
++    text = cell.strip()
++    if text.startswith(":"):
++        text = text[1:]
++    if text.endswith(":"):
++        text = text[:-1]
++    return bool(text) and set(text) == {"-"}
++
++
++def is_separator_row(line):
++    cells = cells_of(line)
++    return bool(cells) and all(is_separator_cell(cell) for cell in cells)
++
++
+ def cells_of(line):
+     return [cell.strip() for cell in line.strip().strip("|").split("|")]
+ 
+@@ -116,20 +176,19 @@ def parse_table(text, path, heading, required):
+         if not line.startswith("|"):
+             break
+         table.append(line)
+-    if len(table) < 2:
++    if len(table) < 2 or not is_separator_row(table[1]):
+         return None, "table after %s has no separator row" % heading
+     header = cells_of(table[0])
+     for column in required:
+         if column not in header:
+             return None, "missing column %s" % column
+     body = []
+-    for line in table[1:]:
++    for line in table[2:]:
+         row = cells_of(line)
+         if len(row) != len(header):
+             return None, "table row cell count differs from its header"
+         body.append(dict(zip(header, row)))
+-    # The second table line is the separator, not a record.
+-    return body[1:], None
++    return body, None
+ 
+ 
+ def index_first(rows, column):
+@@ -182,31 +241,59 @@ def allows_set(cell):
+ 
+ 
+ def collect(root, product_keys):
+-    """Files and the folders Requirement 6 reports, in sorted relative-path order."""
++    """Files and the folders Requirement 6 reports, plus links and listing errors.
++
++    Returns (items, errors). A symbolic link or junction is recorded and not opened or
++    entered. errors are (path, reason) for a folder that cannot be listed.
++    """
+     found = []
++    errors = []
++
++    def onerror(err):
++        filename = getattr(err, "filename", None) or root
++        reason = getattr(err, "strerror", None) or "cannot be listed"
++        errors.append((slash(str(filename)), reason))
++
+     for layer in ("types", "traits"):
+         base = os.path.join(root, layer)
+         if not os.path.isdir(base):
+             continue
+-        for dirpath, dirnames, filenames in os.walk(base):
++        if is_link(base):
++            found.append((layer, "link"))
++            continue
++        for dirpath, dirnames, filenames in os.walk(base, followlinks=False, onerror=onerror):
+             rel_dir = os.path.relpath(dirpath, root).replace("\\", "/")
++            kept = []
+             for name in dirnames:
+-                found.append((rel_dir + "/" + name, True))
++                rel = rel_dir + "/" + name
++                if is_link(os.path.join(dirpath, name)):
++                    found.append((rel, "link"))
++                else:
++                    found.append((rel, "dir"))
++                    kept.append(name)
++            dirnames[:] = kept
+             for name in filenames:
+-                found.append((rel_dir + "/" + name, False))
++                rel = rel_dir + "/" + name
++                if is_link(os.path.join(dirpath, name)):
++                    found.append((rel, "link"))
++                else:
++                    found.append((rel, "file"))
+     unknown_types = set()
+-    for rel, is_dir in found:
++    for rel, kind in found:
+         parts = rel.split("/")
+-        if is_dir and len(parts) == 2 and parts[0] == "types" and parts[1] not in product_keys:
++        if kind == "dir" and len(parts) == 2 and parts[0] == "types" and parts[1] not in product_keys:
+             unknown_types.add(parts[1])
+     items = []
+-    for rel, is_dir in found:
++    for rel, kind in found:
+         parts = rel.split("/")
+         if parts[0] == "types" and len(parts) >= 2 and parts[1] in unknown_types:
+-            if is_dir and len(parts) == 2:
++            if kind == "dir" and len(parts) == 2:
+                 items.append({"rel": rel, "action": "d-folder", "name": parts[1]})
+             continue
+-        if is_dir:
++        if kind == "link":
++            items.append({"rel": rel, "action": "form-path", "name": parts[-1]})
++            continue
++        if kind == "dir":
+             if (parts[0] == "traits" and len(parts) >= 2) or (parts[0] == "types" and len(parts) > 2):
+                 items.append({"rel": rel, "action": "form-path", "name": parts[-1]})
+             continue
+@@ -219,16 +306,19 @@ def collect(root, product_keys):
+         else:
+             items.append({"rel": rel, "action": "form-path", "name": parts[-1]})
+     items.sort(key=lambda item: item["rel"])
+-    return items
++    return items, errors
+ 
+ 
+-def change_word(line):
++def is_change_heading(line):
++    """True when the line is a change heading, including a misspelt one (R2-1)."""
+     if not line.startswith("## "):
+-        return None
++        return False
+     words = line[3:].split()
+-    if not words or words[0] not in CHANGE_WORDS:
+-        return None
+-    return words[0]
++    if not words:
++        return False
++    if words[0].casefold() in CHANGE_FIRST:
++        return True
++    return len(words) >= 2 and words[1].casefold() == "at"
+ 
+ 
+ def parse_heading(line):
+@@ -249,7 +339,10 @@ def parse_heading(line):
+ 
+ 
+ def heading_spans(text):
+-    """Change headings outside fences, each with the raw lines of its section."""
++    """Change headings outside fences, each with the raw lines of its section.
++
++    Each section ends at the next heading's index, so the walk is linear in the file.
++    """
+     lines = text.splitlines()
+     fence = False
+     marks = []
+@@ -262,15 +355,13 @@ def heading_spans(text):
+         if line.startswith("## "):
+             marks.append(index)
+     spans = []
+-    for index in marks:
++    last = len(marks) - 1
++    total = len(lines)
++    for position, index in enumerate(marks):
+         line = lines[index]
+-        if change_word(line) is None:
++        if not is_change_heading(line):
+             continue
+-        end = len(lines)
+-        for later in marks:
+-            if later > index:
+-                end = later
+-                break
++        end = marks[position + 1] if position < last else total
+         spans.append((line, lines[index + 1:end]))
+     return spans
+ 
+@@ -374,15 +465,29 @@ def check_item(root, item, tables):
+     return findings
+ 
+ 
+-def split_part(rest):
+-    """Return (part, body) when rest begins with a part prefix, else (None, rest)."""
+-    index = rest.find(": ")
+-    if index <= 0:
+-        return None, rest
+-    part = rest[:index]
+-    if not part or part != part.strip() or ";" in part or "→" in part or ":" in part:
+-        return None, rest
+-    return part, rest[index + 2:]
++def prefix_of(rest, multi):
++    """Return (part or None, body, bad).
++
++    bad is the part text (or '-') when the prefix rule fails and the line stops there.
++    The prefix is looked for only in the head, the text before the first traits marker.
++    """
++    mark_at = rest.find(TRAITS_MARK)
++    if mark_at == -1:
++        head = rest
++        tail = ""
++    else:
++        head = rest[:mark_at]
++        tail = rest[mark_at:]
++    if ": " not in head:
++        if multi:
++            return None, None, "-"
++        return None, rest, None
++    cut = head.find(": ")
++    part = head[:cut]
++    invalid = part == "" or ";" in part or "→" in part or ":" in part
++    if (not multi) or invalid:
++        return None, None, part or "-"
++    return part, head[cut + 2:] + tail, None
+ 
+ 
+ def check_head(head, path, tables, findings):
+@@ -393,6 +498,9 @@ def check_head(head, path, tables, findings):
+     traits_in_head = []
+     for names in names_by_seg:
+         for name in names:
++            if name == "":
++                findings.append(("form", path, "-", "empty name in the Workflows head"))
++                continue
+             if name in tables["workflow_by_name"]:
+                 types_found.append(tables["workflow_by_name"][name])
+             elif name in tables["sub_by_name"]:
+@@ -400,7 +508,7 @@ def check_head(head, path, tables, findings):
+             elif name in tables["trait_by_name"]:
+                 traits_in_head.append(name)
+             else:
+-                findings.append(("unknown", path, name or "-", "name is not in the open list"))
++                findings.append(("unknown", path, name, "name is not in the open list"))
+     if len(types_found) != 1:
+         findings.append(("e", path, "-", "part must name exactly one product type"))
+     if len(subs_found) > 1:
+@@ -429,27 +537,28 @@ def check_head(head, path, tables, findings):
+ 
+ 
+ def check_traits(text, path, tables, findings):
+-    if text.strip() == "none":
+-        return
+-    if text.strip() == "":
+-        findings.append(("form", path, "-", "traits list is empty"))
++    """Traits text is `none` or names joined by exactly `, `. It is not stripped."""
++    if text == "none":
+         return
+     last = None
+     seen = set()
+-    for name in [part.strip() for part in text.split(",")]:
++    for name in text.split(", "):
++        if name == "" or name != name.strip() or "," in name:
++            findings.append(("form", path, name or "-", "traits are not joined by a comma and one space"))
++            continue
+         trait = tables["trait_by_name"].get(name)
+-        if not name or trait is None:
+-            findings.append(("unknown", path, name or "-", "not a trait name"))
++        if trait is None:
++            findings.append(("unknown", path, name, "not a trait name"))
+             continue
+         if name in seen:
+             findings.append(("form", path, name, "trait repeated"))
+-        else:
+-            index = tables["trait_order"][name]
+-            if last is not None and index < last:
+-                findings.append(("form", path, name, "traits are not in the open list's order"))
+-            if last is None or index > last:
+-                last = index
+-            seen.add(name)
++            continue
++        index = tables["trait_order"][name]
++        if last is not None and index < last:
++            findings.append(("form", path, name, "traits are not in the open list's order"))
++        if last is None or index > last:
++            last = index
++        seen.add(name)
+         if trait["Written"] != "yes":
+             findings.append((
+                 "FLAG", path, name,
+@@ -467,19 +576,14 @@ def check_status(path, text, tables):
+     seen_parts = {}
+     for line in lines:
+         rest = line[len("Workflows: "):]
+-        part, body = split_part(rest)
+-        if multi:
+-            if part is None:
+-                findings.append(("form", shown, "-", "a Workflows line in a multi-part file has no part prefix"))
+-                continue
++        part, body, bad = prefix_of(rest, multi)
++        if bad is not None:
++            findings.append(("form", shown, bad, "Workflows line breaks the part-prefix rule"))
++            continue
++        if part is not None:
+             seen_parts[part] = seen_parts.get(part, 0) + 1
+             if seen_parts[part] == 2:
+                 findings.append(("e", shown, part, "two Workflows lines name the same part"))
+-        elif part is not None:
+-            findings.append(("form", shown, part, "the only Workflows line must not carry a part prefix"))
+-            continue
+-        else:
+-            body = rest
+         if body == "not yet classified":
+             continue
+         if body.count(TRAITS_MARK) != 1:
+@@ -494,6 +598,9 @@ def check_status(path, text, tables):
+ def print_findings(findings):
+     problems = 0
+     for code, path, name, reason in findings:
++        path = escape_field(path)
++        name = escape_field(name)
++        reason = escape_field(reason)
+         if code == "FLAG":
+             print("FLAG (trait) %s: %s - %s" % (path, name, reason))
+         else:
+@@ -506,8 +613,17 @@ def print_findings(findings):
+     return 1
+ 
+ 
++class CheckArgumentParser(argparse.ArgumentParser):
++    def error(self, message):
++        self.print_usage(sys.stderr)
++        sys.stderr.write("%s: error: %s\n" % (self.prog, message))
++        print("RESULT: not checked")
++        sys.stdout.flush()
++        self.exit(2)
++
++
+ def build_parser():
+-    parser = argparse.ArgumentParser(
++    parser = CheckArgumentParser(
+         prog="workflow-check.py",
+         description=__doc__,
+         formatter_class=argparse.RawDescriptionHelpFormatter,
+@@ -543,7 +659,8 @@ def main(argv=None):
+             continue
+         if tables is None:
+             continue
+-        items = collect(root, set(tables["product_by_key"]))
++        items, walk_errors = collect(root, set(tables["product_by_key"]))
++        errors.extend(walk_errors)
+         for item in items:
+             if item["action"] in ("d-folder", "form-path"):
+                 continue
+@@ -563,7 +680,7 @@ def main(argv=None):
+             status_texts.append((status, text))
+     if errors:
+         for path, reason in errors:
+-            print("ERROR: %s: %s" % (path, reason))
++            print("ERROR: %s: %s" % (escape_field(path), escape_field(reason)))
+         print("RESULT: not checked")
+         return 2
+     findings = []
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index a3b53a7..30eaa97 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -407,6 +407,15 @@ Both APPROVE. Review A's Consider (the HARDENING lead on the key's reach should
+ - A type or sub-workflow's statement of its default traits has no form yet, so it is not checked (the open list's promise stands for the increment that gives it a form); the guard against a conditional workflow's sentence contradicting the core is a reading, not a check: it is the reviewers' (both reviewers of every increment that writes a conditional workflow).
+ - The tests and the fixtures are the supervisor's, written before the delegation from the brief's interface; the builder's report found one test that renamed the prose citation of a heading rather than the heading, fixed by the supervisor; the mutation driver (30 mutants) found the missing-kind test not naming its offending name, tightened.
+ 
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| TASK-006 | 1 | Review A | 1 | 1 | 8 | yes — round 2 (handoff/TASK-006-r2.md) |
++| TASK-006 | 1 | Review B | 2 | 1 | 1 | yes — round 2 |
++| TASK-006 | 1 | security auditor | 0 | 5 advisory | — | yes — round 2 |
++
++### TASK-006 round 1 — disposition (PR #23)
++Converged, so blocking: a misspelt change word (`## Adds at`) read as prose, so the change silently did nothing (Review A and Review B; the brief contradicted itself, its example right and its definition wrong: the definition now names the change words case-insensitively, or `at` as the second word); a trait list without its `, ` separator accepted (Review B blocking, Review A Consider); an unreadable folder skipped silently (all three). Also taken in round 2: a byte-order mark hid a first-line heading, so a trait's set escaped (b) (Review A Should fix); an invalid single-line prefix checked further (Review B Should fix); links and junctions followed out of the root, control characters printed raw (a newline in a file name could start a GitHub workflow command), quadratic section search, a docstring slip (the auditor); the separator row unchecked, a repeated unwritten trait flagged twice, an empty head name reported as unknown, a usage error without its RESULT line (Review A Considers); the constraint on hard-coded keys now names the two delivery point keys. The supervisor's side: the usage test now looks for each code as printed; the mutation driver gained the rules it lacked (Review A C8) and round 2's, 49 mutants, all killed.
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/handoff/TASK-006-r2-report.md b/handoff/TASK-006-r2-report.md
+new file mode 100644
+index 0000000..51c8277
+--- /dev/null
++++ b/handoff/TASK-006-r2-report.md
+@@ -0,0 +1,67 @@
++# TASK-006 round 2 report
++
++## Files changed
++
++- `bridge/cursor-bridge/workflow-check.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated; `generated` stamp and the `workflow-check.py` hash)
++- `handoff/TASK-006-r2-report.md` (this report)
++
++## Summary
++
++Round 2 corrects `workflow-check.py` so a misspelt change word is a malformed heading, every input is read as UTF-8 with a leading byte-order mark dropped, an unlistable folder exits 2, a symbolic link or Windows junction is `FAIL (form)` and is not opened or walked into, trait lists split on exactly a comma and one space, a part prefix is judged only in the head text, an empty head name is `form`, each distinct unwritten trait is flagged once, a table without a separator row cannot run, a usage error ends with `RESULT: not checked`, printed fields escape non-printable characters, and each heading section ends at the next heading's index; the manifest was regenerated after the last edit under `bridge/`.
++
++## Commands
++
++1. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` — exit 0
++
++```
++RESULT: OK
++```
++
++2. `python -m pytest tests/test_workflow_check.py -q` — exit 0
++
++```
++75 passed, 1 skipped in 6.91s
++```
++
++The skip is `test_r014_unreadable_folder_stops_the_check` (Windows; the test requires a non-root POSIX user).
++
++3. `python -m pytest tests -q` — exit 0
++
++```
++1027 passed, 21 skipped in 237.26s (0:03:57)
++```
++
++This run was after the first `make-manifest.py`, so the source-tree manifest test passed. Step 5 then refreshed `generated` to `2026-10-16 21:17`; `bridge-check.py --sources` matched that stamp. The suite was not started again after that stamp. The workflow pin is unchanged.
++
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` — exit 0
++
++```
++windowless-check: 30 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++5. `python tools/make-manifest.py` — exit 0
++
++```
++make-manifest: version 2026.10.11d, 107 files hashed, VERSION + MANIFEST.json written
++```
++
++`python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0
++
++```
++bridge-check: version 2026.10.11d (2026-10-16 21:17) at E:\p18-claude-cursor-bridge\Workspace\bridge
++bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.10.11d
++```
++
++6. `git diff --stat` — exit 0. The report is untracked, so it is absent here; `git status --short` also shows `?? handoff/TASK-006-r2-report.md`.
++
++```
++ bridge/cursor-bridge/MANIFEST.json     |   4 +-
++ bridge/cursor-bridge/workflow-check.py | 259 ++++++++++++++++++++++++---------
++ 2 files changed, 190 insertions(+), 73 deletions(-)
++```
++
++## Assumed, not verified
++
++- `os.walk`'s `onerror` is called with an `OSError` whose `filename` is the unlistable folder and whose `strerror` is a usable reason, and that recording it yields exit 2 with `RESULT: not checked` and no findings · this session is Windows, so `test_r014_unreadable_folder_stops_the_check` was skipped · that test on the ubuntu CI leg.
+diff --git a/handoff/TASK-006-r2.md b/handoff/TASK-006-r2.md
+new file mode 100644
+index 0000000..233deb9
+--- /dev/null
++++ b/handoff/TASK-006-r2.md
+@@ -0,0 +1,89 @@
++# TASK-006 round 2: the workflow check — the review's corrections
++
++## Objective
++Round 1 (`handoff/TASK-006-r1-report.md`) built `bridge/cursor-bridge/workflow-check.py`. Its review (Review A, Review B and the security auditor) found that a misspelt change heading, a trait list without its separator, an unreadable folder and a byte-order mark each let a wrong conditional workflow or status line pass, plus smaller defects. This round corrects them. **`handoff/TASK-006.md` still holds in full** (read it first: objective, context, requirements 1–15, constraints, done); this file changes only what it says, and where the two differ this file wins.
++
++Satisfies: R-014, R-033 (unchanged).
++
++## Scope
++Files you may modify:
++- bridge/cursor-bridge/workflow-check.py
++- bridge/cursor-bridge/MANIFEST.json (regenerated with `python tools/make-manifest.py` after your last edit under `bridge/`)
++- docs/BUILDER_NOTES.md
++- handoff/TASK-006-r2-report.md
++
++Do not modify anything else. In particular `.github/workflows/tests.yml` does not change in this round.
++
++## Written by the supervisor; do not edit
++`tests/test_workflow_check.py` and everything under `tests/fixtures/workflows/` were extended for this round and are committed with this file. Do not edit, move, rename or add to them, nor `tests/test_release_b_ci_floor.py`. If a supervisor test contradicts this file or `TASK-006.md`, stop, change no test, and report the contradiction (test name, requirement, what each says).
++
++## Corrections (each is a requirement)
++
++### R2-1. A misspelt change word is a malformed change heading (replaces Requirement 7's first sentence)
++A **change heading** is a line outside a fenced code block that starts with `## ` and whose words (split on whitespace, after `## `) satisfy either:
++- the first word, compared case-insensitively, is one of `add`, `adds`, `added`, `set`, `sets`, `replace`, `replaces`, `replaced`, `replacing`; or
++- the second word, compared case-insensitively, is `at`.
++
++Every change heading must match exactly one of Requirement 7's four forms (case-sensitive, single spaces, no trailing space); any other change heading is `FAIL (form)`, with name `-`. So `## Adds at intake.questions`, `## add at intake.questions`, `## Sets at intake.budget-kind`, `## Replacing interface` and `## Append at intake.questions` all fail as `form`, while `## Settings`, `## Setup`, `## Additional notes`, `## Notes` and `## Replacement history` stay prose and are not checked. A misspelt heading's section is not read as a change.
++
++### R2-2. A byte-order mark is not part of the text
++Read every input (the open list, the registry, every conditional-workflow file, every status file) with `encoding="utf-8-sig"`, so a leading UTF-8 byte-order mark is dropped and a change heading or `Workflows:` line on the first line is read. A file that is not valid UTF-8 still exits 2 (Requirement 3).
++
++### R2-3. An unreadable folder stops the check (Requirement 3, completed)
++Walking `ROOT/types/` and `ROOT/traits/`, a folder that cannot be listed is an `ERROR: <path>: <reason>` line and the run exits 2 with `RESULT: not checked`, never a silent skip. (With `os.walk`, pass an `onerror` that records it.)
++
++### R2-4. Links are not followed (Requirement 6, completed)
++A symbolic link or a Windows junction under `ROOT/types/` or `ROOT/traits/`, to a file or a folder, is `FAIL (form)` with its own path and name `-` or its file name, and is never opened or walked into (`os.path.islink`, and `os.path.isjunction` where Python provides it; `os.walk(..., followlinks=False)` alone does not stop a junction on Windows). The check therefore reads no file outside the folder it was given and cannot loop on a link to a parent.
++
++### R2-5. The trait separator is exactly `, ` (Requirement 11.5, made exact)
++After `; traits: `, the text is `none` or trait Names joined by exactly `, ` (a comma and one space). Split on `, `; a name that still contains `,`, or that has leading or trailing whitespace, or is empty, is `FAIL (form)` (name `-` or the raw text), not `unknown`. So `Has screens,Installable` and `Has screens,  Installable` fail as `form`. Do not strip the traits text before reading it, except that the line's own trailing newline is not part of it.
++
++### R2-6. The part prefix is looked for in the head only (Requirement 11.1, made exact)
++The **head text** is the rest of the line after `Workflows: ` up to the first `; traits: ` (or the whole rest if there is none). A line **attempts a prefix** when its head text contains `: `. Then:
++- the attempted part is the text before the first `: ` of the head text; it must be non-empty and contain no `;`, `→` or `:`, else `FAIL (form)`;
++- in a file with one `Workflows:` line, any attempted prefix (valid or not) is `FAIL (form)`;
++- in a file with several, a line with no attempted prefix, or an invalid one, is `FAIL (form)`;
++- a line failing any of these is not checked further (no `unknown`, `e` or `f` from it).
++
++So the single line `Workflows: bad;part: Web App Development; traits: none` gives one `form` finding only, and `Workflows: Web App Development; traits: none` attempts no prefix.
++
++### R2-7. An empty head segment is form only (Requirement 11.4)
++An empty name in the head (an empty segment around `→` or around a `,`) is `FAIL (form)`, never `unknown`; the line's other findings stand.
++
++### R2-8. One flag per unwritten trait
++A trait repeated on a line gives the `form` finding and no second `FLAG (trait)` line: each distinct unwritten trait is flagged once per line.
++
++### R2-9. The separator row is checked (Requirement 3)
++The second line of every table must be the separator: every cell, stripped, consists of `-` characters with optional `:` at either end and at least one `-`. Otherwise the check cannot run: `ERROR: <path>: table after <heading> has no separator row` and exit 2.
++
++### R2-10. A usage error ends with the RESULT line
++A command-line usage error (an unknown option, `--status` without a file) exits 2 and the last line printed on standard output is `RESULT: not checked`; argparse's own message may stay on standard error.
++
++### R2-11. Printed fields carry no control characters
++Every field the program prints from input (a path, a name, a heading target, a part, a reason that quotes input) is escaped before printing: each character for which `str.isprintable()` is false is replaced by `\xNN` (two lowercase hex digits) when its code point is below 256, else by `\uNNNN` (four lowercase hex digits, or `\UNNNNNNNN` above `0xFFFF`). Printable characters, `→` included, are printed as they are. A tab, an escape (`\x1b`), a bell, a carriage return and a newline inside a name are thereby printed as `\x09`, `\x1b`, `\x07`, `\x0d`, `\x0a`, and no input can start a new output line (which GitHub Actions would read as a workflow command).
++
++### R2-12. Heading sections in linear time
++`heading_spans` (or its replacement) finds each section's end from the next heading's index, not by re-scanning the list of headings for every heading: a file of tens of thousands of headings is read in time proportional to its size.
++
++### R2-13. The docstring of `read_utf8` says what it returns
++It returns three values (text, shown path, reason); its docstring says so.
++
++### R2-14. The two delivery point keys (the constraint's wording, corrected)
++The constraint "Do not hard-code any key, name, point or module from the tables" excepts, beside the delivery-kind list, the two point keys Requirement 9 names (`project-end.delivery`, `intake.delivery-kind`): keep them as named constants, as round 1 did.
++
++## Acceptance criteria
++- [ ] `python -m pytest tests/test_workflow_check.py -q` passes (the supervisor's tests, extended for every correction above).
++- [ ] `python -m pytest tests -q` passes in full (the workflow pin is unchanged, since the workflow does not change this round).
++- [ ] `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` exits 0 with `RESULT: OK`.
++- [ ] `windowless-check.py` and `bridge-check.py --sources` pass.
++
++## Done
++Run each of these from the repository root, in this order, and paste each command with its exit code and the relevant output into your report:
++1. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass`
++2. `python -m pytest tests/test_workflow_check.py -q`
++3. `python -m pytest tests -q`
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++5. `python tools/make-manifest.py`, then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++6. `git diff --stat`
++
++Your report is the file `handoff/TASK-006-r2-report.md`, written as you go, in the form `TASK-006.md`'s Done section describes: the files you changed, a one-paragraph summary, what you ran and what it printed, and a section headed exactly `Assumed, not verified` (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`). Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/tests/fixtures/workflows/fail/b-trait-sets-bom/traits/has-screens.md b/tests/fixtures/workflows/fail/b-trait-sets-bom/traits/has-screens.md
+new file mode 100644
+index 0000000..53b66da
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/b-trait-sets-bom/traits/has-screens.md
+@@ -0,0 +1,3 @@
++﻿## Set at intake.delivery-kind
++
++installer
+diff --git a/tests/fixtures/workflows/fail/form-misspelt-change-word/types/host-extension.md b/tests/fixtures/workflows/fail/form-misspelt-change-word/types/host-extension.md
+new file mode 100644
+index 0000000..66f49a5
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/form-misspelt-change-word/types/host-extension.md
+@@ -0,0 +1,15 @@
++## Adds at intake.questions
++
++q
++
++## add at intake.questions
++
++q
++
++## Replacing interface
++
++x
++
++## Append at intake.questions
++
++q
+diff --git a/tests/fixtures/workflows/pass/types/host-extension.md b/tests/fixtures/workflows/pass/types/host-extension.md
+index 9860294..9e82f36 100644
+--- a/tests/fixtures/workflows/pass/types/host-extension.md
++++ b/tests/fixtures/workflows/pass/types/host-extension.md
+@@ -28,3 +28,19 @@ A deeper heading is prose.
+ ## Add at project-end.delivery for host-installation
+ 
+ Copy the release into the host's folder.
++
++## Settings
++
++Prose.
++
++## Setup
++
++Prose.
++
++## Additional notes
++
++Prose.
++
++## Replacement history
++
++Prose.
+diff --git a/tests/fixtures/workflows/status/flag-repeated-unwritten.md b/tests/fixtures/workflows/status/flag-repeated-unwritten.md
+new file mode 100644
+index 0000000..5b36be5
+--- /dev/null
++++ b/tests/fixtures/workflows/status/flag-repeated-unwritten.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits: Installable, Spends money, Spends money
+diff --git a/tests/fixtures/workflows/status/form-bad-prefix-single.md b/tests/fixtures/workflows/status/form-bad-prefix-single.md
+new file mode 100644
+index 0000000..ba5534d
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-bad-prefix-single.md
+@@ -0,0 +1 @@
++Workflows: bad;part: Web App Development; traits: none
+diff --git a/tests/fixtures/workflows/status/form-empty-segment.md b/tests/fixtures/workflows/status/form-empty-segment.md
+new file mode 100644
+index 0000000..b81161f
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-empty-segment.md
+@@ -0,0 +1 @@
++Workflows: Host Extension Development →; traits: none
+diff --git a/tests/fixtures/workflows/status/form-trait-double-space.md b/tests/fixtures/workflows/status/form-trait-double-space.md
+new file mode 100644
+index 0000000..f7fae22
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-trait-double-space.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits: Has screens,  Installable
+diff --git a/tests/fixtures/workflows/status/form-trait-separator.md b/tests/fixtures/workflows/status/form-trait-separator.md
+new file mode 100644
+index 0000000..8f01190
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-trait-separator.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits: Has screens,Installable
+diff --git a/tests/fixtures/workflows/status/ok-bom.md b/tests/fixtures/workflows/status/ok-bom.md
+new file mode 100644
+index 0000000..0c52b14
+--- /dev/null
++++ b/tests/fixtures/workflows/status/ok-bom.md
+@@ -0,0 +1 @@
++﻿Workflows: Web App Development; traits: none
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index 8054f1d..9e1663e 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -92,6 +92,8 @@ FILE_CASES = [
+     ("form-two-sets", "form", "types/host-extension.md", None),
+     ("form-empty-set", "form", "types/host-extension.md", None),
+     ("form-two-replaces", "form", "types/host-extension.md", None),
++    ("form-misspelt-change-word", "form", "types/host-extension.md", "-"),
++    ("b-trait-sets-bom", "b", "traits/has-screens.md", None),
+ ]
+ 
+ 
+@@ -130,7 +132,7 @@ def status(name):
+     return run("--open-list", STATUS_LIST, "--status", f"{FIX}/status/{name}")
+ 
+ 
+-@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-unclassified.md"])
++@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-unclassified.md", "ok-bom.md"])
+ def test_r014_status_ok(name):
+     rc, lines, err = status(name)
+     assert_clean_end(lines, err)
+@@ -165,6 +167,10 @@ STATUS_CASES = [
+     ("form-sub-type-first.md", "form", None),
+     ("form-trait-in-head.md", "form", None),
+     ("form-no-line.md", "form", "-"),
++    ("form-trait-separator.md", "form", None),
++    ("form-trait-double-space.md", "form", None),
++    ("form-bad-prefix-single.md", "form", None),
++    ("form-empty-segment.md", "form", None),
+ ]
+ 
+ 
+@@ -247,10 +253,125 @@ def test_r033_usage_names_the_three_times_and_the_codes():
+     assert rc == 0
+     for word in ("intake", "release", "calibration", "r-014", "r-033"):
+         assert word in text, word
+-    for code in ("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "set", "kind", "unknown", "form", "flag"):
++    for code in ("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(set)", "(kind)", "(unknown)", "(form)", "flag (trait)"):
+         assert code in text, code
+ 
+ 
++# --- round 2: the review's corrections (handoff/TASK-006-r2.md) ---------------------------------------------------
++
++def test_r014_every_misspelt_change_word_is_form():
++    """R2-1: `## Adds at`, `## add at`, `## Replacing`, `## Append at` are each a malformed change heading."""
++    root = f"{FIX}/fail/form-misspelt-change-word"
++    rc, lines, err = run(root)
++    assert rc == 1
++    forms = [line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/types/host-extension.md: - ")]
++    assert len(forms) == 4, lines
++    assert len(fails(lines)) == 4, "a misspelt heading's section is not read as a change"
++
++
++def test_r014_prose_headings_stay_prose():
++    """R2-1: `## Settings`, `## Setup`, `## Additional notes`, `## Replacement history` in the pass root are prose."""
++    text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
++    for heading in ("## Settings", "## Setup", "## Additional notes", "## Replacement history"):
++        assert f"\n{heading}\n" in text, heading
++    rc, lines, err = run(f"{FIX}/pass")
++    assert rc == 0 and lines[-1] == "RESULT: OK", lines
++
++
++def test_r014_bad_prefix_on_a_single_line_is_form_only():
++    """R2-6: a line that fails the prefix rule is not checked further."""
++    rc, lines, err = status("form-bad-prefix-single.md")
++    assert rc == 1
++    assert len(fails(lines)) == 1 and fails(lines)[0].startswith("FAIL (form) "), lines
++
++
++def test_r014_empty_head_segment_is_form_not_unknown():
++    """R2-7."""
++    rc, lines, err = status("form-empty-segment.md")
++    assert rc == 1
++    assert not [line for line in fails(lines) if line.startswith("FAIL (unknown)")], lines
++
++
++def test_r014_repeated_unwritten_trait_is_flagged_once():
++    """R2-8."""
++    rc, lines, err = status("flag-repeated-unwritten.md")
++    assert rc == 1
++    assert len([line for line in lines if line.startswith("FLAG (trait)") and ": Spends money - " in line]) == 1, lines
++    assert any(line.startswith("FAIL (form) ") for line in lines), lines
++
++
++def test_r014_separator_row_missing(tmp_path):
++    """R2-9."""
++    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
++    broken = tmp_path / "open-list.md"
++    sep = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
++    assert sep in text
++    broken.write_text(text.replace(sep, sep.split("\n")[0] + "\n", 1), encoding="utf-8")
++    assert_not_checked(*run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md"))
++
++
++def test_r014_usage_error_ends_with_result_line():
++    """R2-10."""
++    rc, lines, err = run("--no-such-option")
++    assert rc == 2
++    assert lines and lines[-1] == "RESULT: not checked", (lines, err)
++    assert "Traceback" not in err
++
++
++def test_r014_control_characters_are_escaped(tmp_path):
++    """R2-11: an escape and a bell in a heading target reach the output as \\x1b and \\x07, never raw."""
++    root = tmp_path / "root"
++    (root / "types").mkdir(parents=True)
++    (root / "types" / "host-extension.md").write_text("## Add at intake.x\x1b[31mred\x07\n\nq\n", encoding="utf-8")
++    p = subprocess.run([sys.executable, PROG, str(root)], cwd=str(REPO), capture_output=True, text=True, encoding="utf-8")
++    assert p.returncode == 1, p.stdout
++    assert "\x1b" not in p.stdout and "\x07" not in p.stdout, repr(p.stdout)
++    assert "intake.x\\x1b[31mred\\x07" in p.stdout, p.stdout
++
++
++def _link_folder(link, target):
++    """A junction on Windows (no privilege needed), a symbolic link elsewhere."""
++    if os.name == "nt":
++        import _winapi
++        _winapi.CreateJunction(str(target), str(link))
++    else:
++        os.symlink(str(target), str(link), target_is_directory=True)
++
++
++def test_r014_links_are_not_followed(tmp_path):
++    """R2-4: a linked folder under types/ is form and is never read; a link to a parent cannot loop."""
++    outside = tmp_path / "outside"
++    outside.mkdir()
++    (outside / "claude-code-extension.md").write_text("## Add at nowhere.at-all\n\nq\n", encoding="utf-8")
++    root = tmp_path / "root"
++    (root / "types").mkdir(parents=True)
++    (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
++    _link_folder(root / "types" / "host-extension", outside)
++    _link_folder(root / "types" / "loop", root)
++    p = subprocess.run([sys.executable, PROG, str(root)], cwd=str(REPO), capture_output=True, text=True, encoding="utf-8", timeout=60)
++    lines = p.stdout.splitlines()
++    assert p.returncode == 1, lines
++    assert not [line for line in lines if line.startswith("FAIL (a)")], "a file behind a link was read"
++    shown = str(root).replace("\\", "/")
++    assert any(line.startswith(f"FAIL (form) {shown}/types/host-extension") for line in lines), lines
++    assert lines[-1] == f"RESULT: {len(fails(lines))} problem(s)"
++
++
++@pytest.mark.skipif(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), reason="a folder made unreadable by mode bits needs a non-root POSIX user (CI's ubuntu leg)")
++def test_r014_unreadable_folder_stops_the_check(tmp_path):
++    """R2-3."""
++    root = tmp_path / "root"
++    sub = root / "types" / "host-extension"
++    sub.mkdir(parents=True)
++    (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
++    (sub / "claude-code-extension.md").write_text("## Add at nowhere.at-all\n\nq\n", encoding="utf-8")
++    sub.chmod(0)
++    try:
++        assert_not_checked(*run(str(root)))
++    finally:
++        sub.chmod(0o755)
++
++
+ # --- the CI step (R-033) ------------------------------------------------------------------------------------------
+ 
+ def _jobs():
