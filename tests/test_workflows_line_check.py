@@ -63,6 +63,7 @@ def writing_env():
     """The environment with bytecode writing left on, so a test of R2-1 cannot pass because the runner turned it off."""
     env = dict(os.environ)
     env.pop("PYTHONDONTWRITEBYTECODE", None)
+    env.pop("PYTHONPYCACHEPREFIX", None)
     return env
 
 
@@ -237,7 +238,8 @@ NOT_LOADABLE = {
     "checker-exits": ("checker-exits", VALID["not-yet-classified"], "cannot be loaded (SystemExit)"),
     "rules-absent": ("rules-absent", VALID["not-yet-classified"], "open-list.md"),
     "open-list-without-tables": ("open-list-without-tables", VALID["not-yet-classified"], "missing heading"),
-    "no-escape-field": ("no-escape-field", MALFORMED["no-traits"][0], "workflow-check.py: "),
+    "no-escape-field": ("no-escape-field", MALFORMED["no-traits"][0], "workflow-check.py: AttributeError"),
+    "check-exits-after-load": ("check-exits-after-load", VALID["not-yet-classified"], "workflow-check.py: SystemExit"),
 }
 
 
@@ -250,6 +252,11 @@ def _broken_copy(tmp_path, how):
         checker.write_text("import sys\nsys.exit(3)\n" + checker.read_text(encoding="utf-8"), encoding="utf-8", newline="")
     elif how == "open-list-without-tables":
         (folder / "workflow" / "open-list.md").write_text("# Open list\n\nNo tables here.\n", encoding="utf-8", newline="\n")
+    elif how == "check-exits-after-load":
+        text = checker.read_text(encoding="utf-8")
+        head = "def check_status(path, text, tables):\n"
+        assert text.count(head) == 1
+        checker.write_text(text.replace(head, head + "    raise SystemExit(4)\n"), encoding="utf-8", newline="")
     elif how == "no-escape-field":
         text = checker.read_text(encoding="utf-8")
         assert text.count("def escape_field(") == 1
@@ -278,9 +285,31 @@ def test_r015_loading_the_checker_writes_no_bytecode(tmp_path):
     folder = _bridge_copy(tmp_path)
     status = tmp_path / "PROJECT_STATUS.md"
     write_status(status, VALID["not-yet-classified"])
-    inventory(tmp_path, status, program=folder / "inventory-check.py")
-    conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
+    rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
+    assert "Traceback" not in err and workflows_lines(lines) == [], (lines, err)
+    rc, out, err = conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
+    assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
     assert not (folder / "__pycache__").exists(), sorted(p.name for p in (folder / "__pycache__").iterdir())
+    # Positive control: in this environment, the same load without the switch does leave bytecode beside the checker.
+    probe = ("import importlib.util, sys; s = importlib.util.spec_from_file_location('w', sys.argv[1]); "
+             "m = importlib.util.module_from_spec(s); s.loader.exec_module(m)")
+    subprocess.run([sys.executable, "-c", probe, str(folder / "workflow-check.py")], env=writing_env(), check=True,
+                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    assert (folder / "__pycache__").exists(), "the control: bytecode writing must be on, or this test proves nothing"
+
+
+def test_r015_the_bytecode_switch_is_restored(program):
+    """R2-1: sys.dont_write_bytecode is put back after the check, whatever it was."""
+    before = sys.dont_write_bytecode
+    try:
+        for name in ("inventory-check", "conformance-check"):
+            mod = program(name)
+            for value in (False, True):
+                sys.dont_write_bytecode = value
+                mod.judge_workflows_line("s.md", VALID["not-yet-classified"])
+                assert sys.dont_write_bytecode is value, (name, value)
+    finally:
+        sys.dont_write_bytecode = before
 
 
 @pytest.mark.parametrize("program_name", ["inventory-check.py", "conformance-check.py"])
@@ -299,9 +328,11 @@ def test_r015_checker_is_found_beside_the_real_file_not_the_link(tmp_path, progr
         status = tmp_path / "PROJECT_STATUS.md"
         write_status(status, VALID["not-yet-classified"])
         rc, lines, out, err = inventory(tmp_path, status, program=link)
+        assert "Traceback" not in err and lines and lines[-1].startswith("RESULT: "), (lines, err)
         assert workflows_lines(lines) == [], lines
     else:
         rc, out, err = conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=link)
+        assert "Traceback" not in err, err
         assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
 
 
