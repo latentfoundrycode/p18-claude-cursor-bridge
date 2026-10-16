@@ -377,6 +377,22 @@ Review A APPROVE (nothing weaker than on main); Review B REJECT with four new by
 ### BUG-001 round 5 — disposition (PR #21)
 Review A APPROVE, Review B REJECT, on the same two gaps (converged): the job pin did not cover the workflow's top level, so a workflow-level `defaults: run: shell: "true {0}"` skipped the Socket step with every test green (and a workflow `env:` could set a registry, NODE_OPTIONS or BASH_ENV); and a reusable-workflow job with `secrets: inherit` passed the one-secret rule. FIX: `test_r002_workflow_is_the_pinned_one` pins the whole workflow verbatim (every top-level key and every job), so any change to `.github/workflows/tests.yml` must change the pin in the same diff; the one-secret rule also refuses a job that passes secrets on. Considers: the round-5 SCOPE file's stale count (replaced by round 6's); the deferral docstring says the either-order rule differs from completion-check's register convention. Driver: 56 mutants, all killed by the named assertion. **Consequence for later increments:** an increment that changes the workflow (TASK-006 adds the workflow check to CI) regenerates `WORKFLOW_PIN` in the same diff; its brief says so, and the reviewers read the pin's change as the workflow's.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 | 6 | Review A | 0 | 1 | 2 | Should fix on the follow-up branch (see below); Considers to HARDENING |
+| BUG-001 | 6 | Review B | 0 | 0 | 0 | — |
+
+### BUG-001 round 6 — disposition (PR #21, merged 6743b25)
+Both APPROVE; Review A confirmed `WORKFLOW_PIN` equals the committed workflow and nothing is weaker than on main. Should fix (Review A alone, not converged): the pin and the one-secret rule read `tests.yml` only, so a second file under `.github/workflows/` could hand the key to an install and still merge with every test green (the tests guard the merge, not that pull request's own CI run; HARDENING) — the edge of what the pin covers, not a bypass of it, and a new file that scope-check lists and every reviewer reads. By-class line: merged, and fixed on the follow-up branch before stage B1's review runs again: `test_r002_workflow_is_the_only_one` requires the workflow folder to hold the pinned workflow alone (driver mutant: a second workflow beside it; 57 mutants, all killed). Considers, to docs/HARDENING.md: PyYAML (YAML 1.1) and GitHub's parser read some spellings differently; the scanners' own configuration files sit outside the pin.
+
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 follow-up (PR #22) | 1 | Review A | 0 | 1 | 2 | yes — on the branch |
+| BUG-001 follow-up (PR #22) | 1 | Review B | 0 | 0 | 1 | yes — on the branch |
+
+### BUG-001 follow-up round 1 — disposition (PR #22)
+Both APPROVE; both named the status file's stale Remote sync line (converged, so blocking): fixed. Review A's Considers: the bridge's own Semgrep rules file added to the scanner-configuration lead; a new lead that the structural tests guard the merge and not a pull request's own CI run (the key in a GitHub Environment, or on pushes to main only), and round 6's disposition reworded so it does not read as preventing that.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
