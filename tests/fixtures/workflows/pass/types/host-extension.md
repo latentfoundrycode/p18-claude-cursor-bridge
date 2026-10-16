@@ -28,3 +28,19 @@ A deeper heading is prose.
 ## Add at project-end.delivery for host-installation
 
 Copy the release into the host's folder.
+
+## Settings
+
+Prose.
+
+## Setup
+
+Prose.
+
+## Additional notes
+
+Prose.
+
+## Replacement history
+
+Prose.

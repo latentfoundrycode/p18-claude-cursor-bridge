@@ -92,6 +92,8 @@ FILE_CASES = [
     ("form-two-sets", "form", "types/host-extension.md", None),
     ("form-empty-set", "form", "types/host-extension.md", None),
     ("form-two-replaces", "form", "types/host-extension.md", None),
+    ("form-misspelt-change-word", "form", "types/host-extension.md", "-"),
+    ("b-trait-sets-bom", "b", "traits/has-screens.md", None),
 ]
 
 
@@ -130,7 +132,7 @@ def status(name):
     return run("--open-list", STATUS_LIST, "--status", f"{FIX}/status/{name}")
 
 
-@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-unclassified.md"])
+@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-unclassified.md", "ok-bom.md"])
 def test_r014_status_ok(name):
     rc, lines, err = status(name)
     assert_clean_end(lines, err)
@@ -165,6 +167,10 @@ STATUS_CASES = [
     ("form-sub-type-first.md", "form", None),
     ("form-trait-in-head.md", "form", None),
     ("form-no-line.md", "form", "-"),
+    ("form-trait-separator.md", "form", None),
+    ("form-trait-double-space.md", "form", None),
+    ("form-bad-prefix-single.md", "form", None),
+    ("form-empty-segment.md", "form", None),
 ]
 
 
@@ -247,8 +253,123 @@ def test_r033_usage_names_the_three_times_and_the_codes():
     assert rc == 0
     for word in ("intake", "release", "calibration", "r-014", "r-033"):
         assert word in text, word
-    for code in ("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "set", "kind", "unknown", "form", "flag"):
+    for code in ("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(set)", "(kind)", "(unknown)", "(form)", "flag (trait)"):
         assert code in text, code
+
+
+# --- round 2: the review's corrections (handoff/TASK-006-r2.md) ---------------------------------------------------
+
+def test_r014_every_misspelt_change_word_is_form():
+    """R2-1: `## Adds at`, `## add at`, `## Replacing`, `## Append at` are each a malformed change heading."""
+    root = f"{FIX}/fail/form-misspelt-change-word"
+    rc, lines, err = run(root)
+    assert rc == 1
+    forms = [line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/types/host-extension.md: - ")]
+    assert len(forms) == 4, lines
+    assert len(fails(lines)) == 4, "a misspelt heading's section is not read as a change"
+
+
+def test_r014_prose_headings_stay_prose():
+    """R2-1: `## Settings`, `## Setup`, `## Additional notes`, `## Replacement history` in the pass root are prose."""
+    text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
+    for heading in ("## Settings", "## Setup", "## Additional notes", "## Replacement history"):
+        assert f"\n{heading}\n" in text, heading
+    rc, lines, err = run(f"{FIX}/pass")
+    assert rc == 0 and lines[-1] == "RESULT: OK", lines
+
+
+def test_r014_bad_prefix_on_a_single_line_is_form_only():
+    """R2-6: a line that fails the prefix rule is not checked further."""
+    rc, lines, err = status("form-bad-prefix-single.md")
+    assert rc == 1
+    assert len(fails(lines)) == 1 and fails(lines)[0].startswith("FAIL (form) "), lines
+
+
+def test_r014_empty_head_segment_is_form_not_unknown():
+    """R2-7."""
+    rc, lines, err = status("form-empty-segment.md")
+    assert rc == 1
+    assert not [line for line in fails(lines) if line.startswith("FAIL (unknown)")], lines
+
+
+def test_r014_repeated_unwritten_trait_is_flagged_once():
+    """R2-8."""
+    rc, lines, err = status("flag-repeated-unwritten.md")
+    assert rc == 1
+    assert len([line for line in lines if line.startswith("FLAG (trait)") and ": Spends money - " in line]) == 1, lines
+    assert any(line.startswith("FAIL (form) ") for line in lines), lines
+
+
+def test_r014_separator_row_missing(tmp_path):
+    """R2-9."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    broken = tmp_path / "open-list.md"
+    sep = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
+    assert sep in text
+    broken.write_text(text.replace(sep, sep.split("\n")[0] + "\n", 1), encoding="utf-8")
+    assert_not_checked(*run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md"))
+
+
+def test_r014_usage_error_ends_with_result_line():
+    """R2-10."""
+    rc, lines, err = run("--no-such-option")
+    assert rc == 2
+    assert lines and lines[-1] == "RESULT: not checked", (lines, err)
+    assert "Traceback" not in err
+
+
+def test_r014_control_characters_are_escaped(tmp_path):
+    """R2-11: an escape and a bell in a heading target reach the output as \\x1b and \\x07, never raw."""
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "types" / "host-extension.md").write_text("## Add at intake.x\x1b[31mred\x07\n\nq\n", encoding="utf-8")
+    p = subprocess.run([sys.executable, PROG, str(root)], cwd=str(REPO), capture_output=True, text=True, encoding="utf-8")
+    assert p.returncode == 1, p.stdout
+    assert "\x1b" not in p.stdout and "\x07" not in p.stdout, repr(p.stdout)
+    assert "intake.x\\x1b[31mred\\x07" in p.stdout, p.stdout
+
+
+def _link_folder(link, target):
+    """A junction on Windows (no privilege needed), a symbolic link elsewhere."""
+    if os.name == "nt":
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+    else:
+        os.symlink(str(target), str(link), target_is_directory=True)
+
+
+def test_r014_links_are_not_followed(tmp_path):
+    """R2-4: a linked folder under types/ is form and is never read; a link to a parent cannot loop."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "claude-code-extension.md").write_text("## Add at nowhere.at-all\n\nq\n", encoding="utf-8")
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    _link_folder(root / "types" / "host-extension", outside)
+    _link_folder(root / "types" / "loop", root)
+    p = subprocess.run([sys.executable, PROG, str(root)], cwd=str(REPO), capture_output=True, text=True, encoding="utf-8", timeout=60)
+    lines = p.stdout.splitlines()
+    assert p.returncode == 1, lines
+    assert not [line for line in lines if line.startswith("FAIL (a)")], "a file behind a link was read"
+    shown = str(root).replace("\\", "/")
+    assert any(line.startswith(f"FAIL (form) {shown}/types/host-extension") for line in lines), lines
+    assert lines[-1] == f"RESULT: {len(fails(lines))} problem(s)"
+
+
+@pytest.mark.skipif(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), reason="a folder made unreadable by mode bits needs a non-root POSIX user (CI's ubuntu leg)")
+def test_r014_unreadable_folder_stops_the_check(tmp_path):
+    """R2-3."""
+    root = tmp_path / "root"
+    sub = root / "types" / "host-extension"
+    sub.mkdir(parents=True)
+    (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    (sub / "claude-code-extension.md").write_text("## Add at nowhere.at-all\n\nq\n", encoding="utf-8")
+    sub.chmod(0)
+    try:
+        assert_not_checked(*run(str(root)))
+    finally:
+        sub.chmod(0o755)
 
 
 # --- the CI step (R-033) ------------------------------------------------------------------------------------------
