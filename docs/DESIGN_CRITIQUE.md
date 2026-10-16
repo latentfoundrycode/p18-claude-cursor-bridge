@@ -407,6 +407,15 @@ Both APPROVE. Review A's Consider (the HARDENING lead on the key's reach should 
 - A type or sub-workflow's statement of its default traits has no form yet, so it is not checked (the open list's promise stands for the increment that gives it a form); the guard against a conditional workflow's sentence contradicting the core is a reading, not a check: it is the reviewers' (both reviewers of every increment that writes a conditional workflow).
 - The tests and the fixtures are the supervisor's, written before the delegation from the brief's interface; the builder's report found one test that renamed the prose citation of a heading rather than the heading, fixed by the supervisor; the mutation driver (30 mutants) found the missing-kind test not naming its offending name, tightened.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| TASK-006 | 1 | Review A | 1 | 1 | 8 | yes — round 2 (handoff/TASK-006-r2.md) |
+| TASK-006 | 1 | Review B | 2 | 1 | 1 | yes — round 2 |
+| TASK-006 | 1 | security auditor | 0 | 5 advisory | — | yes — round 2 |
+
+### TASK-006 round 1 — disposition (PR #23)
+Converged, so blocking: a misspelt change word (`## Adds at`) read as prose, so the change silently did nothing (Review A and Review B; the brief contradicted itself, its example right and its definition wrong: the definition now names the change words case-insensitively, or `at` as the second word); a trait list without its `, ` separator accepted (Review B blocking, Review A Consider); an unreadable folder skipped silently (all three). Also taken in round 2: a byte-order mark hid a first-line heading, so a trait's set escaped (b) (Review A Should fix); an invalid single-line prefix checked further (Review B Should fix); links and junctions followed out of the root, control characters printed raw (a newline in a file name could start a GitHub workflow command), quadratic section search, a docstring slip (the auditor); the separator row unchecked, a repeated unwritten trait flagged twice, an empty head name reported as unknown, a usage error without its RESULT line (Review A Considers); the constraint on hard-coded keys now names the two delivery point keys. The supervisor's side: the usage test now looks for each code as printed; the mutation driver gained the rules it lacked (Review A C8) and round 2's, 49 mutants, all killed.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
