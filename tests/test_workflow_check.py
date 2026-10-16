@@ -479,6 +479,101 @@ def test_r014_junction_detected_without_isjunction(tmp_path, monkeypatch, progra
     assert not mod.is_link(str(target))
 
 
+# --- round 4: the third review's corrections (handoff/TASK-006-r4.md) ---------------------------------------------
+
+def _main_in_process(mod, *args, capsys):
+    code = mod.main(list(args))
+    return code, capsys.readouterr().out.splitlines()
+
+
+@pytest.mark.parametrize("isjunction", ["present", "absent"])
+def test_r014_missing_layer_folder_is_not_a_link(tmp_path, monkeypatch, capsys, program, isjunction):
+    """R4-1: a root with no traits/ (and, for the bridge's own folder, no types/ either) passes whether or not
+    os.path.isjunction exists; on Windows its absence takes the lstat fallback, which once counted a missing path as a
+    link."""
+    mod = program("workflow-check")
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    if isjunction == "absent":
+        monkeypatch.delattr(os.path, "isjunction", raising=False)
+    for target in (root, REPO / "bridge" / "cursor-bridge" / "workflow"):
+        code, lines = _main_in_process(mod, str(target), capsys=capsys)
+        assert code == 0 and lines[-1] == "RESULT: OK", (target, lines)
+
+
+@pytest.mark.parametrize("isjunction", ["present", "absent"])
+def test_r014_is_link_false_for_a_path_that_does_not_exist(tmp_path, monkeypatch, program, isjunction):
+    """R4-1, R4-2: nothing there, and a path below a file, are not links on either branch."""
+    mod = program("workflow-check")
+    afile = tmp_path / "a-file"
+    afile.write_text("x", encoding="utf-8")
+    if isjunction == "absent":
+        monkeypatch.delattr(os.path, "isjunction", raising=False)
+    assert not mod.is_link(str(tmp_path / "nothing-here"))
+    assert not mod.is_link(str(afile / "below-a-file"))
+
+
+@pytest.mark.parametrize("error,expected", [(PermissionError, True), (OSError, True), (FileNotFoundError, False), (NotADirectoryError, False)])
+def test_r014_isjunction_error_follows_one_rule(tmp_path, monkeypatch, program, error, expected):
+    """R4-2: on the isjunction branch an OSError is a link (fail closed); a missing path is not."""
+    mod = program("workflow-check")
+
+    def raises(path):
+        raise error("probe")
+
+    monkeypatch.setattr(os.path, "isjunction", raises, raising=False)
+    assert mod.is_link(str(tmp_path / "probe")) is expected
+
+
+@pytest.mark.skipif(os.name != "nt", reason="the lstat fallback runs only on Windows")
+@pytest.mark.parametrize("error,expected", [(PermissionError, True), (OSError, True), (FileNotFoundError, False), (NotADirectoryError, False)])
+def test_r014_fallback_error_follows_one_rule(tmp_path, monkeypatch, program, error, expected):
+    """R4-1: in the Windows fallback an lstat error other than a missing path is a link (fail closed)."""
+    mod = program("workflow-check")
+
+    def raises(path, *a, **k):
+        raise error("probe")
+
+    monkeypatch.delattr(os.path, "isjunction", raising=False)
+    monkeypatch.setattr(os, "lstat", raises)
+    assert mod.is_link(str(tmp_path / "probe")) is expected
+
+
+def test_r014_indented_fence_pair_hides_a_heading():
+    """R4-3: the pass root holds a fence pair indented by two and three spaces around a heading that, read, is (c)."""
+    text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
+    assert "\n  ```\n## Replace design\n   ```" in text, "the precondition: an indented fence pair hides `## Replace design`"
+    rc, lines, err = run(f"{FIX}/pass")
+    assert rc == 0 and lines[-1] == "RESULT: OK", lines
+
+
+def test_r014_indented_closing_fence_closes_the_block():
+    """R4-3: a column-0 fence closed by one indented three spaces; the trait's `## Set` after it is read and is (b)."""
+    root = f"{FIX}/fail/fence-indented-close"
+    rc, lines, err = run(root)
+    assert_clean_end(lines, err)
+    assert rc == 1
+    assert fails(lines) == [f"FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
+
+
+def test_r014_four_spaces_is_not_a_fence():
+    """R4-3: backticks indented four spaces are an indented code block, not a fence; the `## Set` after them is (b) and
+    no fence is left open."""
+    root = f"{FIX}/fail/fence-four-spaces"
+    rc, lines, err = run(root)
+    assert rc == 1
+    assert fails(lines) == [f"FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
+
+
+def test_r014_unclosed_indented_fence_is_form():
+    """R4-3 with R3-6: an indented opening fence never closed hides the heading after it and is one (form)."""
+    root = f"{FIX}/fail/form-indented-fence-open"
+    rc, lines, err = run(root)
+    assert rc == 1
+    assert fails(lines) == [f"FAIL (form) {root}/types/host-extension.md: - - fenced code block is still open at the end of the file"], lines
+
+
 # --- the CI step (R-033) ------------------------------------------------------------------------------------------
 
 def _jobs():
