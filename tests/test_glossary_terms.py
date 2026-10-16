@@ -41,7 +41,7 @@ def test_r028_each_term_has_one_definition(term):
     assert len(meanings) == 1, "%r must be defined exactly once, found %d" % (term, len(meanings))
     words = meanings[0].split()
     assert len(words) >= 8, "%r needs a definition, not a label: %r" % (term, meanings[0])
-    opening = [w.strip(".,;:*_`").lower() for w in words[:len(term.split())]]
+    opening = [w.strip(".,;:*_`\"'").lower() for w in words[:len(term.split())]]
     assert opening != term.lower().split(), "a definition does not open with its own term: %r" % meanings[0]
 
 
