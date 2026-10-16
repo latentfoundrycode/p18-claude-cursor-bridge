@@ -659,7 +659,7 @@ def test_r014_separator_with_double_pipe_is_not_a_separator(tmp_path):
     assert_not_checked(*run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md"))
 
 
-@pytest.mark.parametrize("sep", ["\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", " ", " "],
+@pytest.mark.parametrize("sep", ["\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"],
                          ids=["vt", "ff", "fs", "gs", "rs", "nel", "ls", "ps"])
 def test_r014_lines_end_only_at_line_feeds(tmp_path, sep):
     """R6-2: two lines joined to text by a character Markdown does not end a line at are not fences, so the trait's
@@ -672,6 +672,30 @@ def test_r014_lines_end_only_at_line_feeds(tmp_path, sep):
     shown = str(root).replace("\\", "/")
     assert rc == 1, lines
     assert fails(lines) == [f"FAIL (b) {shown}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
+
+
+def test_r014_table_row_holding_a_line_separator_is_one_row(tmp_path):
+    """R6-2 in parse_table: a U+2028 inside a cell keeps the row whole; split there, its first part would be a short row
+    and the check would stop (exit 2)."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    assert "\n" + LIBRARY_ROW + "\n" in text
+    lsep = LIBRARY_ROW.replace("Included by other programs", "Included by\u2028other programs")
+    changed = tmp_path / "open-list.md"
+    changed.write_text(text.replace("\n" + LIBRARY_ROW + "\n", "\n" + lsep + "\n", 1), encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", str(changed), "--status", f"{FIX}/status/ok-single.md")
+    assert rc == 0 and lines[-1] == "RESULT: OK", lines
+
+
+def test_r014_workflows_line_after_a_form_feed_is_not_a_line(tmp_path):
+    """R6-2 in the status check: `Workflows:` joined to the line before it by a form feed does not begin a line, so the
+    file has no Workflows line (form)."""
+    text = (REPO / FIX / "status/ok-single.md").read_text(encoding="utf-8")
+    assert "\nWorkflows: " in text
+    status = tmp_path / "status.md"
+    status.write_text(text.replace("\nWorkflows: ", "\x0cWorkflows: ", 1), encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(status))
+    assert rc == 1, lines
+    assert len(fails(lines)) == 1 and "status file has no Workflows line" in fails(lines)[0], lines
 
 
 # --- the CI step (R-033) ------------------------------------------------------------------------------------------
