@@ -6,7 +6,12 @@ inventory-check.py and conformance-check.py report a missing line, a malformed l
 right after `Phase:`, judging the grammar by workflow-check.py's check_status and the placement by its new
 check_placement; a rule file that cannot be loaded is a failure; output stays ASCII; lines are split only at a line feed
 (TASK-006's lesson). Special characters are built with chr() so no editing tool can turn an escape into the character.
+
+Round 2 (handoff/TASK-008-r2.md): the valid and unwritten cases run on a bridge copy whose open list marks every entry
+unwritten, with the f/FLAG precondition asserted; every way the rules can fail to load is a case (R2-3, R2-4); loading
+writes no bytecode (R2-1); a program run through a link loads the checker beside its real file (R2-2).
 """
+import importlib.util
 import os
 import pathlib
 import shutil
@@ -54,11 +59,18 @@ def write_status(path, text):
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
+def writing_env():
+    """The environment with bytecode writing left on, so a test of R2-1 cannot pass because the runner turned it off."""
+    env = dict(os.environ)
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+    return env
+
+
 def inventory(cwd, status, program=INVENTORY_CHECK):
     """inventory-check.py on one status file, with no inventory or change log, from a folder of its own."""
     p = subprocess.run([sys.executable, str(program), "--inventory", "absent-inventory.md", "--changes", "absent-changes.md",
                         "--status", str(status)], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
-                       errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       errors="replace", env=writing_env(), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return p.returncode, p.stdout.splitlines(), p.stdout, p.stderr
 
 
@@ -68,7 +80,7 @@ def workflows_lines(lines):
 
 def conformance(root, program=CONFORMANCE_CHECK):
     p = subprocess.run([sys.executable, str(program), str(root), "--offline"], capture_output=True, text=True, encoding="utf-8",
-                       errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       errors="replace", env=writing_env(), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return p.returncode, p.stdout, p.stderr
 
 
@@ -99,9 +111,11 @@ def test_r015_placement_function(program):
 
 @pytest.mark.parametrize("case", sorted(VALID))
 def test_r015_inventory_valid_line_reports_nothing(tmp_path, case):
+    """Run on a copy whose open list marks every entry unwritten, so the bridge line's f and FLAG findings exist."""
+    folder = _unwritten_copy(tmp_path)
     status = tmp_path / "PROJECT_STATUS.md"
     write_status(status, VALID[case])
-    rc, lines, out, err = inventory(tmp_path, status)
+    rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
     assert "Traceback" not in err, err
     assert workflows_lines(lines) == [], lines
 
@@ -129,10 +143,17 @@ def test_r015_inventory_malformed_line(tmp_path, case):
 
 
 def test_r015_inventory_unwritten_types_are_not_malformed(tmp_path):
-    """Codes f and FLAG (unwritten type, sub-type, trait) are workflow-check.py's concern, not a failure here."""
+    """Codes f and FLAG (unwritten type, sub-type, trait) are workflow-check.py's concern, not a failure here.
+
+    The copy's open list marks every entry unwritten and _unwritten_copy asserts that check_status then gives f and
+    FLAG for the bridge line, so this negative test keeps its precondition when release B writes the bridge's entries.
+    """
+    folder = _unwritten_copy(tmp_path)
     status = tmp_path / "PROJECT_STATUS.md"
     write_status(status, VALID["bridge-line"])
-    rc, lines, out, err = inventory(tmp_path, status)
+    rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
+    assert "Traceback" not in err, err
+    assert workflows_lines(lines) == [], lines
     assert not [line for line in lines if "not written" in line], lines
 
 
@@ -179,29 +200,120 @@ def _bridge_copy(tmp_path, with_checker=True, with_rules=True):
     return folder
 
 
-@pytest.mark.parametrize("missing", ["checker", "rules"])
-def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, missing):
-    folder = _bridge_copy(tmp_path, with_checker=(missing != "checker"), with_rules=(missing != "rules"))
+def _load_copy(folder):
+    """The copy's workflow-check.py as a module, written to no __pycache__."""
+    spec = importlib.util.spec_from_file_location("workflow_check_copy", folder / "workflow-check.py")
+    mod = importlib.util.module_from_spec(spec)
+    before = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec.loader.exec_module(mod)
+    finally:
+        sys.dont_write_bytecode = before
+    return mod
+
+
+def _unwritten_copy(tmp_path):
+    """A bridge copy whose open list marks every entry unwritten, with that precondition asserted."""
+    folder = _bridge_copy(tmp_path)
+    open_list = folder / "workflow" / "open-list.md"
+    text = open_list.read_text(encoding="utf-8")
+    open_list.write_text(text.replace("| yes |", "| no |"), encoding="utf-8", newline="")
+    mod = _load_copy(folder)
+    open_text, _, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
+    reg_text, _, reg_err = mod.read_utf8(mod.DEFAULT_REGISTRY)
+    assert open_err is None and reg_err is None, (open_err, reg_err)
+    tables, errors = mod.load_tables(open_text, mod.DEFAULT_OPEN, reg_text, mod.DEFAULT_REGISTRY)
+    assert not errors, errors
+    codes = [item[0] for item in mod.check_status("s.md", VALID["bridge-line"], tables)]
+    assert "f" in codes and "FLAG" in codes, "precondition: the bridge line must give f and FLAG findings, got %r" % codes
+    return folder
+
+
+# Each way the rules can fail to load: (how the copy is broken, status text, the text a not-checked line must hold).
+NOT_LOADABLE = {
+    "checker-absent": ("checker-absent", VALID["not-yet-classified"], "cannot be loaded (FileNotFoundError)"),
+    "checker-syntax-error": ("checker-syntax-error", VALID["not-yet-classified"], "cannot be loaded (SyntaxError)"),
+    "checker-exits": ("checker-exits", VALID["not-yet-classified"], "cannot be loaded (SystemExit)"),
+    "rules-absent": ("rules-absent", VALID["not-yet-classified"], "open-list.md"),
+    "open-list-without-tables": ("open-list-without-tables", VALID["not-yet-classified"], "missing heading"),
+    "no-escape-field": ("no-escape-field", MALFORMED["no-traits"][0], "workflow-check.py: "),
+}
+
+
+def _broken_copy(tmp_path, how):
+    folder = _bridge_copy(tmp_path, with_checker=(how != "checker-absent"), with_rules=(how != "rules-absent"))
+    checker = folder / "workflow-check.py"
+    if how == "checker-syntax-error":
+        checker.write_text(checker.read_text(encoding="utf-8") + "\ndef broken(:\n", encoding="utf-8", newline="")
+    elif how == "checker-exits":
+        checker.write_text("import sys\nsys.exit(3)\n" + checker.read_text(encoding="utf-8"), encoding="utf-8", newline="")
+    elif how == "open-list-without-tables":
+        (folder / "workflow" / "open-list.md").write_text("# Open list\n\nNo tables here.\n", encoding="utf-8", newline="\n")
+    elif how == "no-escape-field":
+        text = checker.read_text(encoding="utf-8")
+        assert text.count("def escape_field(") == 1
+        checker.write_text(text.replace("def escape_field(", "def escape_field_removed("), encoding="utf-8", newline="")
+    return folder
+
+
+@pytest.mark.parametrize("case", sorted(NOT_LOADABLE))
+def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
+    how, text, cause = NOT_LOADABLE[case]
+    folder = _broken_copy(tmp_path, how)
     status = tmp_path / "PROJECT_STATUS.md"
-    write_status(status, VALID["not-yet-classified"])
+    write_status(status, text)
     rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
     assert "Traceback" not in err and "Traceback" not in out, (out, err)
-    assert rc == 1, lines
+    assert rc == 1, (lines, err)
     found = workflows_lines(lines)
     assert found and all(line.startswith("WORKFLOWS LINE: not checked: ") for line in found), lines
-    if missing == "checker":
-        assert any("cannot be loaded" in line for line in found), lines
-    else:
+    assert any(cause in line for line in found), "the cause must name %r: %r" % (cause, found)
+    if how == "rules-absent":
         assert any("open-list.md" in line for line in found), "the cause names the rule file that cannot be read"
+
+
+def test_r015_loading_the_checker_writes_no_bytecode(tmp_path):
+    """R2-1: neither program leaves a __pycache__ beside itself (inventory-check reads only; conformance-check never writes)."""
+    folder = _bridge_copy(tmp_path)
+    status = tmp_path / "PROJECT_STATUS.md"
+    write_status(status, VALID["not-yet-classified"])
+    inventory(tmp_path, status, program=folder / "inventory-check.py")
+    conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
+    assert not (folder / "__pycache__").exists(), sorted(p.name for p in (folder / "__pycache__").iterdir())
+
+
+@pytest.mark.parametrize("program_name", ["inventory-check.py", "conformance-check.py"])
+def test_r015_checker_is_found_beside_the_real_file_not_the_link(tmp_path, program_name):
+    """R2-2: run through a symbolic link, a program loads the workflow-check.py beside its real file."""
+    folder = _bridge_copy(tmp_path)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "workflow-check.py").write_text("raise RuntimeError('the wrong checker')\n", encoding="utf-8")
+    link = elsewhere / program_name
+    try:
+        os.symlink(folder / program_name, link)
+    except (OSError, NotImplementedError) as err:
+        pytest.skip("cannot create a symbolic link here: %s" % err)
+    if program_name == "inventory-check.py":
+        status = tmp_path / "PROJECT_STATUS.md"
+        write_status(status, VALID["not-yet-classified"])
+        rc, lines, out, err = inventory(tmp_path, status, program=link)
+        assert workflows_lines(lines) == [], lines
+    else:
+        rc, out, err = conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=link)
+        assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
 
 
 # --- conformance-check.py ------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("case", sorted(VALID))
 def test_r015_conformance_valid_line_is_ok(tmp_path, case):
-    rc, out, err = conformance(workspace(tmp_path, VALID[case]))
+    """Run on a copy whose open list marks every entry unwritten, as the inventory twin is."""
+    folder = _unwritten_copy(tmp_path)
+    rc, out, err = conformance(workspace(tmp_path, VALID[case]), program=folder / "conformance-check.py")
     assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
-    assert rc == 0 and "RESULT: CONFORMANT" in out, out
+    assert rc == 0 and out.splitlines()[-1] == "RESULT: CONFORMANT", out
 
 
 @pytest.mark.parametrize("case", sorted(MISSING))
@@ -228,12 +340,13 @@ def test_r015_conformance_output_is_ascii(tmp_path):
     assert "\\xdc" in out, out
 
 
-@pytest.mark.parametrize("missing", ["checker", "rules"])
-def test_r015_conformance_rule_files_not_loadable_is_missing(tmp_path, missing):
-    folder = _bridge_copy(tmp_path, with_checker=(missing != "checker"), with_rules=(missing != "rules"))
-    rc, out, err = conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
+@pytest.mark.parametrize("case", sorted(NOT_LOADABLE))
+def test_r015_conformance_rule_files_not_loadable_is_missing(tmp_path, case):
+    how, text_in, cause = NOT_LOADABLE[case]
+    folder = _broken_copy(tmp_path, how)
+    rc, out, err = conformance(workspace(tmp_path, text_in), program=folder / "conformance-check.py")
     assert "Traceback" not in err and "Traceback" not in out, (out, err)
+    assert rc == 1, (out, err)
     v, text = verdict(out, "Workflows line")
     assert v == "MISSING" and text.startswith("Workflows line  - not checked: "), out
-    if missing == "rules":
-        assert "open-list.md" in text, "the cause names the rule file that cannot be read"
+    assert cause in text, "the cause must name %r: %r" % (cause, text)
