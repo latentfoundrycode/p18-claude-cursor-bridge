@@ -17,3 +17,5 @@
 2026-10-16 TASK-006-r5: a `types/` or `traits/` path is examined with `os.lstat` (missing means skip; any other `OSError` is `ERROR` and exit 2). `is_link` uses one `os.lstat` on every Python: `S_ISLNK`, or on Windows `FILE_ATTRIBUTE_REPARSE_POINT`. A fence is a CommonMark opening run of backticks or tildes, closed only by an equal or longer run of the same character with nothing after it but spaces or tabs.
 
 2026-10-16 TASK-006-r6: `cells_of` removes one leading `|` and one trailing `|`, so a row ending or starting `||` keeps its empty cell. File text is split only at `\n` (`file_lines`); a final line feed does not add an empty line. Form feed, vertical tab, and the other `splitlines` breaks stay inside the line.
+
+2026-10-16 TASK-008: Done runs `python -m pytest tests -q` before `python tools/make-manifest.py`, and the install and rollback tests refuse a bridge tree whose edited programs do not match MANIFEST.json, so that ordered run exits 1 until the manifest is regenerated and the suite is run again.

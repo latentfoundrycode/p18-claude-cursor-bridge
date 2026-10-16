@@ -704,6 +704,37 @@ def check_status(path, text, tables):
     return findings
 
 
+def check_placement(path, text):
+    """Where the Workflows lines stand beside Phase (R-015).
+
+    A Workflows line starts with exactly `Workflows: `. The Phase line is the first
+    line that starts with exactly `Phase: `. Text is split only at a line feed, as
+    file_lines does. No Workflows line: no finding (a missing line belongs to
+    check_status). Workflows lines and no Phase line: one finding, `status file has
+    no Phase line`. Otherwise, with the Phase line at index p and k Workflows lines
+    in the file, the lines at indexes p+1 through p+k must all be Workflows lines.
+    When they are, no finding. When they are not, one finding: `Workflows lines do
+    not stand together right after the Phase line`.
+    """
+    shown = slash(path)
+    lines = file_lines(text)
+    workflows = [index for index, line in enumerate(lines) if line.startswith("Workflows: ")]
+    if not workflows:
+        return []
+    phase = None
+    for index, line in enumerate(lines):
+        if line.startswith("Phase: "):
+            phase = index
+            break
+    if phase is None:
+        return [("place", shown, "-", "status file has no Phase line")]
+    k = len(workflows)
+    run = lines[phase + 1:phase + 1 + k]
+    if len(run) == k and all(line.startswith("Workflows: ") for line in run):
+        return []
+    return [("place", shown, "-", "Workflows lines do not stand together right after the Phase line")]
+
+
 def print_findings(findings):
     problems = 0
     for code, path, name, reason in findings:

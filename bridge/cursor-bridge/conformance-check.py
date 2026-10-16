@@ -28,6 +28,8 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,
     ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and
     docs/diagrams/INDEX.md (missing = a diagram retrofit item);
+  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or not right after
+    Phase: is MISSING (R-015);
   - with --screens (or a docs/mockups folder): the design detector in the gate;
   - release A1b: a spending limit recorded for every key, account or provider that can charge
     (the inventory's Resources rows); the inventory's `Development data:` decision; every
@@ -54,6 +56,7 @@ ASCII-only on purpose (cp1252 consoles). Never writes.
 """
 import datetime
 import glob
+import importlib.util
 import json
 import os
 import re
@@ -285,6 +288,56 @@ def memory_dirs(ws):
     return out
 
 
+def judge_workflows_line(path, text):
+    """Judge one status file's Workflows lines (R-015).
+
+    Returns (outcome, rows). outcome is valid, missing, malformed, or not-checked.
+    rows is empty for valid and missing. For malformed, each row is an ASCII
+    (name, reason). For not-checked, each row is an ASCII reason. The grammar is
+    workflow-check.py's check_status; placement is its check_placement. Codes f and
+    FLAG are dropped. Nothing runs at import time.
+    """
+    def ascii_text(value):
+        return ("" if value is None else str(value)).encode("ascii", "backslashreplace").decode("ascii")
+
+    def field(mod, value):
+        escape = getattr(mod, "escape_field", None)
+        return ascii_text(escape(value) if escape is not None else value)
+
+    checker = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflow-check.py")
+    shown = checker.replace("\\", "/")
+    try:
+        spec = importlib.util.spec_from_file_location("workflow_check", checker)
+        if spec is None or spec.loader is None:
+            raise ImportError("no loader")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except Exception as err:
+        return "not-checked", [ascii_text("%s: cannot be loaded (%s)" % (shown, type(err).__name__))]
+    try:
+        causes = []
+        open_text, open_shown, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
+        reg_text, reg_shown, reg_err = mod.read_utf8(mod.DEFAULT_REGISTRY)
+        if open_err:
+            causes.append("%s: %s" % (open_shown, open_err))
+        if reg_err:
+            causes.append("%s: %s" % (reg_shown, reg_err))
+        if causes:
+            return "not-checked", [field(mod, cause) for cause in causes]
+        tables, errors = mod.load_tables(open_text, mod.DEFAULT_OPEN, reg_text, mod.DEFAULT_REGISTRY)
+        if errors:
+            return "not-checked", [field(mod, "%s: %s" % (item_path, reason)) for item_path, reason in errors]
+        findings = [item for item in mod.check_status(path, text, tables) if item[0] not in ("f", "FLAG")]
+        if any(item[3] == "status file has no Workflows line" for item in findings):
+            return "missing", []
+        findings.extend(mod.check_placement(path, text))
+        if findings:
+            return "malformed", [(field(mod, item[2]), field(mod, item[3])) for item in findings]
+        return "valid", []
+    except Exception as err:
+        return "not-checked", [field(mod, "%s: %s" % (shown, type(err).__name__))]
+
+
 def main():
     argv = sys.argv[1:]
     quiet = "--quiet" in argv
@@ -430,6 +483,19 @@ def main():
             add("MISSING", rel, "exists but is gitignored: the records are versioned, a reviewer's change to an ignored record leaves no trace and no history (0b review, S3)")
             continue
         add("OK" if ok else "MISSING", rel, "" if ok else detail)
+    status_path = os.path.join(ws, "docs", "PROJECT_STATUS.md")
+    if os.path.isfile(status_path):
+        status_text = read(status_path)
+        outcome, rows = judge_workflows_line(status_path, "" if status_text is None else status_text)
+        if outcome == "valid":
+            add("OK", "Workflows line")
+        elif outcome == "missing":
+            add("MISSING", "Workflows line", "missing: docs/PROJECT_STATUS.md has no Workflows line")
+        elif outcome == "malformed":
+            detail = "; ".join("%s - %s" % (name, reason) for name, reason in rows)
+            add("MISSING", "Workflows line", "malformed: " + detail)
+        else:
+            add("MISSING", "Workflows line", "not checked: " + "; ".join(rows))
     if os.path.isfile(os.path.join(ws, "project.json")):
         try:
             pj = json.loads(read(os.path.join(ws, "project.json")) or "")
