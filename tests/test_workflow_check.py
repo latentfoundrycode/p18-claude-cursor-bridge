@@ -94,6 +94,7 @@ FILE_CASES = [
     ("form-two-replaces", "form", "types/host-extension.md", None),
     ("form-misspelt-change-word", "form", "types/host-extension.md", "-"),
     ("b-trait-sets-bom", "b", "traits/has-screens.md", None),
+    ("form-unclosed-fence", "form", "types/host-extension.md", "-"),
 ]
 
 
@@ -171,6 +172,8 @@ STATUS_CASES = [
     ("form-trait-double-space.md", "form", None),
     ("form-bad-prefix-single.md", "form", None),
     ("form-empty-segment.md", "form", None),
+    ("form-part-whitespace.md", "form", None),
+    ("form-part-blank.md", "form", None),
 ]
 
 
@@ -370,6 +373,110 @@ def test_r014_unreadable_folder_stops_the_check(tmp_path):
         assert_not_checked(*run(str(root)))
     finally:
         sub.chmod(0o755)
+
+
+# --- round 3: the second review's corrections (handoff/TASK-006-r3.md) --------------------------------------------
+
+def test_r014_misspelt_heading_section_is_not_read_as_a_change():
+    """R2-1 with its precondition: `## Sets at intake.questions` in a trait file would give (b) and (set) if read as a
+    change; it gives one (form) and nothing else."""
+    root = f"{FIX}/fail/form-misspelt-in-trait"
+    rc, lines, err = run(root)
+    assert rc == 1
+    assert len(fails(lines)) == 1 and fails(lines)[0].startswith(f"FAIL (form) {root}/traits/installable.md: - "), lines
+
+
+def test_r014_change_word_with_punctuation_is_form():
+    """R3-4: `## Set:`, `## Add:`, `## Replace:`, `## Adding`, `## Setting` are malformed change headings; a trait's
+    `## Set:` no longer escapes."""
+    root = f"{FIX}/fail/form-change-word-punctuation"
+    rc, lines, err = run(root)
+    assert rc == 1
+    forms = [line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/traits/installable.md: - ")]
+    assert len(forms) == 5 and len(fails(lines)) == 5, lines
+    text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
+    assert "\n## Add-ons\n" in text, "the pass root keeps `## Add-ons` as prose"
+
+
+def test_r014_indented_or_tabbed_change_heading_is_form():
+    """R3-6: ` ## Set at x` and `##<tab>Add at x` are heading candidates that fail the exact forms."""
+    root = f"{FIX}/fail/form-indented-heading"
+    rc, lines, err = run(root)
+    assert rc == 1
+    assert len([line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/types/host-extension.md: ")]) == 2, lines
+
+
+def test_r014_usage_error_message_is_escaped():
+    """R3-1: an argument holding a newline cannot start a GitHub workflow command on standard error."""
+    rc, lines, err = run("--bogus\n::warning::injected")
+    assert rc == 2 and lines[-1] == "RESULT: not checked", (lines, err)
+    assert "\n::warning::" not in err and not err.startswith("::warning::"), err
+    assert "\\x0a::warning::injected" in err, err
+
+
+@pytest.mark.parametrize("sep", ["|---|", "|---|---|---|---|---|---|---|---|"], ids=["one-cell", "eight-cells"])
+def test_r014_separator_cell_count_differs(tmp_path, sep):
+    """R3-2."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    good = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
+    assert good in text
+    broken = tmp_path / "open-list.md"
+    broken.write_text(text.replace(good, good.split("\n")[0] + "\n" + sep + "\n", 1), encoding="utf-8")
+    assert_not_checked(*run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md"))
+
+
+def _outside_with_canary(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "host-extension.md").write_text("## Add at nowhere.at-all\n\nq\n", encoding="utf-8")
+    (outside / "claude-code-extension.md").write_text("## Add at nowhere.at-all\n\nq\n", encoding="utf-8")
+    return outside
+
+
+def test_r014_link_under_an_unknown_type_folder_is_form(tmp_path):
+    """R3-3: the unknown folder keeps its (d); the link inside it is (form) at its own path and is not read."""
+    outside = _outside_with_canary(tmp_path)
+    root = tmp_path / "root"
+    (root / "types" / "not-a-type").mkdir(parents=True)
+    _link_folder(root / "types" / "not-a-type" / "out", outside)
+    rc, lines, err = run(str(root))
+    shown = str(root).replace("\\", "/")
+    assert rc == 1, lines
+    assert any(line.startswith(f"FAIL (d) {shown}/types/not-a-type") for line in lines), lines
+    assert any(line.startswith(f"FAIL (form) {shown}/types/not-a-type/out") for line in lines), lines
+    assert not [line for line in lines if line.startswith("FAIL (a)")], "a file behind a link was read"
+
+
+def test_r014_top_level_link_is_form_and_not_walked(tmp_path):
+    """R3-3: ROOT/types as a link, and ROOT/traits as a dangling link, are each (form) at their own path."""
+    outside = _outside_with_canary(tmp_path)
+    gone = tmp_path / "gone"
+    gone.mkdir()
+    root = tmp_path / "root"
+    root.mkdir()
+    _link_folder(root / "types", outside)
+    _link_folder(root / "traits", gone)
+    gone.rmdir()
+    rc, lines, err = run(str(root))
+    shown = str(root).replace("\\", "/")
+    assert rc == 1, lines
+    assert any(line.startswith(f"FAIL (form) {shown}/types") for line in lines), lines
+    assert any(line.startswith(f"FAIL (form) {shown}/traits") for line in lines), lines
+    assert not [line for line in lines if line.startswith("FAIL (a)")], "a file behind a link was read"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="a junction exists only on Windows")
+def test_r014_junction_detected_without_isjunction(tmp_path, monkeypatch, program):
+    """R3-7: with os.path.isjunction absent (a Python before 3.12), a junction still counts as a link."""
+    mod = program("workflow-check")
+    target = tmp_path / "target"
+    target.mkdir()
+    link = tmp_path / "link"
+    _link_folder(link, target)
+    assert mod.is_link(str(link))
+    monkeypatch.delattr(os.path, "isjunction", raising=False)
+    assert mod.is_link(str(link)), "the fallback must see the reparse point"
+    assert not mod.is_link(str(target))
 
 
 # --- the CI step (R-033) ------------------------------------------------------------------------------------------
