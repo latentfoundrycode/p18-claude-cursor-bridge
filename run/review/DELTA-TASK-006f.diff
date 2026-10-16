@@ -1,0 +1,361 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 4390d7b..6784c8f 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-16 22:41",
++  "generated": "2026-10-16 23:12",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -102,7 +102,7 @@
+     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+-    "cursor-bridge/workflow-check.py": "fd3313dc95ecaf8fd6bda61496c6dd70bcca737b6dcd882dcccddeac480c9172",
++    "cursor-bridge/workflow-check.py": "d36e929a2a1bb29becd88543ca66d8ef8c2aae371246470a409b7f1bfc6432dc",
+     "cursor-bridge/workflow/extension-points.md": "0ebf6901c91d35a36d89151199603e0beefe11e32f171ea6caaba994eed50892",
+     "cursor-bridge/workflow/open-list.md": "00528622752d2732cedce48a1f2db09745be7ee1b9475986a161f084391b3cdd",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+diff --git a/bridge/cursor-bridge/workflow-check.py b/bridge/cursor-bridge/workflow-check.py
+index 733bd5e..588c092 100644
+--- a/bridge/cursor-bridge/workflow-check.py
++++ b/bridge/cursor-bridge/workflow-check.py
+@@ -92,6 +92,19 @@ def joined(root, rel):
+     return slash(root).rstrip("/") + "/" + rel
+ 
+ 
++def file_lines(text):
++    """Split file text only at a line feed (R6-2).
++
++    `read_utf8` uses universal newlines, so a carriage return is already a line feed.
++    A form feed, vertical tab, file/group/record separator, NEL, U+2028, or U+2029
++    stays inside the line. A final line feed does not add an empty line.
++    """
++    lines = text.split("\n")
++    if lines and lines[-1] == "":
++        del lines[-1]
++    return lines
++
++
+ def read_utf8(path):
+     """Return three values (text, shown path, reason).
+ 
+@@ -169,12 +182,22 @@ def is_separator_row(line, width):
+ 
+ 
+ def cells_of(line):
+-    return [cell.strip() for cell in line.strip().strip("|").split("|")]
++    """Strip the line, drop one leading `|` and one trailing `|`, then split on `|`.
++
++    A row such as `| a | b ||` keeps the empty last cell, and `|| a | b |` keeps the
++    empty first cell (R6-1). The same rule applies to the header and the separator.
++    """
++    text = line.strip()
++    if text.startswith("|"):
++        text = text[1:]
++    if text.endswith("|"):
++        text = text[:-1]
++    return [cell.strip() for cell in text.split("|")]
+ 
+ 
+ def parse_table(text, path, heading, required):
+     """The first Markdown table after heading. Returns (rows, error reason or None)."""
+-    lines = text.splitlines()
++    lines = file_lines(text)
+     start_heading = None
+     for index, line in enumerate(lines):
+         if line == heading:
+@@ -421,7 +444,7 @@ def heading_spans(text):
+     walk is linear in the file. The second value is True when a fence is still open at the
+     end of the file (R3-6).
+     """
+-    lines = text.splitlines()
++    lines = file_lines(text)
+     fence = None
+     marks = []
+     for index, line in enumerate(lines):
+@@ -654,7 +677,7 @@ def check_traits(text, path, tables, findings):
+ 
+ def check_status(path, text, tables):
+     shown = slash(path)
+-    lines = [line for line in text.splitlines() if line.startswith("Workflows: ")]
++    lines = [line for line in file_lines(text) if line.startswith("Workflows: ")]
+     if not lines:
+         return [("form", shown, "-", "status file has no Workflows line")]
+     multi = len(lines) > 1
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index cd50a05..b3dbf95 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -15,3 +15,5 @@
+ 2026-10-16 TASK-006-r4: a missing `types/` or `traits/` is skipped with `os.path.lexists` before `is_link`. On both the `os.path.isjunction` branch and the Windows `lstat` fallback, `FileNotFoundError` and `NotADirectoryError` are not links; any other `OSError` is a link. A fence is zero to three leading spaces then three backticks; four spaces is not a fence.
+ 
+ 2026-10-16 TASK-006-r5: a `types/` or `traits/` path is examined with `os.lstat` (missing means skip; any other `OSError` is `ERROR` and exit 2). `is_link` uses one `os.lstat` on every Python: `S_ISLNK`, or on Windows `FILE_ATTRIBUTE_REPARSE_POINT`. A fence is a CommonMark opening run of backticks or tildes, closed only by an equal or longer run of the same character with nothing after it but spaces or tabs.
++
++2026-10-16 TASK-006-r6: `cells_of` removes one leading `|` and one trailing `|`, so a row ending or starting `||` keeps its empty cell. File text is split only at `\n` (`file_lines`); a final line feed does not add an empty line. Form feed, vertical tab, and the other `splitlines` breaks stay inside the line.
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 3d28df1..1b6b5fc 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -443,6 +443,15 @@ Review B approved with no findings; every round-2 finding was confirmed settled
+ ### TASK-006 round 4 — disposition (PR #23)
+ All three approved, and every round-3 finding was confirmed settled by probes. Review A's Consider 1 and the auditor's second advisory named the same defect independently, so it blocked (convergence): the fence rule toggled on any fence-like line, so a four-backtick fence closed on a line of three, a backtick line with text after it closed a fence, and tilde fences were not fences, which let a trait's `## Set` sit between two such lines unseen (the case existed before round 4; R4-3 widened it slightly). Taken in round 5: fences as CommonMark reads them (R5-3). Also taken, since round 5 runs anyway: the auditor's first advisory, that R4-2's error rule on the `os.path.isjunction` branch can never run (CPython's `isjunction` catches its own errors), by one `os.lstat` rule on every Python (R5-2), which also ends round 3's Consider 3 (results that differed by Python version); and Review A's Consider 2, that on POSIX a root whose layer folders cannot be examined was checked as empty and passed, by examining each layer with `os.lstat` and stopping the check on an error other than a missing path (R5-1), which replaces the round-4 HARDENING line about `lexists`. Not taken, recorded in HARDENING: a fence inside an HTML `<pre>` block (the auditor).
+ 
++| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
++|---|---|---|---|---|---|---|
++| TASK-006 | 5 | Review A | 0 | 0 | 3 | partly — round 6 (handoff/TASK-006-r6.md); one to HARDENING |
++| TASK-006 | 5 | Review B | 1 | 0 | 0 | yes — round 6 |
++| TASK-006 | 5 | security auditor | 0 | 4 advisory | — | partly — round 6; three to HARDENING |
++
++### TASK-006 round 5 — disposition (PR #23)
++Every round-4 finding was confirmed settled by probes, R5-3 against a CommonMark reference (markdown-it). Review B blocked: `cells_of` stripped every pipe at a row's ends, so a row ending `||` lost an empty cell and a row with the wrong cell count passed (R6-1). Review A's Consider 1 and the auditor's first advisory named the same defect, so it blocked (convergence): lines were split at form feed, vertical tab, NEL, U+2028 and other characters Markdown does not end a line at, so two fence lines joined to text by one could hide a heading (R6-2). On the supervisor's side: a pass-root block pinning that a backtick in a tilde fence's info string still opens the fence (Review A's test gap; the other two gaps it named are cosmetic or unreachable). Review A's Consider 2 and the auditor's second advisory also named one class together, fences and headings inside container blocks (list items, block quotes): both graded it for recording by class rather than a fix, and the supervisor agrees: it is the tail of heading parsing the by-class line was drawn under at round 3, files under `types/` and `traits/` are written by the bridge's own maintainer and supervisor, and modelling CommonMark's containers is a parser, not a check; recorded in HARDENING with the auditor's third and fourth advisories (headings inside containers; any HTML block, not only `<pre>`).
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index ede5823..4b1e712 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -26,4 +26,4 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ ## Stage B2 — TASK-006, the workflow check (by-class line, review round 3)
+ - A change word wrapped in markup or joined by another character is still prose: `## **Set** intake.x`, `` ## `Replace` design ``, `## Set:at intake.x`, `## Set` with an em dash. Strip leading and trailing `*`, `_`, backticks and any dash before the comparison (Review A, round 3 Consider 2; the tail of heading parsing, low likelihood).
+ - Every reparse point counts as a link on Windows (one `os.lstat` rule on every Python since round 5): OneDrive placeholders and deduplicated files under `types/` or `traits/` fail as `form`. Fail-closed by design; a workflow folder is not expected in a synced folder (Review A, round 3 Consider 3, settled for version dependence by R5-2).
+-- A code fence inside an HTML block (`<pre>`) is read as a fence, though Markdown shows the block as HTML; a backtick line there can leave the check inside a fence Markdown never opened (the security auditor, round 4; the tail of heading parsing).
++- Container blocks are not modelled: a fence opened inside a list item stays open for the check after Markdown ends the item, a heading inside a block quote or list item (`> ## Set at x`, `- ## Set at x`) is not a heading candidate, and a fence line inside any HTML block (types 1 to 7: `<pre>`, `<div>`, `<!-- -->`) is read as a fence; each can hide a change heading Markdown displays. A fail-closed rule (a container marker before `##`, or an indented fence followed by a less-indented line, as `form`) would close most of it (the security auditor rounds 4 and 5, Review A round 5 Consider 2; converged, and both graded it for recording; the tail of heading parsing).
+diff --git a/handoff/TASK-006-r6-report.md b/handoff/TASK-006-r6-report.md
+new file mode 100644
+index 0000000..55ab4bc
+--- /dev/null
++++ b/handoff/TASK-006-r6-report.md
+@@ -0,0 +1,74 @@
++# TASK-006 round 6 report
++
++## Files changed
++
++- `bridge/cursor-bridge/workflow-check.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated; `generated` stamp and the `workflow-check.py` hash)
++- `docs/BUILDER_NOTES.md`
++- `handoff/TASK-006-r6-report.md` (this report)
++
++## Summary
++
++Round 6 corrects `workflow-check.py` so `cells_of` removes exactly one leading `|` and one trailing `|` before splitting, and so file text is split into lines only at a line feed. A table row that starts or ends with `||` keeps its empty cell and fails the header width check (exit 2). A form feed, vertical tab, file/group/record separator, NEL, U+2028, or U+2029 stays inside the line, so it cannot hide a heading between two fence markers. The manifest is regenerated after the last edit under `bridge/`.
++
++## What changed
++
++- R6-1. `cells_of` strips surrounding whitespace, drops one leading `|` when present and one trailing `|` when present, then splits on `|` and strips each cell. The header and the separator use the same function, so a separator ending `||` fails the width check.
++- R6-2. `file_lines` replaces every `str.splitlines()` of file text (`parse_table`, `heading_spans`, `check_status`). It splits only on `\n`. `read_utf8` already opens with universal newlines, so a carriage return is already a line feed. A final line feed does not add an empty line.
++
++## Commands
++
++A preliminary `python tools/make-manifest.py` (exit 0: version 2026.10.11d, 107 files hashed) was run after the last edit under `bridge/` and before command 3, so the suite would see the new `workflow-check.py` hash. Command 5 ran it again and set `generated` to `2026-10-16 23:12`. The hash of `workflow-check.py` (`d36e929a2a1bb29becd88543ca66d8ef8c2aae371246470a409b7f1bfc6432dc`) did not change between the passing run and that stamp. The suite was not started again after that stamp.
++
++1. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` — exit 0
++
++```
++RESULT: OK
++```
++
++2. `python -m pytest tests/test_workflow_check.py -q` — exit 0
++
++```
++123 passed, 1 skipped in 8.52s
++```
++
++The skip is `test_r014_unreadable_folder_stops_the_check` (Windows; the test requires a non-root POSIX user).
++
++3. `python -m pytest tests -q` — exit 0
++
++```
++1075 passed, 21 skipped in 236.72s (0:03:56)
++```
++
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` — exit 0
++
++```
++windowless-check: 30 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++5. `python tools/make-manifest.py` — exit 0
++
++```
++make-manifest: version 2026.10.11d, 107 files hashed, VERSION + MANIFEST.json written
++```
++
++`python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0
++
++```
++bridge-check: version 2026.10.11d (2026-10-16 23:12) at E:\p18-claude-cursor-bridge\Workspace\bridge
++bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.10.11d
++```
++
++6. `git diff --stat` — exit 0. The report is untracked, so it is absent here; `git status --short` also shows `?? handoff/TASK-006-r6-report.md`.
++
++```
++ bridge/cursor-bridge/MANIFEST.json     |  4 ++--
++ bridge/cursor-bridge/workflow-check.py | 31 +++++++++++++++++++++++++++----
++ docs/BUILDER_NOTES.md                  |  2 ++
++ 3 files changed, 31 insertions(+), 6 deletions(-)
++```
++
++## Assumed, not verified
++
++A file that ends in a line feed does not gain a final empty line · `file_lines` drops a trailing empty segment after `split("\n")`, which is what `str.splitlines()` did for `\n` and what the brief does not state · a fixture or sentence that says whether the last line feed is its own empty line.
+diff --git a/handoff/TASK-006-r6.md b/handoff/TASK-006-r6.md
+new file mode 100644
+index 0000000..8f2899e
+--- /dev/null
++++ b/handoff/TASK-006-r6.md
+@@ -0,0 +1,43 @@
++# TASK-006 round 6: the workflow check — the fifth review's corrections
++
++## Objective
++Round 5 (`handoff/TASK-006-r5-report.md`) settled the fourth review. In the fifth review Review B blocked on table rows: `cells_of` strips every pipe at a row's ends, so a row ending `||` (or starting `||`) loses an empty cell and a row with the wrong cell count passes, where Requirement 3 and R3-2 require exit 2. Review A and the security auditor independently found that the check splits a file into lines at characters Markdown does not treat as line ends (form feed, vertical tab, NEL, U+2028 and others), so two fence lines joined to text by such a character can hide a heading Markdown displays. This round corrects both. **`handoff/TASK-006.md` and `-r2.md` to `-r5.md` still hold in full**; this file changes only what it says, and where they differ this file wins.
++
++Satisfies: R-014, R-033 (unchanged).
++
++## Scope
++Files you may modify:
++- bridge/cursor-bridge/workflow-check.py
++- bridge/cursor-bridge/MANIFEST.json (regenerated with `python tools/make-manifest.py` after your last edit under `bridge/`)
++- docs/BUILDER_NOTES.md
++- handoff/TASK-006-r6-report.md
++
++Do not modify anything else; `.github/workflows/tests.yml` does not change.
++
++## Written by the supervisor; do not edit
++`tests/test_workflow_check.py` and everything under `tests/fixtures/workflows/` were extended for this round and are committed with this file. Do not edit, move, rename or add to them, nor `tests/test_release_b_ci_floor.py`. If a supervisor test contradicts a brief, stop, change no test, and report the contradiction.
++
++## Corrections (each is a requirement)
++
++### R6-1. A table row loses exactly one pipe at each end (Requirement 3, R3-2)
++`cells_of(line)` strips the line's surrounding whitespace, then removes **one** leading `|` and, if present, **one** trailing `|`, then splits on `|` and strips each cell. A row such as `| a | b ||` therefore has three cells (the last empty) and `|| a | b |` has three (the first empty); against a two-column header each is "table row cell count differs from its header", exit 2, `RESULT: not checked`. The same function serves the header and the separator row, so a separator ending `||` fails its width check (R3-2) the same way.
++
++### R6-2. Lines end only where Markdown ends them (Requirement 7, R5-3)
++Wherever the check splits a file's text into lines (`heading_spans`, `parse_table`, and any other place it does), it splits only at a line feed. The text is read with universal newlines, so carriage returns are already line feeds; `str.splitlines()`, which also splits at form feed, vertical tab, `\x1c` to `\x1e`, NEL (`\x85`), U+2028 and U+2029, is no longer used for this. A line that holds such a character is one line, read as the rest of R5-3 says (a line beginning `a` then a form feed then three backticks is not a fence).
++
++## Acceptance criteria
++- [ ] `python -m pytest tests/test_workflow_check.py -q` passes (the supervisor's tests, extended for every correction above).
++- [ ] `python -m pytest tests -q` passes in full.
++- [ ] `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` exits 0 with `RESULT: OK`.
++- [ ] `windowless-check.py` and `bridge-check.py --sources` pass.
++
++## Done
++Run each from the repository root, in this order, and paste each command with its exit code and the relevant output into your report:
++1. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass`
++2. `python -m pytest tests/test_workflow_check.py -q`
++3. `python -m pytest tests -q`
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++5. `python tools/make-manifest.py`, then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++6. `git diff --stat`
++
++Your report is the file `handoff/TASK-006-r6-report.md`, written as you go, in the form `TASK-006.md`'s Done section describes, with a section headed exactly `Assumed, not verified` (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`). Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/tests/fixtures/workflows/pass/README.md b/tests/fixtures/workflows/pass/README.md
+index 95203e0..2c44cee 100644
+--- a/tests/fixtures/workflows/pass/README.md
++++ b/tests/fixtures/workflows/pass/README.md
+@@ -1 +1 @@
+-A passing workflow folder for workflow-check.py (TASK-006): every layer, a replaced module whose point a trait and a sub-workflow still add at, a sub-workflow overriding its type workflow's setting, delivery additions for two kinds, a change heading inside a code fence (one pair at column 0, one pair indented up to three spaces, and in the trait file tilde fences, one of them holding a four-backtick line and a shorter tilde line) and prose headings, all of which pass. Nothing outside types/ and traits/ is read.
++A passing workflow folder for workflow-check.py (TASK-006): every layer, a replaced module whose point a trait and a sub-workflow still add at, a sub-workflow overriding its type workflow's setting, delivery additions for two kinds, a change heading inside a code fence (one pair at column 0, one pair indented up to three spaces, and in the trait file tilde fences, one of them holding a four-backtick line and a shorter tilde line, one whose info string holds a backtick) and prose headings, all of which pass. Nothing outside types/ and traits/ is read.
+diff --git a/tests/fixtures/workflows/pass/traits/installable.md b/tests/fixtures/workflows/pass/traits/installable.md
+index 21f10a4..9152b4a 100644
+--- a/tests/fixtures/workflows/pass/traits/installable.md
++++ b/tests/fixtures/workflows/pass/traits/installable.md
+@@ -25,3 +25,7 @@ What does uninstalling keep?
+ ## Replace design
+ ~~~
+ ~~~~
++
++~~~a`b
++## Set at intake.delivery-kind
++~~~
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index 9d88e9d..27d4919 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -581,6 +581,7 @@ def test_r014_tilde_fences_and_longer_runs_hide_headings():
+     text = (REPO / FIX / "pass/traits/installable.md").read_text(encoding="utf-8")
+     assert "\n~~~\n## Set at intake.delivery-kind\n~~~\n" in text, "precondition: a tilde fence hides a Set"
+     assert "\n~~~~\n````\n## Replace design\n~~~\n~~~~" in text, "precondition: a longer tilde fence hides a Replace"
++    assert "\n~~~a`b\n## Set at intake.delivery-kind\n~~~" in text, "precondition: a backtick in a tilde info string still opens"
+     rc, lines, err = run(f"{FIX}/pass")
+     assert rc == 0 and lines[-1] == "RESULT: OK", lines
+ 
+@@ -631,6 +632,72 @@ def test_r014_unclosed_indented_fence_is_form():
+     assert fails(lines) == [f"FAIL (form) {root}/types/host-extension.md: - - fenced code block is still open at the end of the file"], lines
+ 
+ 
++# --- round 6: the fifth review's corrections (handoff/TASK-006-r6.md) ---------------------------------------------
++
++LIBRARY_ROW = "| library | Library | Included by other programs | Library Development | — | no | — |"
++
++
++@pytest.mark.parametrize("row", [LIBRARY_ROW + "|", "|" + LIBRARY_ROW], ids=["trailing-double-pipe", "leading-double-pipe"])
++def test_r014_double_pipe_row_is_a_cell_count_error(tmp_path, row):
++    """R6-1: a row ending or starting `||` keeps its empty cell, so its count differs from the header's: exit 2."""
++    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
++    assert "\n" + LIBRARY_ROW + "\n" in text, "precondition: the row the test breaks"
++    broken = tmp_path / "open-list.md"
++    broken.write_text(text.replace("\n" + LIBRARY_ROW + "\n", "\n" + row + "\n", 1), encoding="utf-8")
++    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
++    assert_not_checked(rc, lines, err)
++    assert any("table row cell count differs from its header" in line for line in lines), lines
++
++
++def test_r014_separator_with_double_pipe_is_not_a_separator(tmp_path):
++    """R6-1 with R3-2: a separator ending `||` has one cell too many."""
++    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
++    good = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
++    assert good in text
++    broken = tmp_path / "open-list.md"
++    broken.write_text(text.replace(good, good.rstrip("\n") + "|\n", 1), encoding="utf-8")
++    assert_not_checked(*run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md"))
++
++
++@pytest.mark.parametrize("sep", ["\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"],
++                         ids=["vt", "ff", "fs", "gs", "rs", "nel", "ls", "ps"])
++def test_r014_lines_end_only_at_line_feeds(tmp_path, sep):
++    """R6-2: two lines joined to text by a character Markdown does not end a line at are not fences, so the trait's
++    `## Set` between them is read and is the one (b)."""
++    root = tmp_path / "root"
++    (root / "traits").mkdir(parents=True)
++    body = f"## Add at intake.questions\n\nq\n\na{sep}```\n\n## Set at intake.delivery-kind\n\ninstaller\n\nb{sep}```\n"
++    (root / "traits" / "installable.md").write_text(body, encoding="utf-8", newline="\n")
++    rc, lines, err = run(str(root))
++    shown = str(root).replace("\\", "/")
++    assert rc == 1, lines
++    assert fails(lines) == [f"FAIL (b) {shown}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
++
++
++def test_r014_table_row_holding_a_line_separator_is_one_row(tmp_path):
++    """R6-2 in parse_table: a U+2028 inside a cell keeps the row whole; split there, its first part would be a short row
++    and the check would stop (exit 2)."""
++    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
++    assert "\n" + LIBRARY_ROW + "\n" in text
++    lsep = LIBRARY_ROW.replace("Included by other programs", "Included by\u2028other programs")
++    changed = tmp_path / "open-list.md"
++    changed.write_text(text.replace("\n" + LIBRARY_ROW + "\n", "\n" + lsep + "\n", 1), encoding="utf-8", newline="\n")
++    rc, lines, err = run("--open-list", str(changed), "--status", f"{FIX}/status/ok-single.md")
++    assert rc == 0 and lines[-1] == "RESULT: OK", lines
++
++
++def test_r014_workflows_line_after_a_form_feed_is_not_a_line(tmp_path):
++    """R6-2 in the status check: `Workflows:` joined to the line before it by a form feed does not begin a line, so the
++    file has no Workflows line (form)."""
++    text = (REPO / FIX / "status/ok-single.md").read_text(encoding="utf-8")
++    assert "\nWorkflows: " in text
++    status = tmp_path / "status.md"
++    status.write_text(text.replace("\nWorkflows: ", "\x0cWorkflows: ", 1), encoding="utf-8", newline="\n")
++    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(status))
++    assert rc == 1, lines
++    assert len(fails(lines)) == 1 and "status file has no Workflows line" in fails(lines)[0], lines
++
++
+ # --- the CI step (R-033) ------------------------------------------------------------------------------------------
+ 
+ def _jobs():
