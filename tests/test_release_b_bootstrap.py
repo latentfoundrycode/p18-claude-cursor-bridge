@@ -74,7 +74,6 @@ def _deferred_rows(inv):
     return [c for c in cells if c and c[0] != "(none)"]
 
 
-OWNER_DATED = re.compile(r"\bowner\b.*\b\d{4}-\d{2}-\d{2}\b", re.I)  # completion-check.py's convention
 
 
 def _deferral_fault(cells):
@@ -85,7 +84,8 @@ def _deferral_fault(cells):
         return "a settled decision sits in Deferred"
     if not re.match(r"no\b", cells[-1].strip().lower()):
         return "an owner decision is still open on it"
-    if not OWNER_DATED.search(" | ".join(cells[1:])):
+    row = " | ".join(cells[1:])
+    if not (re.search(r"\bowner\b", row, re.I) and re.search(r"\b\d{4}-\d{2}-\d{2}\b", row)):
         return "the row does not name the owner with a date"
     return None
 
@@ -98,6 +98,8 @@ def test_r001_deferred_rows_parse():
     assert _deferred_rows(table.split("| R-038")[0]) == []
     assert _deferral_fault(["a later feature", "deferred by the owner", "2026-11-01", "no"]) is None
     assert _deferral_fault(["a later feature", "not needed for B", "2026-11-01", "no — the owner, 2026-11-01"]) is None
+    assert _deferral_fault(["a later feature", "not needed for B", "2026-11-01", "no — deferred by the owner"]) is None
+    assert _deferral_fault(["a later feature", "deferred by the owner", "—", "no"])
     for row in (["a later feature", "not yet", "2026-10-16", "yes"],
                 ["a later feature", "not yet", "2026-10-16", "yes — the owner asked 2026-10-16"],
                 ["a later feature", "not yet", "2026-10-16", "yes — does the owner defer it? (asked 2026-10-16)"],

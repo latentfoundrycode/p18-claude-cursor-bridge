@@ -24,15 +24,73 @@ OSV = re.compile(r"osv-scanner", re.I)
 SOCKET = re.compile(r"\bsocket(?:security)?\b", re.I)
 SCANNERS = (("semgrep", SEMGREP), ("osv-scanner", OSV), ("socket", SOCKET))
 DISABLERS = re.compile(r"(?:\|\||;)\s*(?:true\b|exit\s+0\b|:(?=\s|$|;)|echo\b)")
-# a secret in any form: any `${{ }}` expression reading the secrets context (up to its closing `}}`, so
-# format('{0}', secrets.X) and toJSON(secrets) count), a bare secrets.X / secrets['X'], and the job's github.token
-SECRET_REF = re.compile(r"\$\{\{(?:(?!\}\}).)*?\bsecrets\b|\bsecrets\s*[.\[]|\bgithub\.token\b", re.S)
-INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:-{1,2}\S+\s+)*(?:install|add|i|it|ci|dlx|x|exec)\b|\b(?:npx|bunx|uvx)\b|\bpip3?\s+install\b"
+# a repository secret in any form: any `${{ }}` expression reading the secrets context (up to its closing `}}`, so
+# format('{0}', secrets.X) and toJSON(secrets) count) and a bare secrets.X / secrets['X']; expression names are
+# case-insensitive
+SECRET_CTX = re.compile(r"\$\{\{(?:(?!\}\}).)*?\bsecrets\b|\bsecrets\s*[.\[]", re.S | re.I)
+# a secret or the job's own token, for the rule that nothing is installed beside one
+SECRET_REF = re.compile(SECRET_CTX.pattern + r"|\bgithub\s*(?:\.\s*token\b|\[\s*['\"]token['\"]\s*\])", re.S | re.I)
+INSTALLS = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:-{1,2}[\w-]+(?:=\S+|\s+[^-\s]\S*)?\s+)*?(?:install|add|i|it|ci|dlx|x|exec)\b|\b(?:npx|bunx|uvx)\b|\bpip3?\s+install\b"
                       r"|\buv\s+(?:pip|tool|add|sync|run)\b|\bgo\s+install\b|\bgem\s+install\b|\bcargo\s+install\b"
                       r"|\bcurl\b|\bwget\b|\bpipx\s+(?:install|run)\b")
 # npm's install and clean-install commands with their aliases (npm help install, npm help ci)
-NPM_INSTALL = re.compile(r"\bnpm\s+(?:-{1,2}\S+\s+)*(?:install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add|ci"
-                         r"|clean-install|ic|install-clean|isntall-clean|it|install-test)\b")
+NPM_INSTALL = re.compile(r"\bnpm\s+(?:-{1,2}[\w-]+(?:=\S+|\s+[^-\s]\S*)?\s+)*?(?:install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add|ci"
+                         r"|clean-install|ic|install-clean|isntall-clean|it|cit|install-test|install-ci-test|update|up|upgrade)\b")
+# The security floor job as committed, step by step, verbatim (the supervisor's pin, BUG-001 round 5): a change to
+# any scanner step, its order, its inputs or its environment fails here and must change this pin in the same diff,
+# where both reviewers read it (Merge-Verification-Policy §Anti-gaming). Regenerate it from the workflow only for a
+# change the gate approves.
+FLOOR_JOB = {'name': 'security floor',
+     'runs-on': 'ubuntu-latest',
+     'steps': [{'uses': 'actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09',
+                'with': {'fetch-depth': 0, 'persist-credentials': False}},
+               {'env': {'GITHUB_EVENT_BEFORE': '${{ github.event.before }}',
+                        'GITHUB_EVENT_NAME': '${{ github.event_name }}',
+                        'GITHUB_EVENT_PULL_REQUEST_BASE_SHA': '${{ github.event.pull_request.base.sha }}',
+                        'GITHUB_SHA': '${{ github.sha }}'},
+                'name': 'Semgrep',
+                'run': 'set -euo pipefail\n'
+                       'ARGS=(scan --config p/python --config p/secrets --config .semgrep.yml --config '
+                       'bridge/cursor-bridge/semgrep-bridge-rules.yml --error)\n'
+                       'if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then\n'
+                       '  BASELINE="$(git merge-base "${GITHUB_EVENT_PULL_REQUEST_BASE_SHA}" "${GITHUB_SHA}")"\n'
+                       '  ARGS+=(--baseline-commit "$BASELINE")\n'
+                       'elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then\n'
+                       '  BEFORE="${GITHUB_EVENT_BEFORE}"\n'
+                       '  if [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then\n'
+                       '    ARGS+=(--baseline-commit "$BEFORE")\n'
+                       '  fi\n'
+                       'fi\n'
+                       'pipx run semgrep==1.176.1 "${ARGS[@]}" .\n',
+                'shell': 'bash'},
+               {'name': 'OSV-Scanner',
+                'run': 'curl -fsSL -o osv-scanner '
+                       '"https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"\n'
+                       'echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner" | '
+                       'sha256sum -c -\n'
+                       'chmod +x osv-scanner\n'
+                       'set +e\n'
+                       './osv-scanner scan source --config=osv-scanner.toml '
+                       "--lockfile='requirements.txt:requirements.lock'\n"
+                       'code=$?\n'
+                       'set -e\n'
+                       'if [ "$code" -eq 0 ]; then\n'
+                       '  exit 0\n'
+                       'fi\n'
+                       'if [ "$code" -eq 128 ]; then\n'
+                       '  echo "OSV-Scanner exit 128: requirements.lock was not read"\n'
+                       '  exit 128\n'
+                       'fi\n'
+                       'exit "$code"\n',
+                'shell': 'bash'},
+               {'uses': 'actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444',
+                'with': {'node-version': '22'}},
+               {'name': 'Install the Socket CLI',
+                'run': 'npm install -g --ignore-scripts @socketsecurity/cli@1.7.0'},
+               {'env': {'SOCKET_CLI_API_TOKEN': '${{ secrets.SOCKET_SECURITY_API_KEY }}',
+                        'SOCKET_CLI_ORG_SLUG': '${{ vars.SOCKET_ORG_SLUG }}'},
+                'name': 'Socket',
+                'run': 'socket ci --no-banner'}]}
 LOCK_CLOSURE = {"pytest", "pyyaml", "colorama", "iniconfig", "packaging", "pluggy", "pygments"}
 
 
@@ -79,15 +137,25 @@ def test_r002_disabler_pattern_catches_the_idioms():
 def test_r002_secret_and_install_patterns_catch_their_forms():
     """R-002: the patterns the secret and install checks rely on match each form they claim (a negative test must show its precondition)."""
     for bad in ("${{ secrets.X }}", "${{ secrets['X'] }}", "${{ toJSON(secrets) }}", "${{secrets.X}}",
-                "${{ format('{0}', secrets.X) }}", "${{ github.token }}"):
-        assert SECRET_REF.search(bad), bad
+                "${{ format('{0}', secrets.X) }}", "${{ SECRETS.X }}"):
+        assert SECRET_CTX.search(bad) and SECRET_REF.search(bad), bad
+    for token in ("${{ github.token }}", "${{ github['token'] }}"):
+        assert SECRET_REF.search(token) and not SECRET_CTX.search(token), token
     for ok in ("${{ vars.SOCKET_ORG_SLUG }}", "${{ github.sha }}", "secrets/ folder"):
         assert not SECRET_REF.search(ok), ok
-    for bad in ("npm install x", "npm ci", "npm exec x", "npm --global i x", "npx x", "pnpm dlx x", "yarn dlx x", "bunx x", "uvx x", "uv tool run x",
+    assert not SECRET_REF.search("${{ github.token_url }}")
+    for bad in ("npm install x", "npm ci", "npm exec x", "npm --global i x", "npm --prefix /tmp install x", "npx x", "pnpm dlx x", "yarn dlx x", "bunx x", "uvx x", "uv tool run x",
                 "pip3 install x", "go install x", "curl -fsSL x"):
         assert INSTALLS.search(bad), bad
-    for bad in ("npm i -g x", "npm add x", "npm isntall x", "npm clean-install", "npm -g install x", "npm --global i x", "npm it"):
+    for bad in ("npm i -g x", "npm add x", "npm isntall x", "npm clean-install", "npm -g install x", "npm --global i x", "npm it",
+                "npm --prefix /tmp install x", "npm --prefix=/tmp install x", "npm cit", "npm update -g x"):
         assert NPM_INSTALL.search(bad), bad
+
+
+def test_r002_commands_split_chains():
+    """R-002: a chained second command is read on its own (a negative test must show its precondition)."""
+    assert _commands("npm install -g --ignore-scripts a && npm install -g b ; npm i c | tee x || true") == \
+        ["npm install -g --ignore-scripts a", "npm install -g b", "npm i c", "tee x", "true"]
 
 
 def test_r002_lines_join_continuations():
@@ -122,6 +190,11 @@ def _lines(step):
     if held.strip():
         out.append(held.strip())
     return out
+
+
+def _commands(line):
+    """The commands of one line, split at `&&`, `||`, `;` and `|`, so a chained second command is read on its own."""
+    return [c.strip() for c in re.split(r"&&|\|\||;|\|", line) if c.strip()]
 
 
 def _floor_step(data, pattern):
@@ -181,7 +254,7 @@ def test_r002_no_install_runs_beside_a_secret():
     token): no step that carries a secret (any expression reading the secrets context) installs or fetches anything;
     every npm install skips lifecycle scripts — the line's one mention of the setting is the bare `--ignore-scripts`
     (npm takes the last of several, so `--ignore-scripts --ignore-scripts=false` runs scripts), and no env at any level
-    sets npm's ignore-scripts config; and the Socket CLI is installed at the version the inventory records (1.7.0; a
+    sets npm's ignore-scripts config to anything but `true` (or `1`); and the Socket CLI is installed at the version the inventory records (1.7.0; a
     bump is an admission, supervisor.md rule 14) in a step of the floor's job before the scan."""
     data = _data()
     envs = [data.get("env")] + [j.get("env") for j in _jobs(data).values()] + [s.get("env") for j in _jobs(data).values() for s in _steps(j)]
@@ -195,17 +268,36 @@ def test_r002_no_install_runs_beside_a_secret():
                 for s in _lines(step):
                     assert not INSTALLS.search(s), f"R-002: a step holding a secret installs or fetches ({name}): {s!r}"
             for s in _lines(step):
-                if NPM_INSTALL.search(s):
-                    tokens = s.split()
+                for seg in _commands(s):
+                    if not NPM_INSTALL.search(seg):
+                        continue
+                    tokens = seg.split()
                     mentions = [i for i, t in enumerate(tokens) if "ignore-scripts" in t.lower() or "ignore_scripts" in t.lower()]
-                    assert [tokens[i] for i in mentions] == ["--ignore-scripts"], f"R-002: npm install must carry exactly one bare --ignore-scripts: {s!r}"
+                    assert [tokens[i] for i in mentions] == ["--ignore-scripts"], f"R-002: npm install must carry exactly one bare --ignore-scripts: {seg!r}"
                     after = tokens[mentions[0] + 1].lower() if mentions[0] + 1 < len(tokens) else ""
-                    assert after not in ("true", "false", "0", "1"), f"R-002: --ignore-scripts given a value ({after}) npm would read: {s!r}"
+                    assert after not in ("true", "false", "0", "1"), f"R-002: --ignore-scripts given a value ({after}) npm would read: {seg!r}"
     job, socket = _floor_step(_data(), re.compile(r"(?:^|\s)socket\s+ci\b"))
     steps = _steps(job)
     before = steps[: steps.index(socket)]
     assert any(re.search(r"\bnpm\s+install\b.*\s@socketsecurity/cli@1\.7\.0(?:\s|$)", s) for st in before for s in _lines(st)), \
         "R-002: the Socket CLI is not installed at its recorded version (1.7.0) before the scan"
+
+
+def test_r002_floor_job_is_the_pinned_one():
+    """R-002 (docs/BUILD_PLAN.md TASK-002; the stage B1 review): the `security floor` job is exactly the committed one
+    — its name, runner and every step verbatim, so no scanner can be skipped, its status overwritten or a step added
+    beside the key without this pin changing in the same diff."""
+    data = _data()
+    assert data["jobs"].get("security-floor") == FLOOR_JOB, "R-002: the security floor job differs from the pinned one"
+
+
+def test_r002_one_step_holds_a_secret():
+    """R-002 (secure-coding.snapshot.md V14; the brief: no secret on a scanner's path beyond its own token): in the whole
+    workflow exactly one step refers to a repository secret, in any key — the Socket scan, which runs only
+    `socket ci --no-banner` — so no action, install or other command is handed one."""
+    holders = [(name, step.get("name")) for name, job in _jobs(_data()).items() for step in _steps(job)
+               if SECRET_CTX.search(str(step))]
+    assert holders == [("security-floor", "Socket")], f"R-002: the steps referring to a secret are {holders}"
 
 
 def test_r002_three_scanners_unguarded_on_ubuntu():
@@ -306,14 +398,14 @@ def test_r002_lockfile_pins_closure():
 def test_r002_secrets_only_in_step_env():
     """R-002: `secrets.` appears only inside a step's env: mapping (never in run/with/uses, job- or workflow-level keys), and Socket is authenticated by its repo secret."""
     data = _data()
-    assert not SECRET_REF.search(str({k: v for k, v in data.items() if k != "jobs"})), "R-002: secret at workflow level"
+    assert not SECRET_CTX.search(str({k: v for k, v in data.items() if k != "jobs"})), "R-002: secret at workflow level"
     for name, job in _jobs(data).items():
-        assert not SECRET_REF.search(str({k: v for k, v in job.items() if k != "steps"})), f"R-002: secret at job level in {name}"
+        assert not SECRET_CTX.search(str({k: v for k, v in job.items() if k != "steps"})), f"R-002: secret at job level in {name}"
         for step in _steps(job):
             for key, value in step.items():
                 if key == "env":
                     continue
-                assert not SECRET_REF.search(str(value)), f"R-002: secret outside step env ({key}) in {name}"
+                assert not SECRET_CTX.search(str(value)), f"R-002: secret outside step env ({key}) in {name}"
     _, step = _floor_step(data, re.compile(r"(?:^|\s)socket\s+ci\b"))
     socket_authenticated = "secrets.SOCKET_SECURITY_API_KEY" in str(step.get("env") or {})
     assert socket_authenticated, "R-002: the Socket step is not authenticated by secrets.SOCKET_SECURITY_API_KEY in its env"
