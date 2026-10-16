@@ -393,6 +393,20 @@ Both APPROVE; Review A confirmed `WORKFLOW_PIN` equals the committed workflow an
 ### BUG-001 follow-up round 1 — disposition (PR #22)
 Both APPROVE; both named the status file's stale Remote sync line (converged, so blocking): fixed. Review A's Considers: the bridge's own Semgrep rules file added to the scanner-configuration lead; a new lead that the structural tests guard the merge and not a pull request's own CI run (the key in a GitHub Environment, or on pushes to main only), and round 6's disposition reworded so it does not read as preventing that.
 
+| Subject | Round | Critic | Blocking | Should fix | Consider | Fixed |
+|---|---|---|---|---|---|---|
+| BUG-001 follow-up (PR #22) | 2 | Review A | 0 | 0 | 1 | yes — on TASK-006's branch (HARDENING) |
+| BUG-001 follow-up (PR #22) | 2 | Review B | 0 | 0 | 0 | — |
+
+### BUG-001 follow-up round 2 — disposition (PR #22, merged 4d0f77b)
+Both APPROVE. Review A's Consider (the HARDENING lead on the key's reach should state what each remedy costs the owner) is written on TASK-006's branch.
+
+### TASK-006 — the brief's decisions (the supervisor, 2026-10-16)
+- Carry item 5 (where a part's delivery kind is recorded so a check can read it): no as-built text records it in a readable form, and none of the check's rules needs it; out of TASK-006's scope, carried to TASK-011's brief (intake), where the kind is confirmed.
+- Carry item 4 read with the registry: an addition at `project-end.delivery` must name its kind (`## Add at project-end.delivery for <kind>`); the kind confirmed at intake is a part's kind where no workflow sets one, never an addition's.
+- A type or sub-workflow's statement of its default traits has no form yet, so it is not checked (the open list's promise stands for the increment that gives it a form); the guard against a conditional workflow's sentence contradicting the core is a reading, not a check: it is the reviewers' (both reviewers of every increment that writes a conditional workflow).
+- The tests and the fixtures are the supervisor's, written before the delegation from the brief's interface; the builder's report found one test that renamed the prose citation of a heading rather than the heading, fixed by the supervisor; the mutation driver (30 mutants) found the missing-kind test not naming its offending name, tightened.
+
 ## Resolution
 | Question | Settled | How |
 |---|---|---|
