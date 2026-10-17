@@ -295,6 +295,8 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     assert set(re.findall(r"`(.)`", punct)) == set(wc.TRAILING_PUNCT), punct
     assert "or whose second word is `at` in any case, fails as a malformed change heading" in paragraph
     assert "A file sets each point, and replaces each module, at most once." in paragraph
+    assert ("A `##` line inside a fenced code block (opened by three or more backticks or tildes) is not a heading and "
+            "changes nothing.") in paragraph
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():

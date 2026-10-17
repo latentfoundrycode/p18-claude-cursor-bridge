@@ -57,6 +57,17 @@ def test_r014_default_root_is_the_programs_workflow_folder():
     assert code == 0 and lines[-1] == "RESULT: OK", lines
 
 
+def test_r014_a_file_sets_each_point_at_most_once():
+    """extension-points.md, "How a conditional workflow names a point": a file sets each point at most once, so two Sets
+    of different points in one file pass, where two of the same point are (form) (form-two-sets) (Review A, BUG-005
+    gate round 2)."""
+    type_text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
+    assert "\n## Set at intake.delivery-kind\n" in type_text and "\n## Set at intake.target-environment\n" in type_text, \
+        "precondition: the pass root's type workflow sets two different points outside a fence"
+    code, lines, err = run(f"{FIX}/pass")
+    assert lines == whole_output([]) and err == "" and code == 0, (lines, err)
+
+
 def test_r014_replaced_module_keeps_its_points():
     """Carry item 1 (Requirement 10): the trait has-screens and the sub-workflow add at interface.variants while the
     type workflow replaces interface; the fixture's fenced `## Replace design` and prose headings are not changes."""
