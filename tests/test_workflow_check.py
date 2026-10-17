@@ -976,7 +976,11 @@ def test_r014_separator_cell_count_differs(tmp_path, sep):
     assert good in text
     broken = tmp_path / "open-list.md"
     broken.write_text(text.replace(good, good.split("\n")[0] + "\n" + sep + "\n", 1), encoding="utf-8")
-    assert_not_checked(*run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md"))
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert_not_checked(rc, lines, err)
+    # The cause is the separator (BUG-008's gate round 1: Review A, consider).
+    shown = str(broken).replace("\\", "/")
+    assert lines == [f"ERROR: {shown}: table after ## Product types has no separator row", "RESULT: not checked"], lines
 
 
 def _outside_with_canary(tmp_path):
@@ -1747,6 +1751,10 @@ ROUND7_PRECONDITIONS = [
      "a second word that starts with `at` is not `at` (the widened sweep's line 390)"),
     ("pass/types/host-extension.md", "\n## Go combat it\n",
      "a second word that ends with `at` is not `at` (the widened sweep's line 390)"),
+    ("pass/types/host-extension.md", "\n## Stay a while\n",
+     "a second word that begins `at` is not `at` (BUG-008's gate round 1: the widened sweep's line 390)"),
+    ("pass/types/host-extension.md", "\n## Hold t tight\n",
+     "a second word that ends `at` is not `at` (BUG-008's gate round 1: the widened sweep's line 390)"),
     ("pass/README.md", "Nothing outside types/ and traits/ is read.",
      "a file outside types/ and traits/ in the pass root is never read (round 7: fixtures 3)"),
 ]
@@ -1783,3 +1791,153 @@ def test_r014_every_unreadable_file_is_reported(tmp_path):
         f"ERROR: {shown}/traits/installable.md: cannot be read as UTF-8",
         "RESULT: not checked",
     ], lines
+
+
+# --- BUG-008's gate round 1 (Review A): comparisons against the rule files' own values ---------------------------------
+
+ARROW = chr(0x2192)
+
+
+def _open_list_copy(tmp_path, name, change):
+    """The status cases' open list with one change, each of whose anchors is asserted once."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    for old, new in change:
+        assert text.count(old) == 1, old
+        text = text.replace(old, new)
+    path = tmp_path / name
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _status_file(tmp_path, line):
+    path = tmp_path / "status.md"
+    path.write_text("Phase: building\n" + line + "\n", encoding="utf-8")
+    return path
+
+
+ROW_HOST = "| host-extension | Host extension | Runs inside another application | Host Extension Development | installable | yes | — |"
+ROW_CCE = "| claude-code-extension | Claude Code extension | host-extension | Runs inside Claude Code | Claude Code Extension | installable | yes | — |"
+ROW_INSTALLABLE = "| installable | Installable | Delivered as something installed | yes | — |"
+
+
+# Values other than `yes`: another case, `yes` with more after it, a part of `yes`.
+NOT_YES = ["Yes", "yes, later", "y"]
+
+
+@pytest.mark.parametrize("value", NOT_YES)
+def test_r014_written_other_than_yes_is_unwritten(tmp_path, value):
+    """handoff/TASK-006.md: Written is `yes` or `no`, and any value other than `yes` is unwritten, its case included: a
+    product type, a sub-type and a trait written `Yes`, `yes, later` or `y` give (f), (f) and the trait's FLAG
+    (BUG-008's gate round 1: Review A, the widened sweep's lines 638, 640 and 667)."""
+    open_list = _open_list_copy(tmp_path, "open-list.md", [(row, row.replace("| yes |", "| %s |" % value))
+                                                           for row in (ROW_HOST, ROW_CCE, ROW_INSTALLABLE)])
+    status = _status_file(tmp_path, "Workflows: Host Extension Development " + ARROW + " Claude Code Extension; traits: Installable")
+    rc, lines, err = run("--open-list", str(open_list), "--status", str(status))
+    shown = str(status).replace("\\", "/")
+    assert lines == whole_output([
+        f"FAIL (f) {shown}: Host Extension Development - product type is not written",
+        f"FAIL (f) {shown}: Claude Code Extension - sub-type is not written",
+        f"FLAG (trait) {shown}: Installable - trait not yet written; flagged, work continues (non-fatal)",
+    ]), lines
+    assert rc == 1 and err == "", err
+
+
+@pytest.mark.parametrize("value", NOT_YES)
+def test_r014_replaceable_other_than_yes_is_not_replaceable(tmp_path, value):
+    """The registry's Replaceable is `yes` or `no`, and only `yes` lets a type file replace the module (the program's
+    usage text: whose Replaceable is not yes): the interface module marked `Yes`, `yes, later` or `y` refuses a Replace
+    with (c) (BUG-008's gate round 1: Review A, the widened sweep's line 540)."""
+    reg = (REPO / "bridge/cursor-bridge/workflow/extension-points.md").read_text(encoding="utf-8")
+    row = "| interface | Interface phase | yes |"
+    assert reg.count(row) == 1, "the interface module's row"
+    registry = tmp_path / "extension-points.md"
+    registry.write_text(reg.replace(row, row.replace("| yes |", "| %s |" % value)), encoding="utf-8")
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "types" / "host-extension.md").write_text("## Replace interface\n\nAn interface.\n", encoding="utf-8")
+    rc, lines, err = run("--open-list", STATUS_LIST, "--registry", str(registry), str(root))
+    shown = str(root).replace("\\", "/")
+    assert lines == whole_output([f"FAIL (c) {shown}/types/host-extension.md: interface - module is missing or not replaceable"]), lines
+    assert rc == 1
+
+
+RETIRED = ("## Product types (retired)\n\n| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n"
+           "|---|---|---|---|---|---|---|\n| library | Library | Included by other programs | Library Development | — | no | — |\n\n")
+
+
+@pytest.mark.parametrize("how", ["longer-heading-first", "deeper-heading-first", "trailing-space", "lower-case"])
+def test_r014_a_table_is_read_under_its_exact_heading(tmp_path, how):
+    """workflow/open-list.md, "How this file is read": each table is the first table after its heading, the heading
+    matched exactly: a longer heading, or a deeper one (`### Product types`), with its own table before the real one
+    is not it, and a heading with a trailing space or in lower case is no heading at all, so the table is missing
+    (BUG-008's gate round 1: Review A, the widened sweep's line 203)."""
+    head = "## Product types\n"
+    new = {"longer-heading-first": RETIRED + head, "deeper-heading-first": "#" + RETIRED.replace(" (retired)", "") + head,
+           "trailing-space": "## Product types \n", "lower-case": "## product types\n"}[how]
+    open_list = _open_list_copy(tmp_path, "open-list.md", [(head, new)])
+    status = _status_file(tmp_path, "Workflows: Host Extension Development; traits: none")
+    rc, lines, err = run("--open-list", str(open_list), "--status", str(status))
+    if how.endswith("-first"):
+        assert (rc, lines) == (0, ["RESULT: OK"]), lines
+    else:
+        shown = str(open_list).replace("\\", "/")
+        assert (rc, lines) == (2, [f"ERROR: {shown}: missing heading ## Product types", "RESULT: not checked"]), lines
+
+
+# Product keys where one begins the other, `web` and `web-app`, each with a sub-type of its own.
+WEB_ROWS = [
+    ("| library |", "| web | Web | Served from a host | Web Development | — | yes | — |\n| library |"),
+    ("| local-web-app |", "| local-web | Local web | web | Opened at a local address | Local Web | — | yes | — |\n| local-web-app |"),
+]
+
+
+@pytest.mark.parametrize("line,sub", [
+    ("Workflows: Web App Development " + ARROW + " Local Web; traits: none", "Local Web"),
+    ("Workflows: Web Development " + ARROW + " Local Web App; traits: none", "Local Web App"),
+], ids=["sub-of-web-on-a-web-app-line", "sub-of-web-app-on-a-web-line"])
+def test_r014_a_sub_type_is_of_the_lines_type_by_its_whole_key(tmp_path, line, sub):
+    """supervisor.md, the Workflows grammar: a sub-type is of the line's product type, its Of type the type's key
+    exactly; a key that only begins the other's is another type (BUG-008's gate round 1: Review A, the widened sweep's
+    line 625)."""
+    open_list = _open_list_copy(tmp_path, "open-list.md", WEB_ROWS)
+    status = _status_file(tmp_path, line)
+    rc, lines, err = run("--open-list", str(open_list), "--status", str(status))
+    shown = str(status).replace("\\", "/")
+    assert lines == whole_output([f"FAIL (e) {shown}: {sub} - sub-type is not of the line's product type"]), lines
+
+
+@pytest.mark.parametrize("type_key,sub_key", [("web-app", "local-web"), ("web", "local-web-app")],
+                         ids=["sub-of-web-under-web-app", "sub-of-web-app-under-web"])
+def test_r014_a_sub_workflow_is_under_its_type_by_its_whole_key(tmp_path, type_key, sub_key):
+    """handoff/TASK-006.md, the (d) finding: a sub-workflow file sits under its sub-type's own type, the Of type equal to
+    the folder's key; a key that only begins the other's is another type (BUG-008's gate round 1: Review A, the widened
+    sweep's line 553)."""
+    open_list = _open_list_copy(tmp_path, "open-list.md", WEB_ROWS)
+    root = tmp_path / "root"
+    (root / "types" / type_key).mkdir(parents=True)
+    (root / "types" / (type_key + ".md")).write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    (root / "types" / type_key / (sub_key + ".md")).write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    rc, lines, err = run("--open-list", str(open_list), str(root))
+    shown = str(root).replace("\\", "/")
+    assert lines == whole_output([f"FAIL (d) {shown}/types/{type_key}/{sub_key}.md: {sub_key} - not a sub-type of {type_key}"]), lines
+
+
+LOCAL_WEB_APP = "| local-web-app | Local web app | web-app | Opened at a local address | Local Web App | installable | no | — |"
+
+
+def test_r014_an_of_type_in_another_case_is_another_type(tmp_path):
+    """A sub-type's Of type is its type's key exactly, its case included: local-web-app written of `Web-App` is of no
+    type, so the line gives (e) and its file under types/web-app/ gives (d) (BUG-008's gate round 1: the widened
+    sweep's lines 553 and 625)."""
+    open_list = _open_list_copy(tmp_path, "open-list.md", [(LOCAL_WEB_APP, LOCAL_WEB_APP.replace("| web-app |", "| Web-App |"))])
+    status = _status_file(tmp_path, "Workflows: Web App Development " + ARROW + " Local Web App; traits: none")
+    rc, lines, err = run("--open-list", str(open_list), "--status", str(status))
+    shown = str(status).replace("\\", "/")
+    assert lines == whole_output([f"FAIL (e) {shown}: Local Web App - sub-type is not of the line's product type"]), lines
+    root = tmp_path / "root"
+    (root / "types" / "web-app").mkdir(parents=True)
+    (root / "types" / "web-app.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    (root / "types" / "web-app" / "local-web-app.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    rc, lines, err = run("--open-list", str(open_list), str(root))
+    shown = str(root).replace("\\", "/")
+    assert lines == whole_output([f"FAIL (d) {shown}/types/web-app/local-web-app.md: local-web-app - not a sub-type of web-app"]), lines

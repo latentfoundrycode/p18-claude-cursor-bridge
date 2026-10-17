@@ -334,6 +334,10 @@ def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
         expected = _causes(folder)
         assert len(expected) == 1 if how == "registry-absent" else len(expected) >= 2, "precondition: %r" % expected
         assert found == ["WORKFLOWS LINE: not checked: " + c for c in expected], (found, expected)
+        if how == "open-list-without-tables":
+            # The three causes by name, so the copy's reader is not the only oracle (BUG-008's gate round 1: consider).
+            assert [line.rsplit(": ", 1)[1] for line in found] == [
+                "missing heading ## Product types", "missing heading ## Sub-types", "missing heading ## Traits"], found
     else:
         assert len(found) == 1, found
 
