@@ -411,6 +411,8 @@ FILE_EXACT = {
         'FAIL (kind) {root}/types/host-extension.md: deployment - Set at intake.delivery-kind is not one delivery kind',
         'FAIL (kind) {root}/types/host-extension/claude-code-extension.md: installer` - Set at intake.delivery-kind is not one delivery kind',
     ],
+    # A line of `##` alone is no heading, so it is the Set's first non-blank line (BUG-006 r4: Review A, the heading shape).
+    'kind-bare-hashes': ['FAIL (kind) {root}/types/host-extension.md: ## - Set at intake.delivery-kind is not one delivery kind'],
     'kind-unlisted': ['FAIL (kind) {root}/traits/installable.md: docker-image - delivery kind is not in the delivery-kind list'],
     'set-point-without-set': ['FAIL (set) {root}/types/host-extension.md: intake.questions - point does not accept set'],
     'sub-workflow-changes': [
@@ -1218,6 +1220,8 @@ def test_r033_ci_check_is_not_in_the_security_floor():
 
 ROUND5_PRECONDITIONS = [
     # (fixture, text it holds, the rule the text gives a control to)
+    ("fail/kind-bare-hashes/types/host-extension.md", "## Set at intake.delivery-kind\n##\ninstaller\n",
+     "a line of `##` alone right under a Set heading is no heading (BUG-006 r4)"),
     ("fail/fence-indented-close/traits/installable.md", "\n```\ncode\n    ```\n   ```\n",
      "a closing run indented four spaces is content; the three-space one closes"),
     ("fail/fence-four-spaces/traits/installable.md", "\n    ```\n", "backticks indented four spaces open no fence"),

@@ -303,6 +303,9 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     # What else the check reads and fails, for the maintainer writing a conditional workflow (stage B2 review, round 5:
     # texts and Review B).
     for sentence in (
+        # The heading shape workflow-check.py's HEADING_CANDIDATE reads (BUG-006 r4: Review A).
+        "A `##` heading is a line of at most three spaces, then `##`, then a space or a tab; a line of `##` alone is not "
+        "one and is read as text.",
         "A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own "
         "structure `###` headings and deeper.",
         "A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or "
