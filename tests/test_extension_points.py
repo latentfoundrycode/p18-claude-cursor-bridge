@@ -290,9 +290,12 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     """A prose heading that reads like a change fails; the registry names the words and the stripped
     punctuation workflow-check.py's CHANGE_FIRST and TRAILING_PUNCT hold, and the one-per-target rule (stage
     B2 review, round 4)."""
-    # The paragraph opens with the heading shape, before its first use (BUG-006 r5: Review A).
+    # The paragraph opens with the heading shape, before the term's first use in the file (BUG-006 r5: Review A; the
+    # pin made exact in stage B2 review round 6: the blank line before it, and the term at its own sentence).
     start = TEXT.index("A `##` heading is a line that starts with")
-    assert TEXT[start:].index("Any other `##` heading is prose") > 0
+    assert TEXT[start - 2:start] == "\n\n", TEXT[start - 2:start]
+    assert TEXT.index("`##` heading") == start + 2
+    assert TEXT[start:].index("A `##` heading other than the four forms is prose") > 0
     paragraph = TEXT[start:TEXT.index("\n", start)]
     words_text = paragraph[paragraph.index("ignored, is ") + len("ignored, is "):paragraph.index(", or whose second")]
     words = set(re.findall(r"[a-z]+", words_text)) - {"or"}
@@ -300,7 +303,7 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     assert words == set(wc.CHANGE_FIRST), words
     punct = paragraph[paragraph.index("any trailing ") + len("any trailing "):paragraph.index(" ignored")]
     assert set(re.findall(r"`(.)`", punct)) == set(wc.TRAILING_PUNCT), punct
-    assert "or whose second word is `at` in any case, fails as a malformed change heading" in paragraph
+    assert "or whose second word is `at` in any case, fails as a malformed change heading, so" in paragraph
     assert "A file sets each point, and replaces each module, at most once." in paragraph
     # What else the check reads and fails, for the maintainer writing a conditional workflow (stage B2 review, round 5:
     # texts and Review B).
@@ -318,6 +321,12 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
         "file or a link; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path "
         "(a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that "
         "is no product type.",
+        # The four forms are matched exactly, and an unreadable file stops the check (stage B2 review, round 6: texts,
+        # programs).
+        "The four forms above are matched exactly: `##` at the start of the line, one space between words, and nothing "
+        "after the key or the delivery kind, not even a space.",
+        "A conditional-workflow file that cannot be read as UTF-8 stops the check: it prints an ERROR line naming the "
+        "file and `RESULT: not checked`, and checks nothing.",
     ):
         assert sentence in paragraph, sentence
 

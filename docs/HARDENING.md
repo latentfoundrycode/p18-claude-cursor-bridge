@@ -97,7 +97,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 
 ## Stage B2 — the stage review (round 5, 2026-10-17)
 
-**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants, of which 381 compile, and found 89 of those surviving the workflow-check and Workflows-line tests. Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
+**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants, of which 381 compile, and found 89 of those surviving the workflow-check and Workflows-line tests before that round's cases were written (36 after them, listed below). Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
 
 **Fences and headings:**
 - a closing run indented four spaces is content (fixtures 1, blocking);
@@ -210,3 +210,131 @@ It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The del
 - the registry's heading sentence reads "a line that starts with" and now opens its paragraph, before the term's first use (considers).
 
 Recorded from Review A, for the later program change that reads a line of `##` alone as Markdown does: under a Set whose value the check does not validate (`intake.budget-kind`), such a line passes as the value `##`.
+
+## Stage B2 — the stage review (round 6, 2026-10-17)
+
+**Taken on BUG-007 (the supervisor's fixtures, tests and registry text, no program change).** Round 6 rejected for round 5's class: rules of the workflow check that no test fails for. Review A's tests part rejected (5 blocking, 7 should-fix, 8 consider), fixtures parts 1 and 2 rejected, the programs, texts and fixtures parts 3 to 5 approved. Review B's reply was "APPROVE" with no line of the diff named: per the policy a failed launch, rerun with the stage's next round. Every finding below has its case with exact output, or is recorded with its reason.
+
+**Sections and headings:**
+- a section ends at the next `##` heading, a prose one too, so a Set right above one is empty, at the delivery-kind point too (tests and fixtures 2, converged);
+- the four forms are matched exactly: text after the key, a space after it, and text after the delivery kind (tests);
+- a change heading and an opening fence indented three spaces, the most either may be (fixtures 1 and 2, converged);
+- a fence opened by four backticks, a shorter tilde run inside a fence of four, and a form feed after a closing run, which leaves the fence open (the sweep; round 5's lead on 83 is now a test);
+- a heading whose first word is only punctuation, and one of punctuation alone, is prose (tests).
+
+**Files and folders:**
+- a file that is not `.md` under `types/` and under a type's folder (tests, fixtures 2);
+- a folder named like a trait file under `traits/` (the sweep);
+- a file of an unknown key, and a sub-workflow failing its identity, still have their changes checked (tests, fixtures 2);
+- a link the walk lists among a folder's files, and a link named like a trait file (the sweep);
+- a conditional-workflow file that cannot be read as UTF-8 stops the check with its ERROR line (programs and tests, converged); without that line the check printed a traceback;
+- a missing registry, and a rule file that is a folder, each with its exact ERROR line (tests, the sweep);
+- the default root is read when no root is given, proved by a program copy whose workflow folder fails (tests: the existing test passes whether it is read or not);
+- a root with a trailing slash, and path fields holding a non-ASCII character in FAIL and ERROR lines (tests).
+
+**Set values:**
+- a backtick on the leading side only is not unwrapped (fixtures 2);
+- two backticks are unwrapped to nothing and printed `-` (round 5's lead on 485, now pinned; whether the finding should print the two backticks stays a lead);
+- an addition at a value point is an addition (tests).
+
+**Workflows lines:**
+- trait order is judged against the highest trait so far (tests);
+- an empty traits text, and one ending `, ` (tests);
+- a part named three times gives one (e), and the repeated line is still checked (fixtures 3 and programs, converged);
+- a part's name ends at the first `: `, and a line holding only its prefix lacks the traits marker (tests, the sweep);
+- a Workflow name in another case (fixtures 5);
+- the open list's rows the status cases read are pinned (fixtures 5);
+- inventory-check prints one line per finding in the judge's order, and an (e) case is among the malformed lines (tests).
+
+**The table reader:** a separator cell of a single dash, and a header with no line after it (tests, the sweep).
+
+**Registry text** (texts part): the four forms are matched exactly; "A `##` heading other than the four forms is prose" (carried from BUG-006's gate); an unreadable conditional-workflow file stops the check. The heading paragraph's order pin is exact: a blank line before it and the term's first use at its own sentence (carried).
+
+**The sweep, widened** (run/supervisor/sweep_workflow_check.py, local; Review A, tests part): the bounds `{0,3}` and `{3,}` moved by one each way, the numbers compared moved by one, `== 2` read as `>= 2`, a character set made smaller, the deleted appends of errors and found items, each condition forced true and false, and each `and` clause dropped. It made 756 mutants, of which 711 compile (the 45 that do not are counted apart): 78 survived before BUG-007's cases, 49 after its last round (the list below is written by run/supervisor/write_survivor_list.py from that run's output, run/supervisor/sweep_workflow_check_r10.out, each survivor with its line of workflow-check.py at 6b51ccd and its operator; a line's other operators were killed or did not compile). 41 are equivalent, 4 held on CI only, 4 leads:
+- **Equivalent** (no input separates them, by the supervisor's reasoning, each reread against the program by Review A in BUG-007's gate round 4; reasoning, not a test):
+  - 83, `{3,} -> {2,}` (twice): a closing run must be at least as long as its opening, which is at least three.
+  - 103, `if condition -> False`: a final empty line kept adds a blank line, which no reader acts on.
+  - 134, `< -> <=`: U+0080 is not printable.
+  - 170, `.strip() -> .rstrip()`, `.strip() -> .lstrip()`: separator cells are stripped already by cells_of.
+  - 181, `drop and-clause bool(cells)`: cells_of always returns at least one cell.
+  - 190, `.strip() -> .rstrip()`: a table line starts with a pipe, so nothing on its left is stripped (`.lstrip()` there is killed by the no-trailing-pipe case).
+  - 191, `if condition -> True`: a table line starts with a pipe.
+  - 313, `delete`: a layer that cannot be examined has its error recorded, and the errors alone decide exit 2.
+  - 322, `False -> True`: links are pruned from the folders walked, so following links reaches nothing.
+  - 357, `drop and-clause len(parts) >= 2`: a folder under `traits/` has at least two parts.
+  - 364, `drop and-clause parts[0] == "traits"`: a two-part `types/` path ending `.md` is taken by the line before.
+  - 380, `if condition -> False`: is_change_heading is only called on heading candidates.
+  - 381, `False -> True`: is_change_heading is only called on heading candidates.
+  - 420, `[0] -> [-1]`: a marker is one character repeated.
+  - 422, `[0] -> [-1]`: a marker is one character repeated.
+  - 436, `[0] -> [-1]`: a marker is one character repeated.
+  - 456, `delete`: a fence line cannot be a heading candidate.
+  - 459, `delete`: a fence line cannot be a heading candidate.
+  - 478, `.strip() -> .rstrip()`, `.strip() -> .lstrip()`: any strip of a blank line is empty.
+  - 538, `elif condition -> True`: the change kinds are add, set and replace.
+  - 547, `if condition -> False`: collect never yields a sub-workflow item under an unknown type folder, so 548 is unreachable (it can go when the check is next changed).
+  - 548, `delete`: unreachable, as for 547.
+  - 604, `.strip() -> .rstrip()`, `.strip() -> .lstrip()`: a segment is used only through its names, which are stripped again.
+  - 625, `[0] -> [-1]` (twice): the lists read there hold exactly one entry.
+  - 627, `[0] -> [-1]`: the lists read there hold exactly one entry.
+  - 632, `[0] -> [-1]`: the lists read there hold exactly one entry.
+  - 634, `[0] -> [-1]` (twice): the lists read there hold exactly one entry.
+  - 638, `[0] -> [-1]`: the lists read there hold exactly one entry.
+  - 639, `[0] -> [-1]`: the lists read there hold exactly one entry.
+  - 640, `[0] -> [-1]`: the lists read there hold exactly one entry.
+  - 641, `[0] -> [-1]`: the lists read there hold exactly one entry.
+  - 662, `< -> <=`: an equal index is a repeat, caught first.
+  - 664, `> -> >=`: an equal index is a repeat, caught first.
+  - 688, `if condition -> True`: a part is None only in a one-line file.
+  - 833, `if condition -> False`: every printed field is ASCII already, so the error handler the reconfiguration sets is never used (with the condition forced true it is killed: a closed standard output, test_r014_closed_standard_output_gives_no_traceback).
+- **Held on CI's ubuntu leg only** (the driver leaves them out on this host; that test_r014_link_among_a_folders_files_is_form kills them on Linux is reasoning, not a run):
+  - 161, `if condition -> False`: a symbolic link is known by its mode on CI's ubuntu leg; this host makes junctions.
+  - 162, `True -> False`: as 161.
+  - 335, `if condition -> False`: the dangling link `gone.md` lands among a folder's files on Linux, where reading it as a file is an ERROR; this host's junction is listed as a folder.
+  - 336, `delete`: as 335.
+- **Leads** (an input separates them, through a program defect the next change of the check settles):
+  - 342, `drop and-clause len(parts) == 2`, `== 2 -> >= 2`: an input separates it on a POSIX host only: a folder whose name holds a backslash, directly under `types/`, whose contents the original reports under paths that do not exist (the lead on line 323 below) and the mutant drops; it dies when line 323 is fixed. With keys of the open list's shape and names without a backslash no input separates it.
+  - 360, `== 2 -> >= 2`: as 342, with a folder named like `zz.md\q` under `types/`: the mutant reads a path that does not exist and stops with exit 2.
+  - 626, `False -> True`: the lead below: a head whose sub-type belongs to another type stops at (e).
+
+**Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule: 196 of 196 killed at this round (161 before, 35 new), 198 of 198 after its gate round 1, 199 of 199 after its gate round 3 and 200 of 200 after its gate round 4 (below); mutate_workflows_line.py stands at 42 of 42.
+
+**Leads:**
+- 626 stands (fixtures 4 converged on it with Review A of BUG-006): a possible program defect, for the next change of workflow-check.py.
+- The program's usage text (lines 31 to 35) and the registry's list of what stops the check did not name an unreadable conditional-workflow file; the registry now does, and the usage text is the builder's, for the next change of the program (programs part).
+- Line 323 turns every backslash of a folder's path into a slash, so on a POSIX host a folder named `zz\q` directly under `types/` (itself an unknown type folder) has its contents reported under paths that do not exist (`types/zz/q/sub`), where they should be skipped with their folder; reading only the separator of the host would close it, for the next change of the program (BUG-007's gate round 2: Review A, under WSL; worded so in its gate round 3). The sweep's survivors 342 and 360 are separated only by this input and die with the fix (gate round 3: Review B).
+- The fixtures' 24 headers: the 25th file, status/ok-bom.md, was added in TASK-006 and deleted in BUG-002, so it has no net change in the stage (fixtures 4, noted).
+
+**For TASK-023's brief** (programs part, noted): the calibration that installs release B adds a running project's `Workflows:` line, so the brief names that step.
+
+**Reviewer folders:** each Review A part had a scratch folder of its own this round; none saw another's mutant.
+
+**BUG-007's gate, round 1:** Review A REJECT (2 blocking, 1 should-fix, notes), Review B REJECT (1 blocking). Taken in BUG-007 r2:
+- **Blocking (Review B):** the registry says an unreadable conditional-workflow file stops the check and checks nothing, and no test could see more being checked: a mutant reporting the readable files' findings after the ERROR passed. The UTF-8 case now has a readable failing file beside it, reported while the file is UTF-8 and not once it is not; the driver has that mutant.
+- **Blocking (Review A):** 342 with `parts[0] == "types"` dropped was called equivalent and is not: a folder under `traits/` then hides a type file of the same name. form-traits-folder now holds `types/odd.md` with a failing change beside `traits/odd.md/`, and the driver has the mutant.
+- **Blocking (Review A):** 335 was said to be held on CI and survived there: the case's dangling link had no `.md` in its name, so read as a file it failed as a path all the same. It is named `gone.md` now; read as a file it is an ERROR.
+- **Should-fix (Review A):** 381 was missing from the list of 52; it stands with 380.
+- **Noted (Review A), taken:** the order case's comment says what it separates (a highest trait that never rises); 342 and 360 hold for keys of the open list's shape; form-not-markdown's files that are no conditional workflow hold a failing change, so a read of them would show.
+- **The named driver** has the two mutants, 342's and the readable files checked after an unreadable one (198 of 198 killed).
+
+**BUG-007's gate, round 2:** Review A APPROVE (0 blocking, 1 should-fix, 3 considers), Review B REJECT. REVIEWERS DISAGREED on whether the survivor list is reliable, a correctness question of the records. Review B's example was misread: line 190's survivor is `.strip()` read as `.rstrip()`, and the `.lstrip()` mutant it ran is killed, as it found. But the list named lines without their operators, and its count (52) was stale after r2, which Review A's consider also said; converged, so blocking. Taken in BUG-007 r3:
+- the sweep rerun after r3 and the list above written from its output by a script that fails on a survivor without a reason, each survivor with its operator;
+- **Should-fix (Review A):** 342 and 360 are separated on a POSIX host by a folder name holding a backslash; both reasons say so, and line 323's splitting is a lead above;
+- **Considers (Review A):** the driver's count states its round; the remaining unread files under `traits/` (form-not-markdown's installable.txt, form-traits-folder's two extra.md) hold a failing change, pinned as preconditions.
+
+**BUG-007's gate, round 3:** Review A REJECT, Review B REJECT, converged on one class: survivors listed as equivalent that an input separates. Taken in BUG-007 r4:
+- **Review A (blocking):** 833 with its condition forced true is not equivalent: with standard output closed (a launch with no standard handles, where Python sets sys.stdout to None) the mutant ends in a traceback and exit 1. test_r014_closed_standard_output_gives_no_traceback runs the check so on a passing and a failing root and asserts each exit code and no traceback; the driver has the mutant.
+- **Review B (blocking):** 342 (twice) and 360 named the POSIX backslash input that separates them and stood under Equivalent; they are leads now, beside 626, dying when line 323 is fixed.
+- **Considers (Review A), taken:** the backslash lead names a folder directly under `types/`; the list says a line's other operators were killed or did not compile; the scope file's round-6 count is marked as that round's.
+- **Noted (Review A), taken:** the script that writes the list is kept beside the sweep, run/supervisor/write_survivor_list.py (local), and the list above is its output on the sweep rerun after r4.
+
+**BUG-007's gate, round 4:** Review A REJECT (1 blocking, 1 should-fix, considers), Review B APPROVE. REVIEWERS DISAGREED on whether line 795's survivor is equivalent, a correctness question of the records. Decided for Review A on its evidence: with the `continue` deleted, a root the system refuses outright (a name Windows rejects, a link to itself on POSIX) is still walked and gets two more ERROR lines, the same exit code with a different output. Taken in BUG-007 r5:
+- **Blocking (Review A):** test_r014_root_the_system_refuses_is_not_walked asserts the whole output for such a root; the driver has the mutant "a root that is not a folder still walked", and 795 is gone from the list.
+- **Should-fix (Review A):** the closed-output test first shows its precondition, that the child starts with standard output closed (`repr(sys.stdout)` reads `None`), and now covers an exit-2 root as well, the case whose "no traceback" the usage text promises.
+- **Considers (Review A), taken:** the generator checks each survivor's line and operator against the operators its reason was written for, and stops on any other; the Equivalent heading says the reasons are the supervisor's reasoning, reread by Review A, not a test. The CI-held survivors stay reasoning as well, which the list's heading says since r6 (it did not in r5: gate round 5).
+- The sweep rerun after r5 (run/supervisor/sweep_workflow_check_r10.out, local): 49 survivors, 41 equivalent, 4 held on CI's ubuntu leg, 4 leads.
+
+**BUG-007's gate, round 5:** Review A APPROVE (1 should-fix, 3 considers), Review B APPROVE. Taken in BUG-007 r6, with one more round of the gate, since a record stood wrong:
+- **Should-fix (Review A):** test_r014_root_the_system_refuses_is_not_walked first shows that the root's `types/` raises an error the walk reports (neither FileNotFoundError nor NotADirectoryError, which it skips quietly), so the test cannot pass because the walk would have been silent.
+- **Considers (Review A), taken:** round 4's paragraph said the list's heading marked the CI-held survivors as reasoning, and it did not; the heading says so now (that test_r014_link_among_a_folders_files_is_form kills them on Linux is reasoning, not a run). The generator checks how often each operator survives on a line as well as which. The driver's count reads with its commas.
+
