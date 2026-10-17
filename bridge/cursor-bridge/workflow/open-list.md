@@ -6,7 +6,7 @@ This file is the canonical list of every product type, sub-type and trait the br
 
 ## How this file is read
 
-`workflow-check.py` reads the three tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Product types`, `## Sub-types`, `## Traits`) and before the next `##` heading, its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
+`workflow-check.py` reads the three tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Product types`, `## Sub-types`, `## Traits`) and before the next line that starts with two hashes and a space (`## `), its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
 
 - **Key** — the entry's identifier and the base name of its workflow file: a type workflow at `workflow/types/<key>.md`, a sub-workflow at `workflow/types/<type key>/<key>.md`, a trait's additions at `workflow/traits/<key>.md`. Lowercase letters, digits and hyphens; unique within its table.
 - **Name** — the entry's name in plain words, used in prose and at intake. A trait, which has no workflow name, is named by it on a `Workflows:` line.

@@ -97,7 +97,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 
 ## Stage B2 — the stage review (round 5, 2026-10-17)
 
-**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants and found 89 surviving the workflow-check and Workflows-line tests. Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
+**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants, of which 381 compile, and found 89 of those surviving the workflow-check and Workflows-line tests. Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
 
 **Fences and headings:**
 - a closing run indented four spaces is content (fixtures 1, blocking);
@@ -149,7 +149,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 
 It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The delivery-kinds test reads every kind the list names however it is described. test_open_list holds that no name is `none` or `not yet classified` (tests part).
 
-**The sweep's 36 survivors of 425 after BUG-006**, line numbers of workflow-check.py at 0e7813e (the program is unchanged). The first version of this list called nine survivors equivalent or untestable that an input separates: 285, 605, 126, 299, 300, 312, 349, 354, and 626, which is now a lead. Review A of BUG-006 found them (below), and each of the first eight now has its case. The rest:
+**The sweep's 36 survivors of the 381 mutants that compile, after BUG-006** (425 made; the 44 that do not compile are counted apart, never as killed: r3, Review B of gate round 2), line numbers of workflow-check.py at 0e7813e (the program is unchanged). The first version of this list called nine survivors equivalent or untestable that an input separates: 285, 605, 126, 299, 300, 312, 349, 354, and 626, which is now a lead. Review A of BUG-006 found them (below), and each of the first eight now has its case; it also moved 313 and 322 from "held on CI only" to equivalent. The rest:
 - **Equivalent** (no input separates them):
   - 83: a closing run of two (a close must be at least as long as its opening, at least three).
   - 134: U+0080 is not printable.
@@ -162,7 +162,7 @@ It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The del
   - 604: a segment is used only through its names, which are stripped again.
   - 313: a layer that cannot be examined has its error recorded, and the errors alone decide exit 2.
   - 322: links are pruned from the folders walked, so following links reaches nothing.
-  - 625 to 641: the lists read there hold exactly one entry.
+  - 625, 627 to 641: the lists read there hold exactly one entry (626 is a lead, below).
   - 662, 664: an equal index is a repeat, caught first.
   - 795: a root that is not a folder already ends the run with exit 2.
 - **Held on CI's ubuntu leg only** (162): a symbolic link is known by its mode there, while the links test makes junctions on this Windows host.
@@ -187,10 +187,16 @@ It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The del
   - 299 and 300: a folder that cannot be listed is named with its reason, on every host.
   - 349 and 354: each link is named, one of them inside a folder that is no product type, in the links test's exact output.
   - The list above is corrected to match.
-- **Text (should-fix):** both rule files' "How this file is read" now say a table is the first after its heading and before the next `##` heading, as the reader does. The separators test's comment names the mutant it kills.
+- **Text (should-fix):** both rule files' "How this file is read" now say a table is the first after its heading and before the next line starting `## `, as the reader does (worded so in r3; r2's "the next `##` heading" also covered `##` with a tab or nothing after it, which the reader reads past, Review B of gate round 2). The separators test's comment names the mutant it kills.
 - **Text (considers):**
-  - The registry says a Set value is stripped, and names exactly the files, links and folders that fail.
+  - The registry says a Set value is stripped, and names exactly the files, links and folders that fail, a `types` or `traits` path that is itself a file or a link included (r3, Review A of gate round 2).
   - The open list says no name is `none` or `not yet classified`.
   - The sweep runs test_extension_points.py too.
-- **The named driver** has the eight mutants (159 of 159 killed).
+- **The named driver** has the eight mutants (159 of 159 killed; 160 of 160 with r3's).
+
+**BUG-006's gate, round 2:** Review A APPROVE (0/1/4), Review B REJECT. Taken in BUG-006 r3:
+- **Review B:** r2's "before the next `##` heading" also covered a `##` line with a tab or nothing after it, which the reader reads past. Both rule files now say "before the next line that starts with two hashes and a space (`## `)", and the table-reader test has a case for `##`+tab and a bare `##`.
+- **Review B:** the sweep counted the 44 mutants that do not compile as killed (every test that runs the program fails on them). It now counts them apart and reports its survivors of the 381 that compile; the survivors are the same 36.
+- **Review A (should-fix):** the equivalent range now reads 625, 627 to 641, so 626 is a lead only.
+- **Review A (considers):** the registry names a `types` or `traits` path that is itself a file or a link; the list's intro says 313 and 322 moved.
 - **Recorded, not taken:** the delivery-kinds test finds a kind only when a `(` follows it, so a kind added to the list bare escapes the comparison with `DELIVERY_KINDS`. This is for whoever next changes the list (tests/test_extension_points.py).

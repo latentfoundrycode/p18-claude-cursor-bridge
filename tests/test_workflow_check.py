@@ -1283,7 +1283,11 @@ TABLE_REQ = ["Key", "Name"]
     ("## T\n\n| Key | Name |\n|---|---|\n| a | A |\n\n## T\n\n| Key | Name |\n|---|---|\n| z | Z |\n", [("a", "A")]),
     # a prose line ending in a pipe is not the table's start
     ("## T\n\nsee below |\n\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
-], ids=["blank-line", "no-blank-line", "alignment", "no-trailing-pipe", "no-rows", "heading-twice", "prose-pipe"])
+    # a line starting `##` with no space after it (a tab, or nothing) does not end the section the table is looked
+    # for in; only a line starting `## ` does (BUG-006 r3: Review B)
+    ("## T\n\nprose\n\n##\tU\n##\n\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
+], ids=["blank-line", "no-blank-line", "alignment", "no-trailing-pipe", "no-rows", "heading-twice", "prose-pipe",
+        "hashes-without-space"])
 def test_r014_table_reader_reads_the_first_table_after_its_heading(program, text, rows):
     """The two rule files' tables are read as `How this file is read` says (open-list.md, extension-points.md): the first
     table after the exact heading, its rows to the first line that is not a table line, columns found by header name
@@ -1294,8 +1298,8 @@ def test_r014_table_reader_reads_the_first_table_after_its_heading(program, text
 
 
 def test_r014_table_reader_stops_at_the_next_section(program):
-    """A heading with no table before the next `## ` section is an error, not that section's table (stage B2 review, round
-    5: the supervisor's mutation sweep)."""
+    """A heading with no table before the next line starting `## ` is an error, not that section's table, as both rule
+    files' "How this file is read" says (stage B2 review, round 5: the supervisor's mutation sweep; BUG-006 r3)."""
     found, error = program("workflow-check").parse_table(
         "## T\n\nprose\n\n## U\n\n| Key | Name |\n|---|---|\n| a | A |\n", "t.md", "## T", TABLE_REQ)
     assert found is None and error == "no table after ## T", error

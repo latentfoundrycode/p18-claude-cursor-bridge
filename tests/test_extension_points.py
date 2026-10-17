@@ -163,8 +163,10 @@ def test_r006_the_tables_shape_is_stated_for_the_reader():
     """The shape the check reads is stated in the file, as the open list states its own."""
     assert "`workflow-check.py` reads the two tables below and nothing else in this file" in TEXT
     assert "Each table is the first table after its heading (`## Phase modules`, `## Extension points`)" in TEXT
-    # The reader stops at the next section (BUG-006 r2: Review A).
-    assert "and before the next `##` heading, its rows running to the first line that is not a table line" in TEXT
+    # The reader stops at the next line starting `## `, as parse_table does (BUG-006 r2: Review A; r3: Review B, a `##`
+    # line without the space is no stop).
+    assert ("and before the next line that starts with two hashes and a space (`## `), its rows running to the first "
+            "line that is not a table line") in TEXT
     assert "its columns are found by their header names; no cell contains a `|`" in TEXT
 
 
@@ -307,9 +309,10 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
         "more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening "
         "none, and closes with a run of the same character at least as long, indented at most three spaces and followed "
         "only by spaces or tabs; a fence still open at the end of the file fails.",
-        "The check also fails a `## Set at` section with no non-blank line; a file or link under `types/` or `traits/` "
-        "that is not a conditional workflow at its key's path (a README there included); a folder under `traits/` or "
-        "inside a type's folder; and a folder under `types/` that is no product type.",
+        "The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a "
+        "file or a link; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path "
+        "(a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that "
+        "is no product type.",
     ):
         assert sentence in paragraph, sentence
 

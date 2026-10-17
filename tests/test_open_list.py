@@ -231,8 +231,10 @@ def test_r011_the_tables_shape_is_stated_for_the_reader():
     """R-011: the shape `workflow-check.py` relies on is stated, not only implied by the tables."""
     flat = re.sub(r"\s+", " ", TEXT)
     assert "Each table is the first table after its heading" in flat
-    # The reader stops at the next section (BUG-006 r2: Review A).
-    assert "and before the next `##` heading, its rows running to the first line that is not a table line" in flat
+    # The reader stops at the next line starting `## `, as parse_table does (BUG-006 r2: Review A; r3: Review B, a `##`
+    # line without the space is no stop).
+    assert ("and before the next line that starts with two hashes and a space (`## `), its rows running to the first "
+            "line that is not a table line") in flat
     assert "its rows running to the first line that is not a table line" in flat
     assert "its columns are found by their header names; no cell contains a `|`" in flat
     assert "The order inside a cell carries no meaning; the order traits apply in is the Traits table's." in flat
