@@ -1,0 +1,93 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 7c7d32a..0435883 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-17 06:35",
++  "generated": "2026-10-17 06:58",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -103,7 +103,7 @@
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/workflow-check.py": "8ba92116301d19588a009ec03a479115406fbf9a465421503ff8d7691daca139",
+-    "cursor-bridge/workflow/extension-points.md": "ae0212bde3d9bab940c99d7d8cf269ae317e7c9eebf96624bb609ebca5097b8d",
++    "cursor-bridge/workflow/extension-points.md": "2d4d97470662cb02339443b9dbc75772c598a427a0c4f3ee05f5bc408aeaa2de",
+     "cursor-bridge/workflow/open-list.md": "2cda936e0ed96b2e7422eb2a9ff0596ebb54e3b09056008074da0f001ea2614b",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+diff --git a/bridge/cursor-bridge/workflow/extension-points.md b/bridge/cursor-bridge/workflow/extension-points.md
+index e9f9dd0..c97bd47 100644
+--- a/bridge/cursor-bridge/workflow/extension-points.md
++++ b/bridge/cursor-bridge/workflow/extension-points.md
+@@ -69,7 +69,7 @@ A conditional workflow file states each change it makes under a heading of its o
+ - `## Set at <point key>` — the value it sets there, at a point whose Changes cell includes `set`. Only a type workflow or a sub-workflow may set. The value is the section's first non-blank line; at `intake.delivery-kind` it is one delivery kind's key from the list above, bare or in backticks.
+ - `## Replace <module key>` — its own version of the whole phase, for a module marked replaceable. Only a type workflow or a sub-workflow may replace.
+ 
+-Any other `##` heading is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading unless it is one of the four forms above, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets one point, and replaces one module, at most once.
++Any other `##` heading is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading unless it is one of the four forms above, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets each point, and replaces each module, at most once.
+ 
+ A trait attaches to the main workflow only through its `Add at` headings, so each of its additions names the point it belongs to. Within one file, additions at one point keep the order the file writes them in; across files they apply in the order `supervisor.md` states ("The order additions apply in").
+ 
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 86d3556..8e9e55d 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -88,6 +88,9 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ ## Stage B2 — the stage review (round 4, 2026-10-17)
+ - Taken on BUG-005 (the supervisor's fixtures, tests and text): each CommonMark fence rule the check reads has a control a mutant cannot pass, a backtick fence with an ordinary info string hiding a heading beside the refused one, a fence closed by a longer run, a shorter tilde run that does not close (fixtures parts 1 and 2, converged as one class: fixture coverage of the fence rules); a multi-part status file with a part prefixed `not yet classified` (fixtures part 4: a mutant refusing it would refuse a valid project at intake); a part name with a leading space and with a tab, a trait with a trailing space, a sub-type's key where its name belongs (fixtures parts 3 and 4); the unknown type folder's file holds a change the check would otherwise accept (fixtures part 1); presence checks for the pass root's sub-workflow Set, its repeated Add at, its two delivery kinds and a sub-workflow's Replace of a module its type replaces (fixtures part 2); conformance-check says nothing about the line when the status file is absent, under any name, and the delivery-kinds test reads its paragraph only (tests part); the registry states which headings are read as change headings and that a file sets a point, and replaces a module, at most once, and no longer says workflow-check.py checks the modules' declarations (TASK-014's cross-check is its own test); the open list pauses a part that fits two sub-types of its type equally; the core's Add list reads "such as" (texts part).
+ - A change heading at level 1, at level 3 or deeper, or in Setext form is prose to the check (TASK-006's R7), so `# Set at intake.x` or `### Replace interface` changes nothing and is reported as nothing. A fail-closed rule (such a heading whose first word is a change word, or whose second is `at`, is `form`) would close it; it belongs with TASK-006's heading-parsing leads above (programs part, consider).
+-- A one-line status file with a tab beside the traits marker (`;<TAB>traits:`) is reported as "Workflows line must contain '; traits: ' exactly once", which is true but does not name the tab; a lead for the check's wording, with form-part-empty's above (programs part, noted).
++- A one-line status file with a tab beside the traits marker (`Workflows: Web App Development;<TAB>traits: none`) is reported as "Workflows line breaks the part-prefix rule" (the `: ` after `traits` is read as a part prefix, which a one-line file may not carry), a reason that names neither the tab nor the marker on a file that has no parts; "must contain '; traits: ' exactly once" appears only when the tab follows the colon or the file has several parts. A lead for the check's wording, with form-part-empty's above (programs part, noted; the message corrected by Review A, BUG-005).
+ - The exact-output tests assert an empty standard error; a Python warning or another program's message on standard error in the test's environment would fail them without a defect in the check. None occurs on the Windows workstation or on CI; a lead if one appears (round 4, the supervisor).
+ - review-guard.py verify given an older snapshot's id on the branch compares against that snapshot and reports what changed since (a GATE-INTEGRITY on `.git/config` in round 3, read as a file, no git command run); a warning when the id is not the newest snapshot would have named the mistake. Recorded for the bridge feedback at the reflection (round 3, the supervisor).
++- The registry's "How a conditional workflow names a point" does not say that a `##` line inside a fenced code block is not a heading, which the check honours (CommonMark's fence rules, TASK-006 R5-3); TASK-017, which rewords the procedure for the maintainer writing a conditional workflow, adds the sentence (Review A, BUG-005, consider).
++- One file may replace a module and add at that module's points (the pass root's sub-workflow replaces `interface` and adds at `interface.variants`), and the check accepts it; whether the file's own additions apply to its own replacement is not stated. TASK-017 or TASK-019, where replacement is first written for real, settles it (Review A, BUG-005, consider).
++- test_r015_conformance_no_status_file_no_check refuses the word "workflows" anywhere in conformance-check's output with no status file; a later row naming `.github/workflows` would fail it for its wording, not a defect (Review A, BUG-005, noted).
+diff --git a/tests/fixtures/workflows/status/ok-multi-unclassified.md b/tests/fixtures/workflows/status/ok-multi-unclassified.md
+index 06fa094..b940fc7 100644
+--- a/tests/fixtures/workflows/status/ok-multi-unclassified.md
++++ b/tests/fixtures/workflows/status/ok-multi-unclassified.md
+@@ -1,3 +1,3 @@
+-Phase: building
++Phase: intake
+ Workflows: app: not yet classified
+ Workflows: plugin: Host Extension Development; traits: none
+diff --git a/tests/test_extension_points.py b/tests/test_extension_points.py
+index 21f5b03..440c359 100644
+--- a/tests/test_extension_points.py
++++ b/tests/test_extension_points.py
+@@ -294,7 +294,7 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
+     punct = paragraph[paragraph.index("any trailing ") + len("any trailing "):paragraph.index(" ignored")]
+     assert set(re.findall(r"`(.)`", punct)) == set(wc.TRAILING_PUNCT), punct
+     assert "or whose second word is `at` in any case, fails as a malformed change heading" in paragraph
+-    assert "A file sets one point, and replaces one module, at most once." in paragraph
++    assert "A file sets each point, and replaces each module, at most once." in paragraph
+ 
+ 
+ def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index f0facea..dbd73d1 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -929,6 +929,17 @@ def test_r014_layer_that_cannot_be_examined_stops_the_check(tmp_path, monkeypatc
+     assert any(line.startswith("ERROR: ") and f"{shown}/{layer}" in line.replace("\\", "/") for line in lines), lines
+ 
+ 
++def test_r014_unknown_type_folder_is_reported_without_its_files():
++    """R-014: a folder under types/ that is no product type is the (d) finding alone; its file holds a change the check
++    would refuse with (a), so the exact output shows the folder's files are not read (stage B2 review, round 4: fixtures
++    1; the precondition by Review A, BUG-005)."""
++    text = (REPO / FIX / "fail/d-unknown-type-folder/types/not-a-type/thing.md").read_text(encoding="utf-8")
++    assert "\n## Add at nowhere.at-all\n" in "\n" + text, "precondition: the folder's file holds a change to an unknown point"
++    rc, lines, err = run(f"{FIX}/fail/d-unknown-type-folder")
++    assert lines == whole_output([f"FAIL (d) {FIX}/fail/d-unknown-type-folder/types/not-a-type: not-a-type - type folder is not a product type"]), lines
++    assert err == "" and rc == 1, (lines, err)
++
++
+ def test_r014_tilde_fences_and_longer_runs_hide_headings():
+     """R5-3: in the pass root's trait file a tilde fence hides a trait's `## Set` (b), and a four-tilde fence holds a
+     four-backtick line (the other character, long enough), after which `## Replace interface` (b) stands, and a shorter
