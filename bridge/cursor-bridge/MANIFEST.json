@@ -1,6 +1,6 @@
 {
   "version": "2026.10.11d",
-  "generated": "2026-10-17 04:45",
+  "generated": "2026-10-17 05:29",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -104,7 +104,7 @@
     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
     "cursor-bridge/workflow-check.py": "8ba92116301d19588a009ec03a479115406fbf9a465421503ff8d7691daca139",
     "cursor-bridge/workflow/extension-points.md": "89cba57e689d7377a2ecdb60b8e4273f856a205134b6d23407188ef2f18ec202",
-    "cursor-bridge/workflow/open-list.md": "048fb296ba1a1b6f129b5f404267e2ba3fb82772b0137f69ed1cf2b7a164bb1b",
+    "cursor-bridge/workflow/open-list.md": "107bca81220f71e32979af48bfd024949b938752a1532967079872f704106d1d",
     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",

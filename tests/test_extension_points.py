@@ -81,7 +81,8 @@ def test_r006_the_file_sits_at_its_planned_path_and_is_bounded():
     """R-006, BUILD_PLAN TASK-005 Scope: `workflow/extension-points.md` beside the open list; a bounded
     reference text."""
     assert os.path.isfile(EP)
-    assert "\r" not in TEXT
+    raw = open(EP, encoding="utf-8", newline="").read()
+    assert "\r" not in raw.replace("\r\n", "\n"), "no lone carriage return (a CRLF checkout is fine; stage B2 review, round 3)"
     assert len(TEXT) < 20000
 
 

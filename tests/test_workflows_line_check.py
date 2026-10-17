@@ -184,8 +184,15 @@ def test_r015_inventory_output_is_ascii(tmp_path):
 
 
 def test_r015_inventory_no_status_file_no_check(tmp_path):
-    rc, lines, out, err = inventory(tmp_path, tmp_path / "absent-status.md")
+    """TASK-008 Requirement 4: with no status file the line is not judged, nothing is said about it, and inventory-check
+    keeps its existing note; the run ends normally. test_r015_inventory_missing_line is the positive control."""
+    absent = tmp_path / "absent-status.md"
+    rc, lines, out, err = inventory(tmp_path, absent)
+    assert "Traceback" not in err and "Traceback" not in out, (out, err)
+    assert lines and lines[-1].startswith("RESULT: "), (lines, err)
+    assert "note: status: %s not found (skipped)" % absent in lines, lines
     assert workflows_lines(lines) == [], lines
+    assert not [line for line in lines if "Workflows" in line], lines
 
 
 def _bridge_copy(tmp_path, with_checker=True, with_rules=True):
@@ -280,6 +287,35 @@ def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
         assert any("open-list.md" in line for line in found), "the cause names the rule file that cannot be read"
 
 
+def _non_ascii_folder(tmp_path):
+    folder = tmp_path / ("d" + chr(0xE9))
+    folder.mkdir()
+    return folder
+
+
+def test_r015_inventory_not_checked_path_is_ascii(tmp_path):
+    """The not-checked message names the checker's path; a non-ASCII path reaches the output as its escape. Since BUG-003
+    escape_field makes every finding field ASCII, this message is the one the program's own ascii_text alone guards
+    (stage B2 review, round 3: the driver's mutant had become equivalent for the field tests)."""
+    base = _non_ascii_folder(tmp_path)
+    folder = _broken_copy(base, "checker-absent")
+    status = base / "PROJECT_STATUS.md"
+    write_status(status, VALID["not-yet-classified"])
+    rc, lines, out, err = inventory(base, status, program=folder / "inventory-check.py")
+    found = workflows_lines(lines)
+    assert found and "cannot be loaded (FileNotFoundError)" in found[0], lines
+    assert all(line.isascii() for line in found) and "\\xe9" in found[0], found
+
+
+def test_r015_conformance_not_checked_path_is_ascii(tmp_path):
+    base = _non_ascii_folder(tmp_path)
+    folder = _broken_copy(base, "checker-absent")
+    rc, out, err = conformance(workspace(base, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
+    v, text = verdict(out, "Workflows line")
+    assert v == "MISSING" and "cannot be loaded (FileNotFoundError)" in text, out
+    assert text.isascii() and "\\xe9" in text, text
+
+
 def test_r015_loading_the_checker_writes_no_bytecode(tmp_path):
     """R2-1: neither program leaves a __pycache__ beside itself (inventory-check reads only; conformance-check never writes)."""
     folder = _bridge_copy(tmp_path)
@@ -363,6 +399,21 @@ def test_r015_conformance_malformed_line(tmp_path, case):
     v, text = verdict(out, "Workflows line")
     assert v == "MISSING" and text.startswith("Workflows line  - malformed: "), out
     assert reason in text, out
+    assert rc == 1
+
+
+def test_r015_conformance_no_status_file_no_check(tmp_path):
+    """TASK-008 Requirement 4, conformance-check's half: with no status file the Workflows line is not judged and no row
+    names it; the records row already reports the file missing. test_r015_conformance_missing_line is the positive
+    control."""
+    root = workspace(tmp_path, VALID["not-yet-classified"])
+    (root / "docs" / "PROJECT_STATUS.md").unlink()
+    rc, out, err = conformance(root)
+    assert "Traceback" not in err and "Traceback" not in out, (out, err)
+    assert out.splitlines()[-1].startswith("RESULT: "), out
+    assert verdict(out, "Workflows line") == (None, None), out
+    v, text = verdict(out, "docs/PROJECT_STATUS.md")
+    assert v == "MISSING" and "the bounded status file" in text, out
     assert rc == 1
 
 
