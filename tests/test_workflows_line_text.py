@@ -141,7 +141,7 @@ def test_r015_a_part_prefix_only_with_several_parts_and_the_unclassified_form():
     """Plan §6.2: a project with one part has one line; §7's parts each get their own."""
     p = flat(paragraph())
     assert ("follows `Workflows: ` only when the project has more than one part; a project with one part has one "
-            "line without it; a part's name is not empty, has no space at either end and contains no `:`, `;` or `→`") in p
+            "line without it; a part's name is not empty, has no whitespace at either end and contains no `:`, `;` or `→`") in p
     assert ("with several parts, the lines stand together right after `Phase:`, one per part, in the order of the "
             "project's parts; that is the order \"for each part in the order the status file lists them\" reads") in p
     assert "for each part in the order the status file lists them" in flat(model_section()), "the core reads that order"

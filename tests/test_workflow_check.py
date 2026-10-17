@@ -397,10 +397,19 @@ def test_r014_status_case_gives_exactly_its_findings(name):
 
 def test_r014_sub_workflow_changes_are_checked():
     """R-014 across the three layers: a valid sub-workflow's changes are checked like a type workflow's: an unknown
-    point (a), a set where the point accepts add only (set), a replace of a module that is not replaceable (c)."""
-    codes = [line.split(")")[0] + ")" for line in FILE_EXACT["sub-workflow-changes"]]
-    assert codes == ["FAIL (a)", "FAIL (set)", "FAIL (c)"]
-    assert all("/types/host-extension/claude-code-extension.md: " in line for line in FILE_EXACT["sub-workflow-changes"])
+    point (a), a set where the point accepts add only (set), a replace of a module that is not replaceable (c). Runs the
+    program; the type workflow beside it is valid, so every finding is the sub-workflow's (BUG-003 review: Review A and
+    Review B both found the first version read only the table)."""
+    root = f"{FIX}/fail/sub-workflow-changes"
+    sub = f"{root}/types/host-extension/claude-code-extension.md"
+    rc, lines, err = run(root)
+    assert_clean_end(lines, err)
+    assert rc == 1, lines
+    assert fails(lines) == [
+        f"FAIL (a) {sub}: intake.question - point is not in the extension-point registry",
+        f"FAIL (set) {sub}: intake.questions - point does not accept set",
+        f"FAIL (c) {sub}: design - module is missing or not replaceable",
+    ], lines
 
 
 @pytest.mark.parametrize("encoding", ["utf-8", "cp1252"])
@@ -412,13 +421,15 @@ def test_r014_output_is_ascii_on_every_console(tmp_path, encoding):
     (root / "types").mkdir(parents=True)
     (root / "types" / "host-extension.md").write_text("## Add at intake.t\u00e9st\n\nq\n", encoding="utf-8")
     st = tmp_path / "status.md"
-    st.write_text("Phase: building\nWorkflows: T\u00e9st Development; traits: none\n", encoding="utf-8")
+    st.write_text("Phase: building\nWorkflows: T\u00e9st Development; traits: Gl\u2192it\U0001f600ter\n", encoding="utf-8")
     env = dict(os.environ, PYTHONIOENCODING=encoding)
     p = subprocess.run([sys.executable, PROG, "--status", str(st), str(root)], cwd=str(REPO), capture_output=True, env=env)
     assert p.returncode == 1, p.stdout
     assert all(byte < 128 for byte in p.stdout), p.stdout
     assert b"intake.t\\xe9st - point is not in the extension-point registry" in p.stdout, p.stdout
     assert b": T\\xe9st Development - name is not in the open list" in p.stdout, p.stdout
+    # A character up to U+FFFF and one above it, in a trait name (the security auditor's advisory, BUG-003).
+    assert b": Gl\\u2192it\\U0001f600ter - not a trait name" in p.stdout, p.stdout
 
 
 def test_r014_layer_path_that_is_a_file_is_form(tmp_path):

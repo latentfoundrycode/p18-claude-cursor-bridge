@@ -67,3 +67,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 - workflow-check.py reads a status file as strict UTF-8 and stops (exit 2); inventory-check.py and conformance-check.py read it with replacement and judge the line, so invalid bytes outside the `Workflows:` line give different outcomes; bytes inside it are refused by all three (programs part, noted).
 - inventory-check.py prints its `--status` argument with only non-ASCII escaped; a control character in that operator-given path prints raw (programs part, noted).
 - "Part" has no glossary entry; the term belongs to the plan's §7 and enters the glossary's closed set with the aggregate release (texts part, consider).
+
+## Stage B2 — BUG-003, round 2's fixes
+- workflow-check.py's `escape_field` keeps a literal backslash, so a name that contains the four characters backslash, x, e, 9 prints exactly like a name holding é (escaped as backslash-x-e-9), and the text backslash, x, 0, a like an escaped line feed; no line or RESULT can be forged (the field never holds a raw line break). Escaping the backslash itself would change the agreed escape forms and every exact-output table; a lead for a later change to the check's output (security auditor, BUG-003, advisory).
+- `collect` records a layer path that is not a folder with the kind `link`, which gives the required line today; recording it as `file` gives byte-identical output and keeps the label true if link handling ever gets a reason of its own, and the docstring would then name it (Review A, BUG-003, consider).

@@ -14,7 +14,7 @@ Software name: Claude-Cursor Bridge
 Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
 Worktrees: none
 In flight: none
-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation driver mutate_ci_floor.py, drafts/, in-flight.md as a scratch log while a review runs)
+Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation drivers mutate_ci_floor.py and mutate_workflow_check.py, drafts/, in-flight.md as a scratch log while a review runs)
 Delegated gates: none
 Remote sync: main at 0f04c4f, in sync 2026-10-17; branch bug-003 started from origin/main
 Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
