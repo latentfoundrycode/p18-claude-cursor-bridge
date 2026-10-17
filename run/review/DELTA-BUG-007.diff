@@ -1,0 +1,171 @@
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index cd9029e..20cfc82 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -256,16 +256,16 @@ Recorded from Review A, for the later program change that reads a line of `##` a
+   - 103: a final empty line kept adds a blank line, which no reader acts on.
+   - 181: cells_of always returns at least one cell.
+   - 191: a table line starts with a pipe.
+-  - 342 (each `and` clause dropped, and `>= 2`): a folder under an unknown type folder lies under that folder's own two-part entry, which is listed too.
++  - 342 (`len(parts) == 2` dropped, and `>= 2`): a folder under an unknown type folder lies under that folder's own two-part entry, which is listed too. (The `parts[0] == "types"` clause dropped was listed here at first; an input separates it, see gate round 1 below.)
+   - 357: a folder under `traits/` has at least two parts.
+-  - 360 (`>= 2`): a longer path under `types/` whose second part ends `.md` lies in an unknown type folder, which is skipped first.
++  - 360 (`>= 2`): a longer path under `types/` whose second part ends `.md` lies in an unknown type folder, which is skipped first. This and 342 hold for an open list whose keys have the list's shape (lowercase letters, digits and hyphens); the check does not validate a key's shape, and `--open-list` is an input.
+   - 364 (the `traits` clause dropped): a two-part `types/` path ending `.md` is taken by the line before.
+-  - 380: is_change_heading is only called on heading candidates (as 381).
++  - 380 and 381: is_change_heading is only called on heading candidates.
+   - 538: the change kinds are add, set and replace.
+   - 547: makes 548 unreachable a second way.
+   - 688: a part is None only in a one-line file.
+   - 833: every printed field is ASCII already, and every standard stream has `reconfigure`.
+-- **Held on CI's ubuntu leg only** (161, 162, 335, 336): a symbolic link is known by its mode there, and the dangling-link case lands among a folder's files; this Windows host makes junctions, which the walk lists as folders. The driver leaves them out for that reason.
++- **Held on CI's ubuntu leg only** (161, 162, 335, 336): a symbolic link is known by its mode there, and the dangling-link case lands among a folder's files; this Windows host makes junctions, which the walk lists as folders. The driver leaves them out for that reason. The dangling link is named `gone.md`: under a name without `.md`, 335's mutant read it as a file that fails as a path all the same, and survived on Linux too (gate round 1, Review A, run under WSL).
+ 
+ **Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule, 196 of 196 killed (161 before, 35 new); mutate_workflows_line.py stands at 42 of 42.
+ 
+@@ -277,3 +277,12 @@ Recorded from Review A, for the later program change that reads a line of `##` a
+ **For TASK-023's brief** (programs part, noted): the calibration that installs release B adds a running project's `Workflows:` line, so the brief names that step.
+ 
+ **Reviewer folders:** each Review A part had a scratch folder of its own this round; none saw another's mutant.
++
++**BUG-007's gate, round 1:** Review A REJECT (2 blocking, 1 should-fix, notes), Review B REJECT (1 blocking). Taken in BUG-007 r2:
++- **Blocking (Review B):** the registry says an unreadable conditional-workflow file stops the check and checks nothing, and no test could see more being checked: a mutant reporting the readable files' findings after the ERROR passed. The UTF-8 case now has a readable failing file beside it, reported while the file is UTF-8 and not once it is not; the driver has that mutant.
++- **Blocking (Review A):** 342 with `parts[0] == "types"` dropped was called equivalent and is not: a folder under `traits/` then hides a type file of the same name. form-traits-folder now holds `types/odd.md` with a failing change beside `traits/odd.md/`, and the driver has the mutant.
++- **Blocking (Review A):** 335 was said to be held on CI and survived there: the case's dangling link had no `.md` in its name, so read as a file it failed as a path all the same. It is named `gone.md` now; read as a file it is an ERROR.
++- **Should-fix (Review A):** 381 was missing from the list of 52; it stands with 380.
++- **Noted (Review A), taken:** the order case's comment says what it separates (a highest trait that never rises); 342 and 360 hold for keys of the open list's shape; form-not-markdown's files that are no conditional workflow hold a failing change, so a read of them would show.
++- **The named driver** has the two mutants, 342's and the readable files checked after an unreadable one (198 of 198 killed).
++
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 9c7fa97..71a283e 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,7 +3,7 @@ Last updated: 2026-10-17
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: BUG-007 — stage B2's review, round 6 (branch bug-007; the supervisor's fixtures, tests and registry text, no program change): Review A's tests part and fixtures parts 1 and 2 rejected (rules of the workflow check no test fails for: a section ending at a prose heading, the four forms matched exactly, a heading and a fence indented three spaces, trait order against the highest so far, a missing registry, an unreadable conditional-workflow file); Review B's reply named no line of the diff (a failed launch, rerun with the stage); the supervisor's sweep, widened (bounds, deleted appends, conditions forced, and-clauses dropped), found the rest; round 6's findings and dispositions are in HARDENING
++Increment: BUG-007 — stage B2's review, round 6 (branch bug-007; the supervisor's fixtures, tests and registry text, no program change): Review A's tests part and fixtures parts 1 and 2 rejected (rules of the workflow check no test fails for: a section ending at a prose heading, the four forms matched exactly, a heading and a fence indented three spaces, trait order against the highest so far, a missing registry, an unreadable conditional-workflow file); Review B's reply named no line of the diff (a failed launch, rerun with the stage); the supervisor's sweep, widened (bounds, deleted appends, conditions forced, and-clauses dropped), found the rest; round 6's findings and dispositions are in HARDENING; r2 (PR #33, gate round 1: Review A and Review B both REJECT): a folder under traits/ that hid a type file of its name (342, wrongly called equivalent), the dangling link renamed so Linux kills 335, a readable failing file beside the unreadable one (Review B), 381 listed
+ Last accepted: BUG-006, at commit 6b51ccd (merged to main 2026-10-17, PR #32); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003, BUG-004, BUG-005, BUG-006
+ Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
+ Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
+diff --git a/tests/fixtures/workflows/fail/form-not-markdown/types/host-extension/notes.txt b/tests/fixtures/workflows/fail/form-not-markdown/types/host-extension/notes.txt
+index 1eab331..1dbc01e 100644
+--- a/tests/fixtures/workflows/fail/form-not-markdown/types/host-extension/notes.txt
++++ b/tests/fixtures/workflows/fail/form-not-markdown/types/host-extension/notes.txt
+@@ -1 +1 @@
+-## Add at intake.questions
++## Add at nowhere.at-all
+diff --git a/tests/fixtures/workflows/fail/form-not-markdown/types/host-extensionabc b/tests/fixtures/workflows/fail/form-not-markdown/types/host-extensionabc
+index 1eab331..1dbc01e 100644
+--- a/tests/fixtures/workflows/fail/form-not-markdown/types/host-extensionabc
++++ b/tests/fixtures/workflows/fail/form-not-markdown/types/host-extensionabc
+@@ -1 +1 @@
+-## Add at intake.questions
++## Add at nowhere.at-all
+diff --git a/tests/fixtures/workflows/fail/form-traits-folder/types/odd.md b/tests/fixtures/workflows/fail/form-traits-folder/types/odd.md
+new file mode 100644
+index 0000000..42c02e9
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/form-traits-folder/types/odd.md
+@@ -0,0 +1,3 @@
++## Add at nowhere.at-all
++
++q
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index f785c1f..2f119ff 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -422,12 +422,14 @@ FILE_EXACT = {
+         'FAIL (form) {root}/types/host-extension/claude-code-extension/extra.md: extra.md - path is not a conditional-workflow file',
+     ],
+     # A folder under traits/ (stage B2 review, round 5: fixtures 2), one named like a trait file too (round 6: the
+-    # sweep's line 364).
++    # sweep's line 364), which hides no type file of its name (BUG-007's gate round 1: Review A, the sweep's 342).
+     'form-traits-folder': [
+         'FAIL (form) {root}/traits/installable: installable - path is not a conditional-workflow file',
+         'FAIL (form) {root}/traits/installable/extra.md: extra.md - path is not a conditional-workflow file',
+         'FAIL (form) {root}/traits/odd.md: odd.md - path is not a conditional-workflow file',
+         'FAIL (form) {root}/traits/odd.md/extra.md: extra.md - path is not a conditional-workflow file',
++        'FAIL (unknown) {root}/types/odd.md: odd - not a product type key',
++        'FAIL (a) {root}/types/odd.md: nowhere.at-all - point is not in the extension-point registry',
+     ],
+     'form-two-replaces': ['FAIL (form) {root}/types/host-extension.md: interface - two Replace headings for the same module'],
+     'form-two-sets': ['FAIL (form) {root}/types/host-extension.md: intake.target-environment - two Set at headings for the same point'],
+@@ -518,7 +520,7 @@ STATUS_EXACT = {
+         "FAIL (form) {path}: Installable - traits are not in the open list's order",
+     ],
+     'form-trait-repeat-separated.md': ['FAIL (form) {path}: Has screens - trait repeated'],
+-    # Order is judged against the highest trait so far, not only the one before (round 6: tests).
++    # The highest trait so far rises as traits come in order, so a later one below it fails (round 6: tests).
+     'form-trait-order-highest.md': [
+         'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)',
+         "FAIL (form) {path}: Installable - traits are not in the open list's order",
+@@ -1439,6 +1441,12 @@ ROUND6_PRECONDITIONS = [
+      "a backtick on the leading side only is not unwrapped (fixtures 2)"),
+     ("fail/form-traits-folder/traits/odd.md/extra.md", "## Add at intake.questions\n",
+      "a folder named like a trait file is a folder (the sweep's line 364)"),
++    ("fail/form-traits-folder/types/odd.md", "## Add at nowhere.at-all\n",
++     "a type file named as the folder under traits/ is still checked (the sweep's line 342)"),
++    ("fail/form-not-markdown/types/host-extensionabc", "## Add at nowhere.at-all\n",
++     "a path that is no conditional workflow is never read: its failing change is not reported"),
++    ("fail/form-not-markdown/types/host-extension/notes.txt", "## Add at nowhere.at-all\n",
++     "a path that is no conditional workflow is never read: its failing change is not reported"),
+     ("pass/traits/installable.md", "\n## Add at intake.delivery-kind\n", "an addition at a value point is an addition (tests)"),
+     ("pass/types/host-extension.md", "\n## - notes\n", "a heading whose first word is punctuation only is prose (tests)"),
+     ("pass/types/host-extension.md", "\n## ...\n", "a heading of punctuation alone is prose (tests)"),
+@@ -1515,16 +1523,21 @@ def test_r014_rule_file_that_is_a_folder_cannot_be_read(tmp_path):
+ 
+ def test_r014_conditional_file_not_utf8_stops_the_check(tmp_path):
+     """A conditional-workflow file that cannot be read as UTF-8 stops the check with an ERROR line naming it and no
+-    traceback; the same file in UTF-8 passes (stage B2 review, round 6: programs and tests; the sweep's line 806)."""
++    traceback, and nothing else is checked: a readable failing file beside it, reported when the file is UTF-8, is not
++    reported then (stage B2 review, round 6: programs and tests; the sweep's line 806; the sibling per BUG-007's gate
++    round 1, Review B)."""
+     root = tmp_path / "root"
+     (root / "types").mkdir(parents=True)
++    (root / "traits").mkdir()
++    (root / "traits" / "not-a-trait.md").write_bytes(b"## Add at intake.questions\n\nq\n")
+     path = root / "types" / "host-extension.md"
+     path.write_bytes(b"## Add at intake.questions\n\nq\n")
+-    assert run(str(root)) == (0, ["RESULT: OK"], "")
++    shown = str(root).replace("\\", "/")
++    assert run(str(root)) == (1, [f"FAIL (unknown) {shown}/traits/not-a-trait.md: not-a-trait - not a trait key",
++                                  "RESULT: 1 problem(s)"], "")
+     path.write_bytes(b"## Add at intake.questions\n\n\xff\n")
+     rc, lines, err = run(str(root))
+     assert_not_checked(rc, lines, err)
+-    shown = str(root).replace("\\", "/")
+     assert lines == [f"ERROR: {shown}/types/host-extension.md: cannot be read as UTF-8", "RESULT: not checked"], lines
+ 
+ 
+@@ -1590,23 +1603,24 @@ def test_r014_root_with_a_trailing_slash_prints_one_slash():
+ 
+ 
+ def test_r014_link_among_a_folders_files_is_form(tmp_path):
+-    """A link the walk lists among a folder's files (one whose target is gone), a link named like a trait file, and a
+-    `types` path that is a link to a folder are each reported at their exact line and never read or walked (stage B2
+-    review, round 6: the sweep's lines 335, 336 and 353)."""
++    """A link the walk lists among a folder's files (one whose target is gone, named like a trait file so that reading it
++    as a file would be an ERROR), a link to a folder named like a trait file, and a `types` path that is a link to a
++    folder are each reported at their exact line and never read or walked (stage B2 review, round 6: the sweep's lines
++    335, 336 and 353; the name per BUG-007's gate round 1, Review A)."""
+     outside = _outside_with_canary(tmp_path)
+     gone = tmp_path / "gone"
+     gone.mkdir()
+     root = tmp_path / "root"
+     (root / "traits").mkdir(parents=True)
+     (root / "traits" / "installable.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+-    _link_folder(root / "traits" / "gone", gone)
++    _link_folder(root / "traits" / "gone.md", gone)
+     gone.rmdir()
+     _link_folder(root / "traits" / "has-screens.md", outside)
+     _link_folder(root / "types", outside)
+     rc, lines, err = run(str(root))
+     shown = str(root).replace("\\", "/")
+     assert lines == whole_output([
+-        f"FAIL (form) {shown}/traits/gone: gone - path is not a conditional-workflow file",
++        f"FAIL (form) {shown}/traits/gone.md: gone.md - path is not a conditional-workflow file",
+         f"FAIL (form) {shown}/traits/has-screens.md: has-screens.md - path is not a conditional-workflow file",
+         f"FAIL (form) {shown}/types: types - path is not a conditional-workflow file",
+     ]), lines
