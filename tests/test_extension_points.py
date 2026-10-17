@@ -163,6 +163,8 @@ def test_r006_the_tables_shape_is_stated_for_the_reader():
     """The shape the check reads is stated in the file, as the open list states its own."""
     assert "`workflow-check.py` reads the two tables below and nothing else in this file" in TEXT
     assert "Each table is the first table after its heading (`## Phase modules`, `## Extension points`)" in TEXT
+    # The reader stops at the next section (BUG-006 r2: Review A).
+    assert "and before the next `##` heading, its rows running to the first line that is not a table line" in TEXT
     assert "its columns are found by their header names; no cell contains a `|`" in TEXT
 
 
@@ -175,7 +177,7 @@ def test_r006_how_a_conditional_workflow_names_a_point():
     assert "`## Add at project-end.delivery for <delivery kind>`" in TEXT
     assert ("At that point this form is required and the plain `## Add at project-end.delivery` fails; at every "
             "other point a heading ending `for <kind>` fails.") in TEXT
-    assert "The value is the section's first non-blank line" in TEXT
+    assert "The value is the section's first non-blank line, stripped;" in TEXT
     assert "Only a type workflow or a sub-workflow may set." in TEXT
     assert "Only a type workflow or a sub-workflow may replace." in TEXT
     assert "A trait attaches to the main workflow only through its `Add at` headings" in TEXT
@@ -305,9 +307,9 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
         "more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening "
         "none, and closes with a run of the same character at least as long, indented at most three spaces and followed "
         "only by spaces or tabs; a fence still open at the end of the file fails.",
-        "The check also fails a `## Set at` section with no non-blank line, anything under `types/` or `traits/` that is "
-        "not a conditional workflow at its key's path (a README there included), and a folder under `types/` that is no "
-        "product type.",
+        "The check also fails a `## Set at` section with no non-blank line; a file or link under `types/` or `traits/` "
+        "that is not a conditional workflow at its key's path (a README there included); a folder under `traits/` or "
+        "inside a type's folder; and a folder under `types/` that is no product type.",
     ):
         assert sentence in paragraph, sentence
 

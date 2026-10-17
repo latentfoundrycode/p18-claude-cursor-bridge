@@ -149,31 +149,48 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 
 It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The delivery-kinds test reads every kind the list names however it is described. test_open_list holds that no name is `none` or `not yet classified` (tests part).
 
-**The sweep's 44 survivors after BUG-006**, line numbers of workflow-check.py at 0e7813e. None is a rule a test can hold today:
+**The sweep's 36 survivors of 425 after BUG-006**, line numbers of workflow-check.py at 0e7813e (the program is unchanged). The first version of this list called nine survivors equivalent or untestable that an input separates: 285, 605, 126, 299, 300, 312, 349, 354, and 626, which is now a lead. Review A of BUG-006 found them (below), and each of the first eight now has its case. The rest:
 - **Equivalent** (no input separates them):
   - 83: a closing run of two (a close must be at least as long as its opening, at least three).
   - 134: U+0080 is not printable.
   - 170: separator cells are stripped already by cells_of.
   - 190: a table line starts with a pipe.
-  - 285: cells are stripped.
   - 381: is_change_heading is only called on heading candidates.
   - 420, 422, 436: a marker is one character repeated.
   - 456, 459: a fence line cannot be a heading candidate.
   - 478: any strip of a blank line is empty.
-  - 604, 605: the head's segments and then its names are both stripped, so either strip alone is enough.
+  - 604: a segment is used only through its names, which are stripped again.
+  - 313: a layer that cannot be examined has its error recorded, and the errors alone decide exit 2.
+  - 322: links are pruned from the folders walked, so following links reaches nothing.
   - 625 to 641: the lists read there hold exactly one entry.
   - 662, 664: an equal index is a repeat, caught first.
   - 795: a root that is not a folder already ends the run with exit 2.
-- **Message fallbacks** (126, 299, 300, 312): the text printed when the system gives no reason, which it always gives.
-- **Held where symlinks and permission bits exist** (162, 313, 322, 349, 354): the link and unreadable-folder tests skip on this Windows host and run on CI's ubuntu leg.
+- **Held on CI's ubuntu leg only** (162): a symbolic link is known by its mode there, while the links test makes junctions on this Windows host.
 - **Unreachable** (548): check_sub_identity's "type key is not a product type". collect never yields a sub-workflow item under an unknown type folder (fixtures 1, noted). It can go when the check is next changed.
 - **Leads:**
   - 83: a form feed or NEL after a closing run would close a fence under a `\s` reading, where the check (and Markdown) does not. It belongs with the Unicode-whitespace table-cell lead above (fixtures 1, consider).
   - 485: a Set value of two backticks prints `-` rather than the two backticks in its (kind) finding.
-  - 626: a sub-type of another type stops the head's shape and Written checks, which with the fixture's written entries change nothing.
+  - 626: a head whose sub-type belongs to another type reports (e) and stops there. An unwritten product type or sub-type it names therefore gets no (f), which handoff/TASK-006.md R4's (f) reads as asking for. Example: against the status fixtures' open list, `Workflows: Library Development → Claude Code Extension` gives one (e) where the brief gives (e) and (f). This is a possible program defect, for the next change of workflow-check.py; the line fails either way (Review A of BUG-006).
 
 **Review B returned no verdict**, a should-fix alone. Per the policy that is a failed launch, rerun with the stage's next round, and its finding was taken.
 
 **Scratch folders:** several Review A parts used the same scratchpad folder (`ws`). One part's mutant appeared in another's copy, and a part's own results had to be redone. The checkout was never touched. Each reviewer gets a folder of its own from the next round on, and the point goes to the bridge feedback at the reflection (round 5, the supervisor).
 
-**The sweep is rerun before each later stage review of this check.** A new survivor is either a test, or a line here with its reason.
+**The sweep is rerun before each later stage review of this check.** A new survivor is either a test, or a line here with its reason. The sweep runs test_workflow_check.py, test_workflows_line_check.py and, since BUG-006 r2, test_extension_points.py, which imports the program too.
+
+**BUG-006's gate, round 1:** Review A REJECT, Review B APPROVE. REVIEWERS DISAGREED on whether the survivor list above was honest, a correctness question. The supervisor decided for Review A: it separated each named survivor with one input, and the supervisor's run confirmed all eight are killed by the new cases. Taken in BUG-006 r2:
+- **Cases (blocking):**
+  - 605: a space before a comma in the head; the name is read stripped and only the shape fails.
+  - 285: a Changes cell reading `set , add` accepts a Set, and `add` alone refuses it.
+  - 126: a refused read names the system's reason.
+  - 312: a layer that cannot be examined gives its exact ERROR line.
+  - 299 and 300: a folder that cannot be listed is named with its reason, on every host.
+  - 349 and 354: each link is named, one of them inside a folder that is no product type, in the links test's exact output.
+  - The list above is corrected to match.
+- **Text (should-fix):** both rule files' "How this file is read" now say a table is the first after its heading and before the next `##` heading, as the reader does. The separators test's comment names the mutant it kills.
+- **Text (considers):**
+  - The registry says a Set value is stripped, and names exactly the files, links and folders that fail.
+  - The open list says no name is `none` or `not yet classified`.
+  - The sweep runs test_extension_points.py too.
+- **The named driver** has the eight mutants (159 of 159 killed).
+- **Recorded, not taken:** the delivery-kinds test finds a kind only when a `(` follows it, so a kind added to the list bare escapes the comparison with `DELIVERY_KINDS`. This is for whoever next changes the list (tests/test_extension_points.py).

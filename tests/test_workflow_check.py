@@ -244,16 +244,18 @@ def test_r015_exact_separators_pass(tmp_path, line):
     "Workflows:  Host Extension Development; traits: Installable",
     "Workflows: Host Extension Development ; traits: Installable",
     "Workflows: app:  Web App Development; traits: none\nWorkflows: plugin: Host Extension Development; traits: none",
+    "Workflows: Host Extension Development , Installable; traits: none",
 ], ids=["arrow-unspaced", "two-spaces-before-arrow", "two-spaces-after-arrow", "two-spaces-after-colon",
-        "space-before-traits-mark", "two-spaces-after-part"])
+        "space-before-traits-mark", "two-spaces-after-part", "space-before-comma"])
 def test_r015_separators_are_exact(tmp_path, line):
     """supervisor.md "Project state": the head is `<Workflow name>[ → <Sub-workflow name>]` exactly, after `Workflows: `
     or `<part>: `; any other spacing is (form), as it already is for a part name or the traits (stage B2 review)."""
     rc, lines, err = _status_line_case(tmp_path, line)
     assert_clean_end(lines, err)
     assert rc == 1, lines
-    # The whole output: the shape finding alone, no name read with its spaces trimmed (stage B2 review, round 5: the
-    # supervisor's mutation sweep, where a segment stripped on one side only added an (unknown)).
+    # The whole output: the shape finding alone. Each name is read stripped (handoff/TASK-006.md R11.4), so a space
+    # before a comma still finds `Host Extension Development` and only the shape fails; a name stripped on one side only
+    # would add an (unknown) and an (e) (BUG-006 r2: Review A, the sweep's line 605).
     shown = str(tmp_path / "status.md").replace("\\", "/")
     assert lines == whole_output([f"FAIL (form) {shown}: - - Workflows head is not the product type, then at most its sub-type"]), lines
     assert err == "", err
@@ -668,6 +670,28 @@ def test_r014_registry_heading_missing(tmp_path):
     assert_not_checked(*run("--registry", str(broken), f"{FIX}/pass"))
 
 
+def test_r014_set_changes_cell_is_split_on_commas_and_stripped(tmp_path):
+    """handoff/TASK-006.md, the `set` finding: a point's Changes cell is split on commas and each part stripped, so a
+    cell reading `set , add` accepts a Set as `add, set` does, and `add` alone refuses it (BUG-006 r2: Review A, the
+    sweep's line 285)."""
+    reg = (REPO / "bridge/cursor-bridge/workflow/extension-points.md").read_text(encoding="utf-8")
+    row = "| intake.target-environment | Intake | The product type's target environment | intake | add, set | part |"
+    assert reg.count(row) == 1, "the row of the point the pass root sets"
+    text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
+    assert "\n## Set at intake.target-environment\n" in "\n" + text, "precondition: the pass root sets the point"
+    spaced = tmp_path / "spaced.md"
+    spaced.write_text(reg.replace(row, row.replace("| add, set |", "| set , add |")), encoding="utf-8", newline="\n")
+    rc, lines, err = run("--registry", str(spaced), f"{FIX}/pass")
+    assert (rc, lines, err) == (0, ["RESULT: OK"], ""), (rc, lines, err)
+    add_only = tmp_path / "add-only.md"
+    add_only.write_text(reg.replace(row, row.replace("| add, set |", "| add |")), encoding="utf-8", newline="\n")
+    rc, lines, err = run("--registry", str(add_only), f"{FIX}/pass")
+    assert rc == 1, lines
+    assert lines == whole_output(
+        [f"FAIL (set) {FIX}/pass/types/host-extension.md: intake.target-environment - point does not accept set"]), lines
+    assert err == "", err
+
+
 # --- the usage text -----------------------------------------------------------------------------------------------
 
 def test_r033_usage_names_the_three_times_and_the_codes():
@@ -763,7 +787,9 @@ def _link_folder(link, target):
 
 
 def test_r014_links_are_not_followed(tmp_path):
-    """R2-4: a linked folder under types/ is form and is never read; a link to a parent cannot loop."""
+    """R2-4: a linked folder under types/ is form and is never read; a link to a parent cannot loop. Each link is
+    reported under its own path and name, a link inside a folder that is no product type too, beside the folder's (d)
+    (BUG-006 r2: Review A, the sweep's lines 349 and 354)."""
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "claude-code-extension.md").write_text("## Add at nowhere.at-all\n\nq\n", encoding="utf-8")
@@ -772,13 +798,19 @@ def test_r014_links_are_not_followed(tmp_path):
     (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
     _link_folder(root / "types" / "host-extension", outside)
     _link_folder(root / "types" / "loop", root)
+    (root / "types" / "not-a-type").mkdir()
+    _link_folder(root / "types" / "not-a-type" / "inner-link", outside)
     p = subprocess.run([sys.executable, PROG, str(root)], cwd=str(REPO), capture_output=True, text=True, encoding="utf-8", timeout=60)
     lines = p.stdout.splitlines()
     assert p.returncode == 1, lines
     assert not [line for line in lines if line.startswith("FAIL (a)")], "a file behind a link was read"
     shown = str(root).replace("\\", "/")
-    assert any(line.startswith(f"FAIL (form) {shown}/types/host-extension") for line in lines), lines
-    assert lines[-1] == f"RESULT: {len(fails(lines))} problem(s)"
+    assert lines == whole_output([
+        f"FAIL (form) {shown}/types/host-extension: host-extension - path is not a conditional-workflow file",
+        f"FAIL (form) {shown}/types/loop: loop - path is not a conditional-workflow file",
+        f"FAIL (d) {shown}/types/not-a-type: not-a-type - type folder is not a product type",
+        f"FAIL (form) {shown}/types/not-a-type/inner-link: inner-link - path is not a conditional-workflow file",
+    ]), lines
 
 
 @pytest.mark.skipif(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), reason="a folder made unreadable by mode bits needs a non-root POSIX user (CI's ubuntu leg)")
@@ -1001,7 +1033,8 @@ def test_r014_layer_that_cannot_be_examined_stops_the_check(tmp_path, monkeypatc
     assert code == 2, lines
     assert lines[-1] == "RESULT: not checked", lines
     shown = str(root).replace("\\", "/")
-    assert any(line.startswith("ERROR: ") and f"{shown}/{layer}" in line.replace("\\", "/") for line in lines), lines
+    # The path and the system's reason, not the fallback text (BUG-006 r2: Review A, the sweep's line 312).
+    assert f"ERROR: {shown}/{layer}: Permission denied" in [line.replace("\\", "/") for line in lines], lines
 
 
 def test_r014_unknown_type_folder_is_reported_without_its_files():
@@ -1266,3 +1299,45 @@ def test_r014_table_reader_stops_at_the_next_section(program):
     found, error = program("workflow-check").parse_table(
         "## T\n\nprose\n\n## U\n\n| Key | Name |\n|---|---|\n| a | A |\n", "t.md", "## T", TABLE_REQ)
     assert found is None and error == "no table after ## T", error
+
+
+# --- BUG-006 r2: Review A of BUG-006, the sweep's survivors an input separates --------------------------------------
+
+def test_r014_unreadable_file_names_the_systems_reason(tmp_path, monkeypatch, program):
+    """handoff/TASK-006.md: `<reason>` is free plain-language text; a file the system refuses to read gives `cannot be
+    read (<the system's reason>)`, never the exception's own text (BUG-006 r2: Review A, the sweep's line 126)."""
+    mod = program("workflow-check")
+    path = tmp_path / "refused.md"
+    path.write_text("q\n", encoding="utf-8")
+
+    def refuse(*a, **k):
+        raise PermissionError(13, "Permission denied", str(path))
+
+    monkeypatch.setattr(mod, "open", refuse, raising=False)
+    text, _shown, reason = mod.read_utf8(str(path))
+    assert (text, reason) == (None, "cannot be read (Permission denied)"), reason
+
+
+def test_r014_folder_that_cannot_be_listed_is_named_with_its_reason(tmp_path, monkeypatch, capsys, program):
+    """R2-3 and handoff/TASK-006.md's `<reason>`: a folder under a layer that cannot be listed stops the check with an
+    ERROR line naming that folder, not the root, and the system's reason; on every host, where
+    test_r014_unreadable_folder_stops_the_check needs POSIX mode bits (BUG-006 r2: Review A, the sweep's lines 299
+    and 300)."""
+    mod = program("workflow-check")
+    root = tmp_path / "root"
+    sub = root / "types" / "host-extension"
+    sub.mkdir(parents=True)
+    (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    real = os.scandir
+
+    def scandir(path=".", *a, **k):
+        if os.path.basename(os.fspath(path)) == "host-extension":
+            raise PermissionError(13, "Permission denied", os.fspath(path))
+        return real(path, *a, **k)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    code, lines = _main_in_process(mod, str(root), capsys=capsys)
+    assert code == 2, lines
+    assert lines[-1] == "RESULT: not checked", lines
+    shown = str(sub).replace("\\", "/")
+    assert f"ERROR: {shown}: Permission denied" in [line.replace("\\", "/") for line in lines], lines
