@@ -1,0 +1,490 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 8225b0b..721042e 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-17 04:45",
++  "generated": "2026-10-17 05:29",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -104,7 +104,7 @@
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/workflow-check.py": "8ba92116301d19588a009ec03a479115406fbf9a465421503ff8d7691daca139",
+     "cursor-bridge/workflow/extension-points.md": "89cba57e689d7377a2ecdb60b8e4273f856a205134b6d23407188ef2f18ec202",
+-    "cursor-bridge/workflow/open-list.md": "048fb296ba1a1b6f129b5f404267e2ba3fb82772b0137f69ed1cf2b7a164bb1b",
++    "cursor-bridge/workflow/open-list.md": "107bca81220f71e32979af48bfd024949b938752a1532967079872f704106d1d",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/workflow/open-list.md b/bridge/cursor-bridge/workflow/open-list.md
+index 0cde9a0..a1831a6 100644
+--- a/bridge/cursor-bridge/workflow/open-list.md
++++ b/bridge/cursor-bridge/workflow/open-list.md
+@@ -11,7 +11,7 @@ This file is the canonical list of every product type, sub-type and trait the br
+ - **Key** — the entry's identifier and the base name of its workflow file: a type workflow at `workflow/types/<key>.md`, a sub-workflow at `workflow/types/<type key>/<key>.md`, a trait's additions at `workflow/traits/<key>.md`. Lowercase letters, digits and hyphens; unique within its table.
+ - **Name** — the entry's name in plain words, used in prose and at intake. A trait, which has no workflow name, is named by it on a `Workflows:` line.
+ - **Definition** — what a part must be, or have, for the entry to apply.
+-- **Workflow name** / **Sub-workflow name** — the fixed name of the entry's workflow, used in the status file's `Workflows:` line and in the progress graph's header (§6.3, §7.8). A `Workflows:` line is read by name, so the Workflow names, the Sub-workflow names and the traits' Names are unique across the three tables.
++- **Workflow name** / **Sub-workflow name** — the fixed name of the entry's workflow, used in the status file's `Workflows:` line and in the progress graph's header (§6.3, §7.8). A `Workflows:` line is read by name, so the Workflow names, the Sub-workflow names and the traits' Names are unique across the three tables, and none of them contains `,`, `;`, `:` or `→`, the characters that separate the line's parts and names.
+ - **Default traits** — trait keys, separated by commas, or `—` for none. A sub-type's cell is the complete default set for a part with that sub-type, in place of its type's. The order inside a cell carries no meaning; the order traits apply in is the Traits table's. Default traits are proposals, settled at the design gate.
+ - **Of type** — a sub-type's product type, by key.
+ - **Written** — `yes` once the entry's workflow file exists at its key's path and passes the workflow check, else `no`. The increment that writes an entry's file sets its flag in the same change. A part whose product type or sub-type is not written pauses its project; a trait that is not written is flagged and the work continues (§6.7).
+@@ -75,7 +75,7 @@ A trait is a property that adds work whatever the product type. A part may have
+ 
+ At intake, the supervisor classifies each part against the definitions above (§6.7):
+ 
+-- **A new product type or sub-type pauses the project.** When a part fits no product type, fits two equally, or fits one whose workflow is not yet written, the supervisor stops before design and sends the owner to the bridge's maintainer with its reasons. The maintainer writes the workflow with the owner (below), the release goes out, the project calibrates, and the supervisor resumes.
++- **A new product type or sub-type pauses the project.** When a part fits no product type, fits two equally, fits one whose workflow is not yet written, or fits a sub-type whose sub-workflow is not yet written, the supervisor stops before design and sends the owner to the bridge's maintainer with its reasons. The maintainer writes the workflow with the owner (below), the release goes out, the project calibrates, and the supervisor resumes.
+ - **A new trait is flagged, and the work continues.** Traits only add, so the main workflow and the part's product type still cover everything essential. The supervisor writes the extra handling into the project's design, flags it at the design gate, where the owner may still choose to pause, and puts it forward at the promotion pass at project end, from which the maintainer may write it as trait additions. The same holds for a trait that is defined but not yet written.
+ 
+ ## Adding or changing a conditional workflow
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index dbfcada..b4a5680 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -487,6 +487,11 @@ Every round-4 finding was confirmed settled by probes, R5-3 against a CommonMark
+ | BUG-002 | 2 | security auditor | 0 | 0 | — | PASS |
+ | BUG-002 records | 1 | Review A | 0 | 1 | 2 | APPROVE; all three taken on bug-003 |
+ | BUG-002 records | 1 | Review B | 0 | 0 | 0 | APPROVE |
++| BUG-003 | 1 | Review A | 0 | 0 | 3 | APPROVE; C2 converges with Review B's consider (blocking), taken in round 2; C1 to HARDENING; C3 taken in round 2 |
++| BUG-003 | 1 | Review B | 0 | 0 | 1 | APPROVE (the first reply named nothing from the diff and was re-run); the consider converges with Review A's C2 |
++| BUG-003 | 1 | security auditor | 0 | 1 advisory | — | PASS; the ASCII test's wider characters taken in round 2, the backslash ambiguity to HARDENING |
++| BUG-003 | 2 | Review A | 0 | 1 | 0 | APPROVE; the should-fix (HARDENING's statement of the backslash lead's cost) taken in BUG-004's records |
++| BUG-003 | 2 | Review B | 0 | 0 | 0 | APPROVE |
+ 
+ ### TASK-006 round 6 — disposition (PR #23, merged)
+ All three approved; R6-1 and R6-2 were confirmed by probes at every site, against a CommonMark reference. The remaining findings are the long tail of reading Markdown-like text, in files only the maintainer and the supervisor write, and the by-class line drawn at round 3 holds: Review A's Consider (a heading or `Workflows:` line after a form feed or line separator is now invisible to the check, as to Markdown, though a raw-text reader would see it) and the auditor's two advisories (cells trimmed of any Unicode whitespace rather than spaces and tabs, so a separator followed by such a character is accepted where Markdown shows no table; an escaped pipe inside a cell split as a boundary) are recorded in HARDENING. They are different defects, not one named twice, so convergence does not apply. Carried to TASK-008's brief: any reader of the `Workflows:` line splits lines exactly as `workflow-check.py`'s `file_lines` does.
+@@ -530,6 +535,9 @@ All three approved (Review A 0/1/0, Review B 0/0/0, the security auditor PASS);
+ ### BUG-002 records — disposition (PR #28, merged as 0f04c4f)
+ Both approved (Review A 0/1/2, Review B 0/0/0); CI green on the pushed head. Both confirmed the new test against a mutant that puts round 1's `else:` back (it alone fails) and the driver's 82 of 82. Review A's should-fix, a records gap that did not hold the merge: the grade table had no security-auditor rows for BUG-002, whose round-1 advisory is half of the convergence that opened round 2; the two rows are added above, out of date order, beside BUG-002's own. Its considers: the new test's docstring said a trait in the head is the shape finding in general, true only beside a product type (a lone trait gives only the `e` finding, which returns before the shape test); the docstring now says both. The same holds for BUG-002 round 2's disposition above, whose "gives the `e` finding first" should read "gives only the `e` finding"; that disposition stands as written, corrected here. Noted: Review A could not confirm from the Workspace's files the figures its own earlier reports gave (32,323 and 50,125 generated heads), since the reports live in the session, not in a file; future dispositions quote a figure only with where it is kept.
+ 
++### BUG-003 rounds 1 and 2 — disposition (PR #29, merged as 484badb)
++The fixes from stage B2's review, round 2: the builder made workflow-check.py print ASCII only and report a `types` or `traits` path that is a file (both Review B's, each reproduced first); the supervisor's tests assert every failing case's whole set of findings, with new cases for a valid sub-workflow's changes and the part-name rules. Round 1 approved by all three; converged: Review A's and Review B's considers named the same test, test_r014_sub_workflow_changes_are_checked, which read only the exact table and could pass against no program, so round 2 made it run the program. Also taken in round 2: the ASCII test covers characters above U+FFFF (the auditor); supervisor.md says a part name has no whitespace at either end, as the check strips (Review A). Leads: escape_field's literal backslash (the auditor) and the `file` kind for a non-folder layer path (Review A). Round 2 approved by both; Review A's should-fix (HARDENING overstated what escaping a backslash would cost) is corrected in BUG-004's records. The mutation driver ran 87 of 87 killed (run/supervisor/mutate_workflow_check.py).
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index bbc20f9..764cfea 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -49,7 +49,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ - tests/test_workflows_line_text.py judges the bridge's status line with a grammar checker of its own (TASK-007's proof that the grammar is coherent); it accepts spacing check_status refuses. The shipped check is the authority; a lead to retire the private one when TASK-010 moves the paragraph.
+ - test_r033_ci_runs_the_check_last_in_the_tests_job requires the workflow check to be the tests job's last step; a later CI step goes before it.
+ - tests/test_open_list.py bounds open-list.md at under 300 lines and 30,000 characters; TASK-017 to TASK-021 all add to it, so their briefs check the headroom.
+-- The failing-fixture tests assert the named finding and that the RESULT count agrees, not the number of findings, so a second defect added to a fixture later would pass unseen; and a misspelt type (status/unknown-name.md) also gives a follow-on (e) "part must name exactly one product type".
++- The failing-fixture tests assert the named finding and that the RESULT count agrees, not the number of findings, so a second defect added to a fixture later would pass unseen; and a misspelt type (status/unknown-name.md) also gives a follow-on (e) "part must name exactly one product type". [Closed by BUG-003 and BUG-004: every case's whole standard output is asserted, RESULT line included.]
+ - inventory-check.py prints a traceback when `--status` names a folder (its pre-release-B `read()`); the exit is still non-zero.
+ 
+ ## Stage B2 — BUG-002, the stage review's fixes
+@@ -69,5 +69,17 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ - "Part" has no glossary entry; the term belongs to the plan's §7 and enters the glossary's closed set with the aggregate release (texts part, consider).
+ 
+ ## Stage B2 — BUG-003, round 2's fixes
+-- workflow-check.py's `escape_field` keeps a literal backslash, so a name that contains the four characters backslash, x, e, 9 prints exactly like a name holding é (escaped as backslash-x-e-9), and the text backslash, x, 0, a like an escaped line feed; no line or RESULT can be forged (the field never holds a raw line break). Escaping the backslash itself would change the agreed escape forms and every exact-output table; a lead for a later change to the check's output (security auditor, BUG-003, advisory).
++- workflow-check.py's `escape_field` keeps a literal backslash, so a name that contains the four characters backslash, x, e, 9 prints exactly like a name holding é (escaped as backslash-x-e-9), and the text backslash, x, 0, a like an escaped line feed; no line or RESULT can be forged (the field never holds a raw line break). Escaping the backslash itself would depart from the agreed escape forms (those of Python's backslashreplace) and change what inventory-check and conformance-check print; no current exact-output entry holds a literal backslash. A lead for a later change to the check's output (security auditor, BUG-003, advisory; the cost restated at round 3).
+ - `collect` records a layer path that is not a folder with the kind `link`, which gives the required line today; recording it as `file` gives byte-identical output and keeps the label true if link handling ever gets a reason of its own, and the docstring would then name it (Review A, BUG-003, consider).
++
++## Stage B2 — the stage review (round 3, 2026-10-17)
++- Taken on BUG-004 (the supervisor's tests, fixtures and two open-list sentences): with no status file, inventory-check's note and a normal end are asserted and conformance-check is tested not to judge the line (tests part, blocking); the exact-case tests compare the whole standard output with the RESULT line and an empty standard error (Review B); roots and status files are tested in argument order, roots first (tests part); a whitespace-only Set section and a fence closed by spaces and a tab (fixtures part 1); presence checks for the pass root's deeper heading and backticked Set value (fixtures part 2); a traits marker given twice (fixtures part 3); a key where a name belongs, for a trait and for a product type (fixtures part 4); a lone trait as the head (tests part); the two no-carriage-return assertions read the bytes (tests part); the open list says no name a `Workflows:` line reads contains `,`, `;`, `:` or the arrow, and the pause rule names an unwritten sub-type (texts part).
++- workflow-check.py accepts a table separator of single dashes (`|-|-|`), which Markdown accepts too; the open list's own separators use three. A lead if the tables' reader ever needs to be stricter than Markdown (Review B, consider).
++- `check_sub_identity` tests the type file with `os.path.isfile`, which follows a link, so a `types/<key>.md` that is a link satisfies a sub-workflow's (d) test while the link itself is reported (form); the run fails either way (programs part, consider).
++- workflow-check.py run alone (`--status`) does not check placement; only inventory-check and conformance-check do (TASK-008 Requirement 1). TASK-011's intake module must not say intake checks the line's placement (programs part, noted).
++- TASK-010's rename list (the TASK-009 lead above) also takes extension-points.md's prose that uses "phase" for a module: "replaces a phase not marked replaceable", "A point's phase is replaceable", "may replace the phase with its own" (texts part, consider).
++- TASK-017's rewording of the procedure also takes step 4's "running projects of that product type", which should name a sub-type or trait too (texts part, consider).
++- TASK-011 names where the delivery kind confirmed at intake is recorded (extension-points.md says it is recorded by its key; no field holds it yet), and TASK-019's brief says which delivery-kind key the local web app's `Set at intake.delivery-kind` uses (open-list.md's "delivered by an installer" is a plain word, the key `installer` is a desktop application's kind) (texts part, noted).
++- form-part-empty.md and form-prefix-missing.md print the same finding (`- - Workflows line breaks the part-prefix rule`), so an operator cannot tell which rule broke; a lead for the check's wording (fixtures part 3, consider).
++- tests/test_workflow_check.py's FILE_CASES and STATUS_CASES are now covered by FILE_EXACT and STATUS_EXACT, which alone are forced to list every case; a new case is added to the exact tables and need not be added to the older ones (tests part, noted).
++- The repository has no .gitattributes: with core.autocrlf the Windows checkout holds CRLF and CI's ubuntu leg LF; the programs and the tests read with universal newlines and the BOM checks read bytes, so both pass (several parts, noted).
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 4505f4e..8c8deee 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,20 +3,20 @@ Last updated: 2026-10-17
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: BUG-003 — stage B2's review, round 2 (branch bug-003): every failing case's whole output asserted, cases for a valid sub-workflow's changes and the part-name rules, the Workflows paragraph's placement and part-name sentences, two open-list sentences (supervisor); ASCII output on every console and a `types`/`traits` file as (form) in workflow-check.py (builder); round 2's findings are in run/supervisor/stage-b2-review-2.md and HARDENING
+-Last accepted: BUG-002's records with an exact-findings test, at commit 0f04c4f (merged to main 2026-10-17, PR #28); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records
++Increment: BUG-004 — stage B2's review, round 3 (branch bug-004; the supervisor's tests, fixtures and two open-list sentences, no program change): Review A's tests part rejected (TASK-008 Requirement 4, no status file, was held by a test too weak to fail); the six other parts and Review B approved, their should-fix and cheap considers taken here; round 3's findings are in HARDENING and run/supervisor/in-flight.md
++Last accepted: BUG-003, at commit 484badb (merged to main 2026-10-17, PR #29); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003
+ Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
+ Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
+-Next: BUG-003 through the gate; then stage B2's review again from its step 1 (rounds 1 and 2 rejected; round 2: Review B, and three Review A fixture parts converging); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING); then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
++Next: BUG-004 through the gate; then stage B2's review again from its step 1 (rounds 1 to 3 rejected; round 3: Review A's tests part only); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING); then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation drivers mutate_ci_floor.py and mutate_workflow_check.py, drafts/, in-flight.md as a scratch log while a review runs)
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation drivers mutate_ci_floor.py, mutate_workflow_check.py and mutate_workflows_line.py, drafts/, in-flight.md as a scratch log while a review runs)
+ Delegated gates: none
+-Remote sync: main at 0f04c4f, in sync 2026-10-17; branch bug-003 started from origin/main
++Remote sync: main at 484badb, in sync 2026-10-17; branch bug-004 started from origin/main
+ Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
+ Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25)
+ Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
+diff --git a/tests/fixtures/workflows/fail/fence-close-trailing-space/traits/installable.md b/tests/fixtures/workflows/fail/fence-close-trailing-space/traits/installable.md
+index 225b60c..a51fc0d 100644
+--- a/tests/fixtures/workflows/fail/fence-close-trailing-space/traits/installable.md
++++ b/tests/fixtures/workflows/fail/fence-close-trailing-space/traits/installable.md
+@@ -4,7 +4,7 @@ q
+ 
+ ```
+ x
+-```   
++```  	
+ 
+ ## Set at intake.delivery-kind
+ 
+diff --git a/tests/fixtures/workflows/fail/form-empty-set/types/host-extension.md b/tests/fixtures/workflows/fail/form-empty-set/types/host-extension.md
+index 77c9144..7979cb0 100644
+--- a/tests/fixtures/workflows/fail/form-empty-set/types/host-extension.md
++++ b/tests/fixtures/workflows/fail/form-empty-set/types/host-extension.md
+@@ -1,5 +1,6 @@
+ ## Set at intake.target-environment
+ 
++  	
+ 
+ ## Add at intake.questions
+ 
+diff --git a/tests/fixtures/workflows/status/e-lone-trait.md b/tests/fixtures/workflows/status/e-lone-trait.md
+new file mode 100644
+index 0000000..22ddf0b
+--- /dev/null
++++ b/tests/fixtures/workflows/status/e-lone-trait.md
+@@ -0,0 +1 @@
++Workflows: Installable; traits: none
+diff --git a/tests/fixtures/workflows/status/form-traits-marker-twice.md b/tests/fixtures/workflows/status/form-traits-marker-twice.md
+new file mode 100644
+index 0000000..24e04c3
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-traits-marker-twice.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits: none; traits: none
+diff --git a/tests/fixtures/workflows/status/unknown-trait-key.md b/tests/fixtures/workflows/status/unknown-trait-key.md
+new file mode 100644
+index 0000000..a18a922
+--- /dev/null
++++ b/tests/fixtures/workflows/status/unknown-trait-key.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits: installable
+diff --git a/tests/fixtures/workflows/status/unknown-type-key.md b/tests/fixtures/workflows/status/unknown-type-key.md
+new file mode 100644
+index 0000000..942ccbe
+--- /dev/null
++++ b/tests/fixtures/workflows/status/unknown-type-key.md
+@@ -0,0 +1 @@
++Workflows: web-app; traits: none
+diff --git a/tests/test_extension_points.py b/tests/test_extension_points.py
+index afd9933..ec83042 100644
+--- a/tests/test_extension_points.py
++++ b/tests/test_extension_points.py
+@@ -81,7 +81,8 @@ def test_r006_the_file_sits_at_its_planned_path_and_is_bounded():
+     """R-006, BUILD_PLAN TASK-005 Scope: `workflow/extension-points.md` beside the open list; a bounded
+     reference text."""
+     assert os.path.isfile(EP)
+-    assert "\r" not in TEXT
++    raw = open(EP, encoding="utf-8", newline="").read()
++    assert "\r" not in raw.replace("\r\n", "\n"), "no lone carriage return (a CRLF checkout is fine; stage B2 review, round 3)"
+     assert len(TEXT) < 20000
+ 
+ 
+diff --git a/tests/test_open_list.py b/tests/test_open_list.py
+index 5614932..395e827 100644
+--- a/tests/test_open_list.py
++++ b/tests/test_open_list.py
+@@ -115,7 +115,8 @@ def test_r011_the_file_sits_at_the_s6_11_path_and_is_bounded():
+     """R-011, §6.11: `workflow/open-list.md` beside the bridge's programs; a bounded reference text."""
+     assert os.path.isfile(OL)
+     assert TEXT.count("\n") < 300 and len(TEXT) < 30000
+-    assert "\r" not in TEXT
++    raw = open(OL, encoding="utf-8", newline="").read()
++    assert "\r" not in raw.replace("\r\n", "\n"), "no lone carriage return (a CRLF checkout is fine; stage B2 review, round 3)"
+ 
+ 
+ def test_r011_the_three_tables_parse_in_the_shape_workflow_check_reads():
+@@ -147,6 +148,9 @@ def test_r011_the_names_a_workflows_line_reads_are_unique_across_the_tables():
+              + [r["Name"] for r in table("## Traits")[1]])
+     assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
+     assert "the Workflow names, the Sub-workflow names and the traits' Names are unique across the three tables" in TEXT
++    # workflow-check.py splits a line at these characters (prefix_of, check_head, check_traits): stage B2 review, round 3.
++    assert [n for n in names if any(c in n for c in (",", ";", ":", chr(0x2192)))] == [], "a name holds a separator"
++    assert "none of them contains `,`, `;`, `:` or `" + chr(0x2192) + "`" in TEXT
+ 
+ 
+ def test_r011_every_s6_3_product_type_is_listed_with_its_workflow_name_and_defaults():
+@@ -245,7 +249,8 @@ def test_r011_the_classification_rules_are_recorded():
+     assert "Siblings are exclusive: a part has at most one sub-type of its product type." in flat
+     assert "Two levels are enough" in flat
+     assert "A new product type or sub-type pauses the project." in flat
+-    assert "fits no product type, fits two equally, or fits one whose workflow is not yet written" in flat
++    assert ("fits no product type, fits two equally, fits one whose workflow is not yet written, or fits a sub-type whose "
++            "sub-workflow is not yet written, the supervisor stops before design") in flat
+     assert "the supervisor stops before design" in flat
+     assert "A new trait is flagged, and the work continues." in flat
+     assert "from which the maintainer may write it as trait additions" in flat
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index 2199925..1dca48b 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -71,6 +71,15 @@ def test_r014_replaced_module_keeps_its_points():
+     assert code == 0 and lines[-1] == "RESULT: OK", lines
+ 
+ 
++def test_r014_pass_root_holds_its_only_cases():
++    """Two lines of the pass root are the only fixtures of their rule, so the pass root's OK proves the rule only while
++    they stand (stage B2 review, round 3: fixtures 2): a third-level heading is prose (TASK-006 Requirement 7), and a Set
++    value may be written in backticks."""
++    type_text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
++    assert "\n### Add at not.a-change\n" in type_text, "precondition: a deeper heading that would be (a) if read"
++    assert "\n## Set at intake.delivery-kind\n\n`host-installation`\n" in type_text, "precondition: a backticked Set value"
++
++
+ # --- the conditional-workflow files: one failing root per case --------------------------------------------------
+ 
+ FILE_CASES = [
+@@ -133,6 +142,40 @@ def test_r014_fail_root_beside_the_pass_root_is_reported_in_argument_order():
+     assert fails(lines) == [line for line in lines if line.startswith(f"FAIL (c) {FIX}/fail/c-not-replaceable/")], lines
+ 
+ 
++def findings_of(*args):
++    rc, lines, err = run(*args)
++    assert_clean_end(lines, err)
++    return [line for line in lines if line.startswith(("FAIL (", "FLAG ("))]
++
++
++@pytest.mark.parametrize("first,second", [("c-not-replaceable", "a-unknown-point"), ("a-unknown-point", "c-not-replaceable")])
++def test_r014_roots_are_reported_in_argument_order(first, second):
++    """TASK-006: finding lines come roots in argument order, files in sorted path order, then status files in argument
++    order. Two failing roots, in both orders: c- before a- is not the sorted order of their paths, so a check that
++    sorted across roots fails one of the two (stage B2 review, round 3: Review A, tests part)."""
++    one, two = f"{FIX}/fail/{first}", f"{FIX}/fail/{second}"
++    expected = findings_of(one) + findings_of(two)
++    assert findings_of(one) and findings_of(two), "precondition: each root fails on its own"
++    assert findings_of(one, two) == expected
++
++
++@pytest.mark.parametrize("first,second", [("unknown-trait.md", "f-unwritten-type.md"), ("f-unwritten-type.md", "unknown-trait.md")])
++def test_r014_status_files_are_reported_in_argument_order(first, second):
++    one, two = f"{FIX}/status/{first}", f"{FIX}/status/{second}"
++    single = [findings_of("--open-list", STATUS_LIST, "--status", path) for path in (one, two)]
++    assert single[0] and single[1], "precondition: each status file fails on its own"
++    assert findings_of("--open-list", STATUS_LIST, "--status", one, "--status", two) == single[0] + single[1]
++
++
++def test_r014_roots_come_before_status_files():
++    """The status file is given first on the command line; its findings still follow the root's."""
++    root, path = f"{FIX}/fail/c-not-replaceable", f"{FIX}/status/unknown-trait.md"
++    from_root = findings_of("--open-list", STATUS_LIST, root)
++    from_status = findings_of("--open-list", STATUS_LIST, "--status", path)
++    assert from_root and from_status, "precondition: each fails on its own"
++    assert findings_of("--open-list", STATUS_LIST, "--status", path, root) == from_root + from_status
++
++
+ # --- the status files ---------------------------------------------------------------------------------------------
+ 
+ def status(name):
+@@ -245,12 +288,15 @@ def test_r014_status_case_fails(name, code, offending):
+ def test_r014_trait_in_head_is_only_the_shape_finding():
+     """R-014: a trait's Name is in the open list, so a trait beside the product type in the Workflows head is the shape
+     (form) finding alone, never (unknown); a lone trait gives only the (e) finding, before the shape test (BUG-002 round 2
+-    review: no test held check_head's trait branch exactly)."""
++    review: no test held check_head's trait branch exactly; the lone trait's case added at stage B2's review, round 3)."""
+     rc, lines, err = status("form-trait-in-head.md")
+     assert_clean_end(lines, err)
+     assert rc == 1, lines
+     assert fails(lines) == [f"FAIL (form) {FIX}/status/form-trait-in-head.md: - - "
+                             "Workflows head is not the product type, then at most its sub-type"], lines
++    rc, lines, err = status("e-lone-trait.md")
++    assert rc == 1, lines
++    assert fails(lines) == [f"FAIL (e) {FIX}/status/e-lone-trait.md: - - part must name exactly one product type"], lines
+ 
+ 
+ # --- every case's exact findings (stage B2 review, round 2: a second finding must not hide the named one) -----------
+@@ -322,6 +368,7 @@ FILE_EXACT = {
+ 
+ STATUS_EXACT = {
+     'bom-workflows-line.md': [],
++    'e-lone-trait.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
+     'e-no-type.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
+     'e-same-part.md': ['FAIL (e) {path}: app - two Workflows lines name the same part'],
+     'e-sub-type-of-another.md': ["FAIL (e) {path}: Claude Code Extension - sub-type is not of the line's product type"],
+@@ -355,6 +402,7 @@ STATUS_EXACT = {
+     'form-trait-order.md': ["FAIL (form) {path}: Has screens - traits are not in the open list's order"],
+     'form-trait-repeated.md': ['FAIL (form) {path}: Installable - trait repeated'],
+     'form-trait-separator.md': ['FAIL (form) {path}: Has screens,Installable - traits are not joined by a comma and one space'],
++    'form-traits-marker-twice.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
+     'ok-multi.md': [],
+     'ok-single.md': [],
+     'ok-unclassified.md': [],
+@@ -363,9 +411,21 @@ STATUS_EXACT = {
+         'FAIL (e) {path}: - - part must name exactly one product type',
+     ],
+     'unknown-trait.md': ['FAIL (unknown) {path}: Glitter - not a trait name'],
++    # A key where a Name belongs: the line is read by name only (stage B2 review, round 3: fixtures 4).
++    'unknown-trait-key.md': ['FAIL (unknown) {path}: installable - not a trait name'],
++    'unknown-type-key.md': [
++        'FAIL (unknown) {path}: web-app - name is not in the open list',
++        'FAIL (e) {path}: - - part must name exactly one product type',
++    ],
+ }
+ 
+ 
++def whole_output(expected):
++    """A case's whole standard output: its finding lines, then the RESULT line, which counts the FAIL lines only."""
++    count = sum(1 for line in expected if line.startswith("FAIL ("))
++    return expected + ["RESULT: OK" if count == 0 else f"RESULT: {count} problem(s)"]
++
++
+ def test_r014_every_case_has_its_exact_findings():
+     """Every fixture under fail/ and status/ has an entry, so a new case states its whole output."""
+     assert sorted(FILE_EXACT) == sorted(p.name for p in (REPO / FIX / "fail").iterdir())
+@@ -374,24 +434,28 @@ def test_r014_every_case_has_its_exact_findings():
+ 
+ @pytest.mark.parametrize("case", sorted(FILE_EXACT))
+ def test_r014_file_case_gives_exactly_its_findings(case):
+-    """R-014: each failing root reports its case and nothing else (stage B2 review, round 2: fixtures parts 1-3)."""
++    """R-014: each failing root reports its case and nothing else (stage B2 review, round 2: fixtures parts 1-3); the
++    whole standard output is compared, RESULT line included, and standard error is empty (round 3: Review B)."""
+     root = f"{FIX}/fail/{case}"
+     rc, lines, err = run(root)
+     assert_clean_end(lines, err)
+     expected = [line.replace("{root}", root) for line in FILE_EXACT[case]]
+-    assert [line for line in lines if line.startswith(("FAIL (", "FLAG ("))] == expected, lines
++    assert lines == whole_output(expected), lines
++    assert err == "", err
+     assert rc == (1 if expected else 0), lines
+ 
+ 
+ @pytest.mark.parametrize("name", sorted(STATUS_EXACT))
+ def test_r014_status_case_gives_exactly_its_findings(name):
+     """R-014, R-015: each status file reports its case and nothing else; the part-name rules (non-empty, no `;`, `→` or
+-    `:`) are tested in a file of several lines, where they are reached (stage B2 review, round 2: Review B, fixtures 3)."""
++    `:`) are tested in a file of several lines, where they are reached (stage B2 review, round 2: Review B, fixtures 3);
++    the whole standard output is compared, RESULT line included, and standard error is empty (round 3: Review B)."""
+     path = f"{FIX}/status/{name}"
+     rc, lines, err = status(name)
+     assert_clean_end(lines, err)
+     expected = [line.replace("{path}", path) for line in STATUS_EXACT[name]]
+-    assert [line for line in lines if line.startswith(("FAIL (", "FLAG ("))] == expected, lines
++    assert lines == whole_output(expected), lines
++    assert err == "", err
+     assert rc == (1 if any(line.startswith("FAIL (") for line in expected) else 0), lines
+ 
+ 
+@@ -861,18 +925,27 @@ def test_r014_tilde_fences_and_longer_runs_hide_headings():
+ @pytest.mark.parametrize("case", ["fence-longer-opening", "fence-info-string-not-closing", "fence-backtick-in-info", "fence-close-trailing-space"])
+ def test_r014_commonmark_fence_cases_read_the_set(case):
+     """R5-3: a shorter run does not close a longer fence; a backtick line with text after it does not close; a backtick
+-    line whose info string holds a backtick does not open; a closing run followed only by spaces closes. In each the
+-    trait's `## Set` is read and is the one (b), with no open fence left."""
++    line whose info string holds a backtick does not open; a closing run followed only by spaces or tabs closes. In each
++    the trait's `## Set` is read and is the one (b), with no open fence left."""
+     root = f"{FIX}/fail/{case}"
+     if case == "fence-close-trailing-space":
+         text = (REPO / root / "traits/installable.md").read_text(encoding="utf-8")
+-        assert "\n```   \n" in text, "precondition: the closing run keeps its trailing spaces"
++        assert "\n```  \t\n" in text, "precondition: the closing run keeps its trailing spaces and tab"
+     rc, lines, err = run(root)
+     assert_clean_end(lines, err)
+     assert rc == 1
+     assert fails(lines) == [f"FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
+ 
+ 
++def test_r014_whitespace_only_set_section_is_empty():
++    """TASK-006: a `## Set at` section with no non-blank line is (form); a line of spaces and a tab is blank, so the
++    case's Set section holds one, kept by this precondition (stage B2 review, round 3: fixtures 1)."""
++    root = f"{FIX}/fail/form-empty-set"
++    text = (REPO / root / "types/host-extension.md").read_text(encoding="utf-8")
++    assert "## Set at intake.target-environment\n\n  \t\n\n## Add at" in text, "precondition: the Set section holds only a whitespace line"
++    assert findings_of(root) == [f"FAIL (form) {root}/types/host-extension.md: intake.target-environment - Set at section has no non-blank line"]
++
++
+ def test_r014_indented_fence_pair_hides_a_heading():
+     """R4-3: the pass root holds a fence pair indented by two and three spaces around a heading that, read, is (c)."""
+     text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
+diff --git a/tests/test_workflows_line_check.py b/tests/test_workflows_line_check.py
+index 461210a..3534ca1 100644
+--- a/tests/test_workflows_line_check.py
++++ b/tests/test_workflows_line_check.py
+@@ -184,8 +184,15 @@ def test_r015_inventory_output_is_ascii(tmp_path):
+ 
+ 
+ def test_r015_inventory_no_status_file_no_check(tmp_path):
+-    rc, lines, out, err = inventory(tmp_path, tmp_path / "absent-status.md")
++    """TASK-008 Requirement 4: with no status file the line is not judged, nothing is said about it, and inventory-check
++    keeps its existing note; the run ends normally. test_r015_inventory_missing_line is the positive control."""
++    absent = tmp_path / "absent-status.md"
++    rc, lines, out, err = inventory(tmp_path, absent)
++    assert "Traceback" not in err and "Traceback" not in out, (out, err)
++    assert lines and lines[-1].startswith("RESULT: "), (lines, err)
++    assert "note: status: %s not found (skipped)" % absent in lines, lines
+     assert workflows_lines(lines) == [], lines
++    assert not [line for line in lines if "Workflows" in line], lines
+ 
+ 
+ def _bridge_copy(tmp_path, with_checker=True, with_rules=True):
+@@ -280,6 +287,35 @@ def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
+         assert any("open-list.md" in line for line in found), "the cause names the rule file that cannot be read"
+ 
+ 
++def _non_ascii_folder(tmp_path):
++    folder = tmp_path / ("d" + chr(0xE9))
++    folder.mkdir()
++    return folder
++
++
++def test_r015_inventory_not_checked_path_is_ascii(tmp_path):
++    """The not-checked message names the checker's path; a non-ASCII path reaches the output as its escape. Since BUG-003
++    escape_field makes every finding field ASCII, this message is the one the program's own ascii_text alone guards
++    (stage B2 review, round 3: the driver's mutant had become equivalent for the field tests)."""
++    base = _non_ascii_folder(tmp_path)
++    folder = _broken_copy(base, "checker-absent")
++    status = base / "PROJECT_STATUS.md"
++    write_status(status, VALID["not-yet-classified"])
++    rc, lines, out, err = inventory(base, status, program=folder / "inventory-check.py")
++    found = workflows_lines(lines)
++    assert found and "cannot be loaded (FileNotFoundError)" in found[0], lines
++    assert all(line.isascii() for line in found) and "\\xe9" in found[0], found
++
++
++def test_r015_conformance_not_checked_path_is_ascii(tmp_path):
++    base = _non_ascii_folder(tmp_path)
++    folder = _broken_copy(base, "checker-absent")
++    rc, out, err = conformance(workspace(base, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
++    v, text = verdict(out, "Workflows line")
++    assert v == "MISSING" and "cannot be loaded (FileNotFoundError)" in text, out
++    assert text.isascii() and "\\xe9" in text, text
++
++
+ def test_r015_loading_the_checker_writes_no_bytecode(tmp_path):
+     """R2-1: neither program leaves a __pycache__ beside itself (inventory-check reads only; conformance-check never writes)."""
+     folder = _bridge_copy(tmp_path)
+@@ -366,6 +402,21 @@ def test_r015_conformance_malformed_line(tmp_path, case):
+     assert rc == 1
+ 
+ 
++def test_r015_conformance_no_status_file_no_check(tmp_path):
++    """TASK-008 Requirement 4, conformance-check's half: with no status file the Workflows line is not judged and no row
++    names it; the records row already reports the file missing. test_r015_conformance_missing_line is the positive
++    control."""
++    root = workspace(tmp_path, VALID["not-yet-classified"])
++    (root / "docs" / "PROJECT_STATUS.md").unlink()
++    rc, out, err = conformance(root)
++    assert "Traceback" not in err and "Traceback" not in out, (out, err)
++    assert out.splitlines()[-1].startswith("RESULT: "), out
++    assert verdict(out, "Workflows line") == (None, None), out
++    v, text = verdict(out, "docs/PROJECT_STATUS.md")
++    assert v == "MISSING" and "the bounded status file" in text, out
++    assert rc == 1
++
++
+ def test_r015_conformance_output_is_ascii(tmp_path):
+     rc, out, err = conformance(workspace(tmp_path, HEAD + "Workflows: " + chr(0xDC) + "nknown; traits: none\n"))
+     assert rc == 1 and out.isascii(), repr(out)
