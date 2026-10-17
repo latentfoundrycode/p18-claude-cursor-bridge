@@ -929,6 +929,17 @@ def test_r014_layer_that_cannot_be_examined_stops_the_check(tmp_path, monkeypatc
     assert any(line.startswith("ERROR: ") and f"{shown}/{layer}" in line.replace("\\", "/") for line in lines), lines
 
 
+def test_r014_unknown_type_folder_is_reported_without_its_files():
+    """R-014: a folder under types/ that is no product type is the (d) finding alone; its file holds a change the check
+    would refuse with (a), so the exact output shows the folder's files are not read (stage B2 review, round 4: fixtures
+    1; the precondition by Review A, BUG-005)."""
+    text = (REPO / FIX / "fail/d-unknown-type-folder/types/not-a-type/thing.md").read_text(encoding="utf-8")
+    assert "\n## Add at nowhere.at-all\n" in "\n" + text, "precondition: the folder's file holds a change to an unknown point"
+    rc, lines, err = run(f"{FIX}/fail/d-unknown-type-folder")
+    assert lines == whole_output([f"FAIL (d) {FIX}/fail/d-unknown-type-folder/types/not-a-type: not-a-type - type folder is not a product type"]), lines
+    assert err == "" and rc == 1, (lines, err)
+
+
 def test_r014_tilde_fences_and_longer_runs_hide_headings():
     """R5-3: in the pass root's trait file a tilde fence hides a trait's `## Set` (b), and a four-tilde fence holds a
     four-backtick line (the other character, long enough), after which `## Replace interface` (b) stands, and a shorter
