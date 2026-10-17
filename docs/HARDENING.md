@@ -250,7 +250,7 @@ Recorded from Review A, for the later program change that reads a line of `##` a
 
 **Registry text** (texts part): the four forms are matched exactly; "A `##` heading other than the four forms is prose" (carried from BUG-006's gate); an unreadable conditional-workflow file stops the check. The heading paragraph's order pin is exact: a blank line before it and the term's first use at its own sentence (carried).
 
-**The sweep, widened** (run/supervisor/sweep_workflow_check.py, local; Review A, tests part): the bounds `{0,3}` and `{3,}` moved by one each way, the numbers compared moved by one, `== 2` read as `>= 2`, a character set made smaller, the deleted appends of errors and found items, each condition forced true and false, and each `and` clause dropped. It made 756 mutants, of which 711 compile (the 45 that do not are counted apart): 78 survived before BUG-007's cases, 51 after its third round (BUG-007 r3; the list below is written from that run's output, run/supervisor/sweep_workflow_check_r8.out, each survivor with its line of workflow-check.py at 6b51ccd and its operator, so a line's other operators were killed). 46 are equivalent, 4 held on CI only, 1 a lead:
+**The sweep, widened** (run/supervisor/sweep_workflow_check.py, local; Review A, tests part): the bounds `{0,3}` and `{3,}` moved by one each way, the numbers compared moved by one, `== 2` read as `>= 2`, a character set made smaller, the deleted appends of errors and found items, each condition forced true and false, and each `and` clause dropped. It made 756 mutants, of which 711 compile (the 45 that do not are counted apart): 78 survived before BUG-007's cases, 50 after its last round (the list below is written by run/supervisor/write_survivor_list.py from that run's output, run/supervisor/sweep_workflow_check_r9.out, each survivor with its line of workflow-check.py at 6b51ccd and its operator; a line's other operators were killed or did not compile). 42 are equivalent, 4 held on CI only, 4 leads:
 - **Equivalent** (no input separates them):
   - 83, `{3,} -> {2,}` (twice): a closing run must be at least as long as its opening, which is at least three.
   - 103, `if condition -> False`: a final empty line kept adds a blank line, which no reader acts on.
@@ -261,9 +261,7 @@ Recorded from Review A, for the later program change that reads a line of `##` a
   - 191, `if condition -> True`: a table line starts with a pipe.
   - 313, `delete`: a layer that cannot be examined has its error recorded, and the errors alone decide exit 2.
   - 322, `False -> True`: links are pruned from the folders walked, so following links reaches nothing.
-  - 342, `drop and-clause len(parts) == 2`, `== 2 -> >= 2`: a folder under an unknown type folder lies under that folder's own two-part entry, which is listed too. On a POSIX host a folder name holding a backslash separates it (see the lead on line 323 below); the check does not validate a key's shape either, and `--open-list` is an input, so this holds for keys of the open list's shape and names without a backslash.
   - 357, `drop and-clause len(parts) >= 2`: a folder under `traits/` has at least two parts.
-  - 360, `== 2 -> >= 2`: a longer path under `types/` whose second part ends `.md` lies in an unknown type folder, which is skipped first. On a POSIX host a folder name holding a backslash separates it (see the lead on line 323 below); the check does not validate a key's shape either, and `--open-list` is an input, so this holds for keys of the open list's shape and names without a backslash.
   - 364, `drop and-clause parts[0] == "traits"`: a two-part `types/` path ending `.md` is taken by the line before.
   - 380, `if condition -> False`: is_change_heading is only called on heading candidates.
   - 381, `False -> True`: is_change_heading is only called on heading candidates.
@@ -289,21 +287,23 @@ Recorded from Review A, for the later program change that reads a line of `##` a
   - 664, `> -> >=`: an equal index is a repeat, caught first.
   - 688, `if condition -> True`: a part is None only in a one-line file.
   - 795, `delete`: a root that is not a folder already ends the run with exit 2.
-  - 833, `if condition -> True`, `if condition -> False`: every printed field is ASCII already, and every standard stream has `reconfigure`.
+  - 833, `if condition -> False`: every printed field is ASCII already, so the error handler the reconfiguration sets is never used (with the condition forced true it is killed: a closed standard output, test_r014_closed_standard_output_gives_no_traceback).
 - **Held on CI's ubuntu leg only** (the driver leaves them out on this host):
   - 161, `if condition -> False`: a symbolic link is known by its mode on CI's ubuntu leg; this host makes junctions.
   - 162, `True -> False`: as 161.
   - 335, `if condition -> False`: the dangling link `gone.md` lands among a folder's files on Linux, where reading it as a file is an ERROR; this host's junction is listed as a folder.
   - 336, `delete`: as 335.
-- **A lead:**
+- **Leads** (an input separates them, through a program defect the next change of the check settles):
+  - 342, `drop and-clause len(parts) == 2`, `== 2 -> >= 2`: an input separates it on a POSIX host only: a folder whose name holds a backslash, directly under `types/`, whose contents the original reports under paths that do not exist (the lead on line 323 below) and the mutant drops; it dies when line 323 is fixed. With keys of the open list's shape and names without a backslash no input separates it.
+  - 360, `== 2 -> >= 2`: as 342, with a folder named like `zz.md\q` under `types/`: the mutant reads a path that does not exist and stops with exit 2.
   - 626, `False -> True`: the lead below: a head whose sub-type belongs to another type stops at (e).
 
-**Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule: 196 of 196 killed at this round (161 before, 35 new), 198 of 198 after its gate round 1 (below); mutate_workflows_line.py stands at 42 of 42.
+**Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule: 196 of 196 killed at this round (161 before, 35 new), 198 of 198 after its gate round 1 and 199 of 199 after its gate round 3 (below); mutate_workflows_line.py stands at 42 of 42.
 
 **Leads:**
 - 626 stands (fixtures 4 converged on it with Review A of BUG-006): a possible program defect, for the next change of workflow-check.py.
 - The program's usage text (lines 31 to 35) and the registry's list of what stops the check did not name an unreadable conditional-workflow file; the registry now does, and the usage text is the builder's, for the next change of the program (programs part).
-- Line 323 turns every backslash of a folder's path into a slash, so on a POSIX host a folder named `zz\q` under an unknown type folder has its contents reported under paths that do not exist (`types/zz/q/sub`), where they should be skipped with their folder; reading only the separator of the host would close it, for the next change of the program (BUG-007's gate round 2: Review A, under WSL).
+- Line 323 turns every backslash of a folder's path into a slash, so on a POSIX host a folder named `zz\q` directly under `types/` (itself an unknown type folder) has its contents reported under paths that do not exist (`types/zz/q/sub`), where they should be skipped with their folder; reading only the separator of the host would close it, for the next change of the program (BUG-007's gate round 2: Review A, under WSL; worded so in its gate round 3). The sweep's survivors 342 and 360 are separated only by this input and die with the fix (gate round 3: Review B).
 - The fixtures' 24 headers: the 25th file, status/ok-bom.md, was added in TASK-006 and deleted in BUG-002, so it has no net change in the stage (fixtures 4, noted).
 
 **For TASK-023's brief** (programs part, noted): the calibration that installs release B adds a running project's `Workflows:` line, so the brief names that step.
@@ -322,4 +322,10 @@ Recorded from Review A, for the later program change that reads a line of `##` a
 - the sweep rerun after r3 and the list above written from its output by a script that fails on a survivor without a reason, each survivor with its operator;
 - **Should-fix (Review A):** 342 and 360 are separated on a POSIX host by a folder name holding a backslash; both reasons say so, and line 323's splitting is a lead above;
 - **Considers (Review A):** the driver's count states its round; the remaining unread files under `traits/` (form-not-markdown's installable.txt, form-traits-folder's two extra.md) hold a failing change, pinned as preconditions.
+
+**BUG-007's gate, round 3:** Review A REJECT, Review B REJECT, converged on one class: survivors listed as equivalent that an input separates. Taken in BUG-007 r4:
+- **Review A (blocking):** 833 with its condition forced true is not equivalent: with standard output closed (a launch with no standard handles, where Python sets sys.stdout to None) the mutant ends in a traceback and exit 1. test_r014_closed_standard_output_gives_no_traceback runs the check so on a passing and a failing root and asserts each exit code and no traceback; the driver has the mutant.
+- **Review B (blocking):** 342 (twice) and 360 named the POSIX backslash input that separates them and stood under Equivalent; they are leads now, beside 626, dying when line 323 is fixed.
+- **Considers (Review A), taken:** the backslash lead names a folder directly under `types/`; the list says a line's other operators were killed or did not compile; the scope file's round-6 count is marked as that round's.
+- **Noted (Review A), taken:** the script that writes the list is kept beside the sweep, run/supervisor/write_survivor_list.py (local), and the list above is its output on the sweep rerun after r4.
 

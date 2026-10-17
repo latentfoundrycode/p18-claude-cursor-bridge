@@ -1655,3 +1655,14 @@ def test_r014_part_with_nothing_after_its_prefix_lacks_the_traits_marker(tmp_pat
     shown = str(st).replace("\\", "/")
     assert lines == whole_output([f"FAIL (form) {shown}: - - Workflows line must contain '; traits: ' exactly once"]), lines
     assert rc == 1
+
+
+def test_r014_closed_standard_output_gives_no_traceback():
+    """With standard output closed (a launch with no standard handles: Python then sets sys.stdout to None) the check
+    still runs, decides its exit code and prints no traceback, as its usage text promises (BUG-007's gate round 3:
+    Review A, the sweep's line 833 with its condition forced true)."""
+    launch = "import os, subprocess, sys\nos.close(1)\nsys.exit(subprocess.call([sys.executable] + sys.argv[1:]))\n"
+    for root, code in ((f"{FIX}/pass", 0), (f"{FIX}/fail/form-bad-heading", 1)):
+        p = subprocess.run([sys.executable, "-c", launch, PROG, root], cwd=str(REPO), stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE, text=True, encoding="utf-8")
+        assert p.returncode == code and "Traceback" not in p.stderr, (root, p.returncode, p.stderr)
