@@ -1,0 +1,90 @@
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index 5502118..155439a 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -479,6 +479,10 @@ Every round-4 finding was confirmed settled by probes, R5-3 against a CommonMark
+ | REFAC-B2 | 1 | Review B | 0 | 1 | 0 | APPROVE; the should-fix converges with Review A's S1; taken in round 2 |
+ | REFAC-B2 | 2 | Review A | 0 | 1 | 1 | APPROVE; both taken in the post-merge records |
+ | REFAC-B2 | 2 | Review B | 0 | 0 | 0 | APPROVE |
++| BUG-002 | 1 | Review A | 0 | 0 | 6 | APPROVE; C2 converges with the security auditor's advisory (blocking), taken by the builder in round 2; C1, C3, C4, C5 taken by the supervisor in round 2; C6 at stage B2's reflection |
++| BUG-002 | 1 | Review B | 0 | 0 | 0 | APPROVE |
++| BUG-002 | 2 | Review A | 0 | 1 | 0 | APPROVE; the should-fix taken in the post-merge records |
++| BUG-002 | 2 | Review B | 0 | 0 | 0 | APPROVE |
+ 
+ ### TASK-006 round 6 — disposition (PR #23, merged)
+ All three approved; R6-1 and R6-2 were confirmed by probes at every site, against a CommonMark reference. The remaining findings are the long tail of reading Markdown-like text, in files only the maintainer and the supervisor write, and the by-class line drawn at round 3 holds: Review A's Consider (a heading or `Workflows:` line after a form feed or line separator is now invisible to the check, as to Markdown, though a raw-text reader would see it) and the auditor's two advisories (cells trimmed of any Unicode whitespace rather than spaces and tabs, so a separator followed by such a character is accepted where Markdown shows no table; an escaped pipe inside a cell split as a boundary) are recorded in HARDENING. They are different defects, not one named twice, so convergence does not apply. Carried to TASK-008's brief: any reader of the `Workflows:` line splits lines exactly as `workflow-check.py`'s `file_lines` does.
+@@ -513,6 +517,12 @@ Both approved the test lane as behaviour-preserving (collected set identical; ea
+ ### REFAC-B2 round 2 — disposition (PR #26, merged as 9bb26e0)
+ Both approved (Review A 0/1/1, Review B 0/0/0); CI green on the pushed head. Review A's should-fix, a false clause in one inventory row that no other reviewer named, did not hold the merge; it is corrected in these post-merge records, which the next branch's gate reviews. Review A confirmed round 1's three should-fix items true against their sources (npm's dates; the NameError, probed on a copy; the registry's test and BUILD_PLAN), and found round 2's new clause false: jscpd 5.3.3's only dependencies are its platform binaries, optional and pinned to the same version, with none of their own, so the pin fixes the whole tree, not the top-level package only. The clause came from its own round 1 consider, which round 2 took without checking it against the registry; the supervisor checked it this time (`npm view`) and the row now says so. Round 1's disposition above, which records that clause, stands as written. Its consider taken: the rule that a change to one judge copy is made to both is routed to TASK-024's brief, whose Scope holds only conformance-check.py and whose report of unwritten workflows is the likeliest reason for the copies to diverge.
+ 
++### BUG-002 round 1 — disposition (PR #27)
++The fixes from stage B2's review, round 1. All three approved (Review A 0/0/6, Review B 0/0/0, the security auditor PASS). Review A confirmed the builder's exact comparison of the `Workflows:` head by feeding 32,323 generated heads to the old and the new `check_head`: 519 gained exactly the shape `form` finding and nothing else moved; Review B confirmed the round-1 deferral of the per-part completeness item against the Restructuring Plan, which gives several-part projects their layout and records in a later release. Converged: Review A's consider and the security auditor's advisory both named `traits_in_head` (workflow-check.py:607, :618), filled and never read after the exact comparison; two reviewers on one defect make it blocking, so round 2. Review A's other considers were taken by the supervisor in round 2: the six separator cases pin the shape finding's own reason; a docstring said the check walks no unknown type folder where it walks it and reads no file under it; open-list.md's "until then" covered no period; BUILD_PLAN.md's TASK-004 Done when carries a dated note that no default-traits check exists yet. The sixth (the per-part lead also in the Restructuring Plan's §16) is a `Documents/` write, made at stage B2's reflection point.
++
++### BUG-002 round 2 — disposition (PR #27, merged as 55fd516)
++All three approved (Review A 0/1/0, Review B 0/0/0, the security auditor PASS); CI green on the pushed head. The builder removed the list and wrote the trait branch as one condition; Review A ran round 1's and round 2's `check_head` over 50,125 generated heads and found every finding identical. Review A's should-fix was the supervisor's, a gap in the tests rather than the code, so it did not hold the merge: no test held the exact condition round 2 rewrote; putting round 1's `else:` back survived every test while `form-trait-in-head.md` printed a wrong `FAIL (unknown)` for a trait the open list holds, because that case asks only for some `form` line. Taken in these records: `test_r014_trait_in_head_is_only_the_shape_finding` asserts that fixture's exact findings, and the mutation driver gained the mutant "trait branch dropped". Noted: the brief's "a trait name in the head is the shape `form`" holds only when the counts are right (a lone trait gives the `e` finding first, in both rounds), wording only; the per-part lead's §16 copy is on the reflection's list; TASK-019's brief is written with HARDENING's default-traits line, which BUILD_PLAN's TASK-019 entry does not repeat.
++
+ ## Resolution
+ | Question | Settled | How |
+ |---|---|---|
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index b847eee..ce22b61 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -51,3 +51,8 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ - tests/test_open_list.py bounds open-list.md at under 300 lines and 30,000 characters; TASK-017 to TASK-021 all add to it, so their briefs check the headroom.
+ - The failing-fixture tests assert the named finding and that the RESULT count agrees, not the number of findings, so a second defect added to a fixture later would pass unseen; and a misspelt type (status/unknown-name.md) also gives a follow-on (e) "part must name exactly one product type".
+ - inventory-check.py prints a traceback when `--status` names a folder (its pre-release-B `read()`); the exit is still non-zero.
++
++## Stage B2 — BUG-002, the stage review's fixes
++- Carried to stage B2's reflection (item 3): the per-part completeness lead above goes also into the Restructuring Plan's §16 follow-up lists, where the aggregate release is planned (Review A, BUG-002 round 1).
++- TASK-019's brief is packaged with the default-traits line above (form, check, Scope widening, fixture open list); BUILD_PLAN's TASK-019 entry does not repeat it (Review A, BUG-002 round 2).
++- One failing fixture now has its exact findings asserted (`form-trait-in-head.md`, test_r014_trait_in_head_is_only_the_shape_finding); the lead above on the others (the named finding and the count, not the number of findings) stands.
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 9d6a6e6..1d17292 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,11 +3,11 @@ Last updated: 2026-10-17
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: BUG-002 — stage B2's review fixes (branch bug-002): the separators of the `Workflows:` line exact in workflow-check.py (builder), the supervisor's tests no longer reading the live tree where later increments change it, the registry's `for <kind>` heading, the open list's default-traits sentence; the round-1 findings and dispositions are in run/supervisor/stage-b2-review-1.md
+-Last accepted: the stage B2 refactoring pass, at commit 9bb26e0 (merged to main 2026-10-17, PR #26, after two review rounds); main holds TASK-001 to TASK-009, BUG-001 and the pass
++Increment: BUG-002's post-merge records (branch bug-002-records): its review dispositions, the exact-findings test for a trait in the `Workflows:` head (Review A's round-2 should-fix); then stage B2's review again
++Last accepted: BUG-002, stage B2's review fixes, at commit 55fd516 (merged to main 2026-10-17, PR #27, after two review rounds); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass and BUG-002
+ Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
+ Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
+-Next: BUG-002 through the gate; then stage B2's review again from its step 1 on the stage's new whole change (round 1 rejected: Review B and Review A's tests part); then the demonstration and the reflection items; then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
++Next: these records through the gate; then stage B2's review again from its step 1 on the stage's new whole change, BUG-002 and the refactoring pass included (round 1 rejected: Review B and Review A's tests part); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING); then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -16,7 +16,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation driver mutate_ci_floor.py, drafts/, in-flight.md as a scratch log while a review runs)
+ Delegated gates: none
+-Remote sync: main at 9bb26e0, in sync 2026-10-17; branch bug-002 started from origin/main
++Remote sync: main at 55fd516, in sync 2026-10-17; branch bug-002-records started from origin/main
+ Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
+ Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25)
+ Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index 1bad227..7a97197 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -239,6 +239,16 @@ def test_r014_status_case_fails(name, code, offending):
+     assert lines[-1] == f"RESULT: {len(fails(lines))} problem(s)"
+ 
+ 
++def test_r014_trait_in_head_is_only_the_shape_finding():
++    """R-014: a trait's Name is in the open list, so a trait in the Workflows head is the shape (form) finding alone,
++    never (unknown) (BUG-002 round 2 review: no test held check_head's trait branch exactly)."""
++    rc, lines, err = status("form-trait-in-head.md")
++    assert_clean_end(lines, err)
++    assert rc == 1, lines
++    assert fails(lines) == [f"FAIL (form) {FIX}/status/form-trait-in-head.md: - - "
++                            "Workflows head is not the product type, then at most its sub-type"], lines
++
++
+ def test_r014_unwritten_type_fails_against_the_real_open_list(tmp_path):
+     """The pause (§6.7) against the bridge's own open list: a copy with every entry marked unwritten, so the test still
+     holds once release B writes its first workflows (TASK-017 to TASK-021; stage B2 review)."""
