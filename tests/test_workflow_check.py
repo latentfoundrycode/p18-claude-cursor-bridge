@@ -1677,12 +1677,17 @@ def test_r014_closed_standard_output_gives_no_traceback():
 def test_r014_root_the_system_refuses_is_not_walked(tmp_path):
     """A root the system refuses outright (a name Windows rejects; a link to itself on POSIX) is `not a folder` and
     nothing under it is examined, so no further ERROR line follows (BUG-007's gate round 4: Review A, the sweep's line
-    795, its `continue` deleted)."""
+    795, its `continue` deleted). The root's `types/` is shown first to raise an error the walk reports, not one it
+    skips quietly (its gate round 5: Review A)."""
     if os.name == "nt":
         root = tmp_path / "a<b"
     else:
         root = tmp_path / "loop"
         os.symlink("loop", str(root))
+    with pytest.raises(OSError) as refused:
+        os.lstat(str(root / "types"))
+    assert not isinstance(refused.value, (FileNotFoundError, NotADirectoryError)), \
+        ("precondition: examining the root's types/ would be an ERROR, not a quiet skip", refused.value)
     rc, lines, err = run(str(root))
     assert_not_checked(rc, lines, err)
     assert lines == [f"ERROR: {str(root).replace(chr(92), '/')}: not a folder", "RESULT: not checked"], lines

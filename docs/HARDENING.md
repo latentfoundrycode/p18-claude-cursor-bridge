@@ -287,7 +287,7 @@ Recorded from Review A, for the later program change that reads a line of `##` a
   - 664, `> -> >=`: an equal index is a repeat, caught first.
   - 688, `if condition -> True`: a part is None only in a one-line file.
   - 833, `if condition -> False`: every printed field is ASCII already, so the error handler the reconfiguration sets is never used (with the condition forced true it is killed: a closed standard output, test_r014_closed_standard_output_gives_no_traceback).
-- **Held on CI's ubuntu leg only** (the driver leaves them out on this host):
+- **Held on CI's ubuntu leg only** (the driver leaves them out on this host; that test_r014_link_among_a_folders_files_is_form kills them on Linux is reasoning, not a run):
   - 161, `if condition -> False`: a symbolic link is known by its mode on CI's ubuntu leg; this host makes junctions.
   - 162, `True -> False`: as 161.
   - 335, `if condition -> False`: the dangling link `gone.md` lands among a folder's files on Linux, where reading it as a file is an ERROR; this host's junction is listed as a folder.
@@ -297,7 +297,7 @@ Recorded from Review A, for the later program change that reads a line of `##` a
   - 360, `== 2 -> >= 2`: as 342, with a folder named like `zz.md\q` under `types/`: the mutant reads a path that does not exist and stops with exit 2.
   - 626, `False -> True`: the lead below: a head whose sub-type belongs to another type stops at (e).
 
-**Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule: 196 of 196 killed at this round (161 before, 35 new), 198 of 198 after its gate round 1 199 of 199 after its gate round 3 and 200 of 200 after its gate round 4 (below); mutate_workflows_line.py stands at 42 of 42.
+**Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule: 196 of 196 killed at this round (161 before, 35 new), 198 of 198 after its gate round 1, 199 of 199 after its gate round 3 and 200 of 200 after its gate round 4 (below); mutate_workflows_line.py stands at 42 of 42.
 
 **Leads:**
 - 626 stands (fixtures 4 converged on it with Review A of BUG-006): a possible program defect, for the next change of workflow-check.py.
@@ -331,6 +331,10 @@ Recorded from Review A, for the later program change that reads a line of `##` a
 **BUG-007's gate, round 4:** Review A REJECT (1 blocking, 1 should-fix, considers), Review B APPROVE. REVIEWERS DISAGREED on whether line 795's survivor is equivalent, a correctness question of the records. Decided for Review A on its evidence: with the `continue` deleted, a root the system refuses outright (a name Windows rejects, a link to itself on POSIX) is still walked and gets two more ERROR lines, the same exit code with a different output. Taken in BUG-007 r5:
 - **Blocking (Review A):** test_r014_root_the_system_refuses_is_not_walked asserts the whole output for such a root; the driver has the mutant "a root that is not a folder still walked", and 795 is gone from the list.
 - **Should-fix (Review A):** the closed-output test first shows its precondition, that the child starts with standard output closed (`repr(sys.stdout)` reads `None`), and now covers an exit-2 root as well, the case whose "no traceback" the usage text promises.
-- **Considers (Review A), taken:** the generator checks each survivor's line and operator against the operators its reason was written for, and stops on any other; the Equivalent heading says the reasons are the supervisor's reasoning, reread by Review A, not a test. The CI-held survivors stay reasoning as well, which the list says by its heading.
+- **Considers (Review A), taken:** the generator checks each survivor's line and operator against the operators its reason was written for, and stops on any other; the Equivalent heading says the reasons are the supervisor's reasoning, reread by Review A, not a test. The CI-held survivors stay reasoning as well, which the list's heading says since r6 (it did not in r5: gate round 5).
 - The sweep rerun after r5 (run/supervisor/sweep_workflow_check_r10.out, local): 49 survivors, 41 equivalent, 4 held on CI's ubuntu leg, 4 leads.
+
+**BUG-007's gate, round 5:** Review A APPROVE (1 should-fix, 3 considers), Review B APPROVE. Taken in BUG-007 r6, with one more round of the gate, since a record stood wrong:
+- **Should-fix (Review A):** test_r014_root_the_system_refuses_is_not_walked first shows that the root's `types/` raises an error the walk reports (neither FileNotFoundError nor NotADirectoryError, which it skips quietly), so the test cannot pass because the walk would have been silent.
+- **Considers (Review A), taken:** round 4's paragraph said the list's heading marked the CI-held survivors as reasoning, and it did not; the heading says so now (that test_r014_link_among_a_folders_files_is_form kills them on Linux is reasoning, not a run). The generator checks how often each operator survives on a line as well as which. The driver's count reads with its commas.
 
