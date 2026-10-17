@@ -185,7 +185,9 @@ def test_r015_separators_are_exact(tmp_path, line):
     rc, lines, err = _status_line_case(tmp_path, line)
     assert_clean_end(lines, err)
     assert rc == 1, lines
-    assert any(line.startswith("FAIL (form) ") for line in fails(lines)), lines
+    assert any(line.startswith("FAIL (form) ")
+               and line.endswith(" - Workflows head is not the product type, then at most its sub-type")
+               for line in fails(lines)), lines
 
 
 def test_r014_unwritten_trait_is_flagged_not_failed():
@@ -489,7 +491,7 @@ def _outside_with_canary(tmp_path):
 
 def test_r014_link_under_an_unknown_type_folder_is_form(tmp_path):
     """R3-3: the unknown folder keeps its (d); the link inside it is (form) at its own path. (Whether it is read is not
-    tested here: the check walks no unknown type folder, link or not; test_r014_top_level_link_is_form_and_not_walked
+    tested here: the check reads no file under an unknown type folder, link or not; test_r014_top_level_link_is_form_and_not_walked
     tests a link that would be read.)"""
     outside = _outside_with_canary(tmp_path)
     root = tmp_path / "root"
