@@ -139,7 +139,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 
 **Output escaping:** the escape at each width's boundary.
 
-**Mutation drivers:** run/supervisor/mutate_workflow_check.py names a mutant for each of these, 151 of 151 killed, and mutate_workflows_line.py stands at 42 of 42.
+**Mutation drivers:** run/supervisor/mutate_workflow_check.py names a mutant for each of these, 151 of 151 killed at this round (161 of 161 after BUG-006's gate rounds below: 159 at r2, 160 at r3, 161 at r4), and mutate_workflows_line.py stands at 42 of 42.
 
 **Registry text** (texts part; Review B's should-fix): the registry now states that a section runs to the next `##` heading, so a replacement's own structure uses `###`, and (since BUG-006 r4) what a `##` heading is: at most three spaces, `##`, then a space or a tab, so a line of `##` alone is text. It states the fence rules in full (indent, info string, closing run) and what else fails:
 - an unclosed fence;
@@ -192,13 +192,21 @@ It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The del
   - The registry says a Set value is stripped, and names exactly the files, links and folders that fail, a `types` or `traits` path that is itself a file or a link included (r3, Review A of gate round 2).
   - The open list says no name is `none` or `not yet classified`.
   - The sweep runs test_extension_points.py too.
-- **The named driver** has the eight mutants (159 of 159 killed; 160 of 160 with r3's).
+- **The named driver** has the eight mutants (159 of 159 killed).
+- **Recorded, not taken:** the delivery-kinds test finds a kind only when a `(` follows it, so a kind added to the list bare escapes the comparison with `DELIVERY_KINDS`. This is for whoever next changes the list (tests/test_extension_points.py).
 
 **BUG-006's gate, round 2:** Review A APPROVE (0/1/4), Review B REJECT. Taken in BUG-006 r3:
 - **Review B:** r2's "before the next `##` heading" also covered a `##` line with a tab or nothing after it, which the reader reads past. Both rule files now say "before the next line that starts with two hashes and a space (`## `)", and the table-reader test has a case for `##`+tab and a bare `##`.
 - **Review B:** the sweep counted the 44 mutants that do not compile as killed (every test that runs the program fails on them). It now counts them apart and reports its survivors of the 381 that compile; the survivors are the same 36.
 - **Review A (should-fix):** the equivalent range now reads 625, 627 to 641, so 626 is a lead only.
 - **Review A (considers):** the registry names a `types` or `traits` path that is itself a file or a link; the list's intro says 313 and 322 moved.
+- **The named driver** has r3's mutant (160 of 160 killed).
 
-**BUG-006's gate, round 3:** Review A REJECT (1/0/3), Review B APPROVE (the reviewers disagreed; decided for Review A, whose mutant no test killed). Review A: the registry never said what a `##` heading is. The check reads `^ {0,3}##[ \t]`, so a line of `##` alone is text to it, where Markdown reads an empty heading; the mutant `##(?:[ \t]|$)` survived every test, and no sweep operator makes it. Taken in BUG-006 r4: the registry states the shape; the case kind-bare-hashes (a Set section whose first line is `##` alone) gives the exact (kind) line for `##`; the driver has the mutant. A Markdown reading of a bare `##` would be a program change, not made here.
-- **Recorded, not taken:** the delivery-kinds test finds a kind only when a `(` follows it, so a kind added to the list bare escapes the comparison with `DELIVERY_KINDS`. This is for whoever next changes the list (tests/test_extension_points.py).
+**BUG-006's gate, round 3:** Review A REJECT (1/0/3), Review B APPROVE (the reviewers disagreed; decided for Review A, whose mutant no test killed). Review A: the registry never said what a `##` heading is. The check reads `^ {0,3}##[ \t]`, so a line of `##` alone is text to it, where Markdown reads an empty heading; the mutant `##(?:[ \t]|$)` survived every test, and no sweep operator makes it. Taken in BUG-006 r4: the registry states the shape; the case kind-bare-hashes (a Set section whose first line is `##` alone) gives the exact (kind) line for `##`; the driver has the mutant (161 of 161 killed). A Markdown reading of a bare `##` would be a program change, not made here.
+
+**BUG-006's gate, round 4:** Review A APPROVE (0/1/3), Review B REJECT. Review B: the round-5 paragraph's driver count (151 of 151) was that round's own, not the final count. This converged with Review A's consider that the round-3 record give its count, so it was blocking. Taken in BUG-006 r5:
+- each record states the driver's count at its round;
+- the delivery-kinds item is back under gate round 1, where it was raised (Review A's should-fix);
+- the registry's heading sentence reads "a line that starts with" and now opens its paragraph, before the term's first use (considers).
+
+Recorded from Review A, for the later program change that reads a line of `##` alone as Markdown does: under a Set whose value the check does not validate (`intake.budget-kind`), such a line passes as the value `##`.

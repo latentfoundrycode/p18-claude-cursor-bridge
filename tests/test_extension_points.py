@@ -290,7 +290,9 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     """A prose heading that reads like a change fails; the registry names the words and the stripped
     punctuation workflow-check.py's CHANGE_FIRST and TRAILING_PUNCT hold, and the one-per-target rule (stage
     B2 review, round 4)."""
-    start = TEXT.index("Any other `##` heading is prose")
+    # The paragraph opens with the heading shape, before its first use (BUG-006 r5: Review A).
+    start = TEXT.index("A `##` heading is a line that starts with")
+    assert TEXT[start:].index("Any other `##` heading is prose") > 0
     paragraph = TEXT[start:TEXT.index("\n", start)]
     words_text = paragraph[paragraph.index("ignored, is ") + len("ignored, is "):paragraph.index(", or whose second")]
     words = set(re.findall(r"[a-z]+", words_text)) - {"or"}
@@ -304,8 +306,8 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     # texts and Review B).
     for sentence in (
         # The heading shape workflow-check.py's HEADING_CANDIDATE reads (BUG-006 r4: Review A).
-        "A `##` heading is a line of at most three spaces, then `##`, then a space or a tab; a line of `##` alone is not "
-        "one and is read as text.",
+        "A `##` heading is a line that starts with at most three spaces, then `##`, then a space or a tab; a line of `##` "
+        "alone is not one and is read as text.",
         "A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own "
         "structure `###` headings and deeper.",
         "A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or "
