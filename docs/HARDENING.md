@@ -60,7 +60,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 ## Stage B2 — the stage review (round 2, 2026-10-17)
 - Taken on BUG-003: every failing root and status case asserts its whole output (three fixture parts converged on cases that a second finding could hide); new cases for a valid sub-workflow's changes (Review B, blocking) and for the part-name rules in a file of several lines (Review B and fixtures part 3, converged); the output is ASCII on every console and a `types` or `traits` path that is a file is (form) (Review B; the builder's part); the placement and part-name sentences of supervisor.md's Workflows paragraph (texts part; the placement wording had been routed to TASK-010); the open list states that a part fitting a sub-type takes it and that the names a `Workflows:` line reads are unique across the tables (texts part).
 - Review B's round-1 blocking item (an omitted part's line) still holds as the aggregate release's, Review B agreeing in round 2.
-- TASK-024 (conformance-check reports an unclassified line or one naming an unwritten workflow): tests/test_workflows_line_check.py (the conformance halves at about :291 and :335-349) and tests/test_conformance_check.py (the conformant baseline at about :69 and :104-109) pin today's `Workflows line` OK for those lines; the supervisor's tests for TASK-024, written before its delegation, re-pin them to the report TASK-024 adds, and its brief names both files (tests part).
+- TASK-024 (conformance-check reports an unclassified line or one naming an unwritten workflow): tests/test_workflows_line_check.py (the conformance halves at :333, :378, :388 and :416, the last the no-status test's positive control; line numbers of 2026-10-17, stage B2 review round 5) and tests/test_conformance_check.py (the conformant baseline at about :69 and :104-109) pin today's `Workflows line` OK for those lines; the supervisor's tests for TASK-024, written before its delegation, re-pin them to the report TASK-024 adds, and its brief names both files (tests part).
 - The default-traits line above also widens TASK-019's Scope to tests/test_open_list.py, which pins open-list.md's "No form for that statement exists yet" sentence (tests part).
 - TASK-010's brief checks which of these read the paragraphs it moves or rewords, and widens its Scope to those it changes: tests/test_workflows_line_text.py (the Workflows paragraph), tests/test_open_list.py (the r034 order paragraph), tests/test_glossary_terms.py (the `Phase:` template); the private grammar checker lead above is not tied to TASK-010, whose Done when keeps project state in the core (tests part).
 - TASK-017's brief checks tests/test_open_list.py's pin of step 2's second sentence when it rewords step 2's first (tests part).
@@ -86,11 +86,127 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 - The repository has no .gitattributes: with core.autocrlf the Windows checkout holds CRLF and CI's ubuntu leg LF; the programs and the tests read with universal newlines and the BOM checks read bytes, so both pass (several parts, noted).
 
 ## Stage B2 — the stage review (round 4, 2026-10-17)
-- Taken on BUG-005 (the supervisor's fixtures, tests and text): each CommonMark fence rule the check reads has a control a mutant cannot pass, a backtick fence with an ordinary info string hiding a heading beside the refused one, a fence closed by a longer run, a shorter tilde run that does not close (fixtures parts 1 and 2, converged as one class: fixture coverage of the fence rules); a multi-part status file with a part prefixed `not yet classified` (fixtures part 4: a mutant refusing it would refuse a valid project at intake); a part name with a leading space and with a tab, a trait with a trailing space, a sub-type's key where its name belongs (fixtures parts 3 and 4); the unknown type folder's file holds a change the check would refuse with (a) if it read the file (fixtures part 1); presence checks for the pass root's sub-workflow Set, its repeated Add at, its two delivery kinds and a sub-workflow's Replace of a module its type replaces (fixtures part 2); conformance-check says nothing about the line when the status file is absent, under any name, and the delivery-kinds test reads its paragraph only (tests part); the registry states which headings are read as change headings and that a file sets a point, and replaces a module, at most once, and no longer says workflow-check.py checks the modules' declarations (TASK-014's cross-check is its own test); the open list pauses a part that fits two sub-types of its type equally; the core's Add list reads "such as" (texts part).
-- A change heading at level 1, at level 3 or deeper, or in Setext form is prose to the check (TASK-006's R7), so `# Set at intake.x` or `### Replace interface` changes nothing and is reported as nothing. A fail-closed rule (such a heading whose first word is a change word, or whose second is `at`, is `form`) would close it; it belongs with TASK-006's heading-parsing leads above (programs part, consider).
+- Taken on BUG-005 (the supervisor's fixtures, tests and text): a control for the fence rules then named (corrected in round 5: it was not each rule; a closing run indented four spaces had none, and the supervisor's operator sweep found more), a backtick fence with an ordinary info string hiding a heading beside the refused one, a fence closed by a longer run, a shorter tilde run that does not close (fixtures parts 1 and 2, converged as one class: fixture coverage of the fence rules); a multi-part status file with a part prefixed `not yet classified` (fixtures part 4: a mutant refusing it would refuse a valid project at intake); a part name with a leading space and with a tab, a trait with a trailing space, a sub-type's key where its name belongs (fixtures parts 3 and 4); the unknown type folder's file holds a change the check would refuse with (a) if it read the file (fixtures part 1); presence checks for the pass root's sub-workflow Set, its repeated Add at, its two delivery kinds and a sub-workflow's Replace of a module its type replaces (fixtures part 2); conformance-check says nothing about the line when the status file is absent, under any name, and the delivery-kinds test reads its paragraph only (tests part); the registry states which headings are read as change headings and that a file sets a point, and replaces a module, at most once, and no longer says workflow-check.py checks the modules' declarations (TASK-014's cross-check is its own test); the open list pauses a part that fits two sub-types of its type equally; the core's Add list reads "such as" (texts part).
+- A change heading at level 1, at level 3 or deeper, or in Setext form is prose to the check (TASK-006's R7), so `# Set at intake.x` or `### Replace interface` changes nothing and is reported as nothing. A fail-closed rule (such a heading whose first word is a change word, or whose second is `at`, is `form`) would close it; it belongs with TASK-006's heading-parsing leads above, beside the container-block lead (a change heading inside a block quote or a list item is unseen too: programs part, round 5), and the reverse case, a change heading inside an HTML comment, is read and fails closed (programs part, consider).
 - A one-line status file with a tab beside the traits marker (`Workflows: Web App Development;<TAB>traits: none`) is reported as "Workflows line breaks the part-prefix rule" (the `: ` after `traits` is read as a part prefix, which a one-line file may not carry), a reason that names neither the tab nor the marker on a file that has no parts; "must contain '; traits: ' exactly once" appears only when the tab follows the colon or the file has several parts. A lead for the check's wording, with form-part-empty's above (programs part, noted; the message corrected by Review A, BUG-005).
 - The exact-output tests assert an empty standard error; a Python warning or another program's message on standard error in the test's environment would fail them without a defect in the check. None occurs on the Windows workstation or on CI; a lead if one appears (round 4, the supervisor).
 - review-guard.py verify given an older snapshot's id on the branch compares against that snapshot and reports what changed since (a GATE-INTEGRITY on `.git/config` in round 3, read as a file, no git command run); a warning when the id is not the newest snapshot would have named the mistake. Recorded for the bridge feedback at the reflection (round 3, the supervisor).
 - The registry's "How a conditional workflow names a point" now says that a `##` line inside a fenced code block is not a heading (Review A, BUG-005, consider; taken in its gate round 3, TASK-017's Scope not holding the registry).
-- One file may replace a module and add at that module's points (the pass root's sub-workflow replaces `interface` and adds at `interface.variants`), and the check accepts it; whether the file's own additions apply to its own replacement is not stated. The change that first writes a real Replace (TASK-019, the first type workflow) settles it in the registry's "How a conditional workflow names a point", its brief widening its Scope to extension-points.md (Review A, BUG-005, consider; TASK-017's and TASK-019's planned Scopes hold neither the registry nor the core's paragraph).
+- One file may replace a module and add at that module's points (the pass root's sub-workflow replaces `interface` and adds at `interface.variants`), and the check accepts it; whether the file's own additions apply to its own replacement is not stated. The first type workflow or sub-workflow brief that writes a `## Replace` settles it in the registry's "How a conditional workflow names a point", its brief widening its Scope to extension-points.md (no planned task names a Replace yet: Review A, BUG-005 round 3); the same brief decides whether an empty `## Replace` section, which the check accepts today, is (form) as an empty `## Set at` section is (texts part, round 5) (Review A, BUG-005, consider; TASK-017's and TASK-019's planned Scopes hold neither the registry nor the core's paragraph).
 - test_r015_conformance_no_status_file_no_check refuses the word "workflows" anywhere in conformance-check's output with no status file; a later row naming `.github/workflows` would fail it for its wording, not a defect (Review A, BUG-005, noted).
+
+## Stage B2 — the stage review (round 5, 2026-10-17)
+
+**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants, of which 381 compile, and found 89 of those surviving the workflow-check and Workflows-line tests. Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
+
+**Fences and headings:**
+- a closing run indented four spaces is content (fixtures 1, blocking);
+- two backticks and two tildes open no fence;
+- a heading indented four spaces and an empty `## ` heading are prose.
+
+**Change words** (fixtures 1):
+- each change word without `at`;
+- each stripped mark, and two marks together;
+- a two-word heading ending `at`, and `AT` in capitals.
+
+**Set values:**
+- a Set value right under its heading, with spaces around it and prose after it, is its first non-blank line, stripped;
+- a backtick on one side only is not unwrapped.
+
+**Files and folders:**
+- a sub-workflow file whose key is no sub-type (tests, blocking);
+- two different modules replaced in one file;
+- a folder under `traits/`;
+- a folder inside an unknown type folder;
+- an unlisted kind named on another point (fixtures 2).
+
+**Workflows lines:**
+- a rest only starting as `not yet classified`, or differing from it by case or a space, is read as names (tests and fixtures 4, converged);
+- an indented or lower-case `Workflows:` line is not one (fixtures 3);
+- trait order and repeats beyond neighbouring traits (fixtures 3);
+- a product type's Name, a sub-type's Name in another case, and a traits text with a space before it or `None` (fixtures 4);
+- a status file with no final line feed;
+- each head separator case's whole output.
+
+**The two rule files' table reader:**
+- a table right under its heading;
+- alignment colons;
+- rows without a trailing pipe;
+- a table with no row;
+- the heading given twice;
+- a prose line ending in a pipe;
+- a section with no table.
+
+**Output escaping:** the escape at each width's boundary.
+
+**Mutation drivers:** run/supervisor/mutate_workflow_check.py names a mutant for each of these, 151 of 151 killed at this round (161 of 161 after BUG-006's gate rounds below: 159 at r2, 160 at r3, 161 at r4), and mutate_workflows_line.py stands at 42 of 42.
+
+**Registry text** (texts part; Review B's should-fix): the registry now states that a section runs to the next `##` heading, so a replacement's own structure uses `###`, and (since BUG-006 r4) what a `##` heading is: at most three spaces, `##`, then a space or a tab, so a line of `##` alone is text. It states the fence rules in full (indent, info string, closing run) and what else fails:
+- an unclosed fence;
+- an empty Set;
+- a non-workflow file under `types/` or `traits/`;
+- an unknown type folder.
+
+It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The delivery-kinds test reads every kind the list names however it is described. test_open_list holds that no name is `none` or `not yet classified` (tests part).
+
+**The sweep's 36 survivors of the 381 mutants that compile, after BUG-006** (425 made; the 44 that do not compile are counted apart, never as killed: r3, Review B of gate round 2), line numbers of workflow-check.py at 0e7813e (the program is unchanged). The first version of this list called nine survivors equivalent or untestable that an input separates: 285, 605, 126, 299, 300, 312, 349, 354, and 626, which is now a lead. Review A of BUG-006 found them (below), and each of the first eight now has its case; it also moved 313 and 322 from "held on CI only" to equivalent. The rest:
+- **Equivalent** (no input separates them):
+  - 83: a closing run of two (a close must be at least as long as its opening, at least three).
+  - 134: U+0080 is not printable.
+  - 170: separator cells are stripped already by cells_of.
+  - 190: a table line starts with a pipe.
+  - 381: is_change_heading is only called on heading candidates.
+  - 420, 422, 436: a marker is one character repeated.
+  - 456, 459: a fence line cannot be a heading candidate.
+  - 478: any strip of a blank line is empty.
+  - 604: a segment is used only through its names, which are stripped again.
+  - 313: a layer that cannot be examined has its error recorded, and the errors alone decide exit 2.
+  - 322: links are pruned from the folders walked, so following links reaches nothing.
+  - 625, 627 to 641: the lists read there hold exactly one entry (626 is a lead, below).
+  - 662, 664: an equal index is a repeat, caught first.
+  - 795: a root that is not a folder already ends the run with exit 2.
+- **Held on CI's ubuntu leg only** (162): a symbolic link is known by its mode there, while the links test makes junctions on this Windows host.
+- **Unreachable** (548): check_sub_identity's "type key is not a product type". collect never yields a sub-workflow item under an unknown type folder (fixtures 1, noted). It can go when the check is next changed.
+- **Leads:**
+  - 83: a form feed or NEL after a closing run would close a fence under a `\s` reading, where the check (and Markdown) does not. It belongs with the Unicode-whitespace table-cell lead above (fixtures 1, consider).
+  - 485: a Set value of two backticks prints `-` rather than the two backticks in its (kind) finding.
+  - 626: a head whose sub-type belongs to another type reports (e) and stops there. An unwritten product type or sub-type it names therefore gets no (f), which handoff/TASK-006.md R4's (f) reads as asking for. Example: against the status fixtures' open list, `Workflows: Library Development → Claude Code Extension` gives one (e) where the brief gives (e) and (f). This is a possible program defect, for the next change of workflow-check.py; the line fails either way (Review A of BUG-006).
+
+**Review B returned no verdict**, a should-fix alone. Per the policy that is a failed launch, rerun with the stage's next round, and its finding was taken.
+
+**Scratch folders:** several Review A parts used the same scratchpad folder (`ws`). One part's mutant appeared in another's copy, and a part's own results had to be redone. The checkout was never touched. Each reviewer gets a folder of its own from the next round on, and the point goes to the bridge feedback at the reflection (round 5, the supervisor).
+
+**The sweep is rerun before each later stage review of this check.** A new survivor is either a test, or a line here with its reason. The sweep runs test_workflow_check.py, test_workflows_line_check.py and, since BUG-006 r2, test_extension_points.py, which imports the program too.
+
+**BUG-006's gate, round 1:** Review A REJECT, Review B APPROVE. REVIEWERS DISAGREED on whether the survivor list above was honest, a correctness question. The supervisor decided for Review A: it separated each named survivor with one input, and the supervisor's run confirmed all eight are killed by the new cases. Taken in BUG-006 r2:
+- **Cases (blocking):**
+  - 605: a space before a comma in the head; the name is read stripped and only the shape fails.
+  - 285: a Changes cell reading `set , add` accepts a Set, and `add` alone refuses it.
+  - 126: a refused read names the system's reason.
+  - 312: a layer that cannot be examined gives its exact ERROR line.
+  - 299 and 300: a folder that cannot be listed is named with its reason, on every host.
+  - 349 and 354: each link is named, one of them inside a folder that is no product type, in the links test's exact output.
+  - The list above is corrected to match.
+- **Text (should-fix):** both rule files' "How this file is read" now say a table is the first after its heading and before the next line starting `## `, as the reader does (worded so in r3; r2's "the next `##` heading" also covered `##` with a tab or nothing after it, which the reader reads past, Review B of gate round 2). The separators test's comment names the mutant it kills.
+- **Text (considers):**
+  - The registry says a Set value is stripped, and names exactly the files, links and folders that fail, a `types` or `traits` path that is itself a file or a link included (r3, Review A of gate round 2).
+  - The open list says no name is `none` or `not yet classified`.
+  - The sweep runs test_extension_points.py too.
+- **The named driver** has the eight mutants (159 of 159 killed).
+- **Recorded, not taken:** the delivery-kinds test finds a kind only when a `(` follows it, so a kind added to the list bare escapes the comparison with `DELIVERY_KINDS`. This is for whoever next changes the list (tests/test_extension_points.py).
+
+**BUG-006's gate, round 2:** Review A APPROVE (0/1/4), Review B REJECT. Taken in BUG-006 r3:
+- **Review B:** r2's "before the next `##` heading" also covered a `##` line with a tab or nothing after it, which the reader reads past. Both rule files now say "before the next line that starts with two hashes and a space (`## `)", and the table-reader test has a case for `##`+tab and a bare `##`.
+- **Review B:** the sweep counted the 44 mutants that do not compile as killed (every test that runs the program fails on them). It now counts them apart and reports its survivors of the 381 that compile; the survivors are the same 36.
+- **Review A (should-fix):** the equivalent range now reads 625, 627 to 641, so 626 is a lead only.
+- **Review A (considers):** the registry names a `types` or `traits` path that is itself a file or a link; the list's intro says 313 and 322 moved.
+- **The named driver** has r3's mutant (160 of 160 killed).
+
+**BUG-006's gate, round 3:** Review A REJECT (1/0/3), Review B APPROVE (the reviewers disagreed; decided for Review A, whose mutant no test killed). Review A: the registry never said what a `##` heading is. The check reads `^ {0,3}##[ \t]`, so a line of `##` alone is text to it, where Markdown reads an empty heading; the mutant `##(?:[ \t]|$)` survived every test, and no sweep operator makes it. Taken in BUG-006 r4: the registry states the shape; the case kind-bare-hashes (a Set section whose first line is `##` alone) gives the exact (kind) line for `##`; the driver has the mutant (161 of 161 killed). A Markdown reading of a bare `##` would be a program change, not made here.
+
+**BUG-006's gate, round 4:** Review A APPROVE (0/1/3), Review B REJECT. Review B: the round-5 paragraph's driver count (151 of 151) was that round's own, not the final count. This converged with Review A's consider that the round-3 record give its count, so it was blocking. Taken in BUG-006 r5:
+- each record states the driver's count at its round;
+- the delivery-kinds item is back under gate round 1, where it was raised (Review A's should-fix);
+- the registry's heading sentence reads "a line that starts with" and now opens its paragraph, before the term's first use (considers).
+
+Recorded from Review A, for the later program change that reads a line of `##` alone as Markdown does: under a Set whose value the check does not validate (`intake.budget-kind`), such a line passes as the value `##`.

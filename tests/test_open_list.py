@@ -151,6 +151,12 @@ def test_r011_the_names_a_workflows_line_reads_are_unique_across_the_tables():
     # workflow-check.py splits a line at these characters (prefix_of, check_head, check_traits): stage B2 review, round 3.
     assert [n for n in names if any(c in n for c in (",", ";", ":", chr(0x2192)))] == [], "a name holds a separator"
     assert "none of them contains `,`, `;`, `:` or `" + chr(0x2192) + "`" in TEXT
+    # A traits text reading `none` means no traits (workflow-check.py's check_traits), so no trait is Named `none` and no
+    # name reads `not yet classified` (docs/HARDENING.md, stage B2 review round 3; held by a test since round 5).
+    assert [n for n in names if n in ("none", "not yet classified")] == [], "a name is a reserved value"
+    # ... and the file says so to the maintainer adding an entry (BUG-006 r2: Review A).
+    assert ("No name is `none` or `not yet classified`, the words a `Workflows:` line uses for no traits and for a part "
+            "not yet classified.") in TEXT
 
 
 def test_r011_every_s6_3_product_type_is_listed_with_its_workflow_name_and_defaults():
@@ -225,6 +231,10 @@ def test_r011_the_tables_shape_is_stated_for_the_reader():
     """R-011: the shape `workflow-check.py` relies on is stated, not only implied by the tables."""
     flat = re.sub(r"\s+", " ", TEXT)
     assert "Each table is the first table after its heading" in flat
+    # The reader stops at the next line starting `## `, as parse_table does (BUG-006 r2: Review A; r3: Review B, a `##`
+    # line without the space is no stop).
+    assert ("and before the next line that starts with two hashes and a space (`## `), its rows running to the first "
+            "line that is not a table line") in flat
     assert "its rows running to the first line that is not a table line" in flat
     assert "its columns are found by their header names; no cell contains a `|`" in flat
     assert "The order inside a cell carries no meaning; the order traits apply in is the Traits table's." in flat

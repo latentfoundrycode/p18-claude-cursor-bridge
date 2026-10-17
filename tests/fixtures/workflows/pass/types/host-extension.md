@@ -53,6 +53,12 @@ Prose.
 
 Prose.
 
+    ## Replace design
+
+## 
+
+An empty heading is prose.
+
   ```
 ## Replace design
    ```

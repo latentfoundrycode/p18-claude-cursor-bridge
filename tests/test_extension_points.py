@@ -163,6 +163,10 @@ def test_r006_the_tables_shape_is_stated_for_the_reader():
     """The shape the check reads is stated in the file, as the open list states its own."""
     assert "`workflow-check.py` reads the two tables below and nothing else in this file" in TEXT
     assert "Each table is the first table after its heading (`## Phase modules`, `## Extension points`)" in TEXT
+    # The reader stops at the next line starting `## `, as parse_table does (BUG-006 r2: Review A; r3: Review B, a `##`
+    # line without the space is no stop).
+    assert ("and before the next line that starts with two hashes and a space (`## `), its rows running to the first "
+            "line that is not a table line") in TEXT
     assert "its columns are found by their header names; no cell contains a `|`" in TEXT
 
 
@@ -175,7 +179,7 @@ def test_r006_how_a_conditional_workflow_names_a_point():
     assert "`## Add at project-end.delivery for <delivery kind>`" in TEXT
     assert ("At that point this form is required and the plain `## Add at project-end.delivery` fails; at every "
             "other point a heading ending `for <kind>` fails.") in TEXT
-    assert "The value is the section's first non-blank line" in TEXT
+    assert "The value is the section's first non-blank line, stripped;" in TEXT
     assert "Only a type workflow or a sub-workflow may set." in TEXT
     assert "Only a type workflow or a sub-workflow may replace." in TEXT
     assert "A trait attaches to the main workflow only through its `Add at` headings" in TEXT
@@ -277,15 +281,18 @@ def test_r006_the_checks_delivery_kinds_are_the_registrys(program):
     review)."""
     start = TEXT.index("The delivery kinds are one list")
     paragraph = TEXT[start:TEXT.index("\n", start)]  # to the paragraph's end, not the file's (stage B2 review, round 4)
-    listed = re.findall(r"`([a-z-]+)` \((?:a |an )", paragraph)
+    listed = re.findall(r"`([a-z0-9-]+)` \(", paragraph)  # every kind the list names, however described (round 5: tests)
     assert tuple(listed) == program("workflow-check").DELIVERY_KINDS, listed
+    assert "it grows only as a point does, and workflow-check.py's own copy of it (`DELIVERY_KINDS`) changes with it." in paragraph
 
 
 def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     """A prose heading that reads like a change fails; the registry names the words and the stripped
     punctuation workflow-check.py's CHANGE_FIRST and TRAILING_PUNCT hold, and the one-per-target rule (stage
     B2 review, round 4)."""
-    start = TEXT.index("Any other `##` heading is prose")
+    # The paragraph opens with the heading shape, before its first use (BUG-006 r5: Review A).
+    start = TEXT.index("A `##` heading is a line that starts with")
+    assert TEXT[start:].index("Any other `##` heading is prose") > 0
     paragraph = TEXT[start:TEXT.index("\n", start)]
     words_text = paragraph[paragraph.index("ignored, is ") + len("ignored, is "):paragraph.index(", or whose second")]
     words = set(re.findall(r"[a-z]+", words_text)) - {"or"}
@@ -295,8 +302,24 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     assert set(re.findall(r"`(.)`", punct)) == set(wc.TRAILING_PUNCT), punct
     assert "or whose second word is `at` in any case, fails as a malformed change heading" in paragraph
     assert "A file sets each point, and replaces each module, at most once." in paragraph
-    assert ("A `##` line inside a fenced code block (opened by three or more backticks or tildes) is not a heading and "
-            "changes nothing.") in paragraph
+    # What else the check reads and fails, for the maintainer writing a conditional workflow (stage B2 review, round 5:
+    # texts and Review B).
+    for sentence in (
+        # The heading shape workflow-check.py's HEADING_CANDIDATE reads (BUG-006 r4: Review A).
+        "A `##` heading is a line that starts with at most three spaces, then `##`, then a space or a tab; a line of `##` "
+        "alone is not one and is read as text.",
+        "A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own "
+        "structure `###` headings and deeper.",
+        "A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or "
+        "more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening "
+        "none, and closes with a run of the same character at least as long, indented at most three spaces and followed "
+        "only by spaces or tabs; a fence still open at the end of the file fails.",
+        "The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a "
+        "file or a link; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path "
+        "(a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that "
+        "is no product type.",
+    ):
+        assert sentence in paragraph, sentence
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():

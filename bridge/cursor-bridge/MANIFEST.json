@@ -1,6 +1,6 @@
 {
   "version": "2026.10.11d",
-  "generated": "2026-10-17 07:10",
+  "generated": "2026-10-17 11:00",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -103,8 +103,8 @@
     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
     "cursor-bridge/workflow-check.py": "8ba92116301d19588a009ec03a479115406fbf9a465421503ff8d7691daca139",
-    "cursor-bridge/workflow/extension-points.md": "2b1c5110ef17befe37eb0fb398db77763dfc91288ddcd2d027adf15389bf3a7f",
-    "cursor-bridge/workflow/open-list.md": "2cda936e0ed96b2e7422eb2a9ff0596ebb54e3b09056008074da0f001ea2614b",
+    "cursor-bridge/workflow/extension-points.md": "9a703494b376a9a8c864233f59a37a0f981239e721c6741bff1a0fe0a2200614",
+    "cursor-bridge/workflow/open-list.md": "926f909667b79918943965e003d881e055c012517b31fc07770230c12ec9cbf7",
     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
