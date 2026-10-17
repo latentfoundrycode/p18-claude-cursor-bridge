@@ -22,7 +22,7 @@ TYPE_COLS = ["Key", "Name", "Definition", "Workflow name", "Default traits", "Wr
 SUB_COLS = ["Key", "Name", "Of type", "Definition", "Sub-workflow name", "Default traits", "Written", "Planned"]
 TRAIT_COLS = ["Key", "Name", "Definition", "Written", "Planned"]
 
-# §6.3, as the plan states it (types with their workflow names where the owner fixed them).
+# §6.3, as the plan states it (the product types; every workflow and sub-workflow name is pinned below).
 TYPES = ["mobile-app", "web-app", "website", "own-computer", "backend-service",
          "library", "video-game", "host-extension"]
 SUBTYPES = {"android": "mobile-app", "ios": "mobile-app", "local-web-app": "web-app",
@@ -217,11 +217,13 @@ def test_r011_the_tables_shape_is_stated_for_the_reader():
 
 
 def test_r011_the_open_list_is_the_canonical_source_of_default_traits():
-    """R-011: a type or sub-type file's default traits are checked against this file by workflow-check."""
+    """R-011: the open list is the source of the default traits; the workflow check does not yet check a
+    statement of them, since no form for one exists (stage B2 review: the text had claimed a check never built)."""
     flat = re.sub(r"\s+", " ", TEXT)
     assert "the one source of the default traits of a product type and of a sub-type" in flat
-    assert "a type workflow or sub-workflow that states its default traits is checked against this " \
-           "file by `workflow-check.py`" in flat
+    assert "No form for that statement exists yet, so `workflow-check.py` does not check it" in flat
+    assert "the form and its check come together, in the change that writes the first such statement" in flat
+    assert "is checked against this file by `workflow-check.py`" not in flat
 
 
 def test_r011_the_classification_rules_are_recorded():
@@ -249,8 +251,8 @@ def test_r011_the_s6_10_procedure_is_recorded():
     flat = re.sub(r"\s+", " ", section)
     assert "in the maintainer's session" in flat
     assert "The workflow check passes, and the entry's Written flag is set to `yes` in the same change." in flat
-    assert "Its entry joins this list with every column of its table" in flat
+    assert "Its entry joins this list with every column of its table filled, including," in flat
     assert "calibration applies it to running projects" in flat and "reopening no gate" in flat
     assert "Changing an existing one is the same" in flat
-    assert "A project's supervisor never writes a conditional workflow" in flat
+    assert "A project's supervisor never writes a conditional workflow and never changes this file" in flat
     assert "promotion pass" in flat

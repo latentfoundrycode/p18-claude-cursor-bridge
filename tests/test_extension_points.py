@@ -171,6 +171,10 @@ def test_r006_how_a_conditional_workflow_names_a_point():
     assert "`## Add at <point key>`" in TEXT
     assert "`## Set at <point key>`" in TEXT
     assert "`## Replace <module key>`" in TEXT
+    assert "`## Add at project-end.delivery for <delivery kind>`" in TEXT
+    assert ("At that point this form is required and the plain `## Add at project-end.delivery` fails; at every "
+            "other point a heading ending `for <kind>` fails.") in TEXT
+    assert "The value is the section's first non-blank line" in TEXT
     assert "Only a type workflow or a sub-workflow may set." in TEXT
     assert "Only a type workflow or a sub-workflow may replace." in TEXT
     assert "A trait attaches to the main workflow only through its `Add at` headings" in TEXT
@@ -204,7 +208,9 @@ def test_r006_a_replacement_keeps_the_points_of_the_module_it_replaces():
     """§6.5 ("Today's interface conditions stay together") and TASK-003's deferral: additions from the
     layers below still land on a replaced phase."""
     assert "A replacement keeps the points of the module it replaces, without declaring them again under its `## Replace` heading" in TEXT
-    assert "such as the trait *has screens* adding the mockup variant at `interface.variants`, still apply to it" in TEXT
+    assert ("so every conditional workflow's additions at those points still apply to it, in the core's order: "
+            "the type workflow's, the sub-workflow's and each trait's") in TEXT
+    assert "such as the trait *has screens* adding the mockup variant at `interface.variants`" in TEXT
 
 
 def test_r006_what_the_workflow_check_fails():
@@ -258,6 +264,18 @@ def test_r006_the_inspect_and_test_steps_divide_every_check():
     assert "The inspect step is every other check or review, before the tests or after them" in TEXT
     assert "the reviewer passes (such as the design auditor the trait *has screens* carries)" in TEXT
     assert "The merge gate's conditions (step 8) belong to the core and offer no point" in TEXT
+    assert "a CI check a conditional workflow needs is added at `configuration.items`" in TEXT
+    assert ("the scope check, the diagram check, the boundary log, the triage of the builder's assumptions, the "
+            "reviewer passes (such as the design auditor the trait *has screens* carries), the secret scan and the "
+            "dependency admission") in TEXT
+    assert "An addition at either point is placed in the delegation loop's text at the step that runs it." in TEXT
+
+
+def test_r006_the_checks_delivery_kinds_are_the_registrys(program):
+    """The list lives in this text and in workflow-check.py's DELIVERY_KINDS; they change together (stage B2
+    review)."""
+    listed = re.findall(r"`([a-z-]+)` \((?:a |an )", TEXT[TEXT.index("The delivery kinds are one list"):])
+    assert tuple(listed) == program("workflow-check").DELIVERY_KINDS, listed
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():

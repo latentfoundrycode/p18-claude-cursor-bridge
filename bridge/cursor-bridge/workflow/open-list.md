@@ -1,6 +1,6 @@
 # The open list — product types, sub-types and traits
 
-This file is the canonical list of every product type, sub-type and trait the bridge knows, each with its definition and whether its conditional workflow is written (Restructuring Plan §6.3, §6.11). It is the one source of the default traits of a product type and of a sub-type: a type workflow or sub-workflow that states its default traits is checked against this file by `workflow-check.py`. Each part of a project is classified against the definitions here at intake, and a part that fits none of them is handled as "When something does not fit" below says (§6.7).
+This file is the canonical list of every product type, sub-type and trait the bridge knows, each with its definition and whether its conditional workflow is written (Restructuring Plan §6.3, §6.11). It is the one source of the default traits of a product type and of a sub-type: a type workflow or sub-workflow that states its default traits states the ones given here. No form for that statement exists yet, so `workflow-check.py` does not check it; the form and its check come together, in the change that writes the first such statement, and the reviewers of that change compare the statement with this file. Each part of a project is classified against the definitions here at intake, and a part that fits none of them is handled as "When something does not fit" below says (§6.7).
 
 **The lists are open.** Nobody can foresee every product type or trait, so each entry carries a definition: a part is classified against the definitions, and a part that fits none of them is recognised as new rather than forced into the nearest entry (see "When something does not fit" below).
 
@@ -87,7 +87,7 @@ The procedure (§6.10):
 3. The workflow check passes, and the entry's Written flag is set to `yes` in the same change.
 4. The release's changelog names the conditional workflow, and calibration applies it to running projects of that product type by phase, reopening no gate.
 
-Changing an existing one is the same, editing only its file and, where its definition, default traits or name change, its entry here. A project's supervisor never writes a conditional workflow; it may propose one through the promotion pass at project end.
+Changing an existing one is the same, editing only its file and, where its definition, default traits or name change, its entry here. A project's supervisor never writes a conditional workflow and never changes this file; it may propose either through the promotion pass at project end.
 
 ## Names
 

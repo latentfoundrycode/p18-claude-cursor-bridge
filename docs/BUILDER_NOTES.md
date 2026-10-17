@@ -21,3 +21,5 @@
 2026-10-16 TASK-008: Done runs `python -m pytest tests -q` before `python tools/make-manifest.py`, and the install and rollback tests refuse a bridge tree whose edited programs do not match MANIFEST.json, so that ordered run exits 1 until the manifest is regenerated and the suite is run again.
 
 2026-10-17 TASK-008-r2: while `judge_workflows_line` loads `workflow-check.py`, `sys.dont_write_bytecode` is `True` and restored in `finally`. The checker path is `os.path.realpath` of the program file. `field` calls `escape_field` directly; a missing one, or `SystemExit` during or after load, is not-checked. The post-load handler prints through `ascii_text` only.
+
+2026-10-17 BUG-002-r1: after `python tools/make-manifest.py`, `git diff --stat` warns that LF in `bridge/cursor-bridge/VERSION` will be replaced by CRLF the next time Git touches it, but VERSION is not a diff entry and `git diff -- bridge/cursor-bridge/VERSION` is empty.
