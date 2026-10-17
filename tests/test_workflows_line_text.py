@@ -113,7 +113,7 @@ def test_r015_the_grammar_is_defined_once_after_the_template():
     assert TEXT.index("## Project state") < TEXT.index("**Workflows** records") < TEXT.index("**Terms fixed** is")
     assert TEXT.index("<!-- digest:end -->") < TEXT.index("**Workflows** records"), "core text, not the digest"
     assert GRAMMAR in p
-    assert "one `Workflows:` line per part, beside `Phase:`" in p
+    assert "one `Workflows:` line per part, directly after `Phase:`" in p  # where check_placement requires it
     assert "with the `Phase:` line they name exactly what a resumed session must read" in flat(p)
 
 
@@ -141,7 +141,7 @@ def test_r015_a_part_prefix_only_with_several_parts_and_the_unclassified_form():
     """Plan §6.2: a project with one part has one line; §7's parts each get their own."""
     p = flat(paragraph())
     assert ("follows `Workflows: ` only when the project has more than one part; a project with one part has one "
-            "line without it; a part's name contains no `:`, `;` or `→`") in p
+            "line without it; a part's name is not empty, has no space at either end and contains no `:`, `;` or `→`") in p
     assert ("with several parts, the lines stand together right after `Phase:`, one per part, in the order of the "
             "project's parts; that is the order \"for each part in the order the status file lists them\" reads") in p
     assert "for each part in the order the status file lists them" in flat(model_section()), "the core reads that order"
