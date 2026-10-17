@@ -269,6 +269,8 @@ NOT_LOADABLE = {
     "checker-syntax-error": ("checker-syntax-error", VALID["not-yet-classified"], "cannot be loaded (SyntaxError)"),
     "checker-exits": ("checker-exits", VALID["not-yet-classified"], "cannot be loaded (SystemExit)"),
     "rules-absent": ("rules-absent", VALID["not-yet-classified"], "open-list.md"),
+    # The registry alone unreadable: its cause is named, the open list's is not (round 7: tests).
+    "registry-absent": ("registry-absent", VALID["not-yet-classified"], "extension-points.md: does not exist"),
     "open-list-without-tables": ("open-list-without-tables", VALID["not-yet-classified"], "missing heading"),
     "no-escape-field": ("no-escape-field", MALFORMED["no-traits"][0], "workflow-check.py: AttributeError"),
     "check-exits-after-load": ("check-exits-after-load", VALID["not-yet-classified"], "workflow-check.py: SystemExit"),
@@ -282,6 +284,8 @@ def _broken_copy(tmp_path, how):
         checker.write_text(checker.read_text(encoding="utf-8") + "\ndef broken(:\n", encoding="utf-8", newline="")
     elif how == "checker-exits":
         checker.write_text("import sys\nsys.exit(3)\n" + checker.read_text(encoding="utf-8"), encoding="utf-8", newline="")
+    elif how == "registry-absent":
+        (folder / "workflow" / "extension-points.md").unlink()
     elif how == "open-list-without-tables":
         (folder / "workflow" / "open-list.md").write_text("# Open list\n\nNo tables here.\n", encoding="utf-8", newline="\n")
     elif how == "check-exits-after-load":
@@ -296,6 +300,23 @@ def _broken_copy(tmp_path, how):
     return folder
 
 
+# The cases whose rule files are broken; each of the others is one load failure with one cause.
+RULE_CASES = ("rules-absent", "registry-absent", "open-list-without-tables")
+
+
+def _causes(folder):
+    """The causes a copy with broken rule files must give, from the copy itself: each rule file that cannot be read,
+    else each table that cannot be loaded, as workflow-check.py's own reader states them, escaped as the judges
+    escape them."""
+    mod = _load_copy(folder)
+    reads = [mod.read_utf8(mod.DEFAULT_OPEN), mod.read_utf8(mod.DEFAULT_REGISTRY)]
+    causes = ["%s: %s" % (shown, err) for _, shown, err in reads if err]
+    if not causes:
+        _, errors = mod.load_tables(reads[0][0], mod.DEFAULT_OPEN, reads[1][0], mod.DEFAULT_REGISTRY)
+        causes = ["%s: %s" % (item_path, reason) for item_path, reason in errors]
+    return [mod.escape_field(cause) for cause in causes]
+
+
 @pytest.mark.parametrize("case", sorted(NOT_LOADABLE))
 def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
     how, text, cause = NOT_LOADABLE[case]
@@ -308,8 +329,17 @@ def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
     found = workflows_lines(lines)
     assert found and all(line.startswith("WORKFLOWS LINE: not checked: ") for line in found), lines
     assert any(cause in line for line in found), "the cause must name %r: %r" % (cause, found)
-    if how == "rules-absent":
-        assert any("open-list.md" in line for line in found), "the cause names the rule file that cannot be read"
+    # One line per cause, each whole (TASK-008 Requirement 5; round 7: tests).
+    if how in RULE_CASES:
+        expected = _causes(folder)
+        assert len(expected) == 1 if how == "registry-absent" else len(expected) >= 2, "precondition: %r" % expected
+        assert found == ["WORKFLOWS LINE: not checked: " + c for c in expected], (found, expected)
+        if how == "open-list-without-tables":
+            # The three causes by name, so the copy's reader is not the only oracle (BUG-008's gate round 1: consider).
+            assert [line.rsplit(": ", 1)[1] for line in found] == [
+                "missing heading ## Product types", "missing heading ## Sub-types", "missing heading ## Traits"], found
+    else:
+        assert len(found) == 1, found
 
 
 def _non_ascii_folder(tmp_path):
@@ -427,6 +457,18 @@ def test_r015_conformance_malformed_line(tmp_path, case):
     assert rc == 1
 
 
+def test_r015_conformance_prints_each_finding_in_order(tmp_path):
+    """handoff/TASK-008.md Requirement 7: the row is `malformed: ` and every finding of the judge, `name - reason`, joined
+    by `; `, in the judge's order, the placement's last (stage B2 review, round 7: tests; the inventory twin is
+    test_r015_inventory_prints_each_finding_in_order)."""
+    text = "# Project Status\nPhase: building\nBridge version: %s\n" % VERSION + "Workflows: Nonexistent Development; traits: none\n"
+    rc, out, err = conformance(workspace(tmp_path, text))
+    assert verdict(out, "Workflows line") == ("MISSING", "Workflows line  - malformed: "
+        "Nonexistent Development - name is not in the open list; - - part must name exactly one product type; "
+        "- - Workflows lines do not stand together right after the Phase line"), out
+    assert rc == 1
+
+
 def test_r015_conformance_no_status_file_no_check(tmp_path):
     """TASK-008 Requirement 4, conformance-check's half: with no status file the Workflows line is not judged and no row
     names it; the records row already reports the file missing. The positive control runs first, on the same workspace
@@ -461,3 +503,8 @@ def test_r015_conformance_rule_files_not_loadable_is_missing(tmp_path, case):
     v, text = verdict(out, "Workflows line")
     assert v == "MISSING" and text.startswith("Workflows line  - not checked: "), out
     assert cause in text, "the cause must name %r: %r" % (cause, text)
+    # Every cause, joined by "; " (TASK-008 Requirement 7; round 7: tests).
+    if how in RULE_CASES:
+        assert text == "Workflows line  - not checked: " + "; ".join(_causes(folder)), text
+    else:
+        assert "; " not in text, text

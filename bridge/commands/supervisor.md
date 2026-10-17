@@ -1820,7 +1820,7 @@ Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refa
 
 - the product type is named by its **Workflow name**, the sub-type by its **Sub-workflow name** and each trait by its **Name**, spelled exactly as `~/.claude/cursor-bridge/workflow/open-list.md` spells them; every name on the line is in the open list;
 - exactly one product type and at most one of its sub-types; ` → <Sub-workflow name>` (the arrow is `→`) is left out when the part has no sub-type;
-- the traits follow `; traits: `, separated by a comma and a space, in the order the open list gives them; a part with no trait reads `; traits: none`;
+- the traits follow `; traits: `, separated by a comma and a space, in the order the open list gives them, each at most once; a part with no trait reads `; traits: none`;
 - `<part>: `, the part's name and a colon, follows `Workflows: ` only when the project has more than one part; a project with one part has one line without it; a part's name is not empty, has no whitespace at either end and contains no `:`, `;` or `→`;
 - with several parts, the lines stand together right after `Phase:`, one per part, in the order of the project's parts; that is the order "for each part in the order the status file lists them" reads;
 - until intake has classified a part, its line reads `not yet classified` in place of the names (`Workflows: not yet classified` in a project with one part).
