@@ -11,7 +11,7 @@ This file is the canonical list of every product type, sub-type and trait the br
 - **Key** — the entry's identifier and the base name of its workflow file: a type workflow at `workflow/types/<key>.md`, a sub-workflow at `workflow/types/<type key>/<key>.md`, a trait's additions at `workflow/traits/<key>.md`. Lowercase letters, digits and hyphens; unique within its table.
 - **Name** — the entry's name in plain words, used in prose and at intake. A trait, which has no workflow name, is named by it on a `Workflows:` line.
 - **Definition** — what a part must be, or have, for the entry to apply.
-- **Workflow name** / **Sub-workflow name** — the fixed name of the entry's workflow, used in the status file's `Workflows:` line and in the progress graph's header (§6.3, §7.8).
+- **Workflow name** / **Sub-workflow name** — the fixed name of the entry's workflow, used in the status file's `Workflows:` line and in the progress graph's header (§6.3, §7.8). A `Workflows:` line is read by name, so the Workflow names, the Sub-workflow names and the traits' Names are unique across the three tables.
 - **Default traits** — trait keys, separated by commas, or `—` for none. A sub-type's cell is the complete default set for a part with that sub-type, in place of its type's. The order inside a cell carries no meaning; the order traits apply in is the Traits table's. Default traits are proposals, settled at the design gate.
 - **Of type** — a sub-type's product type, by key.
 - **Written** — `yes` once the entry's workflow file exists at its key's path and passes the workflow check, else `no`. The increment that writes an entry's file sets its flag in the same change. A part whose product type or sub-type is not written pauses its project; a trait that is not written is flagged and the work continues (§6.7).
@@ -36,7 +36,7 @@ To tell a website from a web app at intake, one question decides: **does it keep
 
 ## Sub-types
 
-A sub-type says more precisely what a part of its product type is, where that changes the work. A part has at most one sub-type, of its own product type; a part with no sub-type runs under its type workflow alone.
+A sub-type says more precisely what a part of its product type is, where that changes the work. A part has at most one sub-type, of its own product type; a part with no sub-type runs under its type workflow alone. A part that fits a sub-type's definition takes that sub-type, so a sub-type whose workflow is not yet written pauses the project as an unwritten product type does ("When something does not fit").
 
 | Key | Name | Of type | Definition | Sub-workflow name | Default traits | Written | Planned |
 |---|---|---|---|---|---|---|---|

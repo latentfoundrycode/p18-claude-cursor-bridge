@@ -139,6 +139,16 @@ def test_r011_every_entry_has_a_key_name_definition_and_written_flag():
             assert r["Written"] in ("yes", "no"), r["Key"]
 
 
+def test_r011_the_names_a_workflows_line_reads_are_unique_across_the_tables():
+    """R-011, R-015: a `Workflows:` line names its entries by Workflow name, Sub-workflow name and trait Name, and
+    workflow-check.py looks each up across the three tables, so no name stands in two places (stage B2 review, round 2)."""
+    names = ([r["Workflow name"] for r in table("## Product types")[1]]
+             + [r["Sub-workflow name"] for r in table("## Sub-types")[1]]
+             + [r["Name"] for r in table("## Traits")[1]])
+    assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
+    assert "the Workflow names, the Sub-workflow names and the traits' Names are unique across the three tables" in TEXT
+
+
 def test_r011_every_s6_3_product_type_is_listed_with_its_workflow_name_and_defaults():
     """R-011, §6.3: the eight product types, each with its fixed workflow name and default traits."""
     _, rows = table("## Product types")

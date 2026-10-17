@@ -1,6 +1,6 @@
 {
   "version": "2026.10.11d",
-  "generated": "2026-10-17 02:59",
+  "generated": "2026-10-17 04:45",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -14,7 +14,7 @@
     "agents/test-runner.md": "8358d18b3e8d109d7643ce2610ee433aa5668c4d9601976ece28a4d914f62649",
     "commands/calibrate-bridge.md": "5ccdaa582af3a0084c6ceb20d62ac4dc1998ec86e085aa8688af4dc7ee59294a",
     "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
-    "commands/supervisor.md": "e0b9c6572fbeedbad906ef3c3bf34f487b1a9fcfa4e50d6d63d7d49a04c0924a",
+    "commands/supervisor.md": "176d18e79479781140e39e98b867e5fc26fffe0c57e05b9c233f3ffdf6cd2470",
     "cursor-bridge/CHANGELOG.md": "e437fac211a07e96e54a236f016a9a4062b7c323d84ae0a961b39fdb982102ed",
     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
     "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
@@ -102,9 +102,9 @@
     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
-    "cursor-bridge/workflow-check.py": "703592b23f2ba04101aa7bec63d4c77fdcf490ea259748c82b96d5c5423bb70b",
+    "cursor-bridge/workflow-check.py": "8ba92116301d19588a009ec03a479115406fbf9a465421503ff8d7691daca139",
     "cursor-bridge/workflow/extension-points.md": "89cba57e689d7377a2ecdb60b8e4273f856a205134b6d23407188ef2f18ec202",
-    "cursor-bridge/workflow/open-list.md": "cd6b77507c9fa1e7a7e6bb544849cb7d7a784a27bc233c7c6eb112c46373f64f",
+    "cursor-bridge/workflow/open-list.md": "048fb296ba1a1b6f129b5f404267e2ba3fb82772b0137f69ed1cf2b7a164bb1b",
     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
