@@ -256,16 +256,16 @@ Recorded from Review A, for the later program change that reads a line of `##` a
   - 103: a final empty line kept adds a blank line, which no reader acts on.
   - 181: cells_of always returns at least one cell.
   - 191: a table line starts with a pipe.
-  - 342 (each `and` clause dropped, and `>= 2`): a folder under an unknown type folder lies under that folder's own two-part entry, which is listed too.
+  - 342 (`len(parts) == 2` dropped, and `>= 2`): a folder under an unknown type folder lies under that folder's own two-part entry, which is listed too. (The `parts[0] == "types"` clause dropped was listed here at first; an input separates it, see gate round 1 below.)
   - 357: a folder under `traits/` has at least two parts.
-  - 360 (`>= 2`): a longer path under `types/` whose second part ends `.md` lies in an unknown type folder, which is skipped first.
+  - 360 (`>= 2`): a longer path under `types/` whose second part ends `.md` lies in an unknown type folder, which is skipped first. This and 342 hold for an open list whose keys have the list's shape (lowercase letters, digits and hyphens); the check does not validate a key's shape, and `--open-list` is an input.
   - 364 (the `traits` clause dropped): a two-part `types/` path ending `.md` is taken by the line before.
-  - 380: is_change_heading is only called on heading candidates (as 381).
+  - 380 and 381: is_change_heading is only called on heading candidates.
   - 538: the change kinds are add, set and replace.
   - 547: makes 548 unreachable a second way.
   - 688: a part is None only in a one-line file.
   - 833: every printed field is ASCII already, and every standard stream has `reconfigure`.
-- **Held on CI's ubuntu leg only** (161, 162, 335, 336): a symbolic link is known by its mode there, and the dangling-link case lands among a folder's files; this Windows host makes junctions, which the walk lists as folders. The driver leaves them out for that reason.
+- **Held on CI's ubuntu leg only** (161, 162, 335, 336): a symbolic link is known by its mode there, and the dangling-link case lands among a folder's files; this Windows host makes junctions, which the walk lists as folders. The driver leaves them out for that reason. The dangling link is named `gone.md`: under a name without `.md`, 335's mutant read it as a file that fails as a path all the same, and survived on Linux too (gate round 1, Review A, run under WSL).
 
 **Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule, 196 of 196 killed (161 before, 35 new); mutate_workflows_line.py stands at 42 of 42.
 
@@ -277,3 +277,12 @@ Recorded from Review A, for the later program change that reads a line of `##` a
 **For TASK-023's brief** (programs part, noted): the calibration that installs release B adds a running project's `Workflows:` line, so the brief names that step.
 
 **Reviewer folders:** each Review A part had a scratch folder of its own this round; none saw another's mutant.
+
+**BUG-007's gate, round 1:** Review A REJECT (2 blocking, 1 should-fix, notes), Review B REJECT (1 blocking). Taken in BUG-007 r2:
+- **Blocking (Review B):** the registry says an unreadable conditional-workflow file stops the check and checks nothing, and no test could see more being checked: a mutant reporting the readable files' findings after the ERROR passed. The UTF-8 case now has a readable failing file beside it, reported while the file is UTF-8 and not once it is not; the driver has that mutant.
+- **Blocking (Review A):** 342 with `parts[0] == "types"` dropped was called equivalent and is not: a folder under `traits/` then hides a type file of the same name. form-traits-folder now holds `types/odd.md` with a failing change beside `traits/odd.md/`, and the driver has the mutant.
+- **Blocking (Review A):** 335 was said to be held on CI and survived there: the case's dangling link had no `.md` in its name, so read as a file it failed as a path all the same. It is named `gone.md` now; read as a file it is an ERROR.
+- **Should-fix (Review A):** 381 was missing from the list of 52; it stands with 380.
+- **Noted (Review A), taken:** the order case's comment says what it separates (a highest trait that never rises); 342 and 360 hold for keys of the open list's shape; form-not-markdown's files that are no conditional workflow hold a failing change, so a read of them would show.
+- **The named driver** has the two mutants, 342's and the readable files checked after an unreadable one (198 of 198 killed).
+

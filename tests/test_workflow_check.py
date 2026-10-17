@@ -422,12 +422,14 @@ FILE_EXACT = {
         'FAIL (form) {root}/types/host-extension/claude-code-extension/extra.md: extra.md - path is not a conditional-workflow file',
     ],
     # A folder under traits/ (stage B2 review, round 5: fixtures 2), one named like a trait file too (round 6: the
-    # sweep's line 364).
+    # sweep's line 364), which hides no type file of its name (BUG-007's gate round 1: Review A, the sweep's 342).
     'form-traits-folder': [
         'FAIL (form) {root}/traits/installable: installable - path is not a conditional-workflow file',
         'FAIL (form) {root}/traits/installable/extra.md: extra.md - path is not a conditional-workflow file',
         'FAIL (form) {root}/traits/odd.md: odd.md - path is not a conditional-workflow file',
         'FAIL (form) {root}/traits/odd.md/extra.md: extra.md - path is not a conditional-workflow file',
+        'FAIL (unknown) {root}/types/odd.md: odd - not a product type key',
+        'FAIL (a) {root}/types/odd.md: nowhere.at-all - point is not in the extension-point registry',
     ],
     'form-two-replaces': ['FAIL (form) {root}/types/host-extension.md: interface - two Replace headings for the same module'],
     'form-two-sets': ['FAIL (form) {root}/types/host-extension.md: intake.target-environment - two Set at headings for the same point'],
@@ -518,7 +520,7 @@ STATUS_EXACT = {
         "FAIL (form) {path}: Installable - traits are not in the open list's order",
     ],
     'form-trait-repeat-separated.md': ['FAIL (form) {path}: Has screens - trait repeated'],
-    # Order is judged against the highest trait so far, not only the one before (round 6: tests).
+    # The highest trait so far rises as traits come in order, so a later one below it fails (round 6: tests).
     'form-trait-order-highest.md': [
         'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)',
         "FAIL (form) {path}: Installable - traits are not in the open list's order",
@@ -1439,6 +1441,12 @@ ROUND6_PRECONDITIONS = [
      "a backtick on the leading side only is not unwrapped (fixtures 2)"),
     ("fail/form-traits-folder/traits/odd.md/extra.md", "## Add at intake.questions\n",
      "a folder named like a trait file is a folder (the sweep's line 364)"),
+    ("fail/form-traits-folder/types/odd.md", "## Add at nowhere.at-all\n",
+     "a type file named as the folder under traits/ is still checked (the sweep's line 342)"),
+    ("fail/form-not-markdown/types/host-extensionabc", "## Add at nowhere.at-all\n",
+     "a path that is no conditional workflow is never read: its failing change is not reported"),
+    ("fail/form-not-markdown/types/host-extension/notes.txt", "## Add at nowhere.at-all\n",
+     "a path that is no conditional workflow is never read: its failing change is not reported"),
     ("pass/traits/installable.md", "\n## Add at intake.delivery-kind\n", "an addition at a value point is an addition (tests)"),
     ("pass/types/host-extension.md", "\n## - notes\n", "a heading whose first word is punctuation only is prose (tests)"),
     ("pass/types/host-extension.md", "\n## ...\n", "a heading of punctuation alone is prose (tests)"),
@@ -1515,16 +1523,21 @@ def test_r014_rule_file_that_is_a_folder_cannot_be_read(tmp_path):
 
 def test_r014_conditional_file_not_utf8_stops_the_check(tmp_path):
     """A conditional-workflow file that cannot be read as UTF-8 stops the check with an ERROR line naming it and no
-    traceback; the same file in UTF-8 passes (stage B2 review, round 6: programs and tests; the sweep's line 806)."""
+    traceback, and nothing else is checked: a readable failing file beside it, reported when the file is UTF-8, is not
+    reported then (stage B2 review, round 6: programs and tests; the sweep's line 806; the sibling per BUG-007's gate
+    round 1, Review B)."""
     root = tmp_path / "root"
     (root / "types").mkdir(parents=True)
+    (root / "traits").mkdir()
+    (root / "traits" / "not-a-trait.md").write_bytes(b"## Add at intake.questions\n\nq\n")
     path = root / "types" / "host-extension.md"
     path.write_bytes(b"## Add at intake.questions\n\nq\n")
-    assert run(str(root)) == (0, ["RESULT: OK"], "")
+    shown = str(root).replace("\\", "/")
+    assert run(str(root)) == (1, [f"FAIL (unknown) {shown}/traits/not-a-trait.md: not-a-trait - not a trait key",
+                                  "RESULT: 1 problem(s)"], "")
     path.write_bytes(b"## Add at intake.questions\n\n\xff\n")
     rc, lines, err = run(str(root))
     assert_not_checked(rc, lines, err)
-    shown = str(root).replace("\\", "/")
     assert lines == [f"ERROR: {shown}/types/host-extension.md: cannot be read as UTF-8", "RESULT: not checked"], lines
 
 
@@ -1590,23 +1603,24 @@ def test_r014_root_with_a_trailing_slash_prints_one_slash():
 
 
 def test_r014_link_among_a_folders_files_is_form(tmp_path):
-    """A link the walk lists among a folder's files (one whose target is gone), a link named like a trait file, and a
-    `types` path that is a link to a folder are each reported at their exact line and never read or walked (stage B2
-    review, round 6: the sweep's lines 335, 336 and 353)."""
+    """A link the walk lists among a folder's files (one whose target is gone, named like a trait file so that reading it
+    as a file would be an ERROR), a link to a folder named like a trait file, and a `types` path that is a link to a
+    folder are each reported at their exact line and never read or walked (stage B2 review, round 6: the sweep's lines
+    335, 336 and 353; the name per BUG-007's gate round 1, Review A)."""
     outside = _outside_with_canary(tmp_path)
     gone = tmp_path / "gone"
     gone.mkdir()
     root = tmp_path / "root"
     (root / "traits").mkdir(parents=True)
     (root / "traits" / "installable.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
-    _link_folder(root / "traits" / "gone", gone)
+    _link_folder(root / "traits" / "gone.md", gone)
     gone.rmdir()
     _link_folder(root / "traits" / "has-screens.md", outside)
     _link_folder(root / "types", outside)
     rc, lines, err = run(str(root))
     shown = str(root).replace("\\", "/")
     assert lines == whole_output([
-        f"FAIL (form) {shown}/traits/gone: gone - path is not a conditional-workflow file",
+        f"FAIL (form) {shown}/traits/gone.md: gone.md - path is not a conditional-workflow file",
         f"FAIL (form) {shown}/traits/has-screens.md: has-screens.md - path is not a conditional-workflow file",
         f"FAIL (form) {shown}/types: types - path is not a conditional-workflow file",
     ]), lines
