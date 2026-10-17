@@ -127,11 +127,11 @@ def read_utf8(path):
 
 
 def escape_field(value):
-    """Printable characters stay; every other character becomes \\xNN, \\uNNNN, or \\UNNNNNNNN."""
+    """A character stays only when it is printable and ASCII (code point below 128); every other character becomes \\xNN, \\uNNNN, or \\UNNNNNNNN."""
     text = "" if value is None else str(value)
     parts = []
     for char in text:
-        if char.isprintable():
+        if char.isprintable() and ord(char) < 128:
             parts.append(char)
             continue
         code = ord(char)
@@ -317,6 +317,7 @@ def collect(root, product_keys):
             found.append((layer, "link"))
             continue
         if not os.path.isdir(base):
+            found.append((layer, "link"))
             continue
         for dirpath, dirnames, filenames in os.walk(base, followlinks=False, onerror=onerror):
             rel_dir = os.path.relpath(dirpath, root).replace("\\", "/")
