@@ -380,14 +380,13 @@ FILE_EXACT = {
         'FAIL (form) {root}/types/host-extension.md: intake.delivery-kind - Set at section has no non-blank line',
         'FAIL (kind) {root}/types/host-extension.md: - - Set at intake.delivery-kind is not one delivery kind',
     ],
-    # Each form matched exactly: text after the key or the kind, and a space after the key (round 6: tests).
+    # Each form matched exactly: text after the key or the kind, and a space after the key (round 6: tests); then
+    # each of the four forms loosened one way at a time, two spaces after `##`, two spaces between words, a space
+    # after the key or the kind, lower case, nineteen headings, and `##+Add at ...`, which is no heading and gives
+    # nothing (round 7: fixtures 2 and the widened sweep).
     'form-heading-trailing-text': [
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
-        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
-        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
-        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
-        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
-    ],
+    ] * 24,
     'form-indented-fence-open': ['FAIL (form) {root}/types/host-extension.md: - - fenced code block is still open at the end of the file'],
     # One space, a tab, and three spaces, the most a heading may be indented (round 6: fixtures 1 and 2).
     'form-indented-heading': [
@@ -411,11 +410,15 @@ FILE_EXACT = {
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
     ],
     'form-misspelt-in-trait': ['FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms'],
-    # A file that is not `.md` under traits/, under types/ and under a type's folder (round 6: tests, fixtures 2).
+    # A file that is not `.md` under traits/, under types/ and under a type's folder (round 6: tests, fixtures 2), and
+    # one of each whose name ends in `md` without the dot (round 7: fixtures 2, the widened sweep's lines 360 to 364).
     'form-not-markdown': [
         'FAIL (form) {root}/traits/installable.txt: installable.txt - path is not a conditional-workflow file',
+        'FAIL (form) {root}/traits/installablemd: installablemd - path is not a conditional-workflow file',
         'FAIL (form) {root}/types/host-extension/notes.txt: notes.txt - path is not a conditional-workflow file',
+        'FAIL (form) {root}/types/host-extension/notesmd: notesmd - path is not a conditional-workflow file',
         'FAIL (form) {root}/types/host-extensionabc: host-extensionabc - path is not a conditional-workflow file',
+        'FAIL (form) {root}/types/host-extensionmd: host-extensionmd - path is not a conditional-workflow file',
     ],
     'form-third-level': [
         'FAIL (form) {root}/types/host-extension/claude-code-extension: claude-code-extension - path is not a conditional-workflow file',
@@ -470,7 +473,15 @@ FILE_EXACT = {
     ],
 }
 
+# The single-line status files have no Phase line: only check_status reads them, and workflow-check.py never runs
+# check_placement (inventory-check.py and conformance-check.py do), so a placement check added to it would need a
+# Phase line in each (round 7: fixtures 5, consider). The prefix of a name is the case's subject, not always its
+# finding code: form-traits-none-case and form-unclassified-with-traits are cases of the traits text's and the
+# unclassified line's form, read as unknown names.
 STATUS_EXACT = {
+    # An unprefixed `not yet classified` among several lines breaks the part-prefix rule like any other line (round
+    # 7: fixtures 5).
+    'form-prefix-missing-unclassified.md': ['FAIL (form) {path}: - - Workflows line breaks the part-prefix rule'],
     'bom-workflows-line.md': [],
     'e-lone-trait.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
     'e-no-type.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
@@ -532,6 +543,10 @@ STATUS_EXACT = {
     # The traits text's own edges: no space before the first name, `none` in its case (round 5: fixtures 4).
     'form-traits-double-space.md': ['FAIL (form) {path}:  none - traits are not joined by a comma and one space'],
     'form-traits-none-case.md': ['FAIL (unknown) {path}: None - not a trait name'],
+    # `none` is the whole traits text or no trait at all: beside a name it is an unknown name, first or last (round
+    # 7: fixtures 4, the widened sweep's line 646).
+    'form-traits-none-first.md': ['FAIL (unknown) {path}: none - not a trait name'],
+    'form-traits-none-last.md': ['FAIL (unknown) {path}: none - not a trait name'],
     # An empty traits text, and one ending `, ` (round 6: tests).
     'form-traits-empty.md': ['FAIL (form) {path}: - - traits are not joined by a comma and one space'],
     'form-traits-trailing-comma.md': ['FAIL (form) {path}: - - traits are not joined by a comma and one space'],
@@ -540,6 +555,9 @@ STATUS_EXACT = {
     # review, round 5: tests and fixtures 4, converged).
     'form-unclassified-case.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
     'form-unclassified-trailing-space.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
+    # A space before it, or words before it, too (round 7: fixtures 5, the widened sweep's line 692).
+    'form-unclassified-leading-space.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
+    'form-unclassified-ending.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
     'form-unclassified-with-traits.md': [
         'FAIL (unknown) {path}: not yet classified - name is not in the open list',
         'FAIL (e) {path}: - - part must name exactly one product type',
@@ -833,6 +851,8 @@ def test_r014_usage_error_ends_with_result_line():
     assert rc == 2
     assert lines and lines[-1] == "RESULT: not checked", (lines, err)
     assert "Traceback" not in err
+    # The usage line stays as argparse prints it, on standard error (the program's usage text; round 7: tests).
+    assert err.startswith("usage: workflow-check.py"), err
 
 
 def test_r014_control_characters_are_escaped(tmp_path):
@@ -913,6 +933,12 @@ def test_r014_change_word_with_punctuation_is_form():
     `## Set;`, `## Replace,`, `## Add-`) and two marks (`## Set:;`) are malformed change headings; a trait's `## Set:` no
     longer escapes (stage B2 review, round 5)."""
     root = f"{FIX}/fail/form-change-word-punctuation"
+    text = (REPO / root / "traits/installable.md").read_text(encoding="utf-8")
+    assert [line for line in text.split("\n") if line.startswith("## ")] == [
+        "## Set: intake.delivery-kind", "## Add: intake.questions", "## Replace: design", "## Adding intake.questions",
+        "## Setting intake.budget-kind", "## Adds. intake.questions", "## Set; intake.target-environment",
+        "## Replace, design", "## Add- intake.questions", "## Set:; intake.budget-kind",
+    ], "precondition: each heading the docstring names, two marks on the last (round 7: fixtures 1)"
     rc, lines, err = run(root)
     assert rc == 1
     forms = [line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/traits/installable.md: - ")]
@@ -941,9 +967,10 @@ def test_r014_usage_error_message_is_escaped():
     assert "\\x0a::warning::injected" in err, err
 
 
-@pytest.mark.parametrize("sep", ["|---|", "|---|---|---|---|---|---|---|---|"], ids=["one-cell", "eight-cells"])
+@pytest.mark.parametrize("sep", ["|---|", "|---|---|---|---|---|---|---|---|", "|---|x|---|---|---|---|---|"],
+                         ids=["one-cell", "eight-cells", "second-cell-not-dashes"])
 def test_r014_separator_cell_count_differs(tmp_path, sep):
-    """R3-2."""
+    """R3-2; every cell of the separator is dashes, not the first only (round 7: the widened sweep's line 181)."""
     text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
     good = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
     assert good in text
@@ -988,8 +1015,11 @@ def test_r014_top_level_link_is_form_and_not_walked(tmp_path):
     rc, lines, err = run(str(root))
     shown = str(root).replace("\\", "/")
     assert rc == 1, lines
-    assert any(line.startswith(f"FAIL (form) {shown}/types") for line in lines), lines
-    assert any(line.startswith(f"FAIL (form) {shown}/traits") for line in lines), lines
+    # The whole output, so a deeper line under either link would show (round 7: tests).
+    assert lines == whole_output([
+        f"FAIL (form) {shown}/traits: traits - path is not a conditional-workflow file",
+        f"FAIL (form) {shown}/types: types - path is not a conditional-workflow file",
+    ]), lines
     assert not [line for line in lines if line.startswith("FAIL (a)")], "a file behind a link was read"
 
 
@@ -1148,6 +1178,8 @@ def test_r014_commonmark_fence_cases_read_the_set(case):
         assert "\n```md\n## Replace design\n```\n" in text, "precondition: an ordinary info string opens a fence"
     if case == "fence-longer-opening":
         assert "\n````\n```\n`````\n" in text, "precondition: a shorter run inside, a longer run closes"
+    if case == "fence-info-string-not-closing":
+        assert "\n```\n```python\n```\n" in text, "precondition: a run with text after it inside (round 7: fixtures 1)"
     rc, lines, err = run(root)
     assert_clean_end(lines, err)
     assert rc == 1
@@ -1691,3 +1723,63 @@ def test_r014_root_the_system_refuses_is_not_walked(tmp_path):
     rc, lines, err = run(str(root))
     assert_not_checked(rc, lines, err)
     assert lines == [f"ERROR: {str(root).replace(chr(92), '/')}: not a folder", "RESULT: not checked"], lines
+
+
+# --- stage B2 review, round 7 (BUG-008): the seventh review's controls and the widened sweep's survivors -------------
+
+ROUND7_PRECONDITIONS = [
+    # (fixture, text it holds, the rule the text gives a control to)
+    ("fail/form-heading-trailing-text/types/host-extension.md", "\n##  Add at intake.questions\n",
+     "two spaces after `##` are not one of the four forms (the widened sweep's line 66)"),
+    ("fail/form-heading-trailing-text/types/host-extension.md", "\n## Set at  intake.target-environment\n",
+     "two spaces between words are not one of the four forms (fixtures 2)"),
+    ("fail/form-heading-trailing-text/types/host-extension.md", "\n## Replace interface \n",
+     "a space after the module is not one of the four forms (fixtures 2)"),
+    ("fail/form-heading-trailing-text/types/host-extension.md", "\n## Add at project-end.delivery for installer \n",
+     "a space after the delivery kind is not one of the four forms (fixtures 2)"),
+    ("fail/form-heading-trailing-text/types/host-extension.md", "\n## set at intake.target-environment\n",
+     "the forms are matched in their case (fixtures 2)"),
+    ("fail/form-heading-trailing-text/types/host-extension.md", "\n##+Add at intake.questions\n",
+     "a `##` with no space or tab after it is no heading (the widened sweep's line 78)"),
+    ("pass/types/host-extension.md", "\n```\n```+\n## Replace design\n```\n",
+     "a backtick run with text after it does not close a fence (the widened sweep's line 83)"),
+    ("pass/types/host-extension.md", "\n## Look atop the target\n",
+     "a second word that starts with `at` is not `at` (the widened sweep's line 390)"),
+    ("pass/types/host-extension.md", "\n## Go combat it\n",
+     "a second word that ends with `at` is not `at` (the widened sweep's line 390)"),
+    ("pass/README.md", "Nothing outside types/ and traits/ is read.",
+     "a file outside types/ and traits/ in the pass root is never read (round 7: fixtures 3)"),
+]
+
+
+@pytest.mark.parametrize("rel,held,rule", ROUND7_PRECONDITIONS, ids=[f"{r}:{i}" for i, (r, _, _) in enumerate(ROUND7_PRECONDITIONS)])
+def test_r014_round7_fixtures_hold_their_controls(rel, held, rule):
+    """Each fixture holds the text that makes its case a control (stage B2 review, round 7); the cases' outputs are in
+    FILE_EXACT and STATUS_EXACT, and the pass root must stay RESULT: OK."""
+    text = (REPO / FIX / rel).read_text(encoding="utf-8")
+    assert held in text, rule
+
+
+def test_r014_round7_trailing_spaces_are_bytes_of_the_fixture():
+    """The three headings that end in a space keep it: an editor that trims it would turn the control into a copy of
+    another (round 7: fixtures 2)."""
+    data = (REPO / FIX / "fail/form-heading-trailing-text/types/host-extension.md").read_bytes().replace(b"\r\n", b"\n")
+    for heading in (b"## Add at intake.questions ", b"## Replace interface ", b"## Add at project-end.delivery for installer "):
+        assert b"\n" + heading + b"\n" in data, heading
+
+
+def test_r014_every_unreadable_file_is_reported(tmp_path):
+    """Each file that cannot be read is its own ERROR line, in path order, before RESULT: not checked, not the first
+    only (round 7: the widened sweep's line 818)."""
+    root = tmp_path / "root"
+    (root / "traits").mkdir(parents=True)
+    (root / "traits" / "has-screens.md").write_bytes(b"## Add at intake.questions\n\n\xff\n")
+    (root / "traits" / "installable.md").write_bytes(b"## Add at intake.questions\n\n\xfe\n")
+    rc, lines, err = run(str(root))
+    shown = str(root).replace("\\", "/")
+    assert rc == 2 and "Traceback" not in err, (lines, err)
+    assert lines == [
+        f"ERROR: {shown}/traits/has-screens.md: cannot be read as UTF-8",
+        f"ERROR: {shown}/traits/installable.md: cannot be read as UTF-8",
+        "RESULT: not checked",
+    ], lines
