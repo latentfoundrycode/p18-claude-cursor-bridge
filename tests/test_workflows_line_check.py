@@ -192,7 +192,7 @@ def test_r015_inventory_no_status_file_no_check(tmp_path):
     assert lines and lines[-1].startswith("RESULT: "), (lines, err)
     assert "note: status: %s not found (skipped)" % absent in lines, lines
     assert workflows_lines(lines) == [], lines
-    assert not [line for line in lines if "Workflows" in line], lines
+    assert not [line for line in lines if "workflows" in line.lower()], lines
 
 
 def _bridge_copy(tmp_path, with_checker=True, with_rules=True):
@@ -404,9 +404,11 @@ def test_r015_conformance_malformed_line(tmp_path, case):
 
 def test_r015_conformance_no_status_file_no_check(tmp_path):
     """TASK-008 Requirement 4, conformance-check's half: with no status file the Workflows line is not judged and no row
-    names it; the records row already reports the file missing. test_r015_conformance_missing_line is the positive
-    control."""
+    names it; the records row already reports the file missing. The positive control runs first, on the same workspace
+    with its status file."""
     root = workspace(tmp_path, VALID["not-yet-classified"])
+    rc, out, err = conformance(root)
+    assert verdict(out, "Workflows line") == ("OK", "Workflows line"), "control: with the file the line is judged: " + out
     (root / "docs" / "PROJECT_STATUS.md").unlink()
     rc, out, err = conformance(root)
     assert "Traceback" not in err and "Traceback" not in out, (out, err)

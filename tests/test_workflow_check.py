@@ -161,6 +161,7 @@ def test_r014_roots_are_reported_in_argument_order(first, second):
 
 @pytest.mark.parametrize("first,second", [("unknown-trait.md", "f-unwritten-type.md"), ("f-unwritten-type.md", "unknown-trait.md")])
 def test_r014_status_files_are_reported_in_argument_order(first, second):
+    """TASK-006: status files in argument order, in both orders (stage B2 review, round 3: Review A, tests part)."""
     one, two = f"{FIX}/status/{first}", f"{FIX}/status/{second}"
     single = [findings_of("--open-list", STATUS_LIST, "--status", path) for path in (one, two)]
     assert single[0] and single[1], "precondition: each status file fails on its own"
