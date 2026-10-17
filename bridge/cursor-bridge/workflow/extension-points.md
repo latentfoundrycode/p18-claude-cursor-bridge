@@ -69,8 +69,10 @@ A conditional workflow file states each change it makes under a heading of its o
 - `## Set at <point key>` — the value it sets there, at a point whose Changes cell includes `set`. Only a type workflow or a sub-workflow may set. The value is the section's first non-blank line; at `intake.delivery-kind` it is one delivery kind's key from the list above, bare or in backticks.
 - `## Replace <module key>` — its own version of the whole phase, for a module marked replaceable. Only a type workflow or a sub-workflow may replace.
 
+Any other `##` heading is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading unless it is one of the four forms above, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets each point, and replaces each module, at most once. A `##` line inside a fenced code block (opened by three or more backticks or tildes) is not a heading and changes nothing.
+
 A trait attaches to the main workflow only through its `Add at` headings, so each of its additions names the point it belongs to. Within one file, additions at one point keep the order the file writes them in; across files they apply in the order `supervisor.md` states ("The order additions apply in").
 
 ## How a phase module declares its points
 
-Each phase module that declares points does so in a section headed `## Extension points`, one line per point, giving the point's key from the table above, in the table's order. A module declares exactly the points this registry names it as declaring, and every point it declares is in this registry; `workflow-check.py` checks both directions once every module declares its points (BUILD_PLAN TASK-014).
+Each phase module that declares points does so in a section headed `## Extension points`, one line per point, giving the point's key from the table above, in the table's order. A module declares exactly the points this registry names it as declaring, and every point it declares is in this registry; the two directions are checked once every module declares its points (BUILD_PLAN TASK-014).

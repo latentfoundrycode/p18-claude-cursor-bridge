@@ -75,7 +75,7 @@ A trait is a property that adds work whatever the product type. A part may have 
 
 At intake, the supervisor classifies each part against the definitions above (§6.7):
 
-- **A new product type or sub-type pauses the project.** When a part fits no product type, fits two equally, fits one whose workflow is not yet written, or fits a sub-type whose sub-workflow is not yet written, the supervisor stops before design and sends the owner to the bridge's maintainer with its reasons. The maintainer writes the workflow with the owner (below), the release goes out, the project calibrates, and the supervisor resumes.
+- **A new product type or sub-type pauses the project.** When a part fits no product type, fits two equally, fits one whose workflow is not yet written, fits two sub-types of its type equally, or fits a sub-type whose sub-workflow is not yet written, the supervisor stops before design and sends the owner to the bridge's maintainer with its reasons. The maintainer writes the workflow with the owner (below), the release goes out, the project calibrates, and the supervisor resumes.
 - **A new trait is flagged, and the work continues.** Traits only add, so the main workflow and the part's product type still cover everything essential. The supervisor writes the extra handling into the project's design, flags it at the design gate, where the owner may still choose to pause, and puts it forward at the promotion pass at project end, from which the maintainer may write it as trait additions. The same holds for a trait that is defined but not yet written.
 
 ## Adding or changing a conditional workflow

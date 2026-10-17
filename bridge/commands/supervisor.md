@@ -111,7 +111,7 @@ Until the phases are moved into files of their own, each phase's section of this
 
 **Three kinds of change.** Each change a conditional workflow makes is one of these:
 
-- **Add** — extra questions, sections, diagram kinds, checks, brief constraints, stages, completion conditions, reflection items.
+- **Add** — extra material at a point, such as questions, sections, diagram kinds, checks, brief constraints, stages, completion conditions, reflection items.
 - **Replace** — a whole phase module, only where the phase declares that it may be replaced.
 - **Set** — a value the main workflow leaves open, such as the kind of performance budget (page load, frame time) or the delivery kind.
 

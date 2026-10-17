@@ -249,8 +249,8 @@ def test_r011_the_classification_rules_are_recorded():
     assert "Siblings are exclusive: a part has at most one sub-type of its product type." in flat
     assert "Two levels are enough" in flat
     assert "A new product type or sub-type pauses the project." in flat
-    assert ("fits no product type, fits two equally, fits one whose workflow is not yet written, or fits a sub-type whose "
-            "sub-workflow is not yet written, the supervisor stops before design") in flat
+    assert ("fits no product type, fits two equally, fits one whose workflow is not yet written, fits two sub-types of its "
+            "type equally, or fits a sub-type whose sub-workflow is not yet written, the supervisor stops before design") in flat
     assert "the supervisor stops before design" in flat
     assert "A new trait is flagged, and the work continues." in flat
     assert "from which the maintainer may write it as trait additions" in flat

@@ -275,8 +275,28 @@ def test_r006_the_inspect_and_test_steps_divide_every_check():
 def test_r006_the_checks_delivery_kinds_are_the_registrys(program):
     """The list lives in this text and in workflow-check.py's DELIVERY_KINDS; they change together (stage B2
     review)."""
-    listed = re.findall(r"`([a-z-]+)` \((?:a |an )", TEXT[TEXT.index("The delivery kinds are one list"):])
+    start = TEXT.index("The delivery kinds are one list")
+    paragraph = TEXT[start:TEXT.index("\n", start)]  # to the paragraph's end, not the file's (stage B2 review, round 4)
+    listed = re.findall(r"`([a-z-]+)` \((?:a |an )", paragraph)
     assert tuple(listed) == program("workflow-check").DELIVERY_KINDS, listed
+
+
+def test_r006_the_registry_names_the_change_words_the_check_reads(program):
+    """A prose heading that reads like a change fails; the registry names the words and the stripped
+    punctuation workflow-check.py's CHANGE_FIRST and TRAILING_PUNCT hold, and the one-per-target rule (stage
+    B2 review, round 4)."""
+    start = TEXT.index("Any other `##` heading is prose")
+    paragraph = TEXT[start:TEXT.index("\n", start)]
+    words_text = paragraph[paragraph.index("ignored, is ") + len("ignored, is "):paragraph.index(", or whose second")]
+    words = set(re.findall(r"[a-z]+", words_text)) - {"or"}
+    wc = program("workflow-check")
+    assert words == set(wc.CHANGE_FIRST), words
+    punct = paragraph[paragraph.index("any trailing ") + len("any trailing "):paragraph.index(" ignored")]
+    assert set(re.findall(r"`(.)`", punct)) == set(wc.TRAILING_PUNCT), punct
+    assert "or whose second word is `at` in any case, fails as a malformed change heading" in paragraph
+    assert "A file sets each point, and replaces each module, at most once." in paragraph
+    assert ("A `##` line inside a fenced code block (opened by three or more backticks or tildes) is not a heading and "
+            "changes nothing.") in paragraph
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():

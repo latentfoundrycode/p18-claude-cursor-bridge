@@ -8,6 +8,10 @@ Which host application does the part run inside?
 
 `host-installation`
 
+## Set at intake.target-environment
+
+Inside the host application.
+
 ## Replace interface
 
 The command design replaces the mockup phase.
