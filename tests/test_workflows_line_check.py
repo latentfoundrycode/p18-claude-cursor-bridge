@@ -188,8 +188,10 @@ def test_r015_inventory_no_status_file_no_check(tmp_path):
     keeps its existing note; the run ends normally. test_r015_inventory_missing_line is the positive control."""
     absent = tmp_path / "absent-status.md"
     rc, lines, out, err = inventory(tmp_path, absent)
-    assert "Traceback" not in err and "Traceback" not in out, (out, err)
-    # The whole output, so nothing about the line can be said in any words (BUG-004 round 2, Review A).
+    # The whole output on both streams, so nothing about the line can be said in any words (BUG-004 rounds 2 and 3,
+    # Review A and Review B); the absent inventory is the run's one problem.
+    assert err == "", err
+    assert rc == 1, lines
     assert lines == [
         "note: status: %s not found (skipped)" % absent,
         "note: resources: not a git repository (reads not scanned)",
