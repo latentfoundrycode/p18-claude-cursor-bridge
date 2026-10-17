@@ -277,8 +277,9 @@ def test_r006_the_checks_delivery_kinds_are_the_registrys(program):
     review)."""
     start = TEXT.index("The delivery kinds are one list")
     paragraph = TEXT[start:TEXT.index("\n", start)]  # to the paragraph's end, not the file's (stage B2 review, round 4)
-    listed = re.findall(r"`([a-z-]+)` \((?:a |an )", paragraph)
+    listed = re.findall(r"`([a-z0-9-]+)` \(", paragraph)  # every kind the list names, however described (round 5: tests)
     assert tuple(listed) == program("workflow-check").DELIVERY_KINDS, listed
+    assert "it grows only as a point does, and workflow-check.py's own copy of it (`DELIVERY_KINDS`) changes with it." in paragraph
 
 
 def test_r006_the_registry_names_the_change_words_the_check_reads(program):
@@ -295,8 +296,20 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
     assert set(re.findall(r"`(.)`", punct)) == set(wc.TRAILING_PUNCT), punct
     assert "or whose second word is `at` in any case, fails as a malformed change heading" in paragraph
     assert "A file sets each point, and replaces each module, at most once." in paragraph
-    assert ("A `##` line inside a fenced code block (opened by three or more backticks or tildes) is not a heading and "
-            "changes nothing.") in paragraph
+    # What else the check reads and fails, for the maintainer writing a conditional workflow (stage B2 review, round 5:
+    # texts and Review B).
+    for sentence in (
+        "A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own "
+        "structure `###` headings and deeper.",
+        "A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or "
+        "more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening "
+        "none, and closes with a run of the same character at least as long, indented at most three spaces and followed "
+        "only by spaces or tabs; a fence still open at the end of the file fails.",
+        "The check also fails a `## Set at` section with no non-blank line, anything under `types/` or `traits/` that is "
+        "not a conditional workflow at its key's path (a README there included), and a folder under `types/` that is no "
+        "product type.",
+    ):
+        assert sentence in paragraph, sentence
 
 
 def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():

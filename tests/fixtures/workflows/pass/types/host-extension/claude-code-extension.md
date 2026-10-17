@@ -1,8 +1,8 @@
 # Claude Code Extension (fixture)
 
 ## Set at intake.delivery-kind
-
-installer
+  installer  
+The part's installer delivers it.
 
 ## Replace interface
 

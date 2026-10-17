@@ -203,7 +203,7 @@ def status(name):
     return run("--open-list", STATUS_LIST, "--status", f"{FIX}/status/{name}")
 
 
-@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-multi-unclassified.md", "ok-unclassified.md", "bom-workflows-line.md"])
+@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-multi-unclassified.md", "ok-no-final-newline.md", "ok-unclassified.md", "bom-workflows-line.md"])
 def test_r014_status_ok(name):
     """bom-workflows-line.md is not a whole status file (it has no `Phase:` line, which check_placement would refuse);
     it holds one `Workflows:` line after a byte-order mark, the case only check_status reads."""
@@ -252,9 +252,11 @@ def test_r015_separators_are_exact(tmp_path, line):
     rc, lines, err = _status_line_case(tmp_path, line)
     assert_clean_end(lines, err)
     assert rc == 1, lines
-    assert any(line.startswith("FAIL (form) ")
-               and line.endswith(" - Workflows head is not the product type, then at most its sub-type")
-               for line in fails(lines)), lines
+    # The whole output: the shape finding alone, no name read with its spaces trimmed (stage B2 review, round 5: the
+    # supervisor's mutation sweep, where a segment stripped on one side only added an (unknown)).
+    shown = str(tmp_path / "status.md").replace("\\", "/")
+    assert lines == whole_output([f"FAIL (form) {shown}: - - Workflows head is not the product type, then at most its sub-type"]), lines
+    assert err == "", err
 
 
 def test_r014_unwritten_trait_is_flagged_not_failed():
@@ -336,6 +338,8 @@ FILE_EXACT = {
     'c-not-replaceable': ['FAIL (c) {root}/types/host-extension.md: design - module is missing or not replaceable'],
     'c-unknown-module': ['FAIL (c) {root}/types/host-extension.md: testing - module is missing or not replaceable'],
     'd-sub-type-of-another': ['FAIL (d) {root}/types/web-app/claude-code-extension.md: claude-code-extension - not a sub-type of web-app'],
+    # A sub-workflow file whose key is no sub-type at all (stage B2 review, round 5: tests).
+    'd-unknown-sub-type-key': ['FAIL (d) {root}/types/host-extension/claude-code-extention.md: claude-code-extention - not a sub-type of host-extension'],
     'd-type-file-missing': ['FAIL (d) {root}/types/host-extension/claude-code-extension.md: claude-code-extension - type workflow types/host-extension.md does not exist'],
     'd-unknown-type-folder': ['FAIL (d) {root}/types/not-a-type: not-a-type - type folder is not a product type'],
     'fence-backtick-in-info': ['FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add'],
@@ -345,7 +349,13 @@ FILE_EXACT = {
     'fence-info-string-not-closing': ['FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add'],
     'fence-longer-opening': ['FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add'],
     'form-bad-heading': ['FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms'],
+    # Each stripped punctuation mark, and two marks on one word (stage B2 review, round 5: fixtures 1).
     'form-change-word-punctuation': [
+        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
@@ -358,7 +368,16 @@ FILE_EXACT = {
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
     ],
+    # Every change word without `at`, a two-word heading ending `at`, and `AT` in capitals (stage B2 review, round 5:
+    # fixtures 1, and the supervisor's mutation sweep).
     'form-misspelt-change-word': [
+        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
@@ -370,12 +389,26 @@ FILE_EXACT = {
         'FAIL (form) {root}/types/host-extension/claude-code-extension: claude-code-extension - path is not a conditional-workflow file',
         'FAIL (form) {root}/types/host-extension/claude-code-extension/extra.md: extra.md - path is not a conditional-workflow file',
     ],
+    # A folder under traits/ (stage B2 review, round 5: fixtures 2).
+    'form-traits-folder': [
+        'FAIL (form) {root}/traits/installable: installable - path is not a conditional-workflow file',
+        'FAIL (form) {root}/traits/installable/extra.md: extra.md - path is not a conditional-workflow file',
+    ],
     'form-two-replaces': ['FAIL (form) {root}/types/host-extension.md: interface - two Replace headings for the same module'],
     'form-two-sets': ['FAIL (form) {root}/types/host-extension.md: intake.target-environment - two Set at headings for the same point'],
     'form-unclosed-fence': ['FAIL (form) {root}/types/host-extension.md: - - fenced code block is still open at the end of the file'],
     'kind-missing': ['FAIL (kind) {root}/types/host-extension.md: project-end.delivery - addition at project-end.delivery does not name a delivery kind'],
-    'kind-on-another-point': ['FAIL (kind) {root}/types/host-extension.md: installer - delivery kind is named on a point other than project-end.delivery'],
-    'kind-set-value': ['FAIL (kind) {root}/types/host-extension.md: deployment - Set at intake.delivery-kind is not one delivery kind'],
+    # An unlisted kind on another point is both findings (stage B2 review, round 5: fixtures 2).
+    'kind-on-another-point': [
+        'FAIL (kind) {root}/types/host-extension.md: installer - delivery kind is named on a point other than project-end.delivery',
+        'FAIL (kind) {root}/types/host-extension.md: docker-image - delivery kind is not in the delivery-kind list',
+        'FAIL (kind) {root}/types/host-extension.md: docker-image - delivery kind is named on a point other than project-end.delivery',
+    ],
+    # A value with a backtick on one side only is not unwrapped (stage B2 review, round 5: the supervisor's sweep).
+    'kind-set-value': [
+        'FAIL (kind) {root}/types/host-extension.md: deployment - Set at intake.delivery-kind is not one delivery kind',
+        'FAIL (kind) {root}/types/host-extension/claude-code-extension.md: installer` - Set at intake.delivery-kind is not one delivery kind',
+    ],
     'kind-unlisted': ['FAIL (kind) {root}/traits/installable.md: docker-image - delivery kind is not in the delivery-kind list'],
     'set-point-without-set': ['FAIL (set) {root}/types/host-extension.md: intake.questions - point does not accept set'],
     'sub-workflow-changes': [
@@ -423,12 +456,31 @@ STATUS_EXACT = {
     'form-sub-type-first.md': ['FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type'],
     'form-trait-double-space.md': ['FAIL (form) {path}:  Installable - traits are not joined by a comma and one space'],
     'form-trait-in-head.md': ['FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type'],
+    # Order and repeats beyond neighbouring traits (stage B2 review, round 5: fixtures 3).
+    'form-trait-order-three.md': [
+        'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)',
+        "FAIL (form) {path}: Has screens - traits are not in the open list's order",
+        "FAIL (form) {path}: Installable - traits are not in the open list's order",
+    ],
+    'form-trait-repeat-separated.md': ['FAIL (form) {path}: Has screens - trait repeated'],
     'form-trait-order.md': ["FAIL (form) {path}: Has screens - traits are not in the open list's order"],
     'form-trait-repeated.md': ['FAIL (form) {path}: Installable - trait repeated'],
     'form-trait-separator.md': ['FAIL (form) {path}: Has screens,Installable - traits are not joined by a comma and one space'],
     'form-trait-trailing-space.md': ['FAIL (form) {path}: Has screens  - traits are not joined by a comma and one space'],
+    # The traits text's own edges: no space before the first name, `none` in its case (round 5: fixtures 4).
+    'form-traits-double-space.md': ['FAIL (form) {path}:  none - traits are not joined by a comma and one space'],
+    'form-traits-none-case.md': ['FAIL (unknown) {path}: None - not a trait name'],
     'form-traits-marker-twice.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
+    # A rest that only starts as `not yet classified`, or differs in case or by a space, is read as names (stage B2
+    # review, round 5: tests and fixtures 4, converged).
+    'form-unclassified-case.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
+    'form-unclassified-trailing-space.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
+    'form-unclassified-with-traits.md': [
+        'FAIL (unknown) {path}: not yet classified - name is not in the open list',
+        'FAIL (e) {path}: - - part must name exactly one product type',
+    ],
     'ok-multi.md': [],
+    'ok-no-final-newline.md': [],
     'ok-multi-unclassified.md': [],
     'ok-single.md': [],
     'ok-unclassified.md': [],
@@ -442,6 +494,15 @@ STATUS_EXACT = {
     'unknown-sub-type-key.md': [
         'FAIL (unknown) {path}: claude-code-extension - name is not in the open list',
         'FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type',
+    ],
+    # A product type's Name for its Workflow name, and a sub-type's Name in another case (round 5: fixtures 4).
+    'unknown-sub-type-name.md': [
+        'FAIL (unknown) {path}: Claude Code extension - name is not in the open list',
+        'FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type',
+    ],
+    'unknown-type-name.md': [
+        'FAIL (unknown) {path}: Web app - name is not in the open list',
+        'FAIL (e) {path}: - - part must name exactly one product type',
     ],
     'unknown-type-key.md': [
         'FAIL (unknown) {path}: web-app - name is not in the open list',
@@ -622,12 +683,14 @@ def test_r033_usage_names_the_three_times_and_the_codes():
 # --- round 2: the review's corrections (handoff/TASK-006-r2.md) ---------------------------------------------------
 
 def test_r014_every_misspelt_change_word_is_form():
-    """R2-1: `## Adds at`, `## add at`, `## Replacing`, `## Append at` are each a malformed change heading."""
+    """R2-1: `## Adds at`, `## add at`, `## Replacing`, `## Append at`, each change word without `at` (`## Adds`, `## Added`,
+    `## Sets`, `## Replaces`, `## Replaced`), a two-word `## Look at` and `## Look AT ...` are each a malformed change
+    heading (stage B2 review, round 5)."""
     root = f"{FIX}/fail/form-misspelt-change-word"
     rc, lines, err = run(root)
     assert rc == 1
     forms = [line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/types/host-extension.md: - ")]
-    assert len(forms) == 4, lines
+    assert len(forms) == 11, lines
 
 
 def test_r014_prose_headings_stay_prose():
@@ -745,13 +808,14 @@ def test_r014_misspelt_heading_section_is_not_read_as_a_change():
 
 
 def test_r014_change_word_with_punctuation_is_form():
-    """R3-4: `## Set:`, `## Add:`, `## Replace:`, `## Adding`, `## Setting` are malformed change headings; a trait's
-    `## Set:` no longer escapes."""
+    """R3-4: `## Set:`, `## Add:`, `## Replace:`, `## Adding`, `## Setting`, and each other stripped mark (`## Adds.`,
+    `## Set;`, `## Replace,`, `## Add-`) and two marks (`## Set:;`) are malformed change headings; a trait's `## Set:` no
+    longer escapes (stage B2 review, round 5)."""
     root = f"{FIX}/fail/form-change-word-punctuation"
     rc, lines, err = run(root)
     assert rc == 1
     forms = [line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/traits/installable.md: - ")]
-    assert len(forms) == 5 and len(fails(lines)) == 5, lines
+    assert len(forms) == 10 and len(fails(lines)) == 10, lines
     text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
     assert "\n## Add-ons\n" in text, "the pass root keeps `## Add-ons` as prose"
 
@@ -1115,3 +1179,90 @@ def test_r033_ci_runs_the_check_last_in_the_tests_job():
 def test_r033_ci_check_is_not_in_the_security_floor():
     steps = _jobs()["security-floor"]["steps"]
     assert not any("workflow-check" in str(s) for s in steps)
+
+
+# --- stage B2 review, round 5: the controls the reviewers and the supervisor's mutation sweep found missing -----------
+
+ROUND5_PRECONDITIONS = [
+    # (fixture, text it holds, the rule the text gives a control to)
+    ("fail/fence-indented-close/traits/installable.md", "\n```\ncode\n    ```\n   ```\n",
+     "a closing run indented four spaces is content; the three-space one closes"),
+    ("fail/fence-four-spaces/traits/installable.md", "\n    ```\n", "backticks indented four spaces open no fence"),
+    ("fail/fence-four-spaces/traits/installable.md", "\n``\n", "two backticks open no fence"),
+    ("fail/fence-four-spaces/traits/installable.md", "\n~~\n", "two tildes open no fence"),
+    ("pass/types/host-extension.md", "\n\n    ## Replace design\n", "a heading indented four spaces is prose"),
+    ("pass/types/host-extension.md", "\n## \n", "an empty heading is prose"),
+    ("pass/types/host-extension/claude-code-extension.md",
+     "\n## Set at intake.delivery-kind\n  installer  \nThe part's installer delivers it.\n",
+     "the Set value is the first non-blank line, stripped, with no blank line before it and prose after it"),
+    ("fail/c-not-replaceable/types/host-extension.md", "## Replace interface\n", "two different modules replaced in one file"),
+    ("fail/d-unknown-type-folder/types/not-a-type/deeper/more.md", "## Add at nowhere.at-all\n",
+     "a folder inside an unknown type folder is not reported again"),
+    ("status/form-no-line.md", "\n  Workflows: ", "an indented Workflows line is not one"),
+    ("status/form-no-line.md", "\nworkflows: ", "a lower-case workflows line is not one"),
+]
+
+
+@pytest.mark.parametrize("rel, held, rule", ROUND5_PRECONDITIONS,
+                         ids=[f"{r}: {h.strip()[:24]}" for r, h, _ in ROUND5_PRECONDITIONS])
+def test_r014_round5_fixtures_hold_their_controls(rel, held, rule):
+    """Each fixture holds the text that makes its case a control (stage B2 review, round 5); the cases' outputs are in
+    FILE_EXACT and STATUS_EXACT, and the pass root must stay RESULT: OK."""
+    text = (REPO / FIX / rel).read_text(encoding="utf-8")
+    assert held in text, rule
+
+
+def test_r015_byte_cases_keep_their_bytes():
+    """A trailing space after `not yet classified`, and a status file that starts with a blank line and has no final line
+    feed, are bytes an editor could change; the cases depend on them (stage B2 review, round 5)."""
+    trailing = (REPO / FIX / "status/form-unclassified-trailing-space.md").read_bytes().rstrip(b"\r\n")
+    assert trailing.endswith(b"not yet classified "), trailing
+    no_final = (REPO / FIX / "status/ok-no-final-newline.md").read_bytes()
+    assert no_final.startswith((b"\n", b"\r\n")) and not no_final.endswith(b"\n"), no_final
+
+
+@pytest.mark.parametrize("char, shown", [
+    ("\t", "\\x09"), ("\x7f", "\\x7f"), ("\x80", "\\x80"), ("\xff", "\\xff"), ("Ā", "\\u0100"),
+    ("→", "\\u2192"), ("￿", "\\uffff"), ("\U00010000", "\\U00010000"),
+], ids=["tab", "del", "x80", "xff", "u0100", "arrow", "uffff", "U00010000"])
+def test_r014_escape_field_at_each_width_boundary(program, char, shown):
+    """R-014 output is ASCII: an unprintable or non-ASCII character prints as backslashreplace's forms, `\\xNN` up to
+    U+00FF, `\\uNNNN` up to U+FFFF, `\\UNNNNNNNN` above, each width at its boundary (stage B2 review, round 5: the
+    supervisor's mutation sweep)."""
+    assert program("workflow-check").escape_field("a" + char + "b") == "a" + shown + "b"
+
+
+TABLE_REQ = ["Key", "Name"]
+
+
+@pytest.mark.parametrize("text, rows", [
+    # the first table after the heading, rows to the first non-table line
+    ("## T\n\n| Key | Name |\n|---|---|\n| a | A |\n\nprose\n", [("a", "A")]),
+    # a table right under its heading, no blank line between
+    ("## T\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
+    # alignment colons on either side of the separator's dashes
+    ("## T\n\n| Key | Name |\n|:---|---:|\n| a | A |\n", [("a", "A")]),
+    # rows without their trailing pipe, and spaces after the last pipe
+    ("## T\n\n| Key | Name\n|---|---\n| a | A |   \n| b | B\n", [("a", "A"), ("b", "B")]),
+    # a table with a header and a separator and no row is an empty table
+    ("## T\n\n| Key | Name |\n|---|---|\n", []),
+    # the heading given twice: the first one's table
+    ("## T\n\n| Key | Name |\n|---|---|\n| a | A |\n\n## T\n\n| Key | Name |\n|---|---|\n| z | Z |\n", [("a", "A")]),
+    # a prose line ending in a pipe is not the table's start
+    ("## T\n\nsee below |\n\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
+], ids=["blank-line", "no-blank-line", "alignment", "no-trailing-pipe", "no-rows", "heading-twice", "prose-pipe"])
+def test_r014_table_reader_reads_the_first_table_after_its_heading(program, text, rows):
+    """The two rule files' tables are read as `How this file is read` says (open-list.md, extension-points.md): the first
+    table after the exact heading, its rows to the first line that is not a table line, columns found by header name
+    (stage B2 review, round 5: the supervisor's mutation sweep)."""
+    found, error = program("workflow-check").parse_table(text, "t.md", "## T", TABLE_REQ)
+    assert error is None, error
+    assert [(row["Key"], row["Name"]) for row in found] == rows
+
+
+def test_r014_table_reader_stops_at_the_next_section(program):
+    """A heading with no table before the next `## ` section is an error, not that section's table (stage B2 review, round
+    5: the supervisor's mutation sweep)."""
+    found, error = program("workflow-check").parse_table(
+        "## T\n\nprose\n\n## U\n\n| Key | Name |\n|---|---|\n| a | A |\n", "t.md", "## T", TABLE_REQ)
+    assert found is None and error == "no table after ## T", error

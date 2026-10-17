@@ -151,6 +151,9 @@ def test_r011_the_names_a_workflows_line_reads_are_unique_across_the_tables():
     # workflow-check.py splits a line at these characters (prefix_of, check_head, check_traits): stage B2 review, round 3.
     assert [n for n in names if any(c in n for c in (",", ";", ":", chr(0x2192)))] == [], "a name holds a separator"
     assert "none of them contains `,`, `;`, `:` or `" + chr(0x2192) + "`" in TEXT
+    # A traits text reading `none` means no traits (workflow-check.py's check_traits), so no trait is Named `none` and no
+    # name reads `not yet classified` (docs/HARDENING.md, stage B2 review round 3; held by a test since round 5).
+    assert [n for n in names if n in ("none", "not yet classified")] == [], "a name is a reserved value"
 
 
 def test_r011_every_s6_3_product_type_is_listed_with_its_workflow_name_and_defaults():
