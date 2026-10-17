@@ -250,8 +250,8 @@ Recorded from Review A, for the later program change that reads a line of `##` a
 
 **Registry text** (texts part): the four forms are matched exactly; "A `##` heading other than the four forms is prose" (carried from BUG-006's gate); an unreadable conditional-workflow file stops the check. The heading paragraph's order pin is exact: a blank line before it and the term's first use at its own sentence (carried).
 
-**The sweep, widened** (run/supervisor/sweep_workflow_check.py, local; Review A, tests part): the bounds `{0,3}` and `{3,}` moved by one each way, the numbers compared moved by one, `== 2` read as `>= 2`, a character set made smaller, the deleted appends of errors and found items, each condition forced true and false, and each `and` clause dropped. It made 756 mutants, of which 711 compile (the 45 that do not are counted apart): 78 survived before BUG-007's cases, 50 after its last round (the list below is written by run/supervisor/write_survivor_list.py from that run's output, run/supervisor/sweep_workflow_check_r9.out, each survivor with its line of workflow-check.py at 6b51ccd and its operator; a line's other operators were killed or did not compile). 42 are equivalent, 4 held on CI only, 4 leads:
-- **Equivalent** (no input separates them):
+**The sweep, widened** (run/supervisor/sweep_workflow_check.py, local; Review A, tests part): the bounds `{0,3}` and `{3,}` moved by one each way, the numbers compared moved by one, `== 2` read as `>= 2`, a character set made smaller, the deleted appends of errors and found items, each condition forced true and false, and each `and` clause dropped. It made 756 mutants, of which 711 compile (the 45 that do not are counted apart): 78 survived before BUG-007's cases, 49 after its last round (the list below is written by run/supervisor/write_survivor_list.py from that run's output, run/supervisor/sweep_workflow_check_r10.out, each survivor with its line of workflow-check.py at 6b51ccd and its operator; a line's other operators were killed or did not compile). 41 are equivalent, 4 held on CI only, 4 leads:
+- **Equivalent** (no input separates them, by the supervisor's reasoning, each reread against the program by Review A in BUG-007's gate round 4; reasoning, not a test):
   - 83, `{3,} -> {2,}` (twice): a closing run must be at least as long as its opening, which is at least three.
   - 103, `if condition -> False`: a final empty line kept adds a blank line, which no reader acts on.
   - 134, `< -> <=`: U+0080 is not printable.
@@ -286,7 +286,6 @@ Recorded from Review A, for the later program change that reads a line of `##` a
   - 662, `< -> <=`: an equal index is a repeat, caught first.
   - 664, `> -> >=`: an equal index is a repeat, caught first.
   - 688, `if condition -> True`: a part is None only in a one-line file.
-  - 795, `delete`: a root that is not a folder already ends the run with exit 2.
   - 833, `if condition -> False`: every printed field is ASCII already, so the error handler the reconfiguration sets is never used (with the condition forced true it is killed: a closed standard output, test_r014_closed_standard_output_gives_no_traceback).
 - **Held on CI's ubuntu leg only** (the driver leaves them out on this host):
   - 161, `if condition -> False`: a symbolic link is known by its mode on CI's ubuntu leg; this host makes junctions.
@@ -298,7 +297,7 @@ Recorded from Review A, for the later program change that reads a line of `##` a
   - 360, `== 2 -> >= 2`: as 342, with a folder named like `zz.md\q` under `types/`: the mutant reads a path that does not exist and stops with exit 2.
   - 626, `False -> True`: the lead below: a head whose sub-type belongs to another type stops at (e).
 
-**Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule: 196 of 196 killed at this round (161 before, 35 new), 198 of 198 after its gate round 1 and 199 of 199 after its gate round 3 (below); mutate_workflows_line.py stands at 42 of 42.
+**Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule: 196 of 196 killed at this round (161 before, 35 new), 198 of 198 after its gate round 1 199 of 199 after its gate round 3 and 200 of 200 after its gate round 4 (below); mutate_workflows_line.py stands at 42 of 42.
 
 **Leads:**
 - 626 stands (fixtures 4 converged on it with Review A of BUG-006): a possible program defect, for the next change of workflow-check.py.
@@ -328,4 +327,10 @@ Recorded from Review A, for the later program change that reads a line of `##` a
 - **Review B (blocking):** 342 (twice) and 360 named the POSIX backslash input that separates them and stood under Equivalent; they are leads now, beside 626, dying when line 323 is fixed.
 - **Considers (Review A), taken:** the backslash lead names a folder directly under `types/`; the list says a line's other operators were killed or did not compile; the scope file's round-6 count is marked as that round's.
 - **Noted (Review A), taken:** the script that writes the list is kept beside the sweep, run/supervisor/write_survivor_list.py (local), and the list above is its output on the sweep rerun after r4.
+
+**BUG-007's gate, round 4:** Review A REJECT (1 blocking, 1 should-fix, considers), Review B APPROVE. REVIEWERS DISAGREED on whether line 795's survivor is equivalent, a correctness question of the records. Decided for Review A on its evidence: with the `continue` deleted, a root the system refuses outright (a name Windows rejects, a link to itself on POSIX) is still walked and gets two more ERROR lines, the same exit code with a different output. Taken in BUG-007 r5:
+- **Blocking (Review A):** test_r014_root_the_system_refuses_is_not_walked asserts the whole output for such a root; the driver has the mutant "a root that is not a folder still walked", and 795 is gone from the list.
+- **Should-fix (Review A):** the closed-output test first shows its precondition, that the child starts with standard output closed (`repr(sys.stdout)` reads `None`), and now covers an exit-2 root as well, the case whose "no traceback" the usage text promises.
+- **Considers (Review A), taken:** the generator checks each survivor's line and operator against the operators its reason was written for, and stops on any other; the Equivalent heading says the reasons are the supervisor's reasoning, reread by Review A, not a test. The CI-held survivors stay reasoning as well, which the list says by its heading.
+- The sweep rerun after r5 (run/supervisor/sweep_workflow_check_r10.out, local): 49 survivors, 41 equivalent, 4 held on CI's ubuntu leg, 4 leads.
 

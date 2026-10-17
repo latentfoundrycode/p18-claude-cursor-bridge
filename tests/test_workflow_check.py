@@ -1657,12 +1657,32 @@ def test_r014_part_with_nothing_after_its_prefix_lacks_the_traits_marker(tmp_pat
     assert rc == 1
 
 
+CLOSED_STDOUT = "import os, subprocess, sys\nos.close(1)\nsys.exit(subprocess.call([sys.executable] + sys.argv[1:]))\n"
+
+
 def test_r014_closed_standard_output_gives_no_traceback():
     """With standard output closed (a launch with no standard handles: Python then sets sys.stdout to None) the check
-    still runs, decides its exit code and prints no traceback, as its usage text promises (BUG-007's gate round 3:
-    Review A, the sweep's line 833 with its condition forced true)."""
-    launch = "import os, subprocess, sys\nos.close(1)\nsys.exit(subprocess.call([sys.executable] + sys.argv[1:]))\n"
-    for root, code in ((f"{FIX}/pass", 0), (f"{FIX}/fail/form-bad-heading", 1)):
-        p = subprocess.run([sys.executable, "-c", launch, PROG, root], cwd=str(REPO), stdout=subprocess.PIPE,
+    still decides its exit code, 0, 1 or 2, and prints no traceback, which the usage text promises for exit 2 (BUG-007's
+    gate round 3: Review A, the sweep's line 833 with its condition forced true). The launch is shown first to give
+    the child no standard output (its gate round 4: Review A)."""
+    p = subprocess.run([sys.executable, "-c", CLOSED_STDOUT, "-c", "import sys; sys.stderr.write(repr(sys.stdout))"],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
+    assert (p.returncode, p.stderr) == (0, "None"), "precondition: the child starts with standard output closed"
+    for root, code in ((f"{FIX}/pass", 0), (f"{FIX}/fail/form-bad-heading", 1), (f"{FIX}/absent-root", 2)):
+        p = subprocess.run([sys.executable, "-c", CLOSED_STDOUT, PROG, root], cwd=str(REPO), stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE, text=True, encoding="utf-8")
         assert p.returncode == code and "Traceback" not in p.stderr, (root, p.returncode, p.stderr)
+
+
+def test_r014_root_the_system_refuses_is_not_walked(tmp_path):
+    """A root the system refuses outright (a name Windows rejects; a link to itself on POSIX) is `not a folder` and
+    nothing under it is examined, so no further ERROR line follows (BUG-007's gate round 4: Review A, the sweep's line
+    795, its `continue` deleted)."""
+    if os.name == "nt":
+        root = tmp_path / "a<b"
+    else:
+        root = tmp_path / "loop"
+        os.symlink("loop", str(root))
+    rc, lines, err = run(str(root))
+    assert_not_checked(rc, lines, err)
+    assert lines == [f"ERROR: {str(root).replace(chr(92), '/')}: not a folder", "RESULT: not checked"], lines
