@@ -7,6 +7,7 @@ an unwritten type or sub-type fails, an unwritten trait is flagged and non-fatal
 bridge release, in CI). The fixtures are tests/fixtures/workflows/: `pass/` is the CI root, `fail/<case>/` one root per
 failing case, `status/` the status-line cases with an open list of their own.
 """
+import codecs
 import os
 import pathlib
 import subprocess
@@ -60,7 +61,9 @@ def test_r014_replaced_module_keeps_its_points():
     """Carry item 1 (Requirement 10): the trait has-screens and the sub-workflow add at interface.variants while the
     type workflow replaces interface; the fixture's fenced `## Replace design` and prose headings are not changes."""
     pass_root = REPO / FIX / "pass"
-    assert "## Replace interface" in (pass_root / "types/host-extension.md").read_text(encoding="utf-8")
+    type_text = (pass_root / "types/host-extension.md").read_text(encoding="utf-8")
+    assert "## Replace interface" in type_text
+    assert "\n```\n## Replace design\n## Add at nowhere.at-all\n```\n" in type_text, "precondition: the column-0 fence pair"
     assert "## Add at interface.variants" in (pass_root / "traits/has-screens.md").read_text(encoding="utf-8")
     code, lines, err = run(f"{FIX}/pass")
     assert code == 0 and lines[-1] == "RESULT: OK", lines
@@ -133,12 +136,56 @@ def status(name):
     return run("--open-list", STATUS_LIST, "--status", f"{FIX}/status/{name}")
 
 
-@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-unclassified.md", "ok-bom.md"])
+@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-unclassified.md", "bom-workflows-line.md"])
 def test_r014_status_ok(name):
+    """bom-workflows-line.md is not a whole status file (it has no `Phase:` line, which check_placement would refuse);
+    it holds one `Workflows:` line after a byte-order mark, the case only check_status reads."""
     rc, lines, err = status(name)
     assert_clean_end(lines, err)
     assert rc == 0 and lines[-1] == "RESULT: OK", lines
     assert not [line for line in lines if line.startswith(("FAIL", "FLAG"))], lines
+
+
+@pytest.mark.parametrize("inner", ["fail/b-trait-sets-bom/traits/has-screens.md", "status/bom-workflows-line.md"])
+def test_r014_bom_fixtures_carry_their_bom(inner):
+    """The two byte-order-mark cases test nothing if an editor drops the mark (stage B2 review)."""
+    assert (REPO / FIX / inner).read_bytes().startswith(codecs.BOM_UTF8), inner
+
+
+def _status_line_case(tmp_path, line):
+    path = tmp_path / "status.md"
+    path.write_text("Phase: building\n" + line + "\n", encoding="utf-8", newline="\n")
+    return run("--open-list", STATUS_LIST, "--status", str(path))
+
+
+@pytest.mark.parametrize("line", [
+    "Workflows: Host Extension Development → Claude Code Extension; traits: Installable",
+    "Workflows: app: Web App Development; traits: Has screens, Installable",
+], ids=["single", "with-part"])
+def test_r015_exact_separators_pass(tmp_path, line):
+    """The control for the case below: the grammar's own separators pass."""
+    if line.startswith("Workflows: app: "):
+        line = line + "\nWorkflows: plugin: Host Extension Development → Browser Extension; traits: none"
+    rc, lines, err = _status_line_case(tmp_path, line)
+    assert rc == 0 and lines[-1] == "RESULT: OK", lines
+
+
+@pytest.mark.parametrize("line", [
+    "Workflows: Host Extension Development→Claude Code Extension; traits: Installable",
+    "Workflows: Host Extension Development  → Claude Code Extension; traits: Installable",
+    "Workflows: Host Extension Development →  Claude Code Extension; traits: Installable",
+    "Workflows:  Host Extension Development; traits: Installable",
+    "Workflows: Host Extension Development ; traits: Installable",
+    "Workflows: app:  Web App Development; traits: none\nWorkflows: plugin: Host Extension Development; traits: none",
+], ids=["arrow-unspaced", "two-spaces-before-arrow", "two-spaces-after-arrow", "two-spaces-after-colon",
+        "space-before-traits-mark", "two-spaces-after-part"])
+def test_r015_separators_are_exact(tmp_path, line):
+    """supervisor.md "Project state": the head is `<Workflow name>[ → <Sub-workflow name>]` exactly, after `Workflows: `
+    or `<part>: `; any other spacing is (form), as it already is for a part name or the traits (stage B2 review)."""
+    rc, lines, err = _status_line_case(tmp_path, line)
+    assert_clean_end(lines, err)
+    assert rc == 1, lines
+    assert any(line.startswith("FAIL (form) ") for line in fails(lines)), lines
 
 
 def test_r014_unwritten_trait_is_flagged_not_failed():
@@ -190,9 +237,14 @@ def test_r014_status_case_fails(name, code, offending):
     assert lines[-1] == f"RESULT: {len(fails(lines))} problem(s)"
 
 
-def test_r014_unwritten_type_fails_against_the_real_open_list():
-    """Every entry of the bridge's own open list is unwritten today, so a classified line fails (f): the pause (§6.7)."""
-    rc, lines, err = run("--status", f"{FIX}/status/ok-single.md")
+def test_r014_unwritten_type_fails_against_the_real_open_list(tmp_path):
+    """The pause (§6.7) against the bridge's own open list: a copy with every entry marked unwritten, so the test still
+    holds once release B writes its first workflows (TASK-017 to TASK-021; stage B2 review)."""
+    real = (REPO / "bridge" / "cursor-bridge" / "workflow" / "open-list.md").read_text(encoding="utf-8")
+    copy = tmp_path / "open-list.md"
+    copy.write_text(real.replace("| yes |", "| no |"), encoding="utf-8", newline="\n")
+    assert "| yes |" not in copy.read_text(encoding="utf-8")
+    rc, lines, err = run("--open-list", str(copy), "--status", f"{FIX}/status/ok-single.md")
     assert rc == 1
     assert any(line.startswith(f"FAIL (f) {FIX}/status/ok-single.md: Host Extension Development - ") for line in lines), lines
 
@@ -401,6 +453,8 @@ def test_r014_change_word_with_punctuation_is_form():
 def test_r014_indented_or_tabbed_change_heading_is_form():
     """R3-6: ` ## Set at x` and `##<tab>Add at x` are heading candidates that fail the exact forms."""
     root = f"{FIX}/fail/form-indented-heading"
+    text = (REPO / root / "types/host-extension.md").read_text(encoding="utf-8")
+    assert "\n##" + chr(9) + "Add at intake.questions\n" in text, "precondition: the tab survives"
     rc, lines, err = run(root)
     assert rc == 1
     assert len([line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/types/host-extension.md: ")]) == 2, lines
@@ -434,7 +488,9 @@ def _outside_with_canary(tmp_path):
 
 
 def test_r014_link_under_an_unknown_type_folder_is_form(tmp_path):
-    """R3-3: the unknown folder keeps its (d); the link inside it is (form) at its own path and is not read."""
+    """R3-3: the unknown folder keeps its (d); the link inside it is (form) at its own path. (Whether it is read is not
+    tested here: the check walks no unknown type folder, link or not; test_r014_top_level_link_is_form_and_not_walked
+    tests a link that would be read.)"""
     outside = _outside_with_canary(tmp_path)
     root = tmp_path / "root"
     (root / "types" / "not-a-type").mkdir(parents=True)
@@ -444,7 +500,6 @@ def test_r014_link_under_an_unknown_type_folder_is_form(tmp_path):
     assert rc == 1, lines
     assert any(line.startswith(f"FAIL (d) {shown}/types/not-a-type") for line in lines), lines
     assert any(line.startswith(f"FAIL (form) {shown}/types/not-a-type/out") for line in lines), lines
-    assert not [line for line in lines if line.startswith("FAIL (a)")], "a file behind a link was read"
 
 
 def test_r014_top_level_link_is_form_and_not_walked(tmp_path):
@@ -488,26 +543,31 @@ def _main_in_process(mod, *args, capsys):
 
 @pytest.mark.parametrize("isjunction", ["present", "absent"])
 def test_r014_missing_layer_folder_is_not_a_link(tmp_path, monkeypatch, capsys, program, isjunction):
-    """R4-1: a root with no traits/ (and, for the bridge's own folder, no types/ either) passes whether or not
-    os.path.isjunction exists; on Windows its absence takes the lstat fallback, which once counted a missing path as a
-    link."""
+    """R4-1: a root with no traits/, and a root with neither layer, pass whether or not os.path.isjunction exists; on
+    Windows its absence takes the lstat fallback, which once counted a missing path as a link. Both roots are built
+    here, not the bridge's own folder, which gains its layers in stage B4 (stage B2 review)."""
     mod = program("workflow-check")
     root = tmp_path / "root"
     (root / "types").mkdir(parents=True)
     (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    bare = tmp_path / "bare"
+    bare.mkdir()
     if isjunction == "absent":
         monkeypatch.delattr(os.path, "isjunction", raising=False)
-    for target in (root, REPO / "bridge" / "cursor-bridge" / "workflow"):
+    for target in (root, bare):
         code, lines = _main_in_process(mod, str(target), capsys=capsys)
         assert code == 0 and lines[-1] == "RESULT: OK", (target, lines)
 
 
-def test_r014_missing_layer_is_skipped_before_the_link_test(monkeypatch, capsys, program):
+def test_r014_missing_layer_is_skipped_before_the_link_test(tmp_path, monkeypatch, capsys, program):
     """R4-1: a layer path that does not exist is skipped before it is classified, so even a classifier that calls
-    everything a link reports nothing for the bridge's own folder, which has neither types/ nor traits/."""
+    everything a link reports nothing for a root with neither types/ nor traits/ (built here: the bridge's own folder
+    gains its layers in stage B4; stage B2 review)."""
     mod = program("workflow-check")
+    bare = tmp_path / "bare"
+    bare.mkdir()
     monkeypatch.setattr(mod, "is_link", lambda path: True)
-    code, lines = _main_in_process(mod, str(REPO / "bridge" / "cursor-bridge" / "workflow"), capsys=capsys)
+    code, lines = _main_in_process(mod, str(bare), capsys=capsys)
     assert code == 0 and lines[-1] == "RESULT: OK", lines
 
 
@@ -592,6 +652,9 @@ def test_r014_commonmark_fence_cases_read_the_set(case):
     line whose info string holds a backtick does not open; a closing run followed only by spaces closes. In each the
     trait's `## Set` is read and is the one (b), with no open fence left."""
     root = f"{FIX}/fail/{case}"
+    if case == "fence-close-trailing-space":
+        text = (REPO / root / "traits/installable.md").read_text(encoding="utf-8")
+        assert "\n```   \n" in text, "precondition: the closing run keeps its trailing spaces"
     rc, lines, err = run(root)
     assert_clean_end(lines, err)
     assert rc == 1

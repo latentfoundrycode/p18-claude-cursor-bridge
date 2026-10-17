@@ -1,6 +1,6 @@
 {
   "version": "2026.10.11d",
-  "generated": "2026-10-17 01:36",
+  "generated": "2026-10-17 02:23",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -20,7 +20,7 @@
     "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
     "cursor-bridge/Diagram-Planning-Conventions.md": "f8e3b7839c7c7466b6bb9654f51bf9d9249973ab5ed9f8e10901ce4392f9cc4d",
-    "cursor-bridge/Glossary.md": "8d5c4a4970f7019f91fe858f42901ebb94b0e960ce84a8018b614c745bcee784",
+    "cursor-bridge/Glossary.md": "655e041156d10a553f51180f1d8ffe3f2f2a72f847426963a4a5c269a5e398bc",
     "cursor-bridge/Known-Pitfalls.md": "fbbc6afde8d087c6b22cb90f08e99b430fb68eec56e622a07054a7e41c435bf5",
     "cursor-bridge/Merge-Verification-Policy.md": "9d2668b86b9a694516fe5c352869105115dfb7ac6b3efd5e3bba0e51bd0c0d62",
     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
@@ -103,8 +103,8 @@
     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
     "cursor-bridge/workflow-check.py": "4d5aae831b6a5404bdafcd870a53a5867b8a6767cf858356f24235b907d2cb2d",
-    "cursor-bridge/workflow/extension-points.md": "0ebf6901c91d35a36d89151199603e0beefe11e32f171ea6caaba994eed50892",
-    "cursor-bridge/workflow/open-list.md": "00528622752d2732cedce48a1f2db09745be7ee1b9475986a161f084391b3cdd",
+    "cursor-bridge/workflow/extension-points.md": "89cba57e689d7377a2ecdb60b8e4273f856a205134b6d23407188ef2f18ec202",
+    "cursor-bridge/workflow/open-list.md": "bec3d1d1165b5fb14a409774e41a93da5ac67f587bd492548b222860436de0de",
     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",

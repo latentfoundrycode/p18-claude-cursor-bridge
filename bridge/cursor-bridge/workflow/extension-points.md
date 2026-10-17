@@ -32,7 +32,7 @@ What no point offers stays with the core: a conditional workflow can never remov
 | reflection | Reflection points | no |
 | project-end | Project end | no |
 
-The interface phase is the one replaceable module (§6.4): the main workflow holds its variants once, one per kind of interface a part can have, and a type workflow or sub-workflow may replace the phase with its own; a sub-workflow may replace its type workflow's replacement again (§6.5). A replacement keeps the points of the module it replaces, without declaring them again under its `## Replace` heading, so the additions of the layers below it, such as the trait *has screens* adding the mockup variant at `interface.variants`, still apply to it (§6.5, "Today's interface conditions stay together"). The change cycle declares no points of its own: it runs the other phases' modules again for the change, and their points apply there; its module has no `## Extension points` section.
+The interface phase is the one replaceable module (§6.4): the main workflow holds its variants once, one per kind of interface a part can have, and a type workflow or sub-workflow may replace the phase with its own; a sub-workflow may replace its type workflow's replacement again (§6.5). A replacement keeps the points of the module it replaces, without declaring them again under its `## Replace` heading, so every conditional workflow's additions at those points still apply to it, in the core's order: the type workflow's, the sub-workflow's and each trait's, such as the trait *has screens* adding the mockup variant at `interface.variants` (§6.5, "Today's interface conditions stay together"). The change cycle declares no points of its own: it runs the other phases' modules again for the change, and their points apply there; its module has no `## Extension points` section.
 
 ## Extension points
 
@@ -65,7 +65,8 @@ The interface phase is the one replaceable module (§6.4): the main workflow hol
 A conditional workflow file states each change it makes under a heading of its own, naming the kind of change and its target, and nothing else in the file changes the main workflow:
 
 - `## Add at <point key>` — its additions there. Any conditional workflow may add.
-- `## Set at <point key>` — the value it sets there, at a point whose Changes cell includes `set`. Only a type workflow or a sub-workflow may set.
+- `## Add at project-end.delivery for <delivery kind>` — an addition at `project-end.delivery`, naming the delivery kind it is for by its key from the list above (`## Add at project-end.delivery for installer`). At that point this form is required and the plain `## Add at project-end.delivery` fails; at every other point a heading ending `for <kind>` fails.
+- `## Set at <point key>` — the value it sets there, at a point whose Changes cell includes `set`. Only a type workflow or a sub-workflow may set. The value is the section's first non-blank line; at `intake.delivery-kind` it is one delivery kind's key from the list above, bare or in backticks.
 - `## Replace <module key>` — its own version of the whole phase, for a module marked replaceable. Only a type workflow or a sub-workflow may replace.
 
 A trait attaches to the main workflow only through its `Add at` headings, so each of its additions names the point it belongs to. Within one file, additions at one point keep the order the file writes them in; across files they apply in the order `supervisor.md` states ("The order additions apply in").
