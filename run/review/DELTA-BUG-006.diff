@@ -1,0 +1,198 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 2f9f20a..eccff43 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-17 09:19",
++  "generated": "2026-10-17 09:46",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -103,8 +103,8 @@
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/workflow-check.py": "8ba92116301d19588a009ec03a479115406fbf9a465421503ff8d7691daca139",
+-    "cursor-bridge/workflow/extension-points.md": "a4950b7cab67675abcdaafd575838927dbb664196d19175c47588319ec7ea5f2",
+-    "cursor-bridge/workflow/open-list.md": "7759c258d357f5f7b48d6b7ee7ec4d44cce82549404de7d16b76d2ffe9dcff84",
++    "cursor-bridge/workflow/extension-points.md": "a060a291d3c74e7cb14786b0ff16fba73c8e61fed1e8fe047a7cebef9a8af689",
++    "cursor-bridge/workflow/open-list.md": "926f909667b79918943965e003d881e055c012517b31fc07770230c12ec9cbf7",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/workflow/extension-points.md b/bridge/cursor-bridge/workflow/extension-points.md
+index a3cdca4..309538b 100644
+--- a/bridge/cursor-bridge/workflow/extension-points.md
++++ b/bridge/cursor-bridge/workflow/extension-points.md
+@@ -6,7 +6,7 @@ What no point offers stays with the core: a conditional workflow can never remov
+ 
+ ## How this file is read
+ 
+-`workflow-check.py` reads the two tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Phase modules`, `## Extension points`) and before the next `##` heading, its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
++`workflow-check.py` reads the two tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Phase modules`, `## Extension points`) and before the next line that starts with two hashes and a space (`## `), its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
+ 
+ - **Module** — the phase module's key and the base name of its file, `workflow/phases/<module>.md` (§6.11). Until the phases move into files of their own, each module is its phase's section of `supervisor.md`.
+ - **Phase** — the phase in plain words; for a point, the row of §6.4's table it comes from (Definition of done and Delivery are rows of their own there, declared by the project-end module).
+@@ -69,7 +69,7 @@ A conditional workflow file states each change it makes under a heading of its o
+ - `## Set at <point key>` — the value it sets there, at a point whose Changes cell includes `set`. Only a type workflow or a sub-workflow may set. The value is the section's first non-blank line, stripped; at `intake.delivery-kind` it is one delivery kind's key from the list above, bare or in backticks.
+ - `## Replace <module key>` — its own version of the whole phase, for a module marked replaceable. Only a type workflow or a sub-workflow may replace.
+ 
+-Any other `##` heading is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading unless it is one of the four forms above, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets each point, and replaces each module, at most once. A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own structure `###` headings and deeper. A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening none, and closes with a run of the same character at least as long, indented at most three spaces and followed only by spaces or tabs; a fence still open at the end of the file fails. The check also fails a `## Set at` section with no non-blank line; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path (a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that is no product type.
++Any other `##` heading is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading unless it is one of the four forms above, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets each point, and replaces each module, at most once. A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own structure `###` headings and deeper. A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening none, and closes with a run of the same character at least as long, indented at most three spaces and followed only by spaces or tabs; a fence still open at the end of the file fails. The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a file or a link; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path (a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that is no product type.
+ 
+ A trait attaches to the main workflow only through its `Add at` headings, so each of its additions names the point it belongs to. Within one file, additions at one point keep the order the file writes them in; across files they apply in the order `supervisor.md` states ("The order additions apply in").
+ 
+diff --git a/bridge/cursor-bridge/workflow/open-list.md b/bridge/cursor-bridge/workflow/open-list.md
+index 7a543b8..0da4e4b 100644
+--- a/bridge/cursor-bridge/workflow/open-list.md
++++ b/bridge/cursor-bridge/workflow/open-list.md
+@@ -6,7 +6,7 @@ This file is the canonical list of every product type, sub-type and trait the br
+ 
+ ## How this file is read
+ 
+-`workflow-check.py` reads the three tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Product types`, `## Sub-types`, `## Traits`) and before the next `##` heading, its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
++`workflow-check.py` reads the three tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Product types`, `## Sub-types`, `## Traits`) and before the next line that starts with two hashes and a space (`## `), its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
+ 
+ - **Key** — the entry's identifier and the base name of its workflow file: a type workflow at `workflow/types/<key>.md`, a sub-workflow at `workflow/types/<type key>/<key>.md`, a trait's additions at `workflow/traits/<key>.md`. Lowercase letters, digits and hyphens; unique within its table.
+ - **Name** — the entry's name in plain words, used in prose and at intake. A trait, which has no workflow name, is named by it on a `Workflows:` line.
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 6f45b17..6da5feb 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -97,7 +97,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ 
+ ## Stage B2 — the stage review (round 5, 2026-10-17)
+ 
+-**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants and found 89 surviving the workflow-check and Workflows-line tests. Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
++**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants, of which 381 compile, and found 89 of those surviving the workflow-check and Workflows-line tests. Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
+ 
+ **Fences and headings:**
+ - a closing run indented four spaces is content (fixtures 1, blocking);
+@@ -149,7 +149,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ 
+ It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The delivery-kinds test reads every kind the list names however it is described. test_open_list holds that no name is `none` or `not yet classified` (tests part).
+ 
+-**The sweep's 36 survivors of 425 after BUG-006**, line numbers of workflow-check.py at 0e7813e (the program is unchanged). The first version of this list called nine survivors equivalent or untestable that an input separates: 285, 605, 126, 299, 300, 312, 349, 354, and 626, which is now a lead. Review A of BUG-006 found them (below), and each of the first eight now has its case. The rest:
++**The sweep's 36 survivors of the 381 mutants that compile, after BUG-006** (425 made; the 44 that do not compile are counted apart, never as killed: r3, Review B of gate round 2), line numbers of workflow-check.py at 0e7813e (the program is unchanged). The first version of this list called nine survivors equivalent or untestable that an input separates: 285, 605, 126, 299, 300, 312, 349, 354, and 626, which is now a lead. Review A of BUG-006 found them (below), and each of the first eight now has its case; it also moved 313 and 322 from "held on CI only" to equivalent. The rest:
+ - **Equivalent** (no input separates them):
+   - 83: a closing run of two (a close must be at least as long as its opening, at least three).
+   - 134: U+0080 is not printable.
+@@ -162,7 +162,7 @@ It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The del
+   - 604: a segment is used only through its names, which are stripped again.
+   - 313: a layer that cannot be examined has its error recorded, and the errors alone decide exit 2.
+   - 322: links are pruned from the folders walked, so following links reaches nothing.
+-  - 625 to 641: the lists read there hold exactly one entry.
++  - 625, 627 to 641: the lists read there hold exactly one entry (626 is a lead, below).
+   - 662, 664: an equal index is a repeat, caught first.
+   - 795: a root that is not a folder already ends the run with exit 2.
+ - **Held on CI's ubuntu leg only** (162): a symbolic link is known by its mode there, while the links test makes junctions on this Windows host.
+@@ -187,10 +187,16 @@ It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The del
+   - 299 and 300: a folder that cannot be listed is named with its reason, on every host.
+   - 349 and 354: each link is named, one of them inside a folder that is no product type, in the links test's exact output.
+   - The list above is corrected to match.
+-- **Text (should-fix):** both rule files' "How this file is read" now say a table is the first after its heading and before the next `##` heading, as the reader does. The separators test's comment names the mutant it kills.
++- **Text (should-fix):** both rule files' "How this file is read" now say a table is the first after its heading and before the next line starting `## `, as the reader does (worded so in r3; r2's "the next `##` heading" also covered `##` with a tab or nothing after it, which the reader reads past, Review B of gate round 2). The separators test's comment names the mutant it kills.
+ - **Text (considers):**
+-  - The registry says a Set value is stripped, and names exactly the files, links and folders that fail.
++  - The registry says a Set value is stripped, and names exactly the files, links and folders that fail, a `types` or `traits` path that is itself a file or a link included (r3, Review A of gate round 2).
+   - The open list says no name is `none` or `not yet classified`.
+   - The sweep runs test_extension_points.py too.
+-- **The named driver** has the eight mutants (159 of 159 killed).
++- **The named driver** has the eight mutants (159 of 159 killed; 160 of 160 with r3's).
++
++**BUG-006's gate, round 2:** Review A APPROVE (0/1/4), Review B REJECT. Taken in BUG-006 r3:
++- **Review B:** r2's "before the next `##` heading" also covered a `##` line with a tab or nothing after it, which the reader reads past. Both rule files now say "before the next line that starts with two hashes and a space (`## `)", and the table-reader test has a case for `##`+tab and a bare `##`.
++- **Review B:** the sweep counted the 44 mutants that do not compile as killed (every test that runs the program fails on them). It now counts them apart and reports its survivors of the 381 that compile; the survivors are the same 36.
++- **Review A (should-fix):** the equivalent range now reads 625, 627 to 641, so 626 is a lead only.
++- **Review A (considers):** the registry names a `types` or `traits` path that is itself a file or a link; the list's intro says 313 and 322 moved.
+ - **Recorded, not taken:** the delivery-kinds test finds a kind only when a `(` follows it, so a kind added to the list bare escapes the comparison with `DELIVERY_KINDS`. This is for whoever next changes the list (tests/test_extension_points.py).
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 9447840..3a74852 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,7 +3,7 @@ Last updated: 2026-10-17
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: BUG-006 — stage B2's review, round 5 (branch bug-006; the supervisor's fixtures, tests and registry text, no program change): Review A's fixtures part 1 and tests part rejected (a closing fence indented four spaces and a misspelt sub-workflow name had no test that fails; converged: `not yet classified` matched only exactly by the code, never by a test); Review B's reply carried no verdict (a failed launch, rerun with the stage); the supervisor's operator sweep of workflow-check.py found the rest of the class; round 5's findings are in HARDENING; r2 (PR #32, gate round 1: Review B APPROVE, Review A REJECT on the survivor list's honesty, eight survivors an input separates): their cases and the list corrected, sweep 36 survivors of 425
++Increment: BUG-006 — stage B2's review, round 5 (branch bug-006; the supervisor's fixtures, tests and registry text, no program change): Review A's fixtures part 1 and tests part rejected (a closing fence indented four spaces and a misspelt sub-workflow name had no test that fails; converged: `not yet classified` matched only exactly by the code, never by a test); Review B's reply carried no verdict (a failed launch, rerun with the stage); the supervisor's operator sweep of workflow-check.py found the rest of the class; round 5's findings are in HARDENING; r2 (PR #32, gate round 1: Review B APPROVE, Review A REJECT on the survivor list's honesty, eight survivors an input separates): their cases and the list corrected; r3 (gate round 2: Review A APPROVE, Review B REJECT): the rule texts' next-section wording made exact, the sweep counts non-compiling mutants apart (36 survivors of 381 that compile)
+ Last accepted: BUG-005, at commit 0e7813e (merged to main 2026-10-17, PR #31); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003, BUG-004, BUG-005
+ Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
+ Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
+diff --git a/tests/test_extension_points.py b/tests/test_extension_points.py
+index 1f06663..fe11f5a 100644
+--- a/tests/test_extension_points.py
++++ b/tests/test_extension_points.py
+@@ -163,8 +163,10 @@ def test_r006_the_tables_shape_is_stated_for_the_reader():
+     """The shape the check reads is stated in the file, as the open list states its own."""
+     assert "`workflow-check.py` reads the two tables below and nothing else in this file" in TEXT
+     assert "Each table is the first table after its heading (`## Phase modules`, `## Extension points`)" in TEXT
+-    # The reader stops at the next section (BUG-006 r2: Review A).
+-    assert "and before the next `##` heading, its rows running to the first line that is not a table line" in TEXT
++    # The reader stops at the next line starting `## `, as parse_table does (BUG-006 r2: Review A; r3: Review B, a `##`
++    # line without the space is no stop).
++    assert ("and before the next line that starts with two hashes and a space (`## `), its rows running to the first "
++            "line that is not a table line") in TEXT
+     assert "its columns are found by their header names; no cell contains a `|`" in TEXT
+ 
+ 
+@@ -307,9 +309,10 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
+         "more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening "
+         "none, and closes with a run of the same character at least as long, indented at most three spaces and followed "
+         "only by spaces or tabs; a fence still open at the end of the file fails.",
+-        "The check also fails a `## Set at` section with no non-blank line; a file or link under `types/` or `traits/` "
+-        "that is not a conditional workflow at its key's path (a README there included); a folder under `traits/` or "
+-        "inside a type's folder; and a folder under `types/` that is no product type.",
++        "The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a "
++        "file or a link; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path "
++        "(a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that "
++        "is no product type.",
+     ):
+         assert sentence in paragraph, sentence
+ 
+diff --git a/tests/test_open_list.py b/tests/test_open_list.py
+index f7b05c2..04c1faa 100644
+--- a/tests/test_open_list.py
++++ b/tests/test_open_list.py
+@@ -231,8 +231,10 @@ def test_r011_the_tables_shape_is_stated_for_the_reader():
+     """R-011: the shape `workflow-check.py` relies on is stated, not only implied by the tables."""
+     flat = re.sub(r"\s+", " ", TEXT)
+     assert "Each table is the first table after its heading" in flat
+-    # The reader stops at the next section (BUG-006 r2: Review A).
+-    assert "and before the next `##` heading, its rows running to the first line that is not a table line" in flat
++    # The reader stops at the next line starting `## `, as parse_table does (BUG-006 r2: Review A; r3: Review B, a `##`
++    # line without the space is no stop).
++    assert ("and before the next line that starts with two hashes and a space (`## `), its rows running to the first "
++            "line that is not a table line") in flat
+     assert "its rows running to the first line that is not a table line" in flat
+     assert "its columns are found by their header names; no cell contains a `|`" in flat
+     assert "The order inside a cell carries no meaning; the order traits apply in is the Traits table's." in flat
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index ebd3ca4..32f0b89 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -1283,7 +1283,11 @@ TABLE_REQ = ["Key", "Name"]
+     ("## T\n\n| Key | Name |\n|---|---|\n| a | A |\n\n## T\n\n| Key | Name |\n|---|---|\n| z | Z |\n", [("a", "A")]),
+     # a prose line ending in a pipe is not the table's start
+     ("## T\n\nsee below |\n\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
+-], ids=["blank-line", "no-blank-line", "alignment", "no-trailing-pipe", "no-rows", "heading-twice", "prose-pipe"])
++    # a line starting `##` with no space after it (a tab, or nothing) does not end the section the table is looked
++    # for in; only a line starting `## ` does (BUG-006 r3: Review B)
++    ("## T\n\nprose\n\n##\tU\n##\n\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
++], ids=["blank-line", "no-blank-line", "alignment", "no-trailing-pipe", "no-rows", "heading-twice", "prose-pipe",
++        "hashes-without-space"])
+ def test_r014_table_reader_reads_the_first_table_after_its_heading(program, text, rows):
+     """The two rule files' tables are read as `How this file is read` says (open-list.md, extension-points.md): the first
+     table after the exact heading, its rows to the first line that is not a table line, columns found by header name
+@@ -1294,8 +1298,8 @@ def test_r014_table_reader_reads_the_first_table_after_its_heading(program, text
+ 
+ 
+ def test_r014_table_reader_stops_at_the_next_section(program):
+-    """A heading with no table before the next `## ` section is an error, not that section's table (stage B2 review, round
+-    5: the supervisor's mutation sweep)."""
++    """A heading with no table before the next line starting `## ` is an error, not that section's table, as both rule
++    files' "How this file is read" says (stage B2 review, round 5: the supervisor's mutation sweep; BUG-006 r3)."""
+     found, error = program("workflow-check").parse_table(
+         "## T\n\nprose\n\n## U\n\n| Key | Name |\n|---|---|\n| a | A |\n", "t.md", "## T", TABLE_REQ)
+     assert found is None and error == "no table after ## T", error
