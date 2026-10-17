@@ -1,0 +1,394 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 2ee1e54..6c54e5a 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-17 02:30",
++  "generated": "2026-10-17 02:59",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -102,9 +102,9 @@
+     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+-    "cursor-bridge/workflow-check.py": "ec1b4c0c48e3febb8b66fe7f029fa900ad2adf13f05cd69fb8e56a648d4e5d29",
++    "cursor-bridge/workflow-check.py": "703592b23f2ba04101aa7bec63d4c77fdcf490ea259748c82b96d5c5423bb70b",
+     "cursor-bridge/workflow/extension-points.md": "89cba57e689d7377a2ecdb60b8e4273f856a205134b6d23407188ef2f18ec202",
+-    "cursor-bridge/workflow/open-list.md": "bec3d1d1165b5fb14a409774e41a93da5ac67f587bd492548b222860436de0de",
++    "cursor-bridge/workflow/open-list.md": "cd6b77507c9fa1e7a7e6bb544849cb7d7a784a27bc233c7c6eb112c46373f64f",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/workflow-check.py b/bridge/cursor-bridge/workflow-check.py
+index 5a932f8..ad66b39 100644
+--- a/bridge/cursor-bridge/workflow-check.py
++++ b/bridge/cursor-bridge/workflow-check.py
+@@ -604,7 +604,6 @@ def check_head(head, path, tables, findings):
+     names_by_seg = [[name.strip() for name in segment.split(",")] for segment in segments]
+     types_found = []
+     subs_found = []
+-    traits_in_head = []
+     for names in names_by_seg:
+         for name in names:
+             if name == "":
+@@ -614,9 +613,7 @@ def check_head(head, path, tables, findings):
+                 types_found.append(tables["workflow_by_name"][name])
+             elif name in tables["sub_by_name"]:
+                 subs_found.append(tables["sub_by_name"][name])
+-            elif name in tables["trait_by_name"]:
+-                traits_in_head.append(name)
+-            else:
++            elif name not in tables["trait_by_name"]:
+                 findings.append(("unknown", path, name, "name is not in the open list"))
+     if len(types_found) != 1:
+         findings.append(("e", path, "-", "part must name exactly one product type"))
+diff --git a/bridge/cursor-bridge/workflow/open-list.md b/bridge/cursor-bridge/workflow/open-list.md
+index e5b4ecd..86a45ff 100644
+--- a/bridge/cursor-bridge/workflow/open-list.md
++++ b/bridge/cursor-bridge/workflow/open-list.md
+@@ -1,6 +1,6 @@
+ # The open list — product types, sub-types and traits
+ 
+-This file is the canonical list of every product type, sub-type and trait the bridge knows, each with its definition and whether its conditional workflow is written (Restructuring Plan §6.3, §6.11). It is the one source of the default traits of a product type and of a sub-type: a type workflow or sub-workflow that states its default traits states the ones given here. No form for that statement exists yet, so `workflow-check.py` does not check it; the form and its check come together, in the change that writes the first such statement, and until then the reviewers of that change compare it with this file. Each part of a project is classified against the definitions here at intake, and a part that fits none of them is handled as "When something does not fit" below says (§6.7).
++This file is the canonical list of every product type, sub-type and trait the bridge knows, each with its definition and whether its conditional workflow is written (Restructuring Plan §6.3, §6.11). It is the one source of the default traits of a product type and of a sub-type: a type workflow or sub-workflow that states its default traits states the ones given here. No form for that statement exists yet, so `workflow-check.py` does not check it; the form and its check come together, in the change that writes the first such statement, and the reviewers of that change compare the statement with this file. Each part of a project is classified against the definitions here at intake, and a part that fits none of them is handled as "When something does not fit" below says (§6.7).
+ 
+ **The lists are open.** Nobody can foresee every product type or trait, so each entry carries a definition: a part is classified against the definitions, and a part that fits none of them is recognised as new rather than forced into the nearest entry (see "When something does not fit" below).
+ 
+diff --git a/docs/BUILD_PLAN.md b/docs/BUILD_PLAN.md
+index bab58c0..abcd9f5 100644
+--- a/docs/BUILD_PLAN.md
++++ b/docs/BUILD_PLAN.md
+@@ -61,7 +61,7 @@ Parallel: no
+ Diagrams: none
+ Scope: bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/MANIFEST.json; tests/test_open_list.py
+ Satisfies: R-011
+-Done when: every §6.3 product type, sub-type, and trait is listed with its definition, its default traits, its fixed workflow name / sub-workflow name, and a written/unwritten flag (all unwritten at first); the open list is the canonical source of a type's default traits (a type file's statement is checked against it by `workflow-check`); the §6.10 add/change procedure is recorded; `test_open_list.py` (names R-011) asserts each entry has definition, default-traits, name, and flag, and the file parses in the shape `workflow-check.py` reads.
++Done when: every §6.3 product type, sub-type, and trait is listed with its definition, its default traits, its fixed workflow name / sub-workflow name, and a written/unwritten flag (all unwritten at first); the open list is the canonical source of a type's default traits (a type file's statement is checked against it by `workflow-check`; note 2026-10-17, stage B2's review: no form for that statement exists yet, so nothing checks it; the form and its check come together in the change that writes the first such statement, routed to TASK-019 in docs/HARDENING.md); the §6.10 add/change procedure is recorded; `test_open_list.py` (names R-011) asserts each entry has definition, default-traits, name, and flag, and the file parses in the shape `workflow-check.py` reads.
+ 
+ ### TASK-005 — The extension-point registry
+ Author: supervisor.
+diff --git a/handoff/BUG-002-r2-report.md b/handoff/BUG-002-r2-report.md
+new file mode 100644
+index 0000000..990613f
+--- /dev/null
++++ b/handoff/BUG-002-r2-report.md
+@@ -0,0 +1,122 @@
++# BUG-002-r2 report
++
++## Summary
++
++`check_head` no longer creates, fills, or mentions `traits_in_head`. A name that is a trait's Name still produces no finding in the name loop: the last two branches are the single condition `elif name not in tables["trait_by_name"]:` followed by the existing `unknown` finding, with no empty branch. Every other finding `check_head` emits is unchanged. The full suite counts match the pre-edit run (1151 passed, 23 skipped).
++
++## Files changed
++
++- `bridge/cursor-bridge/workflow-check.py` — only the quoted name-loop block inside `check_head` (`traits_in_head = []` and the trait append removed; `else` rewritten as `elif name not in tables["trait_by_name"]`)
++- `bridge/cursor-bridge/MANIFEST.json` — regenerated by `python tools/make-manifest.py` (generated timestamp `2026-10-17 02:59` and the `cursor-bridge/workflow-check.py` sha256)
++- `handoff/BUG-002-r2-report.md` — this report
++
++`bridge/cursor-bridge/VERSION` is not in the diff. `docs/BUILDER_NOTES.md` was not changed.
++
++## Done
++
++### 1. Before any edit
++
++Command: `python -m pytest tests -q`
++
++Working folder: Workspace root.
++
++Exit code: 0.
++
++Relevant output: `1151 passed, 23 skipped in 259.51s (0:04:19)`.
++
++### 2. After the edit
++
++Command: `python tools/make-manifest.py`
++
++Working folder: Workspace root.
++
++Exit code: 0.
++
++Relevant output: `make-manifest: version 2026.10.11d, 107 files hashed, VERSION + MANIFEST.json written`
++
++Command: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++Working folder: Workspace root.
++
++Exit code: 0.
++
++Relevant output: `bridge-check: version 2026.10.11d (2026-10-17 02:59) at E:\p18-claude-cursor-bridge\Workspace\bridge` then `bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA` and `RESULT: SOURCES MATCH bridge 2026.10.11d`.
++
++`git diff -- bridge/cursor-bridge/VERSION` is empty. Git printed `warning: in the working copy of 'bridge/cursor-bridge/VERSION', LF will be replaced by CRLF the next time Git touches it` and listed no VERSION diff.
++
++### 3. Full suite
++
++Command: `python -m pytest tests -q`
++
++Working folder: Workspace root.
++
++Exit code: 0.
++
++Relevant output: `1151 passed, 23 skipped in 255.84s (0:04:15)`. Same counts as step 1.
++
++### 4. Windowless check
++
++Command: `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++
++Working folder: Workspace root.
++
++Exit code: 0.
++
++Relevant output: `windowless-check: 30 file(s) scanned, 0 FAIL, 0 NOTE`
++
++### 5. Diff
++
++Command: `git diff --stat`
++
++Working folder: Workspace root.
++
++Exit code: 0.
++
++Output:
++
++```
++warning: in the working copy of 'bridge/cursor-bridge/MANIFEST.json', LF will be replaced by CRLF the next time Git touches it
++ bridge/cursor-bridge/MANIFEST.json     | 4 ++--
++ bridge/cursor-bridge/workflow-check.py | 5 +----
++ 2 files changed, 3 insertions(+), 6 deletions(-)
++```
++
++The report is untracked (`?? handoff/BUG-002-r2-report.md`). `git status --short` lists `M bridge/cursor-bridge/MANIFEST.json`, `M bridge/cursor-bridge/workflow-check.py`, and that untracked report. VERSION is not listed.
++
++Command: `git diff -- bridge/cursor-bridge/workflow-check.py`
++
++Working folder: Workspace root.
++
++Exit code: 0.
++
++Output:
++
++```
++diff --git a/bridge/cursor-bridge/workflow-check.py b/bridge/cursor-bridge/workflow-check.py
++index 5a932f8..ad66b39 100644
++--- a/bridge/cursor-bridge/workflow-check.py
+++++ b/bridge/cursor-bridge/workflow-check.py
++@@ -604,7 +604,6 @@ def check_head(head, path, tables, findings):
++     names_by_seg = [[name.strip() for name in segment.split(",")] for segment in segments]
++     types_found = []
++     subs_found = []
++-    traits_in_head = []
++     for names in names_by_seg:
++         for name in names:
++             if name == "":
++@@ -614,9 +613,7 @@ def check_head(head, path, tables, findings):
++                 types_found.append(tables["workflow_by_name"][name])
++             elif name in tables["sub_by_name"]:
++                 subs_found.append(tables["sub_by_name"][name])
++-            elif name in tables["trait_by_name"]:
++-                traits_in_head.append(name)
++-            else:
+++            elif name not in tables["trait_by_name"]:
++                 findings.append(("unknown", path, name, "name is not in the open list"))
++     if len(types_found) != 1:
++         findings.append(("e", path, "-", "part must name exactly one product type"))
++```
++
++## Assumed, not verified
++
++Assumed, not verified: none
+diff --git a/handoff/BUG-002.md b/handoff/BUG-002.md
+index da51126..ccb5791 100644
+--- a/handoff/BUG-002.md
++++ b/handoff/BUG-002.md
+@@ -1,33 +1,30 @@
+-# BUG-002: The workflow check accepts spacing the `Workflows:` grammar does not allow
++# BUG-002 (round 2): remove the list `check_head` fills and never reads
+ 
+ ## Objective
+-Fix the following confirmed defect — repair the named cause, nothing else.
++Round 1 of BUG-002 fixed the `Workflows:` head's separators and was approved by every reviewer. Two reviewers then named the same leftover independently, which makes it blocking: in `bridge/cursor-bridge/workflow-check.py`, `check_head` still builds the list `traits_in_head`, and since round 1 nothing reads it. Remove the list; change nothing else. This is a behaviour-preserving cleanup: every finding `check_head` emits stays exactly as it is.
+ 
+-**Root cause (one sentence):** in `bridge/cursor-bridge/workflow-check.py`, `check_head` strips each `→`-segment and each comma-split name before its shape check compares them with the open list's names, so a head whose spacing differs from the grammar (no space or two spaces around the arrow, a leading space after `Workflows: ` or after `<part>: `, a trailing space before `; traits: `) passes as if it were spelled exactly.
+-
+-**Evidence** (found independently by both reviewers of stage B2; cause proven by reading the code; `bridge/cursor-bridge/workflow-check.py` as it stands today):
++**The code as it stands** (`check_head`, from line 602):
+ 
+ ```python
+-def check_head(head, path, tables, findings):
+-    segments = [segment.strip() for segment in head.split("→")]
+-    names_by_seg = [[name.strip() for name in segment.split(",")] for segment in segments]
+-    ...
+-    if len(subs_found) == 0:
+-        shape_ok = names_by_seg == [[types_found[0]["Workflow name"]]] and not traits_in_head
+-    else:
+-        shape_ok = (
+-            names_by_seg == [[types_found[0]["Workflow name"]], [subs_found[0]["Sub-workflow name"]]]
+-            and not traits_in_head
+-        )
+-    if not shape_ok:
+-        findings.append(("form", path, "-", "Workflows head is not the product type, then at most its sub-type"))
++    types_found = []
++    subs_found = []
++    traits_in_head = []
++    for names in names_by_seg:
++        for name in names:
++            if name == "":
++                findings.append(("form", path, "-", "empty name in the Workflows head"))
++                continue
++            if name in tables["workflow_by_name"]:
++                types_found.append(tables["workflow_by_name"][name])
++            elif name in tables["sub_by_name"]:
++                subs_found.append(tables["sub_by_name"][name])
++            elif name in tables["trait_by_name"]:
++                traits_in_head.append(name)
++            else:
++                findings.append(("unknown", path, name, "name is not in the open list"))
+ ```
+ 
+-The grammar this violates is `bridge/commands/supervisor.md`, section "Project state", the **Workflows** paragraph (line 1819): `Workflows: [<part>: ]<Workflow name>[ → <Sub-workflow name>]; traits: <Trait name>[, <Trait name>…]`, every name "spelled exactly as `~/.claude/cursor-bridge/workflow/open-list.md` spells them". The stripping was commissioned by TASK-006's brief (`handoff/TASK-006.md`, Requirement 11.4: "split on `→`, each segment stripped, and each segment split on `,`, each name stripped"); the rest of the line is already exact: `check_traits` splits on exactly `, ` and does not strip, and `prefix_of` makes a part name with surrounding whitespace `form`. `inventory-check.py` and `conformance-check.py` judge the line through `check_status`, so they inherit the defect and inherit the fix without change. There is no `docs/debug/BUG-002.md`; the evidence above is the whole of it.
+-
+-**Reproduction tests** (supervisor-written and committed; do not edit them):
+-- `tests/test_workflow_check.py::test_r015_separators_are_exact` — 6 parametrized cases (`arrow-unspaced`, `two-spaces-before-arrow`, `two-spaces-after-arrow`, `two-spaces-after-colon`, `space-before-traits-mark`, `two-spaces-after-part`), all failing today; each must pass after your change (exit 1 and at least one `FAIL (form) ` line).
+-- `tests/test_workflow_check.py::test_r015_exact_separators_pass` — the control, 2 cases (`single`, `with-part`), passing today; must still pass.
++The trait branch must stay in effect: a trait name in the head is not `unknown` (it is the shape `form`, which the exact comparison later in the function already gives). Only the list goes.
+ 
+ Satisfies:
+ - R-014 — `workflow-check.py` verifies: every change targets an existing extension point; replace/set appears only in a type or sub-workflow and replace only on a replaceable phase; trait additions only add; every sub-workflow names an existing type workflow; every project's `Workflows:` line names, per part, exactly one product type, at most one sub-type of that type, and traits, all in the open list — an unwritten type or sub-type fails (pauses the project), an unwritten trait is flagged, non-fatal (§6.7).
+@@ -38,79 +35,63 @@ Files you may create or modify:
+ - bridge/cursor-bridge/workflow-check.py
+ - bridge/cursor-bridge/MANIFEST.json (only by running `python tools/make-manifest.py`; never by hand)
+ - docs/BUILDER_NOTES.md
+-- handoff/BUG-002-r1-report.md
++- handoff/BUG-002-r2-report.md
+ 
+-Do not modify anything else. In `bridge/cursor-bridge/workflow-check.py`, only the function `check_head` (lines 602-645) may change; the module docstring's finding list changes only if one of its lines would become wrong (none should: line 27, "FAIL (form) a file, a change heading, or a Workflows line has the wrong shape", stays true).
++Do not modify anything else. In `bridge/cursor-bridge/workflow-check.py`, only the function `check_head` may change, and within it only the lines quoted above.
+ 
+ ## Out of scope
+ - .env and anything under secrets/
+ - CI configuration (`.github/`)
+ - docs/ and handoff/, except the files the Scope section names
+-- every test and every fixture: everything under `tests/`, in particular `tests/test_workflow_check.py`, `tests/test_workflows_line_check.py`, `tests/test_workflows_line_text.py`, `tests/test_conformance_check.py` and `tests/fixtures/workflows/`
+-- `bridge/commands/supervisor.md` and every other text, including `bridge/cursor-bridge/workflow/open-list.md` and `bridge/cursor-bridge/CHANGELOG.md`
+-- `bridge/cursor-bridge/inventory-check.py` and `bridge/cursor-bridge/conformance-check.py` (they need no change)
+-- every function of `workflow-check.py` other than `check_head`: `prefix_of`, `check_traits`, `check_status`, `check_placement` and the rest stay byte-for-byte as they are
++- every test and every fixture (everything under `tests/`)
++- every text, including `bridge/commands/supervisor.md` and everything under `bridge/cursor-bridge/workflow/`
++- every function of `workflow-check.py` other than `check_head`, and every line of `check_head` outside the quoted block
+ - `bridge/cursor-bridge/VERSION`: `make-manifest.py` rewrites it from the newest `## <version>` entry of `bridge/cursor-bridge/CHANGELOG.md`; it must come out byte-identical (if `git diff` shows it changed, stop and report it)
+ 
+ ## Context
+-- `check_head(head, path, tables, findings)` (`workflow-check.py` line 602) receives `head`, the text between `Workflows: ` (or `<part>: `) and `; traits: `, exactly as written in the status file: `check_status` (line 678) takes `rest = line[len("Workflows: "):]`, `prefix_of(rest, multi)` (line 577) removes `<part>: ` on a multi-line file and returns the remainder untouched, and `head, traits = body.split(TRAITS_MARK, 1)` with `TRAITS_MARK = "; traits: "` (line 84). Nothing upstream strips. So for the six failing cases `head` is, respectively, `Host Extension Development→Claude Code Extension`, `Host Extension Development  → Claude Code Extension`, `Host Extension Development →  Claude Code Extension`, ` Host Extension Development` (leading space), `Host Extension Development ` (trailing space) and ` Web App Development` (leading space, the `app:` line).
+-- The lookup tables come from `load_tables` (line 246): `tables["workflow_by_name"]` maps a product type's **Workflow name** to its open-list row (keys `Key`, `Name`, `Workflow name`, `Written`); `tables["sub_by_name"]` maps a **Sub-workflow name** to its row (keys `Key`, `Of type`, `Sub-workflow name`, `Written`); `tables["trait_by_name"]` maps a trait **Name**.
+-- Findings are 4-tuples `(code, path, name, reason)` appended to `findings`. The ones `check_head` emits today, which keep their code, name and reason text exactly: `("form", path, "-", "empty name in the Workflows head")`; `("unknown", path, name, "name is not in the open list")`; `("e", path, "-", "part must name exactly one product type")`; `("e", path, "-", "part must name at most one sub-type")`; `("e", path, <Sub-workflow name>, "sub-type is not of the line's product type")`; `("form", path, "-", "Workflows head is not the product type, then at most its sub-type")`; `("f", path, <Workflow name>, "product type is not written")`; `("f", path, <Sub-workflow name>, "sub-type is not written")`.
+-- The status-file fixtures under `tests/fixtures/workflows/status/` (open list: `tests/fixtures/workflows/status/open-list.md`) already exercise the other head findings (`e-two-types.md`, `e-two-sub-types.md`, `e-sub-type-of-another.md`, `e-no-type.md`, `f-unwritten-type.md`, `f-unwritten-sub-type.md`, `unknown-name.md`, `form-trait-in-head.md`, `form-sub-type-first.md`, `form-empty-segment.md`); their tests in `tests/test_workflow_check.py` (`STATUS_CASES`, from line 200) must keep passing unchanged. Every well-formed line in the fixtures and in `docs/PROJECT_STATUS.md` (`Workflows: Host Extension Development → Claude Code Extension; traits: Installable`) uses exactly one space, `→`, one space.
+-- `inventory-check.py` (line 224) and `conformance-check.py` (line 333) load `workflow-check.py` by path and call `mod.check_status(path, text, tables)`; they filter out `f` and `FLAG`. Their tests (`tests/test_workflows_line_check.py`, `tests/test_conformance_check.py`) must stay green.
+-- The manifest: `tools/make-manifest.py`, run from the Workspace root, rewrites `bridge/cursor-bridge/MANIFEST.json` (a normalized sha256 of every file under `bridge/`) and `bridge/cursor-bridge/VERSION`. `docs/BUILDER_NOTES.md` (2026-10-16 TASK-008) records that the install and rollback tests refuse a bridge tree whose edited programs do not match `MANIFEST.json`, so the full suite fails until the manifest is regenerated; the Done order below accounts for that.
+-- Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (`docs/INVENTORY.md`, Resources, the `Development data:` row). This fix runs only the test suite and the read-only checks under Done, all against files inside the Workspace (the tests write their status files into pytest's `tmp_path`). Do not run anything against `~/.claude` or any installed bridge.
+-- Security context: this is input-handling code. The trust boundary is between a project's status file (text written by a supervisor session, read as untrusted input) and the bridge's checks, whose verdict gates intake and calibration; a check that accepts a line the grammar refuses lets a malformed line through the gate. The governing rules are in `bridge/cursor-bridge/secure-coding.snapshot.md` (the snapshot of the `secure-coding.mdc` rule you already have in force); the project records no ASVS level, so L1 rules apply: validate input against an exact allow-list shape, never by normalizing it first.
++- `tables["trait_by_name"]` maps a trait's Name to its open-list row; `findings` is a list of 4-tuples `(code, path, name, reason)`.
++- The tests that pin `check_head`'s findings are in `tests/test_workflow_check.py` (`STATUS_CASES`, `test_r015_separators_are_exact`, `test_r015_exact_separators_pass`, the `test_r014_status_*` tests); `form-trait-in-head.md` under `tests/fixtures/workflows/status/` is the case of a trait name in the head, which must still give exactly the findings it gives today.
++- `inventory-check.py` and `conformance-check.py` call `check_status`, which calls `check_head`; they need no change.
++- The manifest: `tools/make-manifest.py`, run from the Workspace root, rewrites `bridge/cursor-bridge/MANIFEST.json` and `bridge/cursor-bridge/VERSION`; the install and rollback tests refuse a tree whose programs do not match the manifest, so the full suite fails until it is regenerated.
++- Development data: the dev build is the Workspace sources under `bridge/`; never run anything against `~/.claude` or any installed bridge. This change runs only the test suite and the read-only checks under Done.
+ 
+ ## Diagrams
+-None. The build plan's TASK-006 has `Diagrams: none`, and this fix touches no component, table, state or call order.
++None.
+ 
+ ## Requirements
+-1. In `check_head`, once the counts are right (exactly one product type, at most one sub-type, and that sub-type is of the product type — today's `counts_right`), `head` must equal exactly the product type's Workflow name, or exactly the Workflow name + `" → "` + the sub-type's Sub-workflow name. `" → "` is one space (U+0020), the arrow U+2192, one space; no other character may stand before, after or between. The comparison is on `head` as received, character for character: no stripping, no case folding, no Unicode normalization.
+-2. Any `head` that fails Requirement 1 when the counts are right yields the existing finding `("form", path, "-", "Workflows head is not the product type, then at most its sub-type")`, once, as today.
+-3. The name-by-name lookups that produce `unknown`, the empty-name `form`, the two `e` count findings, the crossed-pair `e` finding and the two `f` findings stay, with the same codes, names, reasons and order of emission as today. When the counts are not right, `check_head` still returns before the shape test, as today.
+-4. A head with a trait Name in it, the sub-type first, or an empty segment still yields the shape `form` (it can no longer equal the exact text, so Requirement 1 covers it).
+-5. No other function in `workflow-check.py` changes, and no other file under `bridge/` changes except `MANIFEST.json` through `tools/make-manifest.py`.
++1. `check_head` no longer creates, fills or mentions `traits_in_head`.
++2. A name that is a trait's Name produces no finding in the name loop, exactly as today. Write it as one condition, with no empty branch: the last two branches become `elif name not in tables["trait_by_name"]:` followed by today's `unknown` finding.
++3. Every finding `check_head` emits keeps its code, name, reason and order of emission, for every input.
++4. No other line in `workflow-check.py` changes, and no other file under `bridge/` changes except `MANIFEST.json` through `tools/make-manifest.py`.
+ 
+ ## Acceptance criteria
+-- [ ] `tests/test_workflow_check.py::test_r015_separators_are_exact` passes in all 6 cases (each failed before the change).
+-- [ ] `tests/test_workflow_check.py::test_r015_exact_separators_pass` passes in both cases.
+-- [ ] `python -m pytest tests -q` exits 0, and no test result other than the 6 above changed; in particular `tests/test_workflow_check.py`, `tests/test_workflows_line_check.py`, `tests/test_workflows_line_text.py` and `tests/test_conformance_check.py` pass in full. Every file under `tests/` is byte-for-byte unchanged.
+-- [ ] The named cause is addressed at its mechanism: the shape test compares the unstripped head text with the exact grammar string (`<Workflow name>` or `<Workflow name> → <Sub-workflow name>`), so no whitespace is normalized away before the head is judged; the stripped names serve only the open-list lookups.
+-- [ ] Both mutants under Constraints are killed by the tests, and the report lists each with the test cases that caught it.
+-- [ ] `bridge/cursor-bridge/MANIFEST.json` is regenerated after the final edit, `bridge/cursor-bridge/VERSION` is unchanged, and `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` reports the sources match.
+-- [ ] R-014 and R-015 are fully met: a `Workflows:` line passes the check only when it is in the grammar exactly; the tests that name R-014 and R-015 (`test_r015_separators_are_exact`, `test_r015_exact_separators_pass`, the `test_r014_status_*` tests) all pass.
++- [ ] `git diff -- bridge/cursor-bridge/workflow-check.py` shows only the quoted block changed, with `traits_in_head` gone and the trait test written as Requirement 2 says.
++- [ ] `python -m pytest tests -q` exits 0 with the same counts as before the change (1151 passed, 23 skipped at the start of this round, unless step 1 of Done shows otherwise; report both).
++- [ ] `bridge/cursor-bridge/MANIFEST.json` is regenerated after the edit, `bridge/cursor-bridge/VERSION` is unchanged, and `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` reports the sources match.
+ 
+ ## Constraints
+-- Do not fix by suppressing the symptom — no retry, broad `try/except`, widened tolerance, added `sleep`, or null-check that hides a wrong value. Here that also means: do not strip, normalize or regex-collapse whitespace anywhere on the way to the shape test, and do not special-case the six test inputs.
+-- Do not edit the reproduction tests, any other test, or any fixture.
++- Do not edit any test or fixture.
+ - Do not leave any `DEBUG-BUG-` line or stray print.
+-- **If you believe the real cause is different from the one named, stop, do not change code, and report why in your summary** — the supervisor will re-diagnose.
+-- Mutation check (your own, in-process, by hand; no script of it lands in the diff): after the fix passes, apply each mutant below to `check_head` alone, run `python -m pytest tests/test_workflow_check.py -q -k "separators"` from the Workspace root, record which cases failed (the mutant is killed if at least one fails), then restore the fixed code exactly. List both in the report as: mutant · cases that caught it. M1 — the head is stripped again before the exact comparison (compare `head.strip()` instead of `head`); expected to be caught by at least `two-spaces-after-colon`, `space-before-traits-mark` and `two-spaces-after-part`. M2 — the comparison is made on the comma-split, stripped names (today's `names_by_seg` comparison put back in place of the exact-text comparison); expected to be caught by all six cases. If a mutant survives, say so in the report; do not change a test. Run the mutants before step 4 of Done, so the manifest is regenerated from the restored, fixed file.
+ - Do not add dependencies.
+-- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
+-- If the brief, the rules, or the tooling got in your way — an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason — append one dated line describing it to `docs/BUILDER_NOTES.md` (the file's format: a line starting `2026-10-17 BUG-002-r1:`, one blank line between entries). Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall: one dated line, so the supervisor can carry it forward.
+-- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
+-- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python — `0` on other platforms). Capturing output does not prevent the window. This fix launches no process; `check_head` must not start one.
+-- Never start a server, a watcher or a daemon; nothing you run may outlive its command. The commands under Done start nothing beyond themselves and the test suite's own subprocesses, which end with each test.
+-- Never run the product, a migration, a seed or a test against the owner's live data; see Development data under Context.
++- Do not read or write any file outside this workspace (the folder you were started in).
++- If the brief, the rules, or the tooling got in your way, append one dated line describing it to `docs/BUILDER_NOTES.md` (a line starting `2026-10-17 BUG-002-r2:`, one blank line between entries). Do not try to fix the tooling.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line.
++- This change launches no process; `check_head` must not start one.
++- Never start a server, a watcher or a daemon; nothing you run may outlive its command.
+ - Do not refactor code outside the scope, even if it looks wrong. Report anything you notice instead.
+-- Follow existing conventions in the file you touch (plain `str` comparisons, the existing tuple shapes, no new imports).
+ - These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff` and `git log` only. The supervisor commits.
+-- Every verification command is listed in full under Done, with its working folder; run exactly those (plus the mutation runs above).
+-- Prefer reuse over new code and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This change is a few lines inside one function.
++- Every verification command is listed in full under Done, with its working folder; run exactly those.
++- Write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This change removes three lines and rewrites one.
+ 
+ ## Done
+ Run these, each from the Workspace root (the folder you were started in), in this order, and record each command, its exit code and the relevant output in your report:
+ 
+-1. Before any edit: `python -m pytest tests/test_workflow_check.py -q -k "separators"` — expect the 6 `test_r015_separators_are_exact` cases failing and the 2 control cases passing.
+-2. After the fix: `python -m pytest tests/test_workflow_check.py tests/test_workflows_line_check.py tests/test_workflows_line_text.py tests/test_conformance_check.py -q` — expect no failures except, possibly, tests that refuse the not-yet-regenerated manifest (name any such test in the report).
+-3. The two mutants (Constraints, "Mutation check"), each with `python -m pytest tests/test_workflow_check.py -q -k "separators"`, then the code restored and that same command run once more — expect 8 passed.
+-4. `python tools/make-manifest.py`, then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — expect the sources to match.
+-5. `python -m pytest tests -q` — expect exit 0, no failures (after the manifest, so the install tests see the regenerated one).
+-6. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` — expect 0 FAIL.
+-7. `git diff --stat` and `git diff -- bridge/cursor-bridge/workflow-check.py` — paste both into the report. Expected files: `bridge/cursor-bridge/workflow-check.py`, `bridge/cursor-bridge/MANIFEST.json`, your report, and possibly `docs/BUILDER_NOTES.md`; `bridge/cursor-bridge/VERSION` must not appear.
++1. Before any edit: `python -m pytest tests -q` — record the counts.
++2. After the edit: `python tools/make-manifest.py`, then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — expect the sources to match.
++3. `python -m pytest tests -q` — expect exit 0 and the counts of step 1.
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` — expect 0 FAIL.
++5. `git diff --stat` and `git diff -- bridge/cursor-bridge/workflow-check.py` — paste both into the report. Expected files: `bridge/cursor-bridge/workflow-check.py`, `bridge/cursor-bridge/MANIFEST.json`, your report, and possibly `docs/BUILDER_NOTES.md`; `bridge/cursor-bridge/VERSION` must not appear.
+ 
+-Your report is the file `handoff/BUG-002-r1-report.md`, which you write as you go — what you did, what you changed, what you ran and what it printed, what you could not do — so that nothing of it is lost when your run ends early. When you finish, it holds a list of every file you changed, a one-paragraph summary of what you did, one sentence stating how the change addresses the named cause, the mutation list (mutant · cases that caught it), and, as its last section, a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++Your report is the file `handoff/BUG-002-r2-report.md`, which you write as you go — what you did, what you changed, what you ran and what it printed, what you could not do — so that nothing of it is lost when your run ends early. When you finish, it holds a list of every file you changed, a one-paragraph summary of what you did, and, as its last section, a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`.
+ 
+ Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index 3e713e2..1bad227 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -185,7 +185,9 @@ def test_r015_separators_are_exact(tmp_path, line):
+     rc, lines, err = _status_line_case(tmp_path, line)
+     assert_clean_end(lines, err)
+     assert rc == 1, lines
+-    assert any(line.startswith("FAIL (form) ") for line in fails(lines)), lines
++    assert any(line.startswith("FAIL (form) ")
++               and line.endswith(" - Workflows head is not the product type, then at most its sub-type")
++               for line in fails(lines)), lines
+ 
+ 
+ def test_r014_unwritten_trait_is_flagged_not_failed():
+@@ -489,7 +491,7 @@ def _outside_with_canary(tmp_path):
+ 
+ def test_r014_link_under_an_unknown_type_folder_is_form(tmp_path):
+     """R3-3: the unknown folder keeps its (d); the link inside it is (form) at its own path. (Whether it is read is not
+-    tested here: the check walks no unknown type folder, link or not; test_r014_top_level_link_is_form_and_not_walked
++    tested here: the check reads no file under an unknown type folder, link or not; test_r014_top_level_link_is_form_and_not_walked
+     tests a link that would be read.)"""
+     outside = _outside_with_canary(tmp_path)
+     root = tmp_path / "root"
