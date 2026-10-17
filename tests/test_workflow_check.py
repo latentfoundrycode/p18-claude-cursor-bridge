@@ -71,6 +71,15 @@ def test_r014_replaced_module_keeps_its_points():
     assert code == 0 and lines[-1] == "RESULT: OK", lines
 
 
+def test_r014_pass_root_holds_its_only_cases():
+    """Two lines of the pass root are the only fixtures of their rule, so the pass root's OK proves the rule only while
+    they stand (stage B2 review, round 3: fixtures 2): a third-level heading is prose (TASK-006 Requirement 7), and a Set
+    value may be written in backticks."""
+    type_text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
+    assert "\n### Add at not.a-change\n" in type_text, "precondition: a deeper heading that would be (a) if read"
+    assert "\n## Set at intake.delivery-kind\n\n`host-installation`\n" in type_text, "precondition: a backticked Set value"
+
+
 # --- the conditional-workflow files: one failing root per case --------------------------------------------------
 
 FILE_CASES = [
@@ -131,6 +140,41 @@ def test_r014_fail_root_beside_the_pass_root_is_reported_in_argument_order():
     rc, lines, err = run(f"{FIX}/pass", f"{FIX}/fail/c-not-replaceable")
     assert rc == 1
     assert fails(lines) == [line for line in lines if line.startswith(f"FAIL (c) {FIX}/fail/c-not-replaceable/")], lines
+
+
+def findings_of(*args):
+    rc, lines, err = run(*args)
+    assert_clean_end(lines, err)
+    return [line for line in lines if line.startswith(("FAIL (", "FLAG ("))]
+
+
+@pytest.mark.parametrize("first,second", [("c-not-replaceable", "a-unknown-point"), ("a-unknown-point", "c-not-replaceable")])
+def test_r014_roots_are_reported_in_argument_order(first, second):
+    """TASK-006: finding lines come roots in argument order, files in sorted path order, then status files in argument
+    order. Two failing roots, in both orders: c- before a- is not the sorted order of their paths, so a check that
+    sorted across roots fails one of the two (stage B2 review, round 3: Review A, tests part)."""
+    one, two = f"{FIX}/fail/{first}", f"{FIX}/fail/{second}"
+    expected = findings_of(one) + findings_of(two)
+    assert findings_of(one) and findings_of(two), "precondition: each root fails on its own"
+    assert findings_of(one, two) == expected
+
+
+@pytest.mark.parametrize("first,second", [("unknown-trait.md", "f-unwritten-type.md"), ("f-unwritten-type.md", "unknown-trait.md")])
+def test_r014_status_files_are_reported_in_argument_order(first, second):
+    """TASK-006: status files in argument order, in both orders (stage B2 review, round 3: Review A, tests part)."""
+    one, two = f"{FIX}/status/{first}", f"{FIX}/status/{second}"
+    single = [findings_of("--open-list", STATUS_LIST, "--status", path) for path in (one, two)]
+    assert single[0] and single[1], "precondition: each status file fails on its own"
+    assert findings_of("--open-list", STATUS_LIST, "--status", one, "--status", two) == single[0] + single[1]
+
+
+def test_r014_roots_come_before_status_files():
+    """The status file is given first on the command line; its findings still follow the root's."""
+    root, path = f"{FIX}/fail/c-not-replaceable", f"{FIX}/status/unknown-trait.md"
+    from_root = findings_of("--open-list", STATUS_LIST, root)
+    from_status = findings_of("--open-list", STATUS_LIST, "--status", path)
+    assert from_root and from_status, "precondition: each fails on its own"
+    assert findings_of("--open-list", STATUS_LIST, "--status", path, root) == from_root + from_status
 
 
 # --- the status files ---------------------------------------------------------------------------------------------
@@ -245,12 +289,15 @@ def test_r014_status_case_fails(name, code, offending):
 def test_r014_trait_in_head_is_only_the_shape_finding():
     """R-014: a trait's Name is in the open list, so a trait beside the product type in the Workflows head is the shape
     (form) finding alone, never (unknown); a lone trait gives only the (e) finding, before the shape test (BUG-002 round 2
-    review: no test held check_head's trait branch exactly)."""
+    review: no test held check_head's trait branch exactly; the lone trait's case added at stage B2's review, round 3)."""
     rc, lines, err = status("form-trait-in-head.md")
     assert_clean_end(lines, err)
     assert rc == 1, lines
     assert fails(lines) == [f"FAIL (form) {FIX}/status/form-trait-in-head.md: - - "
                             "Workflows head is not the product type, then at most its sub-type"], lines
+    rc, lines, err = status("e-lone-trait.md")
+    assert rc == 1, lines
+    assert fails(lines) == [f"FAIL (e) {FIX}/status/e-lone-trait.md: - - part must name exactly one product type"], lines
 
 
 # --- every case's exact findings (stage B2 review, round 2: a second finding must not hide the named one) -----------
@@ -322,6 +369,7 @@ FILE_EXACT = {
 
 STATUS_EXACT = {
     'bom-workflows-line.md': [],
+    'e-lone-trait.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
     'e-no-type.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
     'e-same-part.md': ['FAIL (e) {path}: app - two Workflows lines name the same part'],
     'e-sub-type-of-another.md': ["FAIL (e) {path}: Claude Code Extension - sub-type is not of the line's product type"],
@@ -355,6 +403,7 @@ STATUS_EXACT = {
     'form-trait-order.md': ["FAIL (form) {path}: Has screens - traits are not in the open list's order"],
     'form-trait-repeated.md': ['FAIL (form) {path}: Installable - trait repeated'],
     'form-trait-separator.md': ['FAIL (form) {path}: Has screens,Installable - traits are not joined by a comma and one space'],
+    'form-traits-marker-twice.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
     'ok-multi.md': [],
     'ok-single.md': [],
     'ok-unclassified.md': [],
@@ -363,7 +412,19 @@ STATUS_EXACT = {
         'FAIL (e) {path}: - - part must name exactly one product type',
     ],
     'unknown-trait.md': ['FAIL (unknown) {path}: Glitter - not a trait name'],
+    # A key where a Name belongs: the line is read by name only (stage B2 review, round 3: fixtures 4).
+    'unknown-trait-key.md': ['FAIL (unknown) {path}: installable - not a trait name'],
+    'unknown-type-key.md': [
+        'FAIL (unknown) {path}: web-app - name is not in the open list',
+        'FAIL (e) {path}: - - part must name exactly one product type',
+    ],
 }
+
+
+def whole_output(expected):
+    """A case's whole standard output: its finding lines, then the RESULT line, which counts the FAIL lines only."""
+    count = sum(1 for line in expected if line.startswith("FAIL ("))
+    return expected + ["RESULT: OK" if count == 0 else f"RESULT: {count} problem(s)"]
 
 
 def test_r014_every_case_has_its_exact_findings():
@@ -374,24 +435,28 @@ def test_r014_every_case_has_its_exact_findings():
 
 @pytest.mark.parametrize("case", sorted(FILE_EXACT))
 def test_r014_file_case_gives_exactly_its_findings(case):
-    """R-014: each failing root reports its case and nothing else (stage B2 review, round 2: fixtures parts 1-3)."""
+    """R-014: each failing root reports its case and nothing else (stage B2 review, round 2: fixtures parts 1-3); the
+    whole standard output is compared, RESULT line included, and standard error is empty (round 3: Review B)."""
     root = f"{FIX}/fail/{case}"
     rc, lines, err = run(root)
     assert_clean_end(lines, err)
     expected = [line.replace("{root}", root) for line in FILE_EXACT[case]]
-    assert [line for line in lines if line.startswith(("FAIL (", "FLAG ("))] == expected, lines
+    assert lines == whole_output(expected), lines
+    assert err == "", err
     assert rc == (1 if expected else 0), lines
 
 
 @pytest.mark.parametrize("name", sorted(STATUS_EXACT))
 def test_r014_status_case_gives_exactly_its_findings(name):
     """R-014, R-015: each status file reports its case and nothing else; the part-name rules (non-empty, no `;`, `→` or
-    `:`) are tested in a file of several lines, where they are reached (stage B2 review, round 2: Review B, fixtures 3)."""
+    `:`) are tested in a file of several lines, where they are reached (stage B2 review, round 2: Review B, fixtures 3);
+    the whole standard output is compared, RESULT line included, and standard error is empty (round 3: Review B)."""
     path = f"{FIX}/status/{name}"
     rc, lines, err = status(name)
     assert_clean_end(lines, err)
     expected = [line.replace("{path}", path) for line in STATUS_EXACT[name]]
-    assert [line for line in lines if line.startswith(("FAIL (", "FLAG ("))] == expected, lines
+    assert lines == whole_output(expected), lines
+    assert err == "", err
     assert rc == (1 if any(line.startswith("FAIL (") for line in expected) else 0), lines
 
 
@@ -861,16 +926,25 @@ def test_r014_tilde_fences_and_longer_runs_hide_headings():
 @pytest.mark.parametrize("case", ["fence-longer-opening", "fence-info-string-not-closing", "fence-backtick-in-info", "fence-close-trailing-space"])
 def test_r014_commonmark_fence_cases_read_the_set(case):
     """R5-3: a shorter run does not close a longer fence; a backtick line with text after it does not close; a backtick
-    line whose info string holds a backtick does not open; a closing run followed only by spaces closes. In each the
-    trait's `## Set` is read and is the one (b), with no open fence left."""
+    line whose info string holds a backtick does not open; a closing run followed only by spaces or tabs closes. In each
+    the trait's `## Set` is read and is the one (b), with no open fence left."""
     root = f"{FIX}/fail/{case}"
     if case == "fence-close-trailing-space":
         text = (REPO / root / "traits/installable.md").read_text(encoding="utf-8")
-        assert "\n```   \n" in text, "precondition: the closing run keeps its trailing spaces"
+        assert "\n```  \t\n" in text, "precondition: the closing run keeps its trailing spaces and tab"
     rc, lines, err = run(root)
     assert_clean_end(lines, err)
     assert rc == 1
     assert fails(lines) == [f"FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add"], lines
+
+
+def test_r014_whitespace_only_set_section_is_empty():
+    """TASK-006: a `## Set at` section with no non-blank line is (form); a line of spaces and a tab is blank, so the
+    case's Set section holds one, kept by this precondition (stage B2 review, round 3: fixtures 1)."""
+    root = f"{FIX}/fail/form-empty-set"
+    text = (REPO / root / "types/host-extension.md").read_text(encoding="utf-8")
+    assert "## Set at intake.target-environment\n\n  \t\n\n## Add at" in text, "precondition: the Set section holds only a whitespace line"
+    assert findings_of(root) == [f"FAIL (form) {root}/types/host-extension.md: intake.target-environment - Set at section has no non-blank line"]
 
 
 def test_r014_indented_fence_pair_hides_a_heading():

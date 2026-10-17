@@ -115,7 +115,8 @@ def test_r011_the_file_sits_at_the_s6_11_path_and_is_bounded():
     """R-011, §6.11: `workflow/open-list.md` beside the bridge's programs; a bounded reference text."""
     assert os.path.isfile(OL)
     assert TEXT.count("\n") < 300 and len(TEXT) < 30000
-    assert "\r" not in TEXT
+    raw = open(OL, encoding="utf-8", newline="").read()
+    assert "\r" not in raw.replace("\r\n", "\n"), "no lone carriage return (a CRLF checkout is fine; stage B2 review, round 3)"
 
 
 def test_r011_the_three_tables_parse_in_the_shape_workflow_check_reads():
@@ -147,6 +148,9 @@ def test_r011_the_names_a_workflows_line_reads_are_unique_across_the_tables():
              + [r["Name"] for r in table("## Traits")[1]])
     assert len(names) == len(set(names)), sorted(n for n in names if names.count(n) > 1)
     assert "the Workflow names, the Sub-workflow names and the traits' Names are unique across the three tables" in TEXT
+    # workflow-check.py splits a line at these characters (prefix_of, check_head, check_traits): stage B2 review, round 3.
+    assert [n for n in names if any(c in n for c in (",", ";", ":", chr(0x2192)))] == [], "a name holds a separator"
+    assert "none of them contains `,`, `;`, `:` or `" + chr(0x2192) + "`" in TEXT
 
 
 def test_r011_every_s6_3_product_type_is_listed_with_its_workflow_name_and_defaults():
@@ -245,7 +249,8 @@ def test_r011_the_classification_rules_are_recorded():
     assert "Siblings are exclusive: a part has at most one sub-type of its product type." in flat
     assert "Two levels are enough" in flat
     assert "A new product type or sub-type pauses the project." in flat
-    assert "fits no product type, fits two equally, or fits one whose workflow is not yet written" in flat
+    assert ("fits no product type, fits two equally, fits one whose workflow is not yet written, or fits a sub-type whose "
+            "sub-workflow is not yet written, the supervisor stops before design") in flat
     assert "the supervisor stops before design" in flat
     assert "A new trait is flagged, and the work continues." in flat
     assert "from which the maintainer may write it as trait additions" in flat
