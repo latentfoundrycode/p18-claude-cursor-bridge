@@ -30,3 +30,7 @@ What does uninstalling keep?
 ~~~a`b
 ## Set at intake.delivery-kind
 ~~~
+
+## Add at intake.delivery-kind
+
+The owner confirms the delivery kind at intake.

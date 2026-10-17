@@ -47,6 +47,9 @@ MALFORMED = {
     # (status text, the reason that must be named)
     "no-traits": (HEAD + "Workflows: Host Extension Development\n", "Workflows line must contain '; traits: ' exactly once"),
     "unknown-name": (HEAD + "Workflows: Nonexistent Development; traits: none\n", "name is not in the open list"),
+    # An (e) finding: two product types on one line (stage B2 review, round 6: tests).
+    "two-types": (HEAD + "Workflows: Web App Development, Host Extension Development; traits: none\n",
+                  "part must name exactly one product type"),
     "line-between": ("# Project Status\nPhase: building\nBridge version: %s\n" % VERSION + UNCLASSIFIED,
                      "Workflows lines do not stand together right after the Phase line"),
     "above-phase": ("# Project Status\nBridge version: %s\n" % VERSION + UNCLASSIFIED + "Phase: building\n",
@@ -98,6 +101,8 @@ def workspace(tmp_path, status_text):
 def test_r015_placement_function(program):
     mod = program("workflow-check")
     assert mod.check_placement("s.md", HEAD) == [], "no Workflows line: missing is check_status's finding"
+    # Neither line: still nothing to place (stage B2 review, round 6: the sweep's line 718).
+    assert mod.check_placement("s.md", "# Project Status\n") == []
     assert mod.check_placement("s.md", HEAD + UNCLASSIFIED) == []
     two = "Phase: building\nWorkflows: app: not yet classified\nWorkflows: site: not yet classified\nOther: x\n"
     assert mod.check_placement("s.md", two) == []
@@ -141,6 +146,21 @@ def test_r015_inventory_malformed_line(tmp_path, case):
     found = workflows_lines(lines)
     assert found and all(line.startswith("WORKFLOWS LINE: malformed: ") for line in found), lines
     assert any(line.endswith(" - " + reason) for line in found), lines
+
+
+def test_r015_inventory_prints_each_finding_in_order(tmp_path):
+    """handoff/TASK-008.md: one WORKFLOWS LINE per finding of the judge, in the judge's order, the placement's last
+    (stage B2 review, round 6: tests)."""
+    status = tmp_path / "PROJECT_STATUS.md"
+    write_status(status, "# Project Status\nPhase: building\nBridge version: %s\n" % VERSION
+                 + "Workflows: Nonexistent Development; traits: none\n")
+    rc, lines, out, err = inventory(tmp_path, status)
+    assert rc == 1, lines
+    assert workflows_lines(lines) == [
+        "WORKFLOWS LINE: malformed: Nonexistent Development - name is not in the open list",
+        "WORKFLOWS LINE: malformed: - - part must name exactly one product type",
+        "WORKFLOWS LINE: malformed: - - Workflows lines do not stand together right after the Phase line",
+    ], lines
 
 
 def test_r015_inventory_unwritten_types_are_not_malformed(tmp_path):

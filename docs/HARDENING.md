@@ -97,7 +97,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 
 ## Stage B2 — the stage review (round 5, 2026-10-17)
 
-**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants, of which 381 compile, and found 89 of those surviving the workflow-check and Workflows-line tests. Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
+**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants, of which 381 compile, and found 89 of those surviving the workflow-check and Workflows-line tests before that round's cases were written (36 after them, listed below). Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
 
 **Fences and headings:**
 - a closing run indented four spaces is content (fixtures 1, blocking);
@@ -210,3 +210,70 @@ It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The del
 - the registry's heading sentence reads "a line that starts with" and now opens its paragraph, before the term's first use (considers).
 
 Recorded from Review A, for the later program change that reads a line of `##` alone as Markdown does: under a Set whose value the check does not validate (`intake.budget-kind`), such a line passes as the value `##`.
+
+## Stage B2 — the stage review (round 6, 2026-10-17)
+
+**Taken on BUG-007 (the supervisor's fixtures, tests and registry text, no program change).** Round 6 rejected for round 5's class: rules of the workflow check that no test fails for. Review A's tests part rejected (5 blocking, 7 should-fix, 8 consider), fixtures parts 1 and 2 rejected, the programs, texts and fixtures parts 3 to 5 approved. Review B's reply was "APPROVE" with no line of the diff named: per the policy a failed launch, rerun with the stage's next round. Every finding below has its case with exact output, or is recorded with its reason.
+
+**Sections and headings:**
+- a section ends at the next `##` heading, a prose one too, so a Set right above one is empty, at the delivery-kind point too (tests and fixtures 2, converged);
+- the four forms are matched exactly: text after the key, a space after it, and text after the delivery kind (tests);
+- a change heading and an opening fence indented three spaces, the most either may be (fixtures 1 and 2, converged);
+- a fence opened by four backticks, a shorter tilde run inside a fence of four, and a form feed after a closing run, which leaves the fence open (the sweep; round 5's lead on 83 is now a test);
+- a heading whose first word is only punctuation, and one of punctuation alone, is prose (tests).
+
+**Files and folders:**
+- a file that is not `.md` under `types/` and under a type's folder (tests, fixtures 2);
+- a folder named like a trait file under `traits/` (the sweep);
+- a file of an unknown key, and a sub-workflow failing its identity, still have their changes checked (tests, fixtures 2);
+- a link the walk lists among a folder's files, and a link named like a trait file (the sweep);
+- a conditional-workflow file that cannot be read as UTF-8 stops the check with its ERROR line (programs and tests, converged); without that line the check printed a traceback;
+- a missing registry, and a rule file that is a folder, each with its exact ERROR line (tests, the sweep);
+- the default root is read when no root is given, proved by a program copy whose workflow folder fails (tests: the existing test passes whether it is read or not);
+- a root with a trailing slash, and path fields holding a non-ASCII character in FAIL and ERROR lines (tests).
+
+**Set values:**
+- a backtick on the leading side only is not unwrapped (fixtures 2);
+- two backticks are unwrapped to nothing and printed `-` (round 5's lead on 485, now pinned; whether the finding should print the two backticks stays a lead);
+- an addition at a value point is an addition (tests).
+
+**Workflows lines:**
+- trait order is judged against the highest trait so far (tests);
+- an empty traits text, and one ending `, ` (tests);
+- a part named three times gives one (e), and the repeated line is still checked (fixtures 3 and programs, converged);
+- a part's name ends at the first `: `, and a line holding only its prefix lacks the traits marker (tests, the sweep);
+- a Workflow name in another case (fixtures 5);
+- the open list's rows the status cases read are pinned (fixtures 5);
+- inventory-check prints one line per finding in the judge's order, and an (e) case is among the malformed lines (tests).
+
+**The table reader:** a separator cell of a single dash, and a header with no line after it (tests, the sweep).
+
+**Registry text** (texts part): the four forms are matched exactly; "A `##` heading other than the four forms is prose" (carried from BUG-006's gate); an unreadable conditional-workflow file stops the check. The heading paragraph's order pin is exact: a blank line before it and the term's first use at its own sentence (carried).
+
+**The sweep, widened** (run/supervisor/sweep_workflow_check.py, local; Review A, tests part): the bounds `{0,3}` and `{3,}` moved by one each way, the numbers compared moved by one, `== 2` read as `>= 2`, a character set made smaller, the deleted appends of errors and found items, each condition forced true and false, and each `and` clause dropped. It made 756 mutants, of which 711 compile (the 45 that do not are counted apart): 78 survived before BUG-007's cases, 52 after. Each of the 52 is one of these:
+- **Round 5's list, unchanged:** 83 (a closing run of two), 134, 170, 190, 313, 322, 420, 422, 436, 456, 459, 478, 604, 625 to 641 (626 the lead below), 662, 664, 795 and 548, each for the reason given there.
+- **New, equivalent** (no input separates them):
+  - 103: a final empty line kept adds a blank line, which no reader acts on.
+  - 181: cells_of always returns at least one cell.
+  - 191: a table line starts with a pipe.
+  - 342 (each `and` clause dropped, and `>= 2`): a folder under an unknown type folder lies under that folder's own two-part entry, which is listed too.
+  - 357: a folder under `traits/` has at least two parts.
+  - 360 (`>= 2`): a longer path under `types/` whose second part ends `.md` lies in an unknown type folder, which is skipped first.
+  - 364 (the `traits` clause dropped): a two-part `types/` path ending `.md` is taken by the line before.
+  - 380: is_change_heading is only called on heading candidates (as 381).
+  - 538: the change kinds are add, set and replace.
+  - 547: makes 548 unreachable a second way.
+  - 688: a part is None only in a one-line file.
+  - 833: every printed field is ASCII already, and every standard stream has `reconfigure`.
+- **Held on CI's ubuntu leg only** (161, 162, 335, 336): a symbolic link is known by its mode there, and the dangling-link case lands among a folder's files; this Windows host makes junctions, which the walk lists as folders. The driver leaves them out for that reason.
+
+**Mutation driver:** run/supervisor/mutate_workflow_check.py names a mutant for each new rule, 196 of 196 killed (161 before, 35 new); mutate_workflows_line.py stands at 42 of 42.
+
+**Leads:**
+- 626 stands (fixtures 4 converged on it with Review A of BUG-006): a possible program defect, for the next change of workflow-check.py.
+- The program's usage text (lines 31 to 35) and the registry's list of what stops the check did not name an unreadable conditional-workflow file; the registry now does, and the usage text is the builder's, for the next change of the program (programs part).
+- The fixtures' 24 headers: the 25th file, status/ok-bom.md, was added in TASK-006 and deleted in BUG-002, so it has no net change in the stage (fixtures 4, noted).
+
+**For TASK-023's brief** (programs part, noted): the calibration that installs release B adds a running project's `Workflows:` line, so the brief names that step.
+
+**Reviewer folders:** each Review A part had a scratch folder of its own this round; none saw another's mutant.
