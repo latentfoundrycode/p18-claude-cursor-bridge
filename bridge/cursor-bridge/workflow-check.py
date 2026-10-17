@@ -604,7 +604,6 @@ def check_head(head, path, tables, findings):
     names_by_seg = [[name.strip() for name in segment.split(",")] for segment in segments]
     types_found = []
     subs_found = []
-    traits_in_head = []
     for names in names_by_seg:
         for name in names:
             if name == "":
@@ -614,9 +613,7 @@ def check_head(head, path, tables, findings):
                 types_found.append(tables["workflow_by_name"][name])
             elif name in tables["sub_by_name"]:
                 subs_found.append(tables["sub_by_name"][name])
-            elif name in tables["trait_by_name"]:
-                traits_in_head.append(name)
-            else:
+            elif name not in tables["trait_by_name"]:
                 findings.append(("unknown", path, name, "name is not in the open list"))
     if len(types_found) != 1:
         findings.append(("e", path, "-", "part must name exactly one product type"))
