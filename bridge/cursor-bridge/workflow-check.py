@@ -631,12 +631,10 @@ def check_head(head, path, tables, findings):
     if not counts_right:
         return
     if len(subs_found) == 0:
-        shape_ok = names_by_seg == [[types_found[0]["Workflow name"]]] and not traits_in_head
+        exact = types_found[0]["Workflow name"]
     else:
-        shape_ok = (
-            names_by_seg == [[types_found[0]["Workflow name"]], [subs_found[0]["Sub-workflow name"]]]
-            and not traits_in_head
-        )
+        exact = types_found[0]["Workflow name"] + " → " + subs_found[0]["Sub-workflow name"]
+    shape_ok = head == exact
     if not shape_ok:
         findings.append(("form", path, "-", "Workflows head is not the product type, then at most its sub-type"))
     if types_found[0]["Written"] != "yes":
