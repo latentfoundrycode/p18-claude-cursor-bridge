@@ -8,6 +8,7 @@ bridge release, in CI). The fixtures are tests/fixtures/workflows/: `pass/` is t
 failing case, `status/` the status-line cases with an open list of their own.
 """
 import codecs
+import importlib.util
 import os
 import pathlib
 import shutil
@@ -1832,6 +1833,8 @@ def test_r014_written_other_than_yes_is_unwritten(tmp_path, value):
     open_list = _open_list_copy(tmp_path, "open-list.md", [(row, row.replace("| yes |", "| %s |" % value))
                                                            for row in (ROW_HOST, ROW_CCE, ROW_INSTALLABLE)])
     status = _status_file(tmp_path, "Workflows: Host Extension Development " + ARROW + " Claude Code Extension; traits: Installable")
+    # The control: the same line against the list as written, `yes` in all three rows, gives nothing.
+    assert run("--open-list", STATUS_LIST, "--status", str(status))[:2] == (0, ["RESULT: OK"])
     rc, lines, err = run("--open-list", str(open_list), "--status", str(status))
     shown = str(status).replace("\\", "/")
     assert lines == whole_output([
@@ -1855,6 +1858,8 @@ def test_r014_replaceable_other_than_yes_is_not_replaceable(tmp_path, value):
     root = tmp_path / "root"
     (root / "types").mkdir(parents=True)
     (root / "types" / "host-extension.md").write_text("## Replace interface\n\nAn interface.\n", encoding="utf-8")
+    # The control: the same root against the registry as written, interface replaceable `yes`, gives nothing.
+    assert run("--open-list", STATUS_LIST, str(root))[:2] == (0, ["RESULT: OK"])
     rc, lines, err = run("--open-list", STATUS_LIST, "--registry", str(registry), str(root))
     shown = str(root).replace("\\", "/")
     assert lines == whole_output([f"FAIL (c) {shown}/types/host-extension.md: interface - module is missing or not replaceable"]), lines
@@ -1868,9 +1873,11 @@ RETIRED = ("## Product types (retired)\n\n| Key | Name | Definition | Workflow n
 @pytest.mark.parametrize("how", ["longer-heading-first", "deeper-heading-first", "trailing-space", "lower-case"])
 def test_r014_a_table_is_read_under_its_exact_heading(tmp_path, how):
     """workflow/open-list.md, "How this file is read": each table is the first table after its heading, the heading
-    matched exactly: a longer heading, or a deeper one (`### Product types`), with its own table before the real one
-    is not it, and a heading with a trailing space or in lower case is no heading at all, so the table is missing
-    (BUG-008's gate round 1: Review A, the widened sweep's line 203)."""
+    named exactly: a longer heading, or a deeper one (`### Product types`), with its own table before the real one
+    is not it, and a heading in lower case is no heading at all, so the table is missing (BUG-008's gate round 1:
+    Review A, the widened sweep's line 203). A heading with a trailing space is no heading either: the program's
+    reading, which handoff/TASK-006.md left open (its `Assumed, not verified` example), pinned here and recorded in
+    docs/HARDENING.md as a lead (gate round 2: Review A)."""
     head = "## Product types\n"
     new = {"longer-heading-first": RETIRED + head, "deeper-heading-first": "#" + RETIRED.replace(" (retired)", "") + head,
            "trailing-space": "## Product types \n", "lower-case": "## product types\n"}[how]
@@ -1926,9 +1933,10 @@ LOCAL_WEB_APP = "| local-web-app | Local web app | web-app | Opened at a local a
 
 
 def test_r014_an_of_type_in_another_case_is_another_type(tmp_path):
-    """A sub-type's Of type is its type's key exactly, its case included: local-web-app written of `Web-App` is of no
-    type, so the line gives (e) and its file under types/web-app/ gives (d) (BUG-008's gate round 1: the widened
-    sweep's lines 553 and 625)."""
+    """A sub-type's Of type is its type's key exactly, its case included (handoff/TASK-006.md: Of type is the sub-type's
+    product-type key; workflow/open-list.md: a key is lowercase letters, digits and hyphens): local-web-app written of
+    `Web-App` is of no type, so the line gives (e) and its file under types/web-app/ gives (d) (BUG-008's gate round 1:
+    the widened sweep's lines 553 and 625)."""
     open_list = _open_list_copy(tmp_path, "open-list.md", [(LOCAL_WEB_APP, LOCAL_WEB_APP.replace("| web-app |", "| Web-App |"))])
     status = _status_file(tmp_path, "Workflows: Web App Development " + ARROW + " Local Web App; traits: none")
     rc, lines, err = run("--open-list", str(open_list), "--status", str(status))
@@ -1941,3 +1949,48 @@ def test_r014_an_of_type_in_another_case_is_another_type(tmp_path):
     rc, lines, err = run("--open-list", str(open_list), str(root))
     shown = str(root).replace("\\", "/")
     assert lines == whole_output([f"FAIL (d) {shown}/types/web-app/local-web-app.md: local-web-app - not a sub-type of web-app"]), lines
+
+
+# --- BUG-008's gate round 2 (Review A): the delivery rules at their two points exactly ------------------------------
+
+NOT_THE_DELIVERY_POINTS = [
+    # A longer key, another case, a part of it, its last part, a key ending with it: none is the point.
+    "project-end.delivery-notes", "Project-End.Delivery", "project-end", "delivery", "x-project-end.delivery",
+    "intake.delivery-kind-notes", "Intake.Delivery-Kind", "intake", "delivery-kind", "x-intake.delivery-kind",
+]
+
+
+def test_r014_the_delivery_rules_apply_at_their_two_points_exactly(tmp_path):
+    """handoff/TASK-006.md Requirement 9: `FAIL (kind)` for an `## Add at project-end.delivery` heading with no
+    ` for <kind>`, and for a `## Set at intake.delivery-kind` section whose first non-blank line is not one kind. A point
+    key that is not exactly one of the two is another point, here one the registry lacks, so each heading gives (a)
+    alone, with no (kind) line, though no kind is named and the body is no kind (BUG-008's gate round 2: Review A, the
+    widened sweep's lines 524 and 533)."""
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    adds, sets = NOT_THE_DELIVERY_POINTS[:5], NOT_THE_DELIVERY_POINTS[5:]
+    text = "".join("## Add at %s\n\nnonsense\n\n" % key for key in adds) + "".join("## Set at %s\n\nnonsense\n\n" % key for key in sets)
+    (root / "types" / "host-extension.md").write_text(text, encoding="utf-8")
+    rc, lines, err = run(str(root))
+    shown = str(root).replace("\\", "/") + "/types/host-extension.md"
+    assert lines == whole_output([f"FAIL (a) {shown}: {key} - point is not in the extension-point registry"
+                                  for key in adds + sets]), lines
+    assert rc == 1 and err == "", err
+
+
+# A module name that is not `__main__` exactly: another case, longer, shorter, a part, spaced.
+NOT_MAIN = ["__MAIN__", "__main__x", "x__main__", "x__main__x", "__main", "main__", "main", " __main__ "]
+
+
+@pytest.mark.parametrize("name", NOT_MAIN)
+def test_r015_loaded_as_a_module_the_check_runs_nothing(name, monkeypatch, capsys):
+    """The judges load workflow-check.py as a module (inventory-check.py and conformance-check.py, by
+    spec_from_file_location) and call its checks; the program runs its check only when run as a script, under the
+    name `__main__` exactly. Loaded under any other name, with arguments that would end a run at once, it prints
+    nothing and does not exit (BUG-008's gate round 2: Review B, the widened sweep's line 831)."""
+    monkeypatch.setattr(sys, "argv", ["workflow-check.py", "--bogus"])
+    spec = importlib.util.spec_from_file_location(name, str(REPO / PROG))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert callable(module.main)
+    assert capsys.readouterr() == ("", "")
