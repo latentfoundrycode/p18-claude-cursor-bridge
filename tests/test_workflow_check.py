@@ -78,6 +78,15 @@ def test_r014_pass_root_holds_its_only_cases():
     type_text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
     assert "\n### Add at not.a-change\n" in type_text, "precondition: a deeper heading that would be (a) if read"
     assert "\n## Set at intake.delivery-kind\n\n`host-installation`\n" in type_text, "precondition: a backticked Set value"
+    # TASK-006 Requirements 7 to 9, each held by one line of the pass root (stage B2 review, round 4: fixtures 2).
+    sub_text = (REPO / FIX / "pass/types/host-extension/claude-code-extension.md").read_text(encoding="utf-8")
+    assert "\n## Set at intake.delivery-kind\n" in sub_text, "precondition: a sub-workflow sets what its type sets"
+    assert "\n## Replace interface\n" in sub_text and "\n## Replace interface\n" in type_text, \
+        "precondition: a sub-workflow replaces what its type replaces"
+    trait_text = (REPO / FIX / "pass/traits/installable.md").read_text(encoding="utf-8")
+    assert trait_text.count("\n## Add at intake.questions\n") == 2, "precondition: two additions at one point in one file"
+    assert ("\n## Add at project-end.delivery for installer\n" in trait_text
+            and "\n## Add at project-end.delivery for package\n" in trait_text), "precondition: several delivery kinds in one file"
 
 
 # --- the conditional-workflow files: one failing root per case --------------------------------------------------
@@ -183,7 +192,7 @@ def status(name):
     return run("--open-list", STATUS_LIST, "--status", f"{FIX}/status/{name}")
 
 
-@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-unclassified.md", "bom-workflows-line.md"])
+@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-multi-unclassified.md", "ok-unclassified.md", "bom-workflows-line.md"])
 def test_r014_status_ok(name):
     """bom-workflows-line.md is not a whole status file (it has no `Phase:` line, which check_placement would refuse);
     it holds one `Workflows:` line after a byte-order mark, the case only check_status reads."""
@@ -392,6 +401,9 @@ STATUS_EXACT = {
     'form-part-arrow.md': ['FAIL (form) {path}: a\\u2192b - Workflows line breaks the part-prefix rule'],
     'form-part-blank.md': ['FAIL (form) {path}:   - Workflows line breaks the part-prefix rule'],
     'form-part-colon.md': ['FAIL (form) {path}: a:b - Workflows line breaks the part-prefix rule'],
+    # Whitespace at the start of a part name, and a tab (stage B2 review, round 4: fixtures 3).
+    'form-part-leading-space.md': ['FAIL (form) {path}:  plugin - Workflows line breaks the part-prefix rule'],
+    'form-part-tab.md': ['FAIL (form) {path}: plugin\\x09 - Workflows line breaks the part-prefix rule'],
     'form-part-empty.md': ['FAIL (form) {path}: - - Workflows line breaks the part-prefix rule'],
     'form-part-semicolon.md': ['FAIL (form) {path}: a;b - Workflows line breaks the part-prefix rule'],
     'form-part-whitespace.md': ['FAIL (form) {path}: app  - Workflows line breaks the part-prefix rule'],
@@ -403,8 +415,10 @@ STATUS_EXACT = {
     'form-trait-order.md': ["FAIL (form) {path}: Has screens - traits are not in the open list's order"],
     'form-trait-repeated.md': ['FAIL (form) {path}: Installable - trait repeated'],
     'form-trait-separator.md': ['FAIL (form) {path}: Has screens,Installable - traits are not joined by a comma and one space'],
+    'form-trait-trailing-space.md': ['FAIL (form) {path}: Has screens  - traits are not joined by a comma and one space'],
     'form-traits-marker-twice.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
     'ok-multi.md': [],
+    'ok-multi-unclassified.md': [],
     'ok-single.md': [],
     'ok-unclassified.md': [],
     'unknown-name.md': [
@@ -414,6 +428,10 @@ STATUS_EXACT = {
     'unknown-trait.md': ['FAIL (unknown) {path}: Glitter - not a trait name'],
     # A key where a Name belongs: the line is read by name only (stage B2 review, round 3: fixtures 4).
     'unknown-trait-key.md': ['FAIL (unknown) {path}: installable - not a trait name'],
+    'unknown-sub-type-key.md': [
+        'FAIL (unknown) {path}: claude-code-extension - name is not in the open list',
+        'FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type',
+    ],
     'unknown-type-key.md': [
         'FAIL (unknown) {path}: web-app - name is not in the open list',
         'FAIL (e) {path}: - - part must name exactly one product type',
@@ -912,12 +930,14 @@ def test_r014_layer_that_cannot_be_examined_stops_the_check(tmp_path, monkeypatc
 
 
 def test_r014_tilde_fences_and_longer_runs_hide_headings():
-    """R5-3: in the pass root's trait file a tilde fence hides a trait's `## Set` (b), and a four-tilde fence holding a
-    four-backtick line (the other character, long enough) and a shorter tilde line hides `## Replace design` (b) until
-    its own four-tilde close."""
+    """R5-3: in the pass root's trait file a tilde fence hides a trait's `## Set` (b), and a four-tilde fence holds a
+    four-backtick line (the other character, long enough), after which `## Replace interface` (b) stands, and a shorter
+    tilde line, after which `## Replace design` (b) stands, both still hidden until the fence's own four-tilde close
+    (one heading after each line since stage B2's review, round 4: fixtures 2)."""
     text = (REPO / FIX / "pass/traits/installable.md").read_text(encoding="utf-8")
     assert "\n~~~\n## Set at intake.delivery-kind\n~~~\n" in text, "precondition: a tilde fence hides a Set"
-    assert "\n~~~~\n````\n## Replace design\n~~~\n~~~~" in text, "precondition: a longer tilde fence hides a Replace"
+    assert "\n~~~~\n````\n## Replace interface\n~~~\n## Replace design\n~~~~" in text, (
+        "precondition: a longer tilde fence hides a Replace after a backtick line and another after a shorter tilde line")
     assert "\n~~~a`b\n## Set at intake.delivery-kind\n~~~" in text, "precondition: a backtick in a tilde info string still opens"
     rc, lines, err = run(f"{FIX}/pass")
     assert rc == 0 and lines[-1] == "RESULT: OK", lines
@@ -925,13 +945,19 @@ def test_r014_tilde_fences_and_longer_runs_hide_headings():
 
 @pytest.mark.parametrize("case", ["fence-longer-opening", "fence-info-string-not-closing", "fence-backtick-in-info", "fence-close-trailing-space"])
 def test_r014_commonmark_fence_cases_read_the_set(case):
-    """R5-3: a shorter run does not close a longer fence; a backtick line with text after it does not close; a backtick
-    line whose info string holds a backtick does not open; a closing run followed only by spaces or tabs closes. In each
-    the trait's `## Set` is read and is the one (b), with no open fence left."""
+    """R5-3: a shorter run does not close a longer fence and a longer run does; a backtick line with text after it does
+    not close; a backtick line whose info string holds a backtick does not open, while one with an ordinary info string
+    does (its pair hides `## Replace design`); a closing run followed only by spaces or tabs closes. In each the trait's
+    `## Set` is read and is the one (b), with no open fence left (the controls since stage B2's review, round 4:
+    fixtures 1)."""
     root = f"{FIX}/fail/{case}"
+    text = (REPO / root / "traits/installable.md").read_text(encoding="utf-8")
     if case == "fence-close-trailing-space":
-        text = (REPO / root / "traits/installable.md").read_text(encoding="utf-8")
         assert "\n```  \t\n" in text, "precondition: the closing run keeps its trailing spaces and tab"
+    if case == "fence-backtick-in-info":
+        assert "\n```md\n## Replace design\n```\n" in text, "precondition: an ordinary info string opens a fence"
+    if case == "fence-longer-opening":
+        assert "\n````\n```\n`````\n" in text, "precondition: a shorter run inside, a longer run closes"
     rc, lines, err = run(root)
     assert_clean_end(lines, err)
     assert rc == 1

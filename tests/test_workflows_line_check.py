@@ -419,6 +419,7 @@ def test_r015_conformance_no_status_file_no_check(tmp_path):
     assert "Traceback" not in err and "Traceback" not in out, (out, err)
     assert out.splitlines()[-1].startswith("RESULT: "), out
     assert verdict(out, "Workflows line") == (None, None), out
+    assert "workflows" not in out.lower(), "nothing about the line under any name (stage B2 review, round 4: tests)"
     v, text = verdict(out, "docs/PROJECT_STATUS.md")
     assert v == "MISSING" and "the bounded status file" in text, out
     assert rc == 1

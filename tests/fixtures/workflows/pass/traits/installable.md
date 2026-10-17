@@ -22,8 +22,9 @@ What does uninstalling keep?
 
 ~~~~
 ````
-## Replace design
+## Replace interface
 ~~~
+## Replace design
 ~~~~
 
 ~~~a`b
