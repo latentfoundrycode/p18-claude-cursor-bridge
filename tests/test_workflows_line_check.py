@@ -189,10 +189,13 @@ def test_r015_inventory_no_status_file_no_check(tmp_path):
     absent = tmp_path / "absent-status.md"
     rc, lines, out, err = inventory(tmp_path, absent)
     assert "Traceback" not in err and "Traceback" not in out, (out, err)
-    assert lines and lines[-1].startswith("RESULT: "), (lines, err)
-    assert "note: status: %s not found (skipped)" % absent in lines, lines
-    assert workflows_lines(lines) == [], lines
-    assert not [line for line in lines if "workflows" in line.lower()], lines
+    # The whole output, so nothing about the line can be said in any words (BUG-004 round 2, Review A).
+    assert lines == [
+        "note: status: %s not found (skipped)" % absent,
+        "note: resources: not a git repository (reads not scanned)",
+        "MISSING: absent-inventory.md does not exist",
+        "RESULT: 1 problem(s)",
+    ], lines
 
 
 def _bridge_copy(tmp_path, with_checker=True, with_rules=True):
