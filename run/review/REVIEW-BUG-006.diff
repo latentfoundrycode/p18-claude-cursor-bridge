@@ -1,0 +1,1029 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 023730a..953b0f7 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-17 07:10",
++  "generated": "2026-10-17 10:25",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -103,8 +103,8 @@
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/workflow-check.py": "8ba92116301d19588a009ec03a479115406fbf9a465421503ff8d7691daca139",
+-    "cursor-bridge/workflow/extension-points.md": "2b1c5110ef17befe37eb0fb398db77763dfc91288ddcd2d027adf15389bf3a7f",
+-    "cursor-bridge/workflow/open-list.md": "2cda936e0ed96b2e7422eb2a9ff0596ebb54e3b09056008074da0f001ea2614b",
++    "cursor-bridge/workflow/extension-points.md": "9427564252377792f030d52c2f337d618722ca31d680785c5f9228db85e31119",
++    "cursor-bridge/workflow/open-list.md": "926f909667b79918943965e003d881e055c012517b31fc07770230c12ec9cbf7",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/workflow/extension-points.md b/bridge/cursor-bridge/workflow/extension-points.md
+index a1a2462..fc74855 100644
+--- a/bridge/cursor-bridge/workflow/extension-points.md
++++ b/bridge/cursor-bridge/workflow/extension-points.md
+@@ -6,7 +6,7 @@ What no point offers stays with the core: a conditional workflow can never remov
+ 
+ ## How this file is read
+ 
+-`workflow-check.py` reads the two tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Phase modules`, `## Extension points`), its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
++`workflow-check.py` reads the two tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Phase modules`, `## Extension points`) and before the next line that starts with two hashes and a space (`## `), its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
+ 
+ - **Module** — the phase module's key and the base name of its file, `workflow/phases/<module>.md` (§6.11). Until the phases move into files of their own, each module is its phase's section of `supervisor.md`.
+ - **Phase** — the phase in plain words; for a point, the row of §6.4's table it comes from (Definition of done and Delivery are rows of their own there, declared by the project-end module).
+@@ -58,7 +58,7 @@ The interface phase is the one replaceable module (§6.4): the main workflow hol
+ | project-end.delivery | Delivery | The delivery procedure for the part's delivery kind | project-end | add | part |
+ | reflection.items | Reflection points | Additional reflection items | reflection | add | project |
+ 
+-§6.4 calls its list initial, to be refined during implementation; a refinement is a change to this file as above, never an unlisted point in a conditional workflow. §6.4's "additional checks at the inspect and test steps" is two points here, one per step, so that a check names the step it runs at. The two points divide between them every check and review the delegation loop makes of a change, wherever the module's text places it and whatever the change is: an increment, a fix, a refactoring candidate, or the gate pass of a stage's refactoring branch. The test step is the running of the tests (the increment's tests and the suite, the new tests against the checkpoint) and the checks that run with them, such as the observability tests and the benchmark floor; step 6 runs no tests of its own, the tests having run in step 4, and the trait *performance budgets* carries the floor (§6.8). The inspect step is every other check or review, before the tests or after them: the scope check, the diagram check, the boundary log, the triage of the builder's assumptions, the reviewer passes (such as the design auditor the trait *has screens* carries), the secret scan and the dependency admission. The merge gate's conditions (step 8) belong to the core and offer no point; a CI check a conditional workflow needs is added at `configuration.items`. An addition at either point is placed in the delegation loop's text at the step that runs it. Two points are added to §6.4's list, both at intake, because §6.5 names their kinds as values a type workflow or sub-workflow sets and the core settles both at intake, before design and planning act on them: `intake.budget-kind`, the kind of performance budget, and `intake.delivery-kind`, the delivery kind; `project-end.delivery` holds the procedure for the kind set there. The delivery kinds are one list, the kinds `Delivery-Conventions.md` §1 ships plus §6.4's own: `installer` (a desktop application, §2), `install-script` (a command-line tool or a local server, §3), `package` (a library, its registry's artifact), `web-deployment` (a hosted web application), `store-package` (an app delivered through a store) and `host-installation` (an extension installed into its host); the value set at `intake.delivery-kind` and the kind an addition at `project-end.delivery` names are both drawn from it, and it grows only as a point does. Where no type workflow or sub-workflow sets a part's kind, the kind the supervisor confirms with the owner at intake (Phase 1) is the part's kind, recorded by its key from this list. Each addition at `project-end.delivery` names the delivery kind it is for and applies only to a part of that kind; so a sub-workflow that sets another kind leaves its type workflow's procedure behind, and a trait's procedure for one kind never reaches a part of another. A completion condition added at `project-end.completion-conditions` is checked at project end; a condition the plan must build toward is also added at intake (`intake.requirement-sources`), naming that completion condition as its source, so that it enters the requirements register before planning.
++§6.4 calls its list initial, to be refined during implementation; a refinement is a change to this file as above, never an unlisted point in a conditional workflow. §6.4's "additional checks at the inspect and test steps" is two points here, one per step, so that a check names the step it runs at. The two points divide between them every check and review the delegation loop makes of a change, wherever the module's text places it and whatever the change is: an increment, a fix, a refactoring candidate, or the gate pass of a stage's refactoring branch. The test step is the running of the tests (the increment's tests and the suite, the new tests against the checkpoint) and the checks that run with them, such as the observability tests and the benchmark floor; step 6 runs no tests of its own, the tests having run in step 4, and the trait *performance budgets* carries the floor (§6.8). The inspect step is every other check or review, before the tests or after them: the scope check, the diagram check, the boundary log, the triage of the builder's assumptions, the reviewer passes (such as the design auditor the trait *has screens* carries), the secret scan and the dependency admission. The merge gate's conditions (step 8) belong to the core and offer no point; a CI check a conditional workflow needs is added at `configuration.items`. An addition at either point is placed in the delegation loop's text at the step that runs it. Two points are added to §6.4's list, both at intake, because §6.5 names their kinds as values a type workflow or sub-workflow sets and the core settles both at intake, before design and planning act on them: `intake.budget-kind`, the kind of performance budget, and `intake.delivery-kind`, the delivery kind; `project-end.delivery` holds the procedure for the kind set there. The delivery kinds are one list, the kinds `Delivery-Conventions.md` §1 ships plus §6.4's own: `installer` (a desktop application, §2), `install-script` (a command-line tool or a local server, §3), `package` (a library, its registry's artifact), `web-deployment` (a hosted web application), `store-package` (an app delivered through a store) and `host-installation` (an extension installed into its host); the value set at `intake.delivery-kind` and the kind an addition at `project-end.delivery` names are both drawn from it, and it grows only as a point does, and workflow-check.py's own copy of it (`DELIVERY_KINDS`) changes with it. Where no type workflow or sub-workflow sets a part's kind, the kind the supervisor confirms with the owner at intake (Phase 1) is the part's kind, recorded by its key from this list. Each addition at `project-end.delivery` names the delivery kind it is for and applies only to a part of that kind; so a sub-workflow that sets another kind leaves its type workflow's procedure behind, and a trait's procedure for one kind never reaches a part of another. A completion condition added at `project-end.completion-conditions` is checked at project end; a condition the plan must build toward is also added at intake (`intake.requirement-sources`), naming that completion condition as its source, so that it enters the requirements register before planning.
+ 
+ ## How a conditional workflow names a point
+ 
+@@ -66,10 +66,10 @@ A conditional workflow file states each change it makes under a heading of its o
+ 
+ - `## Add at <point key>` — its additions there. Any conditional workflow may add.
+ - `## Add at project-end.delivery for <delivery kind>` — an addition at `project-end.delivery`, naming the delivery kind it is for by its key from the list above (`## Add at project-end.delivery for installer`). At that point this form is required and the plain `## Add at project-end.delivery` fails; at every other point a heading ending `for <kind>` fails.
+-- `## Set at <point key>` — the value it sets there, at a point whose Changes cell includes `set`. Only a type workflow or a sub-workflow may set. The value is the section's first non-blank line; at `intake.delivery-kind` it is one delivery kind's key from the list above, bare or in backticks.
++- `## Set at <point key>` — the value it sets there, at a point whose Changes cell includes `set`. Only a type workflow or a sub-workflow may set. The value is the section's first non-blank line, stripped; at `intake.delivery-kind` it is one delivery kind's key from the list above, bare or in backticks.
+ - `## Replace <module key>` — its own version of the whole phase, for a module marked replaceable. Only a type workflow or a sub-workflow may replace.
+ 
+-Any other `##` heading is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading unless it is one of the four forms above, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets each point, and replaces each module, at most once. A `##` line inside a fenced code block (opened by three or more backticks or tildes) is not a heading and changes nothing.
++Any other `##` heading is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading unless it is one of the four forms above, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets each point, and replaces each module, at most once. A `##` heading is a line of at most three spaces, then `##`, then a space or a tab; a line of `##` alone is not one and is read as text. A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own structure `###` headings and deeper. A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening none, and closes with a run of the same character at least as long, indented at most three spaces and followed only by spaces or tabs; a fence still open at the end of the file fails. The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a file or a link; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path (a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that is no product type.
+ 
+ A trait attaches to the main workflow only through its `Add at` headings, so each of its additions names the point it belongs to. Within one file, additions at one point keep the order the file writes them in; across files they apply in the order `supervisor.md` states ("The order additions apply in").
+ 
+diff --git a/bridge/cursor-bridge/workflow/open-list.md b/bridge/cursor-bridge/workflow/open-list.md
+index 458e65b..0da4e4b 100644
+--- a/bridge/cursor-bridge/workflow/open-list.md
++++ b/bridge/cursor-bridge/workflow/open-list.md
+@@ -6,12 +6,12 @@ This file is the canonical list of every product type, sub-type and trait the br
+ 
+ ## How this file is read
+ 
+-`workflow-check.py` reads the three tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Product types`, `## Sub-types`, `## Traits`), its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
++`workflow-check.py` reads the three tables below and nothing else in this file; the prose is for the reader. Each table is the first table after its heading (`## Product types`, `## Sub-types`, `## Traits`) and before the next line that starts with two hashes and a space (`## `), its rows running to the first line that is not a table line; its columns are found by their header names; no cell contains a `|`.
+ 
+ - **Key** — the entry's identifier and the base name of its workflow file: a type workflow at `workflow/types/<key>.md`, a sub-workflow at `workflow/types/<type key>/<key>.md`, a trait's additions at `workflow/traits/<key>.md`. Lowercase letters, digits and hyphens; unique within its table.
+ - **Name** — the entry's name in plain words, used in prose and at intake. A trait, which has no workflow name, is named by it on a `Workflows:` line.
+ - **Definition** — what a part must be, or have, for the entry to apply.
+-- **Workflow name** / **Sub-workflow name** — the fixed name of the entry's workflow, used in the status file's `Workflows:` line and in the progress graph's header (§6.3, §7.8). A `Workflows:` line is read by name, so the Workflow names, the Sub-workflow names and the traits' Names are unique across the three tables, and none of them contains `,`, `;`, `:` or `→`, the characters that separate the line's parts and names.
++- **Workflow name** / **Sub-workflow name** — the fixed name of the entry's workflow, used in the status file's `Workflows:` line and in the progress graph's header (§6.3, §7.8). A `Workflows:` line is read by name, so the Workflow names, the Sub-workflow names and the traits' Names are unique across the three tables, and none of them contains `,`, `;`, `:` or `→`, the characters that separate the line's parts and names. No name is `none` or `not yet classified`, the words a `Workflows:` line uses for no traits and for a part not yet classified.
+ - **Default traits** — trait keys, separated by commas, or `—` for none. A sub-type's cell is the complete default set for a part with that sub-type, in place of its type's. The order inside a cell carries no meaning; the order traits apply in is the Traits table's. Default traits are proposals, settled at the design gate.
+ - **Of type** — a sub-type's product type, by key.
+ - **Written** — `yes` once the entry's workflow file exists at its key's path and passes the workflow check, else `no`. The increment that writes an entry's file sets its flag in the same change. A part whose product type or sub-type is not written pauses its project; a trait that is not written is flagged and the work continues (§6.7).
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index b7f0fd3..06b135d 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -60,7 +60,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ ## Stage B2 — the stage review (round 2, 2026-10-17)
+ - Taken on BUG-003: every failing root and status case asserts its whole output (three fixture parts converged on cases that a second finding could hide); new cases for a valid sub-workflow's changes (Review B, blocking) and for the part-name rules in a file of several lines (Review B and fixtures part 3, converged); the output is ASCII on every console and a `types` or `traits` path that is a file is (form) (Review B; the builder's part); the placement and part-name sentences of supervisor.md's Workflows paragraph (texts part; the placement wording had been routed to TASK-010); the open list states that a part fitting a sub-type takes it and that the names a `Workflows:` line reads are unique across the tables (texts part).
+ - Review B's round-1 blocking item (an omitted part's line) still holds as the aggregate release's, Review B agreeing in round 2.
+-- TASK-024 (conformance-check reports an unclassified line or one naming an unwritten workflow): tests/test_workflows_line_check.py (the conformance halves at about :291 and :335-349) and tests/test_conformance_check.py (the conformant baseline at about :69 and :104-109) pin today's `Workflows line` OK for those lines; the supervisor's tests for TASK-024, written before its delegation, re-pin them to the report TASK-024 adds, and its brief names both files (tests part).
++- TASK-024 (conformance-check reports an unclassified line or one naming an unwritten workflow): tests/test_workflows_line_check.py (the conformance halves at :333, :378, :388 and :416, the last the no-status test's positive control; line numbers of 2026-10-17, stage B2 review round 5) and tests/test_conformance_check.py (the conformant baseline at about :69 and :104-109) pin today's `Workflows line` OK for those lines; the supervisor's tests for TASK-024, written before its delegation, re-pin them to the report TASK-024 adds, and its brief names both files (tests part).
+ - The default-traits line above also widens TASK-019's Scope to tests/test_open_list.py, which pins open-list.md's "No form for that statement exists yet" sentence (tests part).
+ - TASK-010's brief checks which of these read the paragraphs it moves or rewords, and widens its Scope to those it changes: tests/test_workflows_line_text.py (the Workflows paragraph), tests/test_open_list.py (the r034 order paragraph), tests/test_glossary_terms.py (the `Phase:` template); the private grammar checker lead above is not tied to TASK-010, whose Done when keeps project state in the core (tests part).
+ - TASK-017's brief checks tests/test_open_list.py's pin of step 2's second sentence when it rewords step 2's first (tests part).
+@@ -86,11 +86,119 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is
+ - The repository has no .gitattributes: with core.autocrlf the Windows checkout holds CRLF and CI's ubuntu leg LF; the programs and the tests read with universal newlines and the BOM checks read bytes, so both pass (several parts, noted).
+ 
+ ## Stage B2 — the stage review (round 4, 2026-10-17)
+-- Taken on BUG-005 (the supervisor's fixtures, tests and text): each CommonMark fence rule the check reads has a control a mutant cannot pass, a backtick fence with an ordinary info string hiding a heading beside the refused one, a fence closed by a longer run, a shorter tilde run that does not close (fixtures parts 1 and 2, converged as one class: fixture coverage of the fence rules); a multi-part status file with a part prefixed `not yet classified` (fixtures part 4: a mutant refusing it would refuse a valid project at intake); a part name with a leading space and with a tab, a trait with a trailing space, a sub-type's key where its name belongs (fixtures parts 3 and 4); the unknown type folder's file holds a change the check would refuse with (a) if it read the file (fixtures part 1); presence checks for the pass root's sub-workflow Set, its repeated Add at, its two delivery kinds and a sub-workflow's Replace of a module its type replaces (fixtures part 2); conformance-check says nothing about the line when the status file is absent, under any name, and the delivery-kinds test reads its paragraph only (tests part); the registry states which headings are read as change headings and that a file sets a point, and replaces a module, at most once, and no longer says workflow-check.py checks the modules' declarations (TASK-014's cross-check is its own test); the open list pauses a part that fits two sub-types of its type equally; the core's Add list reads "such as" (texts part).
+-- A change heading at level 1, at level 3 or deeper, or in Setext form is prose to the check (TASK-006's R7), so `# Set at intake.x` or `### Replace interface` changes nothing and is reported as nothing. A fail-closed rule (such a heading whose first word is a change word, or whose second is `at`, is `form`) would close it; it belongs with TASK-006's heading-parsing leads above (programs part, consider).
++- Taken on BUG-005 (the supervisor's fixtures, tests and text): a control for the fence rules then named (corrected in round 5: it was not each rule; a closing run indented four spaces had none, and the supervisor's operator sweep found more), a backtick fence with an ordinary info string hiding a heading beside the refused one, a fence closed by a longer run, a shorter tilde run that does not close (fixtures parts 1 and 2, converged as one class: fixture coverage of the fence rules); a multi-part status file with a part prefixed `not yet classified` (fixtures part 4: a mutant refusing it would refuse a valid project at intake); a part name with a leading space and with a tab, a trait with a trailing space, a sub-type's key where its name belongs (fixtures parts 3 and 4); the unknown type folder's file holds a change the check would refuse with (a) if it read the file (fixtures part 1); presence checks for the pass root's sub-workflow Set, its repeated Add at, its two delivery kinds and a sub-workflow's Replace of a module its type replaces (fixtures part 2); conformance-check says nothing about the line when the status file is absent, under any name, and the delivery-kinds test reads its paragraph only (tests part); the registry states which headings are read as change headings and that a file sets a point, and replaces a module, at most once, and no longer says workflow-check.py checks the modules' declarations (TASK-014's cross-check is its own test); the open list pauses a part that fits two sub-types of its type equally; the core's Add list reads "such as" (texts part).
++- A change heading at level 1, at level 3 or deeper, or in Setext form is prose to the check (TASK-006's R7), so `# Set at intake.x` or `### Replace interface` changes nothing and is reported as nothing. A fail-closed rule (such a heading whose first word is a change word, or whose second is `at`, is `form`) would close it; it belongs with TASK-006's heading-parsing leads above, beside the container-block lead (a change heading inside a block quote or a list item is unseen too: programs part, round 5), and the reverse case, a change heading inside an HTML comment, is read and fails closed (programs part, consider).
+ - A one-line status file with a tab beside the traits marker (`Workflows: Web App Development;<TAB>traits: none`) is reported as "Workflows line breaks the part-prefix rule" (the `: ` after `traits` is read as a part prefix, which a one-line file may not carry), a reason that names neither the tab nor the marker on a file that has no parts; "must contain '; traits: ' exactly once" appears only when the tab follows the colon or the file has several parts. A lead for the check's wording, with form-part-empty's above (programs part, noted; the message corrected by Review A, BUG-005).
+ - The exact-output tests assert an empty standard error; a Python warning or another program's message on standard error in the test's environment would fail them without a defect in the check. None occurs on the Windows workstation or on CI; a lead if one appears (round 4, the supervisor).
+ - review-guard.py verify given an older snapshot's id on the branch compares against that snapshot and reports what changed since (a GATE-INTEGRITY on `.git/config` in round 3, read as a file, no git command run); a warning when the id is not the newest snapshot would have named the mistake. Recorded for the bridge feedback at the reflection (round 3, the supervisor).
+ - The registry's "How a conditional workflow names a point" now says that a `##` line inside a fenced code block is not a heading (Review A, BUG-005, consider; taken in its gate round 3, TASK-017's Scope not holding the registry).
+-- One file may replace a module and add at that module's points (the pass root's sub-workflow replaces `interface` and adds at `interface.variants`), and the check accepts it; whether the file's own additions apply to its own replacement is not stated. The change that first writes a real Replace (TASK-019, the first type workflow) settles it in the registry's "How a conditional workflow names a point", its brief widening its Scope to extension-points.md (Review A, BUG-005, consider; TASK-017's and TASK-019's planned Scopes hold neither the registry nor the core's paragraph).
++- One file may replace a module and add at that module's points (the pass root's sub-workflow replaces `interface` and adds at `interface.variants`), and the check accepts it; whether the file's own additions apply to its own replacement is not stated. The first type workflow or sub-workflow brief that writes a `## Replace` settles it in the registry's "How a conditional workflow names a point", its brief widening its Scope to extension-points.md (no planned task names a Replace yet: Review A, BUG-005 round 3); the same brief decides whether an empty `## Replace` section, which the check accepts today, is (form) as an empty `## Set at` section is (texts part, round 5) (Review A, BUG-005, consider; TASK-017's and TASK-019's planned Scopes hold neither the registry nor the core's paragraph).
+ - test_r015_conformance_no_status_file_no_check refuses the word "workflows" anywhere in conformance-check's output with no status file; a later row naming `.github/workflows` would fail it for its wording, not a defect (Review A, BUG-005, noted).
++
++## Stage B2 — the stage review (round 5, 2026-10-17)
++
++**Taken on BUG-006 (the supervisor's fixtures, tests and registry text, no program change).** Round 5 rejected for the class round 4 had: rules of the workflow check that no test fails for. Rather than wait for each reviewer to find one, the supervisor ran an operator sweep of workflow-check.py: run/supervisor/sweep_workflow_check.py, local, temporary copies only. It made 425 mutants, of which 381 compile, and found 89 of those surviving the workflow-check and Workflows-line tests. Every reviewer finding and each sweep survivor that a test can separate now has its case, with exact output.
++
++**Fences and headings:**
++- a closing run indented four spaces is content (fixtures 1, blocking);
++- two backticks and two tildes open no fence;
++- a heading indented four spaces and an empty `## ` heading are prose.
++
++**Change words** (fixtures 1):
++- each change word without `at`;
++- each stripped mark, and two marks together;
++- a two-word heading ending `at`, and `AT` in capitals.
++
++**Set values:**
++- a Set value right under its heading, with spaces around it and prose after it, is its first non-blank line, stripped;
++- a backtick on one side only is not unwrapped.
++
++**Files and folders:**
++- a sub-workflow file whose key is no sub-type (tests, blocking);
++- two different modules replaced in one file;
++- a folder under `traits/`;
++- a folder inside an unknown type folder;
++- an unlisted kind named on another point (fixtures 2).
++
++**Workflows lines:**
++- a rest only starting as `not yet classified`, or differing from it by case or a space, is read as names (tests and fixtures 4, converged);
++- an indented or lower-case `Workflows:` line is not one (fixtures 3);
++- trait order and repeats beyond neighbouring traits (fixtures 3);
++- a product type's Name, a sub-type's Name in another case, and a traits text with a space before it or `None` (fixtures 4);
++- a status file with no final line feed;
++- each head separator case's whole output.
++
++**The two rule files' table reader:**
++- a table right under its heading;
++- alignment colons;
++- rows without a trailing pipe;
++- a table with no row;
++- the heading given twice;
++- a prose line ending in a pipe;
++- a section with no table.
++
++**Output escaping:** the escape at each width's boundary.
++
++**Mutation drivers:** run/supervisor/mutate_workflow_check.py names a mutant for each of these, 151 of 151 killed, and mutate_workflows_line.py stands at 42 of 42.
++
++**Registry text** (texts part; Review B's should-fix): the registry now states that a section runs to the next `##` heading, so a replacement's own structure uses `###`, and (since BUG-006 r4) what a `##` heading is: at most three spaces, `##`, then a space or a tab, so a line of `##` alone is text. It states the fence rules in full (indent, info string, closing run) and what else fails:
++- an unclosed fence;
++- an empty Set;
++- a non-workflow file under `types/` or `traits/`;
++- an unknown type folder.
++
++It also says workflow-check.py's `DELIVERY_KINDS` changes with the list. The delivery-kinds test reads every kind the list names however it is described. test_open_list holds that no name is `none` or `not yet classified` (tests part).
++
++**The sweep's 36 survivors of the 381 mutants that compile, after BUG-006** (425 made; the 44 that do not compile are counted apart, never as killed: r3, Review B of gate round 2), line numbers of workflow-check.py at 0e7813e (the program is unchanged). The first version of this list called nine survivors equivalent or untestable that an input separates: 285, 605, 126, 299, 300, 312, 349, 354, and 626, which is now a lead. Review A of BUG-006 found them (below), and each of the first eight now has its case; it also moved 313 and 322 from "held on CI only" to equivalent. The rest:
++- **Equivalent** (no input separates them):
++  - 83: a closing run of two (a close must be at least as long as its opening, at least three).
++  - 134: U+0080 is not printable.
++  - 170: separator cells are stripped already by cells_of.
++  - 190: a table line starts with a pipe.
++  - 381: is_change_heading is only called on heading candidates.
++  - 420, 422, 436: a marker is one character repeated.
++  - 456, 459: a fence line cannot be a heading candidate.
++  - 478: any strip of a blank line is empty.
++  - 604: a segment is used only through its names, which are stripped again.
++  - 313: a layer that cannot be examined has its error recorded, and the errors alone decide exit 2.
++  - 322: links are pruned from the folders walked, so following links reaches nothing.
++  - 625, 627 to 641: the lists read there hold exactly one entry (626 is a lead, below).
++  - 662, 664: an equal index is a repeat, caught first.
++  - 795: a root that is not a folder already ends the run with exit 2.
++- **Held on CI's ubuntu leg only** (162): a symbolic link is known by its mode there, while the links test makes junctions on this Windows host.
++- **Unreachable** (548): check_sub_identity's "type key is not a product type". collect never yields a sub-workflow item under an unknown type folder (fixtures 1, noted). It can go when the check is next changed.
++- **Leads:**
++  - 83: a form feed or NEL after a closing run would close a fence under a `\s` reading, where the check (and Markdown) does not. It belongs with the Unicode-whitespace table-cell lead above (fixtures 1, consider).
++  - 485: a Set value of two backticks prints `-` rather than the two backticks in its (kind) finding.
++  - 626: a head whose sub-type belongs to another type reports (e) and stops there. An unwritten product type or sub-type it names therefore gets no (f), which handoff/TASK-006.md R4's (f) reads as asking for. Example: against the status fixtures' open list, `Workflows: Library Development → Claude Code Extension` gives one (e) where the brief gives (e) and (f). This is a possible program defect, for the next change of workflow-check.py; the line fails either way (Review A of BUG-006).
++
++**Review B returned no verdict**, a should-fix alone. Per the policy that is a failed launch, rerun with the stage's next round, and its finding was taken.
++
++**Scratch folders:** several Review A parts used the same scratchpad folder (`ws`). One part's mutant appeared in another's copy, and a part's own results had to be redone. The checkout was never touched. Each reviewer gets a folder of its own from the next round on, and the point goes to the bridge feedback at the reflection (round 5, the supervisor).
++
++**The sweep is rerun before each later stage review of this check.** A new survivor is either a test, or a line here with its reason. The sweep runs test_workflow_check.py, test_workflows_line_check.py and, since BUG-006 r2, test_extension_points.py, which imports the program too.
++
++**BUG-006's gate, round 1:** Review A REJECT, Review B APPROVE. REVIEWERS DISAGREED on whether the survivor list above was honest, a correctness question. The supervisor decided for Review A: it separated each named survivor with one input, and the supervisor's run confirmed all eight are killed by the new cases. Taken in BUG-006 r2:
++- **Cases (blocking):**
++  - 605: a space before a comma in the head; the name is read stripped and only the shape fails.
++  - 285: a Changes cell reading `set , add` accepts a Set, and `add` alone refuses it.
++  - 126: a refused read names the system's reason.
++  - 312: a layer that cannot be examined gives its exact ERROR line.
++  - 299 and 300: a folder that cannot be listed is named with its reason, on every host.
++  - 349 and 354: each link is named, one of them inside a folder that is no product type, in the links test's exact output.
++  - The list above is corrected to match.
++- **Text (should-fix):** both rule files' "How this file is read" now say a table is the first after its heading and before the next line starting `## `, as the reader does (worded so in r3; r2's "the next `##` heading" also covered `##` with a tab or nothing after it, which the reader reads past, Review B of gate round 2). The separators test's comment names the mutant it kills.
++- **Text (considers):**
++  - The registry says a Set value is stripped, and names exactly the files, links and folders that fail, a `types` or `traits` path that is itself a file or a link included (r3, Review A of gate round 2).
++  - The open list says no name is `none` or `not yet classified`.
++  - The sweep runs test_extension_points.py too.
++- **The named driver** has the eight mutants (159 of 159 killed; 160 of 160 with r3's).
++
++**BUG-006's gate, round 2:** Review A APPROVE (0/1/4), Review B REJECT. Taken in BUG-006 r3:
++- **Review B:** r2's "before the next `##` heading" also covered a `##` line with a tab or nothing after it, which the reader reads past. Both rule files now say "before the next line that starts with two hashes and a space (`## `)", and the table-reader test has a case for `##`+tab and a bare `##`.
++- **Review B:** the sweep counted the 44 mutants that do not compile as killed (every test that runs the program fails on them). It now counts them apart and reports its survivors of the 381 that compile; the survivors are the same 36.
++- **Review A (should-fix):** the equivalent range now reads 625, 627 to 641, so 626 is a lead only.
++- **Review A (considers):** the registry names a `types` or `traits` path that is itself a file or a link; the list's intro says 313 and 322 moved.
++
++**BUG-006's gate, round 3:** Review A REJECT (1/0/3), Review B APPROVE (the reviewers disagreed; decided for Review A, whose mutant no test killed). Review A: the registry never said what a `##` heading is. The check reads `^ {0,3}##[ \t]`, so a line of `##` alone is text to it, where Markdown reads an empty heading; the mutant `##(?:[ \t]|$)` survived every test, and no sweep operator makes it. Taken in BUG-006 r4: the registry states the shape; the case kind-bare-hashes (a Set section whose first line is `##` alone) gives the exact (kind) line for `##`; the driver has the mutant. A Markdown reading of a bare `##` would be a program change, not made here.
++- **Recorded, not taken:** the delivery-kinds test finds a kind only when a `(` follows it, so a kind added to the list bare escapes the comparison with `DELIVERY_KINDS`. This is for whoever next changes the list (tests/test_extension_points.py).
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 91249ee..3a74852 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,20 +3,20 @@ Last updated: 2026-10-17
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: BUG-005 — stage B2's review, round 4 (branch bug-005; the supervisor's fixtures, tests and four text edits, no program change): Review A's fixtures part 1 rejected (a fence rule held by no control a mutant could not pass); the six other parts and Review B approved, their should-fix and the considers taken here; round 4's findings are in HARDENING
+-Last accepted: BUG-004, at commit b5df437 (merged to main 2026-10-17, PR #30); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003, BUG-004
++Increment: BUG-006 — stage B2's review, round 5 (branch bug-006; the supervisor's fixtures, tests and registry text, no program change): Review A's fixtures part 1 and tests part rejected (a closing fence indented four spaces and a misspelt sub-workflow name had no test that fails; converged: `not yet classified` matched only exactly by the code, never by a test); Review B's reply carried no verdict (a failed launch, rerun with the stage); the supervisor's operator sweep of workflow-check.py found the rest of the class; round 5's findings are in HARDENING; r2 (PR #32, gate round 1: Review B APPROVE, Review A REJECT on the survivor list's honesty, eight survivors an input separates): their cases and the list corrected; r3 (gate round 2: Review A APPROVE, Review B REJECT): the rule texts' next-section wording made exact, the sweep counts non-compiling mutants apart (36 survivors of 381 that compile)
++Last accepted: BUG-005, at commit 0e7813e (merged to main 2026-10-17, PR #31); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003, BUG-004, BUG-005
+ Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
+ Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
+-Next: BUG-005 through the gate; then stage B2's review again from its step 1 (rounds 1 to 4 rejected; round 4: Review A's fixtures part 1 only); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING); then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
++Next: BUG-006 through the gate; then stage B2's review again from its step 1 (rounds 1 to 5 rejected; round 5: fixture and test controls, the class the sweep now covers); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING); then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation drivers mutate_ci_floor.py, mutate_workflow_check.py and mutate_workflows_line.py, drafts/, in-flight.md as a scratch log while a review runs)
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation drivers mutate_ci_floor.py, mutate_workflow_check.py and mutate_workflows_line.py, the operator sweep sweep_workflow_check.py, drafts/, in-flight.md as a scratch log while a review runs)
+ Delegated gates: none
+-Remote sync: main at b5df437, in sync 2026-10-17; branch bug-005 started from origin/main
++Remote sync: main at 0e7813e, in sync 2026-10-17; branch bug-006 started from origin/main
+ Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
+ Open issues: none open (ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25)
+ Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
+diff --git a/tests/fixtures/workflows/fail/c-not-replaceable/types/host-extension.md b/tests/fixtures/workflows/fail/c-not-replaceable/types/host-extension.md
+index 92f000f..c45978b 100644
+--- a/tests/fixtures/workflows/fail/c-not-replaceable/types/host-extension.md
++++ b/tests/fixtures/workflows/fail/c-not-replaceable/types/host-extension.md
+@@ -1,3 +1,7 @@
++## Replace interface
++
++The part's own interface.
++
+ ## Replace design
+ 
+ Design is not replaceable.
+diff --git a/tests/fixtures/workflows/fail/d-unknown-sub-type-key/types/host-extension.md b/tests/fixtures/workflows/fail/d-unknown-sub-type-key/types/host-extension.md
+new file mode 100644
+index 0000000..7b5e1ad
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/d-unknown-sub-type-key/types/host-extension.md
+@@ -0,0 +1,3 @@
++## Add at intake.questions
++
++q
+diff --git a/tests/fixtures/workflows/fail/d-unknown-sub-type-key/types/host-extension/claude-code-extention.md b/tests/fixtures/workflows/fail/d-unknown-sub-type-key/types/host-extension/claude-code-extention.md
+new file mode 100644
+index 0000000..7b5e1ad
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/d-unknown-sub-type-key/types/host-extension/claude-code-extention.md
+@@ -0,0 +1,3 @@
++## Add at intake.questions
++
++q
+diff --git a/tests/fixtures/workflows/fail/d-unknown-type-folder/types/not-a-type/deeper/more.md b/tests/fixtures/workflows/fail/d-unknown-type-folder/types/not-a-type/deeper/more.md
+new file mode 100644
+index 0000000..42c02e9
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/d-unknown-type-folder/types/not-a-type/deeper/more.md
+@@ -0,0 +1,3 @@
++## Add at nowhere.at-all
++
++q
+diff --git a/tests/fixtures/workflows/fail/fence-four-spaces/traits/installable.md b/tests/fixtures/workflows/fail/fence-four-spaces/traits/installable.md
+index 16563ea..869ef4d 100644
+--- a/tests/fixtures/workflows/fail/fence-four-spaces/traits/installable.md
++++ b/tests/fixtures/workflows/fail/fence-four-spaces/traits/installable.md
+@@ -4,6 +4,10 @@ q
+ 
+     ```
+ 
++``
++
++~~
++
+ ## Set at intake.delivery-kind
+ 
+ installer
+diff --git a/tests/fixtures/workflows/fail/fence-indented-close/traits/installable.md b/tests/fixtures/workflows/fail/fence-indented-close/traits/installable.md
+index d3aacf7..d43075e 100644
+--- a/tests/fixtures/workflows/fail/fence-indented-close/traits/installable.md
++++ b/tests/fixtures/workflows/fail/fence-indented-close/traits/installable.md
+@@ -4,6 +4,7 @@ q
+ 
+ ```
+ code
++    ```
+    ```
+ 
+ ## Set at intake.delivery-kind
+diff --git a/tests/fixtures/workflows/fail/form-change-word-punctuation/traits/installable.md b/tests/fixtures/workflows/fail/form-change-word-punctuation/traits/installable.md
+index 512cde0..c3ba367 100644
+--- a/tests/fixtures/workflows/fail/form-change-word-punctuation/traits/installable.md
++++ b/tests/fixtures/workflows/fail/form-change-word-punctuation/traits/installable.md
+@@ -17,3 +17,23 @@ q
+ ## Setting intake.budget-kind
+ 
+ x
++
++## Adds. intake.questions
++
++q
++
++## Set; intake.target-environment
++
++x
++
++## Replace, design
++
++x
++
++## Add- intake.questions
++
++q
++
++## Set:; intake.budget-kind
++
++x
+diff --git a/tests/fixtures/workflows/fail/form-misspelt-change-word/types/host-extension.md b/tests/fixtures/workflows/fail/form-misspelt-change-word/types/host-extension.md
+index 66f49a5..6af5177 100644
+--- a/tests/fixtures/workflows/fail/form-misspelt-change-word/types/host-extension.md
++++ b/tests/fixtures/workflows/fail/form-misspelt-change-word/types/host-extension.md
+@@ -13,3 +13,31 @@ x
+ ## Append at intake.questions
+ 
+ q
++
++## Adds intake.questions
++
++q
++
++## Added intake.questions
++
++q
++
++## Sets intake.target-environment
++
++x
++
++## Replaces interface
++
++x
++
++## Replaced interface
++
++x
++
++## Look at
++
++x
++
++## Look AT intake.questions
++
++x
+diff --git a/tests/fixtures/workflows/fail/form-traits-folder/traits/installable/extra.md b/tests/fixtures/workflows/fail/form-traits-folder/traits/installable/extra.md
+new file mode 100644
+index 0000000..7b5e1ad
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/form-traits-folder/traits/installable/extra.md
+@@ -0,0 +1,3 @@
++## Add at intake.questions
++
++q
+diff --git a/tests/fixtures/workflows/fail/kind-bare-hashes/types/host-extension.md b/tests/fixtures/workflows/fail/kind-bare-hashes/types/host-extension.md
+new file mode 100644
+index 0000000..35a6750
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/kind-bare-hashes/types/host-extension.md
+@@ -0,0 +1,3 @@
++## Set at intake.delivery-kind
++##
++installer
+diff --git a/tests/fixtures/workflows/fail/kind-on-another-point/types/host-extension.md b/tests/fixtures/workflows/fail/kind-on-another-point/types/host-extension.md
+index 2f3f876..ed753d4 100644
+--- a/tests/fixtures/workflows/fail/kind-on-another-point/types/host-extension.md
++++ b/tests/fixtures/workflows/fail/kind-on-another-point/types/host-extension.md
+@@ -1,3 +1,7 @@
+ ## Add at intake.questions for installer
+ 
+ A kind on another point.
++
++## Add at intake.requirement-sources for docker-image
++
++An unlisted kind on another point.
+diff --git a/tests/fixtures/workflows/fail/kind-set-value/types/host-extension/claude-code-extension.md b/tests/fixtures/workflows/fail/kind-set-value/types/host-extension/claude-code-extension.md
+new file mode 100644
+index 0000000..04dd633
+--- /dev/null
++++ b/tests/fixtures/workflows/fail/kind-set-value/types/host-extension/claude-code-extension.md
+@@ -0,0 +1,3 @@
++## Set at intake.delivery-kind
++
++installer`
+diff --git a/tests/fixtures/workflows/pass/types/host-extension.md b/tests/fixtures/workflows/pass/types/host-extension.md
+index 7cd170f..c5a57c6 100644
+--- a/tests/fixtures/workflows/pass/types/host-extension.md
++++ b/tests/fixtures/workflows/pass/types/host-extension.md
+@@ -53,6 +53,12 @@ Prose.
+ 
+ Prose.
+ 
++    ## Replace design
++
++## 
++
++An empty heading is prose.
++
+   ```
+ ## Replace design
+    ```
+diff --git a/tests/fixtures/workflows/pass/types/host-extension/claude-code-extension.md b/tests/fixtures/workflows/pass/types/host-extension/claude-code-extension.md
+index 64f9c22..520d30d 100644
+--- a/tests/fixtures/workflows/pass/types/host-extension/claude-code-extension.md
++++ b/tests/fixtures/workflows/pass/types/host-extension/claude-code-extension.md
+@@ -1,8 +1,8 @@
+ # Claude Code Extension (fixture)
+ 
+ ## Set at intake.delivery-kind
+-
+-installer
++  installer  
++The part's installer delivers it.
+ 
+ ## Replace interface
+ 
+diff --git a/tests/fixtures/workflows/status/form-no-line.md b/tests/fixtures/workflows/status/form-no-line.md
+index be6c94f..96dd9d3 100644
+--- a/tests/fixtures/workflows/status/form-no-line.md
++++ b/tests/fixtures/workflows/status/form-no-line.md
+@@ -1,2 +1,4 @@
+ # Project Status
+ Phase: building
++  Workflows: Web App Development; traits: none
++workflows: Web App Development; traits: none
+diff --git a/tests/fixtures/workflows/status/form-trait-order-three.md b/tests/fixtures/workflows/status/form-trait-order-three.md
+new file mode 100644
+index 0000000..3ddb7a3
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-trait-order-three.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits: Spends money, Has screens, Installable
+diff --git a/tests/fixtures/workflows/status/form-trait-repeat-separated.md b/tests/fixtures/workflows/status/form-trait-repeat-separated.md
+new file mode 100644
+index 0000000..03e3dc2
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-trait-repeat-separated.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits: Has screens, Installable, Has screens
+diff --git a/tests/fixtures/workflows/status/form-traits-double-space.md b/tests/fixtures/workflows/status/form-traits-double-space.md
+new file mode 100644
+index 0000000..16ac5ce
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-traits-double-space.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits:  none
+diff --git a/tests/fixtures/workflows/status/form-traits-none-case.md b/tests/fixtures/workflows/status/form-traits-none-case.md
+new file mode 100644
+index 0000000..2f33d27
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-traits-none-case.md
+@@ -0,0 +1 @@
++Workflows: Web App Development; traits: None
+diff --git a/tests/fixtures/workflows/status/form-unclassified-case.md b/tests/fixtures/workflows/status/form-unclassified-case.md
+new file mode 100644
+index 0000000..f80cdca
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-unclassified-case.md
+@@ -0,0 +1 @@
++Workflows: Not yet classified
+diff --git a/tests/fixtures/workflows/status/form-unclassified-trailing-space.md b/tests/fixtures/workflows/status/form-unclassified-trailing-space.md
+new file mode 100644
+index 0000000..04ea7bf
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-unclassified-trailing-space.md
+@@ -0,0 +1 @@
++Workflows: not yet classified 
+diff --git a/tests/fixtures/workflows/status/form-unclassified-with-traits.md b/tests/fixtures/workflows/status/form-unclassified-with-traits.md
+new file mode 100644
+index 0000000..e5e04af
+--- /dev/null
++++ b/tests/fixtures/workflows/status/form-unclassified-with-traits.md
+@@ -0,0 +1 @@
++Workflows: not yet classified; traits: none
+diff --git a/tests/fixtures/workflows/status/ok-no-final-newline.md b/tests/fixtures/workflows/status/ok-no-final-newline.md
+new file mode 100644
+index 0000000..869e5b7
+--- /dev/null
++++ b/tests/fixtures/workflows/status/ok-no-final-newline.md
+@@ -0,0 +1,3 @@
++
++Phase: building
++Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+\ No newline at end of file
+diff --git a/tests/fixtures/workflows/status/unknown-sub-type-name.md b/tests/fixtures/workflows/status/unknown-sub-type-name.md
+new file mode 100644
+index 0000000..a9900d9
+--- /dev/null
++++ b/tests/fixtures/workflows/status/unknown-sub-type-name.md
+@@ -0,0 +1 @@
++Workflows: Host Extension Development → Claude Code extension; traits: none
+diff --git a/tests/fixtures/workflows/status/unknown-type-name.md b/tests/fixtures/workflows/status/unknown-type-name.md
+new file mode 100644
+index 0000000..595e8f5
+--- /dev/null
++++ b/tests/fixtures/workflows/status/unknown-type-name.md
+@@ -0,0 +1 @@
++Workflows: Web app; traits: none
+diff --git a/tests/test_extension_points.py b/tests/test_extension_points.py
+index 50570fe..0fb8500 100644
+--- a/tests/test_extension_points.py
++++ b/tests/test_extension_points.py
+@@ -163,6 +163,10 @@ def test_r006_the_tables_shape_is_stated_for_the_reader():
+     """The shape the check reads is stated in the file, as the open list states its own."""
+     assert "`workflow-check.py` reads the two tables below and nothing else in this file" in TEXT
+     assert "Each table is the first table after its heading (`## Phase modules`, `## Extension points`)" in TEXT
++    # The reader stops at the next line starting `## `, as parse_table does (BUG-006 r2: Review A; r3: Review B, a `##`
++    # line without the space is no stop).
++    assert ("and before the next line that starts with two hashes and a space (`## `), its rows running to the first "
++            "line that is not a table line") in TEXT
+     assert "its columns are found by their header names; no cell contains a `|`" in TEXT
+ 
+ 
+@@ -175,7 +179,7 @@ def test_r006_how_a_conditional_workflow_names_a_point():
+     assert "`## Add at project-end.delivery for <delivery kind>`" in TEXT
+     assert ("At that point this form is required and the plain `## Add at project-end.delivery` fails; at every "
+             "other point a heading ending `for <kind>` fails.") in TEXT
+-    assert "The value is the section's first non-blank line" in TEXT
++    assert "The value is the section's first non-blank line, stripped;" in TEXT
+     assert "Only a type workflow or a sub-workflow may set." in TEXT
+     assert "Only a type workflow or a sub-workflow may replace." in TEXT
+     assert "A trait attaches to the main workflow only through its `Add at` headings" in TEXT
+@@ -277,8 +281,9 @@ def test_r006_the_checks_delivery_kinds_are_the_registrys(program):
+     review)."""
+     start = TEXT.index("The delivery kinds are one list")
+     paragraph = TEXT[start:TEXT.index("\n", start)]  # to the paragraph's end, not the file's (stage B2 review, round 4)
+-    listed = re.findall(r"`([a-z-]+)` \((?:a |an )", paragraph)
++    listed = re.findall(r"`([a-z0-9-]+)` \(", paragraph)  # every kind the list names, however described (round 5: tests)
+     assert tuple(listed) == program("workflow-check").DELIVERY_KINDS, listed
++    assert "it grows only as a point does, and workflow-check.py's own copy of it (`DELIVERY_KINDS`) changes with it." in paragraph
+ 
+ 
+ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
+@@ -295,8 +300,24 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
+     assert set(re.findall(r"`(.)`", punct)) == set(wc.TRAILING_PUNCT), punct
+     assert "or whose second word is `at` in any case, fails as a malformed change heading" in paragraph
+     assert "A file sets each point, and replaces each module, at most once." in paragraph
+-    assert ("A `##` line inside a fenced code block (opened by three or more backticks or tildes) is not a heading and "
+-            "changes nothing.") in paragraph
++    # What else the check reads and fails, for the maintainer writing a conditional workflow (stage B2 review, round 5:
++    # texts and Review B).
++    for sentence in (
++        # The heading shape workflow-check.py's HEADING_CANDIDATE reads (BUG-006 r4: Review A).
++        "A `##` heading is a line of at most three spaces, then `##`, then a space or a tab; a line of `##` alone is not "
++        "one and is read as text.",
++        "A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own "
++        "structure `###` headings and deeper.",
++        "A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or "
++        "more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening "
++        "none, and closes with a run of the same character at least as long, indented at most three spaces and followed "
++        "only by spaces or tabs; a fence still open at the end of the file fails.",
++        "The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a "
++        "file or a link; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path "
++        "(a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that "
++        "is no product type.",
++    ):
++        assert sentence in paragraph, sentence
+ 
+ 
+ def test_r006_the_phase_modules_paths_and_the_change_cycles_empty_declaration():
+diff --git a/tests/test_open_list.py b/tests/test_open_list.py
+index 03505b0..04c1faa 100644
+--- a/tests/test_open_list.py
++++ b/tests/test_open_list.py
+@@ -151,6 +151,12 @@ def test_r011_the_names_a_workflows_line_reads_are_unique_across_the_tables():
+     # workflow-check.py splits a line at these characters (prefix_of, check_head, check_traits): stage B2 review, round 3.
+     assert [n for n in names if any(c in n for c in (",", ";", ":", chr(0x2192)))] == [], "a name holds a separator"
+     assert "none of them contains `,`, `;`, `:` or `" + chr(0x2192) + "`" in TEXT
++    # A traits text reading `none` means no traits (workflow-check.py's check_traits), so no trait is Named `none` and no
++    # name reads `not yet classified` (docs/HARDENING.md, stage B2 review round 3; held by a test since round 5).
++    assert [n for n in names if n in ("none", "not yet classified")] == [], "a name is a reserved value"
++    # ... and the file says so to the maintainer adding an entry (BUG-006 r2: Review A).
++    assert ("No name is `none` or `not yet classified`, the words a `Workflows:` line uses for no traits and for a part "
++            "not yet classified.") in TEXT
+ 
+ 
+ def test_r011_every_s6_3_product_type_is_listed_with_its_workflow_name_and_defaults():
+@@ -225,6 +231,10 @@ def test_r011_the_tables_shape_is_stated_for_the_reader():
+     """R-011: the shape `workflow-check.py` relies on is stated, not only implied by the tables."""
+     flat = re.sub(r"\s+", " ", TEXT)
+     assert "Each table is the first table after its heading" in flat
++    # The reader stops at the next line starting `## `, as parse_table does (BUG-006 r2: Review A; r3: Review B, a `##`
++    # line without the space is no stop).
++    assert ("and before the next line that starts with two hashes and a space (`## `), its rows running to the first "
++            "line that is not a table line") in flat
+     assert "its rows running to the first line that is not a table line" in flat
+     assert "its columns are found by their header names; no cell contains a `|`" in flat
+     assert "The order inside a cell carries no meaning; the order traits apply in is the Traits table's." in flat
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index 1c60b14..464da64 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -203,7 +203,7 @@ def status(name):
+     return run("--open-list", STATUS_LIST, "--status", f"{FIX}/status/{name}")
+ 
+ 
+-@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-multi-unclassified.md", "ok-unclassified.md", "bom-workflows-line.md"])
++@pytest.mark.parametrize("name", ["ok-single.md", "ok-multi.md", "ok-multi-unclassified.md", "ok-no-final-newline.md", "ok-unclassified.md", "bom-workflows-line.md"])
+ def test_r014_status_ok(name):
+     """bom-workflows-line.md is not a whole status file (it has no `Phase:` line, which check_placement would refuse);
+     it holds one `Workflows:` line after a byte-order mark, the case only check_status reads."""
+@@ -244,17 +244,21 @@ def test_r015_exact_separators_pass(tmp_path, line):
+     "Workflows:  Host Extension Development; traits: Installable",
+     "Workflows: Host Extension Development ; traits: Installable",
+     "Workflows: app:  Web App Development; traits: none\nWorkflows: plugin: Host Extension Development; traits: none",
++    "Workflows: Host Extension Development , Installable; traits: none",
+ ], ids=["arrow-unspaced", "two-spaces-before-arrow", "two-spaces-after-arrow", "two-spaces-after-colon",
+-        "space-before-traits-mark", "two-spaces-after-part"])
++        "space-before-traits-mark", "two-spaces-after-part", "space-before-comma"])
+ def test_r015_separators_are_exact(tmp_path, line):
+     """supervisor.md "Project state": the head is `<Workflow name>[ → <Sub-workflow name>]` exactly, after `Workflows: `
+     or `<part>: `; any other spacing is (form), as it already is for a part name or the traits (stage B2 review)."""
+     rc, lines, err = _status_line_case(tmp_path, line)
+     assert_clean_end(lines, err)
+     assert rc == 1, lines
+-    assert any(line.startswith("FAIL (form) ")
+-               and line.endswith(" - Workflows head is not the product type, then at most its sub-type")
+-               for line in fails(lines)), lines
++    # The whole output: the shape finding alone. Each name is read stripped (handoff/TASK-006.md R11.4), so a space
++    # before a comma still finds `Host Extension Development` and only the shape fails; a name stripped on one side only
++    # would add an (unknown) and an (e) (BUG-006 r2: Review A, the sweep's line 605).
++    shown = str(tmp_path / "status.md").replace("\\", "/")
++    assert lines == whole_output([f"FAIL (form) {shown}: - - Workflows head is not the product type, then at most its sub-type"]), lines
++    assert err == "", err
+ 
+ 
+ def test_r014_unwritten_trait_is_flagged_not_failed():
+@@ -336,6 +340,8 @@ FILE_EXACT = {
+     'c-not-replaceable': ['FAIL (c) {root}/types/host-extension.md: design - module is missing or not replaceable'],
+     'c-unknown-module': ['FAIL (c) {root}/types/host-extension.md: testing - module is missing or not replaceable'],
+     'd-sub-type-of-another': ['FAIL (d) {root}/types/web-app/claude-code-extension.md: claude-code-extension - not a sub-type of web-app'],
++    # A sub-workflow file whose key is no sub-type at all (stage B2 review, round 5: tests).
++    'd-unknown-sub-type-key': ['FAIL (d) {root}/types/host-extension/claude-code-extention.md: claude-code-extention - not a sub-type of host-extension'],
+     'd-type-file-missing': ['FAIL (d) {root}/types/host-extension/claude-code-extension.md: claude-code-extension - type workflow types/host-extension.md does not exist'],
+     'd-unknown-type-folder': ['FAIL (d) {root}/types/not-a-type: not-a-type - type folder is not a product type'],
+     'fence-backtick-in-info': ['FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add'],
+@@ -345,12 +351,18 @@ FILE_EXACT = {
+     'fence-info-string-not-closing': ['FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add'],
+     'fence-longer-opening': ['FAIL (b) {root}/traits/installable.md: intake.delivery-kind - a trait file may only add'],
+     'form-bad-heading': ['FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms'],
++    # Each stripped punctuation mark, and two marks on one word (stage B2 review, round 5: fixtures 1).
+     'form-change-word-punctuation': [
+         'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+         'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+         'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+         'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+         'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms',
+     ],
+     'form-empty-set': ['FAIL (form) {root}/types/host-extension.md: intake.target-environment - Set at section has no non-blank line'],
+     'form-indented-fence-open': ['FAIL (form) {root}/types/host-extension.md: - - fenced code block is still open at the end of the file'],
+@@ -358,11 +370,20 @@ FILE_EXACT = {
+         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+     ],
++    # Every change word without `at`, a two-word heading ending `at`, and `AT` in capitals (stage B2 review, round 5:
++    # fixtures 1, and the supervisor's mutation sweep).
+     'form-misspelt-change-word': [
+         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
++        'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
+     ],
+     'form-misspelt-in-trait': ['FAIL (form) {root}/traits/installable.md: - - change heading is not one of the four forms'],
+     'form-not-markdown': ['FAIL (form) {root}/traits/installable.txt: installable.txt - path is not a conditional-workflow file'],
+@@ -370,12 +391,28 @@ FILE_EXACT = {
+         'FAIL (form) {root}/types/host-extension/claude-code-extension: claude-code-extension - path is not a conditional-workflow file',
+         'FAIL (form) {root}/types/host-extension/claude-code-extension/extra.md: extra.md - path is not a conditional-workflow file',
+     ],
++    # A folder under traits/ (stage B2 review, round 5: fixtures 2).
++    'form-traits-folder': [
++        'FAIL (form) {root}/traits/installable: installable - path is not a conditional-workflow file',
++        'FAIL (form) {root}/traits/installable/extra.md: extra.md - path is not a conditional-workflow file',
++    ],
+     'form-two-replaces': ['FAIL (form) {root}/types/host-extension.md: interface - two Replace headings for the same module'],
+     'form-two-sets': ['FAIL (form) {root}/types/host-extension.md: intake.target-environment - two Set at headings for the same point'],
+     'form-unclosed-fence': ['FAIL (form) {root}/types/host-extension.md: - - fenced code block is still open at the end of the file'],
+     'kind-missing': ['FAIL (kind) {root}/types/host-extension.md: project-end.delivery - addition at project-end.delivery does not name a delivery kind'],
+-    'kind-on-another-point': ['FAIL (kind) {root}/types/host-extension.md: installer - delivery kind is named on a point other than project-end.delivery'],
+-    'kind-set-value': ['FAIL (kind) {root}/types/host-extension.md: deployment - Set at intake.delivery-kind is not one delivery kind'],
++    # An unlisted kind on another point is both findings (stage B2 review, round 5: fixtures 2).
++    'kind-on-another-point': [
++        'FAIL (kind) {root}/types/host-extension.md: installer - delivery kind is named on a point other than project-end.delivery',
++        'FAIL (kind) {root}/types/host-extension.md: docker-image - delivery kind is not in the delivery-kind list',
++        'FAIL (kind) {root}/types/host-extension.md: docker-image - delivery kind is named on a point other than project-end.delivery',
++    ],
++    # A value with a backtick on one side only is not unwrapped (stage B2 review, round 5: the supervisor's sweep).
++    'kind-set-value': [
++        'FAIL (kind) {root}/types/host-extension.md: deployment - Set at intake.delivery-kind is not one delivery kind',
++        'FAIL (kind) {root}/types/host-extension/claude-code-extension.md: installer` - Set at intake.delivery-kind is not one delivery kind',
++    ],
++    # A line of `##` alone is no heading, so it is the Set's first non-blank line (BUG-006 r4: Review A, the heading shape).
++    'kind-bare-hashes': ['FAIL (kind) {root}/types/host-extension.md: ## - Set at intake.delivery-kind is not one delivery kind'],
+     'kind-unlisted': ['FAIL (kind) {root}/traits/installable.md: docker-image - delivery kind is not in the delivery-kind list'],
+     'set-point-without-set': ['FAIL (set) {root}/types/host-extension.md: intake.questions - point does not accept set'],
+     'sub-workflow-changes': [
+@@ -423,12 +460,31 @@ STATUS_EXACT = {
+     'form-sub-type-first.md': ['FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type'],
+     'form-trait-double-space.md': ['FAIL (form) {path}:  Installable - traits are not joined by a comma and one space'],
+     'form-trait-in-head.md': ['FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type'],
++    # Order and repeats beyond neighbouring traits (stage B2 review, round 5: fixtures 3).
++    'form-trait-order-three.md': [
++        'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)',
++        "FAIL (form) {path}: Has screens - traits are not in the open list's order",
++        "FAIL (form) {path}: Installable - traits are not in the open list's order",
++    ],
++    'form-trait-repeat-separated.md': ['FAIL (form) {path}: Has screens - trait repeated'],
+     'form-trait-order.md': ["FAIL (form) {path}: Has screens - traits are not in the open list's order"],
+     'form-trait-repeated.md': ['FAIL (form) {path}: Installable - trait repeated'],
+     'form-trait-separator.md': ['FAIL (form) {path}: Has screens,Installable - traits are not joined by a comma and one space'],
+     'form-trait-trailing-space.md': ['FAIL (form) {path}: Has screens  - traits are not joined by a comma and one space'],
++    # The traits text's own edges: no space before the first name, `none` in its case (round 5: fixtures 4).
++    'form-traits-double-space.md': ['FAIL (form) {path}:  none - traits are not joined by a comma and one space'],
++    'form-traits-none-case.md': ['FAIL (unknown) {path}: None - not a trait name'],
+     'form-traits-marker-twice.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
++    # A rest that only starts as `not yet classified`, or differs in case or by a space, is read as names (stage B2
++    # review, round 5: tests and fixtures 4, converged).
++    'form-unclassified-case.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
++    'form-unclassified-trailing-space.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
++    'form-unclassified-with-traits.md': [
++        'FAIL (unknown) {path}: not yet classified - name is not in the open list',
++        'FAIL (e) {path}: - - part must name exactly one product type',
++    ],
+     'ok-multi.md': [],
++    'ok-no-final-newline.md': [],
+     'ok-multi-unclassified.md': [],
+     'ok-single.md': [],
+     'ok-unclassified.md': [],
+@@ -443,6 +499,15 @@ STATUS_EXACT = {
+         'FAIL (unknown) {path}: claude-code-extension - name is not in the open list',
+         'FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type',
+     ],
++    # A product type's Name for its Workflow name, and a sub-type's Name in another case (round 5: fixtures 4).
++    'unknown-sub-type-name.md': [
++        'FAIL (unknown) {path}: Claude Code extension - name is not in the open list',
++        'FAIL (form) {path}: - - Workflows head is not the product type, then at most its sub-type',
++    ],
++    'unknown-type-name.md': [
++        'FAIL (unknown) {path}: Web app - name is not in the open list',
++        'FAIL (e) {path}: - - part must name exactly one product type',
++    ],
+     'unknown-type-key.md': [
+         'FAIL (unknown) {path}: web-app - name is not in the open list',
+         'FAIL (e) {path}: - - part must name exactly one product type',
+@@ -607,6 +672,28 @@ def test_r014_registry_heading_missing(tmp_path):
+     assert_not_checked(*run("--registry", str(broken), f"{FIX}/pass"))
+ 
+ 
++def test_r014_set_changes_cell_is_split_on_commas_and_stripped(tmp_path):
++    """handoff/TASK-006.md, the `set` finding: a point's Changes cell is split on commas and each part stripped, so a
++    cell reading `set , add` accepts a Set as `add, set` does, and `add` alone refuses it (BUG-006 r2: Review A, the
++    sweep's line 285)."""
++    reg = (REPO / "bridge/cursor-bridge/workflow/extension-points.md").read_text(encoding="utf-8")
++    row = "| intake.target-environment | Intake | The product type's target environment | intake | add, set | part |"
++    assert reg.count(row) == 1, "the row of the point the pass root sets"
++    text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
++    assert "\n## Set at intake.target-environment\n" in "\n" + text, "precondition: the pass root sets the point"
++    spaced = tmp_path / "spaced.md"
++    spaced.write_text(reg.replace(row, row.replace("| add, set |", "| set , add |")), encoding="utf-8", newline="\n")
++    rc, lines, err = run("--registry", str(spaced), f"{FIX}/pass")
++    assert (rc, lines, err) == (0, ["RESULT: OK"], ""), (rc, lines, err)
++    add_only = tmp_path / "add-only.md"
++    add_only.write_text(reg.replace(row, row.replace("| add, set |", "| add |")), encoding="utf-8", newline="\n")
++    rc, lines, err = run("--registry", str(add_only), f"{FIX}/pass")
++    assert rc == 1, lines
++    assert lines == whole_output(
++        [f"FAIL (set) {FIX}/pass/types/host-extension.md: intake.target-environment - point does not accept set"]), lines
++    assert err == "", err
++
++
+ # --- the usage text -----------------------------------------------------------------------------------------------
+ 
+ def test_r033_usage_names_the_three_times_and_the_codes():
+@@ -622,12 +709,14 @@ def test_r033_usage_names_the_three_times_and_the_codes():
+ # --- round 2: the review's corrections (handoff/TASK-006-r2.md) ---------------------------------------------------
+ 
+ def test_r014_every_misspelt_change_word_is_form():
+-    """R2-1: `## Adds at`, `## add at`, `## Replacing`, `## Append at` are each a malformed change heading."""
++    """R2-1: `## Adds at`, `## add at`, `## Replacing`, `## Append at`, each change word without `at` (`## Adds`, `## Added`,
++    `## Sets`, `## Replaces`, `## Replaced`), a two-word `## Look at` and `## Look AT ...` are each a malformed change
++    heading (stage B2 review, round 5)."""
+     root = f"{FIX}/fail/form-misspelt-change-word"
+     rc, lines, err = run(root)
+     assert rc == 1
+     forms = [line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/types/host-extension.md: - ")]
+-    assert len(forms) == 4, lines
++    assert len(forms) == 11, lines
+ 
+ 
+ def test_r014_prose_headings_stay_prose():
+@@ -700,7 +789,9 @@ def _link_folder(link, target):
+ 
+ 
+ def test_r014_links_are_not_followed(tmp_path):
+-    """R2-4: a linked folder under types/ is form and is never read; a link to a parent cannot loop."""
++    """R2-4: a linked folder under types/ is form and is never read; a link to a parent cannot loop. Each link is
++    reported under its own path and name, a link inside a folder that is no product type too, beside the folder's (d)
++    (BUG-006 r2: Review A, the sweep's lines 349 and 354)."""
+     outside = tmp_path / "outside"
+     outside.mkdir()
+     (outside / "claude-code-extension.md").write_text("## Add at nowhere.at-all\n\nq\n", encoding="utf-8")
+@@ -709,13 +800,19 @@ def test_r014_links_are_not_followed(tmp_path):
+     (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+     _link_folder(root / "types" / "host-extension", outside)
+     _link_folder(root / "types" / "loop", root)
++    (root / "types" / "not-a-type").mkdir()
++    _link_folder(root / "types" / "not-a-type" / "inner-link", outside)
+     p = subprocess.run([sys.executable, PROG, str(root)], cwd=str(REPO), capture_output=True, text=True, encoding="utf-8", timeout=60)
+     lines = p.stdout.splitlines()
+     assert p.returncode == 1, lines
+     assert not [line for line in lines if line.startswith("FAIL (a)")], "a file behind a link was read"
+     shown = str(root).replace("\\", "/")
+-    assert any(line.startswith(f"FAIL (form) {shown}/types/host-extension") for line in lines), lines
+-    assert lines[-1] == f"RESULT: {len(fails(lines))} problem(s)"
++    assert lines == whole_output([
++        f"FAIL (form) {shown}/types/host-extension: host-extension - path is not a conditional-workflow file",
++        f"FAIL (form) {shown}/types/loop: loop - path is not a conditional-workflow file",
++        f"FAIL (d) {shown}/types/not-a-type: not-a-type - type folder is not a product type",
++        f"FAIL (form) {shown}/types/not-a-type/inner-link: inner-link - path is not a conditional-workflow file",
++    ]), lines
+ 
+ 
+ @pytest.mark.skipif(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), reason="a folder made unreadable by mode bits needs a non-root POSIX user (CI's ubuntu leg)")
+@@ -745,13 +842,14 @@ def test_r014_misspelt_heading_section_is_not_read_as_a_change():
+ 
+ 
+ def test_r014_change_word_with_punctuation_is_form():
+-    """R3-4: `## Set:`, `## Add:`, `## Replace:`, `## Adding`, `## Setting` are malformed change headings; a trait's
+-    `## Set:` no longer escapes."""
++    """R3-4: `## Set:`, `## Add:`, `## Replace:`, `## Adding`, `## Setting`, and each other stripped mark (`## Adds.`,
++    `## Set;`, `## Replace,`, `## Add-`) and two marks (`## Set:;`) are malformed change headings; a trait's `## Set:` no
++    longer escapes (stage B2 review, round 5)."""
+     root = f"{FIX}/fail/form-change-word-punctuation"
+     rc, lines, err = run(root)
+     assert rc == 1
+     forms = [line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/traits/installable.md: - ")]
+-    assert len(forms) == 5 and len(fails(lines)) == 5, lines
++    assert len(forms) == 10 and len(fails(lines)) == 10, lines
+     text = (REPO / FIX / "pass/types/host-extension.md").read_text(encoding="utf-8")
+     assert "\n## Add-ons\n" in text, "the pass root keeps `## Add-ons` as prose"
+ 
+@@ -937,7 +1035,8 @@ def test_r014_layer_that_cannot_be_examined_stops_the_check(tmp_path, monkeypatc
+     assert code == 2, lines
+     assert lines[-1] == "RESULT: not checked", lines
+     shown = str(root).replace("\\", "/")
+-    assert any(line.startswith("ERROR: ") and f"{shown}/{layer}" in line.replace("\\", "/") for line in lines), lines
++    # The path and the system's reason, not the fallback text (BUG-006 r2: Review A, the sweep's line 312).
++    assert f"ERROR: {shown}/{layer}: Permission denied" in [line.replace("\\", "/") for line in lines], lines
+ 
+ 
+ def test_r014_unknown_type_folder_is_reported_without_its_files():
+@@ -1115,3 +1214,138 @@ def test_r033_ci_runs_the_check_last_in_the_tests_job():
+ def test_r033_ci_check_is_not_in_the_security_floor():
+     steps = _jobs()["security-floor"]["steps"]
+     assert not any("workflow-check" in str(s) for s in steps)
++
++
++# --- stage B2 review, round 5: the controls the reviewers and the supervisor's mutation sweep found missing -----------
++
++ROUND5_PRECONDITIONS = [
++    # (fixture, text it holds, the rule the text gives a control to)
++    ("fail/kind-bare-hashes/types/host-extension.md", "## Set at intake.delivery-kind\n##\ninstaller\n",
++     "a line of `##` alone right under a Set heading is no heading (BUG-006 r4)"),
++    ("fail/fence-indented-close/traits/installable.md", "\n```\ncode\n    ```\n   ```\n",
++     "a closing run indented four spaces is content; the three-space one closes"),
++    ("fail/fence-four-spaces/traits/installable.md", "\n    ```\n", "backticks indented four spaces open no fence"),
++    ("fail/fence-four-spaces/traits/installable.md", "\n``\n", "two backticks open no fence"),
++    ("fail/fence-four-spaces/traits/installable.md", "\n~~\n", "two tildes open no fence"),
++    ("pass/types/host-extension.md", "\n\n    ## Replace design\n", "a heading indented four spaces is prose"),
++    ("pass/types/host-extension.md", "\n## \n", "an empty heading is prose"),
++    ("pass/types/host-extension/claude-code-extension.md",
++     "\n## Set at intake.delivery-kind\n  installer  \nThe part's installer delivers it.\n",
++     "the Set value is the first non-blank line, stripped, with no blank line before it and prose after it"),
++    ("fail/c-not-replaceable/types/host-extension.md", "## Replace interface\n", "two different modules replaced in one file"),
++    ("fail/d-unknown-type-folder/types/not-a-type/deeper/more.md", "## Add at nowhere.at-all\n",
++     "a folder inside an unknown type folder is not reported again"),
++    ("status/form-no-line.md", "\n  Workflows: ", "an indented Workflows line is not one"),
++    ("status/form-no-line.md", "\nworkflows: ", "a lower-case workflows line is not one"),
++]
++
++
++@pytest.mark.parametrize("rel, held, rule", ROUND5_PRECONDITIONS,
++                         ids=[f"{r}: {h.strip()[:24]}" for r, h, _ in ROUND5_PRECONDITIONS])
++def test_r014_round5_fixtures_hold_their_controls(rel, held, rule):
++    """Each fixture holds the text that makes its case a control (stage B2 review, round 5); the cases' outputs are in
++    FILE_EXACT and STATUS_EXACT, and the pass root must stay RESULT: OK."""
++    text = (REPO / FIX / rel).read_text(encoding="utf-8")
++    assert held in text, rule
++
++
++def test_r015_byte_cases_keep_their_bytes():
++    """A trailing space after `not yet classified`, and a status file that starts with a blank line and has no final line
++    feed, are bytes an editor could change; the cases depend on them (stage B2 review, round 5)."""
++    trailing = (REPO / FIX / "status/form-unclassified-trailing-space.md").read_bytes().rstrip(b"\r\n")
++    assert trailing.endswith(b"not yet classified "), trailing
++    no_final = (REPO / FIX / "status/ok-no-final-newline.md").read_bytes()
++    assert no_final.startswith((b"\n", b"\r\n")) and not no_final.endswith(b"\n"), no_final
++
++
++@pytest.mark.parametrize("char, shown", [
++    ("\t", "\\x09"), ("\x7f", "\\x7f"), ("\x80", "\\x80"), ("\xff", "\\xff"), ("Ā", "\\u0100"),
++    ("→", "\\u2192"), ("￿", "\\uffff"), ("\U00010000", "\\U00010000"),
++], ids=["tab", "del", "x80", "xff", "u0100", "arrow", "uffff", "U00010000"])
++def test_r014_escape_field_at_each_width_boundary(program, char, shown):
++    """R-014 output is ASCII: an unprintable or non-ASCII character prints as backslashreplace's forms, `\\xNN` up to
++    U+00FF, `\\uNNNN` up to U+FFFF, `\\UNNNNNNNN` above, each width at its boundary (stage B2 review, round 5: the
++    supervisor's mutation sweep)."""
++    assert program("workflow-check").escape_field("a" + char + "b") == "a" + shown + "b"
++
++
++TABLE_REQ = ["Key", "Name"]
++
++
++@pytest.mark.parametrize("text, rows", [
++    # the first table after the heading, rows to the first non-table line
++    ("## T\n\n| Key | Name |\n|---|---|\n| a | A |\n\nprose\n", [("a", "A")]),
++    # a table right under its heading, no blank line between
++    ("## T\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
++    # alignment colons on either side of the separator's dashes
++    ("## T\n\n| Key | Name |\n|:---|---:|\n| a | A |\n", [("a", "A")]),
++    # rows without their trailing pipe, and spaces after the last pipe
++    ("## T\n\n| Key | Name\n|---|---\n| a | A |   \n| b | B\n", [("a", "A"), ("b", "B")]),
++    # a table with a header and a separator and no row is an empty table
++    ("## T\n\n| Key | Name |\n|---|---|\n", []),
++    # the heading given twice: the first one's table
++    ("## T\n\n| Key | Name |\n|---|---|\n| a | A |\n\n## T\n\n| Key | Name |\n|---|---|\n| z | Z |\n", [("a", "A")]),
++    # a prose line ending in a pipe is not the table's start
++    ("## T\n\nsee below |\n\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
++    # a line starting `##` with no space after it (a tab, or nothing) does not end the section the table is looked
++    # for in; only a line starting `## ` does (BUG-006 r3: Review B)
++    ("## T\n\nprose\n\n##\tU\n##\n\n| Key | Name |\n|---|---|\n| a | A |\n", [("a", "A")]),
++], ids=["blank-line", "no-blank-line", "alignment", "no-trailing-pipe", "no-rows", "heading-twice", "prose-pipe",
++        "hashes-without-space"])
++def test_r014_table_reader_reads_the_first_table_after_its_heading(program, text, rows):
++    """The two rule files' tables are read as `How this file is read` says (open-list.md, extension-points.md): the first
++    table after the exact heading, its rows to the first line that is not a table line, columns found by header name
++    (stage B2 review, round 5: the supervisor's mutation sweep)."""
++    found, error = program("workflow-check").parse_table(text, "t.md", "## T", TABLE_REQ)
++    assert error is None, error
++    assert [(row["Key"], row["Name"]) for row in found] == rows
++
++
++def test_r014_table_reader_stops_at_the_next_section(program):
++    """A heading with no table before the next line starting `## ` is an error, not that section's table, as both rule
++    files' "How this file is read" says (stage B2 review, round 5: the supervisor's mutation sweep; BUG-006 r3)."""
++    found, error = program("workflow-check").parse_table(
++        "## T\n\nprose\n\n## U\n\n| Key | Name |\n|---|---|\n| a | A |\n", "t.md", "## T", TABLE_REQ)
++    assert found is None and error == "no table after ## T", error
++
++
++# --- BUG-006 r2: Review A of BUG-006, the sweep's survivors an input separates --------------------------------------
++
++def test_r014_unreadable_file_names_the_systems_reason(tmp_path, monkeypatch, program):
++    """handoff/TASK-006.md: `<reason>` is free plain-language text; a file the system refuses to read gives `cannot be
++    read (<the system's reason>)`, never the exception's own text (BUG-006 r2: Review A, the sweep's line 126)."""
++    mod = program("workflow-check")
++    path = tmp_path / "refused.md"
++    path.write_text("q\n", encoding="utf-8")
++
++    def refuse(*a, **k):
++        raise PermissionError(13, "Permission denied", str(path))
++
++    monkeypatch.setattr(mod, "open", refuse, raising=False)
++    text, _shown, reason = mod.read_utf8(str(path))
++    assert (text, reason) == (None, "cannot be read (Permission denied)"), reason
++
++
++def test_r014_folder_that_cannot_be_listed_is_named_with_its_reason(tmp_path, monkeypatch, capsys, program):
++    """R2-3 and handoff/TASK-006.md's `<reason>`: a folder under a layer that cannot be listed stops the check with an
++    ERROR line naming that folder, not the root, and the system's reason; on every host, where
++    test_r014_unreadable_folder_stops_the_check needs POSIX mode bits (BUG-006 r2: Review A, the sweep's lines 299
++    and 300)."""
++    mod = program("workflow-check")
++    root = tmp_path / "root"
++    sub = root / "types" / "host-extension"
++    sub.mkdir(parents=True)
++    (root / "types" / "host-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
++    real = os.scandir
++
++    def scandir(path=".", *a, **k):
++        if os.path.basename(os.fspath(path)) == "host-extension":
++            raise PermissionError(13, "Permission denied", os.fspath(path))
++        return real(path, *a, **k)
++
++    monkeypatch.setattr(os, "scandir", scandir)
++    code, lines = _main_in_process(mod, str(root), capsys=capsys)
++    assert code == 2, lines
++    assert lines[-1] == "RESULT: not checked", lines
++    shown = str(sub).replace("\\", "/")
++    assert f"ERROR: {shown}: Permission denied" in [line.replace("\\", "/") for line in lines], lines
