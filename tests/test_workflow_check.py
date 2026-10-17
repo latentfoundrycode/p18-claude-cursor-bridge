@@ -239,6 +239,16 @@ def test_r014_status_case_fails(name, code, offending):
     assert lines[-1] == f"RESULT: {len(fails(lines))} problem(s)"
 
 
+def test_r014_trait_in_head_is_only_the_shape_finding():
+    """R-014: a trait's Name is in the open list, so a trait in the Workflows head is the shape (form) finding alone,
+    never (unknown) (BUG-002 round 2 review: no test held check_head's trait branch exactly)."""
+    rc, lines, err = status("form-trait-in-head.md")
+    assert_clean_end(lines, err)
+    assert rc == 1, lines
+    assert fails(lines) == [f"FAIL (form) {FIX}/status/form-trait-in-head.md: - - "
+                            "Workflows head is not the product type, then at most its sub-type"], lines
+
+
 def test_r014_unwritten_type_fails_against_the_real_open_list(tmp_path):
     """The pause (§6.7) against the bridge's own open list: a copy with every entry marked unwritten, so the test still
     holds once release B writes its first workflows (TASK-017 to TASK-021; stage B2 review)."""

@@ -51,3 +51,8 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 - tests/test_open_list.py bounds open-list.md at under 300 lines and 30,000 characters; TASK-017 to TASK-021 all add to it, so their briefs check the headroom.
 - The failing-fixture tests assert the named finding and that the RESULT count agrees, not the number of findings, so a second defect added to a fixture later would pass unseen; and a misspelt type (status/unknown-name.md) also gives a follow-on (e) "part must name exactly one product type".
 - inventory-check.py prints a traceback when `--status` names a folder (its pre-release-B `read()`); the exit is still non-zero.
+
+## Stage B2 — BUG-002, the stage review's fixes
+- Carried to stage B2's reflection (item 3): the per-part completeness lead above goes also into the Restructuring Plan's §16 follow-up lists, where the aggregate release is planned (Review A, BUG-002 round 1).
+- TASK-019's brief is packaged with the default-traits line above (form, check, Scope widening, fixture open list); BUILD_PLAN's TASK-019 entry does not repeat it (Review A, BUG-002 round 2).
+- One failing fixture now has its exact findings asserted (`form-trait-in-head.md`, test_r014_trait_in_head_is_only_the_shape_finding); the lead above on the others (the named finding and the count, not the number of findings) stands.
