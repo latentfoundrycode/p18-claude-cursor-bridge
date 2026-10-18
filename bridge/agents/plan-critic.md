@@ -31,7 +31,7 @@ still Blocking or non-convergent, then the gate, whatever is still open. A round
 confirming read* is one: raise a finding only on text changed since your last read (the file
 holds that diff), or a Blocking finding anywhere; never the same point again in other words.
 A resolution round's file opens with *This is the resolution round*: answer every open
-question in it, and Review B's answer in `run/review/REVIEW-DESIGN-<subject>-R1.md`, in place
+question in it, and Review B's answer in `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for that round, in place
 of findings and with no counts; raise no new finding. A finding the other critic also names keeps the grade
 its content earns: agreement is no reason to grade up.
 

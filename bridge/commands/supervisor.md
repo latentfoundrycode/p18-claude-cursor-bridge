@@ -349,12 +349,19 @@ starts the next. **Four rounds per subject is the owner's ceiling, whatever the 
 find.** The subjects are the design, the plan and each change: a change cycle's design revision
 (the change's name), its plan addendum (`<the change's name>-plan`), and a scoped revision
 mid-build, which is a change named as `docs/DESIGN.md`'s Change section names it; a subject is
-never renamed or split to start its count again. A launch that failed (a reply that names
-nothing from the file) runs once more on the same file and spends no round; a second failure is
-a model's failure (step 3b), and the round is recorded as not run.
+never renamed or split to start its count again. A subject is one token of lower-case letters,
+digits and hyphens: for a change, chosen from its name when the Change section is written (the
+Azure monthly allowance is `azure-allowance`, its plan addendum `azure-allowance-plan`) and
+written in its block's heading in `docs/DESIGN_CRITIQUE.md`. A launch that failed (a reply that
+names nothing from the file) runs once more on the same file and spends no round; a second
+failure is a model's failure: step 3b records it and re-resolves the roster, and the same file
+runs once more on the profile it gives, under its number; a third failure, or no usable
+profile, makes the design wait (below), the round recorded as not run. A round never run spends
+none of the four.
 
 - **The confirming read.** When the critique ends and the text changed after either critic last
-  read it, both critics read it once more, as the next round (the fifth at the most). Its file
+  read it, both critics read it once more, as the next round (the fifth at the most, or
+  `<rounds>` under the owner's line). Its file
   opens with *This round is the confirming read: raise a finding only on text changed since your
   last read, or a Blocking finding anywhere*, and holds the committed diff of the subject's text
   since each critic's last read, each diff labelled with its critic. **A confirming read is
@@ -368,8 +375,9 @@ a model's failure (step 3b), and the round is recorded as not run.
   raise no new finding; your reply answers each question in place of findings, with no counts*.
   Review B answers it with the same read-only command. Its reply arrives on the launch's output
   (the `.err` file holds only the launcher's lines): after `verify`, write it to
-  `run/review/REVIEW-DESIGN-<subject>-R1.md`; `plan-critic` reads that file and answers it; the
-  settlement goes under Resolution.
+  `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for the resolution round just run (`R1`, or
+  `R2` under the owner's line); `plan-critic` reads that file and answers it; the settlement
+  goes under Resolution.
 - **The gate.** Then the subject goes to its gate, whatever is still open: a Blocking finding
   still open after the resolution round does not stop it. The critique record lists what is
   open, with both critics' grades and the settlement.
@@ -380,13 +388,16 @@ earns and never adds a round.
 
 **The launcher holds the ceiling.** `bridge-run.py` reads every `cursor-agent` command whose
 arguments name, anywhere and with either path separator, a file `run/review/DESIGN-<name>.md`;
-every such name is checked, and one refused name refuses the launch. The round is the name's
-last hyphen-separated part: an integer from 1 to 5 written without a leading zero, or `R1`;
-the subject is the rest (`DESIGN-5.md`, the plan's file before 2026.10.18a, is a subject of its
-own). It refuses, with exit 125, before anything starts, and with a message that begins
-`bridge-run: refused - ` and names the file, the round and the `docs/RUN_PARAMETERS.md` it
-looked in, three things: a name it cannot read that way (`0`, `05`, `R0`, a round that is no
-number), a round above five, and a resolution round `R2` or later. The floor is the launcher's:
+every such name is checked, and one refused name refuses the launch. A name is read from
+`DESIGN-` up to `.md` and holds only lower-case letters, digits and hyphens, but for the round's
+`R`. The round is the name's last hyphen-separated part: an integer from 1 to 5 written without
+a leading zero, or `R1`; the subject is the rest. A name of one part is a round with an empty
+subject, which is not `plan` (`DESIGN-5.md`, the plan's file before 2026.10.18a: `DESIGN-1.md`
+to `DESIGN-5.md` allowed, `DESIGN-45.md` refused). It refuses, with exit 125, before anything
+starts, and with a message that begins `bridge-run: refused - ` and names the file, the round
+and the `docs/RUN_PARAMETERS.md` it looked in, three things: a name it cannot read that way (a
+space or a capital in it, `0`, `05`, `R0`, a round that is no number, a `run/review/DESIGN-`
+with no `.md` after its name), a round above five, and a resolution round `R2` or later. The floor is the launcher's:
 a design-mode `cursor-agent` started other than through `bridge-run.py` has no ceiling and
 breaks rule 8. A refusal is neither a failed review nor a model's failure (step 3b): it is not
 retried and no `--record-failure` follows it; the subject goes on to its resolution round or its
@@ -398,21 +409,25 @@ gate, as above.
 launcher allow that subject rounds 1 to `<rounds>`, `R1` and `R2`, and nothing beyond. Under it
 the subject runs the same shape once more from where it stands: critique rounds under the stop
 rule up to `<rounds>` minus one, then a confirming read if the text changed (round `<rounds>` at
-the most), then its next resolution round (`R1` if it has had none, else `R2`, holding what is
-still open after the first), then the gate. You never ask for that line: it is written only on
-the owner's own words, given unprompted or at the gate, where the record shows what is open (an
-owner who sends a design back at its gate to be criticised again gives exactly those words);
-when they name no number, `<rounds>` is the rounds run so far plus five, and the line records
-their words as given. Before the run-parameters step the line is written to
+the most), then, if anything is still open, its next resolution round (`R1` if it has had none,
+else `R2`, holding what is still open after the first), then the gate. You never ask for that
+line: it is written only on the owner's own words, given unprompted or at the gate, where the
+record shows what is open (an owner who sends a design back at its gate to be criticised again
+gives exactly those words). `<rounds>` is a round number, never a count: a number the owner
+names is how many more rounds, added to the rounds run so far; when they name none it is the
+rounds run so far plus five; it is never below six; the line records their words as given. A
+subject is lifted once: the owner's words to criticise it again after that make it a scoped
+revision, a change with a subject of its own. Before the run-parameters step the line is written to
 `docs/RUN_PARAMETERS.md` on its own, creating the file; that step adds its lines beside it.
 
 The record shows each critic's grades apart. Its cost: at most six subagent runs and six
-verdict-bearing Cursor calls per subject, and one re-run of a failed launch each: four rounds,
+verdict-bearing Cursor calls per subject, and two re-runs of a failed launch each at the most: four rounds,
 the confirming read and the resolution round; under the owner's line, up to `<rounds>` and `R2`.
 
 `docs/DESIGN_CRITIQUE.md` has three parts, one block per subject: **Accepted** (finding, critic,
-round, the reason), **Rounds** (round, its kind: critique, confirming read or resolution;
-critic; the counts of Blocking, Should fix and Consider; what was fixed), **Resolution** (the
+round, the reason), **Rounds** (round, its kind: critique, confirming read, resolution, not run
+or refused; the commit its file was built from; critic; the counts of Blocking, Should fix and
+Consider; what was fixed), **Resolution** (the
 question, what was settled, how). The `run/review/DESIGN-*` files are
 removed with `git rm` in the commit that passes the gate, as step 8 removes the review files.
 When no roster profile is usable at intake (Cursor not signed in, both pools exhausted), the
@@ -958,10 +973,11 @@ When any `cursor-agent` call — a delegation, a Review B launch, a resolution r
 stage-close pass — exits non-zero, produces no output, or hits the launcher's limit (exit
 124):
 
-(The one exception: a design-critique launch the launcher refused, exit 125 with
-`bridge-run: refused - ` naming a `run/review/DESIGN-` file, for a round above its ceiling, a
-second resolution round or a name it cannot read, is the ceiling holding, never a model's
-failure: it is not retried and no `--record-failure` follows it; Phase 2.)
+(The one exception: every exit 125 whose message begins `bridge-run: refused - ` and names a
+`run/review/DESIGN-` file is the design critique's ceiling holding, never a model's failure: it
+is not retried and no `--record-failure` follows it; Phase 2. A design-critique reply that
+names nothing from its file follows Phase 2's count: one re-run on the same model, then this
+step's record and re-resolve, then one run on the profile it gives, and no more.)
 
 **First, when the exit code is 124, look before you discard** (KP-033): `git status` and
 `git diff --stat` in the checkout. A builder that completed its edits and then hung on its
