@@ -70,7 +70,7 @@ Exit code: 0. Relevant output: `make-manifest: version 2026.10.11d, 107 files ha
 
 Command: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
 
-Exit code: 0. Relevant output: `bridge-check: version 2026.10.11d (2026-10-18 05:49) at E:\p18-claude-cursor-bridge\Workspace\bridge` and `bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA` and `RESULT: SOURCES MATCH bridge 2026.10.11d`.
+Exit code: 0. Relevant output: `bridge-check: version 2026.10.11d (2026-10-18 05:49) at <Workspace>\bridge` (path redacted by the supervisor, rule 54) and `bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA` and `RESULT: SOURCES MATCH bridge 2026.10.11d`.
 
 ### 5. Full suite after the manifest
 
