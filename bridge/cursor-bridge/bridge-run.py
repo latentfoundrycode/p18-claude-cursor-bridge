@@ -78,7 +78,15 @@ LOG = os.path.join("run", "launcher", "runs.jsonl")
 LEARN_FACTOR = 1.5
 CAP_FACTOR = 2
 DESIGN_DEFAULT_ROUNDS = 5
-DESIGN_RE = re.compile(r"(?i)run[/\\]review[/\\]design-")
+DESIGN_RESOLUTION_DEFAULT = 1
+DESIGN_RESOLUTION_LIFTED = 2
+DESIGN_PATH_NORM = re.compile(r"[/\\]+(?:\.[/\\]+)*")
+DESIGN_MARK = re.compile(r"(?i)run/review/DESIGN-")
+DESIGN_NAME_RE = re.compile(r"^(?:([a-z0-9-]*)-)?(R?)([1-9][0-9]*)$")
+DESIGN_TOKEN_RE = re.compile(r"[^\s\"'`]+")
+DESIGN_LIFT_RE = re.compile(
+    r"^\s*[-*]?\s*(?:\*\*Design rounds above five:\*\*|\*\*Design rounds above five\*\*:|Design rounds above five:)\s*"
+    r"([a-z0-9-]+)\s+([0-9]+)\s*\((.+)\)", re.I)
 
 
 def usage():
@@ -242,14 +250,14 @@ def design_lifts(folder):
     try:
         with open(os.path.join(folder, "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
             for line in f:
-                m = re.match(r"^\s*[-*]?\s*\**Design rounds above five\**\s*:\s*([a-z0-9-]+)\s+(\d+)\s*\((.+)\)", line.strip(), re.I)
+                m = DESIGN_LIFT_RE.match(line.strip())
                 if not m or m.group(1) in lifts:
                     continue
                 words = m.group(3).strip()
                 if not words:
                     continue
                 rounds = int(m.group(2))
-                if rounds <= 5:
+                if rounds <= DESIGN_DEFAULT_ROUNDS:
                     continue
                 lifts[m.group(1)] = rounds
     except (OSError, UnicodeDecodeError):
@@ -257,62 +265,63 @@ def design_lifts(folder):
     return lifts
 
 
-def design_token(text, start):
-    """Text after DESIGN- up to whitespace or a quote; trailing punctuation stripped."""
-    i = start
-    while i < len(text) and text[i] not in " \t\n\r\"'`":
-        i += 1
-    token = text[start:i]
-    while token and token[-1] in ".,;:)])}'\"":
-        token = token[:-1]
-    return token
+def design_round_written(name):
+    return name.rsplit("-", 1)[1] if "-" in name else name
 
 
-def design_parts(name):
-    """(subject, round) when the name is readable, else None."""
-    if "-" in name:
-        subject, round_part = name.rsplit("-", 1)
-    else:
-        subject, round_part = "", name
-    if not re.match(r"^[a-z0-9-]*$", subject):
+def design_refusal(file_label, subject, round_written, detail, params_path):
+    msg = ("design ceiling: %s (subject %s, round %s) %s; looked in %s for "
+           "Design rounds above five: supervisor.md, Phase 2" % (
+               file_label, subject, round_written, detail, params_path))
+    return msg.encode("ascii", "backslashreplace").decode("ascii")
+
+
+def design_refuse_name(name, token, lifts, params_path):
+    """Refusal for one design token; None when allowed."""
+    label_name = name if name is not None else token
+    round_written = design_round_written(label_name)
+    subject = label_name.rsplit("-", 1)[0] if "-" in label_name else ""
+    if name is None:
+        return design_refusal("DESIGN-%s" % token, subject, round_written, "the name cannot be read", params_path)
+    parsed = DESIGN_NAME_RE.match(name)
+    if not parsed:
+        return design_refusal("DESIGN-%s.md" % name, subject, round_written, "the name cannot be read", params_path)
+    subject = parsed.group(1) or ""
+    round_written = design_round_written(name)
+    if parsed.group(2) == "R":
+        limit = DESIGN_RESOLUTION_LIFTED if subject in lifts else DESIGN_RESOLUTION_DEFAULT
+        if int(parsed.group(3)) > limit:
+            return design_refusal("DESIGN-%s.md" % name, subject, round_written,
+                                  "a resolution round beyond R%d" % limit, params_path)
         return None
-    if re.match(r"^[1-9][0-9]*$", round_part) or re.match(r"^R[1-9][0-9]*$", round_part):
-        return subject, round_part
+    limit = lifts.get(subject, DESIGN_DEFAULT_ROUNDS)
+    if int(parsed.group(3)) > limit:
+        return design_refusal("DESIGN-%s.md" % name, subject, round_written,
+                              "above round %d" % limit, params_path)
     return None
-
-
-def design_allowed(subject, round_part, lifts):
-    """Whether this subject's round is within the ceiling (default or owner's line)."""
-    if round_part.startswith("R"):
-        n = int(round_part[1:])
-        return n <= (2 if subject in lifts else 1)
-    n = int(round_part)
-    return n <= (lifts[subject] if subject in lifts else DESIGN_DEFAULT_ROUNDS)
-
-
-def design_refusal(file_label, subject, round_part, params_path):
-    return ("design ceiling: %s subject %s round %s; looked in %s for "
-            "Design rounds above five: (supervisor.md, Phase 2)" % (file_label, subject, round_part, params_path))
 
 
 def design_ceiling(argv, folder):
     """Refuse cursor-agent launches naming a design round above the ceiling; None when allowed."""
     if head_of(argv) != "cursor-agent":
         return None
-    text = " ".join(argv)
+    norm = DESIGN_PATH_NORM.sub("/", " ".join(argv))
+    hits = list(DESIGN_MARK.finditer(norm))
+    if not hits:
+        return None
     params_path = os.path.join(folder, "docs", "RUN_PARAMETERS.md")
     lifts = design_lifts(folder)
-    for m in DESIGN_RE.finditer(text):
-        token = design_token(text, m.end())
+    for m in hits:
+        tm = DESIGN_TOKEN_RE.match(norm, m.end())
+        token = tm.group(0).rstrip(".,;:)])}'\"") if tm else ""
         if not token.endswith(".md"):
-            return design_refusal("DESIGN-%s" % token, "", "", params_path)
-        name = token[:-3]
-        parts = design_parts(name)
-        if parts is None:
-            return design_refusal("DESIGN-%s.md" % name, "", "", params_path)
-        subject, round_part = parts
-        if not design_allowed(subject, round_part, lifts):
-            return design_refusal("DESIGN-%s.md" % name, subject, round_part, params_path)
+            reason = design_refuse_name(None, token, lifts, params_path)
+            if reason:
+                return reason
+            continue
+        reason = design_refuse_name(token[:-3], token, lifts, params_path)
+        if reason:
+            return reason
     return None
 
 
