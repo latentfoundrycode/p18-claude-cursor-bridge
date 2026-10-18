@@ -1,8 +1,8 @@
 diff --git a/docs/HARDENING.md b/docs/HARDENING.md
-index f8fe7c4..f16b5d4 100644
+index f8fe7c4..88fa329 100644
 --- a/docs/HARDENING.md
 +++ b/docs/HARDENING.md
-@@ -487,3 +487,30 @@ The earlier sweeps rerun on the fixed program: the first sweep 49 survivors of 7
+@@ -487,3 +487,32 @@ The earlier sweeps rerun on the fixed program: the first sweep 49 survivors of 7
  - **Should-fix, taken:** line 325's survivor (a folder's subfolders walked in reverse) was filed under "sorted", whose reason does not hold for it: the walk lists the subfolders in the other order, so two that cannot be listed give their ERROR lines in the other order. That order is the file system's own, which no document fixes and which differs between file systems, so 325 has a class of its own, "listing-order", and the claim reads "every survivor an input separates in a fixed order". The order tests' docstrings now cite the document that fixes an order (TASK-006.md Requirement 11 for a status line's findings) or say that none does (the layers, the listing and read errors), say where an input breaks the open list's own rules (a name given twice, a key with a letter outside its rule), and attribute only the reporting itself to R5-1.
  - **Notes, taken:** the "streams" class says each stream read on its own; the "independent" class names the appends to separate lists and argparse's positional; extension-points.md:72 says "with no file inside it read" (the walk still lists the folder); open-list.md:94 says §6.3 spells out the shape for type workflows only; the test block names the run its line numbers come from.
  - **Notes, recorded:** the unwritten copy's `| yes |` replacement changes nothing in the bridge's open list today, where every entry is unwritten; its precondition (f and FLAG findings exist) is asserted all the same. With both streams closed the usage error relies on argparse's own tolerance (probed: exit 2; no test).
@@ -11,19 +11,21 @@ index f8fe7c4..f16b5d4 100644
 +
 +Snapshot STAGE-B2j (368f859 on stage/B2, deleted after verify OK, hash 5e5f870a0dd9b1d7). **Review B** (grok-4.7-medium, the native profile): APPROVE. **Review A** in nine parts: programs, texts and the six fixture parts APPROVE with considers; tests REJECT. Its blocking item: a status file's lines judged with their repeats dropped (`list(dict.fromkeys(lines))` before the line count, or `len(set(lines))`) survived every test, and turned two identical unprefixed lines from two (form) findings into `RESULT: OK`, two identical prefixed lines from (e) into the single-line prefix finding. Its should-fix: the separator cell's "at least one dash" had no failing case (the test rewritten as `all(c == "-" ...)`, without `bool(text)`). Its consider: a head's names with repeats dropped (a product type named twice). ISS-007 recurs (round 10), in a new operator class: a rule rewritten in another idiom, which no sweep had tried.
 +
-+**The supervisor's response:** as in round 9, a sweep for the class before any case (run/supervisor/sweep_idiom.py: repeats dropped from every `for` loop, every `len` and every list assigned in a function, each operand of an `and` or an `or` dropped, `all` and `any` swapped; a repeat of an unhashable item dropped by identity, so a row of a table read twice counts once): 86 survivors of 193 on main's tests (run/supervisor/sweep_idiom_r1.out). Every survivor an input separates got a case (BUG-011, tests and fixtures only, no program change):
++**The supervisor's response:** as in round 9, a sweep for the class before any case (run/supervisor/sweep_idiom.py: repeats dropped from every `for` loop, every `len` and every list assigned in a function, each operand of an `and` or an `or` dropped, `all` and `any` swapped; a repeat of an unhashable item dropped by identity, so a row of a table read twice counts once): 87 survivors of 193 on main's tests (run/supervisor/sweep_idiom_main.out; the first run, run/supervisor/sweep_idiom_r1.out, showed 86 with the earlier helper described below). Every survivor an input separates got a case (BUG-011, tests and fixtures only, no program change):
 +- **Blocking, tests:** e-same-part-identical and form-prefix-missing-identical, each pair's line shown valid alone (test_r014_each_line_of_a_repeated_pair_is_valid_alone); the judges name a repeated finding each time and place two identical lines together (test_r015_a_repeated_finding_is_reported_each_time, test_r015_two_identical_lines_stand_together; the sweep's inventory-check.py 224, conformance-check.py 333, workflow-check.py 729).
 +- **Should-fix, tests:** test_r014_separator_cell_count_differs[last-cell-blank, last-cell-colon-only].
-+- **Consider, tests, and the sweep's head counts:** e-type-named-twice and e-sub-type-named-twice (609, 619, 621, 628); a product type named in two segments (604); the Of type relation left unjudged when a type or a sub-type is named twice (624), a reading handoff/TASK-006.md Requirement 4 leaves open, since its "the line's product type" assumes one, pinned as the program's.
++- **Consider, tests, and the sweep's head counts:** e-type-named-twice and e-sub-type-named-twice (609, 619, 621, 628); a product type named in two segments (604); the Of type relation left unjudged when a type or a sub-type is named twice (624): the cases pin the program's output, which Requirement 4 read literally does not (below, BUG-011's gate round 1).
 +- **The sweep's paths and headings:** a folder named `types` inside types/ and one named `traits` inside traits/ (341, 342, 346, 347, 350, 357); a folder under traits/ named like an unknown type folder (347); a Set at project-end.delivery, which owes no delivery kind (524); `## at at` and `## at at the gate` (382, 390); a header that repeats a column, read (225, 233; no document says it stops the check, so the test pins the program's choice); ERROR reasons where the system's error carries none (126, 299, 300, 312).
 +
-+On the tests with every case, the full sweep leaves 56 survivors of 193 (run/supervisor/sweep_idiom_r5.out, with line 347's two mutants killed by its later case, run/supervisor/sweep_idiom_r6.out; the two together are run/supervisor/sweep_idiom_final.out). The generator run/supervisor/write_idiom_list.py (`--check`) stops on a survivor no class names and on a class entry no survivor matches. The first run's helper had left an unhashable list unchanged, which hid the head's counts of rows (619, 621, 624, 628) and, by consuming an iterator before it failed, counted line 279 killed; the helper now drops a repeated object by identity, and the classes are those of the clean run. The classes are the supervisor's reasoning, not a test:
-+- **25, distinct:** repeats dropped from items that are always distinct: an index or a line number (enumerate, range, the indexes of the Workflows lines and of the change headings, the traits' rows, 202, 209, 279, 451, 465, 467, 717, 721, 727), the program's own constants (the required columns, the five tables, the two layers, 227, 257, 303), a folder's names and the found paths, unique in a listing (325, 333, 340, 345), separate objects (the rows of a table, the spans of a file, the segments' name lists, a root's items, 241, 500, 605, 608, 802, 826; the segments' values are line 604's, which a case kills), a sub-workflow's two identity findings, whose reasons differ (571), the judge's causes, which name different files (inventory-check.py 264), and the default root, alone (788).
-+- **3, first-kept:** repeats dropped where the first of them is the one read: a table's rows (218, 231), where a row given twice is read again as itself, the first row of a name is the one indexed and the rows keep their order; a section's body, whose first non-blank line stays first (477).
-+- **7, argument-twice:** the same root or status file given twice on the command line, read once (785, 786, 794, 813, 820, 825, 828): no document fixes the output for an argument given twice (round 10: tests, held equivalent or out of rule).
-+- **16, implied:** an operand dropped that another one implies, or a count no input reaches: a split always gives a list of one item or more (103); the empty string's characters are not {'-'} (175); a row of `width` cells has cells, and width, a header's count, is one or more (181); a table of two identical lines fails the separator test with the same message (222); a folder deeper than types/<x> is listed after types/<x>, which is counted already (342); a file and a folder never share a name, so the unknown-folder branch's test for a folder changes no item (350); a found folder's path has two parts or more, and one under types/ deeper than two is a folder under a type's folder either way (357); a longer path under types/ whose second part ends `.md` lies in a folder named like a file, which no product type key is, so the unknown-folder branch takes it first (360); a path's parts counted without repeats, where its last part ends `.md` and so differs from the folders before it, and a folder named `types` is an unknown type folder taken first (360, 362, 364); a two-part path ending `.md` under types/ is caught by the test before, so the traits test without its layer changes nothing (364); a delivery kind is read only from the `for <kind>` form, an addition's (529); the sub-type count read only where it is at most one (631).
++On the tests with every case, the full sweep leaves 49 survivors of 193 (run/supervisor/sweep_idiom_r7.out, one run on the tests as committed). The generator run/supervisor/write_idiom_list.py (`--check`) stops on a survivor no class names and on a class entry no survivor matches. The first run's helper had left an unhashable list unchanged, which hid the head's counts of rows (619, 621, 624, 628) and, by consuming an iterator before it failed, counted line 279 killed; the helper now drops a repeated object by identity, and every count above is of the fixed helper. The classes are the supervisor's reasoning, not a test:
++- **25, distinct:** repeats dropped from items that are always distinct: an index or a line number (enumerate, range, the indexes of the Workflows lines and of the change headings, the traits' rows, 202, 209, 279, 451, 465, 467, 717, 721, 727), the program's own constants (the required columns, the five tables, the two layers, 227, 257, 303), a folder's names and the found paths, unique in a listing (325, 333, 340, 345), separate objects (the rows of a table, the spans of a file, the segments' name lists, a root's items, each root's pair of root and items, 241, 500, 605, 608, 802, 825, 826; the segments' values are line 604's, which a case kills), a sub-workflow's two identity findings, whose reasons differ (571), and the default root, alone (788).
++- **2, first-kept:** repeats dropped where the first of them is the one read: a table's data rows (231), where a row given twice is read again as itself, the first row of a name is the one indexed and the rows keep their order (a data row equal to the separator line is line 218's, which a case kills); a section's body, whose first non-blank line stays first (477).
++- **5, argument-twice:** the same root or status file given twice on the command line, read once (785, 786, 794, 813, 828): no document fixes the output for an argument given twice (round 10: tests, held equivalent or out of rule).
++- **12, implied:** an operand dropped that another one implies, or a count no input reaches: a split always gives a list of one item or more (103); the empty string's characters are not {'-'} (175); a row of `width` cells has cells, and width, a header's count, is one or more (181); a folder deeper than types/<x> is listed after types/<x>, which is counted already (342); a file and a folder never share a name, so the unknown-folder branch's test for a folder changes no item (350); a found folder's path has two parts or more, and one under types/ deeper than two is a folder under a type's folder either way (357, its two `and`s); a longer path under types/ whose second part ends `.md` lies in a folder named like a file, which no product type key is, so the unknown-folder branch takes it first (360's `and`); a two-part path, `types` and a name ending `.md`, has two distinct parts (360's `len`); a two-part path ending `.md` under types/ is caught by the test before, so the traits test without its layer changes nothing (364's `and`); a delivery kind is read only from the `for <kind>` form, an addition's (529); the sub-type count read only where it is at most one (631).
 +- **1, platform:** `os.name == "nt"` dropped before the reparse-attribute test: on Windows it is true, and on Linux, where CI runs too, `st_file_attributes` does not exist and the test fails with an AttributeError (163).
 +- **4, loader:** the judges' `spec is None or spec.loader is None`, either operand dropped: spec_from_file_location on a `.py` path always returns a spec with a loader (inventory-check.py 203, conformance-check.py 312; round 9's "unreachable" class holds the same guard).
++
++**BUG-011's gate round 1** (2026-10-18): Review B (grok-4.7-medium) APPROVE, each new case run against the idiom it names. Review A REJECT: five survivors were classed where an input separates them (357's second `len`, 362's and 364's `len`, 222, inventory-check.py 264 and 820), and the Of type comment said the requirement left the reading open. REVIEWERS DISAGREE on whether every survivor some input separates needs a case, or only those a document fixes; a correctness question, decided for Review A, since BUG-011's own scope promises a case for every survivor an input separates.The second attempt adds folder-named-types-in-a-type-folder, folder-named-like-a-sub-workflow and folder-named-like-a-trait (357, 362, 364), test_r014_a_table_of_two_separator_lines_is_read_for_its_columns (222), test_r014_a_row_like_the_separator_is_a_row (218), test_r014_two_tables_without_a_column_are_two_error_lines (820) and the judges' two-tables-without-key (inventory-check.py 264), and the sub-type twin's one-name precondition; 825 moved to distinct, since each root's pair is a separate object. Its notes are taken here: the counts are of one run each, on the fixed helper. **A program lead:** the program judges the Of type relation only where a line names exactly one product type and one sub-type. Read literally, handoff/TASK-006.md Requirement 4 asks it of every sub-type the line names whose Of type is not the line's product type, and "Print each" asks for that finding beside the count's, so a line naming a type twice beside a sub-type of another type owes an Of type finding it does not get. The tests pin the program's output; the gap is for the next change of workflow-check.py (the B2 change is closed to programs).
 +
 +Every test was added or strengthened and none removed or loosened, so the earlier sweeps' and drivers' kills stand (round 9: the first sweep 49 survivors, the widened sweep 351, the control-flow sweep 113, mutate_workflow_check.py 300 of 300, mutate_workflows_line.py 62 of 62; round 10's tests part ran both drivers again, all killed).
 +
@@ -34,7 +36,7 @@ index f8fe7c4..f16b5d4 100644
 +- **Texts:** supervisor.md:1821's "every name on the line is in the open list" reads as covering part names too (TASK-010 rewords that paragraph); the Glossary's Open list entry lists an entry's fields without Planned and Of type; extension-points.md does not say that a leading byte-order mark is dropped (b-trait-sets-bom rests on handoff/TASK-006-r2.md R2-2): leads for the next change of those files.
 +- **Tests:** the equivalents Review A found (seen.add moved above the order test; allows_set read as `"set" in cell`, where every registry cell is add or set; a status argument given twice) agree with the classes above.
 diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
-index 1686d24..b5caa42 100644
+index 1686d24..f7dadae 100644
 --- a/docs/PROJECT_STATUS.md
 +++ b/docs/PROJECT_STATUS.md
 @@ -3,22 +3,22 @@ Last updated: 2026-10-18
@@ -43,7 +45,7 @@ index 1686d24..b5caa42 100644
  Change cycle: none
 -Increment: BUG-010 — stage B2's review, round 9 (branch bug-010): Review B rejected (the usage error with a standard stream closed exits 1, a program defect; four status fixtures' text not pinned); Review A's fixtures 4 (a line breaking the prefix rule not observed unchecked) and tests (`continue` made `break` and a test moved, turning a failing status file into OK) rejected; fixtures 1 and texts converged on extension-points.md:72. ISS-007 recurs (round 9) in a new operator class, control flow. BUG-010: the builder's fix of CheckArgumentParser.error (docs/debug/BUG-010.md), the supervisor's cases for every item and for every separable survivor of a new control-flow sweep (run/supervisor/sweep_flow.py), every status fixture's text pinned, the registry sentence rewritten (HARDENING, "the stage review (round 9)")
 -Last accepted: BUG-009, at commit 04aee91 (merged to main 2026-10-18, PR #35); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003 to BUG-009
-+Increment: BUG-011 — stage B2's review, round 10 (branch bug-011): Review B and eight of Review A's nine parts APPROVE; Review A's tests part REJECT: a status file's lines deduplicated before they are judged (two identical lines turned a failing file into OK) and a separator cell's "at least one dash" held by no test. ISS-007 recurs (round 10) in a new operator class, rules rewritten in another idiom. BUG-011, the supervisor's tests and fixtures only, no program change: the cases named, an idiom sweep (run/supervisor/sweep_idiom.py) with a case for every separable survivor, the rest by class (HARDENING, "the stage review (round 10)"), round 10's test considers and round 9's carried docstrings
++Increment: BUG-011 — stage B2's review, round 10 (branch bug-011): Review B and eight of Review A's nine parts APPROVE; Review A's tests part REJECT: a status file's lines deduplicated before they are judged (two identical lines turned a failing file into OK) and a separator cell's "at least one dash" held by no test. ISS-007 recurs (round 10) in a new operator class, rules rewritten in another idiom. BUG-011, the supervisor's tests and fixtures only, no program change: the cases named, an idiom sweep (run/supervisor/sweep_idiom.py) with a case for every separable survivor, the rest by class (HARDENING, "the stage review (round 10)"), round 10's test considers and round 9's carried docstrings. Gate round 1: Review B APPROVE, Review A REJECT (five survivors classed where an input separates them; the Of type comment); the second attempt adds their cases and records the Of type program lead
 +Last accepted: BUG-010, at commit b7f6ec3 (merged to main 2026-10-18, PR #36); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003 to BUG-010
  Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
  Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
@@ -109,7 +111,7 @@ index 0000000..7b6a66e
 +Workflows: Web App Development; traits: none
 +Workflows: Web App Development; traits: none
 diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
-index 16a0b85..369d44a 100644
+index 16a0b85..ee46746 100644
 --- a/tests/test_workflow_check.py
 +++ b/tests/test_workflow_check.py
 @@ -399,8 +399,9 @@ FILE_EXACT = {
@@ -268,7 +270,7 @@ index 16a0b85..369d44a 100644
      rc, lines, err = run("--no-such-option")
      assert " ".join(err.split()) == ("usage: workflow-check.py [-h] [--open-list FILE] [--registry FILE] [--status FILE] "
                                       "[ROOT ...] workflow-check.py: error: unrecognized arguments: --no-such-option"), err
-@@ -2642,3 +2684,191 @@ def test_r014_a_reason_that_holds_a_key_is_escaped(tmp_path):
+@@ -2642,3 +2684,273 @@ def test_r014_a_reason_that_holds_a_key_is_escaped(tmp_path):
          f"FAIL (d) {f}: x - type workflow types/libr\\xe4ry.md does not exist",
          f"FAIL (d) {f}: x - not a sub-type of libr\\xe4ry"]), p.stdout
      assert p.returncode == 1 and p.stderr == "", p.stderr
@@ -302,6 +304,10 @@ index 16a0b85..369d44a 100644
 +    one = tmp_path / "once.md"
 +    one.write_text("Workflows: Web App Development; traits: none\n", encoding="utf-8", newline="\n")
 +    assert run("--open-list", STATUS_LIST, "--status", str(one))[1] == ["RESULT: OK"]
++    text = (REPO / FIX / "status" / "e-sub-type-named-twice.md").read_text(encoding="utf-8")
++    assert text == "Workflows: Host Extension Development \u2192 Claude Code Extension, Claude Code Extension; traits: none\n"
++    one.write_text("Workflows: Host Extension Development \u2192 Claude Code Extension; traits: none\n", encoding="utf-8", newline="\n")
++    assert run("--open-list", STATUS_LIST, "--status", str(one))[1] == ["RESULT: OK"]
 +
 +
 +# (the status line, the sweep's survivor it separates, the findings).
@@ -309,9 +315,11 @@ index 16a0b85..369d44a 100644
 +    "type-in-two-segments": ("Workflows: Web App Development → Web App Development; traits: none",
 +                             "line 604: the head's segments with repeats dropped",
 +                             ["FAIL (e) {f}: - - part must name exactly one product type"]),
-+    # The Of type relation is judged for one product type and one sub-type only, so a name given twice leaves it
-+    # unjudged: a reading handoff/TASK-006.md Requirement 4 leaves open (its "the line's product type" assumes one),
-+    # pinned as the program's (the sweep's line 624, either count taken with repeats dropped).
++    # The program judges the Of type relation only where the line names exactly one product type and one sub-type, so a
++    # name given twice leaves it unjudged. Read literally, handoff/TASK-006.md Requirement 4 asks it of any sub-type the
++    # line names whose Of type is not the line's product type, and "Print each" asks for that finding beside the count's:
++    # these two cases pin the program's output, and the gap is a lead for the next change of workflow-check.py
++    # (docs/HARDENING.md, "BUG-011's gate round 1"; the sweep's line 624, either count taken with repeats dropped).
 +    "type-twice-sub-of-another": ("Workflows: Web App Development, Web App Development → Claude Code Extension; traits: none",
 +                                  "line 624: the product types counted with repeats dropped",
 +                                  ["FAIL (e) {f}: - - part must name exactly one product type"]),
@@ -356,6 +364,26 @@ index 16a0b85..369d44a 100644
 +                                              ["FAIL (form) {r}/traits/foo: foo - path is not a conditional-workflow file",
 +                                               "FAIL (form) {r}/traits/foo/y.md: y.md - path is not a conditional-workflow file",
 +                                               "FAIL (d) {r}/types/foo: foo - type folder is not a product type"]),
++    # A folder inside a type's folder is (form) whatever its name, `types` too (extension-points.md:72; BUG-011's gate
++    # round 1: Review A, the sweep's second `len` of line 357, which counted the path's parts without repeats and so
++    # dropped the folder); its file is no conditional workflow either.
++    "folder-named-types-in-a-type-folder": ({"types/host-extension.md": "## Add at intake.questions\n\nq\n",
++                                             "types/host-extension/types/f.md": "## Add at intake.questions\n\nq\n"},
++                                            "line 357: a folder under a type's folder counted with repeats dropped",
++                                            ["FAIL (form) {r}/types/host-extension/types: types - path is not a conditional-workflow file",
++                                             "FAIL (form) {r}/types/host-extension/types/f.md: f.md - path is not a conditional-workflow file"]),
++    # A folder named like a file inside a type's folder, and one under traits/, is a folder, and the file inside it,
++    # named like its folder, is at no key's path (extension-points.md:72; BUG-011's gate round 1: Review A, lines 362
++    # and 364 counting the path's parts without repeats, which read it as a sub-workflow and as a trait).
++    "folder-named-like-a-sub-workflow": ({"types/host-extension.md": "## Add at intake.questions\n\nq\n",
++                                          "types/host-extension/x.md/x.md": "## Add at intake.questions\n\nq\n"},
++                                         "line 362: a three-part path counted with repeats dropped",
++                                         ["FAIL (form) {r}/types/host-extension/x.md: x.md - path is not a conditional-workflow file",
++                                          "FAIL (form) {r}/types/host-extension/x.md/x.md: x.md - path is not a conditional-workflow file"]),
++    "folder-named-like-a-trait": ({"traits/installable.md/installable.md": "## Add at intake.questions\n\nq\n"},
++                                  "line 364: a traits path counted with repeats dropped",
++                                  ["FAIL (form) {r}/traits/installable.md: installable.md - path is not a conditional-workflow file",
++                                   "FAIL (form) {r}/traits/installable.md/installable.md: installable.md - path is not a conditional-workflow file"]),
 +    # A Set at project-end.delivery is no addition there, so it owes no delivery kind: its one finding is the point's
 +    # (extension-points.md:68, the `for <kind>` form is an addition's; the sweep's line 524 without `kind == "add"`).
 +    "set-at-delivery": ({"types/host-extension.md": "## Set at project-end.delivery\n\nx\n"},
@@ -460,11 +488,107 @@ index 16a0b85..369d44a 100644
 +    monkeypatch.setattr(mod, "open", fake_open, raising=False)
 +    text, shown, reason = mod.read_utf8(str(path))
 +    assert text is None and reason == "cannot be read (odd failure)", reason
++
++
++def _product_table(text):
++    """The Product types table of an open list's text: its lines, from the header to the last row."""
++    lines = text.split("\n")
++    start = lines.index("## Product types")
++    first = next(k for k in range(start + 1, len(lines)) if lines[k].startswith("|"))
++    end = next(k for k in range(first, len(lines)) if not lines[k].startswith("|"))
++    return "\n".join(lines[first:end]) + "\n"
++
++
++def test_r014_a_table_of_two_separator_lines_is_read_for_its_columns(tmp_path):
++    """A table of two identical separator lines: the first is read as the header, whose cells are dashes, so the
++    table has its separator and lacks its columns (BUG-011's gate round 1: Review A, the sweep's line 222, the table's
++    lines counted with repeats dropped, which names the separator instead). Each is a table that cannot be read
++    (handoff/TASK-006.md Requirement 3); which reason is named, no document fixes: the test pins the program's."""
++    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
++    table = _product_table(text)
++    sep = "|---|---|---|---|---|---|---|"
++    broken, shown = _open_list_with(tmp_path, table, sep + "\n" + sep + "\n")
++    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
++    assert lines == [f"ERROR: {shown}: missing column Key", "RESULT: not checked"], lines
++    assert rc == 2 and err == "", err
++
++
++def test_r014_a_row_like_the_separator_is_a_row(tmp_path):
++    """A product type row that repeats the separator line is read as a row (BUG-011's gate round 1: Review A, the
++    sweep's line 218, the table's lines with repeats dropped, which drops it): its Workflow name is `---` and its
++    Written `---`, so a line naming it gives (f). Such an open list breaks its own rules (open-list.md), and no
++    document says what such a row is; the test pins the program's reading."""
++    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
++    table = _product_table(text)
++    sep = "|---|---|---|---|---|---|---|"
++    assert table.split("\n")[1] == sep, "precondition: the separator line"
++    broken, shown = _open_list_with(tmp_path, table, table + sep + "\n")
++    status = tmp_path / "status.md"
++    status.write_text("Workflows: ---; traits: none\n", encoding="utf-8", newline="\n")
++    rc, lines, err = run("--open-list", str(broken), "--status", str(status))
++    s = str(status).replace("\\", "/")
++    assert lines == [f"FAIL (f) {s}: --- - product type is not written", "RESULT: 1 problem(s)"], lines
++    assert rc == 1 and err == "", err
++
++
++def test_r014_two_tables_without_a_column_are_two_error_lines(tmp_path):
++    """Each table that cannot be read is an ERROR line (handoff/TASK-006.md Requirement 3: "one or more lines"), two
++    identical ones too: the Product types and Sub-types tables both without Key (BUG-011's gate round 1: Review A, the
++    sweep's line 820, the errors printed with repeats dropped). The count of identical lines, no document fixes beyond
++    one per table; the test pins the program's."""
++    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
++    assert text.count("\n| Key | Name |") == 3, "precondition: three tables whose first column is Key"
++    broken = tmp_path / "open-list.md"
++    broken.write_text(text.replace("\n| Key | Name |", "\n| Id | Name |", 2), encoding="utf-8", newline="\n")
++    shown = str(broken).replace("\\", "/")
++    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
++    assert lines == [f"ERROR: {shown}: missing column Key"] * 2 + ["RESULT: not checked"], lines
++    assert rc == 2 and err == "", err
 diff --git a/tests/test_workflows_line_check.py b/tests/test_workflows_line_check.py
-index 2e9891a..14effde 100644
+index 2e9891a..3c92a63 100644
 --- a/tests/test_workflows_line_check.py
 +++ b/tests/test_workflows_line_check.py
-@@ -499,6 +499,31 @@ def test_r015_conformance_prints_each_finding_in_order(tmp_path):
+@@ -288,6 +288,9 @@ NOT_LOADABLE = {
+     "open-list-without-tables": ("open-list-without-tables", VALID["not-yet-classified"], "missing heading"),
+     "no-escape-field": ("no-escape-field", MALFORMED["no-traits"][0], "workflow-check.py: AttributeError"),
+     "check-exits-after-load": ("check-exits-after-load", VALID["not-yet-classified"], "workflow-check.py: SystemExit"),
++    # Two tables without Key give two identical causes, each a line (TASK-008 Requirement 5: one line per cause; BUG-011's
++    # gate round 1: Review A, the idiom sweep's inventory-check.py line 264, the causes printed with repeats dropped).
++    "two-tables-without-key": ("two-tables-without-key", VALID["not-yet-classified"], "missing column Key"),
+ }
+ 
+ 
+@@ -302,6 +305,11 @@ def _broken_copy(tmp_path, how):
+         (folder / "workflow" / "extension-points.md").unlink()
+     elif how == "open-list-without-tables":
+         (folder / "workflow" / "open-list.md").write_text("# Open list\n\nNo tables here.\n", encoding="utf-8", newline="\n")
++    elif how == "two-tables-without-key":
++        open_list = folder / "workflow" / "open-list.md"
++        text = open_list.read_text(encoding="utf-8")
++        assert text.count("\n| Key | Name |") == 3, "precondition: three tables whose first column is Key"
++        open_list.write_text(text.replace("\n| Key | Name |", "\n| Id | Name |", 2), encoding="utf-8", newline="")
+     elif how == "check-exits-after-load":
+         text = checker.read_text(encoding="utf-8")
+         head = "def check_status(path, text, tables):\n"
+@@ -315,7 +323,7 @@ def _broken_copy(tmp_path, how):
+ 
+ 
+ # The cases whose rule files are broken; each of the others is one load failure with one cause.
+-RULE_CASES = ("rules-absent", "registry-absent", "open-list-without-tables")
++RULE_CASES = ("rules-absent", "registry-absent", "open-list-without-tables", "two-tables-without-key")
+ 
+ 
+ def _causes(folder):
+@@ -352,6 +360,8 @@ def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
+             # The three causes by name, so the copy's reader is not the only oracle (BUG-008's gate round 1: consider).
+             assert [line.rsplit(": ", 1)[1] for line in found] == [
+                 "missing heading ## Product types", "missing heading ## Sub-types", "missing heading ## Traits"], found
++        if how == "two-tables-without-key":
++            assert [line.rsplit(": ", 1)[1] for line in found] == ["missing column Key"] * 2, found
+     else:
+         assert len(found) == 1, found
+ 
+@@ -499,6 +509,31 @@ def test_r015_conformance_prints_each_finding_in_order(tmp_path):
      assert rc == 1
  
  
