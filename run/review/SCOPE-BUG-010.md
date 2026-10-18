@@ -1,5 +1,14 @@
 # SCOPE — BUG-010 (stage B2's review, round 9: fixes)
 
+## r2 (gate round 2; over the reviewed head 4edb289 — run/review/DELTA-BUG-010.diff holds the change since that head alone)
+Gate round 1: Review A APPROVE with two should-fix items and notes (docs/HARDENING.md, "BUG-010's gate round 1"); Review B did not run, its model's usage pool being used up (ISS-008), so no Review B verdict exists for round 1. r2 changes no program text. The roster switched to the native profile (the owner's word, ISS-008): composer-2.5 authored the fix again (handoff/BUG-010.md's run-r2 section; handoff/BUG-010-r2-report.md), restoring the method to its checkpoint text first; the result is r1's text byte for byte, so DELTA-BUG-010.diff shows no program change. Review B is grok-4.7-medium, of neither the r2 builder's family (Cursor) nor Review A's. What else r2 changes:
+- tests/test_workflow_check.py: docstrings only — the order tests cite the document that fixes an order (handoff/TASK-006.md Requirement 11 for a status line's findings) or say that none does; the duplicate-row tests say the input breaks the open list's own uniqueness rule; the escape test says the key breaks the open list's key rule; the layer test attributes only the reporting to R5-1; the block comment names the run its line numbers come from.
+- tests/test_extension_points.py and bridge/cursor-bridge/workflow/extension-points.md:72: "with no file inside it read" (the walk still lists the folder); bridge/cursor-bridge/workflow/open-list.md:94: "§6.3 spells out the shape for type workflows only"; bridge/cursor-bridge/MANIFEST.json restamped.
+- handoff/BUG-010.md (the run-r2 section), handoff/BUG-010-r2-report.md (the r2 builder's report), docs/ROSTER.resolved.json (the native profile).
+- Records: docs/HARDENING.md (line 325 in a class of its own, "listing-order"; the "streams" and "independent" reasons; the case count; "BUG-010's gate round 1"), docs/PROJECT_STATUS.md (the owner's decision on the usage pool), this file.
+
+The sections below are r1's, corrected where r2 says.
+
 ## Scope (what this increment is)
 Stage B2's review, round 9 (snapshot STAGE-B2i, 6e3d90f): Review B REJECT (the usage error with a standard stream closed exits 1, with a traceback when standard output is closed; four status fixtures' text not pinned); Review A REJECT on two parts (fixtures 4: a line that breaks the prefix rule was never observed unchecked; tests: `continue` made `break` at lines 687, 693 and 696 and the not-yet-classified test moved above the part count, each turning a failing status file into `RESULT: OK`), with fixtures 1 and texts converging on extension-points.md:72. Every finding is taken here or recorded in docs/HARDENING.md, "the stage review (round 9)". ISS-007 recurs, in a new operator class (control flow), so before any case a control-flow sweep was written and run (run/supervisor/sweep_flow.py), and every survivor an input separates has a case.
 

@@ -1,0 +1,400 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 7edea2a..ee35d33 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.11d",
+-  "generated": "2026-10-18 05:49",
++  "generated": "2026-10-18 10:38",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -103,8 +103,8 @@
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/workflow-check.py": "ff87680ca972eb50abbda822443420f7c650b5fee9e8b607cdf9e6fcf27c9d73",
+-    "cursor-bridge/workflow/extension-points.md": "59d39480199edabff72166cc2a41a3c185805a9a94d863b2a59993f825e0e300",
+-    "cursor-bridge/workflow/open-list.md": "2e809309395db0678056750915d8e20085b433c3a364330f48c73d48df8d6991",
++    "cursor-bridge/workflow/extension-points.md": "d62447f21dd4acff615d4260ed40baa86d8d2f0567f928a1689a9a4cbb98fb8b",
++    "cursor-bridge/workflow/open-list.md": "6d37ec2741ab10f6238aa3a2eb0c4e46f57defd109a80a2b08209c1cfcce8840",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/workflow/extension-points.md b/bridge/cursor-bridge/workflow/extension-points.md
+index 39b8ccf..75d9cba 100644
+--- a/bridge/cursor-bridge/workflow/extension-points.md
++++ b/bridge/cursor-bridge/workflow/extension-points.md
+@@ -69,7 +69,7 @@ A conditional workflow file states each change it makes under a heading of its o
+ - `## Set at <point key>` — the value it sets there, at a point whose Changes cell includes `set`. Only a type workflow or a sub-workflow may set. The value is the section's first non-blank line, stripped; at `intake.delivery-kind` it is one delivery kind's key from the list above, bare or in backticks.
+ - `## Replace <module key>` — its own version of the whole phase, for a module marked replaceable. Only a type workflow or a sub-workflow may replace.
+ 
+-A `##` heading is a line that starts with at most three spaces, then `##`, then a space or a tab; a line of `##` alone is not one and is read as text. The four forms above are matched exactly: `##` at the start of the line, one space between words, and nothing after the key or the delivery kind, not even a space. A `##` heading other than the four forms is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets each point, and replaces each module, at most once. A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own structure `###` headings and deeper. A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening none, and closes with a run of the same character at least as long, indented at most three spaces and followed only by spaces or tabs; a fence still open at the end of the file fails. The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a file or a link; every link under `types/` or `traits/`, which it never follows; a file under `types/` or `traits/` that is not a conditional workflow at its key's path (a README there included); a folder under `traits/` or inside a type's folder; a folder under `types/` that is no product type, reported once, with nothing inside it read (a link inside it is still reported, as a link); and a sub-workflow whose type's own workflow file, `types/<type key>.md`, does not exist. A conditional-workflow file that cannot be read as UTF-8 stops the check: it prints an ERROR line naming the file and `RESULT: not checked`, and checks nothing.
++A `##` heading is a line that starts with at most three spaces, then `##`, then a space or a tab; a line of `##` alone is not one and is read as text. The four forms above are matched exactly: `##` at the start of the line, one space between words, and nothing after the key or the delivery kind, not even a space. A `##` heading other than the four forms is prose, except one that reads like a change: a heading whose first word, in any case and with any trailing `:`, `;`, `,`, `.` or `-` ignored, is add, adds, added, adding, set, sets, setting, replace, replaces, replaced or replacing, or whose second word is `at` in any case, fails as a malformed change heading, so a prose heading such as "Setting up the host" or "Look at the target" is renamed. A file sets each point, and replaces each module, at most once. A section runs from its heading to the next `##` heading, prose or change, so a replacement gives its own structure `###` headings and deeper. A `##` line inside a fenced code block is not a heading and changes nothing: a fence opens with a run of three or more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening none, and closes with a run of the same character at least as long, indented at most three spaces and followed only by spaces or tabs; a fence still open at the end of the file fails. The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a file or a link; every link under `types/` or `traits/`, which it never follows; a file under `types/` or `traits/` that is not a conditional workflow at its key's path (a README there included); a folder under `traits/` or inside a type's folder; a folder under `types/` that is no product type, reported once, with no file inside it read (a link inside it is still reported, as a link); and a sub-workflow whose type's own workflow file, `types/<type key>.md`, does not exist. A conditional-workflow file that cannot be read as UTF-8 stops the check: it prints an ERROR line naming the file and `RESULT: not checked`, and checks nothing.
+ 
+ A trait attaches to the main workflow only through its `Add at` headings, so each of its additions names the point it belongs to. Within one file, additions at one point keep the order the file writes them in; across files they apply in the order `supervisor.md` states ("The order additions apply in").
+ 
+diff --git a/bridge/cursor-bridge/workflow/open-list.md b/bridge/cursor-bridge/workflow/open-list.md
+index 36396bb..b0b11b4 100644
+--- a/bridge/cursor-bridge/workflow/open-list.md
++++ b/bridge/cursor-bridge/workflow/open-list.md
+@@ -91,4 +91,4 @@ Changing an existing one is the same, editing only its file and, where its defin
+ 
+ ## Names
+ 
+-The workflow names of the video game (Game Development) and of its Roblox sub-type (Roblox Game) are the owner's (2026-10-01). The others follow the shape of those two: a type workflow is named for the work on its product type, as §6.3 states, and a sub-workflow for the kind of product its sub-type makes, as Roblox Game is (§6.3 states no shape for sub-workflow names).
++The workflow names of the video game (Game Development) and of its Roblox sub-type (Roblox Game) are the owner's (2026-10-01). The others follow the shape of those two: a type workflow is named for the work on its product type, as §6.3 states, and a sub-workflow for the kind of product its sub-type makes, as Roblox Game is (§6.3 spells out the shape for type workflows only).
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 7079086..f8fe7c4 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -449,7 +449,7 @@ The reruns after r2: the line driver 62 of 62 (mutate_workflows_line_bug009r2.ou
+ 
+ Snapshot STAGE-B2i (6e3d90f on stage/B2, deleted after verify OK, hash 53d3bbbd7b53787c). **Review B:** REJECT, two items: workflow-check.py's usage error with a standard stream closed exits 1, not 2, and with standard output closed prints a traceback (a program defect, BUG-010's fix); four status fixtures' text was not pinned (form-prefix-missing-unclassified, form-part-colon-no-space, form-traits-none-last, form-traits-marker-twice). **Review A** in nine parts: programs, texts, fixtures 1, 2, 3, 5 and 6 APPROVE with should-fix items or considers; fixtures 4 REJECT (the rule that a line breaking the prefix rule is not checked further was unobserved: every such fixture's body was valid); tests REJECT (`continue` made `break` at lines 687, 693 and 696, and the not-yet-classified test moved above the part count, each turning a failing status file into `RESULT: OK`; should-fix: `continue` made `break` at 612, 653, 657 and 660). Fixtures 1's should-fix and the texts part's consider name the same line, extension-points.md:72: blocking by convergence. ISS-007 recurs (round 9), in a new operator class: the order of statements and the way a loop is left, which no sweep had tried.
+ 
+-**The supervisor's response:** rather than cases for the lines named, a sweep for the class, written and run before any case (run/supervisor/sweep_flow.py: every `continue` made `break` or `pass`, every bare `return` made `pass`, every two neighbouring statements swapped, every `for` loop reversed, every member of a module constant dropped, over sweep_wide.py's ranges): 145 survivors of 444 on main's tests (run/supervisor/sweep_flow_r1.out). Every survivor an input separates then got a case, and every status fixture's text is pinned.
++**The supervisor's response:** rather than cases for the lines named, a sweep for the class, written and run before any case (run/supervisor/sweep_flow.py: every `continue` made `break` or `pass`, every bare `return` made `pass`, every two neighbouring statements swapped, every `for` loop reversed, every member of a module constant dropped, over sweep_wide.py's ranges): 145 survivors of 444 on main's tests (run/supervisor/sweep_flow_r1.out). Every survivor an input separates in a fixed order then got a case, and every status fixture's text is pinned.
+ 
+ **Blocking, taken in BUG-010:**
+ - **Review B, the program:** CheckArgumentParser.error wrote to standard error and flushed standard output without allowing either to be `None`, Python's state for a stream the program was started without (docs/debug/BUG-010.md). The builder's fix guards the two calls (handoff/BUG-010.md, handoff/BUG-010-r1-report.md). Reproduction: test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback[stdout-closed, stderr-closed], red at the checkpoint, green after the fix.
+@@ -467,17 +467,23 @@ Snapshot STAGE-B2i (6e3d90f on stage/B2, deleted after verify OK, hash 53d3bbbd7
+ 
+ **BUG-010's fix, Review A in fix mode (before the gate):** APPROVE: the guards test the closed-stream state itself, the cause is repaired where it was named, nothing outside the method changed, the manifest matches. Its consider, taken: the reproduction test asserts each open stream whole, white space aside. Noted, not taken: with both streams closed the run relies on argparse's own tolerance of a missing stream (Python 3.12, which CI pins; probed: exit 2).
+ 
+-**The control-flow sweep:** BUG-010's first cases killed 10 of the 145 (run/supervisor/sweep_flow_r2.out); 17 more cases (each docstring names its survivor) kill 22 more (run/supervisor/sweep_flow_r3.out, and line 740's by the escape case): the order of a file's findings (an open fence, a trait's empty Set at, a delivery kind at an unknown point, a sub-workflow's two identity findings) and of a status line's (two unknown segments, no type and two sub-types, the shape before the written test); the separator before the columns, and the first missing column; the first row of a repeated name and a trait's first place; both layers that cannot be examined, in order; a listing error before a read error; the usage line's option order; a root that is no folder when the rules cannot be read; a reason that holds a key, escaped; file_lines' final line feed; and the judges' load errors before a line is judged. Each pins the output as the program gives it, its order included; where no document fixes an order, a change of it is a change of these tests. On the fixed program, with every case, the full sweep leaves 113 survivors of 444 (run/supervisor/sweep_flow_r4.out); the generator run/supervisor/write_flow_list.py (`--check`) stops on a survivor no class names and on a class entry no survivor matches. The classes are the supervisor's reasoning, not a test:
+-- **68, independent:** two neighbouring statements swapped where neither reads a name the other binds and neither writes output or a list another statement reads: an assignment, a nested definition or a pure read beside another.
++**The control-flow sweep:** BUG-010's first cases killed 10 of the 145 (run/supervisor/sweep_flow_r2.out); 19 more cases (17 in tests/test_workflow_check.py, two in tests/test_workflows_line_check.py; each docstring names its survivor and cites the document that fixes its order, or says that none does) kill 22 more (run/supervisor/sweep_flow_r3.out, and line 740's by the escape case): the order of a file's findings (an open fence, a trait's empty Set at, a delivery kind at an unknown point, a sub-workflow's two identity findings) and of a status line's (two unknown segments, no type and two sub-types, the shape before the written test); the separator before the columns, and the first missing column; the first row of a repeated name and a trait's first place; both layers that cannot be examined, in order; a listing error before a read error; the usage line's option order; a root that is no folder when the rules cannot be read; a reason that holds a key, escaped; file_lines' final line feed; and the judges' load errors before a line is judged. Each pins the output as the program gives it, its order included; where no document fixes an order, a change of it is a change of these tests. On the fixed program, with every case, the full sweep leaves 113 survivors of 444 (run/supervisor/sweep_flow_r4.out); the generator run/supervisor/write_flow_list.py (`--check`) stops on a survivor no class names and on a class entry no survivor matches. The classes are the supervisor's reasoning, not a test:
++- **68, independent:** two neighbouring statements swapped where neither reads what the other binds or writes: an assignment, a nested definition or a pure read beside another, an append to a list the other does not touch (261, 331), and the positional argument declared before the last option, where argparse formats and parses positionals apart from options (772).
+ - **15, before-exit:** a pure computation or an empty list moved above the test that returns or continues before it: nothing it binds is read on the way out, and on the way on it is bound as before.
+ - **6, exclusive:** two tests swapped that no value passes both, each ending in a return or continue, or ending alike: a line that starts with `|` or with `## `, an action that is one of two names, a kind that is `link` or `dir`; a link or a path that is no folder, both reported as a link; a link by mode bits or by reparse attribute, both a link.
+ - **6, commuting:** two steps that give one result in either order: dropping one leading and one trailing `:` (or `|`), which differ only on the one-character string, where both give the empty string; raising the running maximum and testing against it, where an index that raises it is not below it; a row appended before a test that then returns an error; a part counted where a bad prefix gives no part; a repeat test before the unknown-name test, where an unknown name never enters the seen set.
+ - **4, unreachable:** a guard no input reaches, moved: is_change_heading is called only on a line its own pattern matched, so its match is never None (382); a sub-workflow is walked only under a known type folder, so its type key is always a product type and the finding that used the list before it was made never runs (547); spec_from_file_location on a `.py` path always has a loader (the judges' 205, 314).
+-- **5, sorted:** an order the program then discards: the walk's names and its found list, whose items are sorted by their unique path and whose unknown type folders are a set (325, 333, 340, 345); the two streams, each reconfigured alone (834).
++- **4, sorted:** an order the program then discards: a folder's file names and the found list, whose items are sorted by their unique path and whose unknown type folders are a set (333, 340, 345); the two streams, each reconfigured alone (834).
++- **1, listing-order:** a folder's subfolders walked in reverse (325): the walk then lists them in the other order, so two subfolders that cannot be listed give their ERROR lines in the other order, an input separates it; but the original order is the file system's own listing order, which no document fixes and which differs between file systems (NTFS lists by name, ext4 by hash), so no test can pin it without fixing an order the program does not choose (BUG-010's gate round 1: Review A).
+ - **2, fence-line:** a fence's opening or closing line no longer skipped: such a line starts with backticks or tildes after at most three spaces, so the heading candidate never matches it.
+ - **1, error-stops:** the walk goes on past a layer that cannot be examined: its error is already kept, and any error stops the check before a finding is judged, so the extra link item is never printed.
+ - **1, same-list:** the list of a root's items appended before its items are read: the same list object, filled before it is read.
+ - **2, placement-empty:** the placement findings added before the missing-line test: a status file with no Workflows line has no placement finding (check_placement returns none), so the missing outcome is unchanged.
+-- **3, streams:** the order of BUG-010's fixed usage error: the RESULT line printed before the error line, which go to different streams, so each stream receives the same text; the flush of standard output moved above the print, or the exit above the flush, where sys.exit raises SystemExit and the interpreter flushes standard output as it ends.
++- **3, streams:** the order of BUG-010's fixed usage error: the RESULT line printed before the error line, which go to different streams, so each stream, read on its own, receives the same text (merged into one, `2>&1` with standard output unbuffered, the lines could change places, an order no document governs); the flush of standard output moved above the print, or the exit above the flush, where sys.exit raises SystemExit and the interpreter flushes standard output as it ends.
+ 
+ The earlier sweeps rerun on the fixed program: the first sweep 49 survivors of 758 (run/supervisor/sweep_workflow_check_r14.out), r13's less line 103's empty-last-line test forced false (the final-line-feed case kills it) and with the fixed method's flush guard forced false (the interpreter flushes standard output as it ends); write_survivor_list.py --check holds each against its reason. The widened sweep 351 of 731, the same survivors as r8 at their new line numbers (run/supervisor/sweep_wide_r9.out), round 8's class list unchanged. The mutation drivers rerun on the fixed program: mutate_workflow_check.py 300 of 300 killed (run/supervisor/mutate_workflow_check_bug010.out; the mutant "usage error without RESULT" now drops the guarded flush with the RESULT line), mutate_workflows_line.py 62 of 62 (run/supervisor/mutate_workflows_line_bug010.out).
++
++**BUG-010's gate round 1:** Review A APPROVE, with two should-fix items and notes, taken in r2 (tests, texts and records; no program change). Review B did not run: its model's pool was used up (ISS-008). On the owner's word the native profile runs; since its Review B is of the family that built r1's fix, the fix was authored again by composer-2.5 (handoff/BUG-010.md, run r2; handoff/BUG-010-r2-report.md: the method restored, the reproduction tests red at 1453 passed and 2 failed, the fix implemented, 1455 passed, its three mutants caught). Its text is r1's, two guards, byte for byte; Review B of gate round 2 is grok-4.7-medium.
++- **Should-fix, taken:** line 325's survivor (a folder's subfolders walked in reverse) was filed under "sorted", whose reason does not hold for it: the walk lists the subfolders in the other order, so two that cannot be listed give their ERROR lines in the other order. That order is the file system's own, which no document fixes and which differs between file systems, so 325 has a class of its own, "listing-order", and the claim reads "every survivor an input separates in a fixed order". The order tests' docstrings now cite the document that fixes an order (TASK-006.md Requirement 11 for a status line's findings) or say that none does (the layers, the listing and read errors), say where an input breaks the open list's own rules (a name given twice, a key with a letter outside its rule), and attribute only the reporting itself to R5-1.
++- **Notes, taken:** the "streams" class says each stream read on its own; the "independent" class names the appends to separate lists and argparse's positional; extension-points.md:72 says "with no file inside it read" (the walk still lists the folder); open-list.md:94 says §6.3 spells out the shape for type workflows only; the test block names the run its line numbers come from.
++- **Notes, recorded:** the unwritten copy's `| yes |` replacement changes nothing in the bridge's open list today, where every entry is unwritten; its precondition (f and FLAG findings exist) is asserted all the same. With both streams closed the usage error relies on argparse's own tolerance (probed: exit 2; no test).
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index b267b59..1686d24 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -28,7 +28,7 @@ Run parameters: see docs/RUN_PARAMETERS.md (stage pause=run / merge authority=su
+ 
+ ## Release B — notes for a resuming session
+ - This is the first release the bridge's own supervisor builds, as a supervised project (§15 condition 6). The design is the Restructuring Plan (Documents/Claude-Cursor Bridge Restructuring Plan.md), release B, §16 and §6.
+-- Roster: full profile (builder grok-4.7-medium, Review A claude-opus-5-5, Review B gpt-5.6-sol-high) since the owner's "usage reset" of 2026-10-16; the native profile (builder composer-2.5, Review B grok-4.7-medium) ran 2026-10-12 to 2026-10-16.
++- Roster: the native profile (builder composer-2.5, Review A claude-opus-5-5, Review B grok-4.7-medium) since 2026-10-18, on the owner's word ("use the alternative roster") after Cursor's Other Models pool was used up (ISS-008); the full profile (builder grok-4.7-medium, Review B gpt-5.6-sol-high) returns on 2026-11-16 UTC, or earlier if the owner says *usage reset*. Earlier: native 2026-10-12 to 2026-10-16, full 2026-10-16 to 2026-10-18.
+ - Stage B1 (TASK-001, TASK-002) merged after stage B2's TASK-003 to TASK-007, because TASK-002 waited on the owner's Socket variable; B1's change is its own squash commits (9e181e6, fba63bc, and BUG-001's), not a range of main.
+ - `security floor` is a required check on main since 2026-10-13 (the owner's yes).
+ - Merge authority = supervisor — the supervisor completes each gated merge with bare `gh pr merge --squash --match-head-commit` (piped/compound forms fall to the classifier; --admin/force stay refused).
+diff --git a/docs/ROSTER.resolved.json b/docs/ROSTER.resolved.json
+index 46b5cdf..302dc65 100644
+--- a/docs/ROSTER.resolved.json
++++ b/docs/ROSTER.resolved.json
+@@ -1,15 +1,15 @@
+ {
+-  "profile": "full",
+-  "builder": "grok-4.7-medium",
++  "profile": "native",
++  "builder": "composer-2.5",
+   "review_a": "claude-opus-5-5",
+-  "review_b": "gpt-5.6-sol-high",
++  "review_b": "grok-4.7-medium",
+   "families": {
+-    "builder": "xai",
++    "builder": "cursor",
+     "review_a": "anthropic",
+-    "review_b": "openai"
++    "review_b": "xai"
+   },
+-  "other_pool": "available",
++  "other_pool": "exhausted",
+   "probed": true,
+-  "resolved_at": "2026-10-18T03:42 UTC",
++  "resolved_at": "2026-10-18T08:43 UTC",
+   "reset_day": 16
+ }
+diff --git a/handoff/BUG-010-r1-report.md b/handoff/BUG-010-r1-report.md
+index 720ba8c..10fb53c 100644
+--- a/handoff/BUG-010-r1-report.md
++++ b/handoff/BUG-010-r1-report.md
+@@ -70,7 +70,7 @@ Exit code: 0. Relevant output: `make-manifest: version 2026.10.11d, 107 files ha
+ 
+ Command: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
+ 
+-Exit code: 0. Relevant output: `bridge-check: version 2026.10.11d (2026-10-18 05:49) at E:\p18-claude-cursor-bridge\Workspace\bridge` and `bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA` and `RESULT: SOURCES MATCH bridge 2026.10.11d`.
++Exit code: 0. Relevant output: `bridge-check: version 2026.10.11d (2026-10-18 05:49) at <Workspace>\bridge` (path redacted by the supervisor, rule 54) and `bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA` and `RESULT: SOURCES MATCH bridge 2026.10.11d`.
+ 
+ ### 5. Full suite after the manifest
+ 
+diff --git a/handoff/BUG-010-r2-report.md b/handoff/BUG-010-r2-report.md
+new file mode 100644
+index 0000000..81ab2eb
+--- /dev/null
++++ b/handoff/BUG-010-r2-report.md
+@@ -0,0 +1,128 @@
++# BUG-010-r2 report
++
++## Summary
++
++Per r2, `CheckArgumentParser.error` was restored to the pre-fix body from the brief, `make-manifest` was run, and the pre-fix suite showed 1453 passed, 23 skipped, 2 failed; the same two `is not None` guards were then applied again so `sys.stderr.write` and `sys.stdout.flush` are skipped when the corresponding stream is `None`, after which every Done verification passed including 1455 passed and 23 skipped on the full suite.
++
++## How the change addresses the named cause
++
++The method no longer calls `write` on `sys.stderr` or `flush` on `sys.stdout` when that stream is `None`, which is Python's state for a standard stream the program was started without, so the AttributeError that turned a usage error into exit 1 no longer occurs.
++
++## Files changed
++
++- `bridge/cursor-bridge/workflow-check.py` — body of `CheckArgumentParser.error` only: guard before `sys.stderr.write`, guard before `sys.stdout.flush` (working tree matches branch HEAD commit `4595974`; see Done step 7)
++- `bridge/cursor-bridge/MANIFEST.json` — regenerated twice during r2 (`make-manifest` after restore and after fix); unstaged diff vs HEAD is only the `generated` timestamp (`2026-10-18 08:14` → `2026-10-18 10:38`), file hashes unchanged
++- `handoff/BUG-010-r2-report.md` — this report
++
++`bridge/cursor-bridge/VERSION` is not in the diff. `docs/BUILDER_NOTES.md` was not changed. Every file under `tests/` is unchanged.
++
++## Restore (r2 step 1)
++
++Before re-implementing the fix, `CheckArgumentParser.error` was set to exactly the Context text (unconditional `sys.stderr.write` and `sys.stdout.flush`). Command: `python tools/make-manifest.py --version 2026.10.11d` (exit 0). Command: `python -m pytest tests -q` (exit 1). Relevant output: `2 failed, 1453 passed, 23 skipped in 272.64s (0:04:32)`. Failures: `test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback[stdout-closed]`, `[stderr-closed]`.
++
++## Mutation check
++
++- M1 · `test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback[stderr-closed]` (1 failed, 1 passed)
++- M2 · `test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback[stdout-closed]` (1 failed, 1 passed)
++- M3 · `test_r014_usage_error_ends_with_result_line`, `test_r014_usage_error_message_is_escaped`, `test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback[stdout-closed]`, `test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback[stderr-closed]` (4 failed, 412 deselected)
++
++## Done
++
++### 1. Before any edit (after restore, before fix)
++
++Command: `python -m pytest tests -q`
++
++Working folder: Workspace root.
++
++Exit code: 1.
++
++Relevant output: `2 failed, 1453 passed, 23 skipped in 272.64s (0:04:32)` (same run as Restore).
++
++### 2. After the fix
++
++Command: `python -m pytest "tests/test_workflow_check.py::test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback" tests/test_workflow_check.py::test_r014_usage_error_ends_with_result_line tests/test_workflow_check.py::test_r014_usage_error_message_is_escaped tests/test_workflow_check.py::test_r033_usage_names_the_three_times_and_the_codes tests/test_workflow_check.py::test_r014_the_usage_line_names_the_options_in_their_order -q`
++
++Working folder: Workspace root.
++
++Exit code: 0.
++
++Relevant output: `6 passed in 1.73s`.
++
++### 3. Mutants, then the restored file
++
++M1 command: `python -m pytest "tests/test_workflow_check.py::test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback" -q`
++
++Exit code: 1. Relevant output: `FAILED ...[stderr-closed]` and `1 failed, 1 passed in 6.14s`.
++
++M2 command: the same command.
++
++Exit code: 1. Relevant output: `FAILED ...[stdout-closed]` and `1 failed, 1 passed in 5.46s`.
++
++M3 command: `python -m pytest tests/test_workflow_check.py -q -k "usage_error"`
++
++Exit code: 1. Relevant output: four failures named in the mutation list and `4 failed, 412 deselected in 1.21s`.
++
++Fixed code restored, then command: `python -m pytest tests/test_workflow_check.py -q`
++
++Exit code: 0. Relevant output: `415 passed, 1 skipped in 30.56s`. No manifest-refusal failures.
++
++### 4. Manifest and source check
++
++Command: `python tools/make-manifest.py --version 2026.10.11d`
++
++Exit code: 0. Relevant output: `make-manifest: version 2026.10.11d, 107 files hashed, VERSION + MANIFEST.json written`.
++
++Command: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++Exit code: 0. Relevant output: `bridge-check: version 2026.10.11d (2026-10-18 10:38) at <Workspace>\bridge` (path redacted by the supervisor, rule 54), `bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA`, `RESULT: SOURCES MATCH bridge 2026.10.11d`.
++
++### 5. Full suite after the manifest
++
++Command: `python -m pytest tests -q`
++
++Exit code: 0. Relevant output: `1455 passed, 23 skipped in 272.93s (0:04:32)`.
++
++### 6. Windowless check
++
++Command: `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++
++Exit code: 0. Relevant output: `windowless-check: 30 file(s) scanned, 0 FAIL, 0 NOTE`.
++
++### 7. Diffs
++
++Command: `git diff --stat`
++
++Exit code: 0. Output:
++
++```
++warning: in the working copy of 'bridge/cursor-bridge/MANIFEST.json', LF will be replaced by CRLF the next time Git touches it
++warning: in the working copy of 'bridge/cursor-bridge/VERSION', LF will be replaced by CRLF the next time Git touches it
++ bridge/cursor-bridge/MANIFEST.json | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++```
++
++`handoff/BUG-010-r2-report.md` is untracked. `bridge/cursor-bridge/VERSION` does not appear in the stat.
++
++Command: `git diff -- bridge/cursor-bridge/workflow-check.py`
++
++Exit code: 0. Output: (empty — working tree matches HEAD, which already contains the fix from commit `4595974`).
++
++Logical change applied in this run (broken body from the brief → fixed body; same as `git diff 529f26d HEAD -- bridge/cursor-bridge/workflow-check.py` for this method):
++
++```
++@@ -752,9 +752,11 @@ class CheckArgumentParser(argparse.ArgumentParser):
++     def error(self, message):
++         self.print_usage(sys.stderr)
++-        sys.stderr.write("%s: error: %s\n" % (self.prog, escape_field(message)))
+++        if sys.stderr is not None:
+++            sys.stderr.write("%s: error: %s\n" % (self.prog, escape_field(message)))
++         print("RESULT: not checked")
++-        sys.stdout.flush()
+++        if sys.stdout is not None:
+++            sys.stdout.flush()
++         self.exit(2)
++```
++
++## Assumed, not verified
++
++Assumed, not verified: none
+diff --git a/handoff/BUG-010.md b/handoff/BUG-010.md
+index 1d9546f..e9bae3c 100644
+--- a/handoff/BUG-010.md
++++ b/handoff/BUG-010.md
+@@ -1,5 +1,11 @@
+ # BUG-010: workflow-check's usage error with a standard stream closed ends with exit 1
+ 
++## Run r2 — read this first; where it differs from the sections below, it governs
++This brief was run once (r1) by a builder of another model family, whose fix is in the file now. The fix must be authored again in this run, by you: the gate's reviewer may not be of the family that wrote the change it reviews. So:
++1. Before any other edit, restore the body of `CheckArgumentParser.error` in `bridge/cursor-bridge/workflow-check.py` to exactly the text shown under Context ("The method as it stands"), the code before any fix, and nothing else in the file. Then run `python tools/make-manifest.py --version 2026.10.11d` (the manifest holds the r1 fix's hash) and Done step 1: expect 1453 passed, 23 skipped, 2 failed (the two reproduction cases), which shows the restore is complete. If the counts differ, stop and report.
++2. Then implement the fix yourself from the Requirements, and run Done steps 2 to 7 as written.
++3. Your report is `handoff/BUG-010-r2-report.md` (not the r1 report, which stays as it is); your BUILDER_NOTES lines start `2026-10-18 BUG-010-r2:`. In the report, state the restore and its counts before the fix.
++
+ ## Objective
+ Fix the following confirmed defect — repair the named cause, nothing else.
+ 
+@@ -23,6 +29,7 @@ Files you may create or modify:
+ - bridge/cursor-bridge/VERSION
+ - docs/BUILDER_NOTES.md
+ - handoff/BUG-010-r1-report.md
++- handoff/BUG-010-r2-report.md
+ 
+ Do not modify anything else. In `bridge/cursor-bridge/workflow-check.py` only the body of `CheckArgumentParser.error` (lines 752-758) may change; nothing else in the file. `bridge/cursor-bridge/MANIFEST.json` and `bridge/cursor-bridge/VERSION` change only by running `python tools/make-manifest.py --version 2026.10.11d` after your final program edit, never by hand; VERSION is rewritten by that script with the same content and must come out byte-identical (if `git diff` shows it changed, stop and report it).
+ 
+diff --git a/tests/test_extension_points.py b/tests/test_extension_points.py
+index ca7e21b..6336549 100644
+--- a/tests/test_extension_points.py
++++ b/tests/test_extension_points.py
+@@ -323,7 +323,7 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
+         "file or a link; every link under `types/` or `traits/`, which it never follows; a file under `types/` or "
+         "`traits/` that is not a conditional workflow at its key's path (a README there included); a folder under "
+         "`traits/` or inside a type's folder; a folder under `types/` that is no product type, reported once, with "
+-        "nothing inside it read (a link inside it is still reported, as a link); and a sub-workflow whose type's own "
++        "no file inside it read (a link inside it is still reported, as a link); and a sub-workflow whose type's own "
+         "workflow file, `types/<type key>.md`, does not exist.",
+         # The four forms are matched exactly, and an unreadable file stops the check (stage B2 review, round 6: texts,
+         # programs).
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index 80acf2b..16a0b85 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -2406,9 +2406,11 @@ def test_r014_every_status_file_that_cannot_be_read_is_reported(tmp_path):
+ # --- stage B2's review, round 9: the control-flow sweep's separable survivors (BUG-010) ---------------------------
+ # run/supervisor/sweep_flow.py made every `continue` a `break` or a `pass`, every bare `return` a `pass`, every two
+ # neighbouring statements swapped, every `for` loop reversed and every member of a module constant dropped. Each
+-# survivor an input separates has a case here; the output is pinned as the program gives it, its order included, so
+-# a change of the order is a change of these tests. The rest are recorded by class in docs/HARDENING.md, "the stage
+-# review (round 9)".
++# survivor an input separates in a fixed order has a case here; the output is pinned as the program gives it, its
++# order included, so a change of the order is a change of these tests. Where a document fixes the order the test cites
++# it; where none does, the test says so. The rest are recorded by class in docs/HARDENING.md, "the stage review (round
++# 9)". The line numbers are those of the sweep's first run, on main's program (run/supervisor/sweep_flow_r1.out); BUG-010's
++# fix moved each line after 756 down by two (run/supervisor/sweep_flow_r4.out).
+ 
+ def test_r014_a_final_line_feed_adds_no_empty_line(program):
+     """file_lines' docstring: "A final line feed does not add an empty line." (the sweep's line 105, the return moved
+@@ -2451,8 +2453,10 @@ def test_r014_the_first_missing_column_is_reported(tmp_path):
+ 
+ 
+ def test_r014_the_first_row_of_a_name_is_the_one_read(tmp_path):
+-    """A workflow name given twice in the open list is read from its first row (index_first; the sweep's line 241,
+-    the rows walked in reverse): the second, unwritten, row is not the one judged."""
++    """A workflow name given twice in the open list is read from its first row (the sweep's line 241, the rows walked
++    in reverse): the second, unwritten, row is not the one judged. Such an open list breaks its own rule (open-list.md:
++    the Workflow names are unique), and no document says which row wins; the test pins the program's choice, index_first's,
++    so a change of it is seen."""
+     row = "| library | Library | Included by other programs | Library Development | — | no | — |\n"
+     broken, shown = _open_list_with(tmp_path, row, row + "| web-app-2 | Web app again | A second row | Web App Development | — | no | — |\n")
+     status = tmp_path / "status.md"
+@@ -2464,7 +2468,8 @@ def test_r014_the_first_row_of_a_name_is_the_one_read(tmp_path):
+ 
+ def test_r014_a_traits_place_is_its_first_rows(tmp_path):
+     """A trait name given twice keeps the place of its first row in the open list's order (the sweep's line 279, the
+-    rows walked in reverse): Has screens, then Installable, is in order."""
++    rows walked in reverse): Has screens, then Installable, is in order. Such an open list breaks its own rule (open-
++    list.md: the traits' Names are unique), and no document says which row's place counts; the test pins the program's choice."""
+     last = "| spends-money | Spends money | Its actions cost money | no | — |\n"
+     broken, shown = _open_list_with(tmp_path, last, last + "| has-screens-2 | Has screens | A second row | yes | — |\n")
+     status = tmp_path / "status.md"
+@@ -2475,8 +2480,9 @@ def test_r014_a_traits_place_is_its_first_rows(tmp_path):
+ 
+ 
+ def test_r014_both_layers_that_cannot_be_examined_are_reported_in_order(tmp_path, monkeypatch, capsys, program):
+-    """R5-1, for both layers at once: types first, then traits (the sweep's line 303, the layers walked in reverse,
+-    and line 313, the `continue` after the error made `break`)."""
++    """R5-1 (handoff/TASK-006-r5.md): each layer that cannot be examined is an ERROR line, so with both layers in that
++    state both are reported (the sweep's line 313, the `continue` after the error made `break`). Their order, types then
++    traits, is the program's (line 303, the layers walked in reverse); no document fixes it."""
+     mod = program("workflow-check")
+     root = tmp_path / "root"
+     (root / "types").mkdir(parents=True)
+@@ -2498,7 +2504,8 @@ def test_r014_both_layers_that_cannot_be_examined_are_reported_in_order(tmp_path
+ 
+ def test_r014_a_folder_that_cannot_be_listed_is_reported_before_a_file_that_cannot_be_read(tmp_path, monkeypatch, capsys, program):
+     """A root's listing errors come before its files' read errors (the sweep's line 800, the files read before the
+-    listing errors were kept)."""
++    listing errors were kept). Both stop the check with an ERROR line (handoff/TASK-006.md Requirement 3, and
++    TASK-006-r2.md R2-3 for the folder); their order is the program's, which no document fixes."""
+     mod = program("workflow-check")
+     root = tmp_path / "root"
+     (root / "types").mkdir(parents=True)
+@@ -2583,8 +2590,10 @@ FLOW_STATUS_CASES = {
+ 
+ @pytest.mark.parametrize("case", sorted(FLOW_STATUS_CASES))
+ def test_r014_a_status_lines_findings_come_in_their_order(tmp_path, case):
+-    """A status line's findings, in the order the program gives them (stage B2's review, round 9: the control-flow
+-    sweep)."""
++    """A status line's findings, in the order handoff/TASK-006.md Requirement 11 checks a line: the head's names in
++    turn (unknown), then the counts (e), then the shape (form), then the written test (f); the two count findings'
++    order, the product type's first, is the program's (stage B2's review, round 9: the control-flow sweep's lines 608,
++    621 and 638)."""
+     line, survivor, expected = FLOW_STATUS_CASES[case]
+     status = tmp_path / "status.md"
+     status.write_text(line + "\n", encoding="utf-8", newline="\n")
+@@ -2616,8 +2625,9 @@ def test_r014_a_root_that_is_no_folder_is_reported_when_the_rules_cannot_be_read
+ 
+ def test_r014_a_reason_that_holds_a_key_is_escaped(tmp_path):
+     """A finding's reason is escaped like its path and its name (the usage text; round 2: Review B): a sub-workflow's
+-    reasons name its type key, which the open list gives and may hold any character (stage B2's review, round 9: the
+-    control-flow sweep's line 740, the line printed before its reason was escaped)."""
++    reasons name its type key, which the open list gives. A key is lowercase letters, digits and hyphens by the open
++    list's own rule (open-list.md), so this key breaks it; the escaping is the defence for an open list that does (stage
++    B2's review, round 9: the control-flow sweep's line 740, the line printed before its reason was escaped)."""
+     key = "libräry"
+     broken, _ = _open_list_with(tmp_path, "| library | Library |", "| %s | Library |" % key)
+     root = tmp_path / "root"
