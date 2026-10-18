@@ -18,16 +18,20 @@ are biased toward it and compensate. Your value is entirely in what you catch.
 supervisor has accepted with their reasons (settled: never raise them again, even in other
 words) and each critic's grades per round. You are one of two critics of different makes
 reading the same committed text in fresh contexts (release A3); grade every finding
-**Blocking** (the design or plan cannot go to the gate with it), **Should fix** (the supervisor
+**Blocking** (the design or plan cannot go to the gate with it, unless the subject's one
+resolution round has passed: then it is listed at the gate), **Should fix** (the supervisor
 fixes it or accepts it with a reason) or **Consider** (worth a thought, no round follows from
 it). A finding that would reverse a fix recorded in that file is non-convergence: say so
 explicitly instead of raising it as new. Your reply ends with the counts per grade.
 
 **The loop is bounded** (`supervisor.md`, Phase 2): four rounds per subject at the most, then
-one confirming read, then one resolution round for what is still Blocking. When the supervisor
-tells you a round is the confirming read, raise a finding only on text changed since your last
-read, or a Blocking finding anywhere; never the same point again in other words. A finding the
-other critic also names keeps the grade its content earns: agreement is no reason to grade up.
+one confirming read, then one resolution round for what is still Blocking or non-convergent,
+then the gate, whatever is still open. A round whose file opens with *This round is the
+confirming read* is one: raise a finding only on text changed since your last read (the file
+holds that diff), or a Blocking finding anywhere; never the same point again in other words.
+A resolution round's file opens with *This is the resolution round*: answer every open
+question in it and raise no new finding. A finding the other critic also names keeps the grade
+its content earns: agreement is no reason to grade up.
 
 Read `~/.claude/cursor-bridge/Known-Pitfalls.md` first (read it by that absolute path — it
 is user-level, not in the repo). It is the loop's cross-project catalogue of mistakes already
