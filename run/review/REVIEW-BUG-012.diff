@@ -1,0 +1,76 @@
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index dc8463c..9ab2276 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -509,6 +509,8 @@ On the tests with every case, the full sweep leaves 42 survivors of 193 (run/sup
+ 
+ **BUG-011's gate round 2** (2026-10-18): Review B (grok-4.7-medium) APPROVE, each gate-round-1 case run against its mutant. Review A REJECT: line 360's `and` without `len(parts) == 2` and its `len` counted without repeats were classed implied on the ground that no product type key ends `.md`, a rule of open-list.md:11 the program does not check, so an open list keyed `a.md` separates them. REVIEWERS DISAGREE on whether a survivor only a rule-breaking open list separates needs a case; decided for Review A, as in gate round 1, and as round 9's first-row tests and test_r014_a_row_like_the_separator_is_a_row already pin rule-breaking open lists. Its should-fix items: the Of type lead now names each line that owes the finding; and the record claimed a case for every separable survivor while the argument-twice class (785, 786, 794, 813, 828) held five that an argument given twice separates. handoff/TASK-006.md Requirement 1 ("--status FILE may be repeated. Each named file's `Workflows:` lines are checked") and Requirement 4 ("Print each", roots and status files "in argument order") fix that output, so the class is gone: test_r014_an_argument_given_twice_is_checked_twice holds a root and a status file each given twice. The third attempt adds that test and test_r014_a_product_key_named_like_a_file_is_a_type_folder (360's two survivors).
+ 
++**BUG-011's gate round 3** (2026-10-18): Review B and Review A APPROVE; Review A reproduced the 42 survivors on the committed head. Its should-fix: the considers below still held one equivalent on a rule the program does not check (allows_set as `"set" in cell`); BUG-012 gives it a case, after BUG-011 merged on the approved head. Its notes: program lead (1)'s three lines are one example per kind of line (`Web App Development → Claude Code Extension, Browser Extension` is the third kind again).
++
+ Every test was added or strengthened and none removed or loosened, so the earlier sweeps' and drivers' kills stand (round 9: the first sweep 49 survivors, the widened sweep 351, the control-flow sweep 113, mutate_workflow_check.py 300 of 300, mutate_workflows_line.py 62 of 62; round 10's tests part ran both drivers again, all killed).
+ 
+ **Considers, taken (tests):** fixtures 2: the three headings of form-indented-heading pinned whole; the comment on form-misspelt-change-word says which file holds each change word without `at`. Fixtures 3: pass/README.md holds `## Add at nowhere.at-all`, which would fail were the file read. Fixtures 4: test_r014_a_line_without_the_traits_marker_is_not_checked_further, with its precondition; the comment says form-bad-prefix-bodies-unchecked's fourth line repeats a refused part. Fixtures 6: the comment on unknown-trait-key names its twin. Round 9's carried should-fix (BUG-010's gate round 2, Review A): the four order tests' docstrings cite the document that fixes the rule, and say that none fixes the order.
+@@ -516,4 +518,4 @@ Every test was added or strengthened and none removed or loosened, so the earlie
+ **Considers, recorded, not taken:**
+ - **Programs:** conformance-check.py:491-495 reports an existing PROJECT_STATUS.md that cannot be read as having no Workflows line (it fails closed; only the cause is wrong), and inventory-check.py's counterpart raises a traceback as before B2: a lead for TASK-024. Fixtures 5: an empty traits text is reported as "traits are not joined by a comma and one space", where the fix is `; traits: none`: a wording lead for the next change of workflow-check.py.
+ - **Texts:** supervisor.md:1821's "every name on the line is in the open list" reads as covering part names too (TASK-010 rewords that paragraph); the Glossary's Open list entry lists an entry's fields without Planned and Of type; extension-points.md does not say that a leading byte-order mark is dropped (b-trait-sets-bom rests on handoff/TASK-006-r2.md R2-2): leads for the next change of those files.
+-- **Tests:** the equivalents Review A found (seen.add moved above the order test; allows_set read as `"set" in cell`, where every registry cell is add or set) agree with the classes above; the third, a status argument given twice, is separated after all (gate round 2, above) and has a case.
++- **Tests:** the equivalent Review A found (seen.add moved above the order test) agrees with the classes above; the other two are separated after all and have cases: a status argument given twice (gate round 2, above), and allows_set read as `"set" in cell`, which a registry cell `add, reset` separates (handoff/TASK-006.md, the `set` finding: the cell split on commas and stripped; BUG-011's gate round 3, Review A; BUG-012, test_r014_set_changes_cell_is_split_on_commas_and_stripped).
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 5870bff..6682ce7 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,11 +3,11 @@ Last updated: 2026-10-18
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: BUG-011 — stage B2's review, round 10 (branch bug-011): Review B and eight of Review A's nine parts APPROVE; Review A's tests part REJECT: a status file's lines deduplicated before they are judged (two identical lines turned a failing file into OK) and a separator cell's "at least one dash" held by no test. ISS-007 recurs (round 10) in a new operator class, rules rewritten in another idiom. BUG-011, the supervisor's tests and fixtures only, no program change: the cases named, an idiom sweep (run/supervisor/sweep_idiom.py) with a case for every separable survivor, the rest by class (HARDENING, "the stage review (round 10)"), round 10's test considers and round 9's carried docstrings. Gate round 1: Review B APPROVE, Review A REJECT (six survivors classed where an input separates them; the Of type comment); gate round 2: Review B APPROVE, Review A REJECT (line 360's two survivors, separated by an open list keyed `a.md`; the argument-twice class, which TASK-006 fixes); the third attempt adds their cases and records two program leads (the Of type finding on a repeated or second sub-type, the Key format)
+-Last accepted: BUG-010, at commit b7f6ec3 (merged to main 2026-10-18, PR #36); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003 to BUG-010
++Increment: BUG-012 — BUG-011's gate round 3 should-fix (Review A; branch bug-012): a Changes cell holding `set` only inside a word (`add, reset`) refuses a Set, so allows_set read as `"set" in cell` fails a test; the HARDENING considers line that called it equivalent corrected, and gate round 3 recorded. Tests and records only, no program change
++Last accepted: BUG-011, at commit e9ed1b2 (merged to main 2026-10-18, PR #37; three gate rounds, the third approved by both); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003 to BUG-011
+ Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
+ Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
+-Next: BUG-011 through the gate; then stage B2's review again from its step 1 (rounds 1 to 10 rejected; round 10: idiom rewrites, which the new sweep now covers); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING; item 1 completes ISS-007 with its recurrences and ISS-008); then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
++Next: BUG-012 through the gate; then stage B2's review again from its step 1 (round 11; rounds 1 to 10 rejected; round 10: idiom rewrites, which the idiom sweep now covers); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING; item 1 completes ISS-007 with its recurrences and ISS-008); then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -16,7 +16,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation drivers mutate_ci_floor.py, mutate_workflow_check.py and mutate_workflows_line.py, the operator sweeps sweep_workflow_check.py, sweep_wide.py with regex_mutants.py, the control-flow sweep sweep_flow.py and the idiom sweep sweep_idiom.py, the list generators write_survivor_list.py, write_wide_list.py, write_flow_list.py and write_idiom_list.py, drafts/, in-flight.md as a scratch log while a review runs)
+ Delegated gates: none
+-Remote sync: main at b7f6ec3, in sync 2026-10-18; branch bug-011 started from origin/main
++Remote sync: main at e9ed1b2, in sync 2026-10-18; branch bug-012 started from origin/main
+ Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
+ Open issues: ISS-007 open, recurred in round 10 (stage B2's review rejected ten rounds on one class, rules of the workflow check no test fails for; BUG-008 widened the sweep, BUG-009 gave it every white-space reading, BUG-010 added a control-flow sweep, BUG-011 an idiom sweep); ISS-008 open (the Other Models pool used up; the native profile on the owner's word); ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25
+ Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
+diff --git a/tests/test_workflow_check.py b/tests/test_workflow_check.py
+index be90a98..3180228 100644
+--- a/tests/test_workflow_check.py
++++ b/tests/test_workflow_check.py
+@@ -813,7 +813,9 @@ def test_r014_registry_heading_missing(tmp_path):
+ def test_r014_set_changes_cell_is_split_on_commas_and_stripped(tmp_path):
+     """handoff/TASK-006.md, the `set` finding: a point's Changes cell is split on commas and each part stripped, so a
+     cell reading `set , add` accepts a Set as `add, set` does, and `add` alone refuses it (BUG-006 r2: Review A, the
+-    sweep's line 285)."""
++    sweep's line 285); so does `add, reset`, whose parts hold `set` only inside a word (BUG-011's gate round 3: Review A,
++    the cell read as `"set" in cell`). Such a cell breaks the registry's own rules; the finding is the one the text
++    fixes."""
+     reg = (REPO / "bridge/cursor-bridge/workflow/extension-points.md").read_text(encoding="utf-8")
+     row = "| intake.target-environment | Intake | The product type's target environment | intake | add, set | part |"
+     assert reg.count(row) == 1, "the row of the point the pass root sets"
+@@ -830,6 +832,13 @@ def test_r014_set_changes_cell_is_split_on_commas_and_stripped(tmp_path):
+     assert lines == whole_output(
+         [f"FAIL (set) {FIX}/pass/types/host-extension.md: intake.target-environment - point does not accept set"]), lines
+     assert err == "", err
++    in_a_word = tmp_path / "in-a-word.md"
++    in_a_word.write_text(reg.replace(row, row.replace("| add, set |", "| add, reset |")), encoding="utf-8", newline="\n")
++    rc, lines, err = run("--registry", str(in_a_word), f"{FIX}/pass")
++    assert rc == 1, lines
++    assert lines == whole_output(
++        [f"FAIL (set) {FIX}/pass/types/host-extension.md: intake.target-environment - point does not accept set"]), lines
++    assert err == "", err
+ 
+ 
+ # --- the usage text -----------------------------------------------------------------------------------------------
