@@ -10,6 +10,7 @@ Files you may create or modify:
 - bridge/cursor-bridge/bridge-run.py
 - handoff/HOTFIX-001-r1-report.md
 - handoff/HOTFIX-001-r2-report.md (round 2)
+- handoff/HOTFIX-001-r3-report.md (round 3)
 
 Do not modify anything else. In `bridge-run.py`, the only docstring change allowed is one added line in the module docstring that names the new refusal. The rest of the docstring stays as it is.
 
@@ -195,3 +196,11 @@ Round 1 is accepted in its core; this round changes `bridge/cursor-bridge/bridge
 4. **The owner's line in its Markdown forms and its exact alphabet (replaces the regex of point 7).** Accept the colon inside or after the bold (`- **Design rounds above five:** design 8 (...)` and `**Design rounds above five**: design 8 (...)`), led by `-` or `*` or nothing. Only the label ignores case; the subject is `[a-z0-9-]+` as written (a line naming `DESIGN` lifts nothing), and `<rounds>` is ASCII digits `[0-9]+`, never `\d`.
 5. **Minimal code (the frozen rule).** Use one constant for the default ceiling of 5 everywhere it is meant (also in the owner's-line check), and constants for the resolution limits 1 and 2. Take the token with a capture group and `str.rstrip` of the trailing punctuation instead of hand-written character loops. Open `docs/RUN_PARAMETERS.md` only when the command names at least one design file.
 6. **Your `Assumed, not verified` list.** Round 1 said none; Review A found several (the token ending only at space, tab, CR and LF; `re.I` on the whole owner's line; Unicode digits). List every such fact this round, or confirm each with a test you can point to.
+
+## Round 3: corrections from Review B and Review A's last item
+
+Round 2 is accepted in its core; this round changes `bridge/cursor-bridge/bridge-run.py` again and nothing else. Your report for this round is `handoff/HOTFIX-001-r3-report.md`; leave the earlier reports as they are. The acceptance tests now number 75 (the supervisor added 6, all failing on round 2's code); all 75 pass when you are done, the rest of the suite unchanged.
+
+1. **Trailing dots and spaces of a folder name (extends round 2 point 1).** Windows drops a path component's trailing dots and spaces, so `run./review./DESIGN-design-6.md` opens `run/review/DESIGN-design-6.md`. Before round 2's separator normalisation, remove every run of dots and spaces that stands right before a separator: `re.sub(r"[. ]+(?=[/\\])", "", text)`; then apply round 2's normalisation as it is. (A `..` segment loses its dots too and so cannot hide a folder; `x/..` stays an accepted limit, as do 8.3 short names.)
+2. **No traceback on a number `int()` refuses (Review A round 2, the constraint "Never refuse with a traceback").** Python refuses `int()` on more than 4,300 digits with `ValueError`. Catch it where a round or an owner's `<rounds>` is read: a round that `int()` refuses is above every ceiling (refuse it as `above round <N>`, or `a resolution round beyond R<k>`); a line whose `<rounds>` `int()` refuses is not well-formed and is skipped. Do not cap the digit count in a regex.
+3. **Only the label of the owner's line ignores case (round 2 point 4, its letter).** Scope the case-insensitivity to the label with `(?i:...)` and drop the whole-pattern `re.I`, so `[a-z0-9-]+` means lower case only.

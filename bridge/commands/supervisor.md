@@ -379,7 +379,8 @@ resolution round or its gate, the report escalating it to the owner.
   `run/review/DESIGN-<subject>-R1.md` holds every such question and both critics' positions on
   each, and opens with *This is the resolution round: answer every open question in this file;
   raise no new finding; your reply answers each question in place of findings, with no counts*.
-  Review B answers it with the same read-only command. Its reply arrives on the launch's output
+  Review B answers it with the same read-only command, the file's opening line taking the place
+  of the command's request for findings, grades and counts. Its reply arrives on the launch's output
   (the `.err` file holds only the launcher's lines): after `verify`, write it to
   `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for the resolution round just run (`R1`, or
   `R2` under the owner's line); `plan-critic` reads that file and answers it; the settlement
@@ -393,7 +394,9 @@ to the code gate, not to this loop: a finding both critics name keeps the grade 
 earns and never adds a round.
 
 **The launcher holds the ceiling.** `bridge-run.py` reads every `cursor-agent` command whose
-arguments name, anywhere and with either path separator, a file `run/review/DESIGN-<name>.md`;
+arguments name, anywhere and with either path separator, a file `run/review/DESIGN-<name>.md`
+(spelled as Windows also opens it: doubled separators, `.` segments, folder names ending in
+dots or spaces);
 every such name is checked, and one refused name refuses the launch. A name is read from
 `DESIGN-` up to `.md` and holds only lower-case letters, digits and hyphens, but for the round's
 `R`. The round is the name's last hyphen-separated part: a positive integer written without a

@@ -203,6 +203,31 @@ def test_doubled_separators_and_dot_segments_name_the_same_file(program, tmp_pat
     assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", allowed], str(tmp_path)) is None, allowed
 
 
+@pytest.mark.parametrize("prompt", [
+    "read run./review/DESIGN-design-6.md",
+    "read run/review./DESIGN-design-6.md",
+    "read run./review./DESIGN-azure-allowance-45.md",
+    "read run..\\review.\\DESIGN-design-6.md",
+    "read run /review/DESIGN-design-6.md",
+], ids=["dot-after-run", "dot-after-review", "dots-after-both", "windows-dots-after-both", "space-after-run"])
+def test_a_folder_name_ending_in_dots_or_spaces_names_the_same_file(program, tmp_path, prompt):
+    """Review B, HOTFIX-001: Windows drops a folder name's trailing dots and spaces, so `run./review./` opens
+    `run/review/`; reading the round-6 file through it proved it."""
+    br = program("bridge-run")
+    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is not None, prompt
+
+
+def test_a_round_too_long_for_int_is_refused_without_a_traceback(program, tmp_path):
+    """Review A, HOTFIX-001 round 2: Python refuses int() on more than 4,300 digits; the launcher refuses the name
+    instead of ending in a traceback, and a run parameters line holding such a number is skipped as not well-formed."""
+    br = program("bridge-run")
+    assert br.design_ceiling(design_cmd("design-" + "9" * 5000), str(tmp_path)) is not None
+    assert br.design_ceiling(design_cmd("design-R" + "9" * 5000), str(tmp_path)) is not None
+    run_parameters(tmp_path, "Design rounds above five: design %s (\"many\", 2026-10-18)" % ("9" * 5000))
+    assert br.design_ceiling(design_cmd("design-6"), str(tmp_path)) is not None
+    assert br.design_ceiling(design_cmd("design-2"), str(tmp_path)) is None
+
+
 @pytest.mark.parametrize("name, words", [
     ("design-6", "above round 5"), ("design-R2", "beyond R1"), ("design-05", "cannot be read"),
     ("Design-3", "cannot be read"), ("design-confirm", "cannot be read"),
