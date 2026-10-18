@@ -288,6 +288,9 @@ NOT_LOADABLE = {
     "open-list-without-tables": ("open-list-without-tables", VALID["not-yet-classified"], "missing heading"),
     "no-escape-field": ("no-escape-field", MALFORMED["no-traits"][0], "workflow-check.py: AttributeError"),
     "check-exits-after-load": ("check-exits-after-load", VALID["not-yet-classified"], "workflow-check.py: SystemExit"),
+    # Two tables without Key give two identical causes, each a line (TASK-008 Requirement 5: one line per cause; BUG-011's
+    # gate round 1: Review A, the idiom sweep's inventory-check.py line 264, the causes printed with repeats dropped).
+    "two-tables-without-key": ("two-tables-without-key", VALID["not-yet-classified"], "missing column Key"),
 }
 
 
@@ -302,6 +305,11 @@ def _broken_copy(tmp_path, how):
         (folder / "workflow" / "extension-points.md").unlink()
     elif how == "open-list-without-tables":
         (folder / "workflow" / "open-list.md").write_text("# Open list\n\nNo tables here.\n", encoding="utf-8", newline="\n")
+    elif how == "two-tables-without-key":
+        open_list = folder / "workflow" / "open-list.md"
+        text = open_list.read_text(encoding="utf-8")
+        assert text.count("\n| Key | Name |") == 3, "precondition: three tables whose first column is Key"
+        open_list.write_text(text.replace("\n| Key | Name |", "\n| Id | Name |", 2), encoding="utf-8", newline="")
     elif how == "check-exits-after-load":
         text = checker.read_text(encoding="utf-8")
         head = "def check_status(path, text, tables):\n"
@@ -315,7 +323,7 @@ def _broken_copy(tmp_path, how):
 
 
 # The cases whose rule files are broken; each of the others is one load failure with one cause.
-RULE_CASES = ("rules-absent", "registry-absent", "open-list-without-tables")
+RULE_CASES = ("rules-absent", "registry-absent", "open-list-without-tables", "two-tables-without-key")
 
 
 def _causes(folder):
@@ -352,6 +360,8 @@ def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
             # The three causes by name, so the copy's reader is not the only oracle (BUG-008's gate round 1: consider).
             assert [line.rsplit(": ", 1)[1] for line in found] == [
                 "missing heading ## Product types", "missing heading ## Sub-types", "missing heading ## Traits"], found
+        if how == "two-tables-without-key":
+            assert [line.rsplit(": ", 1)[1] for line in found] == ["missing column Key"] * 2, found
     else:
         assert len(found) == 1, found
 

@@ -2714,6 +2714,10 @@ def test_r014_each_line_of_a_repeated_pair_is_valid_alone(tmp_path):
     one = tmp_path / "once.md"
     one.write_text("Workflows: Web App Development; traits: none\n", encoding="utf-8", newline="\n")
     assert run("--open-list", STATUS_LIST, "--status", str(one))[1] == ["RESULT: OK"]
+    text = (REPO / FIX / "status" / "e-sub-type-named-twice.md").read_text(encoding="utf-8")
+    assert text == "Workflows: Host Extension Development \u2192 Claude Code Extension, Claude Code Extension; traits: none\n"
+    one.write_text("Workflows: Host Extension Development \u2192 Claude Code Extension; traits: none\n", encoding="utf-8", newline="\n")
+    assert run("--open-list", STATUS_LIST, "--status", str(one))[1] == ["RESULT: OK"]
 
 
 # (the status line, the sweep's survivor it separates, the findings).
@@ -2721,9 +2725,11 @@ IDIOM_STATUS_CASES = {
     "type-in-two-segments": ("Workflows: Web App Development → Web App Development; traits: none",
                              "line 604: the head's segments with repeats dropped",
                              ["FAIL (e) {f}: - - part must name exactly one product type"]),
-    # The Of type relation is judged for one product type and one sub-type only, so a name given twice leaves it
-    # unjudged: a reading handoff/TASK-006.md Requirement 4 leaves open (its "the line's product type" assumes one),
-    # pinned as the program's (the sweep's line 624, either count taken with repeats dropped).
+    # The program judges the Of type relation only where the line names exactly one product type and one sub-type, so a
+    # name given twice leaves it unjudged. Read literally, handoff/TASK-006.md Requirement 4 asks it of any sub-type the
+    # line names whose Of type is not the line's product type, and "Print each" asks for that finding beside the count's:
+    # these two cases pin the program's output, and the gap is a lead for the next change of workflow-check.py
+    # (docs/HARDENING.md, "BUG-011's gate round 1"; the sweep's line 624, either count taken with repeats dropped).
     "type-twice-sub-of-another": ("Workflows: Web App Development, Web App Development → Claude Code Extension; traits: none",
                                   "line 624: the product types counted with repeats dropped",
                                   ["FAIL (e) {f}: - - part must name exactly one product type"]),
@@ -2768,6 +2774,26 @@ IDIOM_ROOT_CASES = {
                                               ["FAIL (form) {r}/traits/foo: foo - path is not a conditional-workflow file",
                                                "FAIL (form) {r}/traits/foo/y.md: y.md - path is not a conditional-workflow file",
                                                "FAIL (d) {r}/types/foo: foo - type folder is not a product type"]),
+    # A folder inside a type's folder is (form) whatever its name, `types` too (extension-points.md:72; BUG-011's gate
+    # round 1: Review A, the sweep's second `len` of line 357, which counted the path's parts without repeats and so
+    # dropped the folder); its file is no conditional workflow either.
+    "folder-named-types-in-a-type-folder": ({"types/host-extension.md": "## Add at intake.questions\n\nq\n",
+                                             "types/host-extension/types/f.md": "## Add at intake.questions\n\nq\n"},
+                                            "line 357: a folder under a type's folder counted with repeats dropped",
+                                            ["FAIL (form) {r}/types/host-extension/types: types - path is not a conditional-workflow file",
+                                             "FAIL (form) {r}/types/host-extension/types/f.md: f.md - path is not a conditional-workflow file"]),
+    # A folder named like a file inside a type's folder, and one under traits/, is a folder, and the file inside it,
+    # named like its folder, is at no key's path (extension-points.md:72; BUG-011's gate round 1: Review A, lines 362
+    # and 364 counting the path's parts without repeats, which read it as a sub-workflow and as a trait).
+    "folder-named-like-a-sub-workflow": ({"types/host-extension.md": "## Add at intake.questions\n\nq\n",
+                                          "types/host-extension/x.md/x.md": "## Add at intake.questions\n\nq\n"},
+                                         "line 362: a three-part path counted with repeats dropped",
+                                         ["FAIL (form) {r}/types/host-extension/x.md: x.md - path is not a conditional-workflow file",
+                                          "FAIL (form) {r}/types/host-extension/x.md/x.md: x.md - path is not a conditional-workflow file"]),
+    "folder-named-like-a-trait": ({"traits/installable.md/installable.md": "## Add at intake.questions\n\nq\n"},
+                                  "line 364: a traits path counted with repeats dropped",
+                                  ["FAIL (form) {r}/traits/installable.md: installable.md - path is not a conditional-workflow file",
+                                   "FAIL (form) {r}/traits/installable.md/installable.md: installable.md - path is not a conditional-workflow file"]),
     # A Set at project-end.delivery is no addition there, so it owes no delivery kind: its one finding is the point's
     # (extension-points.md:68, the `for <kind>` form is an addition's; the sweep's line 524 without `kind == "add"`).
     "set-at-delivery": ({"types/host-extension.md": "## Set at project-end.delivery\n\nx\n"},
@@ -2872,3 +2898,59 @@ def test_r014_a_read_error_without_its_reason_names_the_error(tmp_path, monkeypa
     monkeypatch.setattr(mod, "open", fake_open, raising=False)
     text, shown, reason = mod.read_utf8(str(path))
     assert text is None and reason == "cannot be read (odd failure)", reason
+
+
+def _product_table(text):
+    """The Product types table of an open list's text: its lines, from the header to the last row."""
+    lines = text.split("\n")
+    start = lines.index("## Product types")
+    first = next(k for k in range(start + 1, len(lines)) if lines[k].startswith("|"))
+    end = next(k for k in range(first, len(lines)) if not lines[k].startswith("|"))
+    return "\n".join(lines[first:end]) + "\n"
+
+
+def test_r014_a_table_of_two_separator_lines_is_read_for_its_columns(tmp_path):
+    """A table of two identical separator lines: the first is read as the header, whose cells are dashes, so the
+    table has its separator and lacks its columns (BUG-011's gate round 1: Review A, the sweep's line 222, the table's
+    lines counted with repeats dropped, which names the separator instead). Each is a table that cannot be read
+    (handoff/TASK-006.md Requirement 3); which reason is named, no document fixes: the test pins the program's."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    table = _product_table(text)
+    sep = "|---|---|---|---|---|---|---|"
+    broken, shown = _open_list_with(tmp_path, table, sep + "\n" + sep + "\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert lines == [f"ERROR: {shown}: missing column Key", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+def test_r014_a_row_like_the_separator_is_a_row(tmp_path):
+    """A product type row that repeats the separator line is read as a row (BUG-011's gate round 1: Review A, the
+    sweep's line 218, the table's lines with repeats dropped, which drops it): its Workflow name is `---` and its
+    Written `---`, so a line naming it gives (f). Such an open list breaks its own rules (open-list.md), and no
+    document says what such a row is; the test pins the program's reading."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    table = _product_table(text)
+    sep = "|---|---|---|---|---|---|---|"
+    assert table.split("\n")[1] == sep, "precondition: the separator line"
+    broken, shown = _open_list_with(tmp_path, table, table + sep + "\n")
+    status = tmp_path / "status.md"
+    status.write_text("Workflows: ---; traits: none\n", encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", str(status))
+    s = str(status).replace("\\", "/")
+    assert lines == [f"FAIL (f) {s}: --- - product type is not written", "RESULT: 1 problem(s)"], lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_two_tables_without_a_column_are_two_error_lines(tmp_path):
+    """Each table that cannot be read is an ERROR line (handoff/TASK-006.md Requirement 3: "one or more lines"), two
+    identical ones too: the Product types and Sub-types tables both without Key (BUG-011's gate round 1: Review A, the
+    sweep's line 820, the errors printed with repeats dropped). The count of identical lines, no document fixes beyond
+    one per table; the test pins the program's."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    assert text.count("\n| Key | Name |") == 3, "precondition: three tables whose first column is Key"
+    broken = tmp_path / "open-list.md"
+    broken.write_text(text.replace("\n| Key | Name |", "\n| Id | Name |", 2), encoding="utf-8", newline="\n")
+    shown = str(broken).replace("\\", "/")
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert lines == [f"ERROR: {shown}: missing column Key"] * 2 + ["RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
