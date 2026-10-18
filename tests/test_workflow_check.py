@@ -813,7 +813,9 @@ def test_r014_registry_heading_missing(tmp_path):
 def test_r014_set_changes_cell_is_split_on_commas_and_stripped(tmp_path):
     """handoff/TASK-006.md, the `set` finding: a point's Changes cell is split on commas and each part stripped, so a
     cell reading `set , add` accepts a Set as `add, set` does, and `add` alone refuses it (BUG-006 r2: Review A, the
-    sweep's line 285)."""
+    sweep's line 285); so does `add, reset`, whose parts hold `set` only inside a word (BUG-011's gate round 3: Review A,
+    the cell read as `"set" in cell`). Such a cell breaks the registry's own rules; the finding is the one the text
+    fixes."""
     reg = (REPO / "bridge/cursor-bridge/workflow/extension-points.md").read_text(encoding="utf-8")
     row = "| intake.target-environment | Intake | The product type's target environment | intake | add, set | part |"
     assert reg.count(row) == 1, "the row of the point the pass root sets"
@@ -826,6 +828,13 @@ def test_r014_set_changes_cell_is_split_on_commas_and_stripped(tmp_path):
     add_only = tmp_path / "add-only.md"
     add_only.write_text(reg.replace(row, row.replace("| add, set |", "| add |")), encoding="utf-8", newline="\n")
     rc, lines, err = run("--registry", str(add_only), f"{FIX}/pass")
+    assert rc == 1, lines
+    assert lines == whole_output(
+        [f"FAIL (set) {FIX}/pass/types/host-extension.md: intake.target-environment - point does not accept set"]), lines
+    assert err == "", err
+    in_a_word = tmp_path / "in-a-word.md"
+    in_a_word.write_text(reg.replace(row, row.replace("| add, set |", "| add, reset |")), encoding="utf-8", newline="\n")
+    rc, lines, err = run("--registry", str(in_a_word), f"{FIX}/pass")
     assert rc == 1, lines
     assert lines == whole_output(
         [f"FAIL (set) {FIX}/pass/types/host-extension.md: intake.target-environment - point does not accept set"]), lines
