@@ -1,15 +1,15 @@
 {
-  "profile": "full",
-  "builder": "grok-4.7-medium",
+  "profile": "native",
+  "builder": "composer-2.5",
   "review_a": "claude-opus-5-5",
-  "review_b": "gpt-5.6-sol-high",
+  "review_b": "grok-4.7-medium",
   "families": {
-    "builder": "xai",
+    "builder": "cursor",
     "review_a": "anthropic",
-    "review_b": "openai"
+    "review_b": "xai"
   },
-  "other_pool": "available",
+  "other_pool": "exhausted",
   "probed": true,
-  "resolved_at": "2026-10-16T16:04 UTC",
+  "resolved_at": "2026-10-18T08:43 UTC",
   "reset_day": 16
 }

@@ -420,12 +420,18 @@ def test_r015_the_bytecode_switch_is_restored(program):
 
 @pytest.mark.parametrize("case", sorted(VALID))
 @pytest.mark.parametrize("name", ["inventory-check", "conformance-check"])
-def test_r015_a_valid_line_is_judged_valid_with_no_rows(program, name, case):
+def test_r015_a_valid_line_is_judged_valid_with_no_rows(tmp_path, name, case):
     """handoff/TASK-008.md, the judge's interface (and its docstring): the outcome is valid, missing, malformed or not
     checked, and the rows are empty for valid. A valid line is judged ("valid", []) by each judge, never malformed
     with no rows, which inventory-check.py prints the same (BUG-009's gate round 1: Review A, a consider; the
-    widened sweep's inventory-check.py line 228, `if findings:` forced true, survived at the output)."""
-    assert program(name).judge_workflows_line("s.md", VALID[case]) == ("valid", [])
+    widened sweep's inventory-check.py line 228, `if findings:` forced true, survived at the output). Judged on a copy
+    whose open list marks every entry unwritten, so the line's f and FLAG findings exist and are dropped, as the
+    output twins are (BUG-009's gate round 2: Review A, a consider)."""
+    folder = _unwritten_copy(tmp_path)
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_") + "_valid_copy", folder / (name + ".py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.judge_workflows_line("s.md", VALID[case]) == ("valid", [])
 
 
 @pytest.mark.parametrize("program_name", ["inventory-check.py", "conformance-check.py"])
@@ -554,3 +560,25 @@ def test_r015_the_bytecode_switch_is_restored_when_the_checker_cannot_be_loaded(
             assert sys.dont_write_bytecode is value, (name, how, value)
     finally:
         sys.dont_write_bytecode = before
+
+
+@pytest.mark.parametrize("judge", ["inventory-check", "conformance-check"])
+def test_r015_tables_that_cannot_be_loaded_are_reported_before_a_line_is_judged(tmp_path, judge):
+    """TASK-008 Requirement 5: rule files that cannot be loaded give `not checked` and their causes, for a status file
+    that holds a Workflows line to judge, not only for `not yet classified`, which needs no table (stage B2's review,
+    round 9: the control-flow sweep's inventory-check.py line 224 and conformance-check.py line 333, the line judged
+    before the load errors were tested, which then judged it with no tables)."""
+    folder = _broken_copy(tmp_path, "open-list-without-tables")
+    expected = _causes(folder)
+    assert len(expected) >= 2, "precondition: %r" % expected
+    text = HEAD + BRIDGE_LINE
+    if judge == "inventory-check":
+        status = tmp_path / "PROJECT_STATUS.md"
+        write_status(status, text)
+        rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
+        assert workflows_lines(lines) == ["WORKFLOWS LINE: not checked: " + c for c in expected], lines
+    else:
+        rc, out, err = conformance(workspace(tmp_path, text), program=folder / "conformance-check.py")
+        assert verdict(out, "Workflows line") == ("MISSING", "Workflows line  - not checked: " + "; ".join(expected)), out
+    assert "Traceback" not in err and "Traceback" not in out, (out, err)
+    assert rc == 1

@@ -91,4 +91,4 @@ Changing an existing one is the same, editing only its file and, where its defin
 
 ## Names
 
-The workflow names of the video game (Game Development) and of its Roblox sub-type (Roblox Game) are the owner's (2026-10-01). The others follow the same shape, as §6.3 fixes it: a type workflow is named for the work on its product type, and a sub-workflow for the kind of product its sub-type makes.
+The workflow names of the video game (Game Development) and of its Roblox sub-type (Roblox Game) are the owner's (2026-10-01). The others follow the shape of those two: a type workflow is named for the work on its product type, as §6.3 states, and a sub-workflow for the kind of product its sub-type makes, as Roblox Game is (§6.3 spells out the shape for type workflows only).
