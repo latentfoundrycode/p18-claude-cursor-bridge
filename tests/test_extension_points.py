@@ -323,7 +323,7 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
         "file or a link; every link under `types/` or `traits/`, which it never follows; a file under `types/` or "
         "`traits/` that is not a conditional workflow at its key's path (a README there included); a folder under "
         "`traits/` or inside a type's folder; a folder under `types/` that is no product type, reported once, with "
-        "nothing inside it read (a link inside it is still reported, as a link); and a sub-workflow whose type's own "
+        "no file inside it read (a link inside it is still reported, as a link); and a sub-workflow whose type's own "
         "workflow file, `types/<type key>.md`, does not exist.",
         # The four forms are matched exactly, and an unreadable file stops the check (stage B2 review, round 6: texts,
         # programs).

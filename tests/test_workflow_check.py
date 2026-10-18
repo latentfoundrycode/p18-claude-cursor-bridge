@@ -2406,9 +2406,11 @@ def test_r014_every_status_file_that_cannot_be_read_is_reported(tmp_path):
 # --- stage B2's review, round 9: the control-flow sweep's separable survivors (BUG-010) ---------------------------
 # run/supervisor/sweep_flow.py made every `continue` a `break` or a `pass`, every bare `return` a `pass`, every two
 # neighbouring statements swapped, every `for` loop reversed and every member of a module constant dropped. Each
-# survivor an input separates has a case here; the output is pinned as the program gives it, its order included, so
-# a change of the order is a change of these tests. The rest are recorded by class in docs/HARDENING.md, "the stage
-# review (round 9)".
+# survivor an input separates in a fixed order has a case here; the output is pinned as the program gives it, its
+# order included, so a change of the order is a change of these tests. Where a document fixes the order the test cites
+# it; where none does, the test says so. The rest are recorded by class in docs/HARDENING.md, "the stage review (round
+# 9)". The line numbers are those of the sweep's first run, on main's program (run/supervisor/sweep_flow_r1.out); BUG-010's
+# fix moved each line after 756 down by two (run/supervisor/sweep_flow_r4.out).
 
 def test_r014_a_final_line_feed_adds_no_empty_line(program):
     """file_lines' docstring: "A final line feed does not add an empty line." (the sweep's line 105, the return moved
@@ -2451,8 +2453,10 @@ def test_r014_the_first_missing_column_is_reported(tmp_path):
 
 
 def test_r014_the_first_row_of_a_name_is_the_one_read(tmp_path):
-    """A workflow name given twice in the open list is read from its first row (index_first; the sweep's line 241,
-    the rows walked in reverse): the second, unwritten, row is not the one judged."""
+    """A workflow name given twice in the open list is read from its first row (the sweep's line 241, the rows walked
+    in reverse): the second, unwritten, row is not the one judged. Such an open list breaks its own rule (open-list.md:
+    the Workflow names are unique), and no document says which row wins; the test pins the program's choice, index_first's,
+    so a change of it is seen."""
     row = "| library | Library | Included by other programs | Library Development | — | no | — |\n"
     broken, shown = _open_list_with(tmp_path, row, row + "| web-app-2 | Web app again | A second row | Web App Development | — | no | — |\n")
     status = tmp_path / "status.md"
@@ -2464,7 +2468,8 @@ def test_r014_the_first_row_of_a_name_is_the_one_read(tmp_path):
 
 def test_r014_a_traits_place_is_its_first_rows(tmp_path):
     """A trait name given twice keeps the place of its first row in the open list's order (the sweep's line 279, the
-    rows walked in reverse): Has screens, then Installable, is in order."""
+    rows walked in reverse): Has screens, then Installable, is in order. Such an open list breaks its own rule (open-
+    list.md: the traits' Names are unique), and no document says which row's place counts; the test pins the program's choice."""
     last = "| spends-money | Spends money | Its actions cost money | no | — |\n"
     broken, shown = _open_list_with(tmp_path, last, last + "| has-screens-2 | Has screens | A second row | yes | — |\n")
     status = tmp_path / "status.md"
@@ -2475,8 +2480,9 @@ def test_r014_a_traits_place_is_its_first_rows(tmp_path):
 
 
 def test_r014_both_layers_that_cannot_be_examined_are_reported_in_order(tmp_path, monkeypatch, capsys, program):
-    """R5-1, for both layers at once: types first, then traits (the sweep's line 303, the layers walked in reverse,
-    and line 313, the `continue` after the error made `break`)."""
+    """R5-1 (handoff/TASK-006-r5.md): each layer that cannot be examined is an ERROR line, so with both layers in that
+    state both are reported (the sweep's line 313, the `continue` after the error made `break`). Their order, types then
+    traits, is the program's (line 303, the layers walked in reverse); no document fixes it."""
     mod = program("workflow-check")
     root = tmp_path / "root"
     (root / "types").mkdir(parents=True)
@@ -2498,7 +2504,8 @@ def test_r014_both_layers_that_cannot_be_examined_are_reported_in_order(tmp_path
 
 def test_r014_a_folder_that_cannot_be_listed_is_reported_before_a_file_that_cannot_be_read(tmp_path, monkeypatch, capsys, program):
     """A root's listing errors come before its files' read errors (the sweep's line 800, the files read before the
-    listing errors were kept)."""
+    listing errors were kept). Both stop the check with an ERROR line (handoff/TASK-006.md Requirement 3, and
+    TASK-006-r2.md R2-3 for the folder); their order is the program's, which no document fixes."""
     mod = program("workflow-check")
     root = tmp_path / "root"
     (root / "types").mkdir(parents=True)
@@ -2583,8 +2590,10 @@ FLOW_STATUS_CASES = {
 
 @pytest.mark.parametrize("case", sorted(FLOW_STATUS_CASES))
 def test_r014_a_status_lines_findings_come_in_their_order(tmp_path, case):
-    """A status line's findings, in the order the program gives them (stage B2's review, round 9: the control-flow
-    sweep)."""
+    """A status line's findings, in the order handoff/TASK-006.md Requirement 11 checks a line: the head's names in
+    turn (unknown), then the counts (e), then the shape (form), then the written test (f); the two count findings'
+    order, the product type's first, is the program's (stage B2's review, round 9: the control-flow sweep's lines 608,
+    621 and 638)."""
     line, survivor, expected = FLOW_STATUS_CASES[case]
     status = tmp_path / "status.md"
     status.write_text(line + "\n", encoding="utf-8", newline="\n")
@@ -2616,8 +2625,9 @@ def test_r014_a_root_that_is_no_folder_is_reported_when_the_rules_cannot_be_read
 
 def test_r014_a_reason_that_holds_a_key_is_escaped(tmp_path):
     """A finding's reason is escaped like its path and its name (the usage text; round 2: Review B): a sub-workflow's
-    reasons name its type key, which the open list gives and may hold any character (stage B2's review, round 9: the
-    control-flow sweep's line 740, the line printed before its reason was escaped)."""
+    reasons name its type key, which the open list gives. A key is lowercase letters, digits and hyphens by the open
+    list's own rule (open-list.md), so this key breaks it; the escaping is the defence for an open list that does (stage
+    B2's review, round 9: the control-flow sweep's line 740, the line printed before its reason was escaped)."""
     key = "libräry"
     broken, _ = _open_list_with(tmp_path, "| library | Library |", "| %s | Library |" % key)
     root = tmp_path / "root"
