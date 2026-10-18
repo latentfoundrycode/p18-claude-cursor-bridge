@@ -392,7 +392,8 @@ FILE_EXACT = {
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
     ] * 24,
     'form-indented-fence-open': ['FAIL (form) {root}/types/host-extension.md: - - fenced code block is still open at the end of the file'],
-    # One space, a tab, and three spaces, the most a heading may be indented (round 6: fixtures 1 and 2).
+    # Indented one and three spaces (three is the most a heading may be indented), and a tab after `##` (round 6:
+    # fixtures 1 and 2; the comment corrected in round 9: fixtures 2).
     'form-indented-heading': [
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
@@ -614,6 +615,28 @@ STATUS_EXACT = {
         'FAIL (unknown) {path}: web app development - name is not in the open list',
         'FAIL (e) {path}: - - part must name exactly one product type',
     ],
+    # Stage B2's review, round 9: each line after one that stops early is checked (tests, blocking); a `not yet
+    # classified` line names its part (tests, blocking); a line that breaks the prefix rule, or has no traits marker, is
+    # not checked further though what follows would fail (fixtures 4, blocking); a name after a finding is checked
+    # (tests, should-fix); a trait key is no trait name (fixtures 6).
+    'e-after-unclassified.md': ['FAIL (unknown) {path}: Toaster Development - name is not in the open list', 'FAIL (e) {path}: - - part must name exactly one product type'],
+    'form-bad-prefix-then-checked.md': ['FAIL (form) {path}: a;b - Workflows line breaks the part-prefix rule', 'FAIL (unknown) {path}: Toaster Development - name is not in the open list', 'FAIL (e) {path}: - - part must name exactly one product type'],
+    'form-no-traits-marker-then-checked.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once", 'FAIL (unknown) {path}: Toaster Development - name is not in the open list', 'FAIL (e) {path}: - - part must name exactly one product type'],
+    'e-same-part-unclassified.md': ['FAIL (e) {path}: app - two Workflows lines name the same part'],
+    'form-bad-prefix-bodies-unchecked.md': [
+        'FAIL (form) {path}: a;b - Workflows line breaks the part-prefix rule',
+        'FAIL (form) {path}: c;d - Workflows line breaks the part-prefix rule',
+        'FAIL (form) {path}: a;b - Workflows line breaks the part-prefix rule',
+    ],
+    'form-bad-prefix-single-unknown.md': ['FAIL (form) {path}: app - Workflows line breaks the part-prefix rule'],
+    'form-bad-prefix-single-two-types.md': ['FAIL (form) {path}: app - Workflows line breaks the part-prefix rule'],
+    'form-bad-prefix-single-unwritten.md': ['FAIL (form) {path}: app - Workflows line breaks the part-prefix rule'],
+    'form-no-traits-marker-unknown-head.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once"],
+    'form-empty-name-then-unknown.md': ['FAIL (form) {path}: - - empty name in the Workflows head', 'FAIL (unknown) {path}: Toaster Development - name is not in the open list', 'FAIL (e) {path}: - - part must name exactly one product type'],
+    'unknown-trait-then-flag.md': ['FAIL (unknown) {path}: Glitter - not a trait name', 'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)'],
+    'form-trait-separator-then-flag.md': ['FAIL (form) {path}: Has screens,Installable - traits are not joined by a comma and one space', 'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)'],
+    'form-trait-repeated-then-flag.md': ['FAIL (form) {path}: Installable - trait repeated', 'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)'],
+    'unknown-trait-key-not-case.md': ['FAIL (unknown) {path}: has-screens - not a trait name'],
 }
 
 
@@ -849,7 +872,7 @@ def test_r014_repeated_unwritten_trait_is_flagged_once():
     rc, lines, err = status("flag-repeated-unwritten.md")
     assert rc == 1
     assert len([line for line in lines if line.startswith("FLAG (trait)") and ": Spends money - " in line]) == 1, lines
-    assert any(line.startswith("FAIL (form) ") for line in lines), lines
+    assert fails(lines) == ["FAIL (form) %s/status/flag-repeated-unwritten.md: Spends money - trait repeated" % FIX], lines
 
 
 def test_r014_separator_row_missing(tmp_path):
@@ -2210,3 +2233,396 @@ def test_r014_a_tab_is_no_fence_indent(tmp_path, text):
     shown = str(root).replace("\\", "/")
     assert lines == whole_output([f"FAIL (b) {shown}/traits/installable.md: intake.delivery-kind - a trait file may only add"]), lines
     assert rc == 1 and err == "", err
+
+
+# --- stage B2 review, round 9 (BUG-010) ----------------------------------------------------------------------------
+
+# Each status fixture's whole text (line feeds as committed; the checkout may carry CRLF), so the line a case is about
+# is stated beside its findings: a fixture given other lines with the same findings fails here (stage B2's review,
+# round 9: Review B, four fixtures swapped with every test passing).
+STATUS_TEXT = {
+    'bom-workflows-line.md': '\ufeffWorkflows: Web App Development; traits: none\n',
+    'e-after-unclassified.md': 'Workflows: app: not yet classified\nWorkflows: site: Toaster Development; traits: none\n',
+    'e-lone-trait.md': 'Workflows: Installable; traits: none\n',
+    'e-no-type.md': 'Workflows: Claude Code Extension; traits: none\n',
+    'e-same-part-checked.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: app: Glitter Development; traits: none\n',
+    'e-same-part-three.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: app: Web App Development; traits: none\nWorkflows: app: Web App Development; traits: Glitter\n',
+    'e-same-part-unclassified.md': 'Workflows: app: not yet classified\nWorkflows: app: Web App Development; traits: none\n',
+    'e-same-part.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: app: Host Extension Development; traits: none\n',
+    'e-sub-type-of-another.md': 'Workflows: Web App Development → Claude Code Extension; traits: none\n',
+    'e-two-sub-types.md': 'Workflows: Host Extension Development → Claude Code Extension, Browser Extension; traits: none\n',
+    'e-two-types.md': 'Workflows: Host Extension Development, Web App Development; traits: none\n',
+    'f-unwritten-sub-type.md': 'Workflows: Web App Development → Local Web App; traits: none\n',
+    'f-unwritten-type.md': 'Workflows: Library Development; traits: none\n',
+    'flag-repeated-unwritten.md': 'Workflows: Web App Development; traits: Installable, Spends money, Spends money\n',
+    'flag-unwritten-trait.md': 'Workflows: Host Extension Development; traits: Installable, Spends money\n',
+    'form-bad-prefix-bodies-unchecked.md': 'Workflows: a;b: Toaster Development; traits: Glitter\nWorkflows: c;d: Library Development; traits: none\nWorkflows: site: Web App Development; traits: none\nWorkflows: a;b: Web App Development; traits: none\n',
+    'form-bad-prefix-single-two-types.md': 'Workflows: app: Library Development, Web App Development; traits: none\n',
+    'form-bad-prefix-single-unknown.md': 'Workflows: app: Toaster Development; traits: Glitter\n',
+    'form-bad-prefix-single-unwritten.md': 'Workflows: app: Library Development; traits: none\n',
+    'form-bad-prefix-single.md': 'Workflows: bad;part: Web App Development; traits: none\n',
+    'form-bad-prefix-then-checked.md': 'Workflows: a;b: Web App Development; traits: none\nWorkflows: site: Toaster Development; traits: none\n',
+    'form-empty-name-then-unknown.md': 'Workflows: , Toaster Development; traits: none\n',
+    'form-empty-segment.md': 'Workflows: Host Extension Development →; traits: none\n',
+    'form-no-line.md': '# Project Status\nPhase: building\n  Workflows: Web App Development; traits: none\nworkflows: Web App Development; traits: none\nWorkflows:Web App Development; traits: none\n',
+    'form-no-traits-marker-then-checked.md': 'Workflows: app: Web App Development\nWorkflows: site: Toaster Development; traits: none\n',
+    'form-no-traits-marker-unknown-head.md': 'Workflows: Toaster Development\n',
+    'form-no-traits-marker.md': 'Workflows: Host Extension Development\n',
+    'form-part-arrow.md': 'Workflows: a→b: Web App Development; traits: none\nWorkflows: plugin: Host Extension Development; traits: none\n',
+    'form-part-blank.md': 'Workflows: app: Web App Development; traits: none\nWorkflows:  : Host Extension Development; traits: none\n',
+    'form-part-colon-no-space.md': 'Workflows: app:Web App Development; traits: none\nWorkflows: plugin: Host Extension Development; traits: none\n',
+    'form-part-colon.md': 'Workflows: a:b: Web App Development; traits: none\nWorkflows: plugin: Host Extension Development; traits: none\n',
+    'form-part-empty.md': 'Workflows: : Web App Development; traits: none\nWorkflows: plugin: Host Extension Development; traits: none\n',
+    'form-part-leading-space.md': 'Workflows: app: Web App Development; traits: none\nWorkflows:  plugin: Host Extension Development; traits: none\n',
+    'form-part-semicolon.md': 'Workflows: a;b: Web App Development; traits: none\nWorkflows: plugin: Host Extension Development; traits: none\n',
+    'form-part-tab.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: plugin\t: Host Extension Development; traits: none\n',
+    'form-part-whitespace.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: app : Host Extension Development; traits: none\n',
+    'form-prefix-missing-unclassified.md': 'Workflows: not yet classified\nWorkflows: plugin: Host Extension Development; traits: none\n',
+    'form-prefix-missing.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: Host Extension Development; traits: none\n',
+    'form-prefix-on-single.md': 'Workflows: app: Host Extension Development; traits: none\n',
+    'form-sub-type-first.md': 'Workflows: Claude Code Extension → Host Extension Development; traits: none\n',
+    'form-trait-double-space.md': 'Workflows: Web App Development; traits: Has screens,  Installable\n',
+    'form-trait-in-head.md': 'Workflows: Host Extension Development, Installable; traits: none\n',
+    'form-trait-order-highest.md': 'Workflows: Web App Development; traits: Has screens, Spends money, Installable\n',
+    'form-trait-order-three.md': 'Workflows: Web App Development; traits: Spends money, Has screens, Installable\n',
+    'form-trait-order.md': 'Workflows: Web App Development; traits: Installable, Has screens\n',
+    'form-trait-repeat-separated.md': 'Workflows: Web App Development; traits: Has screens, Installable, Has screens\n',
+    'form-trait-repeated-then-flag.md': 'Workflows: Web App Development; traits: Installable, Installable, Spends money\n',
+    'form-trait-repeated.md': 'Workflows: Web App Development; traits: Installable, Installable\n',
+    'form-trait-separator-then-flag.md': 'Workflows: Web App Development; traits: Has screens,Installable, Spends money\n',
+    'form-trait-separator.md': 'Workflows: Web App Development; traits: Has screens,Installable\n',
+    'form-trait-trailing-space.md': 'Workflows: Web App Development; traits: Has screens , Installable\n',
+    'form-traits-double-space.md': 'Workflows: Web App Development; traits:  none\n',
+    'form-traits-empty.md': 'Workflows: Web App Development; traits: \n',
+    'form-traits-marker-twice.md': 'Workflows: Web App Development; traits: none; traits: none\n',
+    'form-traits-none-case.md': 'Workflows: Web App Development; traits: None\n',
+    'form-traits-none-first.md': 'Workflows: Web App Development; traits: none, Installable\n',
+    'form-traits-none-last.md': 'Workflows: Web App Development; traits: Installable, none\n',
+    'form-traits-trailing-comma.md': 'Workflows: Web App Development; traits: Has screens, \n',
+    'form-unclassified-case.md': 'Workflows: Not yet classified\n',
+    'form-unclassified-ending.md': 'Workflows: Web App not yet classified\n',
+    'form-unclassified-leading-space.md': 'Workflows:  not yet classified\n',
+    'form-unclassified-trailing-space.md': 'Workflows: not yet classified \n',
+    'form-unclassified-with-traits.md': 'Workflows: not yet classified; traits: none\n',
+    'ok-multi-unclassified.md': 'Phase: intake\nWorkflows: app: not yet classified\nWorkflows: plugin: Host Extension Development; traits: none\n',
+    'ok-multi.md': 'Phase: building\nWorkflows: app: Web App Development; traits: Has screens, Installable\nWorkflows: plugin: Host Extension Development → Browser Extension; traits: none\n',
+    'ok-no-final-newline.md': '\nPhase: building\nWorkflows: Host Extension Development → Claude Code Extension; traits: Installable',
+    'ok-single.md': '# Project Status\nPhase: building\nWorkflows: Host Extension Development → Claude Code Extension; traits: Installable\n',
+    'ok-unclassified.md': 'Phase: intake\nWorkflows: not yet classified\n',
+    'unknown-name.md': 'Workflows: Toaster Development; traits: none\n',
+    'unknown-sub-type-key.md': 'Workflows: Host Extension Development → claude-code-extension; traits: none\n',
+    'unknown-sub-type-name.md': 'Workflows: Host Extension Development → Claude Code extension; traits: none\n',
+    'unknown-trait-key-not-case.md': 'Workflows: Web App Development; traits: has-screens\n',
+    'unknown-trait-key.md': 'Workflows: Web App Development; traits: installable\n',
+    'unknown-trait-then-flag.md': 'Workflows: Web App Development; traits: Glitter, Spends money\n',
+    'unknown-trait.md': 'Workflows: Web App Development; traits: Glitter\n',
+    'unknown-type-key.md': 'Workflows: web-app; traits: none\n',
+    'unknown-type-name.md': 'Workflows: Web app; traits: none\n',
+    'unknown-workflow-name-case.md': 'Workflows: web app development; traits: none\n',
+}
+
+
+def test_r014_every_status_case_holds_exactly_its_lines():
+    assert sorted(STATUS_TEXT) == sorted(STATUS_EXACT), "a status fixture without its text, or a text without its case"
+    for name, text in STATUS_TEXT.items():
+        held = (REPO / FIX / "status" / name).read_bytes().decode("utf-8").replace("\r\n", "\n")
+        assert held == text, name
+
+
+# The bodies a stopped line would have shown failing: each, as a line of its own, gives findings, so a check that went
+# on past the stop would print more than the one (form) line (stage B2's review, round 9: fixtures 4, blocking).
+STOPPED = [
+    ("form-bad-prefix-bodies-unchecked.md", ["Toaster Development; traits: Glitter", "Library Development; traits: none"]),
+    ("form-bad-prefix-single-unknown.md", ["Toaster Development; traits: Glitter"]),
+    ("form-bad-prefix-single-two-types.md", ["Library Development, Web App Development; traits: none"]),
+    ("form-bad-prefix-single-unwritten.md", ["Library Development; traits: none"]),
+]
+
+
+@pytest.mark.parametrize("case, bodies", STOPPED, ids=[c for c, _ in STOPPED])
+def test_r014_a_line_that_breaks_the_prefix_rule_is_not_checked_further(tmp_path, case, bodies):
+    """handoff/TASK-006-r2.md R2-6 (and TASK-006.md Requirement 11): a line that fails the prefix rule "is not checked
+    further (no `unknown`, `e` or `f` from it)". The precondition runs each body as a status line of its own, where it
+    fails; the case then gives the prefix's (form) finding and nothing else (STATUS_EXACT)."""
+    for body in bodies:
+        alone = tmp_path / "alone.md"
+        alone.write_text("Workflows: " + body + "\n", encoding="utf-8")
+        rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(alone))
+        assert rc == 1 and [line for line in fails(lines) if not line.startswith("FAIL (form)")], (body, lines)
+    rc, lines, err = status(case)
+    assert {line.split(")")[0] for line in fails(lines)} == {"FAIL (form"}, lines
+    assert all("breaks the part-prefix rule" in line for line in fails(lines)), lines
+
+
+CLOSE_FD = "import os, subprocess, sys\nos.close(%d)\nsys.exit(subprocess.call([sys.executable] + sys.argv[1:]))\n"
+
+
+@pytest.mark.parametrize("fd", [1, 2], ids=["stdout-closed", "stderr-closed"])
+def test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback(fd):
+    """The usage text: a usage error is exit 2 and ends with `RESULT: not checked`, with no traceback, as a run with
+    a standard stream closed already does for its findings (test_r014_closed_standard_output_gives_no_traceback).
+    Started with standard output or standard error closed (Python then sets that stream to None), a bad argument
+    must still exit 2: with standard error closed the RESULT line is the last line on standard output, and with
+    standard output closed nothing but the usage error reaches standard error (stage B2's review, round 9: Review B;
+    docs/debug/BUG-010.md). The precondition shows the child starts with the stream closed."""
+    probe = "import sys; sys.%s.write(repr(sys.%s))" % (("stderr", "stdout") if fd == 1 else ("stdout", "stderr"))
+    p = subprocess.run([sys.executable, "-c", CLOSE_FD % fd, "-c", probe], capture_output=True, text=True, encoding="utf-8")
+    assert (p.returncode, (p.stderr if fd == 1 else p.stdout)) == (0, "None"), "precondition: the child starts with the stream closed"
+    p = subprocess.run([sys.executable, "-c", CLOSE_FD % fd, PROG, "--no-such-option"], cwd=str(REPO),
+                       capture_output=True, text=True, encoding="utf-8")
+    assert p.returncode == 2, (p.returncode, p.stdout, p.stderr)
+    assert "Traceback" not in p.stdout + p.stderr, (p.stdout, p.stderr)
+    if fd == 2:
+        assert p.stdout.splitlines()[-1] == "RESULT: not checked", p.stdout
+    else:
+        assert p.stderr.splitlines()[-1] == "workflow-check.py: error: unrecognized arguments: --no-such-option", p.stderr
+
+
+def test_r014_every_root_that_is_no_folder_is_reported(tmp_path):
+    """The program's usage text and R4: each argument that cannot be checked is an ERROR line, then `RESULT: not
+    checked`; a second root that is no folder is reported after the first (stage B2's review, round 9: tests, a
+    consider; `continue` made `break` survived)."""
+    first, second = tmp_path / "absent-1", tmp_path / "absent-2"
+    rc, lines, err = run(str(first), str(second))
+    shown = str(tmp_path).replace("\\", "/")
+    assert lines == [f"ERROR: {shown}/absent-1: not a folder", f"ERROR: {shown}/absent-2: not a folder", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+def test_r014_every_status_file_that_cannot_be_read_is_reported(tmp_path):
+    """As above, for two status files that do not exist (stage B2's review, round 9: tests, a consider)."""
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(tmp_path / "no-1.md"), "--status", str(tmp_path / "no-2.md"))
+    shown = str(tmp_path).replace("\\", "/")
+    assert lines == [f"ERROR: {shown}/no-1.md: does not exist", f"ERROR: {shown}/no-2.md: does not exist", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+# --- stage B2's review, round 9: the control-flow sweep's separable survivors (BUG-010) ---------------------------
+# run/supervisor/sweep_flow.py made every `continue` a `break` or a `pass`, every bare `return` a `pass`, every two
+# neighbouring statements swapped, every `for` loop reversed and every member of a module constant dropped. Each
+# survivor an input separates has a case here; the output is pinned as the program gives it, its order included, so
+# a change of the order is a change of these tests. The rest are recorded by class in docs/HARDENING.md, "the stage
+# review (round 9)".
+
+def test_r014_a_final_line_feed_adds_no_empty_line(program):
+    """file_lines' docstring: "A final line feed does not add an empty line." (the sweep's line 105, the return moved
+    above the deletion of the last empty line)."""
+    mod = program("workflow-check")
+    assert mod.file_lines("a\nb\n") == ["a", "b"]
+    assert mod.file_lines("a\nb") == ["a", "b"]
+    assert mod.file_lines("\n") == [""]
+    assert mod.file_lines("") == []
+
+
+def _open_list_with(tmp_path, old, new):
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    assert text.count(old) == 1, "precondition: the text to replace is in the fixture once"
+    broken = tmp_path / "open-list.md"
+    broken.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
+    return broken, str(broken).replace("\\", "/")
+
+
+PRODUCT_HEADER = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
+
+
+def test_r014_a_table_without_its_separator_is_reported_before_its_columns(tmp_path):
+    """A table with no separator row and a missing column is reported for the separator (the sweep's line 227, the
+    column test moved above the separator test)."""
+    broken, shown = _open_list_with(tmp_path, PRODUCT_HEADER,
+                                    "| Key | Name | Definition | Workflow name | Default traits | Done | Planned |\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert lines == [f"ERROR: {shown}: table after ## Product types has no separator row", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+def test_r014_the_first_missing_column_is_reported(tmp_path):
+    """Two required columns missing: the first, in the order the program requires them (the sweep's line 227, the
+    columns walked in reverse)."""
+    broken, shown = _open_list_with(tmp_path, PRODUCT_HEADER, PRODUCT_HEADER.replace("| Key |", "| Id |").replace("| Written |", "| Done |"))
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert lines == [f"ERROR: {shown}: missing column Key", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+def test_r014_the_first_row_of_a_name_is_the_one_read(tmp_path):
+    """A workflow name given twice in the open list is read from its first row (index_first; the sweep's line 241,
+    the rows walked in reverse): the second, unwritten, row is not the one judged."""
+    row = "| library | Library | Included by other programs | Library Development | — | no | — |\n"
+    broken, shown = _open_list_with(tmp_path, row, row + "| web-app-2 | Web app again | A second row | Web App Development | — | no | — |\n")
+    status = tmp_path / "status.md"
+    status.write_text("Workflows: Web App Development; traits: none\n", encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", str(status))
+    assert lines == ["RESULT: OK"], lines
+    assert rc == 0 and err == "", err
+
+
+def test_r014_a_traits_place_is_its_first_rows(tmp_path):
+    """A trait name given twice keeps the place of its first row in the open list's order (the sweep's line 279, the
+    rows walked in reverse): Has screens, then Installable, is in order."""
+    last = "| spends-money | Spends money | Its actions cost money | no | — |\n"
+    broken, shown = _open_list_with(tmp_path, last, last + "| has-screens-2 | Has screens | A second row | yes | — |\n")
+    status = tmp_path / "status.md"
+    status.write_text("Workflows: Web App Development; traits: Has screens, Installable\n", encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", str(status))
+    assert lines == ["RESULT: OK"], lines
+    assert rc == 0 and err == "", err
+
+
+def test_r014_both_layers_that_cannot_be_examined_are_reported_in_order(tmp_path, monkeypatch, capsys, program):
+    """R5-1, for both layers at once: types first, then traits (the sweep's line 303, the layers walked in reverse,
+    and line 313, the `continue` after the error made `break`)."""
+    mod = program("workflow-check")
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "traits").mkdir()
+    real = os.lstat
+
+    def lstat(path, *a, **k):
+        if os.path.basename(os.fspath(path)) in ("types", "traits"):
+            raise PermissionError(13, "Permission denied", os.fspath(path))
+        return real(path, *a, **k)
+
+    monkeypatch.setattr(os, "lstat", lstat)
+    code, lines = _main_in_process(mod, str(root), capsys=capsys)
+    shown = str(root).replace("\\", "/")
+    assert [line.replace("\\", "/") for line in lines] == [
+        f"ERROR: {shown}/types: Permission denied", f"ERROR: {shown}/traits: Permission denied", "RESULT: not checked"], lines
+    assert code == 2
+
+
+def test_r014_a_folder_that_cannot_be_listed_is_reported_before_a_file_that_cannot_be_read(tmp_path, monkeypatch, capsys, program):
+    """A root's listing errors come before its files' read errors (the sweep's line 800, the files read before the
+    listing errors were kept)."""
+    mod = program("workflow-check")
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "traits").mkdir()
+    (root / "types" / "host-extension.md").write_bytes(b"## Add at intake.questions\n\n\xff\n")
+    real = os.walk
+
+    def walk(top, *a, onerror=None, **k):
+        if os.path.basename(os.fspath(top)) == "types" and onerror is not None:
+            onerror(PermissionError(13, "Permission denied", os.path.join(os.fspath(top), "locked")))
+        return real(top, *a, onerror=onerror, **k)
+
+    monkeypatch.setattr(os, "walk", walk)
+    code, lines = _main_in_process(mod, str(root), capsys=capsys)
+    shown = str(root).replace("\\", "/")
+    assert [line.replace("\\", "/") for line in lines] == [
+        f"ERROR: {shown}/types/locked: Permission denied",
+        f"ERROR: {shown}/types/host-extension.md: cannot be read as UTF-8",
+        "RESULT: not checked"], lines
+    assert code == 2
+
+
+def _one_file_root(tmp_path, rel, text):
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "traits").mkdir()
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return root, str(root).replace("\\", "/") + "/" + rel
+
+
+# (the file, its text, the sweep's survivor it separates, the findings in order).
+FLOW_FILE_CASES = {
+    "fence-open-first": ("types/host-extension.md", "## Add at nowhere.at-all\n\nq\n\n```\n",
+                         "line 500: the file's open fence reported after its headings",
+                         ["FAIL (form) {f}: - - fenced code block is still open at the end of the file",
+                          "FAIL (a) {f}: nowhere.at-all - point is not in the extension-point registry"]),
+    "trait-set-empty": ("traits/has-screens.md", "## Set at intake.delivery-kind\n",
+                        "line 516: the trait rule tested before the section's own rules",
+                        ["FAIL (form) {f}: intake.delivery-kind - Set at section has no non-blank line",
+                         "FAIL (b) {f}: intake.delivery-kind - a trait file may only add",
+                         "FAIL (kind) {f}: - - Set at intake.delivery-kind is not one delivery kind"]),
+    "kind-at-unknown-point": ("types/host-extension.md", "## Add at nowhere.at-all for installer\n\nq\n",
+                              "line 524: the delivery kind tested before the point",
+                              ["FAIL (a) {f}: nowhere.at-all - point is not in the extension-point registry",
+                               "FAIL (kind) {f}: installer - delivery kind is named on a point other than project-end.delivery"]),
+    "sub-two-identity-findings": ("types/host-extension/not-a-sub.md", "## Add at intake.questions\n\nq\n",
+                                  "line 571: a sub-workflow's identity findings reversed",
+                                  ["FAIL (d) {f}: not-a-sub - type workflow types/host-extension.md does not exist",
+                                   "FAIL (d) {f}: not-a-sub - not a sub-type of host-extension"]),
+}
+
+
+@pytest.mark.parametrize("case", sorted(FLOW_FILE_CASES))
+def test_r014_a_files_findings_come_in_their_order(tmp_path, case):
+    """A file's findings, in the order the program gives them (stage B2's review, round 9: the control-flow sweep)."""
+    rel, text, survivor, expected = FLOW_FILE_CASES[case]
+    root, shown = _one_file_root(tmp_path, rel, text)
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([line.format(f=shown) for line in expected]), (survivor, lines)
+    assert rc == 1 and err == "", err
+
+
+# (the status line, the sweep's survivor it separates, the findings in order).
+FLOW_STATUS_CASES = {
+    "two-unknown-segments": ("Workflows: Glitter → Toaster; traits: none",
+                             "line 608: the head's segments walked in reverse",
+                             ["FAIL (unknown) {f}: Glitter - name is not in the open list",
+                              "FAIL (unknown) {f}: Toaster - name is not in the open list",
+                              "FAIL (e) {f}: - - part must name exactly one product type"]),
+    "no-type-two-subs": ("Workflows: Claude Code Extension, Browser Extension; traits: none",
+                         "line 621: the sub-type count tested before the type count",
+                         ["FAIL (e) {f}: - - part must name exactly one product type",
+                          "FAIL (e) {f}: - - part must name at most one sub-type"]),
+    "shape-then-unwritten": ("Workflows: Library Development, Installable; traits: none",
+                             "line 638: the written test moved above the shape test",
+                             ["FAIL (form) {f}: - - Workflows head is not the product type, then at most its sub-type",
+                              "FAIL (f) {f}: Library Development - product type is not written"]),
+}
+
+
+@pytest.mark.parametrize("case", sorted(FLOW_STATUS_CASES))
+def test_r014_a_status_lines_findings_come_in_their_order(tmp_path, case):
+    """A status line's findings, in the order the program gives them (stage B2's review, round 9: the control-flow
+    sweep)."""
+    line, survivor, expected = FLOW_STATUS_CASES[case]
+    status = tmp_path / "status.md"
+    status.write_text(line + "\n", encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(status))
+    shown = str(status).replace("\\", "/")
+    assert lines == whole_output([item.format(f=shown) for item in expected]), (survivor, lines)
+    assert rc == 1 and err == "", err
+
+
+def test_r014_the_usage_line_names_the_options_in_their_order():
+    """The usage line argparse prints, white space aside (the sweep's lines 768 and 769, two options declared in the
+    other order)."""
+    rc, lines, err = run("--no-such-option")
+    assert " ".join(err.split()) == ("usage: workflow-check.py [-h] [--open-list FILE] [--registry FILE] [--status FILE] "
+                                     "[ROOT ...] workflow-check.py: error: unrecognized arguments: --no-such-option"), err
+    assert rc == 2 and lines == ["RESULT: not checked"], lines
+
+
+def test_r014_a_root_that_is_no_folder_is_reported_when_the_rules_cannot_be_read(tmp_path):
+    """Every argument that cannot be checked is an ERROR line, the rules' first (the program's usage text and R4): with
+    the open list unreadable, a root that is no folder after one that is still reported (the sweep's line 796, the
+    rules test moved above the folder test, and line 797, the `continue` after it made `break`)."""
+    absent = tmp_path / "absent.md"
+    rc, lines, err = run("--open-list", str(absent), f"{FIX}/pass", str(tmp_path / "absent-root"))
+    shown = str(tmp_path).replace("\\", "/")
+    assert lines == [f"ERROR: {shown}/absent.md: does not exist", f"ERROR: {shown}/absent-root: not a folder", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+def test_r014_a_reason_that_holds_a_key_is_escaped(tmp_path):
+    """A finding's reason is escaped like its path and its name (the usage text; round 2: Review B): a sub-workflow's
+    reasons name its type key, which the open list gives and may hold any character (stage B2's review, round 9: the
+    control-flow sweep's line 740, the line printed before its reason was escaped)."""
+    key = "libräry"
+    broken, _ = _open_list_with(tmp_path, "| library | Library |", "| %s | Library |" % key)
+    root = tmp_path / "root"
+    (root / "types" / key).mkdir(parents=True)
+    (root / "traits").mkdir()
+    (root / "types" / key / "x.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8", newline="\n")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    p = subprocess.run([sys.executable, PROG, "--open-list", str(broken), str(root)], cwd=str(REPO), capture_output=True,
+                       text=True, encoding="utf-8", env=env)
+    f = str(root).replace("\\", "/") + "/types/libr\\xe4ry/x.md"
+    assert p.stdout.splitlines() == whole_output([
+        f"FAIL (d) {f}: x - type workflow types/libr\\xe4ry.md does not exist",
+        f"FAIL (d) {f}: x - not a sub-type of libr\\xe4ry"]), p.stdout
+    assert p.returncode == 1 and p.stderr == "", p.stderr

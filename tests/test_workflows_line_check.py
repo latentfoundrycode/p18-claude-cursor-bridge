@@ -554,3 +554,25 @@ def test_r015_the_bytecode_switch_is_restored_when_the_checker_cannot_be_loaded(
             assert sys.dont_write_bytecode is value, (name, how, value)
     finally:
         sys.dont_write_bytecode = before
+
+
+@pytest.mark.parametrize("judge", ["inventory-check", "conformance-check"])
+def test_r015_tables_that_cannot_be_loaded_are_reported_before_a_line_is_judged(tmp_path, judge):
+    """TASK-008 Requirement 5: rule files that cannot be loaded give `not checked` and their causes, for a status file
+    that holds a Workflows line to judge, not only for `not yet classified`, which needs no table (stage B2's review,
+    round 9: the control-flow sweep's inventory-check.py line 224 and conformance-check.py line 333, the line judged
+    before the load errors were tested, which then judged it with no tables)."""
+    folder = _broken_copy(tmp_path, "open-list-without-tables")
+    expected = _causes(folder)
+    assert len(expected) >= 2, "precondition: %r" % expected
+    text = HEAD + BRIDGE_LINE
+    if judge == "inventory-check":
+        status = tmp_path / "PROJECT_STATUS.md"
+        write_status(status, text)
+        rc, lines, out, err = inventory(tmp_path, status, program=folder / "inventory-check.py")
+        assert workflows_lines(lines) == ["WORKFLOWS LINE: not checked: " + c for c in expected], lines
+    else:
+        rc, out, err = conformance(workspace(tmp_path, text), program=folder / "conformance-check.py")
+        assert verdict(out, "Workflows line") == ("MISSING", "Workflows line  - not checked: " + "; ".join(expected)), out
+    assert "Traceback" not in err and "Traceback" not in out, (out, err)
+    assert rc == 1

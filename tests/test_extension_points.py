@@ -317,10 +317,14 @@ def test_r006_the_registry_names_the_change_words_the_check_reads(program):
         "more backticks or tildes indented at most three spaces, a backtick run whose info string holds a backtick opening "
         "none, and closes with a run of the same character at least as long, indented at most three spaces and followed "
         "only by spaces or tabs; a fence still open at the end of the file fails.",
+        # A folder under types/ that is no product type is reported once and nothing inside it is read, and a missing
+        # type workflow fails a sub-workflow (stage B2's review, round 9: fixtures-1 and texts converged).
         "The check also fails a `## Set at` section with no non-blank line; a `types` or `traits` path that is itself a "
-        "file or a link; a file or link under `types/` or `traits/` that is not a conditional workflow at its key's path "
-        "(a README there included); a folder under `traits/` or inside a type's folder; and a folder under `types/` that "
-        "is no product type.",
+        "file or a link; every link under `types/` or `traits/`, which it never follows; a file under `types/` or "
+        "`traits/` that is not a conditional workflow at its key's path (a README there included); a folder under "
+        "`traits/` or inside a type's folder; a folder under `types/` that is no product type, reported once, with "
+        "nothing inside it read (a link inside it is still reported, as a link); and a sub-workflow whose type's own "
+        "workflow file, `types/<type key>.md`, does not exist.",
         # The four forms are matched exactly, and an unreadable file stops the check (stage B2 review, round 6: texts,
         # programs).
         "The four forms above are matched exactly: `##` at the start of the line, one space between words, and nothing "
