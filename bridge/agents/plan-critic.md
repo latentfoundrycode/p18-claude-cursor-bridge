@@ -24,13 +24,15 @@ fixes it or accepts it with a reason) or **Consider** (worth a thought, no round
 it). A finding that would reverse a fix recorded in that file is non-convergence: say so
 explicitly instead of raising it as new. Your reply ends with the counts per grade.
 
-**The loop is bounded** (`supervisor.md`, Phase 2): four rounds per subject at the most, then
-one confirming read, then one resolution round for what is still Blocking or non-convergent,
-then the gate, whatever is still open. A round whose file opens with *This round is the
+**The loop is bounded** (`supervisor.md`, Phase 2): four rounds per subject at the most
+(more only under the owner's line in `docs/RUN_PARAMETERS.md`, which runs the same shape once
+more), then one confirming read if the text changed, then one resolution round for what is
+still Blocking or non-convergent, then the gate, whatever is still open. A round whose file opens with *This round is the
 confirming read* is one: raise a finding only on text changed since your last read (the file
 holds that diff), or a Blocking finding anywhere; never the same point again in other words.
 A resolution round's file opens with *This is the resolution round*: answer every open
-question in it and raise no new finding. A finding the other critic also names keeps the grade
+question in it, and Review B's answer in `run/review/REVIEW-DESIGN-<subject>-R1.md`, in place
+of findings and with no counts; raise no new finding. A finding the other critic also names keeps the grade
 its content earns: agreement is no reason to grade up.
 
 Read `~/.claude/cursor-bridge/Known-Pitfalls.md` first (read it by that absolute path — it
