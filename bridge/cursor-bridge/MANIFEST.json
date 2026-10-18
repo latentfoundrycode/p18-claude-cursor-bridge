@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-18 23:08",
+  "generated": "2026-10-18 23:16",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -31,7 +31,7 @@
     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
     "cursor-bridge/bridge-install.py": "4ed573348cd98350aba4906e1acf08f262199d169f2710205a9e42c8e1e0ed07",
-    "cursor-bridge/bridge-run.py": "817faa6034d88065158ebe507ffc43978d3a0f3249d12dd0a1beeb13a5b05523",
+    "cursor-bridge/bridge-run.py": "6530169f6b93ac003255e1e95bf9018021e024a847bd9cbd3aa914014968896c",
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
     "cursor-bridge/bridge_env.py": "7fe536ff12e72406a84efa59d2e74788d174092f524ae0438d38169aa99b7d53",
     "cursor-bridge/completion-check.py": "b95fb31a10082f91ee01eb3ae2bef981a71bddef0ca6ea23f72e60d7b75acd03",

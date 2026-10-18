@@ -85,8 +85,9 @@ DESIGN_MARK = re.compile(r"(?i)run/review/DESIGN-")
 DESIGN_NAME_RE = re.compile(r"^(?:([a-z0-9-]*)-)?(R?)([1-9][0-9]*)$")
 DESIGN_TOKEN_RE = re.compile(r"[^\s\"'`]+")
 DESIGN_LIFT_RE = re.compile(
-    r"^\s*[-*]?\s*(?:\*\*Design rounds above five:\*\*|\*\*Design rounds above five\*\*:|Design rounds above five:)\s*"
-    r"([a-z0-9-]+)\s+([0-9]+)\s*\((.+)\)", re.I)
+    r"^\s*[-*]?\s*(?:\*\*(?i:Design rounds above five):\*\*|\*\*(?i:Design rounds above five)\*\*:|(?i:Design rounds above five):)\s*"
+    r"([a-z0-9-]+)\s+([0-9]+)\s*\((.+)\)")
+DESIGN_TRIM_BEFORE_SEP = re.compile(r"[. ]+(?=[/\\])")
 
 
 def usage():
@@ -256,7 +257,10 @@ def design_lifts(folder):
                 words = m.group(3).strip()
                 if not words:
                     continue
-                rounds = int(m.group(2))
+                try:
+                    rounds = int(m.group(2))
+                except ValueError:
+                    continue
                 if rounds <= DESIGN_DEFAULT_ROUNDS:
                     continue
                 lifts[m.group(1)] = rounds
@@ -288,14 +292,18 @@ def design_refuse_name(name, token, lifts, params_path):
         return design_refusal("DESIGN-%s.md" % name, subject, round_written, "the name cannot be read", params_path)
     subject = parsed.group(1) or ""
     round_written = design_round_written(name)
+    try:
+        round_n = int(parsed.group(3))
+    except ValueError:
+        round_n = None
     if parsed.group(2) == "R":
         limit = DESIGN_RESOLUTION_LIFTED if subject in lifts else DESIGN_RESOLUTION_DEFAULT
-        if int(parsed.group(3)) > limit:
+        if round_n is None or round_n > limit:
             return design_refusal("DESIGN-%s.md" % name, subject, round_written,
                                   "a resolution round beyond R%d" % limit, params_path)
         return None
     limit = lifts.get(subject, DESIGN_DEFAULT_ROUNDS)
-    if int(parsed.group(3)) > limit:
+    if round_n is None or round_n > limit:
         return design_refusal("DESIGN-%s.md" % name, subject, round_written,
                               "above round %d" % limit, params_path)
     return None
@@ -305,7 +313,8 @@ def design_ceiling(argv, folder):
     """Refuse cursor-agent launches naming a design round above the ceiling; None when allowed."""
     if head_of(argv) != "cursor-agent":
         return None
-    norm = DESIGN_PATH_NORM.sub("/", " ".join(argv))
+    text = DESIGN_TRIM_BEFORE_SEP.sub("", " ".join(argv))
+    norm = DESIGN_PATH_NORM.sub("/", text)
     hits = list(DESIGN_MARK.finditer(norm))
     if not hits:
         return None
