@@ -354,14 +354,15 @@ digits and hyphens: for a change, chosen from its name when the Change section i
 Azure monthly allowance is `azure-allowance`, its plan addendum `azure-allowance-plan`),
 distinct from `design`, `plan`, every other subject and every other `<token>-plan`, and
 written in its block's heading in `docs/DESIGN_CRITIQUE.md`. A launch that failed (a reply that
-names nothing from the file) runs once more on the same file and spends no round; a second
-failure is a model's failure: step 3b records both failed launches, the second making the mark,
-and re-resolves the roster, and the same file runs once more on the profile it gives, under its
-number; a third failure, or no usable profile, makes the design wait (below), the round
-recorded as not run. A round never run spends none of the four. The wait ends when the roster
-returns (rule 38) or on the owner's word; then the same file runs once under its number, with no
-re-runs, and a failure of that launch is reported to the owner as an escalation and waits for
-their word.
+names nothing from the file) spends no round and follows step 3b, every failed launch recorded:
+a first failure is exit 4, and the same file runs once more; a second is exit 3, which marks the
+model and re-resolves, and the same file runs once more on the profile it gives, under its
+number (a connection error or a hit limit keeps step 3b's exit 4 or 5 and no mark). A third
+failure, an exit 5, or no usable profile makes the design wait (below), the round recorded as
+not run. A round never run spends none of the four. The wait ends when the roster returns
+(rule 38) or on the owner's word; then the same file runs once under its number, with no
+re-runs. If that launch fails too, the round stays not run and the subject goes on to its
+resolution round or its gate, the report escalating it to the owner.
 
 - **The confirming read.** When the critique ends and the text changed after either critic last
   read it, both critics read it once more, as the next round (the fifth at the most, or
@@ -423,14 +424,15 @@ record shows what is open (an owner who sends a design back at its gate to be cr
 gives exactly those words). `<rounds>` is a round number, never a count: the number of the
 last numbered round run (a resolution round not counted) plus the number the owner names, or
 plus five when they name none; it is never below six; the line records their words as given,
-and the report that records it says in one line how their number is spent (two more rounds: one
-critique round, then the confirming read). A subject is lifted once, and a second line for it is
-ignored: the owner's words to criticise it again after that make it a scoped revision, a change
+and the report that records it says in one line how `<rounds>` is spent: critique rounds through
+`<rounds>` minus one, then the confirming read at `<rounds>` if the text changed (for an owner
+who named two after round four: one critique round, then the confirming read). A subject is
+lifted once: the first well-formed line for it stands and a later one is ignored: the owner's words to criticise it again after that make it a scoped revision, a change
 with a subject of its own. Before the run-parameters step the line is written to
 `docs/RUN_PARAMETERS.md` on its own, creating the file; that step adds its lines beside it.
 
 The record shows each critic's grades apart. Its cost: at most six subagent runs and six
-verdict-bearing Cursor calls per subject, and two re-runs of a failed launch each at the most: four rounds,
+verdict-bearing Cursor calls per subject, and, for a failed launch, two re-runs before the wait and one launch after it: four rounds,
 the confirming read and the resolution round; under the owner's line, up to `<rounds>` and `R2`.
 
 `docs/DESIGN_CRITIQUE.md` has three parts, one block per subject: **Accepted** (finding, critic,
@@ -985,8 +987,8 @@ stage-close pass — exits non-zero, produces no output, or hits the launcher's 
 (The one exception: every exit 125 whose message begins `bridge-run: refused - design
 ceiling: ` is the design critique's ceiling holding, never a model's failure: it is not retried
 and no `--record-failure` follows it; Phase 2. A design-critique reply that names nothing from
-its file follows Phase 2's count: one re-run on the same model, then this step records both
-failed launches and re-resolves, then one run on the profile it gives, then the wait Phase 2
+its file is recorded like any failed call and follows the exits below, which Phase 2 counts: the
+exit-4 retry, the exit-3 re-resolve and one run on the profile it gives, then the wait Phase 2
 describes.)
 
 **First, when the exit code is 124, look before you discard** (KP-033): `git status` and
