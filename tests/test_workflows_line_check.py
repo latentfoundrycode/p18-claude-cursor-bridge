@@ -420,12 +420,18 @@ def test_r015_the_bytecode_switch_is_restored(program):
 
 @pytest.mark.parametrize("case", sorted(VALID))
 @pytest.mark.parametrize("name", ["inventory-check", "conformance-check"])
-def test_r015_a_valid_line_is_judged_valid_with_no_rows(program, name, case):
+def test_r015_a_valid_line_is_judged_valid_with_no_rows(tmp_path, name, case):
     """handoff/TASK-008.md, the judge's interface (and its docstring): the outcome is valid, missing, malformed or not
     checked, and the rows are empty for valid. A valid line is judged ("valid", []) by each judge, never malformed
     with no rows, which inventory-check.py prints the same (BUG-009's gate round 1: Review A, a consider; the
-    widened sweep's inventory-check.py line 228, `if findings:` forced true, survived at the output)."""
-    assert program(name).judge_workflows_line("s.md", VALID[case]) == ("valid", [])
+    widened sweep's inventory-check.py line 228, `if findings:` forced true, survived at the output). Judged on a copy
+    whose open list marks every entry unwritten, so the line's f and FLAG findings exist and are dropped, as the
+    output twins are (BUG-009's gate round 2: Review A, a consider)."""
+    folder = _unwritten_copy(tmp_path)
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_") + "_valid_copy", folder / (name + ".py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.judge_workflows_line("s.md", VALID[case]) == ("valid", [])
 
 
 @pytest.mark.parametrize("program_name", ["inventory-check.py", "conformance-check.py"])

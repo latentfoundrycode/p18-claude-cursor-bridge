@@ -752,9 +752,11 @@ def print_findings(findings):
 class CheckArgumentParser(argparse.ArgumentParser):
     def error(self, message):
         self.print_usage(sys.stderr)
-        sys.stderr.write("%s: error: %s\n" % (self.prog, escape_field(message)))
+        if sys.stderr is not None:
+            sys.stderr.write("%s: error: %s\n" % (self.prog, escape_field(message)))
         print("RESULT: not checked")
-        sys.stdout.flush()
+        if sys.stdout is not None:
+            sys.stdout.flush()
         self.exit(2)
 
 

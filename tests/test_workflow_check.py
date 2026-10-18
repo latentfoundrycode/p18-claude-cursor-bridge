@@ -2372,10 +2372,16 @@ def test_r014_usage_error_with_a_closed_stream_exits_2_without_traceback(fd):
                        capture_output=True, text=True, encoding="utf-8")
     assert p.returncode == 2, (p.returncode, p.stdout, p.stderr)
     assert "Traceback" not in p.stdout + p.stderr, (p.stdout, p.stderr)
+    # Each open stream whole, white space aside (argparse wraps the usage line at the terminal's width); with standard
+    # error closed argparse prints the usage line on standard output, and the program writes nothing to the other
+    # stream (BUG-010's gate: Review A, a consider).
+    usage = "usage: workflow-check.py [-h] [--open-list FILE] [--registry FILE] [--status FILE] [ROOT ...]"
     if fd == 2:
         assert p.stdout.splitlines()[-1] == "RESULT: not checked", p.stdout
+        assert " ".join(p.stdout.split()) == usage + " RESULT: not checked", p.stdout
     else:
         assert p.stderr.splitlines()[-1] == "workflow-check.py: error: unrecognized arguments: --no-such-option", p.stderr
+        assert " ".join(p.stderr.split()) == usage + " workflow-check.py: error: unrecognized arguments: --no-such-option", p.stderr
 
 
 def test_r014_every_root_that_is_no_folder_is_reported(tmp_path):
