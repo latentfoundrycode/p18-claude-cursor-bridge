@@ -29,7 +29,7 @@ Stage B2's review, round 10 (snapshot STAGE-B2j, 368f859): Review B APPROVE; Rev
 ## The sweep (local, run/supervisor/, readable)
 sweep_idiom.py (repeats dropped from every `for`, `len` and assigned list, each operand of an `and` or `or` dropped, `all` and `any` swapped; repeats of unhashable items dropped by identity): run on main's tests, then against these tests; write_idiom_list.py (`--check`) puts each survivor in its class and stops on a survivor no class names. Every test was only added or strengthened; none was removed or loosened, so the earlier sweeps' and drivers' kills stand.
 
-Since no program changed, every new test passes on the checkpoint's code as well; what each proves is the mutant it kills, named in its docstring or comment (Review A's two named mutants, and the sweep's lines), and the sweep's runs show each killed: run/supervisor/sweep_idiom_main.out (main's tests, 87 survivors of 193) against sweep_idiom_r7.out (these, 49), both on the fixed helper.
+Since no program changed, every new test passes on the checkpoint's code as well; what each proves is the mutant it kills, named in its docstring or comment (Review A's two named mutants, and the sweep's lines), and the sweep's runs show each killed: run/supervisor/sweep_idiom_main.out (main's tests, 87 survivors of 193) against sweep_idiom_r9.out (these, 42), both on the fixed helper.
 
 ## The second attempt (gate round 1: Review B APPROVE, Review A REJECT)
 Review A found five survivors classed where an input separates them, and the Of type comment wrong; Review B approved. REVIEWERS DISAGREE on whether every separable survivor needs a case; decided for Review A (this scope promises one). What changed since the reviewed head is in run/review/DELTA-BUG-011.diff (tests, docs/HARDENING.md, docs/PROJECT_STATUS.md only); the whole diff is REVIEW-BUG-011.diff as before.
@@ -38,6 +38,12 @@ Review A found five survivors classed where an input separates them, and the Of 
 - tests/test_workflows_line_check.py: the rule case two-tables-without-key (handoff/TASK-008.md Requirement 5, one line per cause; kills inventory-check.py 264).
 - test_r014_each_line_of_a_repeated_pair_is_valid_alone gains the sub-type twin's precondition; the Of type comment says the program judges it only for one type and one sub-type, that Requirement 4 read literally asks for the finding, and that the gap is a program lead (HARDENING, "BUG-011's gate round 1").
 - docs/HARDENING.md's round-10 section: the counts of one run each on the fixed helper (87 on main's tests, 49 on these), the classes regenerated, the gate-round-1 paragraph and the Of type lead.
+
+## The third attempt (gate round 2: Review B APPROVE, Review A REJECT)
+Review A found line 360's `and` (without `len(parts) == 2`) and `len` (counted without repeats) separated by an open list keyed `a.md`, which open-list.md:11 forbids but the program does not check; and the argument-twice class separated by an argument given twice, whose output handoff/TASK-006.md fixes. REVIEWERS DISAGREE on the first; decided for Review A, as in gate round 1. run/review/DELTA-BUG-011.diff is now the change since the head of gate round 2.
+- test_r014_a_product_key_named_like_a_file_is_a_type_folder — open-list.md:11's key rule, which the program does not check; the test pins the program's reading of a key `a.md` (its folder is a type folder, its files sub-workflows); kills 360's `and` and `len`.
+- test_r014_an_argument_given_twice_is_checked_twice — handoff/TASK-006.md Requirement 1 ("--status FILE may be repeated. Each named file's `Workflows:` lines are checked") and Requirement 4 ("Print each", roots and status files in argument order): a root and a status file each given twice, each finding printed twice; kills 785, 786, 794, 813, 828 (the argument-twice class is gone).
+- docs/HARDENING.md: the counts of the sweep's run on these tests, the regenerated classes, "six" survivors in gate round 1, the gate-round-2 paragraph, and the program leads (the Of type finding on all three lines that owe it; the Key format).
 
 ## Expected bookkeeping in the diff
 docs/HARDENING.md ("the stage review (round 10)"), docs/PROJECT_STATUS.md, run/review/ (the review files).
