@@ -288,6 +288,9 @@ NOT_LOADABLE = {
     "open-list-without-tables": ("open-list-without-tables", VALID["not-yet-classified"], "missing heading"),
     "no-escape-field": ("no-escape-field", MALFORMED["no-traits"][0], "workflow-check.py: AttributeError"),
     "check-exits-after-load": ("check-exits-after-load", VALID["not-yet-classified"], "workflow-check.py: SystemExit"),
+    # Two tables without Key give two identical causes, each a line (TASK-008 Requirement 5: one line per cause; BUG-011's
+    # gate round 1: Review A, the idiom sweep's inventory-check.py line 264, the causes printed with repeats dropped).
+    "two-tables-without-key": ("two-tables-without-key", VALID["not-yet-classified"], "missing column Key"),
 }
 
 
@@ -302,6 +305,11 @@ def _broken_copy(tmp_path, how):
         (folder / "workflow" / "extension-points.md").unlink()
     elif how == "open-list-without-tables":
         (folder / "workflow" / "open-list.md").write_text("# Open list\n\nNo tables here.\n", encoding="utf-8", newline="\n")
+    elif how == "two-tables-without-key":
+        open_list = folder / "workflow" / "open-list.md"
+        text = open_list.read_text(encoding="utf-8")
+        assert text.count("\n| Key | Name |") == 3, "precondition: three tables whose first column is Key"
+        open_list.write_text(text.replace("\n| Key | Name |", "\n| Id | Name |", 2), encoding="utf-8", newline="")
     elif how == "check-exits-after-load":
         text = checker.read_text(encoding="utf-8")
         head = "def check_status(path, text, tables):\n"
@@ -315,7 +323,7 @@ def _broken_copy(tmp_path, how):
 
 
 # The cases whose rule files are broken; each of the others is one load failure with one cause.
-RULE_CASES = ("rules-absent", "registry-absent", "open-list-without-tables")
+RULE_CASES = ("rules-absent", "registry-absent", "open-list-without-tables", "two-tables-without-key")
 
 
 def _causes(folder):
@@ -352,6 +360,8 @@ def test_r015_inventory_rule_files_not_loadable_is_a_failure(tmp_path, case):
             # The three causes by name, so the copy's reader is not the only oracle (BUG-008's gate round 1: consider).
             assert [line.rsplit(": ", 1)[1] for line in found] == [
                 "missing heading ## Product types", "missing heading ## Sub-types", "missing heading ## Traits"], found
+        if how == "two-tables-without-key":
+            assert [line.rsplit(": ", 1)[1] for line in found] == ["missing column Key"] * 2, found
     else:
         assert len(found) == 1, found
 
@@ -497,6 +507,31 @@ def test_r015_conformance_prints_each_finding_in_order(tmp_path):
         "Nonexistent Development - name is not in the open list; - - part must name exactly one product type; "
         "- - Workflows lines do not stand together right after the Phase line"), out
     assert rc == 1
+
+
+# Stage B2's review, round 10: a finding given twice is printed twice, and two identical lines stand together (the idiom
+# sweep's inventory-check.py line 224, conformance-check.py line 333 and workflow-check.py line 729: the findings, or
+# the placed run, with repeats dropped).
+REPEATED = "# Project Status\nPhase: building\nWorkflows: Web App Development; traits: none\nWorkflows: Web App Development; traits: none\n"
+
+
+def test_r015_a_repeated_finding_is_reported_each_time(tmp_path):
+    """handoff/TASK-008.md: one WORKFLOWS LINE per finding of the judge, and the conformance row every finding joined
+    by `; `: two identical unprefixed lines each break the part-prefix rule, so each judge names it twice."""
+    status = tmp_path / "PROJECT_STATUS.md"
+    write_status(status, REPEATED)
+    rc, lines, out, err = inventory(tmp_path, status)
+    assert workflows_lines(lines) == ["WORKFLOWS LINE: malformed: - - Workflows line breaks the part-prefix rule"] * 2, lines
+    assert rc == 1, lines
+    rc, out, err = conformance(workspace(tmp_path, REPEATED))
+    assert verdict(out, "Workflows line") == ("MISSING", "Workflows line  - malformed: "
+        "- - Workflows line breaks the part-prefix rule; - - Workflows line breaks the part-prefix rule"), out
+    assert rc == 1
+
+
+def test_r015_two_identical_lines_stand_together(program):
+    """check_placement: the Workflows lines stand together right after the Phase line, two identical ones too."""
+    assert program("workflow-check").check_placement("s.md", REPEATED) == []
 
 
 def test_r015_conformance_no_status_file_no_check(tmp_path):

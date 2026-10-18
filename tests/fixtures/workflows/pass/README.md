@@ -9,3 +9,7 @@ A passing workflow folder for workflow-check.py (TASK-006), every case of which 
 - prose headings: an empty one, a `###` one, ones of punctuation, and ones whose first word starts like a change word (Settings, Setup, Additional, Replacement, Add-ons) or whose second word holds `at` (atop, combat) or is a part of it (a, t).
 
 Nothing outside types/ and traits/ is read.
+
+## Add at nowhere.at-all
+
+The heading above names a point the registry does not have: were this file read, the pass root would fail.

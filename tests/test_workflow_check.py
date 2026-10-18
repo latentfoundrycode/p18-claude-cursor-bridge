@@ -399,8 +399,9 @@ FILE_EXACT = {
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
     ],
-    # Every change word without `at`, a two-word heading ending `at`, and `AT` in capitals (stage B2 review, round 5:
-    # fixtures 1, and the supervisor's mutation sweep).
+    # Each inflected change word without `at`, a two-word heading ending `at`, and `AT` in capitals (stage B2 review,
+    # round 5: fixtures 1, and the supervisor's mutation sweep); add, set and replace without `at` are in
+    # form-change-word-punctuation and form-heading-trailing-text, adding and setting in the first (round 10: fixtures 2).
     'form-misspelt-change-word': [
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
         'FAIL (form) {root}/types/host-extension.md: - - change heading is not one of the four forms',
@@ -590,7 +591,8 @@ STATUS_EXACT = {
         'FAIL (e) {path}: - - part must name exactly one product type',
     ],
     'unknown-trait.md': ['FAIL (unknown) {path}: Glitter - not a trait name'],
-    # A key where a Name belongs: the line is read by name only (stage B2 review, round 3: fixtures 4).
+    # A key where a Name belongs: the line is read by name only (stage B2 review, round 3: fixtures 4). `installable`
+    # is also the Name in another case; its twin unknown-trait-key-not-case is the key alone (round 10: fixtures 6).
     'unknown-trait-key.md': ['FAIL (unknown) {path}: installable - not a trait name'],
     'unknown-sub-type-key.md': [
         'FAIL (unknown) {path}: claude-code-extension - name is not in the open list',
@@ -618,7 +620,9 @@ STATUS_EXACT = {
     # Stage B2's review, round 9: each line after one that stops early is checked (tests, blocking); a `not yet
     # classified` line names its part (tests, blocking); a line that breaks the prefix rule, or has no traits marker, is
     # not checked further though what follows would fail (fixtures 4, blocking); a name after a finding is checked
-    # (tests, should-fix); a trait key is no trait name (fixtures 6).
+    # (tests, should-fix); a trait key is no trait name (fixtures 6). form-bad-prefix-bodies-unchecked's fourth line,
+    # its body valid, repeats the first line's refused part `a;b`: a refused part is never counted for "the same part",
+    # so the line gives its prefix finding alone (round 10: fixtures 4, consider).
     'e-after-unclassified.md': ['FAIL (unknown) {path}: Toaster Development - name is not in the open list', 'FAIL (e) {path}: - - part must name exactly one product type'],
     'form-bad-prefix-then-checked.md': ['FAIL (form) {path}: a;b - Workflows line breaks the part-prefix rule', 'FAIL (unknown) {path}: Toaster Development - name is not in the open list', 'FAIL (e) {path}: - - part must name exactly one product type'],
     'form-no-traits-marker-then-checked.md': ["FAIL (form) {path}: - - Workflows line must contain '; traits: ' exactly once", 'FAIL (unknown) {path}: Toaster Development - name is not in the open list', 'FAIL (e) {path}: - - part must name exactly one product type'],
@@ -637,6 +641,15 @@ STATUS_EXACT = {
     'form-trait-separator-then-flag.md': ['FAIL (form) {path}: Has screens,Installable - traits are not joined by a comma and one space', 'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)'],
     'form-trait-repeated-then-flag.md': ['FAIL (form) {path}: Installable - trait repeated', 'FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)'],
     'unknown-trait-key-not-case.md': ['FAIL (unknown) {path}: has-screens - not a trait name'],
+    # Stage B2's review, round 10 (tests, blocking): a line given twice is two lines, each judged; read with its
+    # repeats dropped, the unprefixed pair would be one valid line and the prefixed pair a single line with a prefix
+    # (BUG-011, the idiom sweep's lines 676 and 679). A name given twice in a head is two names, so the counts fail
+    # (supervisor.md "Project state": exactly one product type, at most one sub-type; round 10: tests, consider, line 609).
+    'e-same-part-identical.md': ['FAIL (e) {path}: app - two Workflows lines name the same part'],
+    'form-prefix-missing-identical.md': ['FAIL (form) {path}: - - Workflows line breaks the part-prefix rule',
+                                         'FAIL (form) {path}: - - Workflows line breaks the part-prefix rule'],
+    'e-type-named-twice.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
+    'e-sub-type-named-twice.md': ['FAIL (e) {path}: - - part must name at most one sub-type'],
 }
 
 
@@ -994,6 +1007,9 @@ def test_r014_indented_or_tabbed_change_heading_is_form():
     text = (REPO / root / "types/host-extension.md").read_text(encoding="utf-8")
     assert "\n##" + chr(9) + "Add at intake.questions\n" in text, "precondition: the tab survives"
     assert "\n   ## Add at intake.questions\n" in text, "precondition: the three spaces survive"
+    # The three headings print the same (form) line, so their whole list is pinned (round 10: fixtures 2, consider).
+    assert _headings("fail/form-indented-heading/types/host-extension.md") == [
+        " ## Set at intake.target-environment", "##" + chr(9) + "Add at intake.questions", "   ## Add at intake.questions"]
     rc, lines, err = run(root)
     assert rc == 1
     assert len([line for line in fails(lines) if line.startswith(f"FAIL (form) {root}/types/host-extension.md: ")]) == 3, lines
@@ -1007,10 +1023,13 @@ def test_r014_usage_error_message_is_escaped():
     assert "\\x0a::warning::injected" in err, err
 
 
-@pytest.mark.parametrize("sep", ["|---|", "|---|---|---|---|---|---|---|---|", "|---|x|---|---|---|---|---|"],
-                         ids=["one-cell", "eight-cells", "second-cell-not-dashes"])
+@pytest.mark.parametrize("sep", ["|---|", "|---|---|---|---|---|---|---|---|", "|---|x|---|---|---|---|---|",
+                                 "|---|---|---|---|---|---| |", "|---|---|---|---|---|---|:|"],
+                         ids=["one-cell", "eight-cells", "second-cell-not-dashes", "last-cell-blank", "last-cell-colon-only"])
 def test_r014_separator_cell_count_differs(tmp_path, sep):
-    """R3-2; every cell of the separator is dashes, not the first only (round 7: the widened sweep's line 181)."""
+    """R3-2; every cell of the separator is dashes, not the first only (round 7: the widened sweep's line 181); a cell
+    is at least one dash, so a blank cell, or one holding only an alignment colon, is none (stage B2's review, round
+    10: tests, should-fix; the separator test without its `bool(text)`)."""
     text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
     good = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
     assert good in text
@@ -1798,6 +1817,8 @@ ROUND7_PRECONDITIONS = [
      "a second word that ends `at` is not `at` (BUG-008's gate round 1: the widened sweep's line 390)"),
     ("pass/README.md", "Nothing outside types/ and traits/ is read.",
      "a file outside types/ and traits/ in the pass root is never read (round 7: fixtures 3)"),
+    ("pass/README.md", "\n## Add at nowhere.at-all\n",
+     "the README holds a change heading that would fail if its content were read (round 10: fixtures 3, consider)"),
 ]
 
 
@@ -2249,6 +2270,10 @@ STATUS_TEXT = {
     'e-same-part-three.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: app: Web App Development; traits: none\nWorkflows: app: Web App Development; traits: Glitter\n',
     'e-same-part-unclassified.md': 'Workflows: app: not yet classified\nWorkflows: app: Web App Development; traits: none\n',
     'e-same-part.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: app: Host Extension Development; traits: none\n',
+    'e-same-part-identical.md': 'Workflows: app: Web App Development; traits: none\nWorkflows: app: Web App Development; traits: none\n',
+    'e-sub-type-named-twice.md': 'Workflows: Host Extension Development → Claude Code Extension, Claude Code Extension; traits: none\n',
+    'e-type-named-twice.md': 'Workflows: Web App Development, Web App Development; traits: none\n',
+    'form-prefix-missing-identical.md': 'Workflows: Web App Development; traits: none\nWorkflows: Web App Development; traits: none\n',
     'e-sub-type-of-another.md': 'Workflows: Web App Development → Claude Code Extension; traits: none\n',
     'e-two-sub-types.md': 'Workflows: Host Extension Development → Claude Code Extension, Browser Extension; traits: none\n',
     'e-two-types.md': 'Workflows: Host Extension Development, Web App Development; traits: none\n',
@@ -2354,6 +2379,18 @@ def test_r014_a_line_that_breaks_the_prefix_rule_is_not_checked_further(tmp_path
     assert all("breaks the part-prefix rule" in line for line in fails(lines)), lines
 
 
+def test_r014_a_line_without_the_traits_marker_is_not_checked_further(tmp_path):
+    """handoff/TASK-006.md Requirement 11: a line without `; traits: ` exactly once is not checked further. Its head,
+    given the marker as a line of its own, fails; the case gives the marker's (form) finding alone (stage B2's review,
+    round 10: fixtures 4, consider; the STOPPED treatment for the marker)."""
+    alone = tmp_path / "alone.md"
+    alone.write_text("Workflows: Toaster Development; traits: none\n", encoding="utf-8")
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(alone))
+    assert rc == 1 and [line for line in fails(lines) if not line.startswith("FAIL (form)")], lines
+    rc, lines, err = status("form-no-traits-marker-unknown-head.md")
+    assert [line.split(": ", 1)[1] for line in fails(lines)] == ["- - Workflows line must contain '; traits: ' exactly once"], lines
+
+
 CLOSE_FD = "import os, subprocess, sys\nos.close(%d)\nsys.exit(subprocess.call([sys.executable] + sys.argv[1:]))\n"
 
 
@@ -2435,7 +2472,8 @@ PRODUCT_HEADER = "| Key | Name | Definition | Workflow name | Default traits | W
 
 def test_r014_a_table_without_its_separator_is_reported_before_its_columns(tmp_path):
     """A table with no separator row and a missing column is reported for the separator (the sweep's line 227, the
-    column test moved above the separator test)."""
+    column test moved above the separator test). Each is a table that cannot be read (handoff/TASK-006.md R3-2 and
+    Requirement 3); which of the two is named is the program's choice, which no document fixes."""
     broken, shown = _open_list_with(tmp_path, PRODUCT_HEADER,
                                     "| Key | Name | Definition | Workflow name | Default traits | Done | Planned |\n")
     rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
@@ -2445,7 +2483,8 @@ def test_r014_a_table_without_its_separator_is_reported_before_its_columns(tmp_p
 
 def test_r014_the_first_missing_column_is_reported(tmp_path):
     """Two required columns missing: the first, in the order the program requires them (the sweep's line 227, the
-    columns walked in reverse)."""
+    columns walked in reverse). That a missing column stops the check is handoff/TASK-006.md Requirement 3's; which of
+    two is named, no document fixes."""
     broken, shown = _open_list_with(tmp_path, PRODUCT_HEADER, PRODUCT_HEADER.replace("| Key |", "| Id |").replace("| Written |", "| Done |"))
     rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
     assert lines == [f"ERROR: {shown}: missing column Key", "RESULT: not checked"], lines
@@ -2562,7 +2601,9 @@ FLOW_FILE_CASES = {
 
 @pytest.mark.parametrize("case", sorted(FLOW_FILE_CASES))
 def test_r014_a_files_findings_come_in_their_order(tmp_path, case):
-    """A file's findings, in the order the program gives them (stage B2's review, round 9: the control-flow sweep)."""
+    """A file's findings, in the order the program gives them (stage B2's review, round 9: the control-flow sweep). Each
+    finding is its rule's (bridge/cursor-bridge/workflow/extension-points.md, "How a conditional workflow names a
+    point"); the order of two findings of one file, no document fixes."""
     rel, text, survivor, expected = FLOW_FILE_CASES[case]
     root, shown = _one_file_root(tmp_path, rel, text)
     rc, lines, err = run(str(root))
@@ -2605,7 +2646,8 @@ def test_r014_a_status_lines_findings_come_in_their_order(tmp_path, case):
 
 def test_r014_the_usage_line_names_the_options_in_their_order():
     """The usage line argparse prints, white space aside (the sweep's lines 768 and 769, two options declared in the
-    other order)."""
+    other order). That a usage error prints the usage and RESULT: not checked is the program's usage text's; the order
+    of the options in the line, no document fixes."""
     rc, lines, err = run("--no-such-option")
     assert " ".join(err.split()) == ("usage: workflow-check.py [-h] [--open-list FILE] [--registry FILE] [--status FILE] "
                                      "[ROOT ...] workflow-check.py: error: unrecognized arguments: --no-such-option"), err
@@ -2642,3 +2684,317 @@ def test_r014_a_reason_that_holds_a_key_is_escaped(tmp_path):
         f"FAIL (d) {f}: x - type workflow types/libr\\xe4ry.md does not exist",
         f"FAIL (d) {f}: x - not a sub-type of libr\\xe4ry"]), p.stdout
     assert p.returncode == 1 and p.stderr == "", p.stderr
+
+
+# --- stage B2's review, round 10: the idiom sweep's separable survivors (BUG-011) ----------------------------------
+# run/supervisor/sweep_idiom.py made every `for` loop walk its items with repeats dropped, every `len(x)` count x's
+# distinct items, every list assigned in a function lose its repeats, every operand of an `and` or an `or` dropped, and
+# every `all` an `any` and back: rules rewritten in another idiom, which no earlier sweep tried (round 10: tests, a
+# status file's lines deduplicated). Each survivor an input separates has a case here or in STATUS_EXACT; the rest are
+# recorded by class in docs/HARDENING.md, "the stage review (round 10)".
+
+def test_r014_each_line_of_a_repeated_pair_is_valid_alone(tmp_path):
+    """The precondition of e-same-part-identical and form-prefix-missing-identical: each pair's line, alone, gives the
+    output a check that dropped repeats would print (RESULT: OK unprefixed; the single-line prefix finding prefixed), so
+    the pair's findings are the repeat's (handoff/TASK-006.md Requirements 11 and 12: each line is checked)."""
+    for name, alone in (("form-prefix-missing-identical.md", ["RESULT: OK"]),
+                        ("e-same-part-identical.md", None)):
+        text = (REPO / FIX / "status" / name).read_text(encoding="utf-8")
+        first, second = text.splitlines()
+        assert first == second, name
+        one = tmp_path / name
+        one.write_text(first + "\n", encoding="utf-8", newline="\n")
+        rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(one))
+        if alone is None:
+            shown = str(one).replace("\\", "/")
+            alone = [f"FAIL (form) {shown}: app - Workflows line breaks the part-prefix rule", "RESULT: 1 problem(s)"]
+        assert lines == alone, (name, lines)
+    text = (REPO / FIX / "status" / "e-type-named-twice.md").read_text(encoding="utf-8")
+    assert text == "Workflows: Web App Development, Web App Development; traits: none\n"
+    one = tmp_path / "once.md"
+    one.write_text("Workflows: Web App Development; traits: none\n", encoding="utf-8", newline="\n")
+    assert run("--open-list", STATUS_LIST, "--status", str(one))[1] == ["RESULT: OK"]
+    text = (REPO / FIX / "status" / "e-sub-type-named-twice.md").read_text(encoding="utf-8")
+    assert text == "Workflows: Host Extension Development \u2192 Claude Code Extension, Claude Code Extension; traits: none\n"
+    one.write_text("Workflows: Host Extension Development \u2192 Claude Code Extension; traits: none\n", encoding="utf-8", newline="\n")
+    assert run("--open-list", STATUS_LIST, "--status", str(one))[1] == ["RESULT: OK"]
+
+
+# (the status line, the sweep's survivor it separates, the findings).
+IDIOM_STATUS_CASES = {
+    "type-in-two-segments": ("Workflows: Web App Development → Web App Development; traits: none",
+                             "line 604: the head's segments with repeats dropped",
+                             ["FAIL (e) {f}: - - part must name exactly one product type"]),
+    # The program judges the Of type relation only where the line names exactly one product type and one sub-type, so a
+    # name given twice leaves it unjudged. Read literally, handoff/TASK-006.md Requirement 4 asks it of any sub-type the
+    # line names whose Of type is not the line's product type, and "Print each" asks for that finding beside the count's:
+    # these two cases pin the program's output, and the gap is a lead for the next change of workflow-check.py
+    # (docs/HARDENING.md, "BUG-011's gate round 1"; the sweep's line 624, either count taken with repeats dropped).
+    "type-twice-sub-of-another": ("Workflows: Web App Development, Web App Development → Claude Code Extension; traits: none",
+                                  "line 624: the product types counted with repeats dropped",
+                                  ["FAIL (e) {f}: - - part must name exactly one product type"]),
+    "sub-twice-of-another": ("Workflows: Web App Development → Claude Code Extension, Claude Code Extension; traits: none",
+                             "line 624: the sub-types counted with repeats dropped",
+                             ["FAIL (e) {f}: - - part must name at most one sub-type"]),
+}
+
+
+@pytest.mark.parametrize("case", sorted(IDIOM_STATUS_CASES))
+def test_r014_a_repeated_name_is_counted_each_time(tmp_path, case):
+    """handoff/TASK-006.md Requirement 11, step 4: the names that are Workflow names count as product types, each
+    one it is given; a product type named in two segments is two (stage B2's review, round 10: the idiom sweep)."""
+    line, survivor, expected = IDIOM_STATUS_CASES[case]
+    status = tmp_path / "status.md"
+    status.write_text(line + "\n", encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(status))
+    shown = str(status).replace("\\", "/")
+    assert lines == whole_output([item.format(f=shown) for item in expected]), (survivor, lines)
+    assert rc == 1 and err == "", err
+
+
+
+
+# (the files of a root, the sweep's survivors they separate, the findings in order; {r} is the root).
+IDIOM_ROOT_CASES = {
+    # A folder named `types` inside types/ is a type folder that is no product type: reported once, its file unread
+    # (extension-points.md:72); with its path's repeats dropped it was no type folder, or its file a type workflow.
+    "type-folder-named-types": ({"types/types/x.md": "## Add at nowhere.at-all\n\nq\n"},
+                                "lines 341, 342, 346, 347 and 350: the path's parts with repeats dropped, or counted so",
+                                ["FAIL (d) {r}/types/types: types - type folder is not a product type"]),
+    # A folder named `traits` inside traits/ is a folder under traits/, and its file no trait file (extension-points.md:72).
+    "trait-folder-named-traits": ({"traits/traits/x.md": "## Add at nowhere.at-all\n\nq\n"},
+                                  "line 357: the folder's parts counted with repeats dropped",
+                                  ["FAIL (form) {r}/traits/traits: traits - path is not a conditional-workflow file",
+                                   "FAIL (form) {r}/traits/traits/x.md: x.md - path is not a conditional-workflow file"]),
+    # A folder under traits/ named like an unknown type folder is still a folder under traits/, and its file is read as
+    # one (extension-points.md:72; the sweep's line 347 without `parts[0] == "types"`, which took it for the type folder).
+    "trait-folder-named-like-a-type-folder": ({"types/foo/x.md": "## Add at nowhere.at-all\n\nq\n",
+                                               "traits/foo/y.md": "## Add at nowhere.at-all\n\nq\n"},
+                                              "line 347: the unknown-type-folder test without its layer",
+                                              ["FAIL (form) {r}/traits/foo: foo - path is not a conditional-workflow file",
+                                               "FAIL (form) {r}/traits/foo/y.md: y.md - path is not a conditional-workflow file",
+                                               "FAIL (d) {r}/types/foo: foo - type folder is not a product type"]),
+    # A folder inside a type's folder is (form) whatever its name, `types` too (extension-points.md:72; BUG-011's gate
+    # round 1: Review A, the sweep's second `len` of line 357, which counted the path's parts without repeats and so
+    # dropped the folder); its file is no conditional workflow either.
+    "folder-named-types-in-a-type-folder": ({"types/host-extension.md": "## Add at intake.questions\n\nq\n",
+                                             "types/host-extension/types/f.md": "## Add at intake.questions\n\nq\n"},
+                                            "line 357: a folder under a type's folder counted with repeats dropped",
+                                            ["FAIL (form) {r}/types/host-extension/types: types - path is not a conditional-workflow file",
+                                             "FAIL (form) {r}/types/host-extension/types/f.md: f.md - path is not a conditional-workflow file"]),
+    # A folder named like a file inside a type's folder, and one under traits/, is a folder, and the file inside it,
+    # named like its folder, is at no key's path (extension-points.md:72; BUG-011's gate round 1: Review A, lines 362
+    # and 364 counting the path's parts without repeats, which read it as a sub-workflow and as a trait).
+    "folder-named-like-a-sub-workflow": ({"types/host-extension.md": "## Add at intake.questions\n\nq\n",
+                                          "types/host-extension/x.md/x.md": "## Add at intake.questions\n\nq\n"},
+                                         "line 362: a three-part path counted with repeats dropped",
+                                         ["FAIL (form) {r}/types/host-extension/x.md: x.md - path is not a conditional-workflow file",
+                                          "FAIL (form) {r}/types/host-extension/x.md/x.md: x.md - path is not a conditional-workflow file"]),
+    "folder-named-like-a-trait": ({"traits/installable.md/installable.md": "## Add at intake.questions\n\nq\n"},
+                                  "line 364: a traits path counted with repeats dropped",
+                                  ["FAIL (form) {r}/traits/installable.md: installable.md - path is not a conditional-workflow file",
+                                   "FAIL (form) {r}/traits/installable.md/installable.md: installable.md - path is not a conditional-workflow file"]),
+    # A Set at project-end.delivery is no addition there, so it owes no delivery kind: its one finding is the point's
+    # (extension-points.md:68, the `for <kind>` form is an addition's; the sweep's line 524 without `kind == "add"`).
+    "set-at-delivery": ({"types/host-extension.md": "## Set at project-end.delivery\n\nx\n"},
+                        "line 524: the delivery-kind rule applied to a Set",
+                        ["FAIL (set) {r}/types/host-extension.md: project-end.delivery - point does not accept set"]),
+}
+
+
+@pytest.mark.parametrize("case", sorted(IDIOM_ROOT_CASES))
+def test_r014_a_paths_repeated_parts_are_read_as_given(tmp_path, case):
+    """A root's findings where a path repeats a name, or a Set stands at the delivery point (stage B2's review, round
+    10: the idiom sweep)."""
+    files, survivor, expected = IDIOM_ROOT_CASES[case]
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "traits").mkdir()
+    for rel, text in files.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text, encoding="utf-8", newline="\n")
+    rc, lines, err = run(str(root))
+    shown = str(root).replace("\\", "/")
+    assert lines == whole_output([item.format(r=shown) for item in expected]), (survivor, lines)
+    assert rc == 1 and err == "", err
+
+
+@pytest.mark.parametrize("heading", ["## at at", "## at at the gate"])
+def test_r014_a_heading_of_at_at_is_a_change_heading(tmp_path, heading):
+    """extension-points.md:72: a heading whose second word is `at` fails as a malformed change heading; `## at at`, two
+    words alike, is one (the idiom sweep's line 390, the words counted with repeats dropped), and so is `## at at the
+    gate` (line 382, the words with repeats dropped, which makes the second word `the`)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", heading + "\n\nq\n")
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([f"FAIL (form) {shown}: - - change heading is not one of the four forms"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_table_whose_header_repeats_a_column_is_read(tmp_path):
+    """A table whose header names a column twice, each row with as many cells: the separator and the rows are counted
+    against every header cell (the idiom sweep's lines 225 and 233, the header counted with repeats dropped). Such an
+    open list breaks its own column list (open-list.md), and no document says it must stop the check; the test pins the
+    program's choice, which reads it."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    head = "| Key | Name | Definition | Written | Planned |\n|---|---|---|---|---|\n"
+    assert text.count(head) == 1
+    start = text.index(head)
+    rows = text[start + len(head):].split("\n")
+    body = []
+    for row in rows:
+        if not row.startswith("|"):
+            break
+        body.append(row + " — |")
+    assert len(body) == 3, "precondition: the three traits rows"
+    new = "| Key | Name | Definition | Written | Planned | Planned |\n|---|---|---|---|---|---|\n" + "\n".join(body) + "\n"
+    broken = tmp_path / "open-list.md"
+    old = head + "\n".join(rows[:3]) + "\n"
+    assert text.count(old) == 1
+    broken.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert lines == ["RESULT: OK"], lines
+    assert rc == 0 and err == "", err
+
+
+def test_r014_an_error_without_its_reason_still_names_one(tmp_path, monkeypatch, capsys, program):
+    """Every argument that cannot be checked is an ERROR line with a reason (handoff/TASK-006.md Requirement 3): where
+    the system's error carries no reason text or no file name, the program's own words stand in (the idiom sweep's
+    lines 299, 300 and 312, each `or` without its fallback; line 126 below)."""
+    mod = program("workflow-check")
+    root = tmp_path / "root"
+    (root / "types").mkdir(parents=True)
+    (root / "traits").mkdir()
+    shown = str(root).replace("\\", "/")
+    real_lstat, real_walk = os.lstat, os.walk
+
+    def lstat(path, *a, **k):
+        if os.path.basename(os.fspath(path)) == "traits":
+            raise OSError()
+        return real_lstat(path, *a, **k)
+
+    def walk(top, *a, onerror=None, **k):
+        if os.path.basename(os.fspath(top)) == "types" and onerror is not None:
+            onerror(OSError())
+        return real_walk(top, *a, onerror=onerror, **k)
+
+    monkeypatch.setattr(os, "lstat", lstat)
+    monkeypatch.setattr(os, "walk", walk)
+    code, lines = _main_in_process(mod, str(root), capsys=capsys)
+    assert [line.replace("\\", "/") for line in lines] == [
+        f"ERROR: {shown}: cannot be listed", f"ERROR: {shown}/traits: cannot be examined", "RESULT: not checked"], lines
+    assert code == 2
+
+
+def test_r014_a_read_error_without_its_reason_names_the_error(tmp_path, monkeypatch, program):
+    """read_utf8: a file that cannot be read names the system's reason, or the error itself where it has none (the
+    idiom sweep's line 126, the `or` without its fallback)."""
+    mod = program("workflow-check")
+    path = tmp_path / "open-list.md"
+    path.write_text("x\n", encoding="utf-8")
+
+    def fake_open(*a, **k):
+        raise OSError("odd failure")
+
+    monkeypatch.setattr(mod, "open", fake_open, raising=False)
+    text, shown, reason = mod.read_utf8(str(path))
+    assert text is None and reason == "cannot be read (odd failure)", reason
+
+
+def _product_table(text):
+    """The Product types table of an open list's text: its lines, from the header to the last row."""
+    lines = text.split("\n")
+    start = lines.index("## Product types")
+    first = next(k for k in range(start + 1, len(lines)) if lines[k].startswith("|"))
+    end = next(k for k in range(first, len(lines)) if not lines[k].startswith("|"))
+    return "\n".join(lines[first:end]) + "\n"
+
+
+def test_r014_a_table_of_two_separator_lines_is_read_for_its_columns(tmp_path):
+    """A table of two identical separator lines: the first is read as the header, whose cells are dashes, so the
+    table has its separator and lacks its columns (BUG-011's gate round 1: Review A, the sweep's line 222, the table's
+    lines counted with repeats dropped, which names the separator instead). Each is a table that cannot be read
+    (handoff/TASK-006.md Requirement 3); which reason is named, no document fixes: the test pins the program's."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    table = _product_table(text)
+    sep = "|---|---|---|---|---|---|---|"
+    broken, shown = _open_list_with(tmp_path, table, sep + "\n" + sep + "\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert lines == [f"ERROR: {shown}: missing column Key", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+def test_r014_a_row_like_the_separator_is_a_row(tmp_path):
+    """A product type row that repeats the separator line is read as a row (BUG-011's gate round 1: Review A, the
+    sweep's line 218, the table's lines with repeats dropped, which drops it): its Workflow name is `---` and its
+    Written `---`, so a line naming it gives (f). Such an open list breaks its own rules (open-list.md), and no
+    document says what such a row is; the test pins the program's reading."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    table = _product_table(text)
+    sep = "|---|---|---|---|---|---|---|"
+    assert table.split("\n")[1] == sep, "precondition: the separator line"
+    broken, shown = _open_list_with(tmp_path, table, table + sep + "\n")
+    status = tmp_path / "status.md"
+    status.write_text("Workflows: ---; traits: none\n", encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", str(status))
+    s = str(status).replace("\\", "/")
+    assert lines == [f"FAIL (f) {s}: --- - product type is not written", "RESULT: 1 problem(s)"], lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_two_tables_without_a_column_are_two_error_lines(tmp_path):
+    """Each table that cannot be read is an ERROR line (handoff/TASK-006.md Requirement 3: "one or more lines"), two
+    identical ones too: the Product types and Sub-types tables both without Key (BUG-011's gate round 1: Review A, the
+    sweep's line 820, the errors printed with repeats dropped). The count of identical lines, no document fixes beyond
+    one per table; the test pins the program's."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    assert text.count("\n| Key | Name |") == 3, "precondition: three tables whose first column is Key"
+    broken = tmp_path / "open-list.md"
+    broken.write_text(text.replace("\n| Key | Name |", "\n| Id | Name |", 2), encoding="utf-8", newline="\n")
+    shown = str(broken).replace("\\", "/")
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert lines == [f"ERROR: {shown}: missing column Key"] * 2 + ["RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+def test_r014_a_product_key_named_like_a_file_is_a_type_folder(tmp_path):
+    """open-list.md:11 writes a key in lowercase letters, digits and hyphens, but the program reads any Key cell as a
+    key: a product type keyed `a.md` makes types/a.md/ its type folder, and each file inside it is read as one of its
+    sub-workflows (BUG-011's gate round 2: Review A, the idiom sweep's line 360, its `len` counted without repeats and
+    its `and` without `len(parts) == 2`, each of which reads a file there as a type file of an unknown key). Such an
+    open list breaks its own rules, and no document says what the program does with it; the test pins the program's
+    reading (as test_r014_a_row_like_the_separator_is_a_row does)."""
+    row = "| library | Library | Included by other programs | Library Development | \u2014 | no | \u2014 |\n"
+    broken, _ = _open_list_with(tmp_path, row, row + "| a.md | A | d | A Dev | \u2014 | yes | no |\n")
+    root = tmp_path / "root"
+    for rel in ("types/a.md/a.md", "types/a.md/b.md"):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("## Add at intake.questions\n\nq\n", encoding="utf-8", newline="\n")
+    (root / "traits").mkdir()
+    rc, lines, err = run("--open-list", str(broken), str(root))
+    r = str(root).replace("\\", "/")
+    assert lines == [f"FAIL (d) {r}/types/a.md/a.md: a - type workflow types/a.md.md does not exist",
+                     f"FAIL (d) {r}/types/a.md/a.md: a - not a sub-type of a.md",
+                     f"FAIL (d) {r}/types/a.md/b.md: b - type workflow types/a.md.md does not exist",
+                     f"FAIL (d) {r}/types/a.md/b.md: b - not a sub-type of a.md",
+                     "RESULT: 4 problem(s)"], lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_an_argument_given_twice_is_checked_twice(tmp_path):
+    """handoff/TASK-006.md Requirement 1: "--status FILE may be repeated. Each named file's Workflows: lines are
+    checked"; Requirement 4: "Print each", in order "roots in argument order, files in sorted path order, then status
+    files in argument order". A root or a status file named twice is checked twice, and each of its findings printed
+    each time (BUG-011's gate round 2: Review A, the idiom sweep's argument-twice class, lines 785, 786, 794, 813 and
+    828, each reading a repeated argument once)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## Add at nowhere.at-all\n\nq\n")
+    rc, lines, err = run(str(root))
+    assert len(lines) == 2 and lines[0].startswith(f"FAIL (a) {shown}: ") and lines[1] == "RESULT: 1 problem(s)", lines
+    assert rc == 1 and err == "", err
+    rc, lines, err = run(str(root), str(root))
+    assert lines == [lines[0], lines[0], "RESULT: 2 problem(s)"] and lines[0].startswith(f"FAIL (a) {shown}: "), lines
+    assert rc == 1 and err == "", err
+    status = f"{FIX}/status/e-type-named-twice.md"
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", status, "--status", status)
+    finding = f"FAIL (e) {status}: - - part must name exactly one product type"
+    assert lines == [finding, finding, "RESULT: 2 problem(s)"], lines
+    assert rc == 1 and err == "", err
