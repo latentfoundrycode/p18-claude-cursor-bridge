@@ -113,6 +113,20 @@ def test_r015_placement_function(program):
     assert mod.check_placement("s.md", "Phase: a\nPhase: b\n" + UNCLASSIFIED) == [("place", "s.md", "-", "Workflows lines do not stand together right after the Phase line")], "the first Phase line counts"
 
 
+def test_r015_placement_reads_the_prefixes_with_their_space(program):
+    """bridge/commands/supervisor.md, "Project state": the status lines are `Phase: ` and `Workflows: `, each prefix with
+    its space, and check_placement places only such lines. A `Workflows:` line without its space is no Workflows line
+    to place (check_status's (form) finding, not a placement one), and stands in no run of them; a `Phase:` line
+    without its space is no Phase line (stage B2's review, round 8: the widened sweep's literals of lines 717, 722 and
+    729 made without their space)."""
+    mod = program("workflow-check")
+    apart = "Phase: building\nWorkflows: app: not yet classified\nOther: x\nWorkflows:site: not yet classified\n"
+    assert mod.check_placement("s.md", apart) == [], "a Workflows: line without its space is not placed"
+    run_broken = "Phase: building\nWorkflows:site: not yet classified\nWorkflows: app: not yet classified\n"
+    assert mod.check_placement("s.md", run_broken) == [("place", "s.md", "-", "Workflows lines do not stand together right after the Phase line")]
+    assert mod.check_placement("s.md", "Phase:building\nWorkflows: not yet classified\n") == [("place", "s.md", "-", "status file has no Phase line")]
+
+
 # --- inventory-check.py --------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("case", sorted(VALID))
@@ -404,6 +418,16 @@ def test_r015_the_bytecode_switch_is_restored(program):
         sys.dont_write_bytecode = before
 
 
+@pytest.mark.parametrize("case", sorted(VALID))
+@pytest.mark.parametrize("name", ["inventory-check", "conformance-check"])
+def test_r015_a_valid_line_is_judged_valid_with_no_rows(program, name, case):
+    """handoff/TASK-008.md, the judge's interface (and its docstring): the outcome is valid, missing, malformed or not
+    checked, and the rows are empty for valid. A valid line is judged ("valid", []) by each judge, never malformed
+    with no rows, which inventory-check.py prints the same (BUG-009's gate round 1: Review A, a consider; the
+    widened sweep's inventory-check.py line 228, `if findings:` forced true, survived at the output)."""
+    assert program(name).judge_workflows_line("s.md", VALID[case]) == ("valid", [])
+
+
 @pytest.mark.parametrize("program_name", ["inventory-check.py", "conformance-check.py"])
 def test_r015_checker_is_found_beside_the_real_file_not_the_link(tmp_path, program_name):
     """R2-2: run through a symbolic link, a program loads the workflow-check.py beside its real file."""
@@ -508,3 +532,25 @@ def test_r015_conformance_rule_files_not_loadable_is_missing(tmp_path, case):
         assert text == "Workflows line  - not checked: " + "; ".join(_causes(folder)), text
     else:
         assert "; " not in text, text
+
+
+@pytest.mark.parametrize("how", ["checker-absent", "checker-syntax-error", "checker-exits"])
+@pytest.mark.parametrize("name", ["inventory-check", "conformance-check"])
+def test_r015_the_bytecode_switch_is_restored_when_the_checker_cannot_be_loaded(tmp_path, name, how):
+    """handoff/TASK-008-r2.md R2-1: the judge puts sys.dont_write_bytecode back in a `finally`, so a checker that is
+    absent, does not compile or exits while it loads leaves the switch as it found it, either way (stage B2's review,
+    round 8: tests; a restore after the load alone survived)."""
+    folder = _broken_copy(tmp_path, how)
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_") + "_copy", folder / (name + ".py"))
+    mod = importlib.util.module_from_spec(spec)
+    before = sys.dont_write_bytecode
+    try:
+        sys.dont_write_bytecode = True
+        spec.loader.exec_module(mod)
+        for value in (False, True):
+            sys.dont_write_bytecode = value
+            outcome, rows = mod.judge_workflows_line("s.md", VALID["not-yet-classified"])
+            assert outcome == "not-checked" and "cannot be loaded" in rows[0], (outcome, rows)
+            assert sys.dont_write_bytecode is value, (name, how, value)
+    finally:
+        sys.dont_write_bytecode = before

@@ -347,7 +347,10 @@ FILE_EXACT = {
         'FAIL (a) {root}/types/web-app/claude-code-extension.md: nowhere.at-all - point is not in the extension-point registry',
     ],
     # A sub-workflow file whose key is no sub-type at all (stage B2 review, round 5: tests).
-    'd-unknown-sub-type-key': ['FAIL (d) {root}/types/host-extension/claude-code-extention.md: claude-code-extention - not a sub-type of host-extension'],
+    'd-unknown-sub-type-key': [
+        'FAIL (d) {root}/types/host-extension/claude-code-extention.md: claude-code-extention - not a sub-type of host-extension',
+        'FAIL (a) {root}/types/host-extension/claude-code-extention.md: nowhere.at-all - point is not in the extension-point registry',
+    ],
     'd-type-file-missing': [
         'FAIL (d) {root}/types/host-extension/claude-code-extension.md: claude-code-extension - type workflow types/host-extension.md does not exist',
         'FAIL (a) {root}/types/host-extension/claude-code-extension.md: nowhere.at-all - point is not in the extension-point registry',
@@ -455,7 +458,12 @@ FILE_EXACT = {
     # A line of `##` alone is no heading, so it is the Set's first non-blank line (BUG-006 r4: Review A, the heading shape).
     'kind-bare-hashes': ['FAIL (kind) {root}/types/host-extension.md: ## - Set at intake.delivery-kind is not one delivery kind'],
     # Two backticks are unwrapped to nothing, printed as `-` (round 6: the sweep's line 485; round 5's lead pinned).
-    'kind-two-backticks': ['FAIL (kind) {root}/types/host-extension.md: - - Set at intake.delivery-kind is not one delivery kind'],
+    # A lone backtick is no pair, so it stays, printed as itself (round 8: tests, the first sweep's line 485 once its
+    # numbers were moved).
+    'kind-two-backticks': [
+        'FAIL (kind) {root}/types/host-extension.md: - - Set at intake.delivery-kind is not one delivery kind',
+        'FAIL (kind) {root}/types/host-extension/claude-code-extension.md: ` - Set at intake.delivery-kind is not one delivery kind',
+    ],
     'kind-unlisted': ['FAIL (kind) {root}/traits/installable.md: docker-image - delivery kind is not in the delivery-kind list'],
     'set-point-without-set': ['FAIL (set) {root}/types/host-extension.md: intake.questions - point does not accept set'],
     'sub-workflow-changes': [
@@ -487,8 +495,10 @@ STATUS_EXACT = {
     'e-lone-trait.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
     'e-no-type.md': ['FAIL (e) {path}: - - part must name exactly one product type'],
     'e-same-part.md': ['FAIL (e) {path}: app - two Workflows lines name the same part'],
-    # A part named three times is one (e), and the repeated line is still checked (round 6: fixtures 3, programs).
-    'e-same-part-three.md': ['FAIL (e) {path}: app - two Workflows lines name the same part'],
+    # A part named three times is one (e), and the repeated lines are still checked, the third too: its unknown trait
+    # is reported (round 6: fixtures 3, programs; round 8: fixtures 3, a mutant that stopped at the third line).
+    'e-same-part-three.md': ['FAIL (e) {path}: app - two Workflows lines name the same part',
+                             'FAIL (unknown) {path}: Glitter - not a trait name'],
     'e-same-part-checked.md': [
         'FAIL (e) {path}: app - two Workflows lines name the same part',
         'FAIL (unknown) {path}: Glitter Development - name is not in the open list',
@@ -504,6 +514,8 @@ STATUS_EXACT = {
         'FAIL (form) {path}: Spends money - trait repeated',
     ],
     'flag-unwritten-trait.md': ['FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)'],
+    # A prefix on a single line fails before its name is read, so this is the single-line rule, not the `;` rule;
+    # form-part-semicolon holds that (round 8: fixtures 4, consider).
     'form-bad-prefix-single.md': ['FAIL (form) {path}: bad;part - Workflows line breaks the part-prefix rule'],
     'form-empty-segment.md': [
         'FAIL (form) {path}: - - empty name in the Workflows head',
@@ -514,6 +526,8 @@ STATUS_EXACT = {
     'form-part-arrow.md': ['FAIL (form) {path}: a\\u2192b - Workflows line breaks the part-prefix rule'],
     'form-part-blank.md': ['FAIL (form) {path}:   - Workflows line breaks the part-prefix rule'],
     'form-part-colon.md': ['FAIL (form) {path}: a:b - Workflows line breaks the part-prefix rule'],
+    # A colon with no space after it is no `<part>: ` prefix, so the line has none (round 8: fixtures 4).
+    'form-part-colon-no-space.md': ['FAIL (form) {path}: - - Workflows line breaks the part-prefix rule'],
     # Whitespace at the start of a part name, and a tab (stage B2 review, round 4: fixtures 3).
     'form-part-leading-space.md': ['FAIL (form) {path}:  plugin - Workflows line breaks the part-prefix rule'],
     'form-part-tab.md': ['FAIL (form) {path}: plugin\\x09 - Workflows line breaks the part-prefix rule'],
@@ -531,6 +545,8 @@ STATUS_EXACT = {
         "FAIL (form) {path}: Has screens - traits are not in the open list's order",
         "FAIL (form) {path}: Installable - traits are not in the open list's order",
     ],
+    # The third `Has screens` is repeated and below the highest trait so far; the program reports a name once, its
+    # repeat, a reading the grammar leaves open (round 8: fixtures 4, consider; recorded in HARDENING).
     'form-trait-repeat-separated.md': ['FAIL (form) {path}: Has screens - trait repeated'],
     # The highest trait so far rises as traits come in order, so a later one below it fails (round 6: tests).
     'form-trait-order-highest.md': [
@@ -1344,6 +1360,7 @@ ROUND5_PRECONDITIONS = [
      "a folder inside an unknown type folder is not reported again"),
     ("status/form-no-line.md", "\n  Workflows: ", "an indented Workflows line is not one"),
     ("status/form-no-line.md", "\nworkflows: ", "a lower-case workflows line is not one"),
+    ("status/form-no-line.md", "\nWorkflows:Web", "a Workflows line without its space is not one (round 8: fixtures 4)"),
 ]
 
 
@@ -1976,6 +1993,17 @@ def test_r014_the_delivery_rules_apply_at_their_two_points_exactly(tmp_path):
     assert lines == whole_output([f"FAIL (a) {shown}: {key} - point is not in the extension-point registry"
                                   for key in adds + sets]), lines
     assert rc == 1 and err == "", err
+    # The control: the same bodies under the two points exactly give their (kind) lines (BUG-008's gate round 3).
+    exact = tmp_path / "exact"
+    (exact / "types").mkdir(parents=True)
+    (exact / "types" / "host-extension.md").write_text(
+        "## Add at project-end.delivery\n\nnonsense\n\n## Set at intake.delivery-kind\n\nnonsense\n", encoding="utf-8")
+    rc, lines, err = run(str(exact))
+    shown = str(exact).replace("\\", "/") + "/types/host-extension.md"
+    assert lines == whole_output([
+        f"FAIL (kind) {shown}: project-end.delivery - addition at project-end.delivery does not name a delivery kind",
+        f"FAIL (kind) {shown}: nonsense - Set at intake.delivery-kind is not one delivery kind"]), lines
+    assert rc == 1 and err == "", err
 
 
 # A module name that is not `__main__` exactly: another case, longer, shorter, a part, spaced.
@@ -1994,3 +2022,191 @@ def test_r015_loaded_as_a_module_the_check_runs_nothing(name, monkeypatch, capsy
     spec.loader.exec_module(module)
     assert callable(module.main)
     assert capsys.readouterr() == ("", "")
+    # The control: under `__main__` exactly the same arguments end a run, exit 2 (BUG-008's gate round 3).
+    spec = importlib.util.spec_from_file_location("__main__", str(REPO / PROG))
+    with pytest.raises(SystemExit) as stop:
+        spec.loader.exec_module(importlib.util.module_from_spec(spec))
+    assert stop.value.code == 2
+    assert capsys.readouterr().out.splitlines()[-1] == "RESULT: not checked"
+
+
+# --- stage B2 review, round 8 (BUG-009): the four forms take one space and no other white space ----------------------
+
+# The four forms, each valid against the bridge's registry, with a body each accepts (the pass root's own).
+FOUR_FORMS = [
+    ("## Add at intake.questions", "q"),
+    ("## Add at project-end.delivery for installer", "q"),
+    ("## Set at intake.target-environment", "Inside the host application."),
+    ("## Replace interface", "An interface."),
+]
+# White space other than one space, each put in place of one space of a form. A form's words are split as the
+# program splits them (is_change_heading: str.split()), so Unicode white space also ends a word: a gap after the first
+# word filled with a no-break space, a form feed, a vertical tab or an ideographic space leaves a change heading, which
+# is (form), rather than prose. extension-points.md does not define a word; this is the program's reading, the safer
+# one (a near-form fails), pinned here (BUG-009's gate round 1: Review A, a consider).
+OTHER_SPACE = [("a tab", "\t"), ("two spaces", "  "), ("a space and a tab", " \t"), ("a no-break space", " "),
+               ("a form feed", "\x0c"), ("a vertical tab", "\x0b"), ("an ideographic space", "　")]
+# Before `##`: one to three spaces make a heading candidate that is no form; four spaces, a tab or other white space
+# make no heading at all.
+INDENTS = [("one space", " ", True), ("two spaces", "  ", True), ("three spaces", "   ", True),
+           ("four spaces", "    ", False), ("a tab", "\t", False), ("a no-break space", " ", False)]
+# After the key or the kind: nothing, not even white space.
+TRAILING = [("a space", " "), ("a tab", "\t"), ("a no-break space", " "), ("a form feed", "\x0c")]
+
+
+def _white_space_variants():
+    """(label, heading line, body, whether it is a form finding), for each form and each way of loosening it."""
+    out = []
+    for heading, body in FOUR_FORMS:
+        out.append(("%s as written" % heading, heading, body, False))
+        gaps = [k for k, ch in enumerate(heading) if ch == " "]
+        for n, k in enumerate(gaps):
+            for name, ws in OTHER_SPACE:
+                # The first gap is the one after `##`: a candidate needs a space or tab there (anything else is prose).
+                form = n > 0 or ws[0] in " \t"
+                out.append(("%s, gap %d as %s" % (heading, n, name), heading[:k] + ws + heading[k + 1:], body, form))
+        for name, ws, form in INDENTS:
+            out.append(("%s, indented %s" % (heading, name), ws + heading, body, form))
+        for name, ws in TRAILING:
+            out.append(("%s, then %s" % (heading, name), heading + ws, body, True))
+    return out
+
+
+def test_r014_the_four_forms_take_one_space_and_no_other_white_space(tmp_path):
+    """bridge/cursor-bridge/workflow/extension-points.md, "How a conditional workflow names a point": the four forms are
+    matched exactly, `##` at the start of the line, one space between words, nothing after the key or the delivery
+    kind; a `##` line is a heading candidate only with at most three spaces before it and a space or tab after it
+    (the program's R3-6, its usage of HEADING_CANDIDATE). So each form with a tab, two spaces, a no-break space, a form
+    feed, a vertical tab or an ideographic space in place of any one of its spaces, indented one to three spaces, or
+    with white space after it is (form); with such white space straight after `##`, indented four spaces, a tab or a
+    no-break space it is prose, no finding; and each form as written gives nothing. Each variant is a root of its own,
+    so each finding names its variant (stage B2's review, round 8: fixtures-2, eleven loosened patterns surviving)."""
+    variants = _white_space_variants()
+    roots = []
+    for n, (label, line, body, form) in enumerate(variants):
+        root = tmp_path / ("v%03d" % n)
+        (root / "types").mkdir(parents=True)
+        (root / "types" / "host-extension.md").write_text(line + "\n\n" + body + "\n", encoding="utf-8")
+        roots.append(root)
+    assert sum(1 for v in variants if v[3]) > 100 and sum(1 for v in variants if not v[3]) > 20, "precondition: both kinds"
+    rc, lines, err = run(*map(str, roots))
+    expected = [f"FAIL (form) {str(root).replace(chr(92), '/')}/types/host-extension.md: - - change heading is not one of the four forms"
+                for root, (_, _, _, form) in zip(roots, variants) if form]
+    assert lines == whole_output(expected), [v[0] for v, root in zip(variants, roots)
+                                             if (str(root).replace(chr(92), "/") in "\n".join(lines)) != v[3]]
+    assert rc == 1 and err == "", err
+
+
+def _headings(rel):
+    text = (REPO / FIX / rel).read_text(encoding="utf-8")
+    return [line for line in text.split("\n") if line.lstrip(" ").startswith("##")]
+
+
+def test_r014_round8_the_loosened_heading_files_hold_their_headings():
+    """Two fixtures print one identical (form) line per heading, so a heading edited into a copy of another would
+    change no output: their whole lists of `##` lines are pinned here (stage B2's review, round 8: fixtures-2,
+    considers)."""
+    assert _headings("fail/form-heading-trailing-text/types/host-extension.md") == [
+        "## Set at intake.target-environment extra", "## Replace interface now", "## Add at intake.questions please",
+        "## Set at intake.budget-kind ", "## Add at project-end.delivery for installer extra",
+        "##  Add at intake.questions", "##  Set at intake.target-environment", "##  Replace interface",
+        "##  Add at project-end.delivery for installer", "## Add  at intake.questions", "## Add at  intake.questions",
+        "## Set  at intake.target-environment", "## Set at  intake.target-environment", "## Replace  interface",
+        "## Add  at project-end.delivery for installer", "## Add at  project-end.delivery for installer",
+        "## Add at project-end.delivery  for installer", "## Add at project-end.delivery for  installer",
+        "## Add at intake.questions ", "## Replace interface ", "## Add at project-end.delivery for installer ",
+        "## add at project-end.delivery for installer", "## set at intake.target-environment", "## replace interface",
+        "##+Add at intake.questions",
+    ]
+    assert _headings("fail/form-misspelt-change-word/types/host-extension.md") == [
+        "## Adds at intake.questions", "## add at intake.questions", "## Replacing interface",
+        "## Append at intake.questions", "## Adds intake.questions", "## Added intake.questions",
+        "## Sets intake.target-environment", "## Replaces interface", "## Replaced interface", "## Look at",
+        "## Look AT intake.questions",
+    ]
+
+
+def test_r014_a_folder_named_like_the_type_file_is_no_type_file(tmp_path):
+    """handoff/TASK-006.md, the (d) finding (its line 159: "`types/<t>.md` exists in the same root"): read as a file,
+    the program's `isfile`, the stricter reading, taken here; a folder of that name is no such file, so the folder gives its own (d) and the sub-workflow's (d) names the missing
+    type workflow (stage B2's review, round 8: tests, consider; `isfile` read as `exists` survived)."""
+    root = tmp_path / "root"
+    (root / "types" / "host-extension.md").mkdir(parents=True)
+    (root / "types" / "host-extension").mkdir()
+    (root / "types" / "host-extension" / "claude-code-extension.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")
+    rc, lines, err = run(str(root))
+    shown = str(root).replace("\\", "/") + "/types"
+    assert lines == whole_output([
+        f"FAIL (d) {shown}/host-extension.md: host-extension.md - type folder is not a product type",
+        f"FAIL (d) {shown}/host-extension/claude-code-extension.md: claude-code-extension - type workflow types/host-extension.md does not exist",
+    ]), lines
+
+
+# The widened sweep after BUG-009's first cases (run/supervisor/sweep_wide_r6.out): a space of a form made optional, a
+# key made possibly empty, and a fence's indent let take a tab survived.
+DROPPED = [
+    # (heading line, whether it is a form finding)
+    ("## Add atintake.questions", True),
+    ("## Add atproject-end.delivery for installer", True),
+    ("## Add at project-end.deliveryfor installer", True),
+    ("## Add at project-end.delivery forinstaller", True),
+    ("## Set atintake.target-environment", True),
+    # A second word `at` makes a change heading of any first word.
+    ("## Addat at", True),
+    ("## Addat at for installer", True),
+    ("## Setat at", True),
+    # `Replace:` is the change word once its trailing colon is stripped.
+    ("## Replace:", True),
+    # No key, no kind.
+    ("## Add at ", True),
+    ("## Add at  for installer", True),
+    ("## Add at project-end.delivery for ", True),
+    ("## Set at ", True),
+    ("## Replace ", True),
+    # Controls: no space after `##` is no heading candidate; neither word a change word nor `at` is prose.
+    ("##Add at intake.questions", False),
+    ("##Replace interface", False),
+    ("## Addat intake.questions", False),
+]
+
+
+def test_r014_the_four_forms_take_each_of_their_spaces_and_a_key(tmp_path):
+    """bridge/cursor-bridge/workflow/extension-points.md, "How a conditional workflow names a point": each form's words
+    are separated by one space and its point, module or delivery kind is a word (`\\S+`). So a form with one of its
+    spaces dropped, or with its key or kind left out, is no form: (form) when the line is a change heading (its first
+    word a change word after trailing punctuation is stripped, or its second word `at`, the program's R3-4), prose
+    otherwise. Each variant is a root of its own (stage B2's review, round 8: the widened sweep's `space -> ' ?'` and
+    `\\S+ -> \\S*` survivors)."""
+    roots = []
+    for n, (line, _) in enumerate(DROPPED):
+        root = tmp_path / ("d%02d" % n)
+        (root / "types").mkdir(parents=True)
+        (root / "types" / "host-extension.md").write_text(line + "\n\nq\n", encoding="utf-8")
+        roots.append(root)
+    rc, lines, err = run(*map(str, roots))
+    expected = [f"FAIL (form) {str(root).replace(chr(92), '/')}/types/host-extension.md: - - change heading is not one of the four forms"
+                for root, (_, form) in zip(roots, DROPPED) if form]
+    assert lines == whole_output(expected), lines
+    assert rc == 1 and err == "", err
+
+
+TAB_FENCES = [
+    ("opening-backticks", "## Add at intake.questions\n\nq\n\n\t```\n\n## Set at intake.delivery-kind\n\ninstaller\n"),
+    ("opening-tildes", "## Add at intake.questions\n\nq\n\n\t~~~\n\n## Set at intake.delivery-kind\n\ninstaller\n"),
+    ("closing", "## Add at intake.questions\n\nq\n\n```\ncode\n\t```\n```\n\n## Set at intake.delivery-kind\n\ninstaller\n"),
+]
+
+
+@pytest.mark.parametrize("text", [t for _, t in TAB_FENCES], ids=[i for i, _ in TAB_FENCES])
+def test_r014_a_tab_is_no_fence_indent(tmp_path, text):
+    """R4-3 and R5-3: a fence is indented by zero to three spaces; a tab before the run is no such indent (CommonMark
+    reads it as four columns, an indented code block). So a run after a tab opens no fence, and closes none: in each
+    trait file the `## Set` after it is read and is the one (b), with no fence left open (stage B2's review, round 8:
+    the widened sweep's `{0,3} -> [ \\t]{0,3}` on the opening and closing patterns)."""
+    root = tmp_path / "root"
+    (root / "traits").mkdir(parents=True)
+    (root / "traits" / "installable.md").write_text(text, encoding="utf-8")
+    rc, lines, err = run(str(root))
+    shown = str(root).replace("\\", "/")
+    assert lines == whole_output([f"FAIL (b) {shown}/traits/installable.md: intake.delivery-kind - a trait file may only add"]), lines
+    assert rc == 1 and err == "", err
