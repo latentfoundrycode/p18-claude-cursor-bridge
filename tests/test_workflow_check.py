@@ -2954,3 +2954,47 @@ def test_r014_two_tables_without_a_column_are_two_error_lines(tmp_path):
     rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
     assert lines == [f"ERROR: {shown}: missing column Key"] * 2 + ["RESULT: not checked"], lines
     assert rc == 2 and err == "", err
+
+
+def test_r014_a_product_key_named_like_a_file_is_a_type_folder(tmp_path):
+    """open-list.md:11 writes a key in lowercase letters, digits and hyphens, but the program reads any Key cell as a
+    key: a product type keyed `a.md` makes types/a.md/ its type folder, and each file inside it is read as one of its
+    sub-workflows (BUG-011's gate round 2: Review A, the idiom sweep's line 360, its `len` counted without repeats and
+    its `and` without `len(parts) == 2`, each of which reads a file there as a type file of an unknown key). Such an
+    open list breaks its own rules, and no document says what the program does with it; the test pins the program's
+    reading (as test_r014_a_row_like_the_separator_is_a_row does)."""
+    row = "| library | Library | Included by other programs | Library Development | \u2014 | no | \u2014 |\n"
+    broken, _ = _open_list_with(tmp_path, row, row + "| a.md | A | d | A Dev | \u2014 | yes | no |\n")
+    root = tmp_path / "root"
+    for rel in ("types/a.md/a.md", "types/a.md/b.md"):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("## Add at intake.questions\n\nq\n", encoding="utf-8", newline="\n")
+    (root / "traits").mkdir()
+    rc, lines, err = run("--open-list", str(broken), str(root))
+    r = str(root).replace("\\", "/")
+    assert lines == [f"FAIL (d) {r}/types/a.md/a.md: a - type workflow types/a.md.md does not exist",
+                     f"FAIL (d) {r}/types/a.md/a.md: a - not a sub-type of a.md",
+                     f"FAIL (d) {r}/types/a.md/b.md: b - type workflow types/a.md.md does not exist",
+                     f"FAIL (d) {r}/types/a.md/b.md: b - not a sub-type of a.md",
+                     "RESULT: 4 problem(s)"], lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_an_argument_given_twice_is_checked_twice(tmp_path):
+    """handoff/TASK-006.md Requirement 1: "--status FILE may be repeated. Each named file's Workflows: lines are
+    checked"; Requirement 4: "Print each", in order "roots in argument order, files in sorted path order, then status
+    files in argument order". A root or a status file named twice is checked twice, and each of its findings printed
+    each time (BUG-011's gate round 2: Review A, the idiom sweep's argument-twice class, lines 785, 786, 794, 813 and
+    828, each reading a repeated argument once)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## Add at nowhere.at-all\n\nq\n")
+    rc, lines, err = run(str(root))
+    assert len(lines) == 2 and lines[0].startswith(f"FAIL (a) {shown}: ") and lines[1] == "RESULT: 1 problem(s)", lines
+    assert rc == 1 and err == "", err
+    rc, lines, err = run(str(root), str(root))
+    assert lines == [lines[0], lines[0], "RESULT: 2 problem(s)"] and lines[0].startswith(f"FAIL (a) {shown}: "), lines
+    assert rc == 1 and err == "", err
+    status = f"{FIX}/status/e-type-named-twice.md"
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", status, "--status", status)
+    finding = f"FAIL (e) {status}: - - part must name exactly one product type"
+    assert lines == [finding, finding, "RESULT: 2 problem(s)"], lines
+    assert rc == 1 and err == "", err
