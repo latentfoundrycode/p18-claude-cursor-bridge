@@ -418,6 +418,16 @@ def test_r015_the_bytecode_switch_is_restored(program):
         sys.dont_write_bytecode = before
 
 
+@pytest.mark.parametrize("case", sorted(VALID))
+@pytest.mark.parametrize("name", ["inventory-check", "conformance-check"])
+def test_r015_a_valid_line_is_judged_valid_with_no_rows(program, name, case):
+    """handoff/TASK-008.md, the judge's interface (and its docstring): the outcome is valid, missing, malformed or not
+    checked, and the rows are empty for valid. A valid line is judged ("valid", []) by each judge, never malformed
+    with no rows, which inventory-check.py prints the same (BUG-009's gate round 1: Review A, a consider; the
+    widened sweep's inventory-check.py line 228, `if findings:` forced true, survived at the output)."""
+    assert program(name).judge_workflows_line("s.md", VALID[case]) == ("valid", [])
+
+
 @pytest.mark.parametrize("program_name", ["inventory-check.py", "conformance-check.py"])
 def test_r015_checker_is_found_beside_the_real_file_not_the_link(tmp_path, program_name):
     """R2-2: run through a symbolic link, a program loads the workflow-check.py beside its real file."""

@@ -2003,6 +2003,7 @@ def test_r014_the_delivery_rules_apply_at_their_two_points_exactly(tmp_path):
     assert lines == whole_output([
         f"FAIL (kind) {shown}: project-end.delivery - addition at project-end.delivery does not name a delivery kind",
         f"FAIL (kind) {shown}: nonsense - Set at intake.delivery-kind is not one delivery kind"]), lines
+    assert rc == 1 and err == "", err
 
 
 # A module name that is not `__main__` exactly: another case, longer, shorter, a part, spaced.
@@ -2038,7 +2039,11 @@ FOUR_FORMS = [
     ("## Set at intake.target-environment", "Inside the host application."),
     ("## Replace interface", "An interface."),
 ]
-# White space other than one space, each put in place of one space of a form.
+# White space other than one space, each put in place of one space of a form. A form's words are split as the
+# program splits them (is_change_heading: str.split()), so Unicode white space also ends a word: a gap after the first
+# word filled with a no-break space, a form feed, a vertical tab or an ideographic space leaves a change heading, which
+# is (form), rather than prose. extension-points.md does not define a word; this is the program's reading, the safer
+# one (a near-form fails), pinned here (BUG-009's gate round 1: Review A, a consider).
 OTHER_SPACE = [("a tab", "\t"), ("two spaces", "  "), ("a space and a tab", " \t"), ("a no-break space", " "),
                ("a form feed", "\x0c"), ("a vertical tab", "\x0b"), ("an ideographic space", "　")]
 # Before `##`: one to three spaces make a heading candidate that is no form; four spaces, a tab or other white space
@@ -2122,8 +2127,8 @@ def test_r014_round8_the_loosened_heading_files_hold_their_headings():
 
 
 def test_r014_a_folder_named_like_the_type_file_is_no_type_file(tmp_path):
-    """handoff/TASK-006.md, the (d) finding: a sub-workflow file needs its type's workflow file `types/<type>.md`; a
-    folder of that name is no such file, so the folder gives its own (d) and the sub-workflow's (d) names the missing
+    """handoff/TASK-006.md, the (d) finding (its line 159: "`types/<t>.md` exists in the same root"): read as a file,
+    the program's `isfile`, the stricter reading, taken here; a folder of that name is no such file, so the folder gives its own (d) and the sub-workflow's (d) names the missing
     type workflow (stage B2's review, round 8: tests, consider; `isfile` read as `exists` survived)."""
     root = tmp_path / "root"
     (root / "types" / "host-extension.md").mkdir(parents=True)
