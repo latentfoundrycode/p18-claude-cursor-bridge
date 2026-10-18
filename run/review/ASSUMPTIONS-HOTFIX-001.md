@@ -2,6 +2,11 @@
 
 From the branch's commit messages (`git log 64ad75a..HEAD --format=%B`), sections `Assumptions:`:
 
+Assumptions: recorded, not fixed (Review A round 3 notes, all fail
+closed or slow): the trim is quadratic on long runs of dots or spaces
+(about 5 s near the command-line limit); an allowed name followed by a
+space and a separator is refused as unreadable.
+
 Assumptions: the token ends at any Unicode white space, quote or
 backquote (Review A: not a bypass); x/.. segments and 8.3 short names
 are not normalised (accepted, the text holds them).
