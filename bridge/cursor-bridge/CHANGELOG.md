@@ -15,6 +15,24 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.18a
+
+**The design critique's ceiling** (a hotfix of 2026.10.11d, cut from its release state, on the owner's order of 2026-10-18; KP-062). The TDP ran its design two-critic loop for 45 rounds on one change. Text, with one program change
+
+**What changed**
+- **At most four rounds per subject** (the design, the plan, each change), whatever the critics still find; then one confirming read by both critics, whose findings are fixed or accepted with a reason and recorded without another read; then one resolution round for whatever is still Blocking or non-convergent, all its questions at once; then the gate, whose critique record lists what is still open (supervisor.md, Phase 2; the plan's critique, Phase 4, now names its file `run/review/DESIGN-plan-<round>.md`; the change cycle's steps 2 and 4 name their subjects).
+- **The convergence rule is the code gate's only**: two critics naming one finding no longer makes it blocking or adds a round (supervisor.md step 8, Merge-Verification-Policy.md).
+- **The launcher holds the ceiling**: `bridge-run.py` refuses a design-mode Review B launch on `run/review/DESIGN-<subject>-<n>.md` with `n` above five, and a resolution round `DESIGN-<subject>-R2` or later, unless `docs/RUN_PARAMETERS.md` carries the owner's words on a line `Design rounds above five: <subject> <rounds> (<their words>, <date>)`.
+- **The digest's rule 6** names the exception (the digest's opening line, which the hook's header already says, is dropped to pay for it). `plan-critic` raises only what is new, or Blocking, in a confirming read, and never grades up on agreement.
+
+**Running projects must**
+- *(all phases)* Install, restart, `/calibrate-bridge`. A design, plan or change critique past its fourth round stops now: the next round is the confirming read if the text changed since a critic last read it, else none; then the one resolution round if anything is still Blocking, then the gate with the open findings listed.
+
+**If rolled back**
+- Nothing to restore. The previous launcher does not refuse a sixth round, so the text's ceiling is then held by the supervisor alone.
+
+---
+
 ## 2026.10.11d
 
 **The report cycle's text items** (the follow-ups accepted by the evaluation of 2026-10-11, plan section 16 under A5's status; the A5 follow-up), with the trial's observations under A5 and the owner's decision D1. Text, with two small program changes for the builder's report file.

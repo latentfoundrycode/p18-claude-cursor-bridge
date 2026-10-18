@@ -316,7 +316,9 @@ fix that **regresses** something already passing. A deadlock over what the softw
 **Convergence is a signal.** When two or more reviewers or auditors independently name the
 same line or the same defect, it is blocking even if each alone marked it advisory —
 decorrelated reviewers agreeing is the strongest evidence this gate produces (three of four
-converged on a lock-leaking lifecycle bug that each had called advisory).
+converged on a lock-leaking lifecycle bug that each had called advisory). The rule is the code
+gate's: a design critique's two critics are bounded by rounds instead (§"Review B's design
+mode", below), and a finding both name keeps the grade its content earns.
 
 **Split verdicts are resolved by the supervisor, not escalated.** First **name the
 disagreement out loud** — `REVIEWERS DISAGREE on <crux>`, which reviewers, and whether the
@@ -391,6 +393,8 @@ python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- curso
 ```
 
 It answers in the critic's grades, Blocking, Should fix and Consider, each finding naming the diagram, section or requirement it concerns, and ends with the counts per grade. A reply that names nothing from the file is a failed launch, not a verdict, as for a code review. `review-guard.py verify DESIGN-<subject>-<round>` afterwards proves the reviewer read only. The record of every round lives in `docs/DESIGN_CRITIQUE.md`, each critic's grades apart; a design resolution round runs the same read-only command on `run/review/DESIGN-<subject>-R<n>.md` holding the one question and both positions, never the code review's `--force` form. The `run/review/DESIGN-*` files are removed with `git rm` in the commit that passes the gate. The installed test that forbids the read-only mode in a reviewer command applies to code reviews, which must execute; a design review must carry `--mode=ask --trust`.
+
+**The loop is bounded** (`supervisor.md`, Phase 2): at most four rounds per subject, then one confirming read by both critics, whose findings are fixed or accepted and recorded without another read, then one resolution round for whatever is still Blocking or non-convergent, then the gate. `bridge-run.py` refuses a design-mode launch on `run/review/DESIGN-<subject>-<n>.md` with `n` above five, and a resolution round `DESIGN-<subject>-R2` or later, unless `docs/RUN_PARAMETERS.md` carries the owner's words on a line `Design rounds above five: <subject> <rounds> (<their words>, <date>)`. The convergence rule of the code gate does not apply to a design critique.
 
 ## Who completes the merge — the `Merge authority` run parameter
 

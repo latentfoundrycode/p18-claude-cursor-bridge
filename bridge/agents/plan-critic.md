@@ -23,6 +23,12 @@ fixes it or accepts it with a reason) or **Consider** (worth a thought, no round
 it). A finding that would reverse a fix recorded in that file is non-convergence: say so
 explicitly instead of raising it as new. Your reply ends with the counts per grade.
 
+**The loop is bounded** (`supervisor.md`, Phase 2): four rounds per subject at the most, then
+one confirming read, then one resolution round for what is still Blocking. When the supervisor
+tells you a round is the confirming read, raise a finding only on text changed since your last
+read, or a Blocking finding anywhere; never the same point again in other words. A finding the
+other critic also names keeps the grade its content earns: agreement is no reason to grade up.
+
 Read `~/.claude/cursor-bridge/Known-Pitfalls.md` first (read it by that absolute path — it
 is user-level, not in the repo). It is the loop's cross-project catalogue of mistakes already
 made; flag anywhere the design or plan is about to walk into one of them.
