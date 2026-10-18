@@ -1,5 +1,14 @@
 # SCOPE — BUG-009 (stage B2's review, round 8: fixes)
 
+## r2 (gate round 2; commit 1ec4854 over the reviewed head f992d26 — run/review/DELTA-BUG-009.diff holds the change since that head alone)
+Gate round 1: Review B APPROVE; Review A APPROVE with one should-fix and considers (docs/HARDENING.md, "BUG-009's gate round 1"). r2 changes no program. What it adds, and what each enforces:
+- tests/test_workflows_line_check.py: test_r015_a_valid_line_is_judged_valid_with_no_rows[judge × case] — handoff/TASK-008.md, the judge's interface: a valid line is ("valid", []) from each judge (the widened sweep's inventory-check.py line 228, `if findings:` forced true, printed the same and survived).
+- tests/test_workflow_check.py: a comment on OTHER_SPACE (a word ends at any Unicode white space, the program's `str.split()`, which the registry text does not settle); the folder test's docstring cites TASK-006.md line 159 and the `isfile` reading; the delivery points' control asserts `rc == 1` and an empty standard error.
+- Drivers: mutate_workflows_line.py two new mutants, the valid line judged malformed with no rows in each judge (62 of 62, mutate_workflows_line_bug009r2.out); the widened sweep rerun (sweep_wide_r8.out: 351 survivors of 731, r7's less line 228, each in a class).
+- Records: docs/HARDENING.md (the line driver's count corrected to five; "BUG-009's gate round 1"; the regenerated round-8 list, the "regex" and "printing" classes' texts and the runs' counts), this file (Requirement 5 corrected to TASK-008-r2.md R2-1).
+
+The sections below are r1's, corrected where r2 says.
+
 No builder ran. Every change is the supervisor's: tests, fixtures and records. No program changed: bridge/cursor-bridge/workflow-check.py, inventory-check.py and conformance-check.py are byte-identical to origin/main 23a1971.
 
 ## Scope (what this increment is)
@@ -20,7 +29,7 @@ Stage B2's review, round 8 (snapshot STAGE-B2h, 44705eb): Review B APPROVE; Revi
   - FILE_EXACT kind-two-backticks: a sub-workflow (new file) sets the delivery kind to a lone backtick, which is no pair and is printed as itself (the first sweep's line 485, `>= 2` read as `>= 1`, separable once its number operator worked); d-unknown-sub-type-key's file adds at `nowhere.at-all`, still checked (fixtures 1, consider).
   - Round 7's carried considers: an in-test control in test_r014_the_delivery_rules_apply_at_their_two_points_exactly (the two points exactly: (kind) on each) and in test_r015_loaded_as_a_module_the_check_runs_nothing (under `__main__` it runs and exits 2).
 - tests/test_workflows_line_check.py, first cases:
-  - test_r015_the_bytecode_switch_is_restored_when_the_checker_cannot_be_loaded[judge × how] — handoff/TASK-008.md Requirement 5 with the judges' own restore: each judge loads workflow-check.py with the checker absent, not compiling, or exiting at load, and `sys.dont_write_bytecode` is back to its earlier value afterwards (tests, should-fix: the switch put back after a good load only survived).
+  - test_r015_the_bytecode_switch_is_restored_when_the_checker_cannot_be_loaded[judge × how] — handoff/TASK-008-r2.md R2-1, the judges' restore in a `finally`: each judge loads workflow-check.py with the checker absent, not compiling, or exiting at load, and `sys.dont_write_bytecode` is back to its earlier value afterwards (tests, should-fix: the switch put back after a good load only survived).
 - BUG-009's second cases (the widened sweep's separable survivors, sweep_wide_r6.out):
   - test_r014_the_four_forms_take_each_of_their_spaces_and_a_key — the same section of extension-points.md: each form's words separated by one space, its key or kind a word; a form with a space dropped or its key or kind left out is (form) where the line is a change heading (R3-4) and prose otherwise; 17 variants (fourteen (form), three prose controls).
   - test_r014_a_tab_is_no_fence_indent[opening-backticks, opening-tildes, closing] — R4-3 and R5-3: a fence is indented by zero to three spaces; a run after a tab opens no fence and closes none.
@@ -28,7 +37,7 @@ Stage B2's review, round 8 (snapshot STAGE-B2h, 44705eb): Review B APPROVE; Revi
 
 ## The mutation drivers and the sweeps (local, run/supervisor/, readable)
 - mutate_workflow_check.py: 23 named mutants for the first cases and 16 for the second, one per rule above; 300 of 300 killed (mutate_workflow_check_bug009b.out).
-- mutate_workflows_line.py: one for the bytecode switch (put back after a good load only) and three for the placement prefixes; 60 of 60 (mutate_workflows_line_bug009b.out).
+- mutate_workflows_line.py: five for the first and second cases (the bytecode switch put back after a good load only, once in each judge, and the three placement prefixes; 60 of 60, mutate_workflows_line_bug009b.out), two for r2 (below).
 - sweep_workflow_check.py: its number operator now builds each mutant at the match's own position (it had made no mutant). 799 mutants, 754 compile, 49 survive after both sets of cases (sweep_workflow_check_r13.out): round 6's list less line 626, which BUG-008's of-type tests kill, with line 357's `2 -> 1`, equivalent as its dropped clause.
 - sweep_wide.py with regex_mutants.py (new): every white-space reading of each regex literal (each space as a tab, any white space, a run, optional; the start indented; the end with trailing white space or anything; `\S+` as `[^ ]+`, `.+`, `\S*`; the indent's bound and class; the class after `##`; `re.I`) and each short string literal with one space dropped (read from the line's string tokens, one mutant per run of spaces). WIDESWEEP
 - write_survivor_list.py (`--check`) and write_wide_list.py stop on a survivor no reason or class names.
