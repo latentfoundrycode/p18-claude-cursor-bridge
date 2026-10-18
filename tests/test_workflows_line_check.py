@@ -499,6 +499,31 @@ def test_r015_conformance_prints_each_finding_in_order(tmp_path):
     assert rc == 1
 
 
+# Stage B2's review, round 10: a finding given twice is printed twice, and two identical lines stand together (the idiom
+# sweep's inventory-check.py line 224, conformance-check.py line 333 and workflow-check.py line 729: the findings, or
+# the placed run, with repeats dropped).
+REPEATED = "# Project Status\nPhase: building\nWorkflows: Web App Development; traits: none\nWorkflows: Web App Development; traits: none\n"
+
+
+def test_r015_a_repeated_finding_is_reported_each_time(tmp_path):
+    """handoff/TASK-008.md: one WORKFLOWS LINE per finding of the judge, and the conformance row every finding joined
+    by `; `: two identical unprefixed lines each break the part-prefix rule, so each judge names it twice."""
+    status = tmp_path / "PROJECT_STATUS.md"
+    write_status(status, REPEATED)
+    rc, lines, out, err = inventory(tmp_path, status)
+    assert workflows_lines(lines) == ["WORKFLOWS LINE: malformed: - - Workflows line breaks the part-prefix rule"] * 2, lines
+    assert rc == 1, lines
+    rc, out, err = conformance(workspace(tmp_path, REPEATED))
+    assert verdict(out, "Workflows line") == ("MISSING", "Workflows line  - malformed: "
+        "- - Workflows line breaks the part-prefix rule; - - Workflows line breaks the part-prefix rule"), out
+    assert rc == 1
+
+
+def test_r015_two_identical_lines_stand_together(program):
+    """check_placement: the Workflows lines stand together right after the Phase line, two identical ones too."""
+    assert program("workflow-check").check_placement("s.md", REPEATED) == []
+
+
 def test_r015_conformance_no_status_file_no_check(tmp_path):
     """TASK-008 Requirement 4, conformance-check's half: with no status file the Workflows line is not judged and no row
     names it; the records row already reports the file missing. The positive control runs first, on the same workspace
