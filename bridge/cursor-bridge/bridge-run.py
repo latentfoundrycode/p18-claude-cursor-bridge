@@ -40,6 +40,7 @@ one run; a run ended at its limit whose kept work merged counts too, so the ceil
 a test run that exits 0 is marked by the launcher itself. The run that raised a ceiling is
 named when the ceiling is chosen. A slow but healthy task is never ended before its ceiling.
 An owner's cap below twice the default is ignored with a note: the line says "above twice".
+Refuses a design critique round above the ceiling (exit 125, `design ceiling:`).
 
 `--key-file <path>` (release A2): a file of `NAME=value` lines, outside the Workspace, whose
 values reach the child's environment only; names are printed, values never (the owner's
@@ -76,6 +77,8 @@ KINDS = {"builder": 7200, "review": 3600, "watch": 3600, "test": 1800}
 LOG = os.path.join("run", "launcher", "runs.jsonl")
 LEARN_FACTOR = 1.5
 CAP_FACTOR = 2
+DESIGN_DEFAULT_ROUNDS = 5
+DESIGN_RE = re.compile(r"(?i)run[/\\]review[/\\]design-")
 
 
 def usage():
@@ -230,6 +233,86 @@ def owner_cap(kind, folder):
                     return int(m.group(2))
     except OSError:
         pass
+    return None
+
+
+def design_lifts(folder):
+    """{subject: max numbered round} from the first well-formed owner's line per subject."""
+    lifts = {}
+    try:
+        with open(os.path.join(folder, "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
+            for line in f:
+                m = re.match(r"^\s*[-*]?\s*\**Design rounds above five\**\s*:\s*([a-z0-9-]+)\s+(\d+)\s*\((.+)\)", line.strip(), re.I)
+                if not m or m.group(1) in lifts:
+                    continue
+                words = m.group(3).strip()
+                if not words:
+                    continue
+                rounds = int(m.group(2))
+                if rounds <= 5:
+                    continue
+                lifts[m.group(1)] = rounds
+    except (OSError, UnicodeDecodeError):
+        pass
+    return lifts
+
+
+def design_token(text, start):
+    """Text after DESIGN- up to whitespace or a quote; trailing punctuation stripped."""
+    i = start
+    while i < len(text) and text[i] not in " \t\n\r\"'`":
+        i += 1
+    token = text[start:i]
+    while token and token[-1] in ".,;:)])}'\"":
+        token = token[:-1]
+    return token
+
+
+def design_parts(name):
+    """(subject, round) when the name is readable, else None."""
+    if "-" in name:
+        subject, round_part = name.rsplit("-", 1)
+    else:
+        subject, round_part = "", name
+    if not re.match(r"^[a-z0-9-]*$", subject):
+        return None
+    if re.match(r"^[1-9][0-9]*$", round_part) or re.match(r"^R[1-9][0-9]*$", round_part):
+        return subject, round_part
+    return None
+
+
+def design_allowed(subject, round_part, lifts):
+    """Whether this subject's round is within the ceiling (default or owner's line)."""
+    if round_part.startswith("R"):
+        n = int(round_part[1:])
+        return n <= (2 if subject in lifts else 1)
+    n = int(round_part)
+    return n <= (lifts[subject] if subject in lifts else DESIGN_DEFAULT_ROUNDS)
+
+
+def design_refusal(file_label, subject, round_part, params_path):
+    return ("design ceiling: %s subject %s round %s; looked in %s for "
+            "Design rounds above five: (supervisor.md, Phase 2)" % (file_label, subject, round_part, params_path))
+
+
+def design_ceiling(argv, folder):
+    """Refuse cursor-agent launches naming a design round above the ceiling; None when allowed."""
+    if head_of(argv) != "cursor-agent":
+        return None
+    text = " ".join(argv)
+    params_path = os.path.join(folder, "docs", "RUN_PARAMETERS.md")
+    lifts = design_lifts(folder)
+    for m in DESIGN_RE.finditer(text):
+        token = design_token(text, m.end())
+        if not token.endswith(".md"):
+            return design_refusal("DESIGN-%s" % token, "", "", params_path)
+        name = token[:-3]
+        parts = design_parts(name)
+        if parts is None:
+            return design_refusal("DESIGN-%s.md" % name, "", "", params_path)
+        subject, round_part = parts
+        if not design_allowed(subject, round_part, lifts):
+            return design_refusal("DESIGN-%s.md" % name, subject, round_part, params_path)
     return None
 
 
@@ -433,6 +516,10 @@ def main():
         return 125
     if "--key-file" in flags and head_of(cmd) == "cursor-agent":
         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
+        return 125
+    reason = design_ceiling(cmd, folder)
+    if reason:
+        sys.stderr.write("bridge-run: refused - %s\n" % reason)
         return 125
     kind = flags[flags.index("--kind") + 1] if "--kind" in flags and flags.index("--kind") + 1 < len(flags) else kind_of(cmd)
     if kind is None and os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1":
