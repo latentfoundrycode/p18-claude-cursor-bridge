@@ -185,6 +185,72 @@ def test_a_line_without_the_owners_words_or_not_above_five_lifts_nothing(program
     assert br.design_ceiling(design_cmd("design-R2"), str(tmp_path)) is not None
 
 
+@pytest.mark.parametrize("prompt", [
+    "read run//review/DESIGN-plan-6.md",
+    "read run\\\\review\\\\DESIGN-plan-6.md",
+    "read run/review//DESIGN-plan-6.md",
+    "read run/./review/DESIGN-plan-6.md",
+    "read run/review/./DESIGN-plan-6.md",
+    "read .\\run\\.\\review\\DESIGN-plan-6.md",
+], ids=["doubled-before-review", "escaped-backslashes", "doubled-before-design", "dot-before-review",
+        "dot-before-design", "windows-dots"])
+def test_doubled_separators_and_dot_segments_name_the_same_file(program, tmp_path, prompt):
+    """Review A, round 1: Windows opens `run//review/...`, `run\\\\review\\\\...` (a JSON-escaped path) and
+    `run/./review/...` as `run/review/...`, so they are read as it is."""
+    br = program("bridge-run")
+    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is not None, prompt
+    allowed = prompt.replace("plan-6", "plan-2")
+    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", allowed], str(tmp_path)) is None, allowed
+
+
+@pytest.mark.parametrize("name, words", [
+    ("design-6", "above round 5"), ("design-R2", "beyond R1"), ("design-05", "cannot be read"),
+    ("Design-3", "cannot be read"), ("design-confirm", "cannot be read"),
+])
+def test_the_refusal_says_which_refusal_it_is_and_names_the_round(program, tmp_path, name, words):
+    """A name that cannot be read is a typo to fix; a round past the ceiling sends the subject on to its resolution
+    round or gate: the message says which, and names the round as written."""
+    br = program("bridge-run")
+    reason = br.design_ceiling(design_cmd(name), str(tmp_path))
+    assert words in reason, reason
+    assert "round %s" % name.rsplit("-", 1)[1] in reason, reason
+
+
+def test_under_the_owners_line_the_refusal_names_the_lifted_ceiling(program, tmp_path):
+    br = program("bridge-run")
+    run_parameters(tmp_path, "Design rounds above five: design 8 (\"to eight\", 2026-10-18)")
+    assert "above round 8" in br.design_ceiling(design_cmd("design-9"), str(tmp_path))
+    assert "beyond R2" in br.design_ceiling(design_cmd("design-R3"), str(tmp_path))
+
+
+def test_the_refusal_is_ascii_whatever_the_name_holds(program, tmp_path):
+    br = program("bridge-run")
+    reason = br.design_ceiling(design_cmd("plän-6"), str(tmp_path))
+    assert reason is not None and reason.isascii(), reason
+
+
+@pytest.mark.parametrize("line", [
+    "- **Design rounds above five:** design 8 (\"to eight\", 2026-10-18)",
+    "**Design rounds above five**: design 8 (\"to eight\", 2026-10-18)",
+    "* Design rounds above five: design 8 (\"to eight\", 2026-10-18)",
+], ids=["colon-inside-bold", "colon-after-bold", "star-bullet"])
+def test_the_owners_line_is_read_in_its_markdown_forms(program, tmp_path, line):
+    br = program("bridge-run")
+    run_parameters(tmp_path, line)
+    assert br.design_ceiling(design_cmd("design-8"), str(tmp_path)) is None
+
+
+@pytest.mark.parametrize("line", [
+    "Design rounds above five: DESIGN 8 (\"to eight\", 2026-10-18)",
+    "Design rounds above five: design ٨ (\"to eight\", 2026-10-18)",
+], ids=["subject-in-capitals", "arabic-indic-digit"])
+def test_the_owners_line_takes_a_lower_case_subject_and_ascii_digits_only(program, tmp_path, line):
+    """A subject is a lower-case token; a round is written in ASCII digits."""
+    br = program("bridge-run")
+    run_parameters(tmp_path, line)
+    assert br.design_ceiling(design_cmd("design-6"), str(tmp_path)) is not None
+
+
 def test_the_launcher_refuses_with_125_before_it_starts_anything(tmp_path):
     """End to end: the refusal is a `bridge-run: refused - ` line and exit 125, before the `started` line, and nothing is
     logged (no cursor-agent is run)."""

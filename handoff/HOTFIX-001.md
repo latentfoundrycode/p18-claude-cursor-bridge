@@ -9,6 +9,7 @@ Satisfies: there is no build-plan increment and no requirements register for thi
 Files you may create or modify:
 - bridge/cursor-bridge/bridge-run.py
 - handoff/HOTFIX-001-r1-report.md
+- handoff/HOTFIX-001-r2-report.md (round 2)
 
 Do not modify anything else. In `bridge-run.py`, the only docstring change allowed is one added line in the module docstring that names the new refusal. The rest of the docstring stays as it is.
 
@@ -183,3 +184,14 @@ Your report is the file `handoff/HOTFIX-001-r1-report.md`. Write it as you go: w
 - a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: a reading of the governing text you resolved one way, a quote or separator character you chose to end a token on, a behaviour of `re` or of the platform you expected. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
 
 Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, so a message printed earlier and then followed by more work is lost.
+
+## Round 2: corrections from Review A
+
+Round 1 is accepted in its core; this round changes `bridge/cursor-bridge/bridge-run.py` again and nothing else. Your report for this round is `handoff/HOTFIX-001-r2-report.md` (the same contents as round 1's, for this round); leave `handoff/HOTFIX-001-r1-report.md` as it is. The acceptance tests now number 69 in `tests/test_bridge_run_design_ceiling.py` (the supervisor added 18; 15 of them fail on round 1's code); all 69 pass when you are done, the rest of the suite unchanged. Every Requirement above still holds except where a point below replaces it.
+
+1. **Separators and dot segments (replaces the matching in point 3).** Before looking for design files, normalise the joined text: replace every run of separators, with any `.` segments between them, by one `/`: exactly `re.sub(r"[/\\]+(?:\.[/\\]+)*", "/", text)`. Then find `run/review/DESIGN-` in the normalised text, ignoring case as before. So `run//review/`, `run\\review\\` (a JSON-escaped path), `run/./review/` and `.\run\.\review\` all name the file. (`x/..` segments and 8.3 short names are not handled: accepted, the text holds them.)
+2. **One anchored match for the name (replaces the split and slice in point 5).** Read the name with one regular expression, `^(?:([a-z0-9-]*)-)?(R?)([1-9][0-9]*)$`: group 1 the subject (empty when absent), group 2 the `R` of a resolution round, group 3 the number, taken with `int`. No `rsplit` and no slice to get a number.
+3. **The refusal says which refusal it is (extends point 8).** The reason reads, in this order: `design ceiling: `, the file as read, `(subject <subject>, round <round>)` where `<round>` is the name's text after its last hyphen as written (`05`, `confirm`, `R2`; the whole name when it has no hyphen), then one of three: `the name cannot be read`, `above round <N>` (`<N>` 5, or the owner's `<rounds>` for that subject), `a resolution round beyond R<k>` (`<k>` 1, or 2 under the owner's line); then the path of `docs/RUN_PARAMETERS.md` it looked in, the words `Design rounds above five:` and `supervisor.md, Phase 2`. The whole reason is ASCII: escape anything else with `encode("ascii", "backslashreplace").decode("ascii")`.
+4. **The owner's line in its Markdown forms and its exact alphabet (replaces the regex of point 7).** Accept the colon inside or after the bold (`- **Design rounds above five:** design 8 (...)` and `**Design rounds above five**: design 8 (...)`), led by `-` or `*` or nothing. Only the label ignores case; the subject is `[a-z0-9-]+` as written (a line naming `DESIGN` lifts nothing), and `<rounds>` is ASCII digits `[0-9]+`, never `\d`.
+5. **Minimal code (the frozen rule).** Use one constant for the default ceiling of 5 everywhere it is meant (also in the owner's-line check), and constants for the resolution limits 1 and 2. Take the token with a capture group and `str.rstrip` of the trailing punctuation instead of hand-written character loops. Open `docs/RUN_PARAMETERS.md` only when the command names at least one design file.
+6. **Your `Assumed, not verified` list.** Round 1 said none; Review A found several (the token ending only at space, tab, CR and LF; `re.I` on the whole owner's line; Unicode digits). List every such fact this round, or confirm each with a test you can point to.
