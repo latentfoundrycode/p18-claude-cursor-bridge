@@ -1,0 +1,609 @@
+diff --git a/.cursor/hooks.json b/.cursor/hooks.json
+new file mode 100644
+index 0000000..ed33d1d
+--- /dev/null
++++ b/.cursor/hooks.json
+@@ -0,0 +1,12 @@
++{
++  "version": 1,
++  "hooks": {
++    "afterFileEdit": [
++      {
++        "command": "python .cursor/hooks/run-hidden.py python .cursor/hooks/boundary-check.py",
++        "timeout": 10,
++        "matcher": "Write"
++      }
++    ]
++  }
++}
+diff --git a/.cursor/hooks/boundary-check.py b/.cursor/hooks/boundary-check.py
+new file mode 100644
+index 0000000..c3363f6
+--- /dev/null
++++ b/.cursor/hooks/boundary-check.py
+@@ -0,0 +1,72 @@
++#!/usr/bin/env python3
++"""Workspace-boundary detector for the Cursor afterFileEdit hook (advisory).
++
++Reads the hook's JSON from stdin, takes the edited file's path and the workspace
++root(s), and records any edit that landed OUTSIDE the workspace to
++<workspace>/docs/BOUNDARY_VIOLATIONS.md. The supervisor reads that file at
++step 4 (Inspect) of the delegation loop and treats an entry like SCOPE DRIFT.
++
++This hook runs AFTER the edit, so it cannot prevent it - it detects. Always
++exits 0 (advisory; never fail-closed). ASCII-only on purpose (cp1252 consoles).
++"""
++import json
++import os
++import sys
++import time
++
++
++def norm(p):
++    return os.path.normcase(os.path.realpath(os.path.abspath(p)))
++
++
++def inside(path, root):
++    path = norm(path)
++    root = norm(root).rstrip("\\/")
++    return path == root or path.startswith(root + os.sep)
++
++
++def main():
++    try:
++        raw = sys.stdin.buffer.read().decode("utf-8-sig", errors="replace")
++    except Exception:
++        raw = ""
++    try:
++        data = json.loads(raw) if raw.strip() else {}
++    except Exception:
++        data = {}
++
++    roots = data.get("workspace_roots") or [os.getcwd()]
++    if isinstance(roots, str):
++        roots = [roots]
++    file_path = data.get("file_path") or data.get("path") or ""
++    if not file_path:
++        return 0
++
++    if any(inside(file_path, r) for r in roots):
++        return 0
++
++    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
++    line = "- %s  OUTSIDE WORKSPACE: %s  (roots: %s)\n" % (
++        stamp, os.path.abspath(file_path), "; ".join(os.path.abspath(r) for r in roots))
++    log_dir = os.path.join(roots[0], "docs")
++    log = os.path.join(log_dir, "BOUNDARY_VIOLATIONS.md")
++    try:
++        os.makedirs(log_dir, exist_ok=True)
++        new = not os.path.exists(log)
++        with open(log, "a", encoding="utf-8") as f:
++            if new:
++                f.write("# Workspace boundary violations\n\n"
++                        "Edits the builder made outside the Workspace, recorded by the "
++                        "boundary-check hook. Each entry is handled like SCOPE DRIFT.\n\n")
++            f.write(line)
++    except Exception as e:
++        sys.stderr.write("boundary-check: could not write log: %s\n" % e)
++    sys.stderr.write("boundary-check: " + line)
++    return 0
++
++
++if __name__ == "__main__":
++    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
++        if hasattr(_s, "reconfigure"):
++            _s.reconfigure(errors="backslashreplace")
++    sys.exit(main())
+diff --git a/.cursor/hooks/run-hidden.py b/.cursor/hooks/run-hidden.py
+new file mode 100644
+index 0000000..7c26ff1
+--- /dev/null
++++ b/.cursor/hooks/run-hidden.py
+@@ -0,0 +1,66 @@
++#!/usr/bin/env python3
++"""run-hidden: launch a console command with NO visible console window (Windows).
++
++Use it to wrap any direct-command hook entry in .cursor/hooks.json (the design
++detector, Semgrep, a linter) so the child process cannot pop a terminal window on
++the user's desktop. On non-Windows it is a transparent pass-through.
++
++  <python.exe> .cursor/hooks/run-hidden.py <command> [args...]
++
++- stdin (the hook's JSON payload) is inherited by the child unchanged.
++- stdout / stderr / exit code are relayed unchanged, so hook semantics are kept.
++- A .cmd/.bat executable (npx, semgrep shims) is run via cmd.exe /d /c, hidden.
++- Never use this for a process the user is meant to watch or interact with.
++
++ASCII-only on purpose (cp1252 consoles).
++"""
++import os
++import shutil
++import subprocess
++import sys
++
++NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
++
++
++def resolve(argv):
++    """Turn a .cmd/.bat launcher into a cmd.exe invocation so CreateProcess can run it."""
++    if sys.platform != "win32" or not argv:
++        return argv
++    exe = argv[0]
++    found = shutil.which(exe) or exe
++    if found.lower().endswith((".cmd", ".bat")):
++        return ["cmd.exe", "/d", "/c", found] + argv[1:]
++    return [found] + argv[1:] if found != exe else argv
++
++
++def main():
++    argv = sys.argv[1:]
++    if argv and argv[0] == "--":
++        argv = argv[1:]
++    if not argv:
++        sys.stderr.write("run-hidden: no command given\n")
++        return 2
++    # stdin is inherited, not pre-read: the child reads the hook payload exactly as it
++    # would have, and the wrapper never blocks on a pipe that has no writer.
++    try:
++        proc = subprocess.run(
++            resolve(argv),
++            stdout=subprocess.PIPE,
++            stderr=subprocess.PIPE,
++            creationflags=NO_WINDOW,
++        )
++    except FileNotFoundError as e:
++        sys.stderr.write("run-hidden: cannot start %s (%s)\n" % (argv[0], e))
++        return 127
++    sys.stdout.buffer.write(proc.stdout)
++    sys.stderr.buffer.write(proc.stderr)
++    sys.stdout.flush()
++    sys.stderr.flush()
++    return proc.returncode
++
++
++if __name__ == "__main__":
++    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
++        if hasattr(_s, "reconfigure"):
++            _s.reconfigure(errors="backslashreplace")
++    sys.exit(main())
+diff --git a/.cursor/hooks/windowless-check.py b/.cursor/hooks/windowless-check.py
+new file mode 100644
+index 0000000..f65ebed
+--- /dev/null
++++ b/.cursor/hooks/windowless-check.py
+@@ -0,0 +1,140 @@
++#!/usr/bin/env python3
++"""windowless-check: flag console subprocess launches that would pop a terminal
++window on Windows.
++
++Scans hook scripts and agent tooling (default: .cursor/hooks) plus any extra paths
++given, and reports every Python subprocess.* / os.system / os.popen call and every
++Node child_process spawn/exec call that does not carry the windowless flag:
++
++  Python : creationflags=subprocess.CREATE_NO_WINDOW   (0 on non-Windows)
++  Node   : { windowsHide: true }
++
++A call may be exempted with a comment on the same line or the line above:
++
++  # windowless: visible-ok <reason the window serves the user>
++  // windowless: visible-ok <reason>
++
++Signal caveat: a call that sets CREATE_NEW_PROCESS_GROUP (a CTRL_BREAK stop path)
++is reported as NOTE, not FAIL, when it lacks CREATE_NO_WINDOW - hiding it must be
++verified against the stop path, not flipped blindly.
++
++Exit 0 = clean (NOTEs allowed), 1 = at least one FAIL, 2 = nothing scanned.
++Usage: python windowless-check.py [path ...]
++ASCII-only on purpose (cp1252 consoles).
++"""
++import os
++import re
++import sys
++
++PY_EXT = (".py",)
++JS_EXT = (".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx")
++SKIP_DIRS = {"node_modules", ".venv", "venv", ".git", "dist", "build", "__pycache__"}
++
++PY_CALL = re.compile(r"\b(subprocess\.(?:run|Popen|call|check_call|check_output)|os\.system|os\.popen)\s*\(")
++JS_CALL = re.compile(r"\b(spawn|spawnSync|exec|execSync|execFile|execFileSync)\s*\(")
++EXEMPT = re.compile(r"windowless:\s*visible-ok\b")
++
++
++def call_text(src, open_paren):
++    """Return the text of the call from the opening paren to its matching close."""
++    depth = 0
++    i = open_paren
++    in_str = None
++    while i < len(src):
++        c = src[i]
++        if in_str:
++            if c == "\\":
++                i += 2
++                continue
++            if c == in_str:
++                in_str = None
++        elif c in ("'", '"', "`"):
++            in_str = c
++        elif c == "(":
++            depth += 1
++        elif c == ")":
++            depth -= 1
++            if depth == 0:
++                return src[open_paren:i + 1]
++        i += 1
++    return src[open_paren:]
++
++
++def line_of(src, pos):
++    return src.count("\n", 0, pos) + 1
++
++
++def exempted(lines, lineno):
++    """Same line: any trailing comment. Line above: only a comment-only line, so a
++    trailing comment on the previous statement never exempts this one."""
++    if 1 <= lineno <= len(lines) and EXEMPT.search(lines[lineno - 1]):
++        return True
++    if lineno >= 2:
++        above = lines[lineno - 2].strip()
++        if above.startswith(("#", "//")) and EXEMPT.search(above):
++            return True
++    return False
++
++
++def scan_file(path):
++    findings = []
++    try:
++        src = open(path, encoding="utf-8", errors="replace").read()
++    except Exception:
++        return findings
++    lines = src.split("\n")
++    is_py = path.endswith(PY_EXT)
++    pattern = PY_CALL if is_py else JS_CALL
++    for m in pattern.finditer(src):
++        name = m.group(1)
++        ln = line_of(src, m.start())
++        if exempted(lines, ln):
++            continue
++        body = call_text(src, m.end() - 1)
++        if is_py:
++            if name in ("os.system", "os.popen"):
++                findings.append(("FAIL", path, ln, name, "cannot be made windowless; use subprocess.run with creationflags"))
++                continue
++            if "creationflags" in body and "NO_WINDOW" in body:
++                continue
++            if "creationflags" in body and "CREATE_NEW_PROCESS_GROUP" in body:
++                findings.append(("NOTE", path, ln, name, "process-group spawn without CREATE_NO_WINDOW; verify the stop path before hiding"))
++                continue
++            findings.append(("FAIL", path, ln, name, "missing creationflags=NO_WINDOW"))
++        else:
++            if "windowsHide" in body:
++                continue
++            findings.append(("FAIL", path, ln, name, "missing windowsHide: true"))
++    return findings
++
++
++def main():
++    paths = sys.argv[1:] or [".cursor/hooks"]
++    files = []
++    for p in paths:
++        if os.path.isfile(p):
++            files.append(p)
++            continue
++        for root, dirs, names in os.walk(p):
++            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
++            for n in names:
++                if n.endswith(PY_EXT + JS_EXT):
++                    files.append(os.path.join(root, n))
++    if not files:
++        print("windowless-check: nothing to scan under %s" % ", ".join(paths))
++        return 2
++    findings = []
++    for f in sorted(files):
++        findings.extend(scan_file(f))
++    fails = [f for f in findings if f[0] == "FAIL"]
++    for kind, path, ln, name, why in findings:
++        print("%s  %s:%d  %s(...)  %s" % (kind, path.replace("\\", "/"), ln, name, why))
++    print("windowless-check: %d file(s) scanned, %d FAIL, %d NOTE" % (len(files), len(fails), len(findings) - len(fails)))
++    return 1 if fails else 0
++
++
++if __name__ == "__main__":
++    for _s in (sys.stdout, sys.stderr):      # never crash on a character the console lacks
++        if hasattr(_s, "reconfigure"):
++            _s.reconfigure(errors="backslashreplace")
++    sys.exit(main())
+diff --git a/.cursor/rules/secure-coding.mdc b/.cursor/rules/secure-coding.mdc
+new file mode 100644
+index 0000000..e33580f
+--- /dev/null
++++ b/.cursor/rules/secure-coding.mdc
+@@ -0,0 +1,155 @@
++---
++description: Secure-coding rules (OWASP ASVS 5.0.0), frozen for this project
++alwaysApply: false
++globs: **/*.py, **/*.ps1, **/*.yml, .githooks/*
++---
++
++<!-- Filtered to ASVS level L2 (L1 and L2 requirements; L3 requirements and the LLM supplement left out). -->
++
++<!-- Bundled secure-coding rule body, DERIVED from OWASP Application Security Verification
++Standard (ASVS) v5.0.0 (May 2025). This is the frozen source cursor-configurator writes into
++each project's `.cursor/rules/secure-coding.mdc`, level-filtered to the project's chosen tier
++(L1 baseline / L2 most apps / L3 high-assurance). Snapshot taken 6 September 2026; ASVS is a
++stable standard (major releases ~6-yearly), so the freeze pins v5.0.0 and does NOT need the
++per-project live-fetch-validation the beta Vercel rules need — this bundled copy is the source.
++
++Requirements are tagged [L1]/[L2]/[L3] (cumulative: L2 includes L1, L3 includes L2). Cite as
++`v5.0.0-<chapter>.<section>.<req>`. Each rule is a derived, condensed restatement — consult the
++full standard for the authoritative text and requirement numbers.
++
++ASVS is licensed CC BY-SA 4.0 (© OWASP Foundation); this derived work carries the same licence.
++
++NOTE: ASVS deliberately excludes AI-specific risks. For an LLM-bearing product, the supervisor
++supplements this rule with the OWASP Top 10 for LLM Applications (recorded in the project's
++`.mdc`, never silently). -->
++
++# Secure Coding Rules (ASVS 5.0.0, derived)
++
++Concise secure-by-default rules for the builder to self-apply during generation. Use
++MUST/SHOULD/NEVER. Tags: **[L1]** baseline, **[L2]** most applications, **[L3]** high-assurance.
++
++## V1 — Encoding & Sanitization
++
++- MUST [L1]: Contextual output encoding at the sink (HTML, HTML-attribute, JS, CSS, URL) — encode on output, not input
++- MUST [L1]: Parameterised queries / prepared statements for all data access; NEVER build a query by string concatenation of untrusted input
++- MUST [L1]: OS commands use a safe API with an argument vector; NEVER pass untrusted input to a shell string
++- MUST [L2]: Untrusted data in a template engine is auto-escaped; NEVER disable auto-escaping for untrusted content
++- MUST [L2]: Path/filename input is canonicalised and confined; reject traversal (`..`, absolute paths, null bytes)
++- SHOULD [L2]: Prefer allow-list sanitisation over deny-list for structured formats (HTML via a vetted sanitiser, not regex)
++
++## V2 — Validation & Business Logic
++
++- MUST [L1]: Validate all input at the trust boundary for type, length, range, and format — server-side, never client-only
++- MUST [L1]: Reject by default; accept only what the allow-list permits
++- MUST [L2]: Enforce business-logic limits (quantity, price, sequence, state transitions) server-side; NEVER trust client-computed values
++- MUST [L2]: Protect check-then-act sequences against TOCTOU/race; make the critical step atomic
++- MUST [L2]: Anti-automation on sensitive flows (rate limits, throttling) so a flow cannot be abused at scale
++
++## V3 — Web Frontend Security
++
++- MUST [L1]: Set a restrictive Content-Security-Policy; avoid `unsafe-inline`/`unsafe-eval`
++- MUST [L1]: Cookies are `Secure`, `HttpOnly`, and `SameSite` (Lax or Strict) as the flow allows
++- MUST [L2]: Set `X-Content-Type-Options: nosniff`, a frame-ancestors/`X-Frame-Options` clickjacking defence, and a sensible `Referrer-Policy`
++- MUST [L2]: State-changing requests carry CSRF protection (token or SameSite-strict + origin check)
++- SHOULD [L2]: Subresource Integrity on externally hosted scripts/styles
++
++## V4 — API & Web Service
++
++- MUST [L1]: Enforce the same authN/authZ on the API as on the UI — the API is not a trusted caller
++- MUST [L1]: Responses set a correct `Content-Type`; JSON APIs never reflect input as HTML
++- MUST [L2]: Validate `Content-Type` on requests; reject unexpected media types
++- MUST [L2]: Apply per-principal rate limiting and payload-size limits to every endpoint
++- SHOULD [L2]: Version the API and avoid leaking internal identifiers in responses
++
++## V5 — File Handling
++
++- MUST [L1]: Validate uploaded file type by content, not extension; store outside the web root
++- MUST [L2]: Cap upload size and count; scan or sandbox where the file is later processed
++- MUST [L2]: Serve user files with a safe `Content-Disposition` and a non-executable content type; NEVER serve from a path built from untrusted input
++
++## V6 — Authentication
++
++- MUST [L1]: Store passwords with a memory-hard KDF (argon2id / scrypt / bcrypt); NEVER plaintext, NEVER fast/unsalted hashes
++- MUST [L1]: Enforce credential strength and check against known-breached password lists
++- MUST [L1]: Generic authentication-failure messages; NEVER reveal whether the username or the password was wrong
++- MUST [L2]: Support MFA for sensitive accounts; re-authenticate before sensitive actions
++- MUST [L2]: Rate-limit and lock out credential-stuffing/brute-force attempts
++
++## V7 — Session Management
++
++- MUST [L1]: Generate session tokens with a CSPRNG, sufficient entropy, and server-side validation
++- MUST [L1]: Regenerate the session identifier on login and on privilege change (anti-fixation)
++- MUST [L1]: Invalidate the session server-side on logout and on idle/absolute timeout
++- MUST [L2]: Bind sessions so a stolen token alone is limited; allow the user to view/revoke active sessions
++
++## V8 — Authorization
++
++- MUST [L1]: Enforce authorization on every request at the server, for every function and object — deny by default
++- MUST [L1]: Verify object ownership/role before acting (defeat IDOR/BOLA); NEVER authorise on a client-supplied identifier alone
++- MUST [L2]: Enforce function-level authZ (no access to an admin function by guessing its route)
++- MUST [L2]: Centralise the authorization decision; do not scatter ad-hoc checks that can drift
++
++## V9 — Self-contained Tokens (JWT etc.)
++
++- MUST [L1]: Verify token signature with an explicit expected algorithm; NEVER accept `alg: none` or an attacker-chosen algorithm
++- MUST [L1]: Validate issuer, audience, and expiry on every use
++- MUST [L2]: Scope token lifetime tightly; support revocation for long-lived grants
++- NEVER [L1]: Put a secret in a token payload — payloads are readable
++
++## V10 — OAuth & OIDC
++
++- MUST [L2]: Use the authorization-code flow with PKCE; NEVER the implicit flow for new work
++- MUST [L2]: Validate `state` (CSRF) and `nonce` (replay); register exact redirect URIs
++- MUST [L2]: Verify ID-token signature, issuer, audience, and expiry
++- SHOULD [L2]: Request least-privilege scopes
++
++## V11 — Cryptography
++
++- MUST [L1]: Use vetted library primitives; NEVER hand-roll crypto
++- MUST [L1]: Authenticated encryption (e.g. AES-GCM / ChaCha20-Poly1305) for confidentiality+integrity
++- MUST [L1]: All randomness for security uses a CSPRNG; NEVER `Math.random`/`rand()` for tokens/keys/IVs
++- MUST [L2]: Keys are generated, stored, and rotated via a key store/secret manager; NEVER hard-coded or committed
++- NEVER [L1]: Use MD5/SHA1 for security, ECB mode, static IVs, or deprecated ciphers
++
++## V12 — Secure Communication
++
++- MUST [L1]: TLS for all data in transit; redirect HTTP→HTTPS and set HSTS
++- MUST [L2]: Validate certificates fully; NEVER disable verification or trust all certs
++- SHOULD [L2]: Modern TLS only (1.2+), strong cipher suites; disable legacy protocols
++
++## V13 — Configuration
++
++- MUST [L1]: No secrets in source, config committed to VCS, logs, or error output; load from a secret manager / environment
++- MUST [L1]: Ship secure defaults; disable debug endpoints, directory listing, and verbose stack traces in production
++- MUST [L2]: Remove default/sample accounts and credentials; least-privilege service accounts
++- MUST [L2]: Keep dependencies patched; fail the build on known-vulnerable or known-malicious packages
++- SHOULD [L2]: Pin dependencies and CI actions to immutable versions (a full commit SHA for actions), never a mutable tag
++
++## V14 — Data Protection
++
++- MUST [L1]: Classify data by sensitivity; encrypt sensitive data at rest
++- MUST [L1]: NEVER log secrets, credentials, tokens, or full PII; redact before logging
++- MUST [L2]: Minimise collection and retention; honour the declared data sensitivity/PII scope
++- MUST [L2]: Set anti-caching headers on responses carrying sensitive data
++- SHOULD [L2]: Mask sensitive fields in UI and in error responses
++
++## V15 — Secure Coding & Architecture
++
++- MUST [L1]: Fail securely — an error denies access, it does not fall through to allow
++- MUST [L1]: NEVER swallow a security-relevant error silently; surface and handle it
++- MUST [L1]: Redact secrets from error output by PATTERN (credential shapes, bearer tokens, key formats) — NEVER blank an entire error body on a status code; a legitimate provider error must stay diagnosable
++- MUST [L2]: Validate and pin the integrity of build-time and run-time dependencies; treat the toolchain as an attack surface
++- MUST [L2]: Deserialise only trusted data with a safe deserialiser; NEVER native-deserialise untrusted input
++- SHOULD [L2]: Keep the trusted computing base small; isolate untrusted processing
++
++## V16 — Security Logging & Error Handling
++
++- MUST [L1]: Log security-relevant events (authN, authZ failures, validation failures, admin actions) with enough context to investigate
++- MUST [L1]: User-facing errors are generic; internal detail (stack traces, queries) stays server-side
++- MUST [L2]: Protect logs from injection (encode untrusted values) and from tampering
++- SHOULD [L2]: Emit logs to a central, time-synced store; do not log the sensitive values themselves
++
++## V17 — WebRTC (only if used)
++
++- MUST [L2]: Authenticate and authorise signalling; encrypt media (SRTP/DTLS)
++- SHOULD [L2]: Rate-limit signalling and validate SDP/ICE input
+diff --git a/.cursor/rules/workspace-boundary.mdc b/.cursor/rules/workspace-boundary.mdc
+new file mode 100644
+index 0000000..3efeb91
+--- /dev/null
++++ b/.cursor/rules/workspace-boundary.mdc
+@@ -0,0 +1,20 @@
++---
++description: Workspace boundary — never read or write outside this workspace
++alwaysApply: true
++---
++
++# Workspace boundary
++
++This workspace (the folder you were started in) is the only place you read from or write
++to. Everything you need for a task is inside it; everything you produce goes inside it.
++Never open, create, or modify a file outside it — not the parent folder, not a sibling
++folder such as `../Documents`, not a home-directory or system path. If a task seems to
++require it, stop and say so in your final summary instead.
++
++If the brief, a rule, or the tooling got in your way — contradictory instructions, a check
++that fired wrongly, a step that cost time for no reason — append one dated line describing
++it to `docs/BUILDER_NOTES.md`. Do the same for anything you learned about a defect or a
++pitfall. Do not try to fix the tooling yourself.
++
++In Markdown, never break a line inside a paragraph or a list item; one paragraph is one
++line, with line breaks only between blocks.
+diff --git a/.gitattributes b/.gitattributes
+new file mode 100644
+index 0000000..e291920
+--- /dev/null
++++ b/.gitattributes
+@@ -0,0 +1 @@
++.githooks/** text eol=lf
+diff --git a/.githooks/pre-commit b/.githooks/pre-commit
+new file mode 100644
+index 0000000..27a1a6d
+--- /dev/null
++++ b/.githooks/pre-commit
+@@ -0,0 +1,11 @@
++#!/bin/sh
++# Bridge windowless gate. The bridge has no linter in its manifest, so there is no lint
++# command here. This runs CI's windowless check (tests.yml, the "windowless check over the
++# bridge's programs" step) and also scans the hook folder .cursor/hooks; a non-zero result
++# blocks the commit.
++# Pre-delegation checkpoint commits bypass this with `git commit --no-verify`
++# (they are recovery anchors and must always succeed).
++if ! python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks; then
++  echo "pre-commit: a subprocess launch is missing the windowless flag (or a 'windowless: visible-ok <reason>' marker). Use --no-verify ONLY for a checkpoint snapshot." 1>&2
++  exit 1
++fi
+diff --git a/.gitignore b/.gitignore
+index e6cbbe6..2db78ea 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -10,3 +10,5 @@ __pycache__/
+ 
+ # Supervisor working/review artifacts
+ run/
++# The boundary log holds absolute paths of this computer; it is read locally and never committed (rule 54; the repository is public)
++docs/BOUNDARY_VIOLATIONS.md
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 18356d0..0453cbd 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -58,6 +58,12 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
+ 2. **The Socket key's job also runs code it does not pin.** Semgrep's open dependency ranges (round 2's lead) and `node-version: "22"` (round 3's) run in the job whose last step holds the key; BUG-001's keyless `--ignore-scripts` install holds, so no mechanism is defeated. Check: the job split of round 2's settle path, the Socket job with its own name and an exact Node release, its name added to main's required checks by the owner's run sheet before it merges; first the throwaway probe that appends to `$GITHUB_PATH` and runs `which socket` in the next step; that probe's tests job fails on the status guard by design (FB-024), so the probe is read in its own step and in `security floor`.
+ 3. **A resume during a gate depends on a file a clone does not have.** Between merges the live position is in run/supervisor/in-flight.md (gitignored); the session-start hook points at the status file, whose In flight reads `none`. Check: after the next compaction during a gate, the resumed session names the gate in progress before its first action; the lasting fix is the hook naming the scratch log (FB-022), a bridge change for the maintainer, or B3's module work if it reaches the hook.
+ 
++## Stage B3 — the core and phase-module split
++
++### CFG-B3, the builder's configuration (2026-10-19)
++- **Lead (ISS-010, FB-025): the boundary-check hook does not run in builder runs.** The project `afterFileEdit` hooks never fired in four headless cursor-agent runs launched the bridge's way (Git Bash, the agent's own home), with or without the matcher, with `python` or the interpreter's full path, with `--trust`; the hook's command run by hand works. The cause (the CLI not running project afterFileEdit hooks headless, or composing them for a shell Git Bash cannot run) is not separated: a launch outside Git Bash would settle it, which the bridge does not make. Until then the Workspace boundary rests on the always-on rule, which an explicit prompt overrode in the probe; step 4's reading of `docs/BOUNDARY_VIOLATIONS.md` finds nothing because nothing writes it. Settle: the maintainer's launch-mode probe (FB-025), or a detector in the launcher.
++- **Recorded:** the pre-commit gate runs only on this computer (`core.hooksPath` is a local setting); CI runs the same windowless check, so a clone without the setting is still gated at the pull request.
++
+ ## Stage B2 — carried to its close (test lane)
+ - Done on BUG-002 (stage B2's review fixes), not in the refactoring pass, whose test lane only consolidates: tests/test_open_list.py pins "filled, including" and its comment at :25 is corrected (TASK-004 r3 Consider); tests/test_extension_points.py pins the configuration.items CI route, the inspect step's members and the placement sentence (TASK-005 r6 Consider).
+ 
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 48c2007..b61ce94 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -32,6 +32,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | SOCKET_SECURITY_API_KEY | repo secret | GitHub repository secrets (name only) | the Socket step of the security floor (`SOCKET_CLI_API_TOKEN`) | the owner, 2026-10-12; free tier, no spend possible. 5 characters of its secret part were in public CI logs of PR #16 (ISS-005): those logs deleted and the key replaced by the owner 2026-10-18 (Socket allows one token, so the old one is void) |
+ | SEMGREP_APP_TOKEN | repo secret | GitHub repository secrets (name only) | nothing: Semgrep runs the OSS engine without a token (owner, 2026-10-12) | the owner; unused, no spend possible |
+ | SOCKET_ORG_SLUG, SOCKET_CLI_ORG_SLUG | repo variable (an identifier, public) | SOCKET_ORG_SLUG is a GitHub repository variable, value `latent-foundry`; SOCKET_CLI_ORG_SLUG is only the Socket step's environment name for it | the Socket step of the security floor: `socket ci` 1.7.0 reads SOCKET_CLI_ORG_SLUG before it asks the API (handoff/TASK-002-r6-report.md) | the owner, 2026-10-12 |
++| The builder's configuration | config | .cursor/rules/workspace-boundary.mdc (always on); .cursor/rules/secure-coding.mdc (OWASP ASVS 5.0.0, L2, from the installed bridge's secure-coding.snapshot.md; loaded for Python, PowerShell, workflow YAML and the git hooks); .cursor/hooks.json, one advisory afterFileEdit entry running .cursor/hooks/boundary-check.py through run-hidden.py (an edit outside the Workspace is logged to docs/BOUNDARY_VIOLATIONS.md, gitignored since it holds this computer's absolute paths: read locally, never committed; the hook does not run in the bridge's headless builder runs, probed four ways on 2026-10-19, ISS-010, so nothing detects a write outside the Workspace today); .githooks/pre-commit running bridge/cursor-bridge/windowless-check.py over CI's folder and .cursor/hooks, active through `core.hooksPath = .githooks` (a local setting, made 2026-10-19); .gitattributes keeps .githooks/ LF | every builder run; every commit but a checkpoint's (`--no-verify`) | CFG-B3, 2026-10-19, supervisor (cursor-configurator) |
+ | BRIDGE_RUN_ALLOW_ANY | config | an optional override read by bridge-run.py (lets any command through the launcher); unset in normal use | bridge/cursor-bridge/bridge-run.py | pre-B; no value stored |
+ | ROSTER_NOW | config | an optional clock override read by roster-check.py (for deterministic reset-day tests); unset in normal use | bridge/cursor-bridge/roster-check.py | pre-B; no value stored |
+ | GH_TOKEN, GH_CONFIG_DIR, GIT_CONFIG_GLOBAL, GIT_TERMINAL_PROMPT | test-only | set and read by the test harness to isolate subprocesses (tests/test_bridge_run.py); not real credentials | the bridge's test suite | pre-B; no value stored |
+@@ -61,6 +62,7 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | Baseline measurement (precondition 3) met before release B: the compaction baseline was taken 2026-10-11 (Reports/Maintainer/2026-10-11-compaction-baseline.md) — about one compaction per active day per project before the digest hook | release B's precondition §14.3 | 2026-10-11, maintainer | the measure is re-taken after release B |
+ | Release B2 (machine-readable YAML front-matter headers on the dual-read records) is a confirmed post-B release — taken up at the planning point after release B is done and accepted; built through the gate like B. Scope in the plan §16 and run/supervisor/maintainer-b2.md | §16; added by the maintainer at the owner's decision | 2026-10-12, owner | — |
+ | The design two-critic loop's ceiling is fixed by a hotfix of the installed 2026.10.11d before release B continues: at most four rounds per subject, one confirming read, a program refusal past round 5 | the TDP ran 45 rounds on one change on 2026-10-18 and used up the Cursor pool and much of the day's usage; a fix inside release B would reach the installed bridge only at stage B6 | 2026-10-18, owner (relayed by the maintainer, confirmed in the supervisor's chat) | — |
++| The builder's secure-coding rule is ASVS level 2 | the bridge launches subprocesses, confines paths, reads keys and gates merges: "most applications"; level 3 is for high-assurance systems; it has no web or SQL surface | 2026-10-19, supervisor (CFG-B3) | the bridge gains a network or data surface |
+ | No diagram index for release B | the design is the plan's prose and its §6.2 layering / §6.11 file layout tables; this is governance text, not a code architecture with components to draw | 2026-10-11, supervisor | a later release adds code whose architecture is load-bearing |
+ 
+ ## Deferred
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 4e21855..a99e1c0 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,11 +3,11 @@ Last updated: 2026-10-19
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at stage B1's close records' merge (PR #46); stage B3 is next
+-Last accepted: stage B1's close records (PR #46, at its merge); before them BUG-016 at ba1e181 (PR #45) and BUG-015 at 1b8c8da (PR #44); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001
++Increment: none — this file states the position at CFG-B3's merge (PR #47); stage B3's command-reference item is next
++Last accepted: CFG-B3 (PR #47, at its merge): the builder's configuration (the boundary and secure-coding rules, the boundary-check hook, the windowless pre-commit gate); before it stage B1's close records at 823f0c5 (PR #46) and BUG-016 at ba1e181 (PR #45); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001, CFG-B3
+ Awaiting user on: none
+ Previously: stage B1 closed 2026-10-19 after four stage-review rounds — round 1 (2026-10-16) both REJECT (BUG-001); round 2 Review A REJECT (the bootstrap tests checked a word, not a record: BUG-015); round 3 Review B REJECT, Review A the same item, convergent (this file on main described its own pull request before the gate: BUG-016, ISS-009); round 4 both APPROVE.
+-Next: stage B3 (docs/BUILD_PLAN.md), its configuration items first (Calibration pending, through cursor-configurator as the bridge's own configuration checkpoint), then the least-confident tests of stage B2 (docs/HARDENING.md, "Stage B2 — least confident", items 2 and 3) before B3's first delegation, then TASK-016.
++Next: stage B3 (docs/BUILD_PLAN.md): the last calibration item first, the generated command reference docs/cli-reference.json (rule 32; Delivery-Conventions.md §4: a generator over the bridge programs' argument parsers and a CI step failing a stale reference), a builder increment through the loop; then the least-confident tests of stage B2 (docs/HARDENING.md, "Stage B2 — least confident", items 2 and 3) before B3's first plan delegation; then TASK-016.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -16,13 +16,13 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 4's; -r3.md, -r2.md and -r1.md the earlier rounds) for stage B1's review, closed; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #46, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) — closed 2026-10-19; B2 (conditional-workflow framework) — closed 2026-10-19; B3 next. Last reflection: stage B1's close, 2026-10-19 (demonstration passed: CI's full gate green on PR #45 and main's push of ba1e181, a fresh session resumed from this file and the inventory alone; conformance 17 OK / 6 MISSING, the Calibration pending items and the recorded no-diagram-index decision / 5 NOTE; completion-check --mode plan OK; no worktree; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
+-Open issues: none open. ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
++Remote sync: main at the merge of PR #47, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — under way, its configuration items first. Last reflection: stage B1's close, 2026-10-19 (demonstration passed; conformance then 17 OK / 6 MISSING / 5 NOTE; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
++Open issues: ISS-010 open (the project's afterFileEdit hook never runs in the bridge's headless builder runs; not relied on; docs/HARDENING.md, Stage B3, CFG-B3). ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
+ Maintainer requests: none open (Release B2's request answered as FB-021 at stage B2's close, 2026-10-19; recorded as a post-B release in INVENTORY.md, Decisions)
+ Bridge version: 2026.10.18a
+ Calibrated: 2026-10-19 from 2026.10.11d to 2026.10.18a — applied: the design critique's ceiling (no design, plan or change critique is running here: release B's plan critique and the hotfix's both closed at their gates, so no subject takes a token and no round file is renamed; it does not reach a code-gate stage review, which stays under standing rule 6's by-class brake), project.json's state; pending: the conformance MISSING items @ stage B3's start (below); not applied (gate passed): none
+-Calibration pending: at stage B3's start, as configuration work — the Workspace boundary rule, the secure-coding rule, the boundary-check hook and the windowless check in the hooks (`.cursor/` builder configuration, recorded 2026-10-16), and the generated command reference docs/cli-reference.json (rule 32, newly reported 2026-10-19 under --installable)
++Calibration pending: the generated command reference docs/cli-reference.json (rule 32, reported 2026-10-19 under --installable), next. Applied 2026-10-19 by CFG-B3: the Workspace boundary rule, the secure-coding rule (ASVS 5.0.0, L2), the boundary-check hook and the windowless pre-commit gate (conformance 21 OK / 2 MISSING: this item and the recorded no-diagram-index decision)
+ Conformance notes (2026-10-19, calibration): the diagram index is MISSING (No diagram index is a recorded decision); NOTE the repository is public; NOTE the design exists under other names (DESIGN_CRITIQUE.md), for the diagram retrofit; NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, reviewed at calibration step 2b
+ Run parameters: see docs/RUN_PARAMETERS.md (the one record; the owner's four answers fixed by test_r001_run_parameters_owner_values)
+ 
