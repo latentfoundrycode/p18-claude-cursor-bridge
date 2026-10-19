@@ -24,8 +24,25 @@ GRANDCHILD = ("import os, subprocess, sys; "
               % PRINT_WINDOW)
 STREAMS = "import sys; print('to-out'); print('to-err', file=sys.stderr); print('read', repr(sys.stdin.read()))"
 HERE = os.path.dirname(os.path.abspath(__file__))
-# Launch paths that bypass subprocess.Popen and so the default; built in pieces so this file does not match itself.
-BYPASS = re.compile(r"\bos\.(system|startfile|spawn\w*|exec\w*)\s*\(|\bmultiprocessing\b|\bCreate" + "Process")
+# Launch paths that bypass subprocess.Popen and so the default (this file and conftest.py are not scanned).
+BYPASS = re.compile(r"\bos\.(system|startfile|spawn\w*|exec\w*)\s*\(|\bfrom\s+os\s+import\b.*\b(system|startfile|spawn\w*|exec\w*)\b"
+                    r"|\bmultiprocessing\b|\bProcessPoolExecutor\b|\bCreateProcess")
+# Creation flags set by keyword or by a dictionary key.
+FLAGS = re.compile(r"""\bcreationflags\s*=|["']creationflags["']\s*:""")
+BYPASSING = ['os.system("x")', "os.startfile(p)", "os.spawnv(os.P_WAIT, exe, args)", "os.execv(exe, args)",
+             "from os import system", "import multiprocessing", "with concurrent.futures.ProcessPoolExecutor() as pool:",
+             "_winapi.CreateProcess(None, cmd, None, None, 0, 0, None, None, None)",
+             "subprocess.run(cmd, creationflags=0x200)", "subprocess.run(cmd, creationflags = 0x200)",
+             'subprocess.run(cmd, **{"creationflags": 0x200})', "subprocess.run(cmd, creationflags=0)  # not CREATE_NO_WINDOW"]
+THROUGH_THE_DEFAULT = ['subprocess.run(cmd, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))',
+                       "subprocess.run(cmd, check=True)", "# os.system is never used here"]
+
+
+def bypasses_the_default(line):
+    """True when one line of a test launches around the default: a path other than subprocess, or creation flags
+    without CREATE_NO_WINDOW. A comment does not count, either way."""
+    code = line.split("#", 1)[0]
+    return bool(BYPASS.search(code)) or (bool(FLAGS.search(code)) and "CREATE_NO_WINDOW" not in code)
 
 
 def window_and_console(line):
@@ -90,15 +107,28 @@ def test_fix001_a_child_that_redirects_nothing_writes_to_the_suite_and_reads_end
     assert "to-err" in err
 
 
+def test_fix001_the_rule_flags_each_way_around_the_default():
+    """The scan below can fail: each known way around the default is flagged, and a launch through it is not."""
+    assert [line for line in BYPASSING if not bypasses_the_default(line)] == []
+    assert [line for line in THROUGH_THE_DEFAULT if bypasses_the_default(line)] == []
+
+
 def test_fix001_no_test_starts_a_program_around_the_default():
     """Every launch in tests/ goes through subprocess, and one that sets its own flags includes CREATE_NO_WINDOW:
     the INVENTORY decision not to run windowless-check.py over tests/ holds only while this is so."""
-    found = []
-    for name in sorted(os.listdir(HERE)):
-        if not name.endswith(".py") or name in ("conftest.py", os.path.basename(__file__)):
-            continue
-        with open(os.path.join(HERE, name), encoding="utf-8") as f:
-            for number, line in enumerate(f, 1):
-                if BYPASS.search(line) or ("creationflags=" in line and "CREATE_NO_WINDOW" not in line):
-                    found.append("%s:%d: %s" % (name, number, line.strip()))
+    found, read, flag_lines = [], set(), 0
+    for root, dirs, files in os.walk(HERE):
+        dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+        for name in sorted(files):
+            relative = os.path.relpath(os.path.join(root, name), HERE)
+            if not name.endswith(".py") or relative in ("conftest.py", "test_tests_windowless.py"):
+                continue
+            read.add(relative.replace(os.sep, "/"))
+            with open(os.path.join(root, name), encoding="utf-8") as f:
+                for number, line in enumerate(f, 1):
+                    flag_lines += bool(FLAGS.search(line))
+                    if bypasses_the_default(line):
+                        found.append("%s:%d: %s" % (relative, number, line.strip()))
+    assert {"test_bridge_run.py", "test_workflows_line_check.py", "helpers/sleep_tree.py"} <= read
+    assert flag_lines > 0
     assert found == []
