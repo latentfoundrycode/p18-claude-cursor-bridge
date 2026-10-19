@@ -538,6 +538,11 @@ Both approved (Review A 0/1/2, Review B 0/0/0); CI green on the pushed head. Bot
 ### BUG-003 rounds 1 and 2 — disposition (PR #29, merged as 484badb)
 The fixes from stage B2's review, round 2: the builder made workflow-check.py print ASCII only and report a `types` or `traits` path that is a file (both Review B's, each reproduced first); the supervisor's tests assert every failing case's whole set of findings, with new cases for a valid sub-workflow's changes and the part-name rules. Round 1 approved by all three; converged: Review A's and Review B's considers named the same test, test_r014_sub_workflow_changes_are_checked, which read only the exact table and could pass against no program, so round 2 made it run the program. Also taken in round 2: the ASCII test covers characters above U+FFFF (the auditor); supervisor.md says a part name has no whitespace at either end, as the check strips (Review A). Leads: escape_field's literal backslash (the auditor) and the `file` kind for a non-folder layer path (Review A). Round 2 approved by both; Review A's should-fix (HARDENING overstated what escaping a backslash would cost) is corrected in BUG-004's records. The mutation driver ran 87 of 87 killed (run/supervisor/mutate_workflow_check.py).
 
+## Resolution
+| Question | Settled | How |
+|---|---|---|
+| (none) | | |
+
 ## Subject: ceiling (the design loop's ceiling, hotfix 2026.10.18a)
 
 **Accepted** (finding, critic, round, the reason):
@@ -564,8 +569,3 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 **Resolution**: none due. Nothing is open after the confirming read: no Blocking finding and no non-convergence in any round, so no resolution round runs, and the subject goes to its gate.
 
 **After the critique** (supervisor, at the brief, for the code gate's reviewers): the change log's and KP-062's migration notes gain one sentence, a round file named other than by its number (`-confirm`) is refused and its next file takes the next number (the spec-packager's note: release B's own plan critique used `DESIGN-plan-confirm.md`); the brief matches `run`, `review` and `DESIGN-` in any case, with a test. Not criticised by the two critics; reviewed at the code gate with the whole diff.
-
-## Resolution
-| Question | Settled | How |
-|---|---|---|
-| (none) | | |
