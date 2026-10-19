@@ -10,3 +10,5 @@ __pycache__/
 
 # Supervisor working/review artifacts
 run/
+# The boundary log holds absolute paths of this computer; it is read locally and never committed (rule 54; the repository is public)
+docs/BOUNDARY_VIOLATIONS.md
