@@ -11,7 +11,9 @@ import argparse
 import ast
 import importlib.util
 import json
+import math
 import os
+import re
 import sys
 
 BRIDGE_PLACEHOLDER = "<bridge folder>/"
@@ -85,6 +87,11 @@ def refuse_bad_default(program_name, option_label):
     raise DumpCliError(1)
 
 
+def path_canonical(text):
+    s = os.path.normcase(text)
+    return re.sub(r"[\\/]+", "/", s)
+
+
 def action_label(action):
     option_strings = action["option_strings"] if isinstance(action, dict) else action.option_strings
     if option_strings:
@@ -97,7 +104,7 @@ def absolute_default_to_placeholder(value, bridge_dir, program_name, option_labe
         rel = os.path.relpath(value, bridge_dir)
     except ValueError:
         refuse_outside_default(program_name, option_label)
-    if rel == os.pardir or rel.startswith(os.pardir + os.sep):
+    if rel in (".", "") or rel == os.pardir or rel.startswith(os.pardir + os.sep):
         refuse_outside_default(program_name, option_label)
     return BRIDGE_PLACEHOLDER + rel.replace(os.sep, "/")
 
@@ -106,15 +113,28 @@ def default_for_json(value, bridge_dir, program_name, option_label):
     if isinstance(value, (list, tuple)):
         return [default_for_json(v, bridge_dir, program_name, option_label) for v in value]
     if isinstance(value, dict):
-        return {default_for_json(k, bridge_dir, program_name, option_label):
-                default_for_json(v, bridge_dir, program_name, option_label) for k, v in value.items()}
+        out = {}
+        for k, v in value.items():
+            wk = default_for_json(k, bridge_dir, program_name, option_label)
+            if not isinstance(wk, str):
+                refuse_bad_default(program_name, option_label)
+            if wk in out:
+                refuse_bad_default(program_name, option_label)
+            out[wk] = default_for_json(v, bridge_dir, program_name, option_label)
+        return out
     if isinstance(value, os.PathLike):
         return default_for_json(os.fspath(value), bridge_dir, program_name, option_label)
     if isinstance(value, str):
         if os.path.isabs(value):
             return absolute_default_to_placeholder(value, bridge_dir, program_name, option_label)
         return value
-    if isinstance(value, (int, float, bool)) or value is None:
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            refuse_bad_default(program_name, option_label)
         return value
     refuse_bad_default(program_name, option_label)
 
@@ -122,6 +142,8 @@ def default_for_json(value, bridge_dir, program_name, option_label):
 def action_entry(action, bridge_dir, program_name):
     label = action_label(action)
     default = default_for_json(action.default, bridge_dir, program_name, label)
+    choices = (default_for_json(list(action.choices), bridge_dir, program_name, label)
+               if action.choices is not None else None)
     return {
         "option_strings": list(action.option_strings),
         "dest": action.dest,
@@ -129,7 +151,7 @@ def action_entry(action, bridge_dir, program_name):
         "type": getattr(action.type, "__name__", None) if action.type is not None else None,
         "default": default,
         "required": action.required,
-        "choices": jsonable(list(action.choices)) if action.choices is not None else None,
+        "choices": choices,
         "help": action.help,
     }
 
@@ -178,20 +200,28 @@ def is_filesystem_root(path):
 def forbidden_path_fragments(root):
     repo = os.path.abspath(root)
     fragments = []
+    seen = set()
     for path in (repo, os.path.expanduser("~"), os.getcwd()):
         path = os.path.abspath(path)
         if is_filesystem_root(path):
             continue
-        fragments.append(path)
+        for piece in (path, os.path.splitdrive(path)[1]):
+            if not piece:
+                continue
+            canon = path_canonical(piece)
+            if canon == "/" or canon in seen:
+                continue
+            seen.add(canon)
+            fragments.append(canon)
     return fragments
 
 
 def check_string_for_paths(text, program_name, option_label, fragments):
     if not isinstance(text, str):
         return
-    ntext = os.path.normcase(text)
+    ntext = path_canonical(text)
     for frag in fragments:
-        if frag and os.path.normcase(frag) in ntext:
+        if frag and frag in ntext:
             if option_label is not None:
                 print("dump-cli: %s: reference text on %s contains a computer path" % (program_name, option_label),
                       file=sys.stderr)
@@ -217,10 +247,9 @@ def check_action_strings(action, program_name, fragments):
     for s in action["option_strings"]:
         check_string_for_paths(s, program_name, label, fragments)
     check_string_for_paths(action["dest"], program_name, label, fragments)
+    check_string_for_paths(action.get("type"), program_name, label, fragments)
     check_string_for_paths(action.get("help"), program_name, label, fragments)
-    if action["choices"] is not None:
-        for choice in action["choices"]:
-            check_string_for_paths(choice, program_name, label, fragments)
+    check_default_strings(action["choices"], program_name, label, fragments)
     check_default_strings(action["default"], program_name, label, fragments)
 
 

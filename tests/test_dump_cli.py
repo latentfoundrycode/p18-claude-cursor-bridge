@@ -957,3 +957,17 @@ def test_cfgb3b_r4_the_repository_folder_is_refused_from_another_folder(tmp_path
         out = p.stdout + p.stderr
         assert p.returncode == 1 and "zz-rf.py" in out and "--x" in out and "Traceback" not in out, (args, out)
     assert not (sb / JSON_REL).exists()
+
+
+@pytest.mark.parametrize("choices", ['["a", "out=" + %s]' % HOME_EXPR, '[("a", "out=" + %s)]' % HOME_EXPR])
+def test_cfgb3b_r4_a_choice_holding_a_path_inside_a_string_is_refused(tmp_path, choices):
+    """Mutation (y), which round 4's builder found uncaught: a choice that is not an absolute path but holds the home
+    folder inside its text, alone or inside a tuple choice, is refused by the string check after the walk."""
+    _refused(tmp_path, "zz-cs.py", _argparse_program('    p.add_argument("--x", choices=%s)\n' % choices), "--x")
+
+
+def test_cfgb3b_r4_a_default_or_choice_that_is_the_program_folder_itself_is_refused(tmp_path):
+    """Round 4's builder refuses an absolute path equal to the program's own folder (its relative path would be "."):
+    a default and a choice alike; a path under the folder still takes the placeholder (test above)."""
+    _refused(tmp_path / "d", "zz-hd.py", _argparse_program('    p.add_argument("--x", default=HERE)\n'), "--x")
+    _refused(tmp_path / "c", "zz-hc.py", _argparse_program('    p.add_argument("--x", choices=[HERE])\n'), "--x")

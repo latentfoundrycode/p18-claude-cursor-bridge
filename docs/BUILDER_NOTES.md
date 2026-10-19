@@ -27,3 +27,5 @@
 2026-10-19 CONFIG-B3b: text-mode `open(...).read()` with default `newline=None` translates CRLF to LF on every platform, so dropping explicit line-ending normalisation in `dump-cli.py --check` is an equivalent mutant everywhere, not only on Windows; the Ubuntu runner checks files out with LF.
 
 2026-10-19 CONFIG-B3b-r3: `json.dumps` on a default double-escapes backslashes, so a home path embedded in a string default never matched the fragment check on Windows; walking defaults as values and comparing fragments with `os.path.normcase` fixes that without a separate forward-slash repository fragment.
+
+2026-10-19 CONFIG-B3b-r4: refusing `relpath` `.` in `absolute_default_to_placeholder` keeps round-3 choice refusal for `HERE` while round-4 walks choices to placeholders for paths under the bridge folder; mutation (y) survived for lack of a test (a tuple choice holding a non-absolute string with a path in it passes the walk, and only the string check catches it); the supervisor's `test_cfgb3b_r4_a_choice_holding_a_path_inside_a_string_is_refused` now catches it (corrected by the supervisor after Review A, round 4).
