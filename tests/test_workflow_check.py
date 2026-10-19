@@ -497,11 +497,15 @@ FILE_EXACT = {
     ],
 }
 
-# The status files have no Phase line, the single-line ones and the multi-line ones alike: only check_status reads
-# them, and workflow-check.py never runs check_placement (inventory-check.py and conformance-check.py do), so a
-# placement check added to it would need a Phase line in each (round 7: fixtures 5, consider; round 12: fixtures 4
-# and 5, the multi-line files named too). The prefix of a name is the case's subject, not always its
-# finding code: form-traits-none-case, form-traits-none-first, form-traits-none-last and form-unclassified-with-traits
+# Only the status files of STATUS_WITH_PHASE have a Phase line; the others, the single-line ones and the multi-line
+# ones alike, have none: only check_status reads them, and workflow-check.py never runs check_placement
+# (inventory-check.py and conformance-check.py do), so a placement check added to it would need a Phase line in each
+# of those (round 7: fixtures 5, consider; round 12: fixtures 4 and 5, the multi-line files named too; BUG-014's gate,
+# Review B: six files do have one, and the set is pinned below).
+STATUS_WITH_PHASE = ["form-no-line.md", "ok-multi-unclassified.md", "ok-multi.md", "ok-no-final-newline.md",
+                     "ok-single.md", "ok-unclassified.md"]
+
+# The prefix of a name is the case's subject, not always its finding code: form-traits-none-case, form-traits-none-first, form-traits-none-last and form-unclassified-with-traits
 # are cases of the traits text's and the unclassified line's form, read as unknown names (round 11: fixtures 5,
 # consider).
 STATUS_EXACT = {
@@ -679,6 +683,15 @@ def test_r014_every_case_has_its_exact_findings():
     """Every fixture under fail/ and status/ has an entry, so a new case states its whole output."""
     assert sorted(FILE_EXACT) == sorted(p.name for p in (REPO / FIX / "fail").iterdir())
     assert sorted(STATUS_EXACT) == sorted(p.name for p in (REPO / FIX / "status").iterdir() if p.name != "open-list.md")
+
+
+def test_r015_only_the_named_status_files_have_a_phase_line():
+    """The STATUS_EXACT comment's claim, checked: a Phase line is one that starts with exactly `Phase: ` (TASK-008.md,
+    the placement rule), and only the files of STATUS_WITH_PHASE hold one (BUG-014's gate, Review B)."""
+    held = sorted(name for name in STATUS_EXACT
+                  if any(line.startswith("Phase: ") for line in
+                         (REPO / FIX / "status" / name).read_text(encoding="utf-8-sig").splitlines()))
+    assert held == STATUS_WITH_PHASE, held
 
 
 # What the bridge's own open list and registry say of every key, point and module a fail root names. The fail roots
