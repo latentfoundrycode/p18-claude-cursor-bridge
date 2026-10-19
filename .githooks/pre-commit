@@ -1,0 +1,10 @@
+#!/bin/sh
+# Bridge windowless gate. The bridge has no linter in its manifest, so there is no lint
+# command here. This runs the windowless check exactly as CI does (tests.yml, the
+# "windowless check over the bridge's programs" step); a non-zero result blocks the commit.
+# Pre-delegation checkpoint commits bypass this with `git commit --no-verify`
+# (they are recovery anchors and must always succeed).
+if ! python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge; then
+  echo "pre-commit: a subprocess launch is missing the windowless flag (or a 'windowless: visible-ok <reason>' marker). Use --no-verify ONLY for a checkpoint snapshot." 1>&2
+  exit 1
+fi

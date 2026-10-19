@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "python .cursor/hooks/run-hidden.py python .cursor/hooks/boundary-check.py",
+        "timeout": 10,
+        "matcher": "Write"
+      }
+    ]
+  }
+}
