@@ -113,22 +113,39 @@ def test_fix001_the_rule_flags_each_way_around_the_default():
     assert [line for line in THROUGH_THE_DEFAULT if bypasses_the_default(line)] == []
 
 
-def test_fix001_no_test_starts_a_program_around_the_default():
-    """Every launch in tests/ goes through subprocess, and one that sets its own flags includes CREATE_NO_WINDOW:
-    the INVENTORY decision not to run windowless-check.py over tests/ holds only while this is so."""
+def scan(folder):
+    """(the lines around the default as "file:line: text", the files read, the count of flags lines) over every .py
+    file under folder, this file and conftest.py apart."""
     found, read, flag_lines = [], set(), 0
-    for root, dirs, files in os.walk(HERE):
+    for root, dirs, files in os.walk(folder):
         dirs[:] = sorted(d for d in dirs if d != "__pycache__")
         for name in sorted(files):
-            relative = os.path.relpath(os.path.join(root, name), HERE)
+            relative = os.path.relpath(os.path.join(root, name), folder).replace(os.sep, "/")
             if not name.endswith(".py") or relative in ("conftest.py", "test_tests_windowless.py"):
                 continue
-            read.add(relative.replace(os.sep, "/"))
+            read.add(relative)
             with open(os.path.join(root, name), encoding="utf-8") as f:
                 for number, line in enumerate(f, 1):
                     flag_lines += bool(FLAGS.search(line))
                     if bypasses_the_default(line):
                         found.append("%s:%d: %s" % (relative, number, line.strip()))
+    return found, read, flag_lines
+
+
+def test_fix001_the_scan_reports_a_launch_around_the_default(tmp_path):
+    """A file holding a way around the default, in a subfolder, is reported at its line; the rest is not."""
+    (tmp_path / "helpers").mkdir()
+    (tmp_path / "helpers" / "planted.py").write_text('import os\nos.system("x")\n', encoding="utf-8")
+    (tmp_path / "test_through.py").write_text(
+        'subprocess.run(cmd, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))\n', encoding="utf-8")
+    (tmp_path / "conftest.py").write_text('os.system("x")\n', encoding="utf-8")
+    assert scan(str(tmp_path)) == (['helpers/planted.py:2: os.system("x")'], {"helpers/planted.py", "test_through.py"}, 1)
+
+
+def test_fix001_no_test_starts_a_program_around_the_default():
+    """Every launch in tests/ goes through subprocess, and one that sets its own flags includes CREATE_NO_WINDOW:
+    the INVENTORY decision not to run windowless-check.py over tests/ holds only while this is so."""
+    found, read, flag_lines = scan(HERE)
     assert {"test_bridge_run.py", "test_workflows_line_check.py", "helpers/sleep_tree.py"} <= read
     assert flag_lines > 0
     assert found == []
