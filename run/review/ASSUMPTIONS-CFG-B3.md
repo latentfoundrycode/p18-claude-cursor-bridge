@@ -2,6 +2,9 @@
 
 From the branch's commit messages (`git log 823f0c5..HEAD --format=%B`), sections `Assumptions:`:
 
+Assumptions:
+- the find-based outside-write check sees the project root only (not the owner's profile) -> accepted, INVENTORY Decisions
+
 Assumptions: none
 
 Assumptions: none
