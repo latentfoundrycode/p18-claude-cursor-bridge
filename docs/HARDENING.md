@@ -53,7 +53,7 @@ Leads the gate drew a line under, and the parts of each stage the supervisor is 
 - inventory-check.py prints a traceback when `--status` names a folder (its pre-release-B `read()`); the exit is still non-zero.
 
 ## Stage B2 — BUG-002, the stage review's fixes
-- Carried to stage B2's reflection (item 3): the per-part completeness lead above goes also into the Restructuring Plan's §16 follow-up lists, where the aggregate release is planned (Review A, BUG-002 round 1).
+- Carried to stage B2's reflection (item 3): the per-part completeness lead above goes also into the Restructuring Plan's §16 follow-up lists, where the aggregate release is planned (Review A, BUG-002 round 1). [Done at stage B2's close, 2026-10-19: release F's follow-up paragraph in §16.]
 - TASK-019's brief is packaged with the default-traits line above (form, check, Scope widening, fixture open list); BUILD_PLAN's TASK-019 entry does not repeat it (Review A, BUG-002 round 2).
 - One failing fixture now has its exact findings asserted (`form-trait-in-head.md`, test_r014_trait_in_head_is_only_the_shape_finding); the lead above on the others (the named finding and the count, not the number of findings) stands. [Closed by BUG-003: every case's whole output is asserted.]
 
@@ -598,6 +598,12 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
 - Fixtures 6: form-unclassified-with-traits (`not yet classified; traits: none`) is reported as an unknown name and a part naming no product type, neither naming the rule it breaks (supervisor.md, "Project state"): a wording lead.
 
 **Incident:** the texts part ran the full suite in the checkout while Review B ran (caches only; the tree clean, verify OK). A feedback lead: a stage part's prompt says not to run the suite while Review B runs.
+
+## Stage B2 — least confident (stage close, 2026-10-19)
+
+1. **The workflow check on real conditional workflows.** Twelve review rounds tested it on fixtures written to break one rule each; no real type workflow, sub-workflow or trait file exists yet, and the first ones (TASK-017 to TASK-021) will use headings, fences and Set values in combinations no fixture holds. Check: when TASK-017's trait files merge, the CI step's run over bridge/cursor-bridge/workflow passes, and each new file gets a FILE_EXACT-style case of its own whole output, written by the supervisor before Review A.
+2. **The judges on the other projects' status files.** inventory-check.py and conformance-check.py read the `Workflows:` lines only on fixtures and on this project's own status file; the TDP, reAngle and the video factory have status files of their own shape (long histories, Windows line endings, other field orders). Check: a fixture test, written before stage B3's first delegation: a copy of each project's real status file with a constructed `Workflows:` line after its `Phase:` line, run through both judges; any finding not about the line itself is a defect of the judges. Stage B4 replaces the constructed lines with each project's classification and its committed fixture: TASK-019 for reAngle and the video factory, TASK-020 for the TDP (BUILD_PLAN.md:214-233); TASK-021 classifies the bridge itself.
+3. **The bridge's own status line fails for the stated reasons only.** `workflow-check.py --status docs/PROJECT_STATUS.md` exits 1 with the two (f) findings for the unwritten Host Extension Development and Claude Code Extension and a FLAG for Installable, and the CI run never covers the bridge's own status file (BUILD_PLAN.md:84); TASK-017 writes Installable (the FLAG goes) and TASK-021 the type and sub-type (BUILD_PLAN.md:242, `RESULT: OK`). Nothing pins that output, so a third finding would go unseen. Check: a test, written before stage B3's first delegation, that pins the whole output of that run; TASK-017's brief and TASK-021's take the test file into their Scope and change the pin (the FLAG dropped, then `RESULT: OK`).
 
 ## Hotfix 2026.10.18a — the design critique's ceiling (HOTFIX-001, merged on release/2026.10.11 as 4624421, PR #39; carried onto main 2026-10-19)
 
