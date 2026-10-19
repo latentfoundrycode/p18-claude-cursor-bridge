@@ -100,6 +100,8 @@ def test_r014_pass_root_holds_its_only_cases():
     assert trait_text.count("\n## Add at intake.questions\n") == 2, "precondition: two additions at one point in one file"
     assert ("\n## Add at project-end.delivery for installer\n" in trait_text
             and "\n## Add at project-end.delivery for package\n" in trait_text), "precondition: several delivery kinds in one file"
+    assert "\n## Add at project-end.delivery for host-installation\n" in type_text, \
+        "precondition: the third delivery kind of pass/README.md (round 11: fixtures 3, consider)"
 
 
 # --- the conditional-workflow files: one failing root per case --------------------------------------------------
@@ -426,6 +428,8 @@ FILE_EXACT = {
         'FAIL (form) {root}/types/host-extensionabc: host-extensionabc - path is not a conditional-workflow file',
         'FAIL (form) {root}/types/host-extensionmd: host-extensionmd - path is not a conditional-workflow file',
     ],
+    # The nested extra.md's body would give (a) were it read, so a program that read it is seen (stage B2's review,
+    # round 11: fixtures 2, consider).
     'form-third-level': [
         'FAIL (form) {root}/types/host-extension/claude-code-extension: claude-code-extension - path is not a conditional-workflow file',
         'FAIL (form) {root}/types/host-extension/claude-code-extension/extra.md: extra.md - path is not a conditional-workflow file',
@@ -473,12 +477,18 @@ FILE_EXACT = {
         'FAIL (set) {root}/types/host-extension/claude-code-extension.md: intake.questions - point does not accept set',
         'FAIL (c) {root}/types/host-extension/claude-code-extension.md: design - module is missing or not replaceable',
     ],
-    # A file of an unknown key still has its changes checked (round 6: tests, fixtures 2).
+    # A file of an unknown key still has its changes checked (round 6: tests, fixtures 2). A key of another table is no
+    # key of this one (TASK-006 Requirement 4, `unknown`: "not a Product types key", "not a Traits key"): a sub-type key
+    # and a trait key at a type file's path, a product type key at a trait file's (stage B2's review, round 11:
+    # fixtures 3, blocking; a sub-workflow saved at a type's path would otherwise pass as a type workflow).
     'unknown-trait-file': [
         'FAIL (unknown) {root}/traits/not-a-trait.md: not-a-trait - not a trait key',
         'FAIL (a) {root}/traits/not-a-trait.md: nowhere.at-all - point is not in the extension-point registry',
+        'FAIL (unknown) {root}/traits/web-app.md: web-app - not a trait key',
     ],
     'unknown-type-file': [
+        'FAIL (unknown) {root}/types/claude-code-extension.md: claude-code-extension - not a product type key',
+        'FAIL (unknown) {root}/types/installable.md: installable - not a product type key',
         'FAIL (unknown) {root}/types/not-a-type.md: not-a-type - not a product type key',
         'FAIL (a) {root}/types/not-a-type.md: nowhere.at-all - point is not in the extension-point registry',
     ],
@@ -487,8 +497,9 @@ FILE_EXACT = {
 # The single-line status files have no Phase line: only check_status reads them, and workflow-check.py never runs
 # check_placement (inventory-check.py and conformance-check.py do), so a placement check added to it would need a
 # Phase line in each (round 7: fixtures 5, consider). The prefix of a name is the case's subject, not always its
-# finding code: form-traits-none-case and form-unclassified-with-traits are cases of the traits text's and the
-# unclassified line's form, read as unknown names.
+# finding code: form-traits-none-case, form-traits-none-first, form-traits-none-last and form-unclassified-with-traits
+# are cases of the traits text's and the unclassified line's form, read as unknown names (round 11: fixtures 5,
+# consider).
 STATUS_EXACT = {
     # An unprefixed `not yet classified` among several lines breaks the part-prefix rule like any other line (round
     # 7: fixtures 5).
@@ -516,8 +527,9 @@ STATUS_EXACT = {
         'FAIL (form) {path}: Spends money - trait repeated',
     ],
     'flag-unwritten-trait.md': ['FLAG (trait) {path}: Spends money - trait not yet written; flagged, work continues (non-fatal)'],
-    # A prefix on a single line fails before its name is read, so this is the single-line rule, not the `;` rule;
-    # form-part-semicolon holds that (round 8: fixtures 4, consider).
+    # A prefix on a single line fails before its part is judged, so the finding is the single-line rule's, though
+    # `bad;part` breaks the `;` rule too; form-part-semicolon holds that rule alone (round 8: fixtures 4, consider;
+    # round 11: fixtures 4, consider).
     'form-bad-prefix-single.md': ['FAIL (form) {path}: bad;part - Workflows line breaks the part-prefix rule'],
     'form-empty-segment.md': [
         'FAIL (form) {path}: - - empty name in the Workflows head',
@@ -815,7 +827,9 @@ def test_r014_set_changes_cell_is_split_on_commas_and_stripped(tmp_path):
     cell reading `set , add` accepts a Set as `add, set` does, and `add` alone refuses it (BUG-006 r2: Review A, the
     sweep's line 285); so does `add, reset`, whose parts hold `set` only inside a word (BUG-011's gate round 3: Review A,
     the cell read as `"set" in cell`). Such a cell breaks the registry's own rules; the finding is the one the text
-    fixes."""
+    fixes. The cell is split on commas, not on a comma and a space, so `add,set` and `add,<tab>set` accept a Set; and
+    nothing is lowered, so `add, Set` refuses it (stage B2's review, round 11: tests, should-fix; the split on ", ",
+    the parts lowered, stripped of spaces only)."""
     reg = (REPO / "bridge/cursor-bridge/workflow/extension-points.md").read_text(encoding="utf-8")
     row = "| intake.target-environment | Intake | The product type's target environment | intake | add, set | part |"
     assert reg.count(row) == 1, "the row of the point the pass root sets"
@@ -839,6 +853,16 @@ def test_r014_set_changes_cell_is_split_on_commas_and_stripped(tmp_path):
     assert lines == whole_output(
         [f"FAIL (set) {FIX}/pass/types/host-extension.md: intake.target-environment - point does not accept set"]), lines
     assert err == "", err
+    for cell in ("add,set", "add,\tset"):
+        unspaced = tmp_path / "unspaced.md"
+        unspaced.write_text(reg.replace(row, row.replace("| add, set |", "| %s |" % cell)), encoding="utf-8", newline="\n")
+        assert run("--registry", str(unspaced), f"{FIX}/pass") == (0, ["RESULT: OK"], ""), cell
+    capital = tmp_path / "capital.md"
+    capital.write_text(reg.replace(row, row.replace("| add, set |", "| add, Set |")), encoding="utf-8", newline="\n")
+    rc, lines, err = run("--registry", str(capital), f"{FIX}/pass")
+    assert (rc, err) == (1, ""), (rc, err)
+    assert lines == whole_output(
+        [f"FAIL (set) {FIX}/pass/types/host-extension.md: intake.target-environment - point does not accept set"]), lines
 
 
 # --- the usage text -----------------------------------------------------------------------------------------------
@@ -876,7 +900,8 @@ def test_r014_prose_headings_stay_prose():
 
 
 def test_r014_bad_prefix_on_a_single_line_is_form_only():
-    """R2-6: a line that fails the prefix rule is not checked further."""
+    """R2-6: a line that fails the prefix rule is not checked further. This file's body is valid, so it shows the one
+    finding only; STOPPED holds the bodies that would give more were they read (round 11: fixtures 4, consider)."""
     rc, lines, err = status("form-bad-prefix-single.md")
     assert rc == 1
     assert len(fails(lines)) == 1 and fails(lines)[0].startswith("FAIL (form) "), lines
@@ -1033,12 +1058,21 @@ def test_r014_usage_error_message_is_escaped():
 
 
 @pytest.mark.parametrize("sep", ["|---|", "|---|---|---|---|---|---|---|---|", "|---|x|---|---|---|---|---|",
-                                 "|---|---|---|---|---|---| |", "|---|---|---|---|---|---|:|"],
-                         ids=["one-cell", "eight-cells", "second-cell-not-dashes", "last-cell-blank", "last-cell-colon-only"])
+                                 "|---|---|---|---|---|---| |", "|---|---|---|---|---|---|:|",
+                                 "|::---|---|---|---|---|---|---|", "|-x-|---|---|---|---|---|---|",
+                                 "|--:--|---|---|---|---|---|---|", "|: ---|---|---|---|---|---|---|",
+                                 "|--- :|---|---|---|---|---|---|", "|---::|---|---|---|---|---|---|"],
+                         ids=["one-cell", "eight-cells", "second-cell-not-dashes", "last-cell-blank", "last-cell-colon-only",
+                              "two-colons", "a-letter-between-dashes", "a-colon-between-dashes", "a-space-after-the-colon",
+                              "a-space-before-the-colon", "two-colons-at-the-end"])
 def test_r014_separator_cell_count_differs(tmp_path, sep):
     """R3-2; every cell of the separator is dashes, not the first only (round 7: the widened sweep's line 181); a cell
     is at least one dash, so a blank cell, or one holding only an alignment colon, is none (stage B2's review, round
-    10: tests, should-fix; the separator test without its `bool(text)`)."""
+    10: tests, should-fix; the separator test without its `bool(text)`); "dashes, with an optional colon at either
+    end" is one colon at most at each end and nothing but dashes between, so `::---`, `-x-` and `--:--` are none
+    (round 11: tests, should-fix; the colons removed with `lstrip(':')`, the dashes tested with `"-" in text`), and so
+    are `: ---`, `--- :` and `---::` (round 11: the string sweep's lines 172 and 174, the cell stripped again after its
+    colon is removed, and 173, every trailing colon removed)."""
     text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
     good = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n|---|---|---|---|---|---|---|\n"
     assert good in text
@@ -3006,4 +3040,396 @@ def test_r014_an_argument_given_twice_is_checked_twice(tmp_path):
     rc, lines, err = run("--open-list", STATUS_LIST, "--status", status, "--status", status)
     finding = f"FAIL (e) {status}: - - part must name exactly one product type"
     assert lines == [finding, finding, "RESULT: 2 problem(s)"], lines
+    assert rc == 1 and err == "", err
+
+
+# --- stage B2's review, round 11: string-method rewrites (BUG-013) -----------------------------------------------
+# Round 11's reviewers rewrote rules with another string method (a prefix test after `lstrip()` or `lower()`, a split on
+# ", ", `casefold` made `lower`, a slice made a strip, a table's membership test case-folded) and found each survived.
+# These are the cases they named; the string-method sweep's other separable survivors follow, and the rest are recorded
+# by class in docs/HARDENING.md, "the stage review (round 11)".
+
+def test_r014_a_delivery_kind_is_matched_exactly(tmp_path):
+    """handoff/TASK-006.md Requirement 9: the delivery kinds are matched exactly, so `Installer` is no kind, in the
+    `for <kind>` form and as a Set's value (stage B2's review, round 11: Review B, the membership tests of lines 527,
+    530 and 536 case-folded)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## Add at project-end.delivery for Installer\n\nx\n")
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([f"FAIL (kind) {shown}: Installer - delivery kind is not in the delivery-kind list"]), lines
+    assert rc == 1 and err == "", err
+    other = tmp_path / "other"
+    other.mkdir()
+    root, shown = _one_file_root(other, "types/host-extension.md", "## Set at intake.delivery-kind\n\nInstaller\n")
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([f"FAIL (kind) {shown}: Installer - Set at intake.delivery-kind is not one delivery kind"]), lines
+    assert rc == 1 and err == "", err
+
+
+@pytest.mark.parametrize("value, finding", [
+    ("  `installer`  ", None),
+    ("` installer `", " installer "),
+    ("\tinstaller\t", None),
+], ids=["spaces-around-backticks", "spaces-inside-backticks", "tabs-around"])
+def test_r014_a_delivery_kind_value_is_stripped_then_unwrapped(tmp_path, value, finding):
+    """handoff/TASK-006.md Requirement 9: "Strip surrounding whitespace and at most one pair of enclosing backticks
+    before comparing": first the white space around the value, tabs included, then one pair of backticks, and nothing
+    after (stage B2's review, round 11: fixtures 3, should-fix; the value unwrapped before it is stripped, or stripped
+    again after; the tests part's line 484 stripped of spaces only)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## Set at intake.delivery-kind\n\n%s\n" % value)
+    rc, lines, err = run(str(root))
+    if finding is None:
+        assert (rc, lines, err) == (0, ["RESULT: OK"], ""), lines
+    else:
+        assert lines == whole_output([f"FAIL (kind) {shown}: {finding} - Set at intake.delivery-kind is not one delivery kind"]), lines
+        assert rc == 1 and err == "", err
+
+
+def test_r014_an_indented_heading_line_stays_in_its_section(tmp_path):
+    """extension-points.md:72: a heading is `##` at the start of a line, so a line indented four spaces is text and
+    does not end the section it stands in: the Set's first non-blank line is that line (stage B2's review, round 11:
+    tests, should-fix; the heading candidate matched on the line stripped of its indent, which ends the section)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## Set at intake.delivery-kind\n    ## note\ninstaller\n")
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([f"FAIL (kind) {shown}: ## note - Set at intake.delivery-kind is not one delivery kind"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_the_change_word_is_case_folded(tmp_path):
+    """extension-points.md:72: a heading whose first word is one of the change words in any case is a change heading;
+    the program compares the word case-folded, so `\u017fets` (a long s, whose case fold is `sets`) is one, and its
+    malformed form is (form) (stage B2's review, round 11: tests, consider; `casefold` made `lower`, which leaves the long
+    s and reads the line as prose). No document names the long s; the test pins the program's reading."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## \u017fets intake.x\n\nq\n")
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([f"FAIL (form) {shown}: - - change heading is not one of the four forms"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_backtick_anywhere_in_the_info_opens_no_fence(tmp_path):
+    """extension-points.md:72 (CommonMark): a backtick fence whose info string holds a backtick anywhere opens no fence,
+    so the `## Replace` after `\u0060\u0060\u0060 a \u0060b\u0060` is read, and the closing run then opens a fence left open
+    (stage B2's review, round 11: tests, consider; the info string read as its first word)."""
+    text = "``` a `b`\n## Replace planning\n```\n\n## Add at intake.questions\n\nq\n"
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", text)
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([f"FAIL (form) {shown}: - - fenced code block is still open at the end of the file",
+                                  f"FAIL (c) {shown}: planning - module is missing or not replaceable"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_head_split_on_a_comma_without_its_space(tmp_path):
+    """supervisor.md, "Project state": names are joined by a comma and a space; the program splits a head on the comma
+    alone and strips each name, so `Web App Development,Has screens` names a type and a trait and breaks the head's
+    shape (stage B2's review, round 11: tests, should-fix; the head split on ", ", which reads one unknown name)."""
+    status = tmp_path / "s.md"
+    status.write_text("Workflows: Web App Development,Has screens; traits: none\n", encoding="utf-8", newline="\n")
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(status))
+    s = str(status).replace("\\", "/")
+    assert lines == [f"FAIL (form) {s}: - - Workflows head is not the product type, then at most its sub-type",
+                     "RESULT: 1 problem(s)"], lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_an_indented_table_line_is_no_table_line(tmp_path):
+    """open-list.md:9: a table is the lines starting with `|`, from the first after its heading to the first that is
+    not, so an indented line is no table line: an indented table before the real one is not read, and an indented row
+    ends the table, so the row's name is not in the list (stage B2's review, round 11: tests, should-fix; lines 210 and
+    219 reading the line stripped of its indent). No document says what an indented line is; the test pins the
+    program's reading."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    header = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |\n"
+    assert text.count(header) == 1, "precondition: the Product types header once"
+    before = tmp_path / "before.md"
+    before.write_text(text.replace(header, "  | x | y |\n  |---|---|\n\n" + header), encoding="utf-8", newline="\n")
+    assert run("--open-list", str(before), "--status", f"{FIX}/status/ok-single.md") == (0, ["RESULT: OK"], "")
+    row = "| library | Library | Included by other programs | Library Development | \u2014 | no | \u2014 |\n"
+    assert text.count(row) == 1, "precondition: the library row once"
+    indented = tmp_path / "indented.md"
+    indented.write_text(text.replace(row, "  " + row), encoding="utf-8", newline="\n")
+    status = tmp_path / "s.md"
+    status.write_text("Workflows: Library Development; traits: none\n", encoding="utf-8", newline="\n")
+    s = str(status).replace("\\", "/")
+    rc, lines, err = run("--open-list", str(indented), "--status", str(status))
+    assert lines[0] == f"FAIL (unknown) {s}: Library Development - name is not in the open list", lines
+    assert rc == 1 and err == "", err
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(status))
+    assert lines == [f"FAIL (f) {s}: Library Development - product type is not written", "RESULT: 1 problem(s)"], lines
+
+
+def test_r014_a_header_cell_is_stripped_of_tabs(tmp_path):
+    """open-list.md:9 finds a table's columns by their header names; a cell is stripped of its white space, tabs
+    included, so `|<tab>Key<tab>|` is the Key column (stage B2's review, round 11: tests, consider; the cells stripped
+    of spaces only). No document says a tab pads a cell; the test pins the program's reading (HARDENING's round 3 lead
+    on white space in a header cell is the reverse question)."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    header = "| Key | Name | Definition | Workflow name | Default traits | Written | Planned |"
+    assert text.count(header) == 1
+    tabbed = tmp_path / "tabbed.md"
+    tabbed.write_text(text.replace(header, header.replace("| Key |", "|\tKey\t|")), encoding="utf-8", newline="\n")
+    assert run("--open-list", str(tabbed), "--status", f"{FIX}/status/ok-single.md") == (0, ["RESULT: OK"], "")
+
+
+# The string-method sweep's other survivors an input separates (run/supervisor/sweep_strings.py on the round-11 cases;
+# the search for a separating input is run/supervisor/separate_strings.py). Each docstring names the sweep's line and
+# the rewrite the case separates; the survivors no input separates are classed in docs/HARDENING.md.
+
+def test_r014_a_separator_cell_of_one_dash_may_carry_its_colon(tmp_path):
+    """open-list.md:9 and handoff/TASK-006.md R3-2: a separator cell is dashes with an optional colon at either end, so
+    `-:` and `:-` are cells (the string sweep's line 171, the leading colon looked for anywhere in the cell, which takes
+    the trailing colon of `-:` and leaves no dash)."""
+    sep = "|-:|:-|---|---|---|---|---|"
+    broken, shown = _open_list_with(tmp_path, PRODUCT_HEADER, PRODUCT_HEADER.split("\n")[0] + "\n" + sep + "\n")
+    assert run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md") == (0, ["RESULT: OK"], "")
+
+
+def test_r014_a_table_line_is_stripped_of_tabs(tmp_path):
+    """handoff/TASK-006.md R6-1: a table line is stripped before its outer pipes are dropped, tabs included, so a header
+    line ending in a tab has the seven cells of its separator (the string sweep's line 190, the line stripped of spaces
+    only, which keeps the tab as an eighth cell). No document says a tab may end a table line; the test pins the
+    program's reading."""
+    header = PRODUCT_HEADER.split("\n")[0]
+    broken, shown = _open_list_with(tmp_path, header + "\n", header + "\t\n")
+    assert run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md") == (0, ["RESULT: OK"], "")
+
+
+@pytest.mark.parametrize("line", ["see ## this", "  ## aside", "\t## aside"],
+                         ids=["inside-a-line", "indented-two-spaces", "indented-a-tab"])
+def test_r014_a_heading_mark_inside_or_after_an_indent_ends_no_table_search(tmp_path, line):
+    """open-list.md:9: each table is the first after its heading, and the search ends at the next heading, a line
+    starting with `## `; a line holding `## ` elsewhere, or after an indent, is text, so the table after it is found
+    (the string sweep's line 213, the heading looked for anywhere in the line, or in the line stripped of its indent).
+    No document names an indented heading here; the test pins the program's reading."""
+    header = PRODUCT_HEADER.split("\n")[0]
+    broken, shown = _open_list_with(tmp_path, header + "\n", line + "\n\n" + header + "\n")
+    assert run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md") == (0, ["RESULT: OK"], "")
+
+
+def test_r014_a_bare_heading_mark_ends_the_table_search(tmp_path):
+    """A line of `## ` alone starts with `## `, so it ends the search for the section's table, and the table after it
+    is not the section's (the string sweep's line 213, the line stripped before the test, which reads `##` as text and
+    finds the table). No document says a heading may be empty; the test pins the program's reading."""
+    header = PRODUCT_HEADER.split("\n")[0]
+    broken, shown = _open_list_with(tmp_path, header + "\n", "## \n\n" + header + "\n")
+    rc, lines, err = run("--open-list", str(broken), "--status", f"{FIX}/status/ok-single.md")
+    assert lines == [f"ERROR: {shown}: no table after ## Product types", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+ADD_QUESTIONS = "## Add at intake.questions\n\nq\n"
+
+
+def _tree(base, rels):
+    for rel in rels:
+        path = base / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(ADD_QUESTIONS, encoding="utf-8", newline="\n")
+    (base / "types").mkdir(parents=True, exist_ok=True)
+    (base / "traits").mkdir(exist_ok=True)
+    return base, str(base).replace("\\", "/")
+
+
+def test_r014_a_file_name_is_matched_exactly(tmp_path):
+    """extension-points.md and open-list.md:11: a conditional-workflow file is `<key>.md`, its key the name before
+    `.md`, matched exactly. So `notes.md.txt` and `web-app.MD` are no conditional-workflow files, and a name with a space
+    before `.md` is the key with that space, which no entry has (the string sweep's lines 360, 362 and 364, the `.md`
+    test made a substring test or made on the name lowered; 361, 363 and 365, the key stripped; 566 and 568, the key
+    stripped before its lookup; 805, the relative path split on `/ ` or on white space, which reads another file). No
+    document names such files; the test pins the program's reading."""
+    root, r = _tree(tmp_path / "root", [
+        "types/host-extension.md", "types/notes.md.txt", "types/web-app.MD", "types/web-app .md",
+        "types/host-extension/claude-code-extension.md", "types/host-extension/notes.md.txt",
+        "types/host-extension/browser-extension.MD", "types/host-extension/claude-code-extension .md",
+        "types/host-extension/ browser-extension.md",
+        "traits/installable.md", "traits/notes.md.txt", "traits/has-screens.MD", "traits/installable .md"])
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([
+        f"FAIL (form) {r}/traits/has-screens.MD: has-screens.MD - path is not a conditional-workflow file",
+        f"FAIL (unknown) {r}/traits/installable .md: installable  - not a trait key",
+        f"FAIL (form) {r}/traits/notes.md.txt: notes.md.txt - path is not a conditional-workflow file",
+        f"FAIL (d) {r}/types/host-extension/ browser-extension.md:  browser-extension - not a sub-type of host-extension",
+        f"FAIL (form) {r}/types/host-extension/browser-extension.MD: browser-extension.MD - path is not a conditional-workflow file",
+        f"FAIL (d) {r}/types/host-extension/claude-code-extension .md: claude-code-extension  - not a sub-type of host-extension",
+        f"FAIL (form) {r}/types/host-extension/notes.md.txt: notes.md.txt - path is not a conditional-workflow file",
+        f"FAIL (form) {r}/types/notes.md.txt: notes.md.txt - path is not a conditional-workflow file",
+        f"FAIL (unknown) {r}/types/web-app .md: web-app  - not a product type key",
+        f"FAIL (form) {r}/types/web-app.MD: web-app.MD - path is not a conditional-workflow file"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_name_ending_in_white_space_is_no_conditional_workflow_file(tmp_path):
+    """As test_r014_a_file_name_is_matched_exactly: a name ending in a space after `.md` does not end in `.md`, so it
+    is no conditional-workflow file (the string sweep's lines 360, 362 and 364, the `.md` test made on the name
+    stripped). Windows trims such a name when the file is made, so the case runs where the file system keeps it."""
+    rels = ["types/web-app.md ", "types/host-extension/browser-extension.md ", "traits/has-screens.md "]
+    root, r = _tree(tmp_path / "root", rels)
+    kept = sorted(os.listdir(root / "types")) + sorted(os.listdir(root / "traits"))
+    if "web-app.md " not in kept or "has-screens.md " not in kept:
+        pytest.skip("this file system trims a trailing space from a name: %r" % kept)
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([
+        f"FAIL (form) {r}/traits/has-screens.md : has-screens.md  - path is not a conditional-workflow file",
+        f"FAIL (form) {r}/types/host-extension/browser-extension.md : browser-extension.md  - path is not a conditional-workflow file",
+        f"FAIL (form) {r}/types/web-app.md : web-app.md  - path is not a conditional-workflow file"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_name_ending_in_a_no_break_space_is_no_conditional_workflow_file(tmp_path):
+    """As test_r014_a_name_ending_in_white_space_is_no_conditional_workflow_file, with a name ending in U+00A0 after
+    `.md`, which `str.strip()` removes and which every file system the suite runs on keeps (NTFS trims only a trailing
+    space), so the case runs on Windows too (the string sweep's lines 360, 362 and 364, the `.md` test made on the name
+    stripped or right-stripped; Review A of BUG-013). The program prints the character escaped (escape_field)."""
+    nbsp = chr(0xA0)
+    rels = ["types/web-app.md" + nbsp, "types/host-extension/browser-extension.md" + nbsp, "traits/has-screens.md" + nbsp]
+    root, r = _tree(tmp_path / "root", rels)
+    kept = sorted(os.listdir(root / "types")) + sorted(os.listdir(root / "traits"))
+    assert "web-app.md" + nbsp in kept and "has-screens.md" + nbsp in kept, kept
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([
+        f"FAIL (form) {r}/traits/has-screens.md\\xa0: has-screens.md\\xa0 - path is not a conditional-workflow file",
+        f"FAIL (form) {r}/types/host-extension/browser-extension.md\\xa0: browser-extension.md\\xa0 - path is not a conditional-workflow file",
+        f"FAIL (form) {r}/types/web-app.md\\xa0: web-app.md\\xa0 - path is not a conditional-workflow file"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_type_folder_name_is_matched_exactly(tmp_path):
+    """open-list.md:11: a type folder is named by its product type's key, matched exactly, so `Host-Extension` and
+    ` host-extension` are folders of no product type (the string sweep's line 342, the folder's name lowered or
+    stripped before it is looked up among the keys, and 347, among the unknown folders' names)."""
+    root, r = _tree(tmp_path / "root", ["types/Host-Extension/claude-code-extension.md",
+                                         "types/ host-extension/claude-code-extension.md"])
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([f"FAIL (d) {r}/types/ host-extension:  host-extension - type folder is not a product type",
+                                  f"FAIL (d) {r}/types/Host-Extension: Host-Extension - type folder is not a product type"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_key_is_looked_up_as_written(tmp_path):
+    """open-list.md:11 writes a key in lowercase letters, but the program reads any Key cell as a key and looks every
+    file's key up as it is written: an open list keyed `Host-Extension` and `Installable` makes types/Host-Extension.md,
+    its folder's sub-workflow and traits/Installable.md the conditional workflows of those entries (the string sweep's
+    lines 547, 566 and 568, the key lowered before its lookup). Such an open list breaks its own rule, and no document
+    says what the program does with it; the test pins the program's reading (as
+    test_r014_a_product_key_named_like_a_file_is_a_type_folder does)."""
+    text = (REPO / "bridge/cursor-bridge/workflow/open-list.md").read_text(encoding="utf-8")
+    assert text.count("| host-extension |") == 3 and text.count("| installable |") == 7, "precondition: the keys' cells"
+    upper = tmp_path / "upper.md"
+    upper.write_text(text.replace("| host-extension |", "| Host-Extension |").replace("| installable |", "| Installable |"),
+                     encoding="utf-8", newline="\n")
+    root, r = _tree(tmp_path / "root", ["types/Host-Extension.md", "types/Host-Extension/claude-code-extension.md",
+                                         "traits/Installable.md"])
+    assert run("--open-list", str(upper), str(root)) == (0, ["RESULT: OK"], "")
+
+
+def test_r014_a_heading_repeated_in_another_case_is_another_point(tmp_path):
+    """handoff/TASK-006.md: two Set headings for one point, or two Replace headings for one module, are a (form)
+    finding; a point or a module is named exactly, so `INTAKE.DELIVERY-KIND` and `PLANNING` are other names, each
+    judged on its own (the string sweep's lines 507 and 513, the name lowered before it is looked up among those seen)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md",
+                                 "## Set at intake.delivery-kind\n\ninstaller\n\n## Set at INTAKE.DELIVERY-KIND\n\ninstaller\n\n"
+                                 "## Replace planning\n\nx\n\n## Replace PLANNING\n\nx\n")
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([
+        f"FAIL (a) {shown}: INTAKE.DELIVERY-KIND - point is not in the extension-point registry",
+        f"FAIL (c) {shown}: planning - module is missing or not replaceable",
+        f"FAIL (c) {shown}: PLANNING - module is missing or not replaceable"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_delivery_kind_on_another_point_is_matched_exactly(tmp_path):
+    """handoff/TASK-006.md Requirement 9: a delivery kind named on a point other than project-end.delivery is reported,
+    and is matched exactly as well, so `Installer` there is also no kind (the string sweep's line 530, the kind lowered
+    before it is looked up; test_r014_a_delivery_kind_is_matched_exactly has the delivery point's twin)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## Add at intake.questions for Installer\n\nq\n")
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([
+        f"FAIL (kind) {shown}: Installer - delivery kind is not in the delivery-kind list",
+        f"FAIL (kind) {shown}: Installer - delivery kind is named on a point other than project-end.delivery"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_bare_heading_mark_ends_a_section(tmp_path):
+    """handoff/TASK-006.md R3-6: a heading candidate is up to three spaces, `##` and a space or a tab, so `## ` alone is
+    one: it ends the Set's section, which is then empty, though it is no change heading itself (the string sweep's
+    line 462, the candidate matched on the line stripped of its end, which reads `##` as text in the section)."""
+    root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## Set at intake.delivery-kind\n## \ninstaller\n")
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([
+        f"FAIL (form) {shown}: intake.delivery-kind - Set at section has no non-blank line",
+        f"FAIL (kind) {shown}: - - Set at intake.delivery-kind is not one delivery kind"]), lines
+    assert rc == 1 and err == "", err
+
+
+def test_r014_a_root_that_is_a_file_is_not_a_folder(tmp_path):
+    """handoff/TASK-006.md Requirement 3: a root that is not a folder is an ERROR line and stops the check, a file too
+    (the string sweep's line 795, the folder test made a test that the path exists, which walks the file as a root
+    with nothing in it)."""
+    path = tmp_path / "root.md"
+    path.write_text("x\n", encoding="utf-8")
+    rc, lines, err = run(str(path))
+    assert lines == [f"ERROR: {str(path).replace(chr(92), '/')}: not a folder", "RESULT: not checked"], lines
+    assert rc == 2 and err == "", err
+
+
+def test_r014_a_root_starting_with_a_slash_keeps_it_in_the_path_shown(tmp_path):
+    """handoff/TASK-006.md Requirement 4: each finding names its file by the root as given, then the file's path inside
+    it, so a root that starts with slashes keeps them: a Linux absolute path, or a Windows long path, `\\\\?\\C:\\...`
+    (the string sweep's line 92, the slashes stripped from both ends of the root, not from its end only)."""
+    root, _ = _one_file_root(tmp_path, "types/host-extension.md", "## Add at nowhere.at-all\n\nq\n")
+    given = "\\\\?\\" + str(root) if os.name == "nt" else str(root)
+    shown = given.replace("\\", "/")
+    assert shown.startswith("/"), "precondition: the root as shown starts with a slash"
+    rc, lines, err = run(given)
+    assert lines == whole_output([f"FAIL (a) {shown}/types/host-extension.md: nowhere.at-all - point is not in the "
+                                  "extension-point registry"]), lines
+    assert rc == 1 and err == "", err
+
+
+# (the status file's text, the sweep's line and rewrite it separates, the findings with {s} for the file).
+STRING_STATUS_CASES = {
+    "traits-text-ending-in-a-space": ("Workflows: app: Web App Development; traits: none \n"
+                                      "Workflows: site: Library Development; traits: none\n",
+                                      "line 590: a prefixed line's traits text stripped after the marker",
+                                      ["FAIL (form) {s}: none  - traits are not joined by a comma and one space",
+                                       "FAIL (f) {s}: Library Development - product type is not written"]),
+    "upper-case-parts": ("Workflows: App: Web App Development; traits: none\nWorkflows: Site: Library Development; traits: none\n",
+                         "line 597: the part compared, lowered, with itself stripped",
+                         ["FAIL (f) {s}: Library Development - product type is not written"]),
+    "semicolon-after-a-space-in-a-part": ("Workflows: a ;b: Web App Development; traits: none\n"
+                                          "Workflows: site: Library Development; traits: none\n",
+                                          "line 597: the semicolon looked for in the part's first word",
+                                          ["FAIL (form) {s}: a ;b - Workflows line breaks the part-prefix rule",
+                                           "FAIL (f) {s}: Library Development - product type is not written"]),
+    "colon-after-a-space-in-a-part": ("Workflows: a :b: Web App Development; traits: none\n"
+                                      "Workflows: site: Library Development; traits: none\n",
+                                      "line 597: the colon looked for in the part's first word",
+                                      ["FAIL (form) {s}: a :b - Workflows line breaks the part-prefix rule",
+                                       "FAIL (f) {s}: Library Development - product type is not written"]),
+    "arrow-after-a-space-in-a-part": ("Workflows: a \u2192 b: Web App Development; traits: none\n"
+                                      "Workflows: site: Library Development; traits: none\n",
+                                      "line 597: the arrow looked for in the part's first word",
+                                      ["FAIL (form) {s}: a \\u2192 b - Workflows line breaks the part-prefix rule",
+                                       "FAIL (f) {s}: Library Development - product type is not written"]),
+    "tab-after-a-head-comma": ("Workflows: Web App Development,\tHas screens; traits: none\n",
+                               "line 605: each name stripped of spaces only",
+                               ["FAIL (form) {s}: - - Workflows head is not the product type, then at most its sub-type"]),
+    "tab-after-a-trait": ("Workflows: Web App Development; traits: Has screens\t\n",
+                          "line 651: a trait name compared with itself stripped of spaces only",
+                          ["FAIL (form) {s}: Has screens\\x09 - traits are not joined by a comma and one space"]),
+    "workflows-line-empty-after-its-prefix": ("Workflows: \n",
+                                              "line 676: the line stripped of its end before the prefix test",
+                                              ["FAIL (form) {s}: - - Workflows line must contain '; traits: ' exactly once"]),
+}
+
+
+@pytest.mark.parametrize("case", sorted(STRING_STATUS_CASES))
+def test_r014_a_status_line_is_read_as_written(tmp_path, case):
+    """supervisor.md, "Project state", and handoff/TASK-006.md: a Workflows line is read as written, with no white space
+    dropped and no case folded, beyond what the grammar strips (the name split on commas, each name stripped); each
+    case names the sweep's survivor it separates."""
+    text, separates, expected = STRING_STATUS_CASES[case]
+    status = tmp_path / "s.md"
+    status.write_text(text, encoding="utf-8", newline="\n")
+    s = str(status).replace("\\", "/")
+    rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(status))
+    assert lines == whole_output([line.format(s=s) for line in expected]), (separates, lines)
     assert rc == 1 and err == "", err

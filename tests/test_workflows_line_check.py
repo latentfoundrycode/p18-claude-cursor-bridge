@@ -127,6 +127,43 @@ def test_r015_placement_reads_the_prefixes_with_their_space(program):
     assert mod.check_placement("s.md", "Phase:building\nWorkflows: not yet classified\n") == [("place", "s.md", "-", "status file has no Phase line")]
 
 
+@pytest.mark.parametrize("text", [
+    "# s\n  Phase: old\nWorkflows: Web App Development; traits: none\nPhase: building\n",
+    "# s\nphase: old\nWorkflows: Web App Development; traits: none\nPhase: building\n",
+    "Phase: b\n  Workflows: x\nWorkflows: Web App Development; traits: none\n",
+    "Phase: b\nworkflows: x\nWorkflows: Web App Development; traits: none\n",
+], ids=["indented-phase", "lower-case-phase", "indented-workflows", "lower-case-workflows"])
+def test_r015_placement_reads_the_prefixes_exactly(program, text):
+    """handoff/TASK-008.md:132: the Phase line is the first line that starts with exactly `Phase: `, and the Workflows
+    lines start with exactly `Workflows: `: an indented or lower-case line is neither, so the Phase line is the later
+    one and the Workflows line does not stand right after it, and a lower-case or indented line between Phase and the
+    real Workflows line breaks the run (stage B2's review, round 11: tests, blocking; lines 717, 722 and 729 reading
+    the line after `lstrip()` or `lower()`, which judged each file valid)."""
+    mod = program("workflow-check")
+    assert mod.check_placement("s.md", text) == [("place", "s.md", "-", "Workflows lines do not stand together right after the Phase line")]
+
+
+NO_PHASE = ("place", "s.md", "-", "status file has no Phase line")
+
+
+@pytest.mark.parametrize("text, expected", [
+    (" Workflows: Web App Development; traits: none\n", []),
+    ("x Workflows: Web App Development; traits: none\n", []),
+    ("\ufeffWorkflows: Web App Development; traits: none\n", []),
+    ("Workflows: \n", [NO_PHASE]),
+    ("Phase: \nWorkflows: app: not yet classified\nWorkflows: site: not yet classified\n", []),
+    ("Phase: intake\nWorkflows: \nWorkflows: plugin: Host Extension Development; traits: none\n", []),
+], ids=["indented-workflows-alone", "workflows-inside-a-line", "workflows-after-a-byte-order-mark",
+        "workflows-empty-after-its-prefix", "phase-empty-after-its-prefix", "workflows-empty-in-the-run"])
+def test_r015_placement_reads_whole_lines_by_their_prefix(program, text, expected):
+    """handoff/TASK-008.md:132: a Workflows line starts with exactly `Workflows: ` and the Phase line with exactly
+    `Phase: `, whatever follows, nothing following included: a line that holds the prefix after an indent, after other
+    text or after a byte-order mark (check_placement reads the text it is given) starts with neither, and a prefix with
+    nothing after it is still the line's (stage B2's review, round 11: the string sweep's line 717, the prefix tested on
+    the line stripped, or looked for anywhere in it; 722 and 729, the line stripped of its end before the test)."""
+    assert program("workflow-check").check_placement("s.md", text) == expected
+
+
 # --- inventory-check.py --------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("case", sorted(VALID))
@@ -549,6 +586,22 @@ def test_r015_conformance_no_status_file_no_check(tmp_path):
     assert "workflows" not in out.lower(), "nothing about the line under any name (stage B2 review, round 4: tests)"
     v, text = verdict(out, "docs/PROJECT_STATUS.md")
     assert v == "MISSING" and "the bounded status file" in text, out
+    assert rc == 1
+
+
+def test_r015_conformance_a_status_folder_is_no_status_file(tmp_path):
+    """TASK-008 Requirement 4, conformance-check's half: a folder named PROJECT_STATUS.md is no status file, so the
+    Workflows line is not judged and no row names it (stage B2 review, round 11: the string sweep's conformance-check.py
+    line 490, `isfile` made `exists`). The positive control runs first, on the same workspace with its status file."""
+    root = workspace(tmp_path, VALID["not-yet-classified"])
+    rc, out, err = conformance(root)
+    assert verdict(out, "Workflows line") == ("OK", "Workflows line"), "control: with the file the line is judged: " + out
+    (root / "docs" / "PROJECT_STATUS.md").unlink()
+    (root / "docs" / "PROJECT_STATUS.md").mkdir()
+    rc, out, err = conformance(root)
+    assert "Traceback" not in err and "Traceback" not in out, (out, err)
+    assert out.splitlines()[-1].startswith("RESULT: "), out
+    assert verdict(out, "Workflows line") == (None, None), out
     assert rc == 1
 
 
