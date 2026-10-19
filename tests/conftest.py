@@ -17,9 +17,14 @@ def windowless_kwargs(kwargs):
     FIX-001 (rule 24, KP-014): the suite starts thousands of console programs. Run from a process with no console
     (a headless builder, a hook), Windows gives each one a visible console window; on 2026-10-19 a builder's suite run
     coincided with a crash that followed a flood of terminal windows. A launch that sets creation flags of its own
-    keeps them; a grandchild inherits its parent's windowless console, so one level is enough."""
+    keeps them; a grandchild inherits its parent's windowless console, so one level is enough. A launch that redirects
+    none of its standard streams gets stdin=DEVNULL as well: Python then hands the child the suite's own output
+    handles, where with the new console alone its output would go to that hidden console (lost from a failure report)
+    and a read of its input would wait there for ever (bridge-run.py does the same)."""
     if not kwargs.get("creationflags"):
         kwargs = dict(kwargs, creationflags=NO_WINDOW)
+        if all(kwargs.get(name) is None for name in ("stdin", "stdout", "stderr")):
+            kwargs["stdin"] = subprocess.DEVNULL
     return kwargs
 
 
