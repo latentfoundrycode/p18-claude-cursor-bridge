@@ -1,11 +1,36 @@
-"""Shared fixtures: load a bridge program as a module by its file name."""
+"""Shared fixtures: load a bridge program as a module by its file name; every program a test starts is windowless."""
 import importlib.util
 import os
+import subprocess
+import sys
 
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CURSOR_BRIDGE = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge")
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def windowless_kwargs(kwargs):
+    """The keyword arguments of a launch, with CREATE_NO_WINDOW as its creation flags when it sets none.
+
+    FIX-001 (rule 24, KP-014): the suite starts thousands of console programs. Run from a process with no console
+    (a headless builder, a hook), Windows gives each one a visible console window; on 2026-10-19 a builder's suite run
+    coincided with a crash that followed a flood of terminal windows. A launch that sets creation flags of its own
+    keeps them; a grandchild inherits its parent's windowless console, so one level is enough."""
+    if not kwargs.get("creationflags"):
+        kwargs = dict(kwargs, creationflags=NO_WINDOW)
+    return kwargs
+
+
+if sys.platform == "win32" and not getattr(subprocess.Popen.__init__, "windowless_default", False):
+    _popen_init = subprocess.Popen.__init__
+
+    def _windowless_init(self, *args, **kwargs):
+        _popen_init(self, *args, **windowless_kwargs(kwargs))
+
+    _windowless_init.windowless_default = True
+    subprocess.Popen.__init__ = _windowless_init
 
 
 def load_program(name):
