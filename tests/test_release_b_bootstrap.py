@@ -4,9 +4,9 @@ enforces: docs/BUILD_PLAN.md TASK-001 Done when; satisfies R-001.
 The bridge is a supervised project (plan section 15 condition 6); this test
 asserts the supervised-project records exist and are internally consistent on
 their authoritative files (project.json, docs/REQUIREMENTS.md, docs/INVENTORY.md,
-docs/RUN_PARAMETERS.md). It deliberately does not assert on the PROJECT_STATUS
-run-parameters digest line, which is a human-readable pointer to the authoritative
-docs/RUN_PARAMETERS.md.
+docs/RUN_PARAMETERS.md), and, in CI, that PROJECT_STATUS's position lines state the
+position at the merge of the pull request that carries them (ISS-009). Its
+run-parameters line is a pointer to docs/RUN_PARAMETERS.md and is not read.
 """
 import json
 import os
@@ -264,13 +264,14 @@ def test_r001_run_parameters_owner_values():
 
 
 def _own_pull_request(env):
-    """The number of the pull request whose tree CI is judging, or None: from a pull request's merge ref
-    (refs/pull/<n>/merge), or, on a push to main, from the squash commit's subject, which ends `(#<n>)`. Read from
-    GitHub's own variables and event file, so a local run has no number."""
+    """The number of the pull request into main whose tree CI is judging, or None: from a pull request's merge ref
+    (refs/pull/<n>/merge) when its base is main, or, on a push to main, from the squash commit's subject, which ends
+    `(#<n>)`. Read from GitHub's own variables and event file, so a local run has no number, and nor has a pull request
+    into another branch (a hotfix on a release branch carries that branch's records)."""
     ref = env.get("GITHUB_REF", "")
     m = re.fullmatch(r"refs/pull/([0-9]+)/merge", ref)
     if m:
-        return int(m.group(1))
+        return int(m.group(1)) if env.get("GITHUB_BASE_REF") == "main" else None
     path = env.get("GITHUB_EVENT_PATH", "")
     if ref != "refs/heads/main" or not path or not os.path.isfile(path):
         return None
@@ -282,15 +283,19 @@ def _own_pull_request(env):
 
 def _position_faults(status, n):
     """Why the status file does not state the position at the merge of pull request n, as a list (empty when it does):
-    its Last accepted line names that pull request first, and its In flight line names nothing waiting for a gate."""
+    its Last accepted line names that pull request first, its Increment line begins `none`, and its In flight line is
+    `none` alone."""
     faults = []
     last = [line for line in status.splitlines() if line.startswith("Last accepted: ")]
     named = re.findall(r"PR #([0-9]+)", last[0]) if len(last) == 1 else []
     if not named or int(named[0]) != n:
         faults.append(f"Last accepted names PR #{named[0] if named else '?'} first, not PR #{n}")
-    flight = [line for line in status.splitlines() if line.startswith("In flight: ")]
-    if len(flight) != 1 or not flight[0].startswith("In flight: none") or "gate" in flight[0]:
+    flight = [line.rstrip() for line in status.splitlines() if line.startswith("In flight: ")]
+    if flight != ["In flight: none"]:
         faults.append(f"In flight is not none at the merge: {flight[:1]}")
+    increment = [line for line in status.splitlines() if line.startswith("Increment: ")]
+    if len(increment) != 1 or not re.match(r"Increment: none( |$)", increment[0]):
+        faults.append(f"Increment is not none at the merge: {increment[:1]}")
     return faults
 
 
@@ -302,7 +307,9 @@ def test_r001_status_names_its_own_merge():
     local run has no pull request to name."""
     n = _own_pull_request(os.environ)
     if n is None:
-        pytest.skip("not a pull request's or main's CI run")
+        into_main = os.environ.get("GITHUB_EVENT_NAME") == "pull_request" and os.environ.get("GITHUB_BASE_REF") == "main"
+        assert not into_main, "R-001: a pull request into main whose number could not be read"
+        pytest.skip("not a pull request into main, nor a squash on main")
     assert _position_faults(_read("docs/PROJECT_STATUS.md"), n) == [], "R-001: the status file at the merge"
 
 
@@ -311,7 +318,8 @@ def test_r001_status_position_parse(tmp_path):
     position reader passes a status naming its pull request first with nothing in flight, and refuses an earlier
     pull request first, a number that only starts the right one, and a branch waiting for its gate (a negative test
     must show its precondition)."""
-    assert _own_pull_request({"GITHUB_REF": "refs/pull/45/merge"}) == 45
+    assert _own_pull_request({"GITHUB_REF": "refs/pull/45/merge", "GITHUB_BASE_REF": "main"}) == 45
+    assert _own_pull_request({"GITHUB_REF": "refs/pull/50/merge", "GITHUB_BASE_REF": "release/2026.11"}) is None
     assert _own_pull_request({}) is None
     event = tmp_path / "event.json"
     event.write_text(json.dumps({"head_commit": {"message": "BUG-016: the records (#45)\n\nbody (#3)"}}), encoding="utf-8")
@@ -319,8 +327,12 @@ def test_r001_status_position_parse(tmp_path):
     assert _own_pull_request({"GITHUB_REF": "refs/heads/bug-016", "GITHUB_EVENT_PATH": str(event)}) is None
     event.write_text(json.dumps({"head_commit": {"message": "a direct push"}}), encoding="utf-8")
     assert _own_pull_request({"GITHUB_REF": "refs/heads/main", "GITHUB_EVENT_PATH": str(event)}) is None
-    good = "Last accepted: BUG-016 (PR #45, at its merge); before it BUG-015 (PR #44)\nIn flight: none\n"
+    good = "Increment: none — at the merge\nLast accepted: BUG-016 (PR #45, at its merge); before it BUG-015 (PR #44)\nIn flight: none\n"
     assert _position_faults(good, 45) == []
     assert len(_position_faults(good, 44)) == 1
     assert len(_position_faults(good.replace("PR #45", "PR #450"), 45)) == 1
     assert len(_position_faults(good.replace("In flight: none", "In flight: none (BUG-016 on its branch, before its gate)"), 45)) == 1
+    for old, new in (("In flight: none", "In flight: none (BUG-017 under Review B since 14:00)"),
+                     ("In flight: none", "In flight: nonesuch builder running"),
+                     ("Increment: none — at the merge", "Increment: BUG-016 on branch bug-016, before its merge")):
+        assert len(_position_faults(good.replace(old, new), 45)) == 1, new
