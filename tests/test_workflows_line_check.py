@@ -592,8 +592,10 @@ def test_r015_conformance_no_status_file_no_check(tmp_path):
 def test_r015_conformance_a_status_folder_is_no_status_file(tmp_path):
     """TASK-008 Requirement 4, conformance-check's half: a folder named PROJECT_STATUS.md is no status file, so the
     Workflows line is not judged and no row names it (stage B2 review, round 11: the string sweep's conformance-check.py
-    line 490, `isfile` made `exists`)."""
+    line 490, `isfile` made `exists`). The positive control runs first, on the same workspace with its status file."""
     root = workspace(tmp_path, VALID["not-yet-classified"])
+    rc, out, err = conformance(root)
+    assert verdict(out, "Workflows line") == ("OK", "Workflows line"), "control: with the file the line is judged: " + out
     (root / "docs" / "PROJECT_STATUS.md").unlink()
     (root / "docs" / "PROJECT_STATUS.md").mkdir()
     rc, out, err = conformance(root)

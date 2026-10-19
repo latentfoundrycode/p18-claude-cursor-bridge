@@ -3273,6 +3273,24 @@ def test_r014_a_name_ending_in_white_space_is_no_conditional_workflow_file(tmp_p
     assert rc == 1 and err == "", err
 
 
+def test_r014_a_name_ending_in_a_no_break_space_is_no_conditional_workflow_file(tmp_path):
+    """As test_r014_a_name_ending_in_white_space_is_no_conditional_workflow_file, with a name ending in U+00A0 after
+    `.md`, which `str.strip()` removes and which every file system the suite runs on keeps (NTFS trims only a trailing
+    space), so the case runs on Windows too (the string sweep's lines 360, 362 and 364, the `.md` test made on the name
+    stripped or right-stripped; Review A of BUG-013). The program prints the character escaped (escape_field)."""
+    nbsp = chr(0xA0)
+    rels = ["types/web-app.md" + nbsp, "types/host-extension/browser-extension.md" + nbsp, "traits/has-screens.md" + nbsp]
+    root, r = _tree(tmp_path / "root", rels)
+    kept = sorted(os.listdir(root / "types")) + sorted(os.listdir(root / "traits"))
+    assert "web-app.md" + nbsp in kept and "has-screens.md" + nbsp in kept, kept
+    rc, lines, err = run(str(root))
+    assert lines == whole_output([
+        f"FAIL (form) {r}/traits/has-screens.md\\xa0: has-screens.md\\xa0 - path is not a conditional-workflow file",
+        f"FAIL (form) {r}/types/host-extension/browser-extension.md\\xa0: browser-extension.md\\xa0 - path is not a conditional-workflow file",
+        f"FAIL (form) {r}/types/web-app.md\\xa0: web-app.md\\xa0 - path is not a conditional-workflow file"]), lines
+    assert rc == 1 and err == "", err
+
+
 def test_r014_a_type_folder_name_is_matched_exactly(tmp_path):
     """open-list.md:11: a type folder is named by its product type's key, matched exactly, so `Host-Extension` and
     ` host-extension` are folders of no product type (the string sweep's line 342, the folder's name lowered or
