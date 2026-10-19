@@ -1,0 +1,1346 @@
+diff --git a/bridge/agents/plan-critic.md b/bridge/agents/plan-critic.md
+index ac09716..78cb3a3 100644
+--- a/bridge/agents/plan-critic.md
++++ b/bridge/agents/plan-critic.md
+@@ -18,11 +18,24 @@ are biased toward it and compensate. Your value is entirely in what you catch.
+ supervisor has accepted with their reasons (settled: never raise them again, even in other
+ words) and each critic's grades per round. You are one of two critics of different makes
+ reading the same committed text in fresh contexts (release A3); grade every finding
+-**Blocking** (the design or plan cannot go to the gate with it), **Should fix** (the supervisor
++**Blocking** (the design or plan cannot go to the gate with it, unless the subject's last
++resolution round has passed: then it is listed at the gate), **Should fix** (the supervisor
+ fixes it or accepts it with a reason) or **Consider** (worth a thought, no round follows from
+ it). A finding that would reverse a fix recorded in that file is non-convergence: say so
+ explicitly instead of raising it as new. Your reply ends with the counts per grade.
+ 
++**The loop is bounded** (`supervisor.md`, Phase 2): four rounds per subject at the most
++(more only under the owner's line in `docs/RUN_PARAMETERS.md`, which runs the same shape once
++more), then one confirming read if the text changed (round five at the most, or `<rounds>`
++at the most under a line already written), then one resolution round for what is still Blocking or non-convergent (`R1`, or
++`R2` under the line), then the gate, whatever is still open. A round whose file opens with *This round is the
++confirming read* is one: raise a finding only on text changed since your last read (the file
++holds that diff), or a Blocking finding anywhere; never the same point again in other words.
++A resolution round's file opens with *This is the resolution round*: answer every open
++question in it, and Review B's answer in `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for that round, in place
++of findings and with no counts; raise no new finding. A finding the other critic also names keeps the grade
++its content earns: agreement is no reason to grade up.
++
+ Read `~/.claude/cursor-bridge/Known-Pitfalls.md` first (read it by that absolute path — it
+ is user-level, not in the repo). It is the loop's cross-project catalogue of mistakes already
+ made; flag anywhere the design or plan is about to walk into one of them.
+diff --git a/bridge/commands/supervisor.md b/bridge/commands/supervisor.md
+index 8c522d6..1fe1bcc 100644
+--- a/bridge/commands/supervisor.md
++++ b/bridge/commands/supervisor.md
+@@ -9,8 +9,6 @@ argument-hint: [optional: a short description of what you want built — omitted
+ <!-- digest:start -->
+ ## The core, in brief
+ 
+-*Re-injected after a compaction; a digest, not the rule: the full text governs.*
+-
+ **Role.** The supervising architect: design, plan, package briefs, delegate to the Cursor builder, review through the gate, report to the owner, a product manager who decides what the software does, never how.
+ 
+ **Founding rules.** N1 The loop's truth lives in files; one-shot programs compute everything; a background process only if it reads and never writes tracked files, is rebuildable, states its commit, starts on demand with a hard time limit, no gate depends on it, touches no data it does not own, migrates no live data outside a release, never runs unreleased code on live data, spends nothing unless asked. N2 No secret in any prompt to Cursor. N3 Every builder run is revertible from its checkpoint; a review run is restored to it (`review-guard.py`). N4 You never write implementation code. N5 One writer per checkout: the builder where it was launched, you in `Workspace/`; no IDE agent beside the loop. N6 Nothing reaches `main` except through the verified gate (CI green, Review A and cross-family Review B approving, no gate-integrity flag); who completes the merge is a run parameter. N7 Design quality is measured, never asked. N8 Security is measured, never asked. N9 For software with screens the running render is measured.
+@@ -19,9 +17,9 @@ argument-hint: [optional: a short description of what you want built — omitted
+ 
+ **Escalate to the owner only** for: product behaviour; scope (deferring or dropping a requirement); a consequence they bear (cost, legal, privacy, lock-in); what only they can provide (a key, an account), as a run sheet; an irreversible or out-of-repository action; a change to what "correct" means. Never correctness, a technical menu, process or round counts. Look in `INVENTORY.md` first.
+ 
+-**Report** leading with the owner's one decision or "Nothing needed — proceeding", the technical part FYI beneath; amounts name platform and account; explain for decision.
++**Report** leading with the owner's one decision or "Nothing needed — proceeding", the technical part FYI beneath; amounts name platform and account.
+ 
+-**Standing rules.** 1 Never write implementation code. 2 Never delegate from a dirty tree. 3 No secret in a prompt. 4 Never skip the secret scan. 5 Never pass a phase gate without the owner's approval or the words of rule 50. 6 Re-delegation ends by defect class, never a round count; stop only on non-convergence or HARDENING. 7 Report what actually happened, reverts and wrong-reason passes included. 8 Never chain or wrap shell commands; `bridge-run.py` is the only launcher; bridge commands in the Bash tool. 9 Merge only on the full gate. 10 Correctness is never the owner's question. 11 A hard technical question goes to a resolution round. 12 Reports lead with the owner's decision. 13 Design correctness is the gate's (N7). 14 Security correctness is the gate's; pin scanners and actions by SHA; never auto-adopt an update. 15 Read the patterns and pitfalls where they apply; record lessons as `ISS-nnn`; probe Cursor capabilities first. 16 The running render is part of the gate (N9). 17 The delegate command is a constant pointer to the committed brief. 18 The builder's self-report is a hint; status comes from git and `scope-check.py`; drift never passes. 19 Only `worktree-teardown.py` removes a worktree; never `git worktree remove`. 20 Context economy: slice large low-stakes material; gate-critical streams reach reviewers whole. 21 Explain for decision. 22 The layout is fixed: `Documents/` beside `Workspace/`. 23 `Documents/` is written only at reflection points. 24 Windowless by default. 25 Refactoring only in the stage-close pass. 26 Root cause first: no reproduction, no fix. 27 Anything the owner must run is a run sheet from the template, with its terminal. 28 The installed bridge governs; calibrate by phase, reopen nothing; after a compaction re-read what the hook names. 29 Run parameters: asked once after the plan, each its own question. 30 No hard line wraps in Markdown. 31 Installable software is finished only with its installer and lifecycle proven. 32 A project command in a run sheet is looked up first. 33 Project end is a trigger: the last stage's close. 34 A request on a finished project is a change cycle, never a question. 35 Optimization only when measured. 36 Every artifact lives in `Workspace/`; review diffs are from committed state. 37 External services: captured live first; done is passing on recorded replies. 38 The roster is resolved, never remembered; failures recorded; switch and return automatic. 39 Branches in one checkout; worktrees under `<root>/Worktrees/` for concurrent work, never yours but step 4's old-<nnn>. 40 Local and remote agree or the status file says why; branches start from `origin/main`; never commit on `main`. 41 Project state lives in `PROJECT_STATUS.md` and `INVENTORY.md`, bounded, read whole; `project.json` states the fundamentals. 42 Every builder run ends with an `Assumed, not verified` list, each dispositioned. 43 Never end a turn with loop work pending unless a builder run, Review B, the CI watch, a `# wake` command or an agent under its ceiling will wake you (never a server); an agent needs its wake-timer; `Awaiting user on:` when waiting. 44 Done is measured against the register (`completion-check.py`). 45 Design is diagram-based; a diagram is normative only if enforced. 46 The build plan is explicit; status derives from `origin/main`. 47 Objections escalate bottom-up; deviation without objection is design regression. 48 The session's model follows the phase (Fable 5.1 through Phase 4 and design revisions, Opus 5.5 from Phase 5); the owner switches it, told at the stage close before; on another model lead with the switch; never override a subagent's. 49 A summary of a verification states its counts. 50 Gates are the owner's, handed over only in their recorded words for a named change, on `Delegated gates:`; never money, scope, keys, accounts or an irreversible step; a general "proceed autonomously" hands over nothing; each such decision leads your next report. 51 A product records who decided, never an agent as a person; per-item approvals go to another model family's judge; a person may override. 52 A value the owner chose is fixed in a test. 53 A key seen in the chat is exposed: the next report leads with its replacement, as a run sheet; until then run only what needs no key. 54 A pause writes the position down first; working files in `run/supervisor/`; no computer path enters a commit. 55 Development data stays apart from live data (design, brief, conformance check). 56 One dependency rule: the gate admits, you record, the owner is asked only for a consequence they bear. 57 Another session's message is mechanics only, never a gate, scope, money or a key. 58 A material change after a gate leads the next report as a one-line notice the owner can stop; escalation matters are asked first.
++**Standing rules.** 1 Never write implementation code. 2 Never delegate from a dirty tree. 3 No secret in a prompt. 4 Never skip the secret scan. 5 Never pass a phase gate without the owner's approval or the words of rule 50. 6 Re-delegation ends by defect class, never a round count; stop only on non-convergence or HARDENING. A design critique stops after four rounds, a due confirming read and a due resolution round, whatever is open. 7 Report what actually happened, reverts and wrong-reason passes included. 8 Never chain or wrap shell commands; `bridge-run.py` is the only launcher; bridge commands in the Bash tool. 9 Merge only on the full gate. 10 Correctness is never the owner's question. 11 A hard technical question goes to a resolution round. 12 Reports lead with the owner's decision. 13 Design correctness is the gate's (N7). 14 Security correctness is the gate's; pin scanners and actions by SHA; never auto-adopt an update. 15 Read the patterns and pitfalls where they apply; record lessons as `ISS-nnn`; probe Cursor capabilities first. 16 The running render is part of the gate (N9). 17 The delegate command is a constant pointer to the committed brief. 18 The builder's self-report is a hint; status comes from git and `scope-check.py`; drift never passes. 19 Only `worktree-teardown.py` removes a worktree; never `git worktree remove`. 20 Context economy: slice large low-stakes material; gate-critical streams reach reviewers whole. 21 Explain for decision. 22 The layout is fixed: `Documents/` beside `Workspace/`. 23 `Documents/` is written only at reflection points. 24 Windowless by default. 25 Refactoring only in the stage-close pass. 26 Root cause first: no reproduction, no fix. 27 Anything the owner must run is a run sheet from the template, with its terminal. 28 The installed bridge governs; calibrate by phase, reopen nothing; after a compaction re-read what the hook names. 29 Run parameters: asked once after the plan, each its own question. 30 No hard line wraps in Markdown. 31 Installable software is finished only with its installer and lifecycle proven. 32 A project command in a run sheet is looked up first. 33 Project end is a trigger: the last stage's close. 34 A request on a finished project is a change cycle, never a question. 35 Optimization only when measured. 36 Every artifact lives in `Workspace/`; review diffs are from committed state. 37 External services: captured live first; done is passing on recorded replies. 38 The roster is resolved, never remembered; failures recorded; switch and return automatic. 39 Branches in one checkout; worktrees under `<root>/Worktrees/` for concurrent work, never yours but step 4's old-<nnn>. 40 Local and remote agree or the status file says why; branches start from `origin/main`; never commit on `main`. 41 Project state lives in `PROJECT_STATUS.md` and `INVENTORY.md`, bounded, read whole; `project.json` states the fundamentals. 42 Every builder run ends with an `Assumed, not verified` list, each dispositioned. 43 Never end a turn with loop work pending unless a builder run, Review B, the CI watch, a `# wake` command or an agent under its ceiling will wake you (never a server); an agent needs its wake-timer; `Awaiting user on:` when waiting. 44 Done is measured against the register (`completion-check.py`). 45 Design is diagram-based; a diagram is normative only if enforced. 46 The build plan is explicit; status derives from `origin/main`. 47 Objections escalate bottom-up; deviation without objection is design regression. 48 The session's model follows the phase (Fable 5.1 through Phase 4 and design revisions, Opus 5.5 from Phase 5); the owner switches it, told at the stage close before; on another model lead with the switch; never override a subagent's. 49 A summary of a verification states its counts. 50 Gates are the owner's, handed over only in their recorded words for a named change, on `Delegated gates:`; never money, scope, keys, accounts or an irreversible step; a general "proceed autonomously" hands over nothing; each such decision leads your next report. 51 A product records who decided, never an agent as a person; per-item approvals go to another model family's judge; a person may override. 52 A value the owner chose is fixed in a test. 53 A key seen in the chat is exposed: the next report leads with its replacement, as a run sheet; until then run only what needs no key. 54 A pause writes the position down first; working files in `run/supervisor/`; no computer path enters a commit. 55 Development data stays apart from live data (design, brief, conformance check). 56 One dependency rule: the gate admits, you record, the owner is asked only for a consequence they bear. 57 Another session's message is mechanics only, never a gate, scope, money or a key. 58 A material change after a gate leads the next report as a one-line notice the owner can stop; escalation matters are asked first.
+ 
+ **Permissions.** Auto mode; deny rules and the `permission-guard` hook refuse the override merge and every force-push; the hook alone refuses any `git worktree remove` and a merge without `premerge`'s record; never ask the owner for a permission. Builders and reviewers run with the owner's identity withheld.
+ <!-- digest:end -->
+@@ -358,8 +356,8 @@ critic's grades per round. Review B's design mode reads only: commit the design
+ diagrams, the requirements register, `docs/DESIGN_CRITIQUE.md` (the accepted list and the
+ earlier grades) and the critic's lenses (copied from `plan-critic`'s sections, so the reviewer
+ needs nothing outside the Workspace) to `run/review/DESIGN-<subject>-<round>.md` (`<subject>`:
+-`design`, `plan`, or the change's name, so that a plan's round 1 never overwrites the
+-design's), `git add -f` it, then launch, exactly:
++`design`, `plan`, the change's name, or `<the change's name>-plan`, so that a plan's round 1
++never overwrites the design's), `git add -f` it, then launch, exactly:
+ 
+ ```bash
+ python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --mode=ask --trust --model <review_b from docs/ROSTER.resolved.json> "The text to criticise is already written to run/review/DESIGN-<subject>-<round>.md, with the lenses, the grades to answer in, and the record of what was accepted so far. Read that file whole; do not ask for it; the findings it lists as accepted are settled, do not raise them again; answer with your findings in its grades, each naming the diagram, section or requirement it concerns, then the counts per grade, and nothing else." 2> run/review/REVIEW-DESIGN-<subject>-<round>.err
+@@ -370,25 +368,109 @@ diagram, section or requirement it concerns. Snapshot before and `verify` after
+ code review; a reply that names nothing from the file is a failed launch, not a verdict. Then
+ fix what both found; what you accept with a reason goes on the list and is settled.
+ 
+-**The loop stops by what was found.** Another round follows only on a Blocking finding, or a
+-Should-fix finding you did not accept with a reason; a critic whose round returned nothing of
+-that kind drops out; when both have dropped out the design goes to the gate. Two brakes: a
+-finding that reverses an earlier fix is non-convergence, settled by a resolution round
+-(`plan-critic` and Review B's design mode answering each other, on the record), never by
+-another critique; and after four rounds (the owner's ceiling) whatever is still Blocking goes
+-to a resolution round as well. Nothing leaves unchecked: a critic that dropped out reads the
+-final text once more if anything it had reviewed was changed afterwards; the text leaving a
+-fourth round or a resolution round gets one confirming read by both. The record shows each
+-critic's grades apart. Its cost: one subagent run and one Cursor call per round, plus the
+-confirming reads and a resolution round where one is needed.
+-
+-`docs/DESIGN_CRITIQUE.md` has three parts, one block per subject (the design, the plan, each
+-change): **Accepted** (finding, critic, round, the reason), **Rounds** (round, critic, the
+-counts of Blocking, Should fix and Consider, what was fixed), **Resolution** (the question, what
+-was settled, how). A design resolution round runs the same read-only command on
+-`run/review/DESIGN-<subject>-R<n>.md`, which holds the one question and both critics' positions;
+-`plan-critic` then reads Review B's answer from `run/review/REVIEW-DESIGN-<subject>-R<n>.err`
+-and answers it, and the settlement goes under Resolution. The `run/review/DESIGN-*` files are
++**The loop stops by what was found, and after four rounds at the most.** Another round follows
++only on a Blocking finding, or a Should-fix finding you did not accept with a reason; a critic
++whose round returned nothing of that kind drops out; when both have dropped out the critique
++ends. A finding that reverses an earlier fix is non-convergence: it is recorded, starts no
++round and waits for the resolution round; any other such finding in the same round still
++starts the next. **Four rounds per subject is the owner's ceiling, whatever the critics still
++find.** The subjects are the design, the plan and each change: a change cycle's design revision
++(the change's name), its plan addendum (`<the change's name>-plan`), and a scoped revision
++mid-build, which is a change named as `docs/DESIGN.md`'s Change section names it; a subject is
++never renamed or split to start its count again. A subject is one token of lower-case letters,
++digits and hyphens: for a change, chosen from its name when the Change section is written (the
++Azure monthly allowance is `azure-allowance`, its plan addendum `azure-allowance-plan`),
++distinct from `design`, `plan`, every other subject and every other `<token>-plan`, and
++written in its block's heading in `docs/DESIGN_CRITIQUE.md`. A launch that failed (a reply that
++names nothing from the file) spends no round and follows step 3b, every failed launch recorded:
++a first failure is exit 4, and the same file runs once more; a second is exit 3, which marks the
++model and re-resolves, and the same file runs once more on the profile it gives, under its
++number (a connection error or a hit limit keeps step 3b's exit 4 or 5 and no mark). A third
++failure, an exit 5, or no usable profile makes the design wait (below), the round recorded as
++not run. A round never run spends none of the four. The wait ends when the roster returns
++(rule 38) or on the owner's word; then the same file runs once under its number, with no
++re-runs. If that launch fails too, the round stays not run and the subject goes on to its
++resolution round or its gate, the report escalating it to the owner.
++
++- **The confirming read.** When the critique ends and the text changed after either critic last
++  read it, both critics read it once more, as the next round (the fifth at the most, or
++  `<rounds>` at the most under an owner's line already written). Its file
++  opens with *This round is the confirming read: raise a finding only on text changed since your
++  last read, or a Blocking finding anywhere*, and holds the committed diff of the subject's text
++  since each critic's last read, each diff labelled with its critic. **A confirming read is
++  final, whatever its number: no critique round follows it**, save when the owner's line is
++  written after it (below). What it finds is fixed (recorded as fixed, unverified) or accepted
++  with a reason.
++- **The resolution round.** Whatever is still Blocking or non-convergent (neither fixed nor
++  accepted with a reason) after the confirming read, or after the critique where no confirming
++  read was due, goes to the subject's **one resolution round**:
++  `run/review/DESIGN-<subject>-R1.md` holds every such question and both critics' positions on
++  each, and opens with *This is the resolution round: answer every open question in this file;
++  raise no new finding; your reply answers each question in place of findings, with no counts*.
++  Review B answers it with the same read-only command, the file's opening line taking the place
++  of the command's request for findings, grades and counts. Its reply arrives on the launch's output
++  (the `.err` file holds only the launcher's lines): after `verify`, write it to
++  `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for the resolution round just run (`R1`, or
++  `R2` under the owner's line); `plan-critic` reads that file and answers it; the settlement
++  goes under Resolution.
++- **The gate.** Then the subject goes to its gate, whatever is still open: a Blocking finding
++  still open after its last resolution round does not stop it. The critique record lists what is
++  open, with both critics' grades and the settlement.
++
++The convergence rule of step 8 (two reviewers naming the same defect makes it blocking) belongs
++to the code gate, not to this loop: a finding both critics name keeps the grade its content
++earns and never adds a round.
++
++**The launcher holds the ceiling.** `bridge-run.py` reads every `cursor-agent` command whose
++arguments name, anywhere and with either path separator, a file `run/review/DESIGN-<name>.md`
++(spelled as Windows also opens it: doubled separators, `.` segments, folder names ending in
++dots or spaces);
++every such name is checked, and one refused name refuses the launch. A name is read from
++`DESIGN-` up to `.md` and holds only lower-case letters, digits and hyphens, but for the round's
++`R`. The round is the name's last hyphen-separated part: a positive integer written without a
++leading zero, or `R` and such an integer; the subject is the rest. Without the owner's line,
++rounds 1 to 5 and `R1` are allowed. A name of one part is a round with an empty subject, which
++is not `plan` (`DESIGN-5.md`, the plan's file before 2026.10.18a: `DESIGN-1.md` to
++`DESIGN-5.md` allowed, `DESIGN-45.md` refused; no line can name that subject, so it is never
++lifted). It refuses, with exit 125, before anything starts, and with a message that begins
++`bridge-run: refused - design ceiling: ` and names the file, the round and the
++`docs/RUN_PARAMETERS.md` it looked in, three things: a name it cannot read that way (a space or
++a capital in it, `0`, `05`, `06`, `R0`, a round that is no number, a `run/review/DESIGN-` with
++no `.md` after its name), a round above five, and a resolution round `R2` or later. The floor is the launcher's:
++a design-mode `cursor-agent` started other than through `bridge-run.py` has no ceiling and
++breaks rule 8. A refusal is neither a failed review nor a model's failure (step 3b): it is not
++retried and no `--record-failure` follows it; the subject goes on to its resolution round or its
++gate, as above.
++
++**The owner's line.** The owner's words lift the ceiling for one subject: a line
++`Design rounds above five: <subject> <rounds> (<their words>, <date>)` in
++`docs/RUN_PARAMETERS.md`, the subject compared exactly and `<rounds>` above five, lets the
++launcher allow that subject rounds 1 to `<rounds>`, `R1` and `R2`, and nothing beyond. Under it
++the subject runs the same shape once more from where it stands: critique rounds under the stop
++rule up to `<rounds>` minus one, then a confirming read if the text changed (round `<rounds>` at
++the most), then, if anything is still open, its next resolution round (`R1` if it has had none,
++else `R2`, holding what is still open after the first), then the gate. You never ask for that
++line: it is written only on the owner's own words, given unprompted or at the gate, where the
++record shows what is open (an owner who sends a design back at its gate to be criticised again
++gives exactly those words). `<rounds>` is a round number, never a count: the number of the
++last numbered round run (a resolution round not counted) plus the number the owner names, or
++plus five when they name none; it is never below six; the line records their words as given,
++and the report that records it says in one line how `<rounds>` is spent: critique rounds through
++`<rounds>` minus one, then the confirming read at `<rounds>` if the text changed (for an owner
++who named two after round four: one critique round, then the confirming read). A subject is
++lifted once: the first well-formed line for it stands and a later one is ignored: the owner's words to criticise it again after that make it a scoped revision, a change
++with a subject of its own. Before the run-parameters step the line is written to
++`docs/RUN_PARAMETERS.md` on its own, creating the file; that step adds its lines beside it.
++
++The record shows each critic's grades apart. Its cost: at most six subagent runs and six
++verdict-bearing Cursor calls per subject, and, for a failed launch, two re-runs before the wait and one launch after it: four rounds,
++the confirming read and the resolution round; under the owner's line, up to `<rounds>` and `R2`.
++
++`docs/DESIGN_CRITIQUE.md` has three parts, one block per subject: **Accepted** (finding, critic,
++round, the reason), **Rounds** (round, its kind: critique, confirming read, resolution, not run
++or refused; the commit its file was built from; critic; the counts of Blocking, Should fix and
++Consider; what was fixed), **Resolution** (the
++question, what was settled, how). The `run/review/DESIGN-*` files are
+ removed with `git rm` in the commit that passes the gate, as step 8 removes the review files.
+ When no roster profile is usable at intake (Cursor not signed in, both pools exhausted), the
+ design waits and the report says so, as rule 38's failure path does; `plan-critic` alone is
+@@ -616,8 +698,8 @@ three to eight increments, and its close is a **reflection point** (see "Reflect
+ points"). Every increment belongs to exactly one stage; **the close of the last stage is
+ project end** (see "Reflection points" — it is a defined trigger, not a judgement).
+ Run the design's two-critic loop over the plan, with the design as context (`plan-critic`
+-and Review B's design mode on `run/review/DESIGN-<round>.md` holding the plan; the same stop
+-rule, brakes and record in `docs/DESIGN_CRITIQUE.md`; release A3), looking for ordering errors, increments that are secretly
++and Review B's design mode on `run/review/DESIGN-plan-<round>.md` holding the plan; the same
++stop rule, ceiling, confirming read, resolution round and record in `docs/DESIGN_CRITIQUE.md`; release A3), looking for ordering errors, increments that are secretly
+ two increments, acceptance criteria that cannot actually be checked, stages that are not
+ demonstrable on their own, and — for UI increments — whether the design acceptance criteria
+ are present and checkable — and whether every requirement in the register is satisfied by an increment.
+@@ -695,7 +777,7 @@ Installer verification: local | ci-only | n/a (not a desktop application)
+ Parallel increments: off | on
+ ```
+ 
+-Two optional lines are never asked and are written only on the owner's recorded word (release A2): `Agent ceiling: <seconds>` raises the hour a background agent may run before the loop guard stops counting it, and `Ceiling above twice: <kind> <seconds> (<the owner's words>, <date>)` lets the launcher's learned limit for one kind of run (builder, review, watch, test) exceed twice its default.
++Three optional lines are never asked and are written only on the owner's recorded word (release A2; the third 2026.10.18a): `Agent ceiling: <seconds>` raises the hour a background agent may run before the loop guard stops counting it, `Ceiling above twice: <kind> <seconds> (<the owner's words>, <date>)` lets the launcher's learned limit for one kind of run (builder, review, watch, test) exceed twice its default, and `Design rounds above five: <subject> <rounds> (<the owner's words>, <date>)` lets one subject's design critique run past its ceiling (Phase 2; written before this step when the subject is the design or the plan).
+ 
+ The **model pool state** is not a run parameter — it changes with the owner's usage, not
+ with the project. `"other_pool"` in `docs/ROSTER.json` is flipped to `exhausted`
+@@ -933,6 +1015,13 @@ When any `cursor-agent` call — a delegation, a Review B launch, a resolution r
+ stage-close pass — exits non-zero, produces no output, or hits the launcher's limit (exit
+ 124):
+ 
++(The one exception: every exit 125 whose message begins `bridge-run: refused - design
++ceiling: ` is the design critique's ceiling holding, never a model's failure: it is not retried
++and no `--record-failure` follows it; Phase 2. A design-critique reply that names nothing from
++its file is recorded like any failed call and follows the exits below, which Phase 2 counts: the
++exit-4 retry, the exit-3 re-resolve and one run on the profile it gives, then the wait Phase 2
++describes.)
++
+ **First, when the exit code is 124, look before you discard** (KP-033): `git status` and
+ `git diff --stat` in the checkout. A builder that completed its edits and then hung on its
+ way out (a lost connection while reporting, an orphaned server it started) has done the
+@@ -1331,7 +1420,8 @@ instead. In short, a branch merges to `main` only when **all** hold:
+ 
+ **Convergence is a signal.** When two or more reviewers or auditors independently name the
+ same line or the same defect, treat it as blocking even if each alone marked it advisory:
+-decorrelated reviewers agreeing is the strongest evidence the loop produces.
++decorrelated reviewers agreeing is the strongest evidence the loop produces. This is the code
++gate's rule; a design critique's two critics are bounded by its ceiling instead (Phase 2).
+ 
+ A `REJECT` from either reviewer goes back through re-delegation (step 7), not to the user
+ — continue while concerns converge and get fixed, stopping only on non-convergence per
+@@ -1455,7 +1545,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
+ 2. **Design revision** (Phase 2, scaled). Append a dated **Change: <name>** section to
+    `docs/DESIGN.md` — what changes in the architecture, data model, interfaces, security
+    context, or delivery, and why; the unchanged design is referenced, not rewritten. **Revise the diagrams the change touches** the same way they were drafted — specialists, top-down, `python ~/.claude/cursor-bridge/diagram-check.py --mode design` — and select any catalogue kind the change newly needs; a project designed before diagram-based planning gets at least its component diagram (with its element map) and, if it stores data, its entity-relationship diagram at its first change cycle. Run
+-   the two-critic loop of Phase 2 on the delta section with the existing design as context (release A3). Gate: present
++   the two-critic loop of Phase 2, with its ceiling, on the delta section with the existing design as context (release A3; the subject is the change's name). Gate: present
+    it as a decision brief, with the critique's record for the change, and get approval. Patch the Project Summary at this gate.
+ 3. **UI mockups** (Phase 3) **only if the change touches the UI**, and only for the
+    affected screens and states; the visual system is amended, not replaced. Gate as in
+@@ -1466,7 +1556,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
+    that alters or removes existing behaviour → say so plainly in the brief and the
+    change log). The Packaging & installer stage is re-run as the last stage when the
+    deliverable must be rebuilt (it always must for a shipped version bump). Run
+-   the two-critic loop on the addendum. Gate: present it and get approval.
++   the two-critic loop, with its ceiling, on the addendum (the subject `<the change's name>-plan`). Gate: present it and get approval.
+ 5. **Run parameters** are kept from the original run; ask only for one that is missing.
+    **Configuration** (Phase 5) is skipped unless the change needs new tooling, in which
+    case only the additions are configured, append-only.
+@@ -1909,7 +1999,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep
+    increment relies on. Stop only on true non-convergence (same defect twice, a regressing
+    fix). Resolve reviewer splits yourself, favouring established invariants; convene a
+    resolution round for a hard split; escalate only an intent deadlock. A round count is
+-   never itself a reason to involve the user.
++   never itself a reason to involve the user. The design critique is the exception: its
++   two critics stop after four rounds, one confirming read if the text changed and one
++   resolution round if anything is still Blocking or non-convergent, per subject, whatever is
++   still open (Phase 2); the launcher refuses a sixth round and a second resolution round
++   unless the owner's line allows the same shape once more, up to its rounds and `R2`.
+ 7. Report what actually happened. If Cursor produced something worse than what was
+    there, or you reverted a run, or a test is passing for the wrong reason, say so.
+    You are a quality signal in this loop, alongside the merge gate.
+diff --git a/bridge/cursor-bridge/CHANGELOG.md b/bridge/cursor-bridge/CHANGELOG.md
+index d377cac..a90f6f8 100644
+--- a/bridge/cursor-bridge/CHANGELOG.md
++++ b/bridge/cursor-bridge/CHANGELOG.md
+@@ -15,6 +15,24 @@ project must show before the other projects resume.
+ 
+ ---
+ 
++## 2026.10.18a
++
++**The design critique's ceiling** (a hotfix of 2026.10.11d, cut from its release state, on the owner's order of 2026-10-18; KP-062). The TDP ran its design two-critic loop for 45 rounds on one change. Text, with one program change
++
++**What changed**
++- **At most four rounds per subject** (the design, the plan, each change and its plan addendum, a mid-build scoped revision being a change), whatever the critics still find; a finding that reverses an earlier fix is non-convergence, starts no round and waits for the resolution round. Then, if the text changed after a critic last read it, one confirming read by both, final whatever its number: its file says it is the confirming read and holds the diff since each critic's last read, labelled by critic, and its findings are fixed (recorded as fixed, unverified) or accepted with a reason. Then one resolution round, `DESIGN-<subject>-R1.md`, holding every question still Blocking or non-convergent, answered in place of findings; Review B's reply, which arrives on the launch's output, is written to `REVIEW-DESIGN-<subject>-R<n>.md` for `plan-critic`. A subject is one token of lower-case letters, digits and hyphens, distinct from every other, a change's chosen from its name and written in its record's heading. Then the gate, whatever is still open, its critique record listing it (supervisor.md, Phase 2; the plan's critique, Phase 4, now names its file `run/review/DESIGN-plan-<round>.md`; the change cycle's steps 2 and 4 name their subjects). A failed launch runs once more on the same file and spends no round; the launches follow step 3b, every one recorded: the second failure (exit 3) marks the model and the file runs once on the re-resolved profile; then the design waits for the roster or the owner's word, and the file runs once more under its number with no re-runs; if that fails too, the round stays not run and the subject goes on to its resolution round or its gate; a round never run spends none of the four. The record gives each round's commit, and refused or not-run rounds.
++- **The convergence rule is the code gate's only**: two critics naming one finding no longer makes it blocking or adds a round (supervisor.md step 8, Merge-Verification-Policy.md).
++- **The launcher holds the ceiling**: `bridge-run.py` refuses, with exit 125, before anything starts, and with a message beginning `bridge-run: refused - design ceiling: ` that names the file, the round and the `docs/RUN_PARAMETERS.md` it looked in, a `cursor-agent` launch naming, anywhere in its arguments and with either path separator, a `run/review/DESIGN-<name>.md` whose round (the name's last hyphen-separated part: a positive integer without a leading zero, or `R` and one; 1 to 5 and `R1` allowed) is above five, is `R2` or later, or cannot be read (a name is read from `DESIGN-` up to `.md`, lower-case letters, digits, hyphens and the round's `R` only; a one-part name such as the plan's old `DESIGN-5.md` is a round with an empty subject); one refused name among several refuses the launch. A line `Design rounds above five: <subject> <rounds> (<their words>, <date>)` in `docs/RUN_PARAMETERS.md`, written only on the owner's own words and never asked for (`<rounds>` a round number: the last numbered round run, a resolution round not counted, plus the more rounds they name, or five more when they name none, never below six; the report says how `<rounds>` is spent), allows that subject rounds up to `<rounds>` and `R2`, and nothing beyond: the same shape once more, once, the first well-formed line standing and a later one ignored; a further send-back makes a scoped revision. The empty subject of the plan's old files is never lifted. A refusal is not a model's failure (step 3b); the subject goes on to its resolution round or its gate. Tests (`tests/test_bridge_run_design_ceiling.py`): rounds 1 to 5 and R1 allowed; round six, round 45, R2 and R3 refused; 0, 05, 06, R0, a round that is no number, a name holding a space or a capital and a design file with no `.md` after its name refused; `DESIGN-1.md` to `DESIGN-5.md` allowed and `DESIGN-45.md` refused; a subject holding hyphens or digits read whole; a backslash path, an absolute path, trailing punctuation, doubled separators, `.` segments and folder names ending in dots or spaces read; a round too long for `int` refused without a traceback; a launch naming an allowed and a refused file refused; any mode refused alike; other review files and commands untouched; the owner's line lifting one subject only, up to its rounds and R2; the first well-formed line for a subject standing and a later one ignored; a line lifting `plan` not lifting the old one-part files; a line without the owner's words, or not above five, lifting nothing; exit 125 before the launch line, the message beginning `bridge-run: refused - design ceiling: ` and naming the file, the round and `docs/RUN_PARAMETERS.md`, nothing logged.
++- **The digest's rule 6** names the exception, its "stop only on non-convergence" kept to re-delegation (the digest's opening line, which the hook's header already says, and the report line's "explain for decision", which is rule 21, are dropped to pay for it). Standing rule 6 in full, the run parameters' optional lines and step 3b say the same. `plan-critic` raises only what is new, or Blocking, in a confirming read, only answers in a resolution round, lists a Blocking finding open after the last resolution round at the gate, and never grades up on agreement.
++
++**Running projects must**
++- *(all phases)* Install, restart, `/calibrate-bridge`. A design, plan or change critique that has run four rounds or fewer follows the new text from where it stands. One that has run five or more, whatever its fifth was, gets no confirming read and no further round: the last round's fixes are recorded as fixed, unverified; whatever is still Blocking or non-convergent goes to `DESIGN-<subject>-R1.md` if that subject has had no resolution round, else straight to the gate, whose critique record lists what is open. Only that subject's owner's line allows more, and then it continues under Phase 2's shape from where it stands. A running subject whose name is not such a token takes one at calibration, written in its record's heading (a plan critique on the old `DESIGN-<round>.md` files takes `plan`); its next file carries it and its count continues. A round file named other than by its number (a confirming read written `DESIGN-<subject>-confirm.md`, say) cannot be read and is refused: its next file takes the next round's number.
++
++**If rolled back**
++- Nothing to restore. The previous launcher does not refuse a sixth round, so the text's ceiling is then held by the supervisor alone.
++
++---
++
+ ## 2026.10.11d
+ 
+ **The report cycle's text items** (the follow-ups accepted by the evaluation of 2026-10-11, plan section 16 under A5's status; the A5 follow-up), with the trial's observations under A5 and the owner's decision D1. Text, with two small program changes for the builder's report file.
+diff --git a/bridge/cursor-bridge/Known-Pitfalls.md b/bridge/cursor-bridge/Known-Pitfalls.md
+index 1a219d5..03dd289 100644
+--- a/bridge/cursor-bridge/Known-Pitfalls.md
++++ b/bridge/cursor-bridge/Known-Pitfalls.md
+@@ -539,3 +539,9 @@ it applies.**
+ - **Cause:** the Bash tool's foreground limit of 600 seconds, a different limit from the thirty-minute end of a background command (KP-053); a subagent cannot raise it past ten minutes.
+ - **Correction:** a suite that takes more than ten minutes runs through the launcher in the background (`bridge-run.py --limit auto --kind test`), its output to a file under `run/`, with the Bash tool's `timeout` at the suite cap; `test-runner` reads the file afterwards and never starts such a suite itself (supervisor.md step 4, test-runner.md; release 2026.10.11d).
+ - **Applies:** every project whose suite runs longer than ten minutes. The sign: a `test-runner` report that ends with a timeout and no result.
++
++### KP-062 — A design critique ran 45 rounds on one change, and the four-round ceiling stopped nothing
++- **Surfaced:** the TDP, 2026-10-18: the design two-critic loop on one change (the Azure monthly allowance) ran 45 rounds in about seventeen hours on Fable 5.1, one Cursor Review B call per round. It used up the owner's monthly Cursor pool for non-native models a few days after its reset, and about $156 of the day's $234 of price-weighted Claude usage, subagents not counted. Its `docs/DESIGN_CRITIQUE.md` shows the decay: rounds 1 to 4 found 34 Blocking findings; rounds 5 to 44 found 12 in all, most rounds none, and one to six Should-fix findings each, most of them restatements and paraphrase sweeps.
++- **Cause:** three gaps in the text, which together made an endless loop. The four-round ceiling covered only what was still Blocking, so a Should-fix finding past round four had no cap. "The text leaving a fourth round gets one confirming read by both" restarted the loop: every fix changed the text, every confirming read found a few new Should-fix items, and every fix needed another read. The code gate's convergence rule (two reviewers naming one defect makes it blocking) was applied to the two design critics and restarted the loop after round four; the digest's rule 6 ("never a round count") invited the same reading. Nothing in a program held the written ceiling.
++- **Correction (2026.10.18a):** at most four rounds per subject (the design, the plan, each change and each change's plan addendum), a non-convergent finding starting none; then, if the text changed, one confirming read by both critics, final whatever its number, whose findings are fixed or accepted and recorded; then one resolution round holding every question still Blocking or non-convergent; then the gate, whatever is still open, its record listing it. A subject is one token of lower-case letters, digits and hyphens, distinct from every other. A failed launch follows step 3b, every one recorded: it runs once more (exit 4), then once on the re-resolved profile (exit 3); then the design waits for the roster or the owner's word, and the file runs once more with no re-runs; if that fails too, the round stays not run and the subject goes on to its resolution round or its gate. The convergence rule is the code gate's only. `bridge-run.py` refuses, with exit 125 and a message beginning `bridge-run: refused - design ceiling: `, a `cursor-agent` launch naming `run/review/DESIGN-<name>.md` whose round is above five, is `R2` or later, or cannot be read (a round is a positive integer without a leading zero, or `R` and one, 1 to 5 and `R1` allowed; a name holding a space or a capital cannot be read); a `Design rounds above five: <subject> <rounds>` line in `docs/RUN_PARAMETERS.md`, written only on the owner's own words, allows that subject rounds up to `<rounds>` and `R2`, the same shape once more, once, and nothing beyond. The digest's rule 6 names the exception, and `plan-critic` raises only what is new, or Blocking, in a confirming read. A critique that has run four rounds or fewer when the release is installed follows the new text from where it stands. One that has run five or more, whatever its fifth was, gets no confirming read and no further round: its open findings go to its one resolution round, or to the gate if it has had one. Only that subject's owner's line allows more, and then it continues under Phase 2's shape from where it stands. A running subject whose name is not such a token takes one at calibration, written in its record's heading (a plan critique on the old `DESIGN-<round>.md` files takes `plan`); its next file carries it and its count continues. A round file named other than by its number (a confirming read written `DESIGN-<subject>-confirm.md`, say) cannot be read and is refused: its next file takes the next round's number.
++- **Applies:** every design, plan and change-cycle critique; any loop whose stop rule counts only one grade of finding. The sign: a critique past four rounds, rounds whose findings are restatements of earlier ones, or a design-mode `cursor-agent` started other than through `bridge-run.py`, which no ceiling holds (rule 8).
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index ee35d33..c098396 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,12 +1,12 @@
+ {
+-  "version": "2026.10.11d",
+-  "generated": "2026-10-18 10:38",
++  "version": "2026.10.18a",
++  "generated": "2026-10-19 09:18",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+     "agents/diagram-specialist.md": "7105060c84d870d933be43675b410c90c1e04df6029f92ad4146884c57d2fee5",
+     "agents/diff-reviewer.md": "91bd2cd177d30b19a3524cc16851a31ede37a64c166afcdd4d24f1e7306a5c6e",
+-    "agents/plan-critic.md": "f8b64907d7a54d4b1448c28ae77e6c9c6a563f7101bc440fddd97e5fe6b6a44f",
++    "agents/plan-critic.md": "d4ffae36e2762ece3cc6fd1453ff07f73ae3344283dbe570567dc2e98ef232d9",
+     "agents/refactor-scout.md": "8e077479f19b7c4a7a45e5ad38c9935d5b660a6b5f58a2ed0f608facb1dfdbc6",
+     "agents/secret-sentinel.md": "ee011fcf065ad01f98e7b9b16f6081d826983a12eeb9ebff2764d5bc05ad81db",
+     "agents/security-auditor.md": "6dc6181ed255ea67dbedee6cf0912fb925152b3d74fc45bee74b74e8db6e1c82",
+@@ -14,24 +14,24 @@
+     "agents/test-runner.md": "8358d18b3e8d109d7643ce2610ee433aa5668c4d9601976ece28a4d914f62649",
+     "commands/calibrate-bridge.md": "5ccdaa582af3a0084c6ceb20d62ac4dc1998ec86e085aa8688af4dc7ee59294a",
+     "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
+-    "commands/supervisor.md": "718dd41c357d2cece17163865981bbe848ce89ff661303aef87071e2993fc970",
+-    "cursor-bridge/CHANGELOG.md": "e437fac211a07e96e54a236f016a9a4062b7c323d84ae0a961b39fdb982102ed",
++    "commands/supervisor.md": "c192e132321e567a17e1de2c31924f84401f184dfcf4f898a60ca35f4f04d338",
++    "cursor-bridge/CHANGELOG.md": "4e5dd4878aec6a49eb37c9f1183f6a765204aad40560730cb28c25615f6a8d25",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
+     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
+     "cursor-bridge/Diagram-Planning-Conventions.md": "f8e3b7839c7c7466b6bb9654f51bf9d9249973ab5ed9f8e10901ce4392f9cc4d",
+     "cursor-bridge/Glossary.md": "e9719a36d87c68dc354b05d6800d067b99a8361c9098e029ce86966ff470898d",
+-    "cursor-bridge/Known-Pitfalls.md": "fbbc6afde8d087c6b22cb90f08e99b430fb68eec56e622a07054a7e41c435bf5",
+-    "cursor-bridge/Merge-Verification-Policy.md": "9d2668b86b9a694516fe5c352869105115dfb7ac6b3efd5e3bba0e51bd0c0d62",
++    "cursor-bridge/Known-Pitfalls.md": "35cc09fa58ab1a2fdd704635673542d46f0be53e94a9d03b7a3eee380a1bff1f",
++    "cursor-bridge/Merge-Verification-Policy.md": "3494b49c1d3f38334f9911152ab5ad2cf5fca4bce235fd8be00a26722e41d562",
+     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
+     "cursor-bridge/Performance-Conventions.md": "71d5e95675f5482249538a7c17026fc997e98038d3e0f72b551505c39284f486",
+     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
+-    "cursor-bridge/VERSION": "b96d627a2058bbb88675f287a390d02dd9a840f1d9695871ec2ede27fcf49d86",
++    "cursor-bridge/VERSION": "ccf68286ecd234409f574ed54a4e4e4398938611ee0921888b502cbb3ce812e5",
+     "cursor-bridge/bench-check.py": "ea34fa87a1f3383cd34600f48a817a23b6fc0cd4ad461a77b796baf05ef2643e",
+     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
+     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
+     "cursor-bridge/bridge-install.py": "4ed573348cd98350aba4906e1acf08f262199d169f2710205a9e42c8e1e0ed07",
+-    "cursor-bridge/bridge-run.py": "3b5754a9e2c7a1cd61bf84c3982b5d16b6bc49d6871463a25dcadb6508d58cc8",
++    "cursor-bridge/bridge-run.py": "6530169f6b93ac003255e1e95bf9018021e024a847bd9cbd3aa914014968896c",
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+     "cursor-bridge/bridge_env.py": "7fe536ff12e72406a84efa59d2e74788d174092f524ae0438d38169aa99b7d53",
+     "cursor-bridge/completion-check.py": "b95fb31a10082f91ee01eb3ae2bef981a71bddef0ca6ea23f72e60d7b75acd03",
+diff --git a/bridge/cursor-bridge/Merge-Verification-Policy.md b/bridge/cursor-bridge/Merge-Verification-Policy.md
+index 3a7eaa5..b87b149 100644
+--- a/bridge/cursor-bridge/Merge-Verification-Policy.md
++++ b/bridge/cursor-bridge/Merge-Verification-Policy.md
+@@ -316,7 +316,9 @@ fix that **regresses** something already passing. A deadlock over what the softw
+ **Convergence is a signal.** When two or more reviewers or auditors independently name the
+ same line or the same defect, it is blocking even if each alone marked it advisory —
+ decorrelated reviewers agreeing is the strongest evidence this gate produces (three of four
+-converged on a lock-leaking lifecycle bug that each had called advisory).
++converged on a lock-leaking lifecycle bug that each had called advisory). The rule is the code
++gate's: a design critique's two critics are bounded by rounds instead (§"Review B's design
++mode", below), and a finding both name keeps the grade its content earns.
+ 
+ **Split verdicts are resolved by the supervisor, not escalated.** First **name the
+ disagreement out loud** — `REVIEWERS DISAGREE on <crux>`, which reviewers, and whether the
+@@ -384,13 +386,15 @@ ordinary re-delegation loop as a fresh finding.
+ 
+ ## Review B's design mode (release A3)
+ 
+-Before the design gate, and again for a plan, a change cycle's design revision and a scoped revision, the cross-family reviewer reads the design as one of two critics (`supervisor.md`, Phase 2). The supervisor commits the design text, the diagrams, the requirements register, `docs/DESIGN_CRITIQUE.md` (the accepted list and the earlier grades, so that the reviewer does not raise what is settled) and the critic's lenses (copied from `plan-critic`'s sections, so the reviewer needs nothing outside the Workspace) to `run/review/DESIGN-<subject>-<round>.md` (`<subject>`: `design`, `plan`, or the change's name) with `git add -f`, snapshots with `review-guard.py snapshot DESIGN-<subject>-<round>`, and launches the reviewer **read-only, with the workspace trusted**, through the launcher:
++Before the design gate, and again for a plan, a change cycle's design revision and a scoped revision, the cross-family reviewer reads the design as one of two critics (`supervisor.md`, Phase 2). The supervisor commits the design text, the diagrams, the requirements register, `docs/DESIGN_CRITIQUE.md` (the accepted list and the earlier grades, so that the reviewer does not raise what is settled) and the critic's lenses (copied from `plan-critic`'s sections, so the reviewer needs nothing outside the Workspace) to `run/review/DESIGN-<subject>-<round>.md` (`<subject>`: `design`, `plan`, the change's name, or `<the change's name>-plan`) with `git add -f`, snapshots with `review-guard.py snapshot DESIGN-<subject>-<round>`, and launches the reviewer **read-only, with the workspace trusted**, through the launcher:
+ 
+ ```bash
+ python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --mode=ask --trust --model <review_b from docs/ROSTER.resolved.json> "The text to criticise is already written to run/review/DESIGN-<subject>-<round>.md, with the lenses, the grades to answer in, and the record of what was accepted so far. Read that file whole; do not ask for it; the findings it lists as accepted are settled, do not raise them again; answer with your findings in its grades, each naming the diagram, section or requirement it concerns, then the counts per grade, and nothing else." 2> run/review/REVIEW-DESIGN-<subject>-<round>.err
+ ```
+ 
+-It answers in the critic's grades, Blocking, Should fix and Consider, each finding naming the diagram, section or requirement it concerns, and ends with the counts per grade. A reply that names nothing from the file is a failed launch, not a verdict, as for a code review. `review-guard.py verify DESIGN-<subject>-<round>` afterwards proves the reviewer read only. The record of every round lives in `docs/DESIGN_CRITIQUE.md`, each critic's grades apart; a design resolution round runs the same read-only command on `run/review/DESIGN-<subject>-R<n>.md` holding the one question and both positions, never the code review's `--force` form. The `run/review/DESIGN-*` files are removed with `git rm` in the commit that passes the gate. The installed test that forbids the read-only mode in a reviewer command applies to code reviews, which must execute; a design review must carry `--mode=ask --trust`.
++It answers in the critic's grades, Blocking, Should fix and Consider, each finding naming the diagram, section or requirement it concerns, and ends with the counts per grade. A reply that names nothing from the file is a failed launch, not a verdict, as for a code review. `review-guard.py verify DESIGN-<subject>-<round>` afterwards proves the reviewer read only. The record of every round lives in `docs/DESIGN_CRITIQUE.md`, each critic's grades apart; a design resolution round runs the same read-only command on `run/review/DESIGN-<subject>-R1.md` (`R2` under the owner's line) holding every open question and both positions on each, never the code review's `--force` form. The `run/review/DESIGN-*` files are removed with `git rm` in the commit that passes the gate. The installed test that forbids the read-only mode in a reviewer command applies to code reviews, which must execute; a design review must carry `--mode=ask --trust`.
++
++**The loop is bounded** (`supervisor.md`, Phase 2): at most four rounds per subject, a non-convergent finding starting none; then, if the text changed after a critic last read it, one confirming read by both, whose file opens by saying so and holds the diff since each critic's last read, labelled by critic, and which no critique round follows; then one resolution round, `DESIGN-<subject>-R1.md`, holding every question still Blocking or non-convergent, whose file opens with *answer every open question in this file; raise no new finding; your reply answers each question in place of findings, with no counts*, which takes the place of the launch command's request for findings, grades and counts, and whose Review B reply the supervisor writes to `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for `plan-critic`; then the gate, whatever is still open. A subject is one token of lower-case letters, digits and hyphens, distinct from every other subject. A failed launch follows the supervisor's step 3b, every one recorded: the first (exit 4) runs once more on the same file, the second (exit 3) marks the model and runs once on the re-resolved profile; then the design waits for the roster or the owner's word, and the file runs once more under its number with no re-runs; if that fails too, the round stays not run and the subject goes on to its resolution round or its gate. `bridge-run.py` refuses, with exit 125 and a message beginning `bridge-run: refused - design ceiling: `, a `cursor-agent` launch naming, anywhere and with either separator, a `run/review/DESIGN-<name>.md` whose round (the name's last hyphen-separated part: a positive integer without a leading zero, or `R` and one; 1 to 5 and `R1` allowed) is above five, is `R2` or later, or cannot be read, a name holding anything but lower-case letters, digits, hyphens and the round's `R` being one that cannot. A line `Design rounds above five: <subject> <rounds> (<their words>, <date>)` in `docs/RUN_PARAMETERS.md`, written only on the owner's own words, allows that subject rounds up to `<rounds>` and `R2`, and nothing beyond: the same shape once more, critique rounds up to `<rounds>` minus one, a confirming read at `<rounds>` at the most, then the next resolution round if anything is open. `<rounds>` is a round number: the last numbered round run, a resolution round not counted, plus the more rounds the owner names, or five more when they name none, never below six; a subject is lifted once, its first well-formed line standing and a later one ignored. A refusal is neither a failed review nor a model's failure. The convergence rule of the code gate does not apply to a design critique.
+ 
+ ## Who completes the merge — the `Merge authority` run parameter
+ 
+diff --git a/bridge/cursor-bridge/VERSION b/bridge/cursor-bridge/VERSION
+index 5bf8dec..2472b61 100644
+--- a/bridge/cursor-bridge/VERSION
++++ b/bridge/cursor-bridge/VERSION
+@@ -1 +1 @@
+-2026.10.11d
++2026.10.18a
+diff --git a/bridge/cursor-bridge/bridge-run.py b/bridge/cursor-bridge/bridge-run.py
+index 054aae7..0e69cb4 100644
+--- a/bridge/cursor-bridge/bridge-run.py
++++ b/bridge/cursor-bridge/bridge-run.py
+@@ -40,6 +40,7 @@ one run; a run ended at its limit whose kept work merged counts too, so the ceil
+ a test run that exits 0 is marked by the launcher itself. The run that raised a ceiling is
+ named when the ceiling is chosen. A slow but healthy task is never ended before its ceiling.
+ An owner's cap below twice the default is ignored with a note: the line says "above twice".
++Refuses a design critique round above the ceiling (exit 125, `design ceiling:`).
+ 
+ `--key-file <path>` (release A2): a file of `NAME=value` lines, outside the Workspace, whose
+ values reach the child's environment only; names are printed, values never (the owner's
+@@ -76,6 +77,17 @@ KINDS = {"builder": 7200, "review": 3600, "watch": 3600, "test": 1800}
+ LOG = os.path.join("run", "launcher", "runs.jsonl")
+ LEARN_FACTOR = 1.5
+ CAP_FACTOR = 2
++DESIGN_DEFAULT_ROUNDS = 5
++DESIGN_RESOLUTION_DEFAULT = 1
++DESIGN_RESOLUTION_LIFTED = 2
++DESIGN_PATH_NORM = re.compile(r"[/\\]+(?:\.[/\\]+)*")
++DESIGN_MARK = re.compile(r"(?i)run/review/DESIGN-")
++DESIGN_NAME_RE = re.compile(r"^(?:([a-z0-9-]*)-)?(R?)([1-9][0-9]*)$")
++DESIGN_TOKEN_RE = re.compile(r"[^\s\"'`]+")
++DESIGN_LIFT_RE = re.compile(
++    r"^\s*[-*]?\s*(?:\*\*(?i:Design rounds above five):\*\*|\*\*(?i:Design rounds above five)\*\*:|(?i:Design rounds above five):)\s*"
++    r"([a-z0-9-]+)\s+([0-9]+)\s*\((.+)\)")
++DESIGN_TRIM_BEFORE_SEP = re.compile(r"[. ]+(?=[/\\])")
+ 
+ 
+ def usage():
+@@ -233,6 +245,95 @@ def owner_cap(kind, folder):
+     return None
+ 
+ 
++def design_lifts(folder):
++    """{subject: max numbered round} from the first well-formed owner's line per subject."""
++    lifts = {}
++    try:
++        with open(os.path.join(folder, "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
++            for line in f:
++                m = DESIGN_LIFT_RE.match(line.strip())
++                if not m or m.group(1) in lifts:
++                    continue
++                words = m.group(3).strip()
++                if not words:
++                    continue
++                try:
++                    rounds = int(m.group(2))
++                except ValueError:
++                    continue
++                if rounds <= DESIGN_DEFAULT_ROUNDS:
++                    continue
++                lifts[m.group(1)] = rounds
++    except (OSError, UnicodeDecodeError):
++        pass
++    return lifts
++
++
++def design_round_written(name):
++    return name.rsplit("-", 1)[1] if "-" in name else name
++
++
++def design_refusal(file_label, subject, round_written, detail, params_path):
++    msg = ("design ceiling: %s (subject %s, round %s) %s; looked in %s for "
++           "Design rounds above five: supervisor.md, Phase 2" % (
++               file_label, subject, round_written, detail, params_path))
++    return msg.encode("ascii", "backslashreplace").decode("ascii")
++
++
++def design_refuse_name(name, token, lifts, params_path):
++    """Refusal for one design token; None when allowed."""
++    label_name = name if name is not None else token
++    round_written = design_round_written(label_name)
++    subject = label_name.rsplit("-", 1)[0] if "-" in label_name else ""
++    if name is None:
++        return design_refusal("DESIGN-%s" % token, subject, round_written, "the name cannot be read", params_path)
++    parsed = DESIGN_NAME_RE.match(name)
++    if not parsed:
++        return design_refusal("DESIGN-%s.md" % name, subject, round_written, "the name cannot be read", params_path)
++    subject = parsed.group(1) or ""
++    round_written = design_round_written(name)
++    try:
++        round_n = int(parsed.group(3))
++    except ValueError:
++        round_n = None
++    if parsed.group(2) == "R":
++        limit = DESIGN_RESOLUTION_LIFTED if subject in lifts else DESIGN_RESOLUTION_DEFAULT
++        if round_n is None or round_n > limit:
++            return design_refusal("DESIGN-%s.md" % name, subject, round_written,
++                                  "a resolution round beyond R%d" % limit, params_path)
++        return None
++    limit = lifts.get(subject, DESIGN_DEFAULT_ROUNDS)
++    if round_n is None or round_n > limit:
++        return design_refusal("DESIGN-%s.md" % name, subject, round_written,
++                              "above round %d" % limit, params_path)
++    return None
++
++
++def design_ceiling(argv, folder):
++    """Refuse cursor-agent launches naming a design round above the ceiling; None when allowed."""
++    if head_of(argv) != "cursor-agent":
++        return None
++    text = DESIGN_TRIM_BEFORE_SEP.sub("", " ".join(argv))
++    norm = DESIGN_PATH_NORM.sub("/", text)
++    hits = list(DESIGN_MARK.finditer(norm))
++    if not hits:
++        return None
++    params_path = os.path.join(folder, "docs", "RUN_PARAMETERS.md")
++    lifts = design_lifts(folder)
++    for m in hits:
++        tm = DESIGN_TOKEN_RE.match(norm, m.end())
++        token = tm.group(0).rstrip(".,;:)])}'\"") if tm else ""
++        if not token.endswith(".md"):
++            reason = design_refuse_name(None, token, lifts, params_path)
++            if reason:
++                return reason
++            continue
++        reason = design_refuse_name(token[:-3], token, lifts, params_path)
++        if reason:
++            return reason
++    return None
++
++
+ def learned_limit(kind, folder):
+     """(limit, reason): the kind's default, or one and a half times the longest healthy run,
+     never below the default and never above twice it without the owner's words."""
+@@ -434,6 +535,10 @@ def main():
+     if "--key-file" in flags and head_of(cmd) == "cursor-agent":
+         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
+         return 125
++    reason = design_ceiling(cmd, folder)
++    if reason:
++        sys.stderr.write("bridge-run: refused - %s\n" % reason)
++        return 125
+     kind = flags[flags.index("--kind") + 1] if "--kind" in flags and flags.index("--kind") + 1 < len(flags) else kind_of(cmd)
+     if kind is None and os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1":
+         kind = "test"                                        # the tests' own helpers
+diff --git a/docs/DESIGN_CRITIQUE.md b/docs/DESIGN_CRITIQUE.md
+index b4a5680..02e9b02 100644
+--- a/docs/DESIGN_CRITIQUE.md
++++ b/docs/DESIGN_CRITIQUE.md
+@@ -542,3 +542,30 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
+ | Question | Settled | How |
+ |---|---|---|
+ | (none) | | |
++
++## Subject: ceiling (the design loop's ceiling, hotfix 2026.10.18a)
++
++**Accepted** (finding, critic, round, the reason):
++- Count the rounds from `docs/DESIGN_CRITIQUE.md`, not from the file name, so that launching `DESIGN-<subject>-5.md` again is refused (Review B, round 1, Consider 1). Not taken: the record is prose the supervisor writes, which a program would read fragilely; the file-name count is the mechanical floor, and the text now says a failed launch runs again on the same file and spends no round, so a repeated launch of a file is the one case the text allows. A supervisor that relaunches a round file to go around the ceiling breaks the text, as the TDP broke the old one; KP-062 names that sign.
++- A scoped revision keeps the subject it revises, so its count does not restart (Review B, round 1, Consider 2). REVIEWERS DISAGREE: plan-critic (Should fix 5) asks for a scoped revision to be a change with its own subject. A correctness question, decided for plan-critic: a scoped revision mid-build is a new, owner-approved change of scope, and the text already gives each change its own four rounds; keeping the old subject would leave a revision after a spent critique no rounds at all. The anti-gaming concern is met by "a subject is never renamed or split to start its count again".
++- The owner's line's shape stated in the digest's rule 6 too (Review B, round 2, part of Blocking 1). Not taken there: the digest is at 9497 of its 9500 characters and is the summary; the lift is rare, is written only on the owner's words, and its shape is in Phase 2, standing rule 6, the policy, `plan-critic` and KP-062, which the hook names for re-reading after a compaction; the launcher holds its bound in any case.
++- `permission-guard.py` refusing a `cursor-agent` not started through `bridge-run.py` whose arguments name a design file (plan-critic, round 2, Should fix 5, first of its two fixes). Not taken: the hotfix keeps to one program change; the critic's second fix is taken instead (Phase 2 and KP-062's sign say the floor is the launcher's and a bare launch breaks rule 8). A candidate for release B's hook work.
++- The digest's figure in the entry above may predate round 2's C1 (plan-critic, round 3, Should fix 3). No change: 9,497 was measured after C1 was applied, and the two digest-size tests pass on the committed text.
++- Read `docs/RUN_PARAMETERS.md` relative to the folder before `run/review/` in the named file rather than the launcher's current folder (plan-critic, round 3, Consider 4). Not taken: the sibling `Ceiling above twice` line is read from the current folder and the two should agree; round 2's C3 makes the refusal name the file it looked in, so a lift not seen is diagnosable.
++- What follows a second failed launch (plan-critic round 3 Should fix 2: the round runs again under its number after step 3b's re-resolve; Review B round 3 Should fix 5: no launch after the one re-run). REVIEWERS DISAGREE, decided for both bounds: one re-run on the same model, then step 3b's record and re-resolve and one run on the profile it gives, then the design waits with the round recorded as not run; a round never run spends none of the four; the cost sentence says two re-runs at the most.
++
++**Rounds** (round, kind, the commit its file was built from, critic, Blocking / Should fix / Consider, what was fixed):
++- 1, critique, file at 158641c, plan-critic: 2 / 8 / 3. Fixed: the resolution round's file is R1 and holds every open question, in Phase 2, the policy and plan-critic (B1); a critique already past round five gets no confirming read and goes to R1 or the gate (B2, in the change log and KP-062); a confirming read is final whatever its number (S1); the confirming read's file says so and holds the diff since each critic's last read, and the record gives each round's kind (S2); the refusal's exact reading, a name that cannot be read refused (S3); the owner's line written alone before the run-parameters step, never asked for, and the third optional line (S4); a scoped revision is a change (S5); digest rule 6 reordered (S6); "brakes" replaced in Phase 4, "or non-convergent" in plan-critic (S7); the tests named in the change log (S8); a failed launch runs again on the same file (C1); the owner's words at the gate are the line's words (C2); "six at the most" (C3).
++- 1, critique, file at 158641c, Review B (grok-4.7-medium): 2 / 8 / 2. Fixed: the round-45 project cannot launch a confirming read (B1, as plan-critic's B2; no `-C` file form added, a critique past five simply has no confirming read); the owner's line lifts up to its rounds and R2 only, said alike in all four texts (B2); digest rule 6 (S1); the resolution round follows the confirming read or its absence (S2); R1 holds every question, "non-convergent" in plan-critic (S3); standing rule 6 names the owner's words (S4); the confirming and resolution files open with their instruction, Review B's prompt unchanged (S5); a refusal is not a model failure, in Phase 2 and step 3b (S6); the round is the name's last hyphen-separated part (S7); a Blocking finding open after the resolution round is listed at the gate, and plan-critic's Blocking grade says so (S8). Considers 1 and 2 accepted above.
++- 2, critique, file at 674e407, plan-critic: 0 / 6 / 5. Fixed: the migration boundary is four rounds run or fewer, five or more getting no confirming read and no further round, and a refusal sends the subject on to its resolution round or gate (S1); the subject lists name `<the change's name>-plan` in Phase 2 and the policy (S2); the owner's line runs the same shape once more, critique rounds to `<rounds>` minus one, a confirming read at `<rounds>` at the most, then the next resolution round, and `<rounds>` is the rounds so far plus five when the owner names none (S3, with Review B's B1); only 1 to 5 without a leading zero and `R1` are rounds, `0`, `05`, `R0` refused, in the tests (S4); the floor is the launcher's, a bare launch breaks rule 8, in Phase 2 and KP-062's sign (S5, its second fix; the first accepted above); Review B's R1 reply is written to `REVIEW-DESIGN-<subject>-R1.md` after `verify`, the `.err` holding only the launcher's lines (S6); the R1 file asks for answers in place of findings, with no counts (C1); the confirming read's diffs labelled by critic (C2); the refusal names the file, the round and the run parameters file it looked in (C3); either separator, anywhere, every name checked (C4); "six verdict-bearing calls, and one re-run of a failed launch each" (C5).
++- 2, critique, file at 674e407, Review B (grok-4.7-medium): 1 / 3 / 2. Fixed: under the owner's line the confirming read is at `<rounds>` at the most, so it is never refused, said in Phase 2, standing rule 6, the policy, `plan-critic` and KP-062, with "save under the owner's line" on the confirming read's finality and the cost sentence (B1; its digest part accepted above); the refusal message `bridge-run: refused - ` in Phase 2 for all three refusals, and step 3b's exception names all three (S1); a failed launch runs once more, a second failure is a model's failure and the round is recorded as not run (S2); a non-convergent finding starts no round and waits for the resolution round, any other such finding still starts the next (S3); the digest's rule 6 reads "a due confirming read and a due resolution round", standing rule 6 states both conditions (C1); `R2` is the next resolution round under the line, holding what is still open after the first (C2).
++- 3, critique, file at 170a1f0, plan-critic: 1 / 3 / 4. Fixed: a subject is one token of lower-case letters, digits and hyphens, a change's chosen from its name and written in its record's heading; the launcher reads a name from `DESIGN-` up to `.md` and refuses one holding a space or a capital, or a design file with no `.md` after its name, with tests (B1, in Phase 2, the policy, KP-062 and the change log); `<rounds>` is a round number, the owner's number being how many more rounds (S1); the failed launch's second failure (S2, decided above); a subject is lifted once, a further send-back making a scoped revision (C1); the lifted resolution round only if anything is open (C2); the record gives each round's commit and kinds not run and refused (C3). S3 and C4 accepted above.
++- 3, critique, file at 170a1f0, Review B (grok-4.7-medium): 0 / 5 / 2. Fixed: the confirming read is "the fifth at the most, or `<rounds>` under the owner's line" (S1); Review B's resolution reply goes to `REVIEW-DESIGN-<subject>-R<n>.md` for the round just run, in Phase 2, the policy and plan-critic (S2); the migration's stop holds unless that subject's owner's line allows further rounds, in KP-062 and the change log (S3); a one-part name is a round with an empty subject, not `plan`: `DESIGN-1.md` to `DESIGN-5.md` allowed, `DESIGN-45.md` refused, with tests (S4); a second failed launch (S5, decided above); `<rounds>` never below six (C1); step 3b's exception is every exit 125 naming a design file (C2).
++- 4, critique (the last), file at 1d531c1, plan-critic: 0 / 6 / 3. Fixed: step 3b records both failed launches, the second making the mark, so the re-resolve can give another profile (S1); the round's grammar is a positive integer without a leading zero, or `R` and one, 1 to 5 and `R1` allowed without the line (S2); `<rounds>` counts from the last numbered round run, a resolution round not counted (S3); a running subject whose name is not a token takes one at calibration, an old plan critique `plan` (S4); the policy's launch names `R2` under the line (S5); the wait ends on the roster's return or the owner's word, then one launch with no re-runs, then an escalation (S6); plan-critic's Blocking grade says the last resolution round (C1); the report says how the owner's number is spent (C2); the refusal's message begins `bridge-run: refused - design ceiling: ` and step 3b keys on it (C3).
++- 4, critique (the last), file at 1d531c1, Review B (grok-4.7-medium): 0 / 6 / 2. Fixed: the confirming read is at `<rounds>` at the most under a line already written, and final; the save applies only to a line written after it; plan-critic states the number (S1); the policy's launch and plan-critic's Blocking grade name the last resolution round (S2, with plan-critic's S5 and C1); the migration's stop closes before the owner's line, which then continues the subject under Phase 2's shape (S3); the empty subject is never lifted, and a running old plan critique takes `plan` (S4, with plan-critic's S4); a subject token is distinct from `design`, `plan`, every other subject and every `<token>-plan` (S5); after the wait the same file runs once with no re-runs, a further failure escalated (S6, with plan-critic's S6); a second line for one subject ignored, with a test (C1); a leading zero refused on every round, `06` in the tests (C2).
++- 5, confirming read (final), file at e6f615f, plan-critic: 0 / 2 / 3. Fixed, recorded as fixed, unverified: the cost sentence counts two re-runs before the wait and one launch after it (S1); the change log's tests name the second line ignored and the message's round (S2); the report line says how `<rounds>` is spent, the two-rounds case an example (C1); the first well-formed line for a subject stands, a later one ignored, with a test (C2); every failed launch is recorded, the post-wait one included (C3).
++- 5, confirming read (final), file at e6f615f, Review B (grok-4.7-medium): 0 / 3 / 2. Fixed, recorded as fixed, unverified: a failed launch follows step 3b's exits as written, the first exit 4 (one retry), the second exit 3 (mark, re-resolve, one run on the profile it gives), a connection error or hit limit keeping exit 4 or 5 and no mark (S1, in Phase 2, step 3b, the policy, KP-062 and the change log); a failure of the post-wait launch leaves the round not run and sends the subject on to its resolution round or its gate (S2, in the same four places); the report line names the critique rounds through `<rounds>` minus one and the confirming read at `<rounds>` (S3, with plan-critic's C1); plan-critic reads "`<rounds>` at the most under a line already written" (C4); the change log's tests name the second line and the empty subject's case (C5, with plan-critic's S2).
++
++**Resolution**: none due. Nothing is open after the confirming read: no Blocking finding and no non-convergence in any round, so no resolution round runs, and the subject goes to its gate.
++
++**After the critique** (supervisor, at the brief, for the code gate's reviewers): the change log's and KP-062's migration notes gain one sentence, a round file named other than by its number (`-confirm`) is refused and its next file takes the next number (the spec-packager's note: release B's own plan critique used `DESIGN-plan-confirm.md`); the brief matches `run`, `review` and `DESIGN-` in any case, with a test. Not criticised by the two critics; reviewed at the code gate with the whole diff.
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 9ab2276..732c2a9 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -519,3 +519,12 @@ Every test was added or strengthened and none removed or loosened, so the earlie
+ - **Programs:** conformance-check.py:491-495 reports an existing PROJECT_STATUS.md that cannot be read as having no Workflows line (it fails closed; only the cause is wrong), and inventory-check.py's counterpart raises a traceback as before B2: a lead for TASK-024. Fixtures 5: an empty traits text is reported as "traits are not joined by a comma and one space", where the fix is `; traits: none`: a wording lead for the next change of workflow-check.py.
+ - **Texts:** supervisor.md:1821's "every name on the line is in the open list" reads as covering part names too (TASK-010 rewords that paragraph); the Glossary's Open list entry lists an entry's fields without Planned and Of type; extension-points.md does not say that a leading byte-order mark is dropped (b-trait-sets-bom rests on handoff/TASK-006-r2.md R2-2): leads for the next change of those files.
+ - **Tests:** the equivalent Review A found (seen.add moved above the order test) agrees with the classes above; the other two are separated after all and have cases: a status argument given twice (gate round 2, above), and allows_set read as `"set" in cell`, which a registry cell `add, reset` separates (handoff/TASK-006.md, the `set` finding: the cell split on commas and stripped; BUG-011's gate round 3, Review A; BUG-012, test_r014_set_changes_cell_is_split_on_commas_and_stripped).
++
++## Hotfix 2026.10.18a — the design critique's ceiling (HOTFIX-001, merged on release/2026.10.11 as 4624421, PR #39; carried onto main 2026-10-19)
++
++**Leads (the code gate, three rounds; recorded, not taken):**
++- **The trim's time on long runs.** `DESIGN_TRIM_BEFORE_SEP` (`[. ]+(?=[/\\])`) is tried at every start of a run of dots or spaces, so a prompt holding one run of many thousand dots or spaces before a separator takes time quadratic in its length. A launch prompt is the constant pointer, so no real prompt comes near it. Check: time `design_ceiling` on a prompt of 100,000 dots followed by `/`; if it takes more than a second, match the run once (a possessive or atomic form, or a hand-written scan).
++- **An allowed name followed by a space and a separator.** `run/review/DESIGN-ceiling-3.md /x` is read with the trim and refused as a name that cannot be read, where the file is an allowed round. The refusal fails closed and no launch is written that way. Check: a test with that argument, and the token's end taken at the first space before the trim runs.
++- **Accepted limits of the launcher's reading.** A path through `x/..`, a Windows 8.3 short name of the folder, a prompt that names the file in other words, and a second launch of an allowed round file are not refused; the text forbids each and KP-062 names the sign. Check: none planned; the record of each round's commit is the audit.
++- **The scope check's base on later rounds.** `scope-check.py` measures from the brief's first commit, so the supervisor's own commits between rounds (a round-2 brief, round-file commits) show as SCOPE DRIFT on round 2 and after; the builder's own change was confirmed with `git diff --stat <the round's brief commit>`. Check: a `--base` for re-delegations (a bridge feedback lead).
++- **The builder's baselines.** The builder's own suite runs showed the install and rollback tests failing in its environment only, where the supervisor's `test-runner` runs were green (944 passed, 20 skipped). Check: run the rollback tests under the agent home with the launcher's stripped environment once, to learn which variable they read (a bridge feedback lead).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 77feb94..905eaf7 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -1,6 +1,6 @@
+ # Inventory — Claude-Cursor Bridge
+ Reflected through: none
+-Updated: 2026-10-17
++Updated: 2026-10-19
+ 
+ The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
+ 
+@@ -17,6 +17,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The CI security floor | Semgrep (OSS engine, explicit rulesets, diff-aware), OSV-Scanner and Socket run in the `security floor` job beside the tests; the tests install from a committed lockfile; every action pinned by commit SHA, checkouts without persisted credentials, secrets only in step-level env | .github/workflows/tests.yml; requirements.lock; .semgrep.yml; osv-scanner.toml; socket.yml | tests/test_release_b_ci_floor.py | release B (TASK-002) |
+ | The workflow check | Checks every conditional workflow (types/, traits/) against the open list and the extension-point registry, and a status file's `Workflows:` lines against the open list; an unwritten type or sub-type fails, an unwritten trait is flagged; runs in CI over the bridge's workflow folder and the sample fixtures | bridge/cursor-bridge/workflow-check.py; .github/workflows/tests.yml (bridge programs job) | tests/test_workflow_check.py | release B (TASK-006) |
+ | The `Workflows:` status line | One line per part beside `Phase:`, naming the part's product type, sub-type and traits by the open list's workflow and trait names, in a stated grammar; `not yet classified` before intake. inventory-check.py and conformance-check.py fail a missing line, a malformed one (judged by workflow-check.py's check_status), lines that do not stand together right after `Phase:` (its check_placement), and rule files that cannot be loaded | bridge/commands/supervisor.md, "Project state"; bridge/cursor-bridge/inventory-check.py, conformance-check.py, workflow-check.py | tests/test_workflows_line_text.py; tests/test_workflows_line_check.py | release B (TASK-007; enforced since TASK-008) |
++| The design critique's ceiling | A design, plan or change critique stops after four rounds, one confirming read if the text changed and one resolution round, whatever is still open; the launcher refuses any cursor-agent launch naming a round file above five, a second resolution round, or a round file whose name cannot be read, unless the owner's `Design rounds above five:` line lifts that subject once | bridge/commands/supervisor.md, Phase 2; bridge/cursor-bridge/bridge-run.py (design_ceiling) | tests/test_bridge_run_design_ceiling.py | hotfix 2026.10.18a (HOTFIX-001; on main 2026-10-19) |
+ | The glossary's workflow terms | The closed set of release B's terms (main workflow core, phase module, extension point, product type, sub-type, trait, the conditional workflows, add/replace/set, the open list, workflow and sub-workflow names, the workflow check, the compaction-survival list), and a Phase entry listing all eight status values | bridge/cursor-bridge/Glossary.md, "Main and conditional workflows" | tests/test_glossary_terms.py | release B (TASK-009) |
+ 
+ ## Resources
+@@ -28,7 +29,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | GitHub repository (public; protected `main`, required checks: the tests jobs and `security floor`) | config | github.com/latentfoundrycode/p18-claude-cursor-bridge | the gate, every PR | pre-B |
+ | Semgrep 1.176.1 / OSV-Scanner 2.7.0 / Socket CLI 1.7.0 | tool | .github/workflows/tests.yml, job `security floor` (Semgrep through pipx at its version; OSV-Scanner's binary checked by SHA-256; Socket CLI at its version) | the bridge's CI gate | TASK-002 |
+ | jscpd 5.3.3 | tool | run by `npx --yes jscpd@5.3.3` at stage B2's refactoring pass, chosen as a release older than two weeks (5.4.1 was eight days old); 5.4.0 (2026-09-30) was also old enough and was overlooked, so the next pass takes the newest release then older than two weeks; jscpd 5.3.3 has no dependencies beyond its platform binaries, each pinned to 5.3.3 and without dependencies of their own, so the pin fixes the whole tree (npm, read 2026-10-17) | the stage-close refactoring pass (supervisor.md step 9) | 2026-10-17, supervisor |
+-| SOCKET_SECURITY_API_KEY | repo secret | GitHub repository secrets (name only) | the Socket step of the security floor (`SOCKET_CLI_API_TOKEN`) | the owner, 2026-10-12; free tier, no spend possible. 5 characters of its secret part were in public CI logs of PR #16 (ISS-005): replacement asked of the owner 2026-10-16 |
++| SOCKET_SECURITY_API_KEY | repo secret | GitHub repository secrets (name only) | the Socket step of the security floor (`SOCKET_CLI_API_TOKEN`) | the owner, 2026-10-12; free tier, no spend possible. 5 characters of its secret part were in public CI logs of PR #16 (ISS-005): those logs deleted and the key replaced by the owner 2026-10-18 (Socket allows one token, so the old one is void) |
+ | SEMGREP_APP_TOKEN | repo secret | GitHub repository secrets (name only) | nothing: Semgrep runs the OSS engine without a token (owner, 2026-10-12) | the owner; unused, no spend possible |
+ | SOCKET_ORG_SLUG, SOCKET_CLI_ORG_SLUG | repo variable (an identifier, public) | SOCKET_ORG_SLUG is a GitHub repository variable, value `latent-foundry`; SOCKET_CLI_ORG_SLUG is only the Socket step's environment name for it | the Socket step of the security floor: `socket ci` 1.7.0 reads SOCKET_CLI_ORG_SLUG before it asks the API (handoff/TASK-002-r6-report.md) | the owner, 2026-10-12 |
+ | BRIDGE_RUN_ALLOW_ANY | config | an optional override read by bridge-run.py (lets any command through the launcher); unset in normal use | bridge/cursor-bridge/bridge-run.py | pre-B; no value stored |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 6682ce7..466076c 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -1,31 +1,42 @@
+ # Project Status
+-Last updated: 2026-10-18
++Last updated: 2026-10-19
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: BUG-012 — BUG-011's gate round 3 should-fix (Review A; branch bug-012): a Changes cell holding `set` only inside a word (`add, reset`) refuses a Set, so allows_set read as `"set" in cell` fails a test; the HARDENING considers line that called it equivalent corrected, and gate round 3 recorded. Tests and records only, no program change
+-Last accepted: BUG-011, at commit e9ed1b2 (merged to main 2026-10-18, PR #37; three gate rounds, the third approved by both); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003 to BUG-011
+-Awaiting user on: deleting the logs of three PR #16 runs (38241764324, 38244794839, 38309209568) that still show 5 characters of the Socket key, and replacing the key (run sheet given 2026-10-16, run/supervisor/runsheet-socket-key-2026-10-16.md); blocks only stage B1's close, not the build
++Increment: HOTFIX-001 carried onto main (branch hotfix-001-main, the re-plan's step (3)): hotfix 2026.10.18a cherry-picked (MANIFEST.json regenerated, supervisor.md merged with main's own changes exactly), its critique record and hardening leads in docs/, this PR's CI the first run on the replaced Socket key. Parked: BUG-013 — stage B2's review, round 11 (branch bug-013): string-method rewrites of the workflow check's rules survive every test. The round's named cases, the string-method sweep's other separable survivors, each with a case, and the rest classed in HARDENING. Tests, fixtures and records only, no program change
++Last accepted: BUG-012, at commit 9a8fc6e (merged to main 2026-10-18, PR #38); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 and its records, BUG-003 to BUG-012
++Awaiting user on: none (the owner deleted PR #16's three logs, verified gone 2026-10-18, and replaced the Socket key 2026-10-18T20:15:24Z, the only token Socket allows, so the old one is void; the first CI run using it, step (3)'s PR into main, confirms it, then stage B1's review runs again)
+ Previously: stage B1's review (2026-10-16) — Review A and Review B both REJECT: this file was stale on main (fixed here), the stage tests were too weak (fixed here), the Socket key was in the environment while npm installed the CLI (BUG-001), and three key-bearing logs survived the owner's deletion of 2026-10-13 (the owner's run sheet). Paused by the owner 2026-10-13 (weekly usage limit); resumed 2026-10-16 on the owner's word, relayed by the maintainer, with "usage reset".
+-Next: BUG-012 through the gate; then stage B2's review again from its step 1 (round 11; rounds 1 to 10 rejected; round 10: idiom rewrites, which the idiom sweep now covers); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING; item 1 completes ISS-007 with its recurrences and ISS-008); then stage B3 (TASK-016 first); once the owner reports the logs deleted and the key replaced, stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b), then its reflection items.
++Next: HOTFIX-001's gate on main (test-runner, secret-sentinel, Review A, review files from run/supervisor/hotfix/write_review_hotfix001_main.py (merge base with origin/main; write_review_hotfix001.py is the release branch's, never for this step), Review B, CI with --required, merge, healthy marks, sync); then BUG-013 through the gate (merge origin/main into bug-013 first, this file taken from main); then stage B2's review again from its step 1 (round 12; a code-gate stage review, judged by defect class under standing rule 6: a finding of the same test-strength class goes to HARDENING and the stage closes, only a new class or a defeated safety mechanism blocks; 2026.10.18a's design ceiling does not reach it); then the demonstration and the reflection items (item 3 also copies the per-part lead into the Restructuring Plan's §16, see HARDENING; item 1 completes ISS-007 with its recurrences and ISS-008); then stage B3 (TASK-016 first); stage B1's review runs again on B1's whole change (9e181e6, fba63bc, 6743b25, 4d0f77b) once step (3)'s CI confirms the new key, then its reflection items.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation drivers mutate_ci_floor.py, mutate_workflow_check.py and mutate_workflows_line.py, the operator sweeps sweep_workflow_check.py, sweep_wide.py with regex_mutants.py, the control-flow sweep sweep_flow.py and the idiom sweep sweep_idiom.py, the list generators write_survivor_list.py, write_wide_list.py, write_flow_list.py and write_idiom_list.py, drafts/, in-flight.md as a scratch log while a review runs)
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail: the owner's run sheet runsheet-socket-key-2026-10-16.md, maintainer-b2.md, the mutation drivers mutate_ci_floor.py, mutate_workflow_check.py and mutate_workflows_line.py, the operator sweeps sweep_workflow_check.py, sweep_wide.py with regex_mutants.py, the control-flow sweep sweep_flow.py, the idiom sweep sweep_idiom.py and the string-method sweep sweep_strings.py with its separator search separate_strings.py and probe_unicode.py, the list generators write_survivor_list.py, write_wide_list.py, write_flow_list.py, write_idiom_list.py and write_strings_list.py, drafts/, in-flight.md as a scratch log while a review runs; the hotfix's position hotfix-position.md and hotfix/ with its critique record DESIGN_CRITIQUE.md, the round-file generator design_ceiling_file.py, the review-file writer write_review_hotfix001.py, SCOPE-HOTFIX-001.md, the change-log and KP-062 texts with apply_r2b.py; for step (3) on main write_review_hotfix001_main.py, SCOPE-HOTFIX-001-main.md, carry_records.py, hardening_hotfix.md)
+ Delegated gates: none
+-Remote sync: main at e9ed1b2, in sync 2026-10-18; branch bug-012 started from origin/main
++Remote sync: main at 9a8fc6e, in sync 2026-10-19; branches bug-013 and hotfix-001-main started from origin/main
+ Stage: B1 (supervised-project bootstrap) — closing; its stage review is to be repeated. Last reflection: none yet (intake 2026-10-11)
+-Open issues: ISS-007 open, recurred in round 10 (stage B2's review rejected ten rounds on one class, rules of the workflow check no test fails for; BUG-008 widened the sweep, BUG-009 gave it every white-space reading, BUG-010 added a control-flow sweep, BUG-011 an idiom sweep); ISS-008 open (the Other Models pool used up; the native profile on the owner's word); ISS-002 fixed 2026-10-13; ISS-005 fixed in code, its remaining logs and key replacement are the owner's, see Awaiting; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25
++Open issues: ISS-007 open, recurred in round 11 (stage B2's review rejected eleven rounds on one class, rules of the workflow check no test fails for; BUG-008 widened the sweep, BUG-009 gave it every white-space reading, BUG-010 added a control-flow sweep, BUG-011 an idiom sweep, BUG-013 a string-method sweep); ISS-008 open (the Other Models pool used up; the native profile on the owner's word); ISS-002 fixed 2026-10-13; ISS-005 fixed in code, the logs deleted and the key replaced by the owner, closed once HOTFIX-001's PR passes the Socket step on the new key; ISS-006, a roster-check test reading the Workspace's run log, fixed in 6743b25
+ Maintainer requests: Release B2 recorded as a post-B release (owner confirmed 2026-10-12; run/supervisor/maintainer-b2.md); FB-nnn closure at the first stage close
+-Bridge version: 2026.10.11d
+-Calibrated: n/a — the bridge runs the installed 2026.10.11d it is the source of; intake 2026-10-11
+-Calibration pending: none
+-Conformance notes (2026-10-16, stage B1 close): MISSING for the bridge as a project — the Workspace boundary rule, the secure-coding rule, the boundary-check hook, the windowless check in the hooks (all `.cursor/` builder configuration), and the diagram index (No diagram index is a recorded decision); configuration items for the next stage
++Bridge version: 2026.10.18a
++Calibrated: 2026-10-19 from 2026.10.11d to 2026.10.18a — applied: the design critique's ceiling (no design, plan or change critique is running here: release B's plan critique and the hotfix's both closed at their gates, so no subject takes a token and no round file is renamed; it does not reach stage B2's review, a code-gate stage review, which stays under standing rule 6's by-class brake), project.json's state; pending: the conformance MISSING items @ stage B3's start (below); not applied (gate passed): none
++Calibration pending: at stage B3's start, as configuration work — the Workspace boundary rule, the secure-coding rule, the boundary-check hook and the windowless check in the hooks (`.cursor/` builder configuration, recorded 2026-10-16), and the generated command reference docs/cli-reference.json (rule 32, newly reported 2026-10-19 under --installable)
++Conformance notes (2026-10-19, calibration): the diagram index is MISSING (No diagram index is a recorded decision); NOTE the repository is public; NOTE the design exists under other names (DESIGN_CRITIQUE.md), for the diagram retrofit; NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, reviewed at calibration step 2b
+ Run parameters: see docs/RUN_PARAMETERS.md (stage pause=run / merge authority=supervisor / refactoring pass=on / installer verification=n/a / parallel increments=off)
+ 
++## Re-plan (the owner, 2026-10-18, confirmed in this session's chat: "Yes, resume in that order")
++The design two-critic loop's ceiling is fixed first, as a hotfix of the installed 2026.10.11d, then release B resumes: (1) BUG-013 parked on its branch (below); (2) the hotfix on branch release/2026.10.11, cut from 64ad75a (2026.10.11d), its position in run/supervisor/hotfix-position.md while that branch is checked out (it has no docs/); (3) the same change carried onto main; (4) BUG-013 resumed, then stage B2's review round 12 and the rest of release B. The install and the projects' pause around it are the maintainer's, on the owner's word.
++- Step (2) done 2026-10-18: hotfix 2026.10.18a merged on release/2026.10.11 as 4624421 (PR #39, CI green); the maintainer told it is ready to install. Its full position, the critique record and the hardening items are in run/supervisor/hotfix-position.md and run/supervisor/hotfix/.
++- **Paused** after step (2) on the owner's order (2026-10-18: pause so they can restart the app and calibrate). On resume, on their word: step (3), carrying 4624421 onto main through the gate (its CI is the first to use the replaced Socket key, which closes that item and unblocks B1's close); then step (4).
++
++## BUG-013, parked (paused 2026-10-18 on the owner's "gracefully pause", then parked for the re-plan)
++- Branch bug-013, its work committed there without the gate (no gate step has run): the round-11 named cases, the string sweep's cases (the second round-11 block at the end of tests/test_workflow_check.py, test_r015_placement_reads_whole_lines_by_their_prefix and test_r015_conformance_a_status_folder_is_no_status_file in tests/test_workflows_line_check.py), three new LF fixtures, extra.md's new body, this file. The two test files passed (482 passed 2 skipped; 79 passed 2 skipped).
++- The string sweep: 292 survivors of 433 on main, 261 after the named cases, 202 on the final tests (run/supervisor/sweep_strings_main.out, _r1, _r3), all classed by write_strings_list.py --check. The confirming run on the committed tests (`--only sweep_strings_r3.out`, output _r4) was stopped at the pause: run it first on resume.
++- The HARDENING round-11 section is drafted at run/supervisor/drafts/hardening_r11.md: replace CLASSES_GO_HERE with write_strings_list.py's output, then append it to docs/HARDENING.md with run/supervisor/append_crlf.py (CRLF).
++- Then: full suite (background, `# wake`), test-runner, secret-sentinel, commit with an `Assumptions:` section, PR "BUG-013: ...", the gate (review files from a write_review_bug013.py, base 9a8fc6e), merge, healthy marks, sync; then stage B2's review round 12 (STAGE-B2l), its squash list with BUG-013's added.
++
+ ## Release B — notes for a resuming session
+ - This is the first release the bridge's own supervisor builds, as a supervised project (§15 condition 6). The design is the Restructuring Plan (Documents/Claude-Cursor Bridge Restructuring Plan.md), release B, §16 and §6.
+ - Roster: the native profile (builder composer-2.5, Review A claude-opus-5-5, Review B grok-4.7-medium) since 2026-10-18, on the owner's word ("use the alternative roster") after Cursor's Other Models pool was used up (ISS-008); the full profile (builder grok-4.7-medium, Review B gpt-5.6-sol-high) returns on 2026-11-16 UTC, or earlier if the owner says *usage reset*. Earlier: native 2026-10-12 to 2026-10-16, full 2026-10-16 to 2026-10-18.
+diff --git a/handoff/HOTFIX-001-r1-report.md b/handoff/HOTFIX-001-r1-report.md
+new file mode 100644
+index 0000000..368266d
+--- /dev/null
++++ b/handoff/HOTFIX-001-r1-report.md
+@@ -0,0 +1,38 @@
++# HOTFIX-001 r1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/bridge-run.py`
++
++## Summary
++
++Added `design_ceiling(argv, folder)` and helpers in `bridge-run.py` to scan joined `cursor-agent` arguments for `run/review/DESIGN-<name>.md` paths (case-insensitive folders, either separator), parse subject and round, enforce the default ceiling (numbered rounds 1–5 and `R1`) or an owner's `Design rounds above five:` line in `docs/RUN_PARAMETERS.md`, and return a one-line `design ceiling:` reason when a name is unreadable or over the ceiling. `main()` calls it immediately after the `--key-file` refusal and returns 125 before kind, limit, or `bridge-run: started`. One module docstring line documents the refusal.
++
++## Tests run
++
++Baseline (before edits): `python -m pytest -q tests` → `76 failed, 835 passed, 20 skipped, 9 errors in 274.86s (0:04:34)`. Failing ids: all 51 in `tests/test_bridge_run_design_ceiling.py`; 25 in `tests/test_rollback.py` (listed in baseline log); 9 errors in `tests/test_rollback.py` (same log).
++
++Acceptance: `python -m pytest -q tests/test_bridge_run_design_ceiling.py` → `51 passed in 0.76s`.
++
++Launcher: `python -m pytest -q tests/test_bridge_run.py` → `16 passed in 13.76s`.
++
++Final full suite: `python -m pytest -q tests` → `38 failed, 873 passed, 20 skipped, 9 errors in 161.35s (0:02:41)`.
++
++## Test result changes
++
++- All 51 `tests/test_bridge_run_design_ceiling.py` cases: failed → passed.
++- `tests/test_install_check.py::test_the_source_tree_is_checked_against_its_manifest_only`: passed → failed (`STALE cursor-bridge/bridge-run.py`; MANIFEST not restamped per scope; supervisor restamps).
++- Twelve further `tests/test_install_check.py` and `tests/test_install_check_a4.py` cases failed in the final run (install/check flows that copy the source tree and hit the stale manifest); they were not in the baseline failure list and are attributed to the same unstamped `bridge-run.py` edit, not to design-ceiling logic.
++- `tests/test_rollback.py` failures and errors: unchanged in count and ids versus baseline (25 failed, 9 errors).
++
++## How `main` keeps the started line first on refusal
++
++`design_ceiling` runs after command acceptance and the `--key-file` check but before `run_id`, `sys.stderr.write("bridge-run: started …")`, `write_log`, or `write_pid_file`; a refusal writes only `bridge-run: refused - …` and returns 125, so nothing is logged and no started line is emitted.
++
++## Assumed, not verified
++
++Assumed, not verified: none.
++
++## Builder notes
++
++2026-10-18: Baseline full-suite run took ~4.5 minutes while design-ceiling tests were still failing; parallel work started after baseline began but before it finished.
+diff --git a/handoff/HOTFIX-001-r2-report.md b/handoff/HOTFIX-001-r2-report.md
+new file mode 100644
+index 0000000..6cf4a52
+--- /dev/null
++++ b/handoff/HOTFIX-001-r2-report.md
+@@ -0,0 +1,43 @@
++# HOTFIX-001 r2 report
++
++## Files changed
++
++- `bridge/cursor-bridge/bridge-run.py`
++
++## Summary
++
++Round 2 updates `design_ceiling` in `bridge-run.py` per Review A: path segments are normalised before matching `run/review/DESIGN-`; design names are parsed with one anchored regex; refusal reasons name the file, `(subject …, round …)`, and whether the name is unreadable, above the numbered ceiling, or past the resolution limit; owner's lines accept Markdown bold/colon variants and ASCII `[0-9]+` rounds only; `docs/RUN_PARAMETERS.md` is read only when the command names a design file; constants cover default round 5 and resolution limits 1 and 2; refusal text is forced to ASCII with `backslashreplace`.
++
++## Tests run
++
++Baseline before round 2 edits (acceptance only, round 1 code in tree): `python -m pytest -q tests/test_bridge_run_design_ceiling.py` → `15 failed, 54 passed in 1.71s`. Failed ids: `test_doubled_separators_and_dot_segments_name_the_same_file` (all six parametrized cases), `test_the_refusal_says_which_refusal_it_is_and_names_the_round` (five cases), `test_under_the_owners_line_the_refusal_names_the_lifted_ceiling`, `test_the_refusal_is_ascii_whatever_the_name_holds`, `test_the_owners_line_is_read_in_its_markdown_forms[colon-inside-bold]`, `test_the_owners_line_takes_a_lower_case_subject_and_ascii_digits_only[arabic-indic-digit]`.
++
++Full-suite baseline from round 1 report (before any HOTFIX-001 edit): `76 failed, 835 passed, 20 skipped, 9 errors in 274.86s`.
++
++Acceptance: `python -m pytest -q tests/test_bridge_run_design_ceiling.py` → `69 passed in 0.76s`.
++
++Launcher: `python -m pytest -q tests/test_bridge_run.py` → `16 passed in 14.50s`.
++
++Final full suite: `python -m pytest -q tests` → `38 failed, 891 passed, 20 skipped, 9 errors in 164.20s`.
++
++## Test result changes (round 2 vs pre-r2 acceptance)
++
++- All 15 previously failing `tests/test_bridge_run_design_ceiling.py` cases (and the 18 supervisor-added cases that already passed on round 1): now pass; total 69/69 on that module.
++- Versus round 1 final full suite (`38 failed, 873 passed, 20 skipped, 9 errors`): pass count rose by 18 (new tests only); failure and error counts unchanged; `tests/test_install_check.py::test_the_source_tree_is_checked_against_its_manifest_only` still fails (`STALE cursor-bridge/bridge-run.py`; MANIFEST out of scope).
++- `tests/test_rollback.py` failures/errors: unchanged versus round 1 final (25 failed, 9 errors).
++
++## How `main` keeps the started line first on refusal
++
++`design_ceiling` runs after command acceptance and the `--key-file` check but before `run_id`, `sys.stderr.write("bridge-run: started …")`, `write_log`, or `write_pid_file`; a refusal writes only `bridge-run: refused - …` and returns 125, so nothing is logged and no started line is emitted.
++
++## Assumed, not verified
++
++- Token ends at the first character in the class `[^\s\"'`]+` (space, tab, CR, LF, quotes, backquote) · matches round 1 behaviour and `test_trailing_punctuation_is_not_part_of_the_name` · a prompt with another delimiter would show otherwise.
++- `DESIGN_LIFT_RE` uses `re.I` on the whole pattern so only the label is case-insensitive in practice; subject must match `[a-z0-9-]+` · `test_the_owners_line_takes_a_lower_case_subject_and_ascii_digits_only[subject-in-capitals]` · a line with a mixed-case subject that still matched `[a-z0-9-]+` would differ.
++- Owner `<rounds>` must be ASCII `[0-9]+`; Arabic-Indic digits do not form a well-formed line · `test_the_owners_line_takes_a_lower_case_subject_and_ascii_digits_only[arabic-indic-digit]` · a line with only ASCII digits would lift.
++- Path normalisation `re.sub(r"[/\\]+(?:\.[/\\]+)*", "/", text)` is sufficient for doubled separators and `/.` segments but not `..` or 8.3 names · handoff Round 2 point 1 · no test covers `x/..`.
++- Non-`.md` tokens that fail the unreadable path still call `design_refuse_name(None, …)`; empty token after strip is skipped without refusal · no dedicated test · a `DESIGN-` with no token would need one.
++
++## Builder notes
++
++2026-10-18: Round 2 did not re-run the full pre-edit suite; full-suite comparison uses the round 1 report baseline and the post-r2 final run.
+diff --git a/handoff/HOTFIX-001-r3-report.md b/handoff/HOTFIX-001-r3-report.md
+new file mode 100644
+index 0000000..6d7baf5
+--- /dev/null
++++ b/handoff/HOTFIX-001-r3-report.md
+@@ -0,0 +1,43 @@
++# HOTFIX-001 r3 report
++
++## Files changed
++
++- `bridge/cursor-bridge/bridge-run.py`
++
++## Summary
++
++Round 3 applies Review B and Review A follow-ups on `design_ceiling`: strip runs of dots and spaces immediately before path separators (Windows folder-name quirk) before the existing separator normalisation; catch `ValueError` from `int()` on oversized round or owner `<rounds>` digits so refusal stays a reason string, not a traceback; scope case-insensitivity on the owner's-line label with `(?i:…)` and remove whole-pattern `re.I` so subject and rounds stay strictly lower-case and ASCII digits.
++
++## Tests run
++
++Baseline before round 3 edits (full suite, round 2 code in tree): `python -m pytest -q tests` → `43 failed, 892 passed, 20 skipped, 9 errors in 159.09s`. The six acceptance cases that failed on round 2 code: `test_a_folder_name_ending_in_dots_or_spaces_names_the_same_file` (all five parametrized cases), `test_a_round_too_long_for_int_is_refused_without_a_traceback`.
++
++Acceptance before round 3 edits: `python -m pytest -q tests/test_bridge_run_design_ceiling.py` → `6 failed, 69 passed in 0.84s` (same six ids as above).
++
++Acceptance after: `python -m pytest -q tests/test_bridge_run_design_ceiling.py` → `75 passed in 0.84s`.
++
++Launcher: `python -m pytest -q tests/test_bridge_run.py` → `16 passed in 14.49s`.
++
++Final full suite: `python -m pytest -q tests` → `38 failed, 897 passed, 20 skipped, 9 errors in 165.37s`.
++
++## Test result changes (round 3 vs baseline)
++
++- All six previously failing `tests/test_bridge_run_design_ceiling.py` cases now pass; module total 75/75.
++- Versus round 2 final full suite (`38 failed, 891 passed, 20 skipped, 9 errors`): pass count rose by six (supervisor-added cases only); failure and error counts unchanged; `tests/test_install_check.py::test_the_source_tree_is_checked_against_its_manifest_only` still fails (`STALE cursor-bridge/bridge-run.py`; MANIFEST out of scope).
++- `tests/test_rollback.py` failures/errors: unchanged versus round 2 final.
++
++## How `main` keeps the started line first on refusal
++
++`design_ceiling` runs after command acceptance and the `--key-file` check but before `run_id`, `sys.stderr.write("bridge-run: started …")`, `write_log`, or `write_pid_file`; a refusal writes only `bridge-run: refused - …` and returns 125, so nothing is logged and no started line is emitted.
++
++## Assumed, not verified
++
++- `DESIGN_TRIM_BEFORE_SEP` (`[. ]+(?=[/\\])`) matches only dots and spaces before `/` or `\`, not other Unicode space · round 3 point 1 and `test_a_folder_name_ending_in_dots_or_spaces_names_the_same_file` · a path with another character before the separator would differ.
++- `int()` `ValueError` on overlong digit strings is treated as above the numbered or resolution ceiling, not as unreadable name · `test_a_round_too_long_for_int_is_refused_without_a_traceback` · a different policy would change refusal wording.
++- Owner-line label case folding via `(?i:Design rounds above five)` leaves `[a-z0-9-]+` subject and `[0-9]+` rounds case-sensitive · `test_the_owners_line_takes_a_lower_case_subject_and_ascii_digits_only` · mixed-case subject in a line that still matched would lift incorrectly.
++- Token ends at the first character in `[^\s\"'`]+` · `test_trailing_punctuation_is_not_part_of_the_name` · another delimiter in a prompt would show otherwise.
++- Path normalisation after trim does not handle `..` or 8.3 short names · handoff accepted limit · no test covers `x/..`.
++
++## Builder notes
++
++2026-10-18: Full-suite baseline was captured at session start on round 2 code (`43 failed`); round 2 report used `38 failed` after its edit; the higher pre-r3 failure count matches the same rollback/install_check set plus environment variance, not a regression from round 3.
+diff --git a/handoff/HOTFIX-001.md b/handoff/HOTFIX-001.md
+new file mode 100644
+index 0000000..bf9f31a
+--- /dev/null
++++ b/handoff/HOTFIX-001.md
+@@ -0,0 +1,206 @@
++# HOTFIX-001: the launcher holds the design critique's ceiling
++
++## Objective
++This is a hotfix of the bridge's release 2026.10.11d, cut on the branch `hotfix-ceiling` as version 2026.10.18a (KP-062). On 2026-10-18 one supervised project ran its design two-critic loop for 45 rounds on one change, which used up the owner's Cursor allowance. The text that limits that loop is already committed (`bridge/commands/supervisor.md`, Phase 2). This hotfix adds the program change that enforces it. `bridge/cursor-bridge/bridge-run.py`, the launcher every `cursor-agent` run goes through, gets a function `design_ceiling(argv, folder)`. It reads the `run/review/DESIGN-<name>.md` file names in a `cursor-agent` command and refuses a design round above the ceiling with exit 125, before anything starts. Commands that do not name a design file behave exactly as they do today.
++
++Satisfies: there is no build-plan increment and no requirements register for this work. The increment id is HOTFIX-001. The requirement is the committed text quoted under Context ("The launcher holds the ceiling." and "The owner's line.", `bridge/commands/supervisor.md`, Phase 2), with the test list in `bridge/cursor-bridge/CHANGELOG.md`, entry `## 2026.10.18a`, bullet "**The launcher holds the ceiling**". The trace to that requirement is the docstring of `tests/test_bridge_run_design_ceiling.py`, which names 2026.10.18a, KP-062 and both paragraphs.
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/bridge-run.py
++- handoff/HOTFIX-001-r1-report.md
++- handoff/HOTFIX-001-r2-report.md (round 2)
++- handoff/HOTFIX-001-r3-report.md (round 3)
++
++Do not modify anything else. In `bridge-run.py`, the only docstring change allowed is one added line in the module docstring that names the new refusal. The rest of the docstring stays as it is.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration (`.github/`)
++- docs/ and handoff/, except the files the Scope section names
++- `tests/`, all of it. Do not edit `tests/test_bridge_run_design_ceiling.py`: the supervisor wrote it and it is the acceptance test. Do not edit `tests/conftest.py` or any other test either.
++- `bridge/cursor-bridge/MANIFEST.json` and `bridge/cursor-bridge/VERSION`. The supervisor restamps them after your run. Do not run `tools/make-manifest.py`.
++- Every text file. That includes `bridge/commands/*.md`, `bridge/cursor-bridge/CHANGELOG.md`, `bridge/agents/*.md`, `README.md` and the `*.snapshot.md` files.
++- Every other program under `bridge/cursor-bridge/` (`bridge_env.py`, `review-guard.py`, `bridge-check.py` and the rest).
++- `run/` (the files there, such as `run/review/DESIGN-plan-*.md`, are records; do not touch them) and `.git/`.
++
++## Context
++**Where you are.** This checkout is the bridge's own source repository (the folder you were started in, branch `hotfix-ceiling`). It is not a supervised project. It has no `docs/BUILD_PLAN.md`, no `docs/DESIGN.md` and no `docs/INVENTORY.md`, and it has no `.cursor/rules/` folder. The secure-coding and minimal-code principles are in `bridge/cursor-bridge/secure-coding.snapshot.md` and `bridge/cursor-bridge/minimal-code.snapshot.md`. Read them as the rules in force. Do not copy them anywhere.
++
++**Development data:** none. The work runs only the test suite, and the tests use pytest's `tmp_path` and a temporary home (`tests/conftest.py`, the `home_of_the_tests` autouse fixture). Never run `bridge-run.py` against a real project's folder or against the installed bridge under `~/.claude/cursor-bridge/`, and never run it with a real `cursor-agent` command.
++
++**Security context.** The trust boundary is the launcher's command line. The supervisor writes the `cursor-agent` arguments, and the prompt text in them can carry names that came from model output. The launcher is the gate that must hold even when the supervisor does not, which is why `supervisor.md` says "The floor is the launcher's". So the reading must refuse whatever it cannot read and never let it through unchecked. No ASVS level is recorded for the bridge. The rules that apply: never print or read a key file (`key_file_env` is untouched by this work), no new dependency, standard library only.
++
++**The governing text.** It is quoted below verbatim from `bridge/commands/supervisor.md`, Phase 2, lines 395 to 432. The text wins over this brief's specification if the two disagree. If you find a disagreement, stop: do not choose between them. Report the disagreement in your report and your last message.
++
++```
++**The launcher holds the ceiling.** `bridge-run.py` reads every `cursor-agent` command whose
++arguments name, anywhere and with either path separator, a file `run/review/DESIGN-<name>.md`;
++every such name is checked, and one refused name refuses the launch. A name is read from
++`DESIGN-` up to `.md` and holds only lower-case letters, digits and hyphens, but for the round's
++`R`. The round is the name's last hyphen-separated part: a positive integer written without a
++leading zero, or `R` and such an integer; the subject is the rest. Without the owner's line,
++rounds 1 to 5 and `R1` are allowed. A name of one part is a round with an empty subject, which
++is not `plan` (`DESIGN-5.md`, the plan's file before 2026.10.18a: `DESIGN-1.md` to
++`DESIGN-5.md` allowed, `DESIGN-45.md` refused; no line can name that subject, so it is never
++lifted). It refuses, with exit 125, before anything starts, and with a message that begins
++`bridge-run: refused - design ceiling: ` and names the file, the round and the
++`docs/RUN_PARAMETERS.md` it looked in, three things: a name it cannot read that way (a space or
++a capital in it, `0`, `05`, `06`, `R0`, a round that is no number, a `run/review/DESIGN-` with
++no `.md` after its name), a round above five, and a resolution round `R2` or later. The floor is the launcher's:
++a design-mode `cursor-agent` started other than through `bridge-run.py` has no ceiling and
++breaks rule 8. A refusal is neither a failed review nor a model's failure (step 3b): it is not
++retried and no `--record-failure` follows it; the subject goes on to its resolution round or its
++gate, as above.
++
++**The owner's line.** The owner's words lift the ceiling for one subject: a line
++`Design rounds above five: <subject> <rounds> (<their words>, <date>)` in
++`docs/RUN_PARAMETERS.md`, the subject compared exactly and `<rounds>` above five, lets the
++launcher allow that subject rounds 1 to `<rounds>`, `R1` and `R2`, and nothing beyond. Under it
++the subject runs the same shape once more from where it stands: critique rounds under the stop
++rule up to `<rounds>` minus one, then a confirming read if the text changed (round `<rounds>` at
++the most), then, if anything is still open, its next resolution round (`R1` if it has had none,
++else `R2`, holding what is still open after the first), then the gate. You never ask for that
++line: it is written only on the owner's own words, given unprompted or at the gate, where the
++record shows what is open (an owner who sends a design back at its gate to be criticised again
++gives exactly those words). `<rounds>` is a round number, never a count: the number of the
++last numbered round run (a resolution round not counted) plus the number the owner names, or
++plus five when they name none; it is never below six; the line records their words as given,
++and the report that records it says in one line how `<rounds>` is spent: critique rounds through
++`<rounds>` minus one, then the confirming read at `<rounds>` if the text changed (for an owner
++who named two after round four: one critique round, then the confirming read). A subject is
++lifted once: the first well-formed line for it stands and a later one is ignored: the owner's words to criticise it again after that make it a scoped revision, a change
++with a subject of its own. Before the run-parameters step the line is written to
++`docs/RUN_PARAMETERS.md` on its own, creating the file; that step adds its lines beside it.
++```
++
++The test list for this text is in `bridge/cursor-bridge/CHANGELOG.md`, entry `## 2026.10.18a`, bullet "**The launcher holds the ceiling**". Read it; do not edit it.
++
++**What exists in `bridge/cursor-bridge/bridge-run.py` today.** Quoted exactly:
++- `def head_of(argv):` returns `os.path.basename(argv[0]).lower().replace(".exe", "").replace(".cmd", "") if argv else ""`. Use it for "the head is `cursor-agent`".
++- `def owner_cap(kind, folder):` is the sibling reader whose way of reading `docs/RUN_PARAMETERS.md` the new owner's line follows. Its body:
++  ```python
++  try:
++      with open(os.path.join(folder, "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
++          for line in f:
++              m = re.match(r"^\s*[-*]?\s*\**Ceiling above twice\**\s*:\s*(\w+)\s+(\d+)\s*\((.+)\)", line.strip(), re.I)
++              if m and m.group(1).lower() == kind and m.group(3).strip():
++                  return int(m.group(2))
++  except OSError:
++      pass
++  return None
++  ```
++- `def main():` sets `folder = os.getcwd()` (line 421). It then refuses an unaccepted command (lines 431 to 433) and refuses `--key-file` with `cursor-agent` (lines 434 to 436):
++  ```python
++      if "--key-file" in flags and head_of(cmd) == "cursor-agent":
++          sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
++          return 125
++  ```
++  After that, `main` chooses the kind and the limit, computes `run_id`, and writes the first stderr line of a started run (line 456): `sys.stderr.write("bridge-run: started %s\n" % run_id)`. The run is logged to `run/launcher/runs.jsonl` (`write_log`) only after the command has started.
++- File conventions: plain module-level functions, `re`, short docstrings, constants in upper case near the top, ASCII-only source ("ASCII-only on purpose (cp1252 consoles)" in the module docstring), every refusal written as one `bridge-run: refused - ...` line followed by `return 125`.
++- Tests load the program as a module through `tests/conftest.py`'s `program` fixture (`load_program("bridge-run")`) and call `br.design_ceiling(argv, str(tmp_path))` directly. So the function must be at module level with exactly that name and signature.
++
++**A value fixed by the owner.** The ceiling is fixed: 5 rounds and `R1` without the owner's line, and `R2` as the most the line allows. The test file pins it. Do not change it.
++
++## Diagrams
++None. This repository has no normative diagrams, and the hotfix has no build-plan `Diagrams:` field.
++
++## Requirements
++1. `bridge-run.py` has a module-level function `design_ceiling(argv, folder)`. It returns `None` when the launch is allowed and a reason string when it is refused. `argv` is the inner command (the `cmd` list in `main`) and `folder` is the launcher's current folder.
++2. Only a command whose `head_of(argv)` is `cursor-agent` is read; for any other command the function returns `None`. The mode (`--mode=ask`, `--force`, `--mode=plan`, or none) makes no difference.
++3. The arguments are joined with spaces. Every occurrence of `run` + separator + `review` + separator + `DESIGN-` is found, where each separator is either `/` or `\` and the occurrence can be anywhere in the text (the prefix of an absolute path makes no difference). `REVIEW-DESIGN-` does not match, because the text right before `DESIGN-` must be the `review` folder and its separator. Match these three, `run`, `review` and `DESIGN-`, ignoring case (on Windows `Run\Review\DESIGN-x-6.md` names the same file and must not slip past); the name after `DESIGN-` is still read as point 5 says, capitals refused.
++4. For each occurrence, the token is the text after `DESIGN-` up to the next white space, quote (`"` or `'`) or backquote. Strip any trailing `.`, `,`, `;`, `:`, `)`, `]`, `}` and quotes from it. The result must then end in `.md`; otherwise the name cannot be read. The name is the token without `.md`.
++5. The name may hold only lower-case letters, digits and hyphens, except for an `R` that starts the round. The round is the name's last hyphen-separated part. The subject is everything before the last hyphen, and it is empty when there is no hyphen: a one-part name such as `5` is round 5 with an empty subject, and the empty subject is not `plan`. The round must be a positive integer without a leading zero (`[1-9][0-9]*`), or `R` followed by such an integer. Any other name cannot be read and is refused. That covers an empty round, `0`, `05`, `06`, `R`, `R0`, `R01`, `R02`, `r1`, `confirm`, `5b`, a capital letter or a space anywhere in the name, and a token that does not end in `.md`.
++6. Without the owner's line, rounds 1 to 5 and `R1` are allowed. A round above 5, and `R2` or later, are refused.
++7. The owner's line is read from `os.path.join(folder, "docs", "RUN_PARAMETERS.md")`, the way `owner_cap` reads `Ceiling above twice`. The line is `Design rounds above five: <subject> <rounds> (<their words>, <date>)`, optionally led by `-` or `*` and by bold marks. The subject is a token of lower-case letters, digits and hyphens, compared exactly. `<rounds>` is a decimal integer, parsed with `int`. The words inside the parentheses must not be empty.
++8. A line without words, or whose `<rounds>` is not above 5, is not well-formed. Skip it: it does not use up the subject's lift. The first well-formed line for a subject stands, and any later line for the same subject is ignored. Under that line, the subject is allowed rounds 1 to `<rounds>`, `R1` and `R2`, and nothing beyond. No line can name the empty subject. A missing or unreadable file (an `OSError`, or content that does not decode as UTF-8) counts as no line.
++9. Every name found in the command is checked. If any name is refused, the launch is refused, and the reason is the one for the first refused name.
++10. The reason string begins with `design ceiling: ` and is one line, with no newline inside. It names all of the following:
++    - the file: `DESIGN-<name>.md` as read, or the raw token when the name cannot be read
++    - the subject
++    - the round
++    - the full path of the `docs/RUN_PARAMETERS.md` it looked in, built from `folder`, so the text contains the folder
++    - the words `Design rounds above five:`, which start the line that lifts the ceiling
++    - `supervisor.md` (Phase 2, where the rule is)
++    The string is ASCII text.
++11. `main()` calls `design_ceiling(cmd, folder)` right after the existing `--key-file` refusal (after line 436) and before the kind, the limit and the `bridge-run: started` line. When it returns a reason, `main` writes `bridge-run: refused - <reason>` and a newline to stderr and returns 125. Nothing is started, nothing is written to `run/launcher/runs.jsonl`, no pid file is written, and no `started` line is printed.
++12. For every command that names no `run/review/DESIGN-` file, the behaviour is unchanged. That includes `cursor-agent` code reviews (`REVIEW-012.diff`, `STAGE-B2.diff`, `REVIEW-DESIGN-*.err`), `gh pr checks`, and the test suites. The `started` line stays the first stderr line of every run that starts.
++13. It behaves the same on Windows and POSIX. It uses the standard library only (`re` and `os` are already imported) and adds no dependency.
++
++## Acceptance criteria
++- [ ] `tests/test_bridge_run_design_ceiling.py` passes in full, all 51 tests (today all 51 fail because `design_ceiling` does not exist):
++  - `test_rounds_up_to_five_and_one_resolution_round_are_allowed`, 8 cases: `design-1`, `design-4`, `design-5`, `plan-5`, `azure-allowance-5`, `change-2-5`, `design-R1`, `5`
++  - `test_a_sixth_round_and_a_second_resolution_round_are_refused`, 7 cases: `design-6`, `plan-7`, `azure-allowance-45`, `change-2-6`, `design-R2`, `design-R3`, `6`
++  - `test_a_round_that_cannot_be_read_is_refused`, 14 cases: `design-0`, `design-05`, `design-R0`, `design-R01`, `design-confirm`, `ceiling-5b`, `design-`, `design-R`, `Azure monthly allowance-1`, `Design-1`, `azure-Allowance-2`, `design-r1`, `design-06`, `design-R02` (each with an owner's line for its subject present)
++  - `test_a_design_file_whose_name_does_not_end_in_md_is_refused`
++  - `test_a_one_part_name_is_a_round_with_an_empty_subject`, 5 cases: `1` allowed, `5` allowed, `45` refused, `R1` allowed, `R2` refused (with a line lifting `plan` present)
++  - `test_trailing_punctuation_is_not_part_of_the_name`
++  - `test_an_absolute_path_is_read_too`
++  - `test_the_folders_are_matched_in_any_case`
++  - `test_one_refused_name_among_several_refuses_the_launch`
++  - `test_the_refusal_names_the_file_and_where_it_looked_for_the_owners_line`
++  - `test_the_mode_does_not_matter`
++  - `test_other_files_and_commands_are_not_touched`
++  - `test_a_windows_path_is_read_too`
++  - `test_the_owners_line_lifts_the_ceiling_for_its_subject_only`
++  - `test_a_second_line_for_one_subject_is_ignored`
++  - `test_the_first_well_formed_line_stands`
++  - `test_a_line_without_the_owners_words_or_not_above_five_lifts_nothing`, 4 cases: `no-words`, `empty-words`, `not-above-five`, `below-five`
++  - `test_the_launcher_refuses_with_125_before_it_starts_anything` (end to end: exit 125, stderr begins `bridge-run: refused - design ceiling: `, no `bridge-run: started`, no `run/launcher/runs.jsonl`)
++- [ ] The rest of the suite gives the same results as before your change: the same tests pass and the same tests fail. There is one expected exception. `tests/test_install_check.py::test_the_source_tree_is_checked_against_its_manifest_only` compares the source tree with `MANIFEST.json`, which you do not restamp. If it passes before your change and fails after, report that and leave it; the supervisor restamps. Record the baseline before you change anything (see Done).
++- [ ] No behaviour changes for a command that names no `run/review/DESIGN-` file. `tests/test_bridge_run.py` and the other suites that launch `bridge-run.py` give unchanged results.
++- [ ] The governing text is fully met, with no placeholder, no stub and no "later" path. The trace to it is the acceptance test module's docstring, which already names 2026.10.18a, KP-062 and both paragraphs. Do not add a test.
++- [ ] `bridge-run.py` stays ASCII-only, standard library only, with the same style (plain functions, `re`, short docstrings). Outside `design_ceiling` and its helpers (if any), the call in `main`, and at most one added line in the module docstring, the file is unchanged.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
++- If the brief, the rules, or the tooling got in your way, write one dated line describing it under a heading `Builder notes` in your report (this hotfix branch has no `docs/` folder; do not create one). That covers an instruction that contradicted another, a check that fired wrongly, or a step that cost time for no reason. Do not try to fix the tooling. Add one dated line the same way for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round), so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms). The new code launches no process. Keep it that way.
++- Never start a server, a watcher or a daemon that outlives a test.
++- Do not refactor code outside the scope, even if it looks wrong. That includes `owner_cap`, `cap_for` and the rest of `main`. If you notice something worth changing there, report it instead.
++- Never run the product, a migration, a seed or a test against the owner's live data. Here that means: never run `bridge-run.py` against a real project folder, against `~/.claude/cursor-bridge/`, or with a real `cursor-agent` command. Run only the test commands below.
++- The ceiling values (5, `R1`, and `R2` under the line) are the owner's. The tests in `tests/test_bridge_run_design_ceiling.py` pin them. Do not change the values or the test. If the work seems to need a change, report it.
++- Follow the existing conventions of `bridge-run.py`.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff` and `git log` only.
++- Numbers from the text (the round, `<rounds>`) are read with a regular expression for their exact shape and converted with `int`. Never slice or split a string to get a number. A round is a count of review rounds, at least 1, with no upper bound. `<rounds>` is a round number and must be above 5 for its line to count.
++- Never print or read a key file. `design_ceiling` reads only `docs/RUN_PARAMETERS.md` under `folder`.
++- The `bridge-run: started` line stays the first stderr line of a run that starts. No new output is written before it on a run that starts.
++- Never refuse with a traceback: whatever the arguments or the run parameters file hold, `design_ceiling` returns `None` or a reason string.
++- Verification commands, run from the workspace root (the folder holding `bridge/` and `tests/`), exactly as written:
++  - Baseline, before you change any file: `python -m pytest -q tests`. Copy its last summary line and the ids of every failing test into the report.
++  - The acceptance test: `python -m pytest -q tests/test_bridge_run_design_ceiling.py`
++  - The launcher's existing tests: `python -m pytest -q tests/test_bridge_run.py`
++  - The full suite, after your change: `python -m pytest -q tests`. Compare it with the baseline.
++- Prefer reuse over new code: `head_of`, the `owner_cap` reading pattern, `re` and `os`. Write the minimum that meets the acceptance criteria (the frozen `minimal-code` rule, `bridge/cursor-bridge/minimal-code.snapshot.md`, is in force). This never overrides the refusal of what cannot be read.
++
++## Done
++Your report is the file `handoff/HOTFIX-001-r1-report.md`. Write it as you go: what you did, what you changed, what you ran and what it printed, and what you could not do. That way nothing is lost if your run ends early. When you finish, the report holds:
++- a list of every file you changed
++- a one-paragraph summary of what you did
++- the baseline and the final full-suite summary lines, with the ids of any test whose result changed
++- one sentence on how `main` keeps the `started` line first and logs nothing on a refusal
++- a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: a reading of the governing text you resolved one way, a quote or separator character you chose to end a token on, a behaviour of `re` or of the platform you expected. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, so a message printed earlier and then followed by more work is lost.
++
++## Round 2: corrections from Review A
++
++Round 1 is accepted in its core; this round changes `bridge/cursor-bridge/bridge-run.py` again and nothing else. Your report for this round is `handoff/HOTFIX-001-r2-report.md` (the same contents as round 1's, for this round); leave `handoff/HOTFIX-001-r1-report.md` as it is. The acceptance tests now number 69 in `tests/test_bridge_run_design_ceiling.py` (the supervisor added 18; 15 of them fail on round 1's code); all 69 pass when you are done, the rest of the suite unchanged. Every Requirement above still holds except where a point below replaces it.
++
++1. **Separators and dot segments (replaces the matching in point 3).** Before looking for design files, normalise the joined text: replace every run of separators, with any `.` segments between them, by one `/`: exactly `re.sub(r"[/\\]+(?:\.[/\\]+)*", "/", text)`. Then find `run/review/DESIGN-` in the normalised text, ignoring case as before. So `run//review/`, `run\\review\\` (a JSON-escaped path), `run/./review/` and `.\run\.\review\` all name the file. (`x/..` segments and 8.3 short names are not handled: accepted, the text holds them.)
++2. **One anchored match for the name (replaces the split and slice in point 5).** Read the name with one regular expression, `^(?:([a-z0-9-]*)-)?(R?)([1-9][0-9]*)$`: group 1 the subject (empty when absent), group 2 the `R` of a resolution round, group 3 the number, taken with `int`. No `rsplit` and no slice to get a number.
++3. **The refusal says which refusal it is (extends point 8).** The reason reads, in this order: `design ceiling: `, the file as read, `(subject <subject>, round <round>)` where `<round>` is the name's text after its last hyphen as written (`05`, `confirm`, `R2`; the whole name when it has no hyphen), then one of three: `the name cannot be read`, `above round <N>` (`<N>` 5, or the owner's `<rounds>` for that subject), `a resolution round beyond R<k>` (`<k>` 1, or 2 under the owner's line); then the path of `docs/RUN_PARAMETERS.md` it looked in, the words `Design rounds above five:` and `supervisor.md, Phase 2`. The whole reason is ASCII: escape anything else with `encode("ascii", "backslashreplace").decode("ascii")`.
++4. **The owner's line in its Markdown forms and its exact alphabet (replaces the regex of point 7).** Accept the colon inside or after the bold (`- **Design rounds above five:** design 8 (...)` and `**Design rounds above five**: design 8 (...)`), led by `-` or `*` or nothing. Only the label ignores case; the subject is `[a-z0-9-]+` as written (a line naming `DESIGN` lifts nothing), and `<rounds>` is ASCII digits `[0-9]+`, never `\d`.
++5. **Minimal code (the frozen rule).** Use one constant for the default ceiling of 5 everywhere it is meant (also in the owner's-line check), and constants for the resolution limits 1 and 2. Take the token with a capture group and `str.rstrip` of the trailing punctuation instead of hand-written character loops. Open `docs/RUN_PARAMETERS.md` only when the command names at least one design file.
++6. **Your `Assumed, not verified` list.** Round 1 said none; Review A found several (the token ending only at space, tab, CR and LF; `re.I` on the whole owner's line; Unicode digits). List every such fact this round, or confirm each with a test you can point to.
++
++## Round 3: corrections from Review B and Review A's last item
++
++Round 2 is accepted in its core; this round changes `bridge/cursor-bridge/bridge-run.py` again and nothing else. Your report for this round is `handoff/HOTFIX-001-r3-report.md`; leave the earlier reports as they are. The acceptance tests now number 75 (the supervisor added 6, all failing on round 2's code); all 75 pass when you are done, the rest of the suite unchanged.
++
++1. **Trailing dots and spaces of a folder name (extends round 2 point 1).** Windows drops a path component's trailing dots and spaces, so `run./review./DESIGN-design-6.md` opens `run/review/DESIGN-design-6.md`. Before round 2's separator normalisation, remove every run of dots and spaces that stands right before a separator: `re.sub(r"[. ]+(?=[/\\])", "", text)`; then apply round 2's normalisation as it is. (A `..` segment loses its dots too and so cannot hide a folder; `x/..` stays an accepted limit, as do 8.3 short names.)
++2. **No traceback on a number `int()` refuses (Review A round 2, the constraint "Never refuse with a traceback").** Python refuses `int()` on more than 4,300 digits with `ValueError`. Catch it where a round or an owner's `<rounds>` is read: a round that `int()` refuses is above every ceiling (refuse it as `above round <N>`, or `a resolution round beyond R<k>`); a line whose `<rounds>` `int()` refuses is not well-formed and is skipped. Do not cap the digit count in a regex.
++3. **Only the label of the owner's line ignores case (round 2 point 4, its letter).** Scope the case-insensitivity to the label with `(?i:...)` and drop the whole-pattern `re.I`, so `[a-z0-9-]+` means lower case only.
+diff --git a/project.json b/project.json
+index bccb107..de49f67 100644
+--- a/project.json
++++ b/project.json
+@@ -6,7 +6,7 @@
+   "state": {
+     "phase": "building",
+     "stage": "B1 (closing)",
+-    "bridge": "2026.10.11d",
+-    "updated": "2026-10-16"
++    "bridge": "2026.10.18a",
++    "updated": "2026-10-19"
+   }
+ }
+diff --git a/tests/test_bridge_run_design_ceiling.py b/tests/test_bridge_run_design_ceiling.py
+new file mode 100644
+index 0000000..d0ec466
+--- /dev/null
++++ b/tests/test_bridge_run_design_ceiling.py
+@@ -0,0 +1,291 @@
++"""bridge-run.py holds the design critique's ceiling (2026.10.18a, KP-062; enforces: supervisor.md, Phase 2, "The loop
++stops by what was found, and after four rounds at the most", and "The launcher holds the ceiling"): a cursor-agent
++launch whose arguments name run/review/DESIGN-<subject>-<n>.md with n above five is refused, and so are a second
++resolution round, DESIGN-<subject>-R2 or later, and a round that cannot be read (only 1 to 5 and R1 can), unless docs/RUN_PARAMETERS.md carries the owner's words on a line
++`Design rounds above five: <subject> <rounds> (<their words>, <date>)`, which allows rounds up to <rounds> and a second
++resolution round for that subject. The TDP ran 45 rounds on one change on 2026-10-18."""
++import os
++import subprocess
++import sys
++
++import pytest
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "bridge-run.py")
++PROMPT = ("The text to criticise is already written to run/review/DESIGN-%s.md, with the lenses, the grades to answer in, "
++          "and the record of what was accepted so far. Read that file whole; do not ask for it.")
++
++
++def design_cmd(name, mode="--mode=ask"):
++    return ["cursor-agent", "-p", mode, "--trust", "--model", "grok-4.7-medium", PROMPT % name]
++
++
++def run_parameters(folder, *lines):
++    (folder / "docs").mkdir(exist_ok=True)
++    (folder / "docs" / "RUN_PARAMETERS.md").write_text("# Run parameters\n" + "".join(l + "\n" for l in lines),
++                                                        encoding="utf-8", newline="\n")
++
++
++@pytest.mark.parametrize("name", ["design-1", "design-4", "design-5", "plan-5", "azure-allowance-5", "change-2-5",
++                                  "design-R1", "5"])
++def test_rounds_up_to_five_and_one_resolution_round_are_allowed(program, tmp_path, name):
++    """Four rounds and the confirming read (round five), and the subject's one resolution round, launch as before; a
++    subject holding a hyphen or a digit is read whole (`change-2-5` is subject `change-2`, round five), and the plan's
++    older file name without a subject (`DESIGN-5.md`) counts as a subject of its own."""
++    br = program("bridge-run")
++    assert br.design_ceiling(design_cmd(name), str(tmp_path)) is None
++
++
++@pytest.mark.parametrize("name, subject", [("design-6", "design"), ("plan-7", "plan"), ("azure-allowance-45", "azure-allowance"),
++                                           ("change-2-6", "change-2"), ("design-R2", "design"), ("design-R3", "design"),
++                                           ("6", "")])
++def test_a_sixth_round_and_a_second_resolution_round_are_refused(program, tmp_path, name, subject):
++    """Past the ceiling the launcher refuses, naming the subject, the ceiling and the line that lifts it."""
++    br = program("bridge-run")
++    reason = br.design_ceiling(design_cmd(name), str(tmp_path))
++    assert reason is not None, name
++    assert "Design rounds above five:" in reason and "supervisor.md" in reason, reason
++    if subject:
++        assert subject in reason, reason
++
++
++@pytest.mark.parametrize("name", ["design-0", "design-05", "design-R0", "design-R01", "design-confirm", "ceiling-5b",
++                                  "design-", "design-R", "Azure monthly allowance-1", "Design-1", "azure-Allowance-2",
++                                  "design-r1", "design-06", "design-R02"])
++def test_a_round_that_cannot_be_read_is_refused(program, tmp_path, name):
++    """Only 1 to 5 without a leading zero, and R1, are rounds: `0` would be a sixth critique file, `R0` a second
++    resolution file and `05` a second fifth round; a round that is no number is no round at all."""
++    br = program("bridge-run")
++    run_parameters(tmp_path, "Design rounds above five: %s 8 (\"run it to eight\", 2026-10-18)" % name.rsplit("-", 1)[0])
++    assert br.design_ceiling(design_cmd(name), str(tmp_path)) is not None, name
++
++
++def test_a_design_file_whose_name_does_not_end_in_md_is_refused(program, tmp_path):
++    """A subject written with spaces ends the name before `.md`: the launch is refused as a name it cannot read, never
++    let through unchecked."""
++    br = program("bridge-run")
++    for prompt in ("read run/review/DESIGN-azure allowance-6.md", "read run/review/DESIGN-azure"):
++        assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is not None, prompt
++
++
++@pytest.mark.parametrize("name, allowed", [("1", True), ("5", True), ("45", False), ("R1", True), ("R2", False)])
++def test_a_one_part_name_is_a_round_with_an_empty_subject(program, tmp_path, name, allowed):
++    """The plan's file before 2026.10.18a, `DESIGN-<round>.md`, is held by the same ceiling; its empty subject is not
++    `plan`, so a line lifting `plan` does not lift it."""
++    br = program("bridge-run")
++    run_parameters(tmp_path, "Design rounds above five: plan 50 (\"let the plan run\", 2026-10-18)")
++    assert (br.design_ceiling(design_cmd(name), str(tmp_path)) is None) == allowed, name
++
++
++def test_trailing_punctuation_is_not_part_of_the_name(program, tmp_path):
++    """A file named at the end of a sentence (`...DESIGN-design-1.md.`) or before a comma is read without it."""
++    br = program("bridge-run")
++    for prompt in ("read run/review/DESIGN-design-1.md.", "read run/review/DESIGN-design-1.md, then answer",
++                   "read (run/review/DESIGN-design-1.md)"):
++        assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is None, prompt
++    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", "read run/review/DESIGN-design-6.md."],
++                             str(tmp_path)) is not None
++
++
++def test_an_absolute_path_is_read_too(program, tmp_path):
++    br = program("bridge-run")
++    for prompt in ("read D:\\work\\proj\\run\\review\\DESIGN-design-6.md", "read /srv/proj/run/review/DESIGN-design-6.md"):
++        assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is not None, prompt
++
++
++def test_the_folders_are_matched_in_any_case(program, tmp_path):
++    """On Windows `Run\\Review\\DESIGN-design-6.md` names the same file as `run/review/DESIGN-design-6.md`, so the
++    folders' case is no way around the ceiling."""
++    br = program("bridge-run")
++    for prompt in ("read Run\\Review\\DESIGN-design-6.md", "read RUN/REVIEW/design-design-6.md"):
++        assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is not None, prompt
++
++
++def test_one_refused_name_among_several_refuses_the_launch(program, tmp_path):
++    br = program("bridge-run")
++    prompt = "compare run/review/DESIGN-design-1.md with run/review/DESIGN-design-6.md"
++    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is not None
++    prompt = "compare run/review/DESIGN-design-1.md with run/review/DESIGN-plan-2.md"
++    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is None
++
++
++def test_the_refusal_names_the_file_and_where_it_looked_for_the_owners_line(program, tmp_path):
++    """After an app restart the session can sit at the project root, where there is no docs/: the message says which
++    run parameters file was read, so a lift that was not seen is not mistaken for the ceiling."""
++    br = program("bridge-run")
++    reason = br.design_ceiling(design_cmd("design-6"), str(tmp_path))
++    assert "DESIGN-design-6.md" in reason and "RUN_PARAMETERS.md" in reason, reason
++    assert str(tmp_path) in reason, reason
++
++
++def test_the_mode_does_not_matter(program, tmp_path):
++    """The refusal reads the file the arguments name, not the mode: a launch without `--mode=ask` (the code review's
++    `--force` form) on a sixth round is refused too, so dropping the read-only mode is no way around the ceiling."""
++    br = program("bridge-run")
++    assert br.design_ceiling(design_cmd("design-6", mode="--force"), str(tmp_path)) is not None
++    assert br.design_ceiling(design_cmd("design-6", mode="--mode=plan"), str(tmp_path)) is not None
++
++
++def test_other_files_and_commands_are_not_touched(program, tmp_path):
++    """A code review's file, a stage review's, the launcher's own .err name and a command that is not cursor-agent
++    are no design rounds."""
++    br = program("bridge-run")
++    for prompt in ("the diff is already at run/review/REVIEW-012.diff; read it",
++                   "the diff is already at run/review/STAGE-B2.diff; read it",
++                   "see run/review/REVIEW-DESIGN-design-9.err"):
++        assert br.design_ceiling(["cursor-agent", "-p", "--force", "--model", "m", prompt], str(tmp_path)) is None, prompt
++    assert br.design_ceiling(["gh", "pr", "checks", "12", "--watch", "--required"], str(tmp_path)) is None
++
++
++def test_a_windows_path_is_read_too(program, tmp_path):
++    br = program("bridge-run")
++    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", "read run\\review\\DESIGN-design-6.md"], str(tmp_path)) is not None
++
++
++def test_the_owners_line_lifts_the_ceiling_for_its_subject_only(program, tmp_path):
++    """`Design rounds above five: design 8 (...)` allows rounds up to eight and a second resolution round for the
++    design; the plan keeps its ceiling; round nine and a third resolution round stay refused."""
++    br = program("bridge-run")
++    run_parameters(tmp_path, "Design rounds above five: design 8 (\"let the design run to eight\", 2026-10-18)")
++    for name in ("design-5", "design-6", "design-8", "design-R1", "design-R2"):
++        assert br.design_ceiling(design_cmd(name), str(tmp_path)) is None, name
++    for name in ("design-9", "design-R3", "plan-6", "plan-R2"):
++        assert br.design_ceiling(design_cmd(name), str(tmp_path)) is not None, name
++
++
++def test_a_second_line_for_one_subject_is_ignored(program, tmp_path):
++    """A subject is lifted once: the first line governs, so a later, larger line lifts nothing more."""
++    br = program("bridge-run")
++    run_parameters(tmp_path, "Design rounds above five: design 8 (\"to eight\", 2026-10-18)",
++                   "Design rounds above five: design 12 (\"to twelve\", 2026-10-19)")
++    assert br.design_ceiling(design_cmd("design-8"), str(tmp_path)) is None
++    assert br.design_ceiling(design_cmd("design-9"), str(tmp_path)) is not None
++
++
++def test_the_first_well_formed_line_stands(program, tmp_path):
++    """A line without the owner's words lifts nothing and does not use up the subject's one lift: the first
++    well-formed line after it stands, as the sibling `Ceiling above twice` line is read."""
++    br = program("bridge-run")
++    run_parameters(tmp_path, "Design rounds above five: design 12",
++                   "Design rounds above five: design 8 (\"to eight\", 2026-10-18)")
++    assert br.design_ceiling(design_cmd("design-8"), str(tmp_path)) is None
++    assert br.design_ceiling(design_cmd("design-9"), str(tmp_path)) is not None
++
++
++@pytest.mark.parametrize("line", [
++    "Design rounds above five: design 8",
++    "Design rounds above five: design 8 ()",
++    "Design rounds above five: design 5 (\"five\", 2026-10-18)",
++    "Design rounds above five: design 4 (\"four\", 2026-10-18)",
++], ids=["no-words", "empty-words", "not-above-five", "below-five"])
++def test_a_line_without_the_owners_words_or_not_above_five_lifts_nothing(program, tmp_path, line):
++    br = program("bridge-run")
++    run_parameters(tmp_path, line)
++    assert br.design_ceiling(design_cmd("design-6"), str(tmp_path)) is not None
++    assert br.design_ceiling(design_cmd("design-R2"), str(tmp_path)) is not None
++
++
++@pytest.mark.parametrize("prompt", [
++    "read run//review/DESIGN-plan-6.md",
++    "read run\\\\review\\\\DESIGN-plan-6.md",
++    "read run/review//DESIGN-plan-6.md",
++    "read run/./review/DESIGN-plan-6.md",
++    "read run/review/./DESIGN-plan-6.md",
++    "read .\\run\\.\\review\\DESIGN-plan-6.md",
++], ids=["doubled-before-review", "escaped-backslashes", "doubled-before-design", "dot-before-review",
++        "dot-before-design", "windows-dots"])
++def test_doubled_separators_and_dot_segments_name_the_same_file(program, tmp_path, prompt):
++    """Review A, round 1: Windows opens `run//review/...`, `run\\\\review\\\\...` (a JSON-escaped path) and
++    `run/./review/...` as `run/review/...`, so they are read as it is."""
++    br = program("bridge-run")
++    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is not None, prompt
++    allowed = prompt.replace("plan-6", "plan-2")
++    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", allowed], str(tmp_path)) is None, allowed
++
++
++@pytest.mark.parametrize("prompt", [
++    "read run./review/DESIGN-design-6.md",
++    "read run/review./DESIGN-design-6.md",
++    "read run./review./DESIGN-azure-allowance-45.md",
++    "read run..\\review.\\DESIGN-design-6.md",
++    "read run /review/DESIGN-design-6.md",
++], ids=["dot-after-run", "dot-after-review", "dots-after-both", "windows-dots-after-both", "space-after-run"])
++def test_a_folder_name_ending_in_dots_or_spaces_names_the_same_file(program, tmp_path, prompt):
++    """Review B, HOTFIX-001: Windows drops a folder name's trailing dots and spaces, so `run./review./` opens
++    `run/review/`; reading the round-6 file through it proved it."""
++    br = program("bridge-run")
++    assert br.design_ceiling(["cursor-agent", "-p", "--mode=ask", prompt], str(tmp_path)) is not None, prompt
++
++
++def test_a_round_too_long_for_int_is_refused_without_a_traceback(program, tmp_path):
++    """Review A, HOTFIX-001 round 2: Python refuses int() on more than 4,300 digits; the launcher refuses the name
++    instead of ending in a traceback, and a run parameters line holding such a number is skipped as not well-formed."""
++    br = program("bridge-run")
++    assert br.design_ceiling(design_cmd("design-" + "9" * 5000), str(tmp_path)) is not None
++    assert br.design_ceiling(design_cmd("design-R" + "9" * 5000), str(tmp_path)) is not None
++    run_parameters(tmp_path, "Design rounds above five: design %s (\"many\", 2026-10-18)" % ("9" * 5000))
++    assert br.design_ceiling(design_cmd("design-6"), str(tmp_path)) is not None
++    assert br.design_ceiling(design_cmd("design-2"), str(tmp_path)) is None
++
++
++@pytest.mark.parametrize("name, words", [
++    ("design-6", "above round 5"), ("design-R2", "beyond R1"), ("design-05", "cannot be read"),
++    ("Design-3", "cannot be read"), ("design-confirm", "cannot be read"),
++])
++def test_the_refusal_says_which_refusal_it_is_and_names_the_round(program, tmp_path, name, words):
++    """A name that cannot be read is a typo to fix; a round past the ceiling sends the subject on to its resolution
++    round or gate: the message says which, and names the round as written."""
++    br = program("bridge-run")
++    reason = br.design_ceiling(design_cmd(name), str(tmp_path))
++    assert words in reason, reason
++    assert "round %s" % name.rsplit("-", 1)[1] in reason, reason
++
++
++def test_under_the_owners_line_the_refusal_names_the_lifted_ceiling(program, tmp_path):
++    br = program("bridge-run")
++    run_parameters(tmp_path, "Design rounds above five: design 8 (\"to eight\", 2026-10-18)")
++    assert "above round 8" in br.design_ceiling(design_cmd("design-9"), str(tmp_path))
++    assert "beyond R2" in br.design_ceiling(design_cmd("design-R3"), str(tmp_path))
++
++
++def test_the_refusal_is_ascii_whatever_the_name_holds(program, tmp_path):
++    br = program("bridge-run")
++    reason = br.design_ceiling(design_cmd("plän-6"), str(tmp_path))
++    assert reason is not None and reason.isascii(), reason
++
++
++@pytest.mark.parametrize("line", [
++    "- **Design rounds above five:** design 8 (\"to eight\", 2026-10-18)",
++    "**Design rounds above five**: design 8 (\"to eight\", 2026-10-18)",
++    "* Design rounds above five: design 8 (\"to eight\", 2026-10-18)",
++], ids=["colon-inside-bold", "colon-after-bold", "star-bullet"])
++def test_the_owners_line_is_read_in_its_markdown_forms(program, tmp_path, line):
++    br = program("bridge-run")
++    run_parameters(tmp_path, line)
++    assert br.design_ceiling(design_cmd("design-8"), str(tmp_path)) is None
++
++
++@pytest.mark.parametrize("line", [
++    "Design rounds above five: DESIGN 8 (\"to eight\", 2026-10-18)",
++    "Design rounds above five: design ٨ (\"to eight\", 2026-10-18)",
++], ids=["subject-in-capitals", "arabic-indic-digit"])
++def test_the_owners_line_takes_a_lower_case_subject_and_ascii_digits_only(program, tmp_path, line):
++    """A subject is a lower-case token; a round is written in ASCII digits."""
++    br = program("bridge-run")
++    run_parameters(tmp_path, line)
++    assert br.design_ceiling(design_cmd("design-6"), str(tmp_path)) is not None
++
++
++def test_the_launcher_refuses_with_125_before_it_starts_anything(tmp_path):
++    """End to end: the refusal is a `bridge-run: refused - ` line and exit 125, before the `started` line, and nothing is
++    logged (no cursor-agent is run)."""
++    env = dict(os.environ)
++    env["LOCALAPPDATA"] = str(tmp_path / "localappdata")
++    env.pop("BRIDGE_RUN_ALLOW_ANY", None)
++    p = subprocess.run([sys.executable, PROG, "--limit", "auto", "--kind", "review", "--", *design_cmd("design-6")],
++                       capture_output=True, text=True, env=env, cwd=str(tmp_path),
++                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
++    assert p.returncode == 125, (p.returncode, p.stderr)
++    assert p.stderr.startswith("bridge-run: refused - design ceiling: "), p.stderr
++    assert "bridge-run: started" not in p.stderr, p.stderr
++    assert not (tmp_path / "run" / "launcher" / "runs.jsonl").exists()
