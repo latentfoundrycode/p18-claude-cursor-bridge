@@ -9,8 +9,11 @@ run-parameters digest line, which is a human-readable pointer to the authoritati
 docs/RUN_PARAMETERS.md.
 """
 import json
+import os
 import pathlib
 import re
+
+import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
@@ -243,3 +246,81 @@ def test_r001_run_parameters_parse():
     assert _parameter_faults(good.replace("Installer verification: local\n", "")) == ["Installer verification: 0 lines"]
     assert _parameter_faults(good.replace("Merge authority: supervisor", "Merge authority: ")) == ["Merge authority: ''"]
     assert _parameter_faults(good.replace("Stage pause: run", "Stage pause: later")) == ["Stage pause: 'later'"]
+
+
+# The values the owner chose (RUN_PARAMETERS.md; INVENTORY Decisions, 2026-10-11 and 2026-10-12, owner), fixed in a test
+# (rule 52). Installer verification is not among them: n/a is the product type's, not an answer of the owner's.
+OWNER_RUN_PARAMETERS = {"Stage pause": "run", "Merge authority": "supervisor", "Refactoring pass": "on",
+                        "Parallel increments": "off"}
+
+
+def test_r001_run_parameters_owner_values():
+    """R-001 (rule 52, a value the owner chose is fixed in a test): RUN_PARAMETERS.md holds the owner's answers. A
+    change of one is the owner's, made with this test (stage B1's review round 3, Review A: a flipped parameter
+    passed every test)."""
+    for key, value in OWNER_RUN_PARAMETERS.items():
+        lines = [line for line in _read("docs/RUN_PARAMETERS.md").splitlines() if line.startswith(key + ": ")]
+        assert len(lines) == 1 and re.match(re.escape(value) + r"( |$)", lines[0][len(key) + 2:]), f"R-001: {key}: {lines}"
+
+
+def _own_pull_request(env):
+    """The number of the pull request whose tree CI is judging, or None: from a pull request's merge ref
+    (refs/pull/<n>/merge), or, on a push to main, from the squash commit's subject, which ends `(#<n>)`. Read from
+    GitHub's own variables and event file, so a local run has no number."""
+    ref = env.get("GITHUB_REF", "")
+    m = re.fullmatch(r"refs/pull/([0-9]+)/merge", ref)
+    if m:
+        return int(m.group(1))
+    path = env.get("GITHUB_EVENT_PATH", "")
+    if ref != "refs/heads/main" or not path or not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        message = (json.load(f).get("head_commit") or {}).get("message") or ""
+    m = re.search(r"[(]#([0-9]+)[)]$", (message.splitlines() or [""])[0].strip())
+    return int(m.group(1)) if m else None
+
+
+def _position_faults(status, n):
+    """Why the status file does not state the position at the merge of pull request n, as a list (empty when it does):
+    its Last accepted line names that pull request first, and its In flight line names nothing waiting for a gate."""
+    faults = []
+    last = [line for line in status.splitlines() if line.startswith("Last accepted: ")]
+    named = re.findall(r"PR #([0-9]+)", last[0]) if len(last) == 1 else []
+    if not named or int(named[0]) != n:
+        faults.append(f"Last accepted names PR #{named[0] if named else '?'} first, not PR #{n}")
+    flight = [line for line in status.splitlines() if line.startswith("In flight: ")]
+    if len(flight) != 1 or not flight[0].startswith("In flight: none") or "gate" in flight[0]:
+        faults.append(f"In flight is not none at the merge: {flight[:1]}")
+    return faults
+
+
+def test_r001_status_names_its_own_merge():
+    """R-001 (docs/BUILD_PLAN.md, stage B1's demonstration: a fresh session resumes from PROJECT_STATUS.md alone): the
+    status file a pull request carries states the position at that pull request's merge, since a squash puts it on
+    main unchanged: its Last accepted line names this pull request first, and nothing is in flight. Stage B1's review
+    rounds 1 and 3 rejected the file on main describing its own pull request before the gate (ISS-009). CI only: a
+    local run has no pull request to name."""
+    n = _own_pull_request(os.environ)
+    if n is None:
+        pytest.skip("not a pull request's or main's CI run")
+    assert _position_faults(_read("docs/PROJECT_STATUS.md"), n) == [], "R-001: the status file at the merge"
+
+
+def test_r001_status_position_parse(tmp_path):
+    """R-001: the pull request is read from a merge ref and from a squash subject on main, and nowhere else; the
+    position reader passes a status naming its pull request first with nothing in flight, and refuses an earlier
+    pull request first, a number that only starts the right one, and a branch waiting for its gate (a negative test
+    must show its precondition)."""
+    assert _own_pull_request({"GITHUB_REF": "refs/pull/45/merge"}) == 45
+    assert _own_pull_request({}) is None
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"head_commit": {"message": "BUG-016: the records (#45)\n\nbody (#3)"}}), encoding="utf-8")
+    assert _own_pull_request({"GITHUB_REF": "refs/heads/main", "GITHUB_EVENT_PATH": str(event)}) == 45
+    assert _own_pull_request({"GITHUB_REF": "refs/heads/bug-016", "GITHUB_EVENT_PATH": str(event)}) is None
+    event.write_text(json.dumps({"head_commit": {"message": "a direct push"}}), encoding="utf-8")
+    assert _own_pull_request({"GITHUB_REF": "refs/heads/main", "GITHUB_EVENT_PATH": str(event)}) is None
+    good = "Last accepted: BUG-016 (PR #45, at its merge); before it BUG-015 (PR #44)\nIn flight: none\n"
+    assert _position_faults(good, 45) == []
+    assert len(_position_faults(good, 44)) == 1
+    assert len(_position_faults(good.replace("PR #45", "PR #450"), 45)) == 1
+    assert len(_position_faults(good.replace("In flight: none", "In flight: none (BUG-016 on its branch, before its gate)"), 45)) == 1
