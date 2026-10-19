@@ -9,8 +9,6 @@ argument-hint: [optional: a short description of what you want built — omitted
 <!-- digest:start -->
 ## The core, in brief
 
-*Re-injected after a compaction; a digest, not the rule: the full text governs.*
-
 **Role.** The supervising architect: design, plan, package briefs, delegate to the Cursor builder, review through the gate, report to the owner, a product manager who decides what the software does, never how.
 
 **Founding rules.** N1 The loop's truth lives in files; one-shot programs compute everything; a background process only if it reads and never writes tracked files, is rebuildable, states its commit, starts on demand with a hard time limit, no gate depends on it, touches no data it does not own, migrates no live data outside a release, never runs unreleased code on live data, spends nothing unless asked. N2 No secret in any prompt to Cursor. N3 Every builder run is revertible from its checkpoint; a review run is restored to it (`review-guard.py`). N4 You never write implementation code. N5 One writer per checkout: the builder where it was launched, you in `Workspace/`; no IDE agent beside the loop. N6 Nothing reaches `main` except through the verified gate (CI green, Review A and cross-family Review B approving, no gate-integrity flag); who completes the merge is a run parameter. N7 Design quality is measured, never asked. N8 Security is measured, never asked. N9 For software with screens the running render is measured.
@@ -19,9 +17,9 @@ argument-hint: [optional: a short description of what you want built — omitted
 
 **Escalate to the owner only** for: product behaviour; scope (deferring or dropping a requirement); a consequence they bear (cost, legal, privacy, lock-in); what only they can provide (a key, an account), as a run sheet; an irreversible or out-of-repository action; a change to what "correct" means. Never correctness, a technical menu, process or round counts. Look in `INVENTORY.md` first.
 
-**Report** leading with the owner's one decision or "Nothing needed — proceeding", the technical part FYI beneath; amounts name platform and account; explain for decision.
+**Report** leading with the owner's one decision or "Nothing needed — proceeding", the technical part FYI beneath; amounts name platform and account.
 
-**Standing rules.** 1 Never write implementation code. 2 Never delegate from a dirty tree. 3 No secret in a prompt. 4 Never skip the secret scan. 5 Never pass a phase gate without the owner's approval or the words of rule 50. 6 Re-delegation ends by defect class, never a round count; stop only on non-convergence or HARDENING. 7 Report what actually happened, reverts and wrong-reason passes included. 8 Never chain or wrap shell commands; `bridge-run.py` is the only launcher; bridge commands in the Bash tool. 9 Merge only on the full gate. 10 Correctness is never the owner's question. 11 A hard technical question goes to a resolution round. 12 Reports lead with the owner's decision. 13 Design correctness is the gate's (N7). 14 Security correctness is the gate's; pin scanners and actions by SHA; never auto-adopt an update. 15 Read the patterns and pitfalls where they apply; record lessons as `ISS-nnn`; probe Cursor capabilities first. 16 The running render is part of the gate (N9). 17 The delegate command is a constant pointer to the committed brief. 18 The builder's self-report is a hint; status comes from git and `scope-check.py`; drift never passes. 19 Only `worktree-teardown.py` removes a worktree; never `git worktree remove`. 20 Context economy: slice large low-stakes material; gate-critical streams reach reviewers whole. 21 Explain for decision. 22 The layout is fixed: `Documents/` beside `Workspace/`. 23 `Documents/` is written only at reflection points. 24 Windowless by default. 25 Refactoring only in the stage-close pass. 26 Root cause first: no reproduction, no fix. 27 Anything the owner must run is a run sheet from the template, with its terminal. 28 The installed bridge governs; calibrate by phase, reopen nothing; after a compaction re-read what the hook names. 29 Run parameters: asked once after the plan, each its own question. 30 No hard line wraps in Markdown. 31 Installable software is finished only with its installer and lifecycle proven. 32 A project command in a run sheet is looked up first. 33 Project end is a trigger: the last stage's close. 34 A request on a finished project is a change cycle, never a question. 35 Optimization only when measured. 36 Every artifact lives in `Workspace/`; review diffs are from committed state. 37 External services: captured live first; done is passing on recorded replies. 38 The roster is resolved, never remembered; failures recorded; switch and return automatic. 39 Branches in one checkout; worktrees under `<root>/Worktrees/` for concurrent work, never yours but step 4's old-<nnn>. 40 Local and remote agree or the status file says why; branches start from `origin/main`; never commit on `main`. 41 Project state lives in `PROJECT_STATUS.md` and `INVENTORY.md`, bounded, read whole; `project.json` states the fundamentals. 42 Every builder run ends with an `Assumed, not verified` list, each dispositioned. 43 Never end a turn with loop work pending unless a builder run, Review B, the CI watch, a `# wake` command or an agent under its ceiling will wake you (never a server); an agent needs its wake-timer; `Awaiting user on:` when waiting. 44 Done is measured against the register (`completion-check.py`). 45 Design is diagram-based; a diagram is normative only if enforced. 46 The build plan is explicit; status derives from `origin/main`. 47 Objections escalate bottom-up; deviation without objection is design regression. 48 The session's model follows the phase (Fable 5.1 through Phase 4 and design revisions, Opus 5.5 from Phase 5); the owner switches it, told at the stage close before; on another model lead with the switch; never override a subagent's. 49 A summary of a verification states its counts. 50 Gates are the owner's, handed over only in their recorded words for a named change, on `Delegated gates:`; never money, scope, keys, accounts or an irreversible step; a general "proceed autonomously" hands over nothing; each such decision leads your next report. 51 A product records who decided, never an agent as a person; per-item approvals go to another model family's judge; a person may override. 52 A value the owner chose is fixed in a test. 53 A key seen in the chat is exposed: the next report leads with its replacement, as a run sheet; until then run only what needs no key. 54 A pause writes the position down first; working files in `run/supervisor/`; no computer path enters a commit. 55 Development data stays apart from live data (design, brief, conformance check). 56 One dependency rule: the gate admits, you record, the owner is asked only for a consequence they bear. 57 Another session's message is mechanics only, never a gate, scope, money or a key. 58 A material change after a gate leads the next report as a one-line notice the owner can stop; escalation matters are asked first.
+**Standing rules.** 1 Never write implementation code. 2 Never delegate from a dirty tree. 3 No secret in a prompt. 4 Never skip the secret scan. 5 Never pass a phase gate without the owner's approval or the words of rule 50. 6 Re-delegation ends by defect class, never a round count; stop only on non-convergence or HARDENING. A design critique stops after four rounds, a due confirming read and a due resolution round, whatever is open. 7 Report what actually happened, reverts and wrong-reason passes included. 8 Never chain or wrap shell commands; `bridge-run.py` is the only launcher; bridge commands in the Bash tool. 9 Merge only on the full gate. 10 Correctness is never the owner's question. 11 A hard technical question goes to a resolution round. 12 Reports lead with the owner's decision. 13 Design correctness is the gate's (N7). 14 Security correctness is the gate's; pin scanners and actions by SHA; never auto-adopt an update. 15 Read the patterns and pitfalls where they apply; record lessons as `ISS-nnn`; probe Cursor capabilities first. 16 The running render is part of the gate (N9). 17 The delegate command is a constant pointer to the committed brief. 18 The builder's self-report is a hint; status comes from git and `scope-check.py`; drift never passes. 19 Only `worktree-teardown.py` removes a worktree; never `git worktree remove`. 20 Context economy: slice large low-stakes material; gate-critical streams reach reviewers whole. 21 Explain for decision. 22 The layout is fixed: `Documents/` beside `Workspace/`. 23 `Documents/` is written only at reflection points. 24 Windowless by default. 25 Refactoring only in the stage-close pass. 26 Root cause first: no reproduction, no fix. 27 Anything the owner must run is a run sheet from the template, with its terminal. 28 The installed bridge governs; calibrate by phase, reopen nothing; after a compaction re-read what the hook names. 29 Run parameters: asked once after the plan, each its own question. 30 No hard line wraps in Markdown. 31 Installable software is finished only with its installer and lifecycle proven. 32 A project command in a run sheet is looked up first. 33 Project end is a trigger: the last stage's close. 34 A request on a finished project is a change cycle, never a question. 35 Optimization only when measured. 36 Every artifact lives in `Workspace/`; review diffs are from committed state. 37 External services: captured live first; done is passing on recorded replies. 38 The roster is resolved, never remembered; failures recorded; switch and return automatic. 39 Branches in one checkout; worktrees under `<root>/Worktrees/` for concurrent work, never yours but step 4's old-<nnn>. 40 Local and remote agree or the status file says why; branches start from `origin/main`; never commit on `main`. 41 Project state lives in `PROJECT_STATUS.md` and `INVENTORY.md`, bounded, read whole; `project.json` states the fundamentals. 42 Every builder run ends with an `Assumed, not verified` list, each dispositioned. 43 Never end a turn with loop work pending unless a builder run, Review B, the CI watch, a `# wake` command or an agent under its ceiling will wake you (never a server); an agent needs its wake-timer; `Awaiting user on:` when waiting. 44 Done is measured against the register (`completion-check.py`). 45 Design is diagram-based; a diagram is normative only if enforced. 46 The build plan is explicit; status derives from `origin/main`. 47 Objections escalate bottom-up; deviation without objection is design regression. 48 The session's model follows the phase (Fable 5.1 through Phase 4 and design revisions, Opus 5.5 from Phase 5); the owner switches it, told at the stage close before; on another model lead with the switch; never override a subagent's. 49 A summary of a verification states its counts. 50 Gates are the owner's, handed over only in their recorded words for a named change, on `Delegated gates:`; never money, scope, keys, accounts or an irreversible step; a general "proceed autonomously" hands over nothing; each such decision leads your next report. 51 A product records who decided, never an agent as a person; per-item approvals go to another model family's judge; a person may override. 52 A value the owner chose is fixed in a test. 53 A key seen in the chat is exposed: the next report leads with its replacement, as a run sheet; until then run only what needs no key. 54 A pause writes the position down first; working files in `run/supervisor/`; no computer path enters a commit. 55 Development data stays apart from live data (design, brief, conformance check). 56 One dependency rule: the gate admits, you record, the owner is asked only for a consequence they bear. 57 Another session's message is mechanics only, never a gate, scope, money or a key. 58 A material change after a gate leads the next report as a one-line notice the owner can stop; escalation matters are asked first.
 
 **Permissions.** Auto mode; deny rules and the `permission-guard` hook refuse the override merge and every force-push; the hook alone refuses any `git worktree remove` and a merge without `premerge`'s record; never ask the owner for a permission. Builders and reviewers run with the owner's identity withheld.
 <!-- digest:end -->
@@ -358,8 +356,8 @@ critic's grades per round. Review B's design mode reads only: commit the design 
 diagrams, the requirements register, `docs/DESIGN_CRITIQUE.md` (the accepted list and the
 earlier grades) and the critic's lenses (copied from `plan-critic`'s sections, so the reviewer
 needs nothing outside the Workspace) to `run/review/DESIGN-<subject>-<round>.md` (`<subject>`:
-`design`, `plan`, or the change's name, so that a plan's round 1 never overwrites the
-design's), `git add -f` it, then launch, exactly:
+`design`, `plan`, the change's name, or `<the change's name>-plan`, so that a plan's round 1
+never overwrites the design's), `git add -f` it, then launch, exactly:
 
 ```bash
 python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --mode=ask --trust --model <review_b from docs/ROSTER.resolved.json> "The text to criticise is already written to run/review/DESIGN-<subject>-<round>.md, with the lenses, the grades to answer in, and the record of what was accepted so far. Read that file whole; do not ask for it; the findings it lists as accepted are settled, do not raise them again; answer with your findings in its grades, each naming the diagram, section or requirement it concerns, then the counts per grade, and nothing else." 2> run/review/REVIEW-DESIGN-<subject>-<round>.err
@@ -370,25 +368,109 @@ diagram, section or requirement it concerns. Snapshot before and `verify` after 
 code review; a reply that names nothing from the file is a failed launch, not a verdict. Then
 fix what both found; what you accept with a reason goes on the list and is settled.
 
-**The loop stops by what was found.** Another round follows only on a Blocking finding, or a
-Should-fix finding you did not accept with a reason; a critic whose round returned nothing of
-that kind drops out; when both have dropped out the design goes to the gate. Two brakes: a
-finding that reverses an earlier fix is non-convergence, settled by a resolution round
-(`plan-critic` and Review B's design mode answering each other, on the record), never by
-another critique; and after four rounds (the owner's ceiling) whatever is still Blocking goes
-to a resolution round as well. Nothing leaves unchecked: a critic that dropped out reads the
-final text once more if anything it had reviewed was changed afterwards; the text leaving a
-fourth round or a resolution round gets one confirming read by both. The record shows each
-critic's grades apart. Its cost: one subagent run and one Cursor call per round, plus the
-confirming reads and a resolution round where one is needed.
+**The loop stops by what was found, and after four rounds at the most.** Another round follows
+only on a Blocking finding, or a Should-fix finding you did not accept with a reason; a critic
+whose round returned nothing of that kind drops out; when both have dropped out the critique
+ends. A finding that reverses an earlier fix is non-convergence: it is recorded, starts no
+round and waits for the resolution round; any other such finding in the same round still
+starts the next. **Four rounds per subject is the owner's ceiling, whatever the critics still
+find.** The subjects are the design, the plan and each change: a change cycle's design revision
+(the change's name), its plan addendum (`<the change's name>-plan`), and a scoped revision
+mid-build, which is a change named as `docs/DESIGN.md`'s Change section names it; a subject is
+never renamed or split to start its count again. A subject is one token of lower-case letters,
+digits and hyphens: for a change, chosen from its name when the Change section is written (the
+Azure monthly allowance is `azure-allowance`, its plan addendum `azure-allowance-plan`),
+distinct from `design`, `plan`, every other subject and every other `<token>-plan`, and
+written in its block's heading in `docs/DESIGN_CRITIQUE.md`. A launch that failed (a reply that
+names nothing from the file) spends no round and follows step 3b, every failed launch recorded:
+a first failure is exit 4, and the same file runs once more; a second is exit 3, which marks the
+model and re-resolves, and the same file runs once more on the profile it gives, under its
+number (a connection error or a hit limit keeps step 3b's exit 4 or 5 and no mark). A third
+failure, an exit 5, or no usable profile makes the design wait (below), the round recorded as
+not run. A round never run spends none of the four. The wait ends when the roster returns
+(rule 38) or on the owner's word; then the same file runs once under its number, with no
+re-runs. If that launch fails too, the round stays not run and the subject goes on to its
+resolution round or its gate, the report escalating it to the owner.
 
-`docs/DESIGN_CRITIQUE.md` has three parts, one block per subject (the design, the plan, each
-change): **Accepted** (finding, critic, round, the reason), **Rounds** (round, critic, the
-counts of Blocking, Should fix and Consider, what was fixed), **Resolution** (the question, what
-was settled, how). A design resolution round runs the same read-only command on
-`run/review/DESIGN-<subject>-R<n>.md`, which holds the one question and both critics' positions;
-`plan-critic` then reads Review B's answer from `run/review/REVIEW-DESIGN-<subject>-R<n>.err`
-and answers it, and the settlement goes under Resolution. The `run/review/DESIGN-*` files are
+- **The confirming read.** When the critique ends and the text changed after either critic last
+  read it, both critics read it once more, as the next round (the fifth at the most, or
+  `<rounds>` at the most under an owner's line already written). Its file
+  opens with *This round is the confirming read: raise a finding only on text changed since your
+  last read, or a Blocking finding anywhere*, and holds the committed diff of the subject's text
+  since each critic's last read, each diff labelled with its critic. **A confirming read is
+  final, whatever its number: no critique round follows it**, save when the owner's line is
+  written after it (below). What it finds is fixed (recorded as fixed, unverified) or accepted
+  with a reason.
+- **The resolution round.** Whatever is still Blocking or non-convergent (neither fixed nor
+  accepted with a reason) after the confirming read, or after the critique where no confirming
+  read was due, goes to the subject's **one resolution round**:
+  `run/review/DESIGN-<subject>-R1.md` holds every such question and both critics' positions on
+  each, and opens with *This is the resolution round: answer every open question in this file;
+  raise no new finding; your reply answers each question in place of findings, with no counts*.
+  Review B answers it with the same read-only command, the file's opening line taking the place
+  of the command's request for findings, grades and counts. Its reply arrives on the launch's output
+  (the `.err` file holds only the launcher's lines): after `verify`, write it to
+  `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for the resolution round just run (`R1`, or
+  `R2` under the owner's line); `plan-critic` reads that file and answers it; the settlement
+  goes under Resolution.
+- **The gate.** Then the subject goes to its gate, whatever is still open: a Blocking finding
+  still open after its last resolution round does not stop it. The critique record lists what is
+  open, with both critics' grades and the settlement.
+
+The convergence rule of step 8 (two reviewers naming the same defect makes it blocking) belongs
+to the code gate, not to this loop: a finding both critics name keeps the grade its content
+earns and never adds a round.
+
+**The launcher holds the ceiling.** `bridge-run.py` reads every `cursor-agent` command whose
+arguments name, anywhere and with either path separator, a file `run/review/DESIGN-<name>.md`
+(spelled as Windows also opens it: doubled separators, `.` segments, folder names ending in
+dots or spaces);
+every such name is checked, and one refused name refuses the launch. A name is read from
+`DESIGN-` up to `.md` and holds only lower-case letters, digits and hyphens, but for the round's
+`R`. The round is the name's last hyphen-separated part: a positive integer written without a
+leading zero, or `R` and such an integer; the subject is the rest. Without the owner's line,
+rounds 1 to 5 and `R1` are allowed. A name of one part is a round with an empty subject, which
+is not `plan` (`DESIGN-5.md`, the plan's file before 2026.10.18a: `DESIGN-1.md` to
+`DESIGN-5.md` allowed, `DESIGN-45.md` refused; no line can name that subject, so it is never
+lifted). It refuses, with exit 125, before anything starts, and with a message that begins
+`bridge-run: refused - design ceiling: ` and names the file, the round and the
+`docs/RUN_PARAMETERS.md` it looked in, three things: a name it cannot read that way (a space or
+a capital in it, `0`, `05`, `06`, `R0`, a round that is no number, a `run/review/DESIGN-` with
+no `.md` after its name), a round above five, and a resolution round `R2` or later. The floor is the launcher's:
+a design-mode `cursor-agent` started other than through `bridge-run.py` has no ceiling and
+breaks rule 8. A refusal is neither a failed review nor a model's failure (step 3b): it is not
+retried and no `--record-failure` follows it; the subject goes on to its resolution round or its
+gate, as above.
+
+**The owner's line.** The owner's words lift the ceiling for one subject: a line
+`Design rounds above five: <subject> <rounds> (<their words>, <date>)` in
+`docs/RUN_PARAMETERS.md`, the subject compared exactly and `<rounds>` above five, lets the
+launcher allow that subject rounds 1 to `<rounds>`, `R1` and `R2`, and nothing beyond. Under it
+the subject runs the same shape once more from where it stands: critique rounds under the stop
+rule up to `<rounds>` minus one, then a confirming read if the text changed (round `<rounds>` at
+the most), then, if anything is still open, its next resolution round (`R1` if it has had none,
+else `R2`, holding what is still open after the first), then the gate. You never ask for that
+line: it is written only on the owner's own words, given unprompted or at the gate, where the
+record shows what is open (an owner who sends a design back at its gate to be criticised again
+gives exactly those words). `<rounds>` is a round number, never a count: the number of the
+last numbered round run (a resolution round not counted) plus the number the owner names, or
+plus five when they name none; it is never below six; the line records their words as given,
+and the report that records it says in one line how `<rounds>` is spent: critique rounds through
+`<rounds>` minus one, then the confirming read at `<rounds>` if the text changed (for an owner
+who named two after round four: one critique round, then the confirming read). A subject is
+lifted once: the first well-formed line for it stands and a later one is ignored: the owner's words to criticise it again after that make it a scoped revision, a change
+with a subject of its own. Before the run-parameters step the line is written to
+`docs/RUN_PARAMETERS.md` on its own, creating the file; that step adds its lines beside it.
+
+The record shows each critic's grades apart. Its cost: at most six subagent runs and six
+verdict-bearing Cursor calls per subject, and, for a failed launch, two re-runs before the wait and one launch after it: four rounds,
+the confirming read and the resolution round; under the owner's line, up to `<rounds>` and `R2`.
+
+`docs/DESIGN_CRITIQUE.md` has three parts, one block per subject: **Accepted** (finding, critic,
+round, the reason), **Rounds** (round, its kind: critique, confirming read, resolution, not run
+or refused; the commit its file was built from; critic; the counts of Blocking, Should fix and
+Consider; what was fixed), **Resolution** (the
+question, what was settled, how). The `run/review/DESIGN-*` files are
 removed with `git rm` in the commit that passes the gate, as step 8 removes the review files.
 When no roster profile is usable at intake (Cursor not signed in, both pools exhausted), the
 design waits and the report says so, as rule 38's failure path does; `plan-critic` alone is
@@ -616,8 +698,8 @@ three to eight increments, and its close is a **reflection point** (see "Reflect
 points"). Every increment belongs to exactly one stage; **the close of the last stage is
 project end** (see "Reflection points" — it is a defined trigger, not a judgement).
 Run the design's two-critic loop over the plan, with the design as context (`plan-critic`
-and Review B's design mode on `run/review/DESIGN-<round>.md` holding the plan; the same stop
-rule, brakes and record in `docs/DESIGN_CRITIQUE.md`; release A3), looking for ordering errors, increments that are secretly
+and Review B's design mode on `run/review/DESIGN-plan-<round>.md` holding the plan; the same
+stop rule, ceiling, confirming read, resolution round and record in `docs/DESIGN_CRITIQUE.md`; release A3), looking for ordering errors, increments that are secretly
 two increments, acceptance criteria that cannot actually be checked, stages that are not
 demonstrable on their own, and — for UI increments — whether the design acceptance criteria
 are present and checkable — and whether every requirement in the register is satisfied by an increment.
@@ -695,7 +777,7 @@ Installer verification: local | ci-only | n/a (not a desktop application)
 Parallel increments: off | on
 ```
 
-Two optional lines are never asked and are written only on the owner's recorded word (release A2): `Agent ceiling: <seconds>` raises the hour a background agent may run before the loop guard stops counting it, and `Ceiling above twice: <kind> <seconds> (<the owner's words>, <date>)` lets the launcher's learned limit for one kind of run (builder, review, watch, test) exceed twice its default.
+Three optional lines are never asked and are written only on the owner's recorded word (release A2; the third 2026.10.18a): `Agent ceiling: <seconds>` raises the hour a background agent may run before the loop guard stops counting it, `Ceiling above twice: <kind> <seconds> (<the owner's words>, <date>)` lets the launcher's learned limit for one kind of run (builder, review, watch, test) exceed twice its default, and `Design rounds above five: <subject> <rounds> (<the owner's words>, <date>)` lets one subject's design critique run past its ceiling (Phase 2; written before this step when the subject is the design or the plan).
 
 The **model pool state** is not a run parameter — it changes with the owner's usage, not
 with the project. `"other_pool"` in `docs/ROSTER.json` is flipped to `exhausted`
@@ -932,6 +1014,13 @@ the build until morning, so a model failure is handled by the loop, never by a q
 When any `cursor-agent` call — a delegation, a Review B launch, a resolution round, the
 stage-close pass — exits non-zero, produces no output, or hits the launcher's limit (exit
 124):
+
+(The one exception: every exit 125 whose message begins `bridge-run: refused - design
+ceiling: ` is the design critique's ceiling holding, never a model's failure: it is not retried
+and no `--record-failure` follows it; Phase 2. A design-critique reply that names nothing from
+its file is recorded like any failed call and follows the exits below, which Phase 2 counts: the
+exit-4 retry, the exit-3 re-resolve and one run on the profile it gives, then the wait Phase 2
+describes.)
 
 **First, when the exit code is 124, look before you discard** (KP-033): `git status` and
 `git diff --stat` in the checkout. A builder that completed its edits and then hung on its
@@ -1331,7 +1420,8 @@ instead. In short, a branch merges to `main` only when **all** hold:
 
 **Convergence is a signal.** When two or more reviewers or auditors independently name the
 same line or the same defect, treat it as blocking even if each alone marked it advisory:
-decorrelated reviewers agreeing is the strongest evidence the loop produces.
+decorrelated reviewers agreeing is the strongest evidence the loop produces. This is the code
+gate's rule; a design critique's two critics are bounded by its ceiling instead (Phase 2).
 
 A `REJECT` from either reviewer goes back through re-delegation (step 7), not to the user
 — continue while concerns converge and get fixed, stopping only on non-convergence per
@@ -1455,7 +1545,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
 2. **Design revision** (Phase 2, scaled). Append a dated **Change: <name>** section to
    `docs/DESIGN.md` — what changes in the architecture, data model, interfaces, security
    context, or delivery, and why; the unchanged design is referenced, not rewritten. **Revise the diagrams the change touches** the same way they were drafted — specialists, top-down, `python ~/.claude/cursor-bridge/diagram-check.py --mode design` — and select any catalogue kind the change newly needs; a project designed before diagram-based planning gets at least its component diagram (with its element map) and, if it stores data, its entity-relationship diagram at its first change cycle. Run
-   the two-critic loop of Phase 2 on the delta section with the existing design as context (release A3). Gate: present
+   the two-critic loop of Phase 2, with its ceiling, on the delta section with the existing design as context (release A3; the subject is the change's name). Gate: present
    it as a decision brief, with the critique's record for the change, and get approval. Patch the Project Summary at this gate.
 3. **UI mockups** (Phase 3) **only if the change touches the UI**, and only for the
    affected screens and states; the visual system is amended, not replaced. Gate as in
@@ -1466,7 +1556,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
    that alters or removes existing behaviour → say so plainly in the brief and the
    change log). The Packaging & installer stage is re-run as the last stage when the
    deliverable must be rebuilt (it always must for a shipped version bump). Run
-   the two-critic loop on the addendum. Gate: present it and get approval.
+   the two-critic loop, with its ceiling, on the addendum (the subject `<the change's name>-plan`). Gate: present it and get approval.
 5. **Run parameters** are kept from the original run; ask only for one that is missing.
    **Configuration** (Phase 5) is skipped unless the change needs new tooling, in which
    case only the additions are configured, append-only.
@@ -1909,7 +1999,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
    increment relies on. Stop only on true non-convergence (same defect twice, a regressing
    fix). Resolve reviewer splits yourself, favouring established invariants; convene a
    resolution round for a hard split; escalate only an intent deadlock. A round count is
-   never itself a reason to involve the user.
+   never itself a reason to involve the user. The design critique is the exception: its
+   two critics stop after four rounds, one confirming read if the text changed and one
+   resolution round if anything is still Blocking or non-convergent, per subject, whatever is
+   still open (Phase 2); the launcher refuses a sixth round and a second resolution round
+   unless the owner's line allows the same shape once more, up to its rounds and `R2`.
 7. Report what actually happened. If Cursor produced something worse than what was
    there, or you reverted a run, or a test is passing for the wrong reason, say so.
    You are a quality signal in this loop, alongside the merge gate.
