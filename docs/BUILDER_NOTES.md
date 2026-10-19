@@ -24,4 +24,4 @@
 
 2026-10-17 BUG-002-r1: after `python tools/make-manifest.py`, `git diff --stat` warns that LF in `bridge/cursor-bridge/VERSION` will be replaced by CRLF the next time Git touches it, but VERSION is not a diff entry and `git diff -- bridge/cursor-bridge/VERSION` is empty.
 
-2026-10-19 CONFIG-B3b: on Windows, `open(..., encoding="utf-8").read()` in `dump-cli.py --check` normalises CRLF to LF before compare, so the handoff mutation that drops explicit line-ending normalisation is not caught by `test_cfgb3b_check_accepts_a_crlf_copy` locally; Ubuntu CI still exercises CRLF checkout behaviour.
+2026-10-19 CONFIG-B3b: text-mode `open(...).read()` with default `newline=None` translates CRLF to LF on every platform, so dropping explicit line-ending normalisation in `dump-cli.py --check` is an equivalent mutant everywhere, not only on Windows; the Ubuntu runner checks files out with LF.

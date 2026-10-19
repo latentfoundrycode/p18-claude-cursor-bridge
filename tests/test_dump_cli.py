@@ -653,3 +653,185 @@ def test_cfgb3b_r2_markdown_shows_each_action_whole(tmp_path):
             check(s["positionals"] + s["options"], s_lo, s_hi, (c["name"], s["name"]))
     record = [s for s in _entry(data, "evaluate-reports.py")["subcommands"] if s["name"] == "record"][0]
     assert record["positionals"], "evaluate-reports record has positionals to show"
+
+
+# --- round 3 (handoff/CONFIG-B3b-r3.md): the security re-check's findings ------------------------------------------
+# Blocking: the string check read a default through json.dumps, which doubles backslashes, so a home path inside a
+# default never matched on Windows; a dict default was never judged. Advisories: case and slash forms of the folders,
+# sub-command names, os.PathLike defaults.
+
+HOME_EXPR = 'os.path.join(os.path.expanduser("~"), "Documents")'
+
+
+def test_cfgb3b_r3_a_path_inside_a_string_default_is_refused(tmp_path):
+    """Blocking (security re-check): a default that is not itself absolute but holds the home folder is refused, naming
+    the option; the check reads the string, not its JSON text."""
+    _refused(tmp_path, "zz-str.py", _argparse_program('    p.add_argument("--out", default="out=" + %s)\n' % HOME_EXPR),
+             "--out")
+
+
+def test_cfgb3b_r3_a_dict_default_is_judged_like_a_list(tmp_path):
+    """Blocking: a dict default's values are judged at any depth - a path under the program's folder takes the
+    placeholder, any other absolute path is refused naming the option."""
+    sb = _sandbox(tmp_path / "sb")
+    source = _argparse_program(
+        '    p.add_argument("--map", default={"k": os.path.join(HERE, "workflow", "open-list.md"), "n": 1})\n')
+    (sb / "bridge" / "cursor-bridge" / "zz-map.py").write_text(source, encoding="utf-8")
+    data = _generated(sb)
+    opt = [o for o in _entry(data, "zz-map.py")["options"] if o["option_strings"] == ["--map"]][0]
+    assert opt["default"] == {"k": "<bridge folder>/workflow/open-list.md", "n": 1}
+    _refused(tmp_path / "out", "zz-map.py",
+             _argparse_program('    p.add_argument("--map", default={"k": %s})\n' % HOME_EXPR), "--map")
+
+
+def test_cfgb3b_r3_a_pathlike_default_is_a_path(tmp_path):
+    """Advisory: an os.PathLike default (pathlib.Path) is judged as its string - the placeholder under the program's
+    folder, a refusal by name elsewhere, never a traceback."""
+    sb = _sandbox(tmp_path / "sb")
+    source = _argparse_program('    import pathlib\n'
+                               '    p.add_argument("--where", default=pathlib.Path(HERE) / "workflow" / "open-list.md")\n')
+    (sb / "bridge" / "cursor-bridge" / "zz-pl.py").write_text(source, encoding="utf-8")
+    data = _generated(sb)
+    opt = [o for o in _entry(data, "zz-pl.py")["options"] if o["option_strings"] == ["--where"]][0]
+    assert opt["default"] == "<bridge folder>/workflow/open-list.md"
+    _refused(tmp_path / "out", "zz-pl.py",
+             _argparse_program('    import pathlib\n    p.add_argument("--where", default=pathlib.Path(%s))\n' % HOME_EXPR),
+             "--where")
+
+
+def test_cfgb3b_r3_the_home_folder_in_forward_slashes_is_refused(tmp_path):
+    """Advisory: the home folder written with forward slashes in a help text is refused (the comparison folds the
+    separators, as os.path.normcase does on Windows)."""
+    _refused(tmp_path, "zz-fs.py", _argparse_program(
+        '    p.add_argument("--x", help="see " + os.path.expanduser("~").replace(os.sep, "/"))\n'), "--x")
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="paths ignore case only on Windows")
+def test_cfgb3b_r3_the_home_folder_in_another_case_is_refused(tmp_path):
+    """Advisory: on Windows the home folder in upper case in a help text, and in lower case in a docstring usage, is
+    refused."""
+    _refused(tmp_path / "help", "zz-up.py", _argparse_program(
+        '    p.add_argument("--x", help="see " + os.path.expanduser("~").upper())\n'), "--x")
+    usage = '"""zz-low: see %s."""\n' % os.path.expanduser("~").lower().replace("\\", "/")
+    _refused(tmp_path / "doc", "zz-low.py", usage + PROGRAM_NODOC)
+
+
+def test_cfgb3b_r3_a_subcommand_named_by_a_path_is_refused(tmp_path):
+    """Advisory: sub-command names, option strings and dests are checked like every other string."""
+    _refused(tmp_path, "zz-sub.py", _argparse_program(
+        '    sub = p.add_subparsers(dest="cmd")\n    sub.add_parser(%s)\n' % HOME_EXPR))
+
+
+# Review A's round-2 survivors (S2), each with the input that separates it.
+
+def _option(tmp_path, name, body, option):
+    sb = _sandbox(tmp_path / "sb")
+    (sb / "bridge" / "cursor-bridge" / name).write_text(_argparse_program(body), encoding="utf-8")
+    data = _generated(sb)
+    return sb, data, [o for o in _entry(data, name)["options"] if o["option_strings"] == [option]][0]
+
+
+def test_cfgb3b_r3_the_repository_folder_in_forward_slashes_is_refused(tmp_path):
+    """x1: the repository's folder written with forward slashes in a help text."""
+    _refused(tmp_path, "zz-rs.py", _argparse_program('    p.add_argument("--x", help="see " + HERE.replace(os.sep, "/"))\n'),
+             "--x")
+
+
+def test_cfgb3b_r3_the_current_folder_is_refused(tmp_path):
+    """x2: run from a folder outside the repository and the home folder, a help text holding the current folder."""
+    sb = _sandbox(tmp_path / "sb")
+    (sb / "bridge" / "cursor-bridge" / "zz-cwd.py").write_text(
+        _argparse_program('    p.add_argument("--x", help="from " + os.getcwd())\n'), encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    for args in ((), ("--check",)):
+        p = _run(sb, *args, cwd=elsewhere)
+        out = p.stdout + p.stderr
+        assert p.returncode == 1 and "zz-cwd.py" in out and "--x" in out and "Traceback" not in out, (args, out)
+    assert not (sb / JSON_REL).exists()
+
+
+def test_cfgb3b_r3_a_home_at_the_filesystem_root_is_not_a_fragment(tmp_path):
+    """x3: with the home folder at the filesystem root, the repository's own reference still generates (a root would
+    match every path)."""
+    sb = _sandbox(tmp_path / "sb")
+    anchor = pathlib.Path(tmp_path).anchor
+    env = dict(os.environ, HOME=anchor, USERPROFILE=anchor)
+    p = _run(sb, env=env)
+    assert p.returncode == 0, p.stdout + p.stderr
+
+
+def test_cfgb3b_r3_a_choice_holding_a_path_is_refused(tmp_path):
+    """x5."""
+    _refused(tmp_path, "zz-ch.py", _argparse_program('    p.add_argument("--x", choices=["a", HERE])\n'), "--x")
+
+
+def test_cfgb3b_r3_a_docstring_holding_the_repository_folder_is_refused(tmp_path):
+    """x6: a hand-parsed command whose usage text holds the repository's folder literally."""
+    sb_path = tmp_path / "sb"
+    usage = '"""zz-doc: installed at %s."""\n' % str(sb_path).replace("\\", "/")
+    _refused(tmp_path, "zz-doc.py", usage + PROGRAM_NODOC)
+
+
+def test_cfgb3b_r3_a_subcommand_description_holding_a_path_is_refused(tmp_path):
+    """x7."""
+    _refused(tmp_path, "zz-sd.py", _argparse_program(
+        '    sub = p.add_subparsers(dest="cmd")\n    sub.add_parser("go", description="in " + HERE)\n'))
+
+
+def test_cfgb3b_r3_a_name_starting_with_two_dots_is_inside(tmp_path):
+    """x8: a file under the program's folder whose name starts with '..' is inside it: the placeholder."""
+    _, _, opt = _option(tmp_path, "zz-dd.py", '    p.add_argument("--x", default=os.path.join(HERE, "..foo"))\n', "--x")
+    assert opt["default"] == "<bridge folder>/..foo"
+
+
+def test_cfgb3b_r3_the_parent_folder_itself_is_refused(tmp_path):
+    """x9: a default equal to the parent of the program's folder is outside it."""
+    _refused(tmp_path, "zz-par.py", _argparse_program('    p.add_argument("--x", default=os.path.dirname(HERE))\n'), "--x")
+
+
+def test_cfgb3b_r3_tuple_and_nested_list_defaults(tmp_path):
+    """x10, x12: a tuple default and a nested list default are judged element by element."""
+    _, _, opt = _option(tmp_path / "t", "zz-tu.py",
+                        '    p.add_argument("--x", nargs=2, default=(os.path.join(HERE, "a"), "b"))\n', "--x")
+    assert opt["default"] == ["<bridge folder>/a", "b"]
+    _, _, opt = _option(tmp_path / "n", "zz-ne.py", '    p.add_argument("--x", default=[[os.path.join(HERE, "a")], "b"])\n',
+                        "--x")
+    assert opt["default"] == [["<bridge folder>/a"], "b"]
+
+
+@pytest.mark.parametrize("before", [False, True])
+def test_cfgb3b_r3_the_bytecode_flag_is_restored(tmp_path, before):
+    """x11: build_reference leaves sys.dont_write_bytecode as it found it."""
+    sb = _sandbox(tmp_path / "sb")
+    gen = _load(sb / "tools" / "dump-cli.py", "flag%d" % before)
+    saved = sys.dont_write_bytecode
+    try:
+        sys.dont_write_bytecode = before
+        gen.build_reference(str(sb))
+        assert sys.dont_write_bytecode is before
+    finally:
+        sys.dont_write_bytecode = saved
+
+
+def test_cfgb3b_r3_a_subcommand_description_is_fenced(tmp_path):
+    """x14: a sub-command's description is shown in a fenced block."""
+    sb = _sandbox(tmp_path / "sb")
+    (sb / "bridge" / "cursor-bridge" / "zz-sf.py").write_text(_argparse_program(
+        '    sub = p.add_subparsers(dest="cmd")\n    sub.add_parser("go", description="zz sub description")\n'),
+        encoding="utf-8")
+    _generated(sb)
+    assert _fenced("zz sub description") in (sb / MD_REL).read_text(encoding="utf-8")
+
+
+def test_cfgb3b_r3_each_action_is_a_list_item(tmp_path):
+    """Review A B2: each action line is a Markdown list item ("- " first) whose fields are separated by "; ", so the
+    lines of a section do not run together into one paragraph."""
+    sb = _sandbox(tmp_path / "sb")
+    data = _generated(sb)
+    md = (sb / MD_REL).read_text(encoding="utf-8")
+    action_lines = [l for _, l in _md_regions(md) if "required: " in l]
+    assert action_lines
+    for line in action_lines:
+        assert line.startswith("- `"), line
+        assert "; default: " in line and "; required: " in line, line

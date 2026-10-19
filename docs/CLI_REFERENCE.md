@@ -227,14 +227,16 @@ anything of the tree survived. Exit 0 = ended or already gone, 1 = something sur
 
 Path: `bridge/cursor-bridge/completion-check.py`
 
+```
 Check requirements coverage and shipped stand-ins.
+```
 
 ### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--mode`; default: `"done"`; required: false; choices: ["plan", "done"]
-  - - `--requirements`; default: `"docs/REQUIREMENTS.md"`; required: false
-  - - `--only`; default: `""`; required: false; comma-separated requirement IDs; the run is limited to them
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--mode` default: "done" required: false choices: ["plan", "done"]
+`--requirements` default: "docs/REQUIREMENTS.md" required: false
+`--only` default: "" required: false comma-separated requirement IDs; the run is limited to them
 
 ## conformance-check.py
 
@@ -301,92 +303,98 @@ ASCII-only on purpose (cp1252 consoles). Never writes.
 
 Path: `bridge/cursor-bridge/diagram-check.py`
 
+```
 Check the normative design diagrams.
+```
 
 ### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--mode`; default: `"design"`; required: false; choices: ["design", "code", "done"]
-  - - `--index`; default: `"docs/diagrams/INDEX.md"`; required: false
-  - - `--requirements`; default: `"docs/REQUIREMENTS.md"`; required: false
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--mode` default: "design" required: false choices: ["design", "code", "done"]
+`--index` default: "docs/diagrams/INDEX.md" required: false
+`--requirements` default: "docs/REQUIREMENTS.md" required: false
 
 ## evaluate-reports.py
 
 Path: `bridge/cursor-bridge/evaluate-reports.py`
 
+```
 evaluate-reports: the report cycle's program (restructuring plan, section 12; release A3).
+```
 
 ### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
 
 ### Subcommand `collect`
 
 #### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--ledger`; required: false
-  - - `--project-root`; required: false; one project root instead of the three (tests)
-  - - `--project-name`; required: false
-  - - `--home`; required: false; the folder holding .claude/projects (tests)
-  - - `--out`; required: false
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--ledger` default: null required: false
+`--project-root` default: null required: false one project root instead of the three (tests)
+`--project-name` default: null required: false
+`--home` default: null required: false the folder holding .claude/projects (tests)
+`--out` default: null required: false
 
 ### Subcommand `record`
 
 #### Positionals
 
-  - - `project`; required: true
-  - - `id`; required: true
-  - - `outcome`; required: true
+`project` default: null required: true
+`id` default: null required: true
+`outcome` default: null required: true
 
 #### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--ledger`; required: false
-  - - `--project-root`; required: false; one project root instead of the three (tests)
-  - - `--project-name`; required: false
-  - - `--home`; required: false; the folder holding .claude/projects (tests)
-  - - `--reason`; required: false
-  - - `--force`; default: `false`; required: false
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--ledger` default: null required: false
+`--project-root` default: null required: false one project root instead of the three (tests)
+`--project-name` default: null required: false
+`--home` default: null required: false the folder holding .claude/projects (tests)
+`--reason` default: null required: false
+`--force` default: false required: false
 
 ### Subcommand `seed`
 
 #### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--ledger`; required: false
-  - - `--project-root`; required: false; one project root instead of the three (tests)
-  - - `--project-name`; required: false
-  - - `--home`; required: false; the folder holding .claude/projects (tests)
-  - - `--date`; required: false
-  - - `--evaluations`; required: false; the folder of the first evaluation's tables (default Reports/Evaluations/2026-10-04)
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--ledger` default: null required: false
+`--project-root` default: null required: false one project root instead of the three (tests)
+`--project-name` default: null required: false
+`--home` default: null required: false the folder holding .claude/projects (tests)
+`--date` default: null required: false
+`--evaluations` default: null required: false the folder of the first evaluation's tables (default Reports/Evaluations/2026-10-04)
 
 ### Subcommand `extract`
 
 #### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--ledger`; required: false
-  - - `--project-root`; required: false; one project root instead of the three (tests)
-  - - `--project-name`; required: false
-  - - `--home`; required: false; the folder holding .claude/projects (tests)
-  - - `--out`; required: false
-  - - `--since`; required: false; a date; default the ledger's last extract, else the newest evaluation folder
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--ledger` default: null required: false
+`--project-root` default: null required: false one project root instead of the three (tests)
+`--project-name` default: null required: false
+`--home` default: null required: false the folder holding .claude/projects (tests)
+`--out` default: null required: false
+`--since` default: null required: false a date; default the ledger's last extract, else the newest evaluation folder
 
 ## inventory-check.py
 
 Path: `bridge/cursor-bridge/inventory-check.py`
 
+```
 Check the project's current-state record.
+```
 
 ### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--inventory`; default: `"docs/INVENTORY.md"`; required: false
-  - - `--status`; default: `"docs/PROJECT_STATUS.md"`; required: false
-  - - `--changes`; default: `"docs/CHANGES.md"`; required: false
-  - - `--max-lines`; default: `120`; required: false
-  - - `--max-chars`; default: `12000`; required: false
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--inventory` default: "docs/INVENTORY.md" required: false
+`--status` default: "docs/PROJECT_STATUS.md" required: false
+`--changes` default: "docs/CHANGES.md" required: false
+`--max-lines` default: 120 required: false
+`--max-chars` default: 12000 required: false
 
 ## invisible-check.py
 
@@ -532,15 +540,17 @@ that cannot read its input never blocks the loop. ASCII-only on purpose. Never w
 
 Path: `bridge/cursor-bridge/plan-check.py`
 
+```
 Validate the build plan and list ready increments.
+```
 
 ### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--plan`; default: `"docs/BUILD_PLAN*.md"`; required: false
-  - - `--base`; default: `"origin/main"`; required: false
-  - - `--no-git`; default: `false`; required: false; skip deriving merged increments from git
-  - - `--briefs`; default: `"handoff"`; required: false; folder of the briefs compared with their increments
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--plan` default: "docs/BUILD_PLAN*.md" required: false
+`--base` default: "origin/main" required: false
+`--no-git` default: false required: false skip deriving merged increments from git
+`--briefs` default: "handoff" required: false folder of the briefs compared with their increments
 
 ## pr-activity-check.py
 
@@ -865,15 +875,17 @@ stalls normal builds is the fastest way to get a safety control switched off.
 
 Path: `bridge/cursor-bridge/sync-check.py`
 
+```
 Compare local <base> with the remote's <base>.
+```
 
 ### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--apply`; default: `false`; required: false; fast-forward local <base> when BEHIND
-  - - `--strict`; default: `false`; required: false; project end: OFFLINE/UNPUBLISHED fail
-  - - `--base`; default: `"main"`; required: false
-  - - `--remote`; default: `"origin"`; required: false
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--apply` default: false required: false fast-forward local <base> when BEHIND
+`--strict` default: false required: false project end: OFFLINE/UNPUBLISHED fail
+`--base` default: "main" required: false
+`--remote` default: "origin" required: false
 
 ## wake-timer.py
 
@@ -927,6 +939,7 @@ ASCII-only on purpose (cp1252 consoles).
 
 Path: `bridge/cursor-bridge/workflow-check.py`
 
+```
 workflow-check: keep conditional workflows honest against the open list and the extension-point registry (R-014, R-033).
 
   python workflow-check.py [--open-list FILE] [--registry FILE] [--status FILE]... [ROOT ...]
@@ -965,18 +978,18 @@ program prints ERROR lines and RESULT: not checked, and no traceback. A command-
 error also exits 2; the usage line argparse prints stays as it is, argparse's message is
 escaped the same way as a printed field, and the last line on standard output is
 RESULT: not checked.
-
+```
 
 ### Positionals
 
-  - - `roots`; required: false
+`roots` default: null required: false
 
 ### Options
 
-  - - `-h --help`; default: `"==SUPPRESS=="`; required: false; show this help message and exit
-  - - `--open-list`; default: `"<bridge folder>/workflow/open-list.md"`; required: false
-  - - `--registry`; default: `"<bridge folder>/workflow/extension-points.md"`; required: false
-  - - `--status`; default: `[]`; required: false
+`-h --help` default: "==SUPPRESS==" required: false show this help message and exit
+`--open-list` default: "<bridge folder>/workflow/open-list.md" required: false
+`--registry` default: "<bridge folder>/workflow/extension-points.md" required: false
+`--status` default: [] required: false
 
 ## worktree-teardown.py
 

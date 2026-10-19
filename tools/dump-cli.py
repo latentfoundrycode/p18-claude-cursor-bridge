@@ -69,13 +69,27 @@ def jsonable(value):
     return json.loads(json.dumps(value))
 
 
+class DumpCliError(Exception):
+    def __init__(self, code=1):
+        self.code = code
+
+
+def refuse_outside_default(program_name, option_label):
+    print("dump-cli: %s: absolute default on %s is outside the bridge folder" % (program_name, option_label),
+          file=sys.stderr)
+    raise DumpCliError(1)
+
+
 def default_for_json(value, bridge_dir, program_name, option_label):
+    if isinstance(value, (list, tuple)):
+        return [default_for_json(v, bridge_dir, program_name, option_label) for v in value]
     if isinstance(value, str) and os.path.isabs(value):
-        rel = os.path.relpath(value, bridge_dir)
-        if rel.startswith(".."):
-            print("dump-cli: %s: absolute default on %s is outside the bridge folder" % (program_name, option_label),
-                  file=sys.stderr)
-            raise DumpCliError(1)
+        try:
+            rel = os.path.relpath(value, bridge_dir)
+        except ValueError:
+            refuse_outside_default(program_name, option_label)
+        if rel == os.pardir or rel.startswith(os.pardir + os.sep):
+            refuse_outside_default(program_name, option_label)
         return BRIDGE_PLACEHOLDER + rel.replace(os.sep, "/")
     return jsonable(value)
 
@@ -118,11 +132,6 @@ def parser_entry(parser, bridge_dir, program_name):
     }
 
 
-class DumpCliError(Exception):
-    def __init__(self, code=1):
-        self.code = code
-
-
 def classify_program(path, name):
     text = open(path, encoding="utf-8").read()
     if has_top_level_build_parser(path):
@@ -133,13 +142,77 @@ def classify_program(path, name):
     return "docstring"
 
 
+def is_filesystem_root(path):
+    path = os.path.abspath(path)
+    drive, tail = os.path.splitdrive(path)
+    if drive:
+        return tail in ("\\", "/") or tail == ""
+    return path == os.sep
+
+
+def forbidden_path_fragments(root):
+    repo = os.path.abspath(root)
+    fragments = []
+    for path in (repo, os.path.expanduser("~"), os.getcwd()):
+        path = os.path.abspath(path)
+        if is_filesystem_root(path):
+            continue
+        fragments.append(path)
+        if path == repo:
+            fragments.append(path.replace(os.sep, "/"))
+    return fragments
+
+
+def check_string_for_paths(text, program_name, option_label, fragments):
+    if not isinstance(text, str):
+        return
+    for frag in fragments:
+        if frag and frag in text:
+            if option_label is not None:
+                print("dump-cli: %s: reference text on %s contains a computer path" % (program_name, option_label),
+                      file=sys.stderr)
+            else:
+                print("dump-cli: %s: reference text contains a computer path" % program_name, file=sys.stderr)
+            raise DumpCliError(1)
+
+
+def validate_reference_strings(data, root):
+    fragments = forbidden_path_fragments(root)
+    for cmd in data["commands"]:
+        name = cmd["name"]
+        if cmd["source"] == "docstring":
+            check_string_for_paths(cmd.get("usage"), name, None, fragments)
+            continue
+        check_string_for_paths(cmd.get("description"), name, None, fragments)
+        for sub in cmd["subcommands"]:
+            check_string_for_paths(sub.get("description"), name, None, fragments)
+            for a in sub["positionals"] + sub["options"]:
+                label = a["option_strings"][0] if a["option_strings"] else a["dest"]
+                check_string_for_paths(a.get("help"), name, label, fragments)
+                if a["choices"] is not None:
+                    for choice in a["choices"]:
+                        check_string_for_paths(choice, name, label, fragments)
+                check_string_for_paths(json.dumps(a["default"]), name, label, fragments)
+        for a in cmd["positionals"] + cmd["options"]:
+            label = a["option_strings"][0] if a["option_strings"] else a["dest"]
+            check_string_for_paths(a.get("help"), name, label, fragments)
+            if a["choices"] is not None:
+                for choice in a["choices"]:
+                    check_string_for_paths(choice, name, label, fragments)
+            check_string_for_paths(json.dumps(a["default"]), name, label, fragments)
+
+
 def command_entry(bridge_dir, name):
     path = os.path.join(bridge_dir, name)
     rel_path = "bridge/cursor-bridge/" + name
     kind = classify_program(path, name)
     base = {"name": name, "path": rel_path, "source": kind}
     if kind == "docstring":
-        base["usage"] = module_docstring(path)
+        usage = module_docstring(path)
+        if usage is None:
+            print("dump-cli: %s: no module docstring" % name, file=sys.stderr)
+            raise DumpCliError(1)
+        base["usage"] = usage
         return base
     mod = load_bridge_module(path, "cmd")
     parsed = parser_entry(mod.build_parser(), bridge_dir, name)
@@ -152,8 +225,36 @@ def command_entry(bridge_dir, name):
 
 def build_reference(root):
     bridge_dir = os.path.join(root, "bridge", "cursor-bridge")
-    commands = [command_entry(bridge_dir, name) for name in command_programs(bridge_dir)]
-    return {"commands": commands}
+    previous_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        commands = [command_entry(bridge_dir, name) for name in command_programs(bridge_dir)]
+    finally:
+        sys.dont_write_bytecode = previous_bytecode
+    data = {"commands": commands}
+    validate_reference_strings(data, root)
+    return data
+
+
+def reference_json_text(data):
+    return json.dumps(data, indent=2, sort_keys=True) + "\n"
+
+
+def append_fenced(lines, text):
+    lines.append("```")
+    lines.extend(text.splitlines())
+    lines.append("```")
+    lines.append("")
+
+
+def render_action_line(action):
+    label = "`%s`" % (" ".join(action["option_strings"]) if action["option_strings"] else action["dest"])
+    parts = [label, "default: %s" % json.dumps(action["default"]), "required: %s" % json.dumps(action["required"])]
+    if action["choices"] is not None:
+        parts.append("choices: %s" % json.dumps(action["choices"]))
+    if action["help"]:
+        parts.append(action["help"])
+    return " ".join(parts)
 
 
 def render_markdown(data):
@@ -164,53 +265,30 @@ def render_markdown(data):
         lines.append("Path: `%s`" % cmd["path"])
         lines.append("")
         if cmd["source"] == "docstring":
-            lines.append("```")
-            lines.extend(cmd["usage"].splitlines())
-            lines.append("```")
-            lines.append("")
+            append_fenced(lines, cmd["usage"])
             continue
         if cmd.get("description"):
-            lines.append(cmd["description"])
-            lines.append("")
+            append_fenced(lines, cmd["description"])
         for section, items in (("Positionals", cmd["positionals"]), ("Options", cmd["options"])):
             if not items:
                 continue
             lines.append("### %s" % section)
             lines.append("")
             for a in items:
-                opts = " ".join(a["option_strings"]) if a["option_strings"] else a["dest"]
-                parts = ["- `%s`" % opts]
-                if a["default"] is not None:
-                    parts.append("default: `%s`" % json.dumps(a["default"]))
-                parts.append("required: %s" % json.dumps(a["required"]))
-                if a["choices"] is not None:
-                    parts.append("choices: %s" % json.dumps(a["choices"]))
-                if a["help"]:
-                    parts.append(a["help"])
-                lines.append("  - " + "; ".join(parts))
+                lines.append(render_action_line(a))
             lines.append("")
         for sub in cmd["subcommands"]:
             lines.append("### Subcommand `%s`" % sub["name"])
             lines.append("")
             if sub.get("description"):
-                lines.append(sub["description"])
-                lines.append("")
+                append_fenced(lines, sub["description"])
             for section, items in (("Positionals", sub["positionals"]), ("Options", sub["options"])):
                 if not items:
                     continue
                 lines.append("#### %s" % section)
                 lines.append("")
                 for a in items:
-                    opts = " ".join(a["option_strings"]) if a["option_strings"] else a["dest"]
-                    parts = ["- `%s`" % opts]
-                    if a["default"] is not None:
-                        parts.append("default: `%s`" % json.dumps(a["default"]))
-                    parts.append("required: %s" % json.dumps(a["required"]))
-                    if a["choices"] is not None:
-                        parts.append("choices: %s" % json.dumps(a["choices"]))
-                    if a["help"]:
-                        parts.append(a["help"])
-                    lines.append("  - " + "; ".join(parts))
+                    lines.append(render_action_line(a))
                 lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -218,7 +296,7 @@ def render_markdown(data):
 def write_outputs(root, data):
     docs = os.path.join(root, "docs")
     os.makedirs(docs, exist_ok=True)
-    json_text = json.dumps(data, indent=2, sort_keys=True) + "\n"
+    json_text = reference_json_text(data)
     md_text = render_markdown(data)
     json_path = os.path.join(docs, "cli-reference.json")
     md_path = os.path.join(docs, "CLI_REFERENCE.md")
@@ -234,19 +312,16 @@ def normalise(text):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], allow_abbrev=False)
     ap.add_argument("--check", action="store_true", help="compare committed reference files without writing")
-    args, extras = ap.parse_known_args(argv)
-    if extras:
-        ap.print_usage(file=sys.stderr)
-        return 2
+    args = ap.parse_args(argv)
     root = repo_root()
     if args.check:
         try:
             data = build_reference(root)
         except DumpCliError as e:
             return e.code
-        json_expected = json.dumps(data, indent=2, sort_keys=True) + "\n"
+        json_expected = reference_json_text(data)
         md_expected = render_markdown(data)
         failures = []
         for rel, expected in ((JSON_REL, json_expected), (MD_REL, md_expected)):
