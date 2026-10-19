@@ -475,6 +475,58 @@ def test_r029_a_linked_file_under_workflow_is_not_read(tmp_path):
     assert not any("Text from outside" in l for l in lines), lines
 
 
+def _link_folder(link, target):
+    """A folder link: a junction on Windows (no privilege needed), a symbolic link elsewhere; skip if neither works."""
+    try:
+        if sys.platform == "win32":
+            import _winapi
+            _winapi.CreateJunction(str(target), str(link))
+        else:
+            os.symlink(str(target), str(link), target_is_directory=True)
+    except (OSError, NotImplementedError, AttributeError):
+        pytest.skip("this account cannot create a folder link")
+
+
+def test_r029_a_reference_through_a_link_out_of_the_bridge_folder_does_not_resolve(tmp_path):
+    """Requirement 1 of round 2: a reference whose segments are all plain still fails when its real path leaves
+    bridge/ (here through a folder link inside it); the builder's mutation (l), the containment check dropped, survived
+    without this case."""
+    root = make_repo(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "Target.md").write_bytes(b"# Target\n")
+    link = root / "bridge" / "cursor-bridge" / "linked"
+    _link_folder(link, outside)
+    try:
+        assert (link / "Target.md").exists()   # the precondition: without the check the reference would resolve
+        text, numbers = core_plus("Read ~/.claude/cursor-bridge/linked/Target.md here")
+        write(root, CORE, text)
+        rc, lines = run(root)
+        assert rc == 1 and fails(lines) == ["FAIL (ref) %s:%d: ~/.claude/cursor-bridge/linked/Target.md"
+                                            % (CORE, numbers[0])], lines
+    finally:
+        os.rmdir(str(link))   # removes the link itself, never its target
+
+
+def test_r029_a_linked_folder_under_workflow_is_not_read(tmp_path):
+    """Requirement 11 of round 2: links are not read, a folder link included; on Windows that is a junction, which
+    os.walk enters unless the program refuses it."""
+    root = make_repo(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "moved.md").write_bytes(b"# Outside\n\nText from outside the repository.\n")
+    phases = root / "bridge" / "cursor-bridge" / "workflow" / "phases"
+    phases.mkdir(parents=True)
+    link = phases / "linked"
+    _link_folder(link, outside)
+    try:
+        assert (link / "moved.md").exists()
+        rc, lines = run(root)
+        assert not any("Text from outside" in l or "linked" in l for l in lines), lines
+    finally:
+        os.rmdir(str(link))
+
+
 def _load_program():
     spec = importlib.util.spec_from_file_location("trace_check_under_test", str(TRACE_CHECK))
     module = importlib.util.module_from_spec(spec)

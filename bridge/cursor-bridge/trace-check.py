@@ -32,13 +32,11 @@ import subprocess
 import sys
 
 GIT_TIMEOUT = 120
-NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 BASELINE_REL = "bridge/cursor-bridge/workflow/trace-baseline.txt"
 EXCEPTIONS_REL = "bridge/cursor-bridge/workflow/trace-exceptions.md"
 CORE_REL = "bridge/commands/supervisor.md"
 WORKFLOW_PREFIX = "bridge/cursor-bridge/workflow/"
-EXCEPTIONS_NAME = "trace-exceptions.md"
 ENTRY_RE = re.compile(
     r"^- (reword|new) ([A-Z][A-Z0-9]*-[0-9]+) (\S+\.md) (.+)$"
 )
@@ -46,13 +44,12 @@ ID_RE = re.compile(r"^[A-Z][A-Z0-9]*-[0-9]+$")
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6}) (.*)$")
 FENCE_OPEN_RE = re.compile(r"^(`{3,}|~{3,})")
 LIST_ITEM_RE = re.compile(r"^([-*+]|[0-9]+[.)])\s")
-REF_RE = re.compile(r"~/.claude/([^\s`\"'()\[\],;]+)")
+REF_RE = re.compile(r"~/\.claude/([^\s`\"'()\[\],;]+)")
 CITE_RE = re.compile(
     r'\b(see|per|under) "([^"]+)"(?: \u2192 "([^"]+)")*',
     re.IGNORECASE,
 )
 EM_DASH = "\u2014"
-ARROW = "\u2192"
 PLACEHOLDER_CHARS = frozenset("<>*\u2026")
 REF_STRIP = ".:"
 
@@ -65,11 +62,12 @@ def escape_field(value):
     text = "" if value is None else str(value)
     parts = []
     for char in text:
-        if char.isprintable() and ord(char) < 128:
-            parts.append(char)
-            continue
         code = ord(char)
-        if code < 256:
+        if code < 0x20 or code == 0x7f:
+            parts.append("\\x%02x" % code)
+        elif code < 128:
+            parts.append(char)
+        elif code < 256:
             parts.append("\\x%02x" % code)
         elif code <= 0xFFFF:
             parts.append("\\u%04x" % code)
@@ -216,9 +214,7 @@ def parse_units(text):
             current_para = {"fence": False, "lines": [line]}
             continue
 
-        if current_para is None or current_para.get("list_done"):
-            if current_para is not None and not current_para.get("fence"):
-                end_unit()
+        if current_para is None:
             current_para = {"fence": False, "lines": [line]}
         else:
             current_para["lines"].append(line)
@@ -243,10 +239,12 @@ def git_run(root, args):
             capture_output=True,
             stdin=subprocess.DEVNULL,
             timeout=GIT_TIMEOUT,
-            creationflags=NO_WINDOW,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-    except (OSError, subprocess.TimeoutExpired) as err:
-        return None, str(err)
+    except subprocess.TimeoutExpired:
+        return None, "timed out after %d s" % GIT_TIMEOUT
+    except OSError as err:
+        return None, "cannot be started (%s)" % err
     return proc, None
 
 
@@ -275,10 +273,15 @@ def collect_md_paths(root, under_workflow):
     found = []
     for dirpath, _dirnames, filenames in os.walk(under_workflow):
         for name in filenames:
-            if name.endswith(".md") and name != EXCEPTIONS_NAME:
-                full = os.path.join(dirpath, name)
-                rel = slash(os.path.relpath(full, root))
-                found.append(rel)
+            if not name.endswith(".md"):
+                continue
+            full = os.path.join(dirpath, name)
+            if os.path.islink(full):
+                continue
+            rel = slash(os.path.relpath(full, root))
+            if rel == EXCEPTIONS_REL:
+                continue
+            found.append(rel)
     found.sort()
     return found
 
@@ -301,47 +304,37 @@ def valid_exception_file(rel):
 
 def parse_exceptions(text, errors):
     entries = []
-    prose, rest = text, ""
-    marker = "## Entries"
-    idx = text.find("\n" + marker + "\n")
-    if idx < 0:
-        if text.rstrip().endswith(marker):
-            idx = text.rfind(marker)
-            rest = ""
-        else:
-            errors.append(("trace-exceptions.md", "no ## Entries line (requirement 6)"))
-            return None
-    else:
-        rest = text[idx + len("\n" + marker + "\n"):]
-    line_no = text[: idx + len("\n" + marker + "\n")].count("\n") + 1
-    for line in rest.split("\n"):
-        line_no += 1
+    lines = file_lines(text)
+    entries_idx = None
+    for idx, line in enumerate(lines):
+        if line == "## Entries":
+            entries_idx = idx
+            break
+    if entries_idx is None:
+        errors.append((EXCEPTIONS_REL, "no ## Entries line (requirement 6)"))
+        return None
+    for idx in range(entries_idx + 1, len(lines)):
+        line = lines[idx]
+        line_no = idx + 1
         if line.strip() == "":
             continue
         m = ENTRY_RE.match(line)
         if not m:
             errors.append((
-                "trace-exceptions.md",
-                "malformed entry at line %d (requirement 6)" % line_no,
+                EXCEPTIONS_REL,
+                "line %d: malformed entry (requirement 6)" % line_no,
             ))
             return None
         kind, inc_id, file_rel, heading = m.group(1), m.group(2), m.group(3), m.group(4)
-        if not ID_RE.match(inc_id):
+        if (
+            not ID_RE.match(inc_id)
+            or " " in file_rel
+            or not valid_exception_file(file_rel)
+            or not heading.strip()
+        ):
             errors.append((
-                "trace-exceptions.md",
-                "malformed entry at line %d (requirement 6)" % line_no,
-            ))
-            return None
-        if " " in file_rel or not valid_exception_file(file_rel):
-            errors.append((
-                "trace-exceptions.md",
-                "malformed entry at line %d (requirement 6)" % line_no,
-            ))
-            return None
-        if not heading.strip():
-            errors.append((
-                "trace-exceptions.md",
-                "malformed entry at line %d (requirement 6)" % line_no,
+                EXCEPTIONS_REL,
+                "line %d: malformed entry (requirement 6)" % line_no,
             ))
             return None
         entries.append({
@@ -371,18 +364,40 @@ def unit_excused(path, unit, excused_current):
     return False
 
 
+def bridge_contains(root, bridge_path):
+    bridge_root = os.path.join(root, "bridge")
+    try:
+        real_target = os.path.realpath(bridge_path)
+        real_bridge = os.path.realpath(bridge_root)
+    except OSError:
+        return False
+    try:
+        return os.path.commonpath([real_target, real_bridge]) == real_bridge
+    except ValueError:
+        return False
+
+
 def resolve_ref(rest, root):
     rest = rest.rstrip(REF_STRIP)
+    if rest.endswith("/"):
+        rest = rest[:-1]
+    bridge_root = os.path.join(root, "bridge")
     if rest == "":
-        target = os.path.join(root, "bridge")
-        return os.path.isdir(target) or os.path.isfile(target)
+        return bridge_contains(root, bridge_root) and (
+            os.path.isdir(bridge_root) or os.path.isfile(bridge_root)
+        )
     segments = rest.split("/")
+    for seg in segments:
+        if seg == "" or seg == "." or seg == ".." or "\\" in seg or ":" in seg:
+            return False
     resolved = []
     for seg in segments:
         if seg == "..." or any(c in PLACEHOLDER_CHARS for c in seg):
             break
         resolved.append(seg)
     bridge_path = os.path.join(root, "bridge", *resolved)
+    if not bridge_contains(root, bridge_path):
+        return False
     return os.path.exists(bridge_path)
 
 
@@ -391,25 +406,18 @@ def find_refs_in_file(rel, text, root, findings_ref):
     for no, line in enumerate(lines, 1):
         for m in REF_RE.finditer(line):
             rest = m.group(1)
+            shown = rest.rstrip(REF_STRIP)
             if not resolve_ref(rest, root):
-                findings_ref.append((rel, no, "~/.claude/" + rest))
+                findings_ref.append((rel, no, "~/.claude/" + shown))
 
 
 def citation_strings(normal):
     out = []
     for m in CITE_RE.finditer(normal):
         quotes = [m.group(2)]
-        tail = m.group(0)
-        pos = tail.find(ARROW)
-        while pos >= 0:
-            sub = tail[pos:]
-            qm = re.match(r' \u2192 "([^"]+)"', sub)
-            if qm:
-                quotes.append(qm.group(1))
-                tail = sub[len(qm.group(0)):]
-                pos = tail.find(ARROW)
-            else:
-                break
+        span = m.group(0)
+        for qm in re.finditer(r' \u2192 "([^"]+)"', span):
+            quotes.append(qm.group(1))
         out.append(quotes)
     return out
 
@@ -424,13 +432,7 @@ def heading_resolves(title, all_headings):
 def check_citations(rel, units, all_headings, findings_cite):
     for unit in units:
         for quote_chain in citation_strings(unit["normal"]):
-            if not quote_chain:
-                continue
-            first = quote_chain[0]
-            if not heading_resolves(first, all_headings):
-                findings_cite.append((rel, deepest_heading(unit["chain"]), first))
-                continue
-            for q in quote_chain[1:]:
+            for q in quote_chain:
                 if not heading_resolves(q, all_headings):
                     findings_cite.append((rel, deepest_heading(unit["chain"]), q))
 
@@ -438,7 +440,7 @@ def check_citations(rel, units, all_headings, findings_cite):
 def load_baseline_file(root, sha, rel, errors):
     proc, err = git_run(root, ["show", "%s:%s" % (sha, rel)])
     if proc is None:
-        errors.append(("git", err))
+        errors.append(("git show", err))
         return None
     if proc.returncode != 0:
         errors.append((rel, "missing at baseline commit"))
@@ -454,7 +456,8 @@ class CheckArgumentParser(argparse.ArgumentParser):
     def error(self, message):
         self.print_usage(sys.stderr)
         if sys.stderr is not None:
-            sys.stderr.write("%s: error: %s\n" % (self.prog, escape_field(message)))
+            sys.stderr.write("%s: error: %s\n" % (self.prog, message))
+        print("ERROR: usage: %s" % escape_field(message))
         print("RESULT: not checked")
         if sys.stdout is not None:
             sys.stdout.flush()
@@ -484,7 +487,7 @@ def main(argv=None):
 
     proc, err = git_run(root, ["rev-parse", "--is-inside-work-tree"])
     if proc is None:
-        errors.append(("git", "cannot be started (%s)" % err))
+        errors.append(("git rev-parse", err))
     elif proc.returncode != 0 or proc.stdout.decode("ascii", "replace").strip() != "true":
         errors.append((slash(root), "not a git work tree"))
 
@@ -504,7 +507,7 @@ def main(argv=None):
     if sha and not errors:
         proc, err = git_run(root, ["cat-file", "-e", "%s^{commit}" % sha])
         if proc is None:
-            errors.append(("git", "cannot be started (%s)" % err))
+            errors.append(("git cat-file", err))
         elif proc.returncode != 0:
             errors.append((
                 sha,
@@ -533,19 +536,28 @@ def main(argv=None):
     excused_current, reword_baseline = build_excuse_index(entries or [])
 
     baseline_workflow_paths = []
-    proc, _ = git_run(root, [
+    proc, err = git_run(root, [
         "ls-tree", "-r", "-z", "--name-only", sha, "--", WORKFLOW_PREFIX,
     ])
+    if proc is None:
+        print("ERROR: git ls-tree: %s" % escape_field(err))
+        print("RESULT: not checked")
+        return 2
     if proc.returncode != 0:
-        print("ERROR: git ls-tree: failed")
+        print("ERROR: git ls-tree: command failed")
         print("RESULT: not checked")
         return 2
     raw = proc.stdout
     for part in raw.split(b"\0"):
         if not part:
             continue
-        rel = part.decode("utf-8", "replace")
-        if rel.endswith(".md") and not rel.endswith("/" + EXCEPTIONS_NAME):
+        try:
+            rel = part.decode("utf-8")
+        except UnicodeDecodeError:
+            print("ERROR: %s: cannot be read as UTF-8" % escape_field(part.decode("latin-1")))
+            print("RESULT: not checked")
+            return 2
+        if rel.endswith(".md") and rel != EXCEPTIONS_REL:
             baseline_workflow_paths.append(rel)
     baseline_workflow_paths.sort()
 
@@ -560,10 +572,7 @@ def main(argv=None):
     baseline_supervisor_traced = []
 
     for rel in baseline_homes:
-        if rel == CORE_REL:
-            text = load_baseline_file(root, sha, rel, errors)
-        else:
-            text = load_baseline_file(root, sha, rel, errors)
+        text = load_baseline_file(root, sha, rel, errors)
         if text is None:
             continue
         units, _heads = parse_units(text)
@@ -578,13 +587,6 @@ def main(argv=None):
                 })
 
     if errors:
-        for path, reason in errors:
-            print("ERROR: %s: %s" % (escape_field(path), escape_field(reason)))
-        print("RESULT: not checked")
-        return 2
-
-    baseline_supervisor_text = load_baseline_file(root, sha, CORE_REL, errors)
-    if baseline_supervisor_text is None:
         for path, reason in errors:
             print("ERROR: %s: %s" % (escape_field(path), escape_field(reason)))
         print("RESULT: not checked")
@@ -629,7 +631,11 @@ def main(argv=None):
                 if rel not in current_paths_for_norm.get(nf, []):
                     current_paths_for_norm.setdefault(nf, []).append(rel)
 
-    fails = []
+    fails_dropped = []
+    fails_copy = []
+    fails_new = []
+    fails_ref = []
+    fails_cite = []
     notes = []
     seen_norm_finding = set()
     dropped_count = 0
@@ -664,16 +670,16 @@ def main(argv=None):
                 excused_count += 1
                 seen_norm_finding.add(nf)
             else:
-                fails.append(
+                fails_dropped.append(
                     "FAIL (dropped) %s: %s - %s" % (CORE_REL, bh, excerpt(nf))
                 )
                 dropped_count += 1
                 seen_norm_finding.add(nf)
         elif c > b:
             paths = sorted(current_paths_for_norm.get(nf, current_paths_all.get(nf, [])))
-            fails.append(
+            fails_copy.append(
                 "FAIL (copy) %s: %s - %s"
-                % (", ".join(paths), bh, excerpt(nf))
+                % (", ".join(escape_field(p) for p in paths), bh, excerpt(nf))
             )
             seen_norm_finding.add(nf)
 
@@ -689,13 +695,21 @@ def main(argv=None):
             nf = u["normal"]
             if nf not in baseline_set:
                 h = deepest_heading(u["chain"])
-                fails.append("FAIL (new) %s: %s - %s" % (rel, h, excerpt(nf)))
+                fails_new.append(
+                    "FAIL (new) %s: %s - %s" % (escape_field(rel), h, excerpt(nf))
+                )
 
     for rel, line_no, ref in sorted(findings_ref):
-        fails.append("FAIL (ref) %s:%d: %s" % (rel, line_no, escape_field(ref)))
+        fails_ref.append(
+            "FAIL (ref) %s:%d: %s" % (escape_field(rel), line_no, escape_field(ref))
+        )
 
-    for rel, h, q in sorted(findings_cite):
-        fails.append('FAIL (cite) %s: %s - "%s"' % (rel, h, escape_field(q)))
+    for rel, h, q in findings_cite:
+        fails_cite.append(
+            'FAIL (cite) %s: %s - "%s"' % (escape_field(rel), h, escape_field(q))
+        )
+
+    fails = fails_dropped + fails_copy + fails_new + fails_ref + fails_cite
 
     if args.map:
         for traced in baseline_supervisor_traced:
@@ -708,14 +722,7 @@ def main(argv=None):
             )
 
     for line in fails:
-        if line.startswith("FAIL (dropped)") or line.startswith("FAIL (copy)"):
-            print(line)
-    for line in fails:
-        if line.startswith("FAIL (new)"):
-            print(line)
-    for line in fails:
-        if line.startswith("FAIL (ref)") or line.startswith("FAIL (cite)"):
-            print(line)
+        print(line)
     for line in notes:
         print(line)
 
