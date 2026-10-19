@@ -731,12 +731,16 @@ def sql_schema(text):
 
 
 # ------------------------------------------------------------------ main
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(description="Check the normative design diagrams.")
     ap.add_argument("--mode", choices=("design", "code", "done"), default="design")
     ap.add_argument("--index", default="docs/diagrams/INDEX.md")
     ap.add_argument("--requirements", default="docs/REQUIREMENTS.md")
-    a = ap.parse_args()
+    return ap
+
+
+def main():
+    a = build_parser().parse_args()
     code_mode, done = a.mode in ("code", "done"), a.mode == "done"
     fails, notes = [], []
 

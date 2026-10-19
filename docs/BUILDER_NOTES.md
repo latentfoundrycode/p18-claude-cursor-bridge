@@ -23,3 +23,5 @@
 2026-10-17 TASK-008-r2: while `judge_workflows_line` loads `workflow-check.py`, `sys.dont_write_bytecode` is `True` and restored in `finally`. The checker path is `os.path.realpath` of the program file. `field` calls `escape_field` directly; a missing one, or `SystemExit` during or after load, is not-checked. The post-load handler prints through `ascii_text` only.
 
 2026-10-17 BUG-002-r1: after `python tools/make-manifest.py`, `git diff --stat` warns that LF in `bridge/cursor-bridge/VERSION` will be replaced by CRLF the next time Git touches it, but VERSION is not a diff entry and `git diff -- bridge/cursor-bridge/VERSION` is empty.
+
+2026-10-19 CONFIG-B3b: on Windows, `open(..., encoding="utf-8").read()` in `dump-cli.py --check` normalises CRLF to LF before compare, so the handoff mutation that drops explicit line-ending normalisation is not caught by `test_cfgb3b_check_accepts_a_crlf_copy` locally; Ubuntu CI still exercises CRLF checkout behaviour.

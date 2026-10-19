@@ -482,3 +482,174 @@ def test_cfgb3b_generator_follows_the_program_conventions():
     assert text.startswith("#!/usr/bin/env python3")
     doc = ast.get_docstring(ast.parse(text)) or ""
     assert "--check" in doc
+
+
+# --- round 2 (handoff/CONFIG-B3b-r2.md): the reviewers' findings ----------------------------------------------------
+# Review A S1-S3, S5, S6, C1, C2, C4, C5 and the security auditor's advisories 1, 2 and 5 (two converged: S1 = advisory 1,
+# S2 = advisory 2). Each refused case also writes nothing.
+
+def _argparse_program(body, doc='"""zz test program."""'):
+    """A command with a top-level build_parser(); HERE is its own folder. `body` holds the add_argument lines."""
+    return (doc + "\nimport argparse\nimport os\n\nHERE = os.path.dirname(os.path.abspath(__file__))\n\n\n"
+            "def build_parser():\n    p = argparse.ArgumentParser(description=\"zz\")\n" + body +
+            "    return p\n\n\nif __name__ == \"__main__\":\n    build_parser().parse_args()\n")
+
+
+PROGRAM_LIST_IN = _argparse_program(
+    '    p.add_argument("--files", nargs="*", default=[os.path.join(HERE, "workflow", "open-list.md"), "plain"])\n')
+PROGRAM_LIST_OUT = _argparse_program(
+    '    p.add_argument("--files", nargs="*", default=["plain", os.path.abspath(os.path.join(HERE, os.pardir, "elsewhere"))])\n')
+PROGRAM_HELP_PATH = _argparse_program('    p.add_argument("--x", help="see " + HERE)\n')
+PROGRAM_DESC_HOME = _argparse_program('    p.description = os.path.expanduser("~") + " notes"\n')
+PROGRAM_NODOC = 'import sys\n\n\ndef main():\n    return 0\n\n\nif __name__ == "__main__":\n    sys.exit(main())\n'
+
+
+def _refused(tmp_path, name, source, *names):
+    """The generator and --check each exit 1 naming `name` (and each of `names`), and write nothing."""
+    sb = _sandbox(tmp_path / "sb")
+    (sb / "bridge" / "cursor-bridge" / name).write_text(source, encoding="utf-8")
+    for args in ((), ("--check",)):
+        p = _run(sb, *args, cwd=sb)
+        out = p.stdout + p.stderr
+        assert p.returncode == 1, (args, out)
+        assert "Traceback" not in out, out
+        for n in (name,) + names:
+            assert n in out, (args, n, out)
+        assert not (sb / JSON_REL).exists() and not (sb / MD_REL).exists()
+
+
+def test_cfgb3b_r2_check_exits_1_when_the_generator_refuses(tmp_path):
+    """Review A S5: --check returns the refusal, not 0, for a parser without build_parser() and an outside default."""
+    _refused(tmp_path / "bad", "zz-bad.py", PROGRAM_BAD)
+    _refused(tmp_path / "abs", "zz-abs.py", PROGRAM_ABS, "--where")
+
+
+def test_cfgb3b_r2_list_default_under_the_bridge_takes_the_placeholder(tmp_path):
+    """S1 / advisory 1: a path inside a list default is judged like a string default."""
+    sb = _sandbox(tmp_path / "sb")
+    (sb / "bridge" / "cursor-bridge" / "zz-list.py").write_text(PROGRAM_LIST_IN, encoding="utf-8")
+    data = _generated(sb)
+    files = [o for o in _entry(data, "zz-list.py")["options"] if o["option_strings"] == ["--files"]][0]
+    assert files["default"] == ["<bridge folder>/workflow/open-list.md", "plain"]
+
+
+def test_cfgb3b_r2_list_default_outside_the_bridge_is_refused(tmp_path):
+    """S1 / advisory 1."""
+    _refused(tmp_path, "zz-list.py", PROGRAM_LIST_OUT, "--files")
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="a second drive letter exists only on Windows")
+def test_cfgb3b_r2_default_on_another_drive_is_refused_by_name(tmp_path):
+    """S2 / advisory 2: os.path.relpath raises ValueError across drives; the refusal names the program and the option."""
+    drive = os.path.splitdrive(str(tmp_path))[0].upper()
+    other = "E:/elsewhere/x" if drive != "E:" else "C:/elsewhere/x"
+    source = _argparse_program('    p.add_argument("--far", default=%r)\n' % other)
+    _refused(tmp_path, "zz-far.py", source, "--far")
+
+
+def test_cfgb3b_r2_help_or_description_holding_a_path_is_refused(tmp_path):
+    """Advisory 1 / Requirement 5: any string of the reference holding the repository's folder or the home folder is
+    refused, naming the program."""
+    _refused(tmp_path / "help", "zz-help.py", PROGRAM_HELP_PATH)
+    _refused(tmp_path / "desc", "zz-desc.py", PROGRAM_DESC_HOME)
+
+
+def test_cfgb3b_r2_command_without_docstring_is_refused(tmp_path):
+    """S3: a hand-parsed command with no module docstring exits 1 naming it (no traceback)."""
+    _refused(tmp_path, "zz-nodoc.py", PROGRAM_NODOC)
+
+
+def test_cfgb3b_r2_the_trap_programs_would_leave_their_files(tmp_path):
+    """Advisory 5: the precondition of test_cfgb3b_new_programs_are_found_and_none_is_run - run directly, each trap
+    program does leave its file, so that test's absence check means something."""
+    folder = tmp_path / "direct"
+    folder.mkdir()
+    for name, source, marker, args in (("zz-trap.py", PROGRAM_TRAP, "RAN-IMPORT", ()),
+                                       ("zz-argp.py", PROGRAM_ARGP, "RAN-MAIN", ("t",))):
+        (folder / name).write_text(source, encoding="utf-8")
+        subprocess.run([sys.executable, str(folder / name), *args], cwd=str(folder), capture_output=True, timeout=60)
+        assert (folder / marker).exists(), name
+
+
+def test_cfgb3b_r2_no_bytecode_is_written(tmp_path):
+    """C1 / Requirement 6: neither a run nor --check leaves __pycache__ in the bridge folder (bytecode writing is off
+    while the argparse programs are imported), whatever PYTHONDONTWRITEBYTECODE says."""
+    sb = _sandbox(tmp_path / "sb")
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+    for args in ((), ("--check",)):
+        p = _run(sb, *args, env=env)
+        assert p.returncode == 0, p.stdout + p.stderr
+        assert not (sb / "bridge" / "cursor-bridge" / "__pycache__").exists(), args
+
+
+def test_cfgb3b_r2_an_abbreviated_option_is_a_usage_error(tmp_path):
+    """C2: --che is not --check (no abbreviation); exit 2, nothing written."""
+    sb = _sandbox(tmp_path / "sb")
+    p = _run(sb, "--che")
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert not (sb / JSON_REL).exists() and not (sb / MD_REL).exists()
+
+
+def _md_regions(md):
+    """The Markdown's lines outside fenced blocks, with their indexes."""
+    out, fenced = [], False
+    for i, line in enumerate(md.split("\n")):
+        if line.startswith("```"):
+            fenced = not fenced
+            continue
+        if not fenced:
+            out.append((i, line))
+    return out
+
+
+def _fenced(text):
+    return "```\n" + "\n".join(text.splitlines()) + "\n```"
+
+
+def test_cfgb3b_r2_markdown_shows_each_action_whole(tmp_path):
+    """S6, C4, C5 / Requirement 3: under each command's heading (and each sub-command's), every action has one line
+    naming it in backticks (option strings joined by a space, or the dest of a positional) and showing its default in
+    JSON (null included), `required: true|false` and each choice in JSON; descriptions and usages are fenced."""
+    sb = _sandbox(tmp_path / "sb")
+    (sb / "bridge" / "cursor-bridge" / "zz-argp.py").write_text(PROGRAM_ARGP, encoding="utf-8")
+    data = _generated(sb)
+    md = (sb / MD_REL).read_text(encoding="utf-8")
+    lines = _md_regions(md)
+    names = [c["name"] for c in data["commands"]]
+    heads = [(i, l) for i, l in lines if l.startswith("#")]
+
+    def region(start_name, within=None):
+        lo, hi = within or (0, len(md.split("\n")))
+        start = next(i for i, l in heads if lo <= i < hi and start_name in l)
+        end = next((i for i, l in heads if start < i < hi and any(n in l for n in names if n != start_name)), hi)
+        return start, end
+
+    def check(actions, lo, hi, where):
+        for a in actions:
+            label = "`%s`" % (" ".join(a["option_strings"]) if a["option_strings"] else a["dest"])
+            hits = [l for i, l in lines if lo < i < hi and label in l and "required:" in l]
+            assert len(hits) == 1, (where, label, hits)
+            line = hits[0]
+            assert "required: %s" % json.dumps(a["required"]) in line, (where, label)
+            assert json.dumps(a["default"]) in line, (where, label)
+            for c in a["choices"] or []:
+                assert json.dumps(c) in line, (where, label, c)
+
+    for c in data["commands"]:
+        lo, hi = region(c["name"])
+        if c["source"] == "docstring":
+            assert _fenced(c["usage"]) in md, c["name"]
+            continue
+        if c["description"]:
+            assert _fenced(c["description"]) in md, c["name"]
+        sub_starts = [next(i for i, l in heads if lo < i < hi and s["name"] in l) for s in c["subcommands"]]
+        check(c["positionals"] + c["options"], lo, min(sub_starts + [hi]), c["name"])
+        for s in c["subcommands"]:
+            s_lo = next(i for i, l in heads if lo < i < hi and s["name"] in l)
+            s_hi = next((i for i, l in heads if s_lo < i < hi and any(o["name"] in l for o in c["subcommands"]
+                                                                       if o["name"] != s["name"])), hi)
+            if s["description"]:
+                assert _fenced(s["description"]) in md
+            check(s["positionals"] + s["options"], s_lo, s_hi, (c["name"], s["name"]))
+    record = [s for s in _entry(data, "evaluate-reports.py")["subcommands"] if s["name"] == "record"][0]
+    assert record["positionals"], "evaluate-reports record has positionals to show"

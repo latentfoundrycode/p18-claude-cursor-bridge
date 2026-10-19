@@ -258,13 +258,17 @@ def brief_findings(path, item):
     return found
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(description="Validate the build plan and list ready increments.")
     ap.add_argument("--plan", default="docs/BUILD_PLAN*.md")
     ap.add_argument("--base", default="origin/main")
     ap.add_argument("--no-git", action="store_true", help="skip deriving merged increments from git")
     ap.add_argument("--briefs", default="handoff", help="folder of the briefs compared with their increments")
-    a = ap.parse_args()
+    return ap
+
+
+def main():
+    a = build_parser().parse_args()
     paths = sorted(glob.glob(a.plan))
     if not paths:
         print("plan-check: no plan matches %s" % a.plan)

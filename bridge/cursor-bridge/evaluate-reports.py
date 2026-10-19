@@ -543,7 +543,7 @@ def cmd_extract(a):
     return 0
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd")
     for name in ("collect", "record", "seed", "extract"):
@@ -565,6 +565,11 @@ def main():
             p.add_argument("--evaluations", help="the folder of the first evaluation's tables (default Reports/Evaluations/2026-10-04)")
         if name == "extract":
             p.add_argument("--since", help="a date; default the ledger's last extract, else the newest evaluation folder")
+    return ap
+
+
+def main():
+    ap = build_parser()
     a = ap.parse_args()
     if not a.cmd:
         ap.print_usage()
