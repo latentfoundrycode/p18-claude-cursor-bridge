@@ -1,7 +1,7 @@
 ---
 description: Secure-coding rules (OWASP ASVS 5.0.0), frozen for this project
 alwaysApply: false
-globs: **/*.py, **/*.ps1
+globs: **/*.py, **/*.ps1, **/*.yml, .githooks/*
 ---
 
 <!-- Filtered to ASVS level L2 (L1 and L2 requirements; L3 requirements and the LLM supplement left out). -->
@@ -21,7 +21,7 @@ ASVS is licensed CC BY-SA 4.0 (© OWASP Foundation); this derived work carries t
 
 NOTE: ASVS deliberately excludes AI-specific risks. For an LLM-bearing product, the supervisor
 supplements this rule with the OWASP Top 10 for LLM Applications (recorded in the project's
-`.mdc`, never silently) — see the final section. -->
+`.mdc`, never silently). -->
 
 # Secure Coding Rules (ASVS 5.0.0, derived)
 
