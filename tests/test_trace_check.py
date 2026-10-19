@@ -7,10 +7,14 @@ Done when (a clean move, a two-hop move, a copy into two homes fails, a silent r
 fails, a dropped boundary section fails, a dangling reference fails, both exception kinds), as handoff/TASK-016.md
 specifies the program's output. Each case builds a small git repository in a temporary folder. Supervisor-authored.
 """
+import importlib.util
+import os
 import pathlib
 import re
 import subprocess
 import sys
+
+import pytest
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 TRACE_CHECK = REPO / "bridge" / "cursor-bridge" / "trace-check.py"
@@ -284,6 +288,10 @@ def test_r029_a_word_ending_in_see_per_or_under_is_not_a_citation(tmp_path):
     write(root, CORE, BASE_CORE + "\nWe understand \"No such section\" and hyper \"Nor this\" and foresee \"Nor that\".\n")
     rc, lines = run(root)
     assert rc == 0 and fails(lines) == [], lines
+    # the positive control: the same text with the word itself is a citation
+    write(root, CORE, BASE_CORE + "\nWe understand \"No such section\"; see \"No such section\".\n")
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Standing rules - "No such section"' % CORE], lines
 
 
 def test_r029_a_new_entry_excuses_new_text_but_not_a_dropped_passage(tmp_path):
@@ -331,7 +339,7 @@ def test_r029_a_malformed_exceptions_file_is_not_checked(tmp_path):
         entries(root, line)
         rc, lines = run(root)
         assert rc == 2 and lines[-1] == "RESULT: not checked", (line, lines)
-        assert any(l.startswith("ERROR: ") and re.search(r"\b6\b", l) for l in lines), (line, lines)
+        assert any(l.startswith("ERROR: ") and "line 6" in l for l in lines), (line, lines)
     write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", "# Trace exceptions\n\nNo entries heading.\n")
     rc, lines = run(root)
     assert rc == 2 and lines[-1] == "RESULT: not checked", lines
@@ -340,3 +348,154 @@ def test_r029_a_malformed_exceptions_file_is_not_checked(tmp_path):
 def test_r029_a_folder_that_is_not_a_repository_is_not_checked(tmp_path):
     rc, lines = run(tmp_path)
     assert rc == 2 and lines[-1] == "RESULT: not checked", lines
+
+
+# --- round 2 (Review A's REJECT and the security auditor's FAIL on 7d9974b; handoff/TASK-016-r2.md) ---------------
+
+ARROW = chr(0x2192)
+
+
+def core_plus(*paragraphs):
+    """The baseline core with paragraphs appended under Standing rules, and the line number of each."""
+    text = BASE_CORE
+    numbers = []
+    for p in paragraphs:
+        text += "\n"
+        numbers.append(text.count("\n") + 1)
+        text += p + "\n"
+    return text, numbers
+
+
+def test_r029_each_heading_of_an_arrow_chain_is_a_citation(tmp_path):
+    root = make_repo(tmp_path)
+    text, _ = core_plus('(see "The project layout" %s "No such sub-section")' % ARROW,
+                        '(see "Nope A" %s "Nope B")' % ARROW)
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == [
+        'FAIL (cite) %s: Standing rules - "No such sub-section"' % CORE,
+        'FAIL (cite) %s: Standing rules - "Nope A"' % CORE,
+        'FAIL (cite) %s: Standing rules - "Nope B"' % CORE,
+    ], lines
+
+
+def test_r029_an_arrow_chain_that_resolves_passes(tmp_path):
+    root = make_repo(tmp_path)
+    text, _ = core_plus('(see "Supervisor" %s "The project layout")' % ARROW)
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 0 and fails(lines) == [], lines
+
+
+def test_r029_cite_findings_are_in_file_order(tmp_path):
+    root = make_repo(tmp_path)
+    text, _ = core_plus('First see "Zzz missing".', 'Then see "Aaa missing".')
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert [l.rsplit(" - ", 1)[1] for l in fails(lines)] == ['"Zzz missing"', '"Aaa missing"'], lines
+
+
+def test_r029_dropped_findings_come_before_copy_findings(tmp_path):
+    root = make_repo(tmp_path)
+    rule_2 = "2. Reports lead with the owner's decision,\n   and the technical part follows.\n"
+    write(root, CORE, core_without(rule_2))
+    write(root, PHASES + "intake.md", "# Intake\n\n" + BOUNDARY)
+    rc, lines = run(root)
+    assert rc == 1 and [l.split(" ")[1] for l in fails(lines)] == ["(dropped)", "(copy)"], lines
+
+
+def test_r029_a_printed_reference_is_stripped_of_its_trailing_stop(tmp_path):
+    root = make_repo(tmp_path)
+    text, numbers = core_plus("Read ~/.claude/cursor-bridge/Nope.md.")
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == ["FAIL (ref) %s:%d: ~/.claude/cursor-bridge/Nope.md" % (CORE, numbers[0])], lines
+
+
+def test_r029_a_reference_outside_the_bridge_folder_never_resolves(tmp_path):
+    """Security (round 1 FAIL): a reference resolves only to a path inside bridge/; a `..`, `.` or empty segment, a
+    backslash or a colon is a ref finding without any file-system lookup (a UNC form would otherwise reach the network
+    on Windows). README.md exists at the root, so `../README.md` would resolve without the rule."""
+    root = make_repo(tmp_path)
+    write(root, "README.md", "# Readme\n")
+    refs = ["~/.claude/../README.md", "~/.claude/C:/Windows", "~/.claude/" + "\\\\host\\share\\x",
+            "~/.claude/cursor-bridge/./Glossary.md", "~/.claude/cursor-bridge//Glossary.md"]
+    text, numbers = core_plus(*("Read %s here" % r for r in refs))
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 1 and [l.split(": ", 1)[0] for l in fails(lines)] == \
+        ["FAIL (ref) %s:%d" % (CORE, n) for n in numbers], lines
+
+
+def test_r029_only_the_workflow_folders_own_exceptions_file_is_left_out(tmp_path):
+    root = make_repo(tmp_path)
+    write(root, PHASES + "trace-exceptions.md", "# Intake\n\nA passage no baseline holds.\n")
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == ["FAIL (new) %strace-exceptions.md: Intake - A passage no baseline holds."
+                                        % PHASES], lines
+
+
+def test_r029_the_entries_marker_is_a_line_that_is_exactly_it(tmp_path):
+    root = make_repo(tmp_path)
+    write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", "## Entries\n")
+    rc, lines = run(root)
+    assert rc == 0 and lines[-1] == "RESULT: OK", lines
+    for text in ("# Trace exceptions\n\n### Entries\n", "# Trace exceptions\n\nfoo ## Entries\n"):
+        write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", text)
+        rc, lines = run(root)
+        assert rc == 2 and lines[-1] == "RESULT: not checked", (text, lines)
+
+
+def test_r029_a_usage_error_prints_an_error_line(tmp_path):
+    root = make_repo(tmp_path)
+    rc, lines = run(root, "--bogus")
+    assert rc == 2 and lines[-1] == "RESULT: not checked", lines
+    assert any(l.startswith("ERROR: ") for l in lines), lines
+
+
+def test_r029_printed_paths_are_ascii(tmp_path):
+    root = make_repo(tmp_path)
+    write(root, PHASES + "caf" + chr(0xE9) + ".md", "# Cafe\n\nA passage no baseline holds.\n")
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == ["FAIL (new) %scaf\\xe9.md: Cafe - A passage no baseline holds." % PHASES], lines
+    assert all(l.isascii() for l in lines), lines
+
+
+def test_r029_a_linked_file_under_workflow_is_not_read(tmp_path):
+    root = make_repo(tmp_path)
+    outside = tmp_path / "outside.md"
+    outside.write_bytes(b"# Outside\n\nText from outside the repository.\n")
+    link = root / "bridge" / "cursor-bridge" / "workflow" / "phases" / "linked.md"
+    link.parent.mkdir(parents=True)
+    try:
+        os.symlink(str(outside), str(link))
+    except (OSError, NotImplementedError):
+        pytest.skip("this account cannot create a symbolic link")
+    rc, lines = run(root)
+    assert not any("Text from outside" in l for l in lines), lines
+
+
+def _load_program():
+    spec = importlib.util.spec_from_file_location("trace_check_under_test", str(TRACE_CHECK))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_r029_a_git_failure_after_the_start_is_not_checked(tmp_path, monkeypatch, capsys):
+    """Requirement 9: a git command that cannot run (here ls-tree, after the first commands ran) ends in exit 2 with
+    an ERROR line naming the reason, never a traceback."""
+    root = make_repo(tmp_path)
+    program = _load_program()
+    real = program.git_run
+
+    def failing_ls_tree(where, args):
+        if args and args[0] == "ls-tree":
+            return None, "timed out"
+        return real(where, args)
+
+    monkeypatch.setattr(program, "git_run", failing_ls_tree)
+    rc = program.main(["--repo", str(root)])
+    out = capsys.readouterr().out.splitlines()
+    assert rc == 2 and out[-1] == "RESULT: not checked", out
+    assert any(l.startswith("ERROR: ") and "timed out" in l for l in out), out
