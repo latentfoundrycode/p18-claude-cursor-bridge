@@ -10,6 +10,10 @@ Stage B1's review round 2 (snapshot STAGE-B1, the four squash commits 9e181e6, f
 - **Records:** INVENTORY's `--no-banner` row brought to the 2026-10-18 outcome (both reviewers); the status file's position lines; `project.json`'s `version` equal to the bridge's (`bridge/cursor-bridge/VERSION`); the status's list of B1's change naming all four commits; R-001's evidence naming BUG-001 and BUG-015; HARDENING's record of round 2, including the job-boundary should-fix recorded under standing rule 6 with its settle path.
 - **Review A of this change** (APPROVE 0/2/4): its two should-fix items (the register reader's negative test; the settle path keeping the required check `security floor`) and considers 1, 3 and 4 (the driver judging each kill by the test it names; the failure message for a second Decisions row; the Decisions reader's decider, date and "met" checks under the negative test) are in the diff; consider 2 is kept (the baseline's Settled cell names the maintainer: rule 51's record of who decided).
 
+## Review B, round 1, and how it was settled
+
+REJECT on one item: `docs/PROJECT_STATUS.md` recorded the full suite as 1617 passed, 24 skipped, a run taken before the register's negative test was added. The suite was rerun on the committed tree (1618 passed, 24 skipped, as Review B found) and the line corrected in commit 334d18d. Review B found the rest of the change sound. This round reads the whole diff again.
+
 ## Out of scope
 
 - Any program under `bridge/` or `.github/`. The job-boundary lead (the Socket key's job also runs Semgrep's open dependency ranges) is recorded, not fixed: rule 6 classes it with the earlier lead "an unpinned dependency is a risk of BUG-001's kind at scan time"; BUG-001's keyless `--ignore-scripts` install still holds. Its settle path is a later builder increment.
