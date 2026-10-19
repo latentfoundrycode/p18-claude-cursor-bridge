@@ -46,19 +46,98 @@ def test_r001_project_json_wellformed():
         assert key in pj["state"], f"R-001: project.json state lacks {key}"
 
 
+def _table_rows(text, heading):
+    """The cells of each row of the first table under `heading`, its header and separator rows left out."""
+    assert heading in text, f"R-001: no {heading} section"
+    section = text.split(heading, 1)[1].split("\n## ", 1)[0]
+    rows = [line.strip() for line in section.splitlines() if line.strip().startswith("|")]
+    assert len(rows) >= 2, f"R-001: the {heading} table has no header row"
+    return [[c.strip() for c in r.strip("|").split("|")] for r in rows[2:]]
+
+
+def _register_faults(text):
+    """Why the register's ID column does not carry R-001..R-038 each once, as a list (empty when it does). An ID counts
+    only as the first cell of a table row, so an introduction naming the range stands in for no row."""
+    ids = [line.strip().strip("|").split("|")[0].strip() for line in text.splitlines() if line.strip().startswith("|")]
+    if "ID" not in ids:
+        return ["no table with an ID column"]
+    return [f"R-{n:03d} {ids.count(f'R-{n:03d}')} times" for n in range(1, 39) if ids.count(f"R-{n:03d}") != 1]
+
+
 def test_r001_requirements_register_complete():
-    """R-001: the register carries R-001..R-038."""
-    reqs = _read("docs/REQUIREMENTS.md")
-    for n in range(1, 39):
-        assert f"R-{n:03d}" in reqs, f"R-001: register lacks R-{n:03d}"
+    """R-001: the register's ID column carries R-001..R-038, each once (read from the table's first cells, not the
+    text, where an introduction naming a range would stand in for a row: stage B1's review round 2, Review A)."""
+    assert _register_faults(_read("docs/REQUIREMENTS.md")) == [], "R-001: the register's ID column"
+
+
+def test_r001_requirements_register_parse():
+    """R-001: the register reader passes a complete register and refuses a missing row whose ID the introduction still
+    names, a row given twice and a table without an ID column (a negative test must show its precondition)."""
+    rows = "".join(f"| R-{n:03d} | a requirement |\n" for n in range(1, 39))
+    text = "The register holds R-001 to R-038.\n\n| ID | Requirement |\n|---|---|\n" + rows
+    assert _register_faults(text) == []
+    assert _register_faults(text.replace("| R-038 | a requirement |\n", "")) == ["R-038 0 times"]
+    assert _register_faults(text + "| R-007 | again |\n") == ["R-007 2 times"]
+    assert _register_faults(text.replace("| ID |", "| Key |")) == ["no table with an ID column"]
+
+
+DATED = r"[0-9]{4}-[0-9]{2}-[0-9]{2}"
+# Each record TASK-001's Done when names, by the start of its Decisions row, and who its Settled cell must name.
+DECIDED = (("R-038:", "owner"), ("Decision 6 confirmed", "owner"), ("Baseline measurement", "maintainer"))
+
+
+def _decision_faults(rows):
+    """Why the Decisions rows do not record R-038 and decision 6 as owner-answered with the date and the baseline as
+    met, as a list (empty when they do). Each is the one row whose first cell begins with it; its Settled cell (the
+    third) holds a date and who decided."""
+    faults = []
+    for start, who in DECIDED:
+        found = [cells for cells in rows if cells[0].startswith(start)]
+        if len(found) != 1:
+            faults.append(f"{len(found)} Decisions rows start {start!r} (one row each, edited in place)")
+            continue
+        settled = found[0][2] if len(found[0]) > 2 else ""
+        if not (re.search(DATED, settled) and who in settled):
+            faults.append(f"{start!r}: the Settled cell lacks a date or {who!r}: {settled!r}")
+        if start == "Baseline measurement" and not re.match(r"Baseline measurement [(]precondition 3[)] met", found[0][0]):
+            faults.append(f"the baseline is not recorded as met: {found[0][0][:80]!r}")
+    return faults
 
 
 def test_r001_inventory_decisions_recorded():
-    """R-001: decision 6, R-038, and the met baseline precondition are recorded."""
-    inv = _read("docs/INVENTORY.md")
-    assert "Decision 6" in inv or "decision 6" in inv, "R-001: decision 6 not recorded"
-    assert "R-038" in inv, "R-001: R-038 not recorded"
-    assert "aseline measurement" in inv, "R-001: baseline precondition not recorded"
+    """R-001 (docs/BUILD_PLAN.md TASK-001 Done when): decision 6 and R-038 are recorded as owner-answered with the date in
+    INVENTORY Decisions, and the baseline-measurement precondition as met. Each is a row of the Decisions table whose
+    first cell begins with it and whose Settled cell (the third) holds the date and who decided; a mention elsewhere in
+    the file does not count (stage B1's review round 2, Review A: the R-038 and decision-6 rows deleted, and the baseline
+    row rewritten as not met, each passed the earlier substring test)."""
+    assert _decision_faults(_table_rows(_read("docs/INVENTORY.md"), "## Decisions")) == [], "R-001: INVENTORY Decisions"
+
+
+DECISIONS = """## Decisions
+| Decision | Reason | Settled | Revisit only if |
+|---|---|---|---|
+| R-038: install at B6 | x | 2026-10-11, owner | — |
+| Decision 6 confirmed: the classifications | x | 2026-10-11, owner | — |
+| Baseline measurement (precondition 3) met before release B | x | 2026-10-11, maintainer | — |
+
+## Deferred
+see Decisions: R-038, Decision 6 confirmed, Baseline measurement
+"""
+
+
+def test_r001_inventory_decisions_parse():
+    """R-001: the Decisions reader passes the three records and refuses each way of losing one: a row gone while the
+    text still names it, a row twice, the wrong decider, no date, the baseline not met (a negative test must show its
+    precondition)."""
+    assert _decision_faults(_table_rows(DECISIONS, "## Decisions")) == []
+    for old, new in (("| R-038: install at B6", "| Other: install at B6"),
+                     ("| Decision 6", "| R-038: again | x | 2026-10-12, owner | — |\n| Decision 6"),
+                     ("classifications | x | 2026-10-11, owner", "classifications | x | 2026-10-11, supervisor"),
+                     ("B6 | x | 2026-10-11, owner", "B6 | x | owner"),
+                     ("(precondition 3) met", "(precondition 3) NOT met"),
+                     ("2026-10-11, maintainer", "2026-10-11, supervisor")):
+        assert DECISIONS.count(old) == 1, old
+        assert len(_decision_faults(_table_rows(DECISIONS.replace(old, new), "## Decisions"))) == 1, old
 
 
 SETTLED_ELSEWHERE = ("r-038", "second checkout", "second-checkout")
@@ -128,10 +207,39 @@ def test_r001_phase_matches_status():
     assert m.group(1) == pj["state"]["phase"], f"R-001: project.json phase {pj['state']['phase']!r} differs from the status file's {m.group(1)!r}"
 
 
+# The run parameters and the values each may take (supervisor.md, "Run parameters", the file's template).
+RUN_PARAMETERS = {
+    "Stage pause": r"(run|pause)",
+    "Merge authority": r"(supervisor|owner)",
+    "Refactoring pass": r"(on|off)",
+    "Installer verification": r"(local|ci-only|n/a)",
+    "Parallel increments": r"(off|on)",
+}
+
+
+def _parameter_faults(text):
+    faults = []
+    for key, value in RUN_PARAMETERS.items():
+        lines = [line for line in text.splitlines() if line.startswith(key + ": ")]
+        if len(lines) != 1:
+            faults.append(f"{key}: {len(lines)} lines")
+        elif not re.match(value + r"( |$)", lines[0][len(key) + 2:]):
+            faults.append(f"{key}: {lines[0][len(key) + 2:][:40]!r}")
+    return faults
+
+
 def test_r001_run_parameters_authoritative():
-    """R-001: RUN_PARAMETERS.md is the authoritative run-parameter record and is complete."""
-    rp = _read("docs/RUN_PARAMETERS.md").lower()
-    assert "stage pause:" in rp
-    assert "merge authority:" in rp
-    assert "refactoring pass:" in rp
-    assert "parallel increments:" in rp
+    """R-001: RUN_PARAMETERS.md is the authoritative run-parameter record and is complete: each of the five parameters
+    of supervisor.md's template stands on one line of its own, with one of its values (stage B1's review round 2,
+    Review A: the file lacking a parameter, or with a value blanked, passed the earlier substring test)."""
+    assert _parameter_faults(_read("docs/RUN_PARAMETERS.md")) == []
+
+
+def test_r001_run_parameters_parse():
+    """R-001: the parameter reader refuses a missing line, a blank value and a value outside the template (a negative
+    test must show its precondition)."""
+    good = "".join(f"{k}: {v.strip('()').split('|')[0]}\n" for k, v in RUN_PARAMETERS.items())
+    assert _parameter_faults(good) == []
+    assert _parameter_faults(good.replace("Installer verification: local\n", "")) == ["Installer verification: 0 lines"]
+    assert _parameter_faults(good.replace("Merge authority: supervisor", "Merge authority: ")) == ["Merge authority: ''"]
+    assert _parameter_faults(good.replace("Stage pause: run", "Stage pause: later")) == ["Stage pause: 'later'"]
