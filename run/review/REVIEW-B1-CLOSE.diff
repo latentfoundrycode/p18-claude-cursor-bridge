@@ -1,0 +1,111 @@
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 8511267..18356d0 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -47,6 +47,17 @@ Snapshot STAGE-B1 (2dbf9d6 on stage/B1, deleted after verify OK, hash d8590ae43a
+ 
+ **Recorded, kept:** the Decisions reader matches the decider as a word in the Settled cell ("2026-10-11, supervisor (owner not asked)" passes); BUG-015's Review A consider 2, kept: the cell's form is free text, and who decided is rule 51's record, read by the reviewers.
+ 
++### The stage review, round 4 (2026-10-19): approved
++
++Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee2821606eec6), the six squash commits 9e181e6, fba63bc, 6743b25, 4d0f77b, 1b8c8da (BUG-015, PR #44) and ba1e181 (BUG-016, PR #45). **Review B** (grok-4.7-medium, the native profile): APPROVE, no findings; it ran the stage's three test files (47 passed, 1 skipped: the guard, locally) and the guard with ba1e181's real squash subject (passes on main's file, fails on 1b8c8da's). **Review A**: APPROVE, Blocking 0 / Should fix 0 / Consider 3; on a copy, the stage's tests (47 passed, 1 skipped), the guard under ten sets of GitHub variables and nine status-file mutants (all as expected), twelve record and workflow mutants (eleven killed, each by its named test; the twelfth, Installer verification set to local, survives as intended, since that value follows the product type and is not one of the owner's answers the test fixes); read main's required checks and the push run of ba1e181 (39268304307: all three jobs green, the guard ran, no Socket banner, no key-shaped string). No REJECT, so no round 5 (the stage close's step 7).
++
++**Considers, taken at the close:** INVENTORY's run-parameter row named all the parameters as the owner's answers of 2026-10-11, while the test fixes four of five (Installer verification follows the product type) and Merge authority was answered on 2026-10-12: the row says so now. R-002's evidence named "its round-6 follow-up" without its commit: 4d0f77b added. **Recorded (Feedback FB-024 and the least-confident item 3 below):** during a gate the status file's In flight reads `none` by the convention, so a resume finds the live position only through the file's "How this file is written" pointer to run/supervisor/in-flight.md; and a settle path's throwaway pull request now fails the tests job on the status guard, which its run sheet must say.
++
++### Least confident (stage close, 2026-10-19)
++1. **The status guard's push path rests on GitHub's squash subject.** test_r001_status_names_its_own_merge reads the pull request's number on a push to main from the head commit's subject ending `(#n)`; a merge made any other way (a merge commit, an edited subject) skips silently. Check: at each stage close, the push run of the last squash reports, on each leg, the same passed and skipped counts as that pull request's last run on the same tree (a skipped guard shows one passed fewer and one skipped more); today PR #45's run 39267616332 and main's push run 39268304307 agree, ubuntu 1619 passed / 26 skipped and windows 1622 / 23. CI's `pytest -q` prints no per-file counts, so the comparison is per leg. A later increment may make the push path fail rather than skip on a subject without `(#n)`, as the pull-request path already does.
++2. **The Socket key's job also runs code it does not pin.** Semgrep's open dependency ranges (round 2's lead) and `node-version: "22"` (round 3's) run in the job whose last step holds the key; BUG-001's keyless `--ignore-scripts` install holds, so no mechanism is defeated. Check: the job split of round 2's settle path, the Socket job with its own name and an exact Node release, its name added to main's required checks by the owner's run sheet before it merges; first the throwaway probe that appends to `$GITHUB_PATH` and runs `which socket` in the next step; that probe's tests job fails on the status guard by design (FB-024), so the probe is read in its own step and in `security floor`.
++3. **A resume during a gate depends on a file a clone does not have.** Between merges the live position is in run/supervisor/in-flight.md (gitignored); the session-start hook points at the status file, whose In flight reads `none`. Check: after the next compaction during a gate, the resumed session names the gate in progress before its first action; the lasting fix is the hook naming the scratch log (FB-022), a bridge change for the maintainer, or B3's module work if it reaches the hook.
++
+ ## Stage B2 — carried to its close (test lane)
+ - Done on BUG-002 (stage B2's review fixes), not in the refactoring pass, whose test lane only consolidates: tests/test_open_list.py pins "filled, including" and its comment at :25 is corrected (TASK-004 r3 Consider); tests/test_extension_points.py pins the configuration.items CI route, the inspect step's members and the placement sentence (TASK-005 r6 Consider).
+ 
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 087836b..48c2007 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -54,7 +54,7 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | Semgrep scans diff-aware on pull requests and pushes; the tree as it stood was audited once in full on 2026-10-16 (Semgrep 1.176.1, CI's four rulesets: 189 rules, 139 files): one finding, `os.chmod(dst, 0o755)` on the cursor-agent shim in bridge-install.py, accepted | the shim must be executable; 0o755 lets only its owner write it | 2026-10-16, supervisor | a release changes the rule packs or adds code outside a diff's reach — the full audit is re-run at each release |
+ | Pull requests from forks get no secrets, so the Socket step fails and the required check blocks them | the repository is the owner's alone; outside contributions are not expected | 2026-10-16, supervisor | outside contributions are wanted |
+ | Semgrep runs the OSS engine with explicit rulesets and no token | the bridge's own code has no SQL or web surface, where the Pro engine's taint analysis earns its place | 2026-10-12, owner | the bridge gains code with a SQL or web surface |
+-| The run parameters are the owner's answers, recorded in docs/RUN_PARAMETERS.md alone (fixed by test_r001_run_parameters_owner_values); kind: private (project.json) | owner's run-parameter answers; one record, so no copy can drift from it (stage B1's review round 3) | 2026-10-11, owner | the owner changes a run parameter |
++| The run parameters are recorded in docs/RUN_PARAMETERS.md alone: the owner's four answers (Stage pause, Refactoring pass and Parallel increments 2026-10-11; Merge authority 2026-10-12, its own row above), fixed by test_r001_run_parameters_owner_values; Installer verification follows the product type (n/a for a host extension); kind: private (project.json) | owner's run-parameter answers; one record, so no copy can drift from it (stage B1's review rounds 3 and 4) | 2026-10-11 and 2026-10-12, owner | the owner changes a run parameter |
+ | Governance text is the supervisor's to write; programs are the builder's | §15 condition 3, keeping N4 intact | 2026-10-11, §15 | — |
+ | Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1) | a session must never load the half-edited bridge, and an install must never run unreleased code on a running project | 2026-10-11, §15 | — |
+ | Who decided is recorded: owner / supervisor / design(the plan) / maintainer; no agent recorded as a person | rule 51 | 2026-10-11 | — |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index b761485..4e21855 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,22 +3,22 @@ Last updated: 2026-10-19
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at BUG-016's merge (PR #45); stage B1's review round 4 is next
+-Last accepted: BUG-016 (PR #45, at its merge): the status file names its own merge, the owner's run parameters fixed in a test; before it BUG-015 at 1b8c8da (PR #44) and stage B2's close records at 0ae877e (PR #43); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001
++Increment: none — this file states the position at stage B1's close records' merge (PR #46); stage B3 is next
++Last accepted: stage B1's close records (PR #46, at its merge); before them BUG-016 at ba1e181 (PR #45) and BUG-015 at 1b8c8da (PR #44); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001
+ Awaiting user on: none
+-Previously: stage B1's review — round 1 (2026-10-16) both REJECT (this file stale on main, the stage tests weak, the Socket key beside the npm install: BUG-001); round 2 (2026-10-19) Review A REJECT (three bootstrap tests checked a word, not a record: BUG-015); round 3 (2026-10-19) Review B REJECT, Review A APPROVE with the same item as should-fix, convergent: this file on main described its own pull request before the gate (BUG-016, ISS-009).
+-Next: stage B1's review round 4 from the stage close's step 1 (its six squash commits: 9e181e6, fba63bc, 6743b25, 4d0f77b, 1b8c8da and BUG-016's of PR #45), judged by class under standing rule 6; then B1's demonstration (CI's full gate green on a pull request, and a fresh session resuming from this file and docs/INVENTORY.md alone) and reflection items; then stage B3, its configuration items first (Calibration pending), then the least-confident tests of stage B2 (docs/HARDENING.md, "Stage B2 — least confident", items 2 and 3) before its first delegation, then TASK-016.
++Previously: stage B1 closed 2026-10-19 after four stage-review rounds — round 1 (2026-10-16) both REJECT (BUG-001); round 2 Review A REJECT (the bootstrap tests checked a word, not a record: BUG-015); round 3 Review B REJECT, Review A the same item, convergent (this file on main described its own pull request before the gate: BUG-016, ISS-009); round 4 both APPROVE.
++Next: stage B3 (docs/BUILD_PLAN.md), its configuration items first (Calibration pending, through cursor-configurator as the bridge's own configuration checkpoint), then the least-confident tests of stage B2 (docs/HARDENING.md, "Stage B2 — least confident", items 2 and 3) before B3's first delegation, then TASK-016.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 3's; SCOPE-STAGE-B1-r2.md and -r1.md earlier rounds) for the stage review; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 4's; -r3.md, -r2.md and -r1.md the earlier rounds) for stage B1's review, closed; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
+ Delegated gates: none
+-Remote sync: main at BUG-016's merge (PR #45), in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B2 (conditional-workflow framework) — closed 2026-10-19; B1 (supervised-project bootstrap) — closing, its stage review round 4 next. Last reflection: stage B2's close, 2026-10-19 (demonstration passed; Issues ISS-005, ISS-007, ISS-008 completed; Feedback FB-010 to FB-021; least confident in HARDENING; Project Summary patched)
+-Open issues: ISS-009 open (this file on main describing its own pull request before the gate, stage B1's review rounds 1 to 3; BUG-016's test guards it from this merge on; completed at B1's reflection). ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
++Remote sync: main at the merge of PR #46, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) — closed 2026-10-19; B2 (conditional-workflow framework) — closed 2026-10-19; B3 next. Last reflection: stage B1's close, 2026-10-19 (demonstration passed: CI's full gate green on PR #45 and main's push of ba1e181, a fresh session resumed from this file and the inventory alone; conformance 17 OK / 6 MISSING, the Calibration pending items and the recorded no-diagram-index decision / 5 NOTE; completion-check --mode plan OK; no worktree; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
++Open issues: none open. ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
+ Maintainer requests: none open (Release B2's request answered as FB-021 at stage B2's close, 2026-10-19; recorded as a post-B release in INVENTORY.md, Decisions)
+ Bridge version: 2026.10.18a
+ Calibrated: 2026-10-19 from 2026.10.11d to 2026.10.18a — applied: the design critique's ceiling (no design, plan or change critique is running here: release B's plan critique and the hotfix's both closed at their gates, so no subject takes a token and no round file is renamed; it does not reach a code-gate stage review, which stays under standing rule 6's by-class brake), project.json's state; pending: the conformance MISSING items @ stage B3's start (below); not applied (gate passed): none
+@@ -29,9 +29,9 @@ Run parameters: see docs/RUN_PARAMETERS.md (the one record; the owner's four ans
+ ## How this file is written (ISS-009)
+ Every pull request carries this file as it will read at that pull request's merge: Last accepted names the pull request first (by number; a squash cannot know its own hash), In flight is none, and Next is the step after the merge. tests/test_release_b_bootstrap.py, test_r001_status_names_its_own_merge, checks it in CI for pull requests into main and for squashes on main. Between merges the position lives in run/supervisor/in-flight.md, which a resume after a compaction reads first (this file's In flight reads none during a gate). Its costs: the post-merge steps (the healthy marks, sync-check.py --apply) are the loop's, not this file's Next; a revert pull request restores an older file and fails its own CI until the file is rewritten for it; a maintainer's pull request into main rewrites this file too.
+ 
+-## Stage B1, closing
+-- Stage review: round 1 (2026-10-16) and round 2 (2026-10-19) REJECT, fixed by BUG-001 (6743b25, 4d0f77b) and BUG-015 (1b8c8da, PR #44); round 3 (2026-10-19; snapshot STAGE-B1, 2dbf9d6, hash d8590ae43a38aec4, verify OK; stage/B1 deleted): Review B REJECT (this file, the one finding; full suite 1618 passed, 24 skipped), Review A APPROVE 0/1/4 (the same item; the status at its cap; the run parameters not fixed; Node 22 floating in the key's job; a stale R-number). Fixed or recorded in BUG-016; the record: docs/HARDENING.md, "Stage B1", "The stage review, round 3".
+-- B1's change is its own squash commits (9e181e6, fba63bc, 6743b25, 4d0f77b, 1b8c8da, and BUG-016's), not a range of main: stage B1 merged after stage B2's TASK-003 to TASK-007, because TASK-002 waited on the owner's Socket variable.
++## Stage B1, closed 2026-10-19
++- Stage review: four rounds; round 4 (snapshot STAGE-B1, 4db96c3, hash 36eee2821606eec6, verify OK; stage/B1 deleted) Review B APPROVE with no findings, Review A APPROVE 0/0/3 (two taken in these records, one recorded as FB-024 and least-confident item 3). The record: docs/HARDENING.md, "Stage B1", rounds 2 to 4 and "Least confident (stage close, 2026-10-19)".
++- B1's change is its own squash commits (9e181e6, fba63bc, 6743b25, 4d0f77b, 1b8c8da, ba1e181), not a range of main: stage B1 merged after stage B2's TASK-003 to TASK-007, because TASK-002 waited on the owner's Socket variable.
+ 
+ ## Release B — notes for a resuming session
+ - This is the first release the bridge's own supervisor builds, as a supervised project (§15 condition 6). The design is the Restructuring Plan (Documents/Claude-Cursor Bridge Restructuring Plan.md), release B, §16 and §6.
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 2313840..7110f5b 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -4,8 +4,8 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ 
+ | ID | Requirement | Source | Status | Evidence |
+ |---|---|---|---|---|
+-| R-001 | The bridge is set up as a supervised project: a status file, a requirements register drawn from this plan, a resolved model roster, run parameters, and a `project.json`. | DESIGN §15 condition 6 | built | tests/test_release_b_bootstrap.py (TASK-001, merged 9e181e6; tightened by BUG-001, 6743b25, BUG-015, 1b8c8da, and BUG-016, PR #45) |
+-| R-002 | The security floor (Semgrep, OSV-Scanner, Socket) runs in the bridge's own CI gate, pinned by commit, installing from a committed lockfile, alongside the tests it already runs. | DESIGN §15 condition 6 (P2) | built | tests/test_release_b_ci_floor.py (TASK-002, merged fba63bc; tightened by BUG-001 after stage B1's review, merged 6743b25, and its round-6 follow-up) |
++| R-001 | The bridge is set up as a supervised project: a status file, a requirements register drawn from this plan, a resolved model roster, run parameters, and a `project.json`. | DESIGN §15 condition 6 | built | tests/test_release_b_bootstrap.py (TASK-001, merged 9e181e6; tightened by BUG-001, 6743b25, BUG-015, 1b8c8da, and BUG-016, ba1e181) |
++| R-002 | The security floor (Semgrep, OSV-Scanner, Socket) runs in the bridge's own CI gate, pinned by commit, installing from a committed lockfile, alongside the tests it already runs. | DESIGN §15 condition 6 (P2) | built | tests/test_release_b_ci_floor.py (TASK-002, merged fba63bc; tightened by BUG-001 after stage B1's review, merged 6743b25, and its round-6 follow-up, merged 4d0f77b) |
+ | R-003 | The supervisor's instructions are split into the main-workflow core and per-phase modules; the core holds the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state, and the standing rules that hold in every phase. | DESIGN §6.2 | planned | — |
+ | R-004 | Each phase module holds its phase's whole procedure and opens with the short list of what must survive a compaction. | DESIGN §16; §6.2 | planned | — |
+ | R-005 | The compaction/session-start hook names the current phase's module(s) to re-read after a compaction (one for most phases; planning and building map to two), plus the conditional-workflow files (type, sub-type, trait) that touch the current phase; it carries the Phase→module table for every template phase value, including the reflection and project-end modules and any further files the phase re-reads. | DESIGN §16; §6.2 | planned | — |
+diff --git a/project.json b/project.json
+index 7710ade..ed12e5d 100644
+--- a/project.json
++++ b/project.json
+@@ -5,7 +5,7 @@
+   "version": "2026.10.18a",
+   "state": {
+     "phase": "building",
+-    "stage": "B2 closed; B1 closing",
++    "stage": "B1 and B2 closed; B3 next",
+     "bridge": "2026.10.18a",
+     "updated": "2026-10-19"
+   }
