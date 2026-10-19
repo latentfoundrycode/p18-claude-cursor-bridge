@@ -26,6 +26,7 @@ The calibration of 2026-10-19 (to bridge 2026.10.18a) found four conformance flo
   - Consider 1: docs/INVENTORY.md, the configuration row's "Used by" now says the hook does not run in builder runs.
   - Consider 2: a stand-in detector is recorded as an INVENTORY decision: a marker touched before each builder launch, then `find` over the project root with the Workspace pruned, listing anything newer; tested here on 2026-10-19 (silent with no change, lists a file written to ../Worktrees on purpose, the probe file removed).
   - Consider 3: the probe count; the records were right (four runs in all), the supervisor's message to the reviewer had said five.
+- Review B, round 2 (snapshot of 737d421): APPROVE 0/1/0. Should-fix: docs/INVENTORY.md:35 still said nothing detects a write outside the Workspace, against the new Decisions row; fixed, and docs/HARDENING.md, Stage B3's lead, now names the stand-in check beside the always-on rule for the same reason.
 
 ## Verification
 
