@@ -80,22 +80,47 @@ def refuse_outside_default(program_name, option_label):
     raise DumpCliError(1)
 
 
+def refuse_bad_default(program_name, option_label):
+    print("dump-cli: %s: default on %s is not JSON-serializable" % (program_name, option_label), file=sys.stderr)
+    raise DumpCliError(1)
+
+
+def action_label(action):
+    option_strings = action["option_strings"] if isinstance(action, dict) else action.option_strings
+    if option_strings:
+        return option_strings[0]
+    return action["dest"] if isinstance(action, dict) else action.dest
+
+
+def absolute_default_to_placeholder(value, bridge_dir, program_name, option_label):
+    try:
+        rel = os.path.relpath(value, bridge_dir)
+    except ValueError:
+        refuse_outside_default(program_name, option_label)
+    if rel == os.pardir or rel.startswith(os.pardir + os.sep):
+        refuse_outside_default(program_name, option_label)
+    return BRIDGE_PLACEHOLDER + rel.replace(os.sep, "/")
+
+
 def default_for_json(value, bridge_dir, program_name, option_label):
     if isinstance(value, (list, tuple)):
         return [default_for_json(v, bridge_dir, program_name, option_label) for v in value]
-    if isinstance(value, str) and os.path.isabs(value):
-        try:
-            rel = os.path.relpath(value, bridge_dir)
-        except ValueError:
-            refuse_outside_default(program_name, option_label)
-        if rel == os.pardir or rel.startswith(os.pardir + os.sep):
-            refuse_outside_default(program_name, option_label)
-        return BRIDGE_PLACEHOLDER + rel.replace(os.sep, "/")
-    return jsonable(value)
+    if isinstance(value, dict):
+        return {default_for_json(k, bridge_dir, program_name, option_label):
+                default_for_json(v, bridge_dir, program_name, option_label) for k, v in value.items()}
+    if isinstance(value, os.PathLike):
+        return default_for_json(os.fspath(value), bridge_dir, program_name, option_label)
+    if isinstance(value, str):
+        if os.path.isabs(value):
+            return absolute_default_to_placeholder(value, bridge_dir, program_name, option_label)
+        return value
+    if isinstance(value, (int, float, bool)) or value is None:
+        return value
+    refuse_bad_default(program_name, option_label)
 
 
 def action_entry(action, bridge_dir, program_name):
-    label = action.option_strings[0] if action.option_strings else action.dest
+    label = action_label(action)
     default = default_for_json(action.default, bridge_dir, program_name, label)
     return {
         "option_strings": list(action.option_strings),
@@ -158,22 +183,45 @@ def forbidden_path_fragments(root):
         if is_filesystem_root(path):
             continue
         fragments.append(path)
-        if path == repo:
-            fragments.append(path.replace(os.sep, "/"))
     return fragments
 
 
 def check_string_for_paths(text, program_name, option_label, fragments):
     if not isinstance(text, str):
         return
+    ntext = os.path.normcase(text)
     for frag in fragments:
-        if frag and frag in text:
+        if frag and os.path.normcase(frag) in ntext:
             if option_label is not None:
                 print("dump-cli: %s: reference text on %s contains a computer path" % (program_name, option_label),
                       file=sys.stderr)
             else:
                 print("dump-cli: %s: reference text contains a computer path" % program_name, file=sys.stderr)
             raise DumpCliError(1)
+
+
+def check_default_strings(value, program_name, option_label, fragments):
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            check_default_strings(item, program_name, option_label, fragments)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            check_default_strings(key, program_name, option_label, fragments)
+            check_default_strings(item, program_name, option_label, fragments)
+    elif isinstance(value, str):
+        check_string_for_paths(value, program_name, option_label, fragments)
+
+
+def check_action_strings(action, program_name, fragments):
+    label = action_label(action)
+    for s in action["option_strings"]:
+        check_string_for_paths(s, program_name, label, fragments)
+    check_string_for_paths(action["dest"], program_name, label, fragments)
+    check_string_for_paths(action.get("help"), program_name, label, fragments)
+    if action["choices"] is not None:
+        for choice in action["choices"]:
+            check_string_for_paths(choice, program_name, label, fragments)
+    check_default_strings(action["default"], program_name, label, fragments)
 
 
 def validate_reference_strings(data, root):
@@ -185,21 +233,12 @@ def validate_reference_strings(data, root):
             continue
         check_string_for_paths(cmd.get("description"), name, None, fragments)
         for sub in cmd["subcommands"]:
+            check_string_for_paths(sub["name"], name, None, fragments)
             check_string_for_paths(sub.get("description"), name, None, fragments)
             for a in sub["positionals"] + sub["options"]:
-                label = a["option_strings"][0] if a["option_strings"] else a["dest"]
-                check_string_for_paths(a.get("help"), name, label, fragments)
-                if a["choices"] is not None:
-                    for choice in a["choices"]:
-                        check_string_for_paths(choice, name, label, fragments)
-                check_string_for_paths(json.dumps(a["default"]), name, label, fragments)
+                check_action_strings(a, name, fragments)
         for a in cmd["positionals"] + cmd["options"]:
-            label = a["option_strings"][0] if a["option_strings"] else a["dest"]
-            check_string_for_paths(a.get("help"), name, label, fragments)
-            if a["choices"] is not None:
-                for choice in a["choices"]:
-                    check_string_for_paths(choice, name, label, fragments)
-            check_string_for_paths(json.dumps(a["default"]), name, label, fragments)
+            check_action_strings(a, name, fragments)
 
 
 def command_entry(bridge_dir, name):
@@ -254,7 +293,17 @@ def render_action_line(action):
         parts.append("choices: %s" % json.dumps(action["choices"]))
     if action["help"]:
         parts.append(action["help"])
-    return " ".join(parts)
+    return "- " + "; ".join(parts)
+
+
+def render_actions_section(lines, heading, level, items):
+    if not items:
+        return
+    lines.append("%s %s" % ("#" * level, heading))
+    lines.append("")
+    for a in items:
+        lines.append(render_action_line(a))
+    lines.append("")
 
 
 def render_markdown(data):
@@ -269,27 +318,15 @@ def render_markdown(data):
             continue
         if cmd.get("description"):
             append_fenced(lines, cmd["description"])
-        for section, items in (("Positionals", cmd["positionals"]), ("Options", cmd["options"])):
-            if not items:
-                continue
-            lines.append("### %s" % section)
-            lines.append("")
-            for a in items:
-                lines.append(render_action_line(a))
-            lines.append("")
+        render_actions_section(lines, "Positionals", 3, cmd["positionals"])
+        render_actions_section(lines, "Options", 3, cmd["options"])
         for sub in cmd["subcommands"]:
             lines.append("### Subcommand `%s`" % sub["name"])
             lines.append("")
             if sub.get("description"):
                 append_fenced(lines, sub["description"])
-            for section, items in (("Positionals", sub["positionals"]), ("Options", sub["options"])):
-                if not items:
-                    continue
-                lines.append("#### %s" % section)
-                lines.append("")
-                for a in items:
-                    lines.append(render_action_line(a))
-                lines.append("")
+            render_actions_section(lines, "Positionals", 4, sub["positionals"])
+            render_actions_section(lines, "Options", 4, sub["options"])
     return "\n".join(lines).rstrip() + "\n"
 
 

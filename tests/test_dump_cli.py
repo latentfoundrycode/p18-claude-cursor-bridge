@@ -835,3 +835,125 @@ def test_cfgb3b_r3_each_action_is_a_list_item(tmp_path):
     for line in action_lines:
         assert line.startswith("- `"), line
         assert "; default: " in line and "; required: " in line, line
+
+
+# --- round 4 (handoff/CONFIG-B3b-r4.md): the security re-check's round-3 findings and Review A's -----------------
+# Blocking (security re-check): a folder was found only in its one written form; doubled backslashes (a list or JSON
+# written into a text), the Git Bash and WSL forms and the form without its drive letter went through. Convergent (the
+# supervisor, the security re-check, Review A S1): a dict default whose keys cannot be JSON keys ended in a traceback.
+# Advisories: the type field and non-string choices were not checked; a NaN default wrote non-standard JSON. Review A
+# S2: parts of Requirement 2 had no test that separates them.
+
+HOME_SPLIT = 'd, rest = os.path.splitdrive(os.path.expanduser("~"))\n'
+
+
+def test_cfgb3b_r4_a_folder_written_with_doubled_backslashes_is_refused(tmp_path):
+    """Blocking: a help text holding a list of paths (Python writes each backslash twice) and a description holding a
+    JSON example are refused; the text really holds the doubled form on Windows."""
+    if sys.platform == "win32":
+        assert "\\\\" in repr([os.path.expanduser("~")]) and "\\\\" in json.dumps(os.path.expanduser("~"))
+    _refused(tmp_path / "repr", "zz-rp.py", _argparse_program(
+        '    p.add_argument("--x", help="searches %r" % [os.path.expanduser("~")])\n'), "--x")
+    _refused(tmp_path / "json", "zz-js.py", _argparse_program(
+        '    import json\n    p.description = "example: " + json.dumps({"dir": os.path.expanduser("~")})\n'))
+
+
+@pytest.mark.parametrize("form", ['"/" + d[:1].lower() + rest.replace(os.sep, "/")',
+                                  '"/mnt/" + d[:1].lower() + rest.replace(os.sep, "/")',
+                                  "rest"])
+def test_cfgb3b_r4_the_home_folder_without_its_drive_is_refused(tmp_path, form):
+    """Blocking: the home folder in the Git Bash form (/c/Users/...), the WSL form (/mnt/c/Users/...) and with no drive
+    letter (\\Users\\...) is refused, in a help text."""
+    _refused(tmp_path, "zz-nd.py", _argparse_program("    " + HOME_SPLIT + '    p.add_argument("--x", help="see " + %s)\n'
+                                                     % form), "--x")
+
+
+def test_cfgb3b_r4_a_folder_written_with_doubled_forward_slashes_is_refused(tmp_path):
+    """Blocking: the repository's folder with its separators doubled (a URL-like or escaped form) is refused."""
+    _refused(tmp_path, "zz-dfs.py", _argparse_program(
+        '    p.add_argument("--x", help="see " + HERE.replace(os.sep, "//"))\n'), "--x")
+
+
+def test_cfgb3b_r4_a_home_at_the_root_of_a_drive_is_still_not_a_fragment(tmp_path):
+    """The folder without its drive is skipped where it is the root: a home at the root of its drive leaves the
+    repository's own reference to generate."""
+    sb = _sandbox(tmp_path / "sb")
+    anchor = pathlib.Path(tmp_path).anchor
+    env = dict(os.environ, HOME=anchor, USERPROFILE=anchor)
+    p = _run(sb, env=env)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert json.loads((sb / JSON_REL).read_text(encoding="utf-8"))["commands"]
+
+
+@pytest.mark.parametrize("default", ['{("a", "b"): 1}', '{1: "a", "b": 2}', '{1: "a"}', '{pathlib.Path("a"): 1, "a": 2}'])
+def test_cfgb3b_r4_a_dict_default_whose_keys_are_not_distinct_strings_is_refused(tmp_path, default):
+    """Convergent (the supervisor, the security re-check, Review A S1): a key that is not a string or os.PathLike, or
+    two keys that walk to one string, are refused naming the option, never a traceback."""
+    _refused(tmp_path, "zz-dk.py", _argparse_program('    import pathlib\n    p.add_argument("--map", default=%s)\n'
+                                                     % default), "--map")
+
+
+def test_cfgb3b_r4_a_pathlike_dict_key_takes_the_placeholder(tmp_path):
+    """A dict key that is an os.PathLike under the program's folder becomes the placeholder string."""
+    _, _, opt = _option(tmp_path, "zz-pk.py", '    import pathlib\n'
+                        '    p.add_argument("--map", default={pathlib.Path(HERE) / "a": 1})\n', "--map")
+    assert opt["default"] == {"<bridge folder>/a": 1}
+
+
+@pytest.mark.parametrize("value", ['float("nan")', 'float("inf")', '[float("-inf")]'])
+def test_cfgb3b_r4_a_default_that_is_not_a_json_number_is_refused(tmp_path, value):
+    """Review A noted 2: NaN and the infinities are not JSON; a default holding one is refused naming the option."""
+    _refused(tmp_path, "zz-nan.py", _argparse_program('    p.add_argument("--x", type=float, default=%s)\n' % value),
+             "--x")
+
+
+def test_cfgb3b_r4_a_type_named_by_a_path_is_refused(tmp_path):
+    """Advisory: the type field is checked like the dest."""
+    _refused(tmp_path, "zz-ty.py", _argparse_program(
+        '    def conv(s):\n        return s\n    conv.__name__ = os.path.expanduser("~")\n'
+        '    p.add_argument("--x", type=conv)\n'), "--x")
+
+
+@pytest.mark.parametrize("choices", ['[("a", os.path.expanduser("~"))]', '["a", pathlib.Path(os.path.expanduser("~"))]'])
+def test_cfgb3b_r4_a_choice_that_is_not_a_string_is_walked(tmp_path, choices):
+    """Advisory: choices are walked like a default (a tuple holding a path, an os.PathLike), refused naming the option,
+    never a traceback."""
+    _refused(tmp_path, "zz-cw.py", _argparse_program('    import pathlib\n    p.add_argument("--x", choices=%s)\n'
+                                                     % choices), "--x")
+
+
+def test_cfgb3b_r4_a_choice_under_the_program_folder_takes_the_placeholder(tmp_path):
+    """A choice that is an absolute path under the program's folder is written as the placeholder, as a default is."""
+    _, _, opt = _option(tmp_path, "zz-cp.py", '    p.add_argument("--x", choices=["a", os.path.join(HERE, "b")])\n', "--x")
+    assert opt["choices"] == ["a", "<bridge folder>/b"]
+
+
+@pytest.mark.parametrize("default", ['{"k": "out=" + %s}' % HOME_EXPR, '{"out=" + %s: 1}' % HOME_EXPR,
+                                     '[{"k": {"j": "out=" + %s}}]' % HOME_EXPR])
+def test_cfgb3b_r4_a_dict_value_or_key_holding_a_path_is_refused(tmp_path, default):
+    """Review A S2 (survivors 1-3): a dict value, a dict key and a value two dicts deep that hold the home folder inside
+    a string (not an absolute path) are refused by the string check, naming the option."""
+    _refused(tmp_path, "zz-dv.py", _argparse_program('    p.add_argument("--map", default=%s)\n' % default), "--map")
+
+
+def test_cfgb3b_r4_an_option_string_or_dest_holding_a_path_is_refused(tmp_path):
+    """Review A S2 (survivor 4): an option string and a dest holding the home folder are each refused."""
+    _refused(tmp_path / "os", "zz-os.py", _argparse_program(
+        '    p.add_argument("--x", "--in-" + %s)\n' % HOME_EXPR), "--x")
+    _refused(tmp_path / "de", "zz-de.py", _argparse_program(
+        '    p.add_argument("--x", dest="d" + %s)\n' % HOME_EXPR), "--x")
+
+
+def test_cfgb3b_r4_the_repository_folder_is_refused_from_another_folder(tmp_path):
+    """Review A S2 (the repository fragment): run from a folder that is neither the repository nor the home folder, a
+    help text holding the program's folder is refused by the repository's fragment alone."""
+    sb = _sandbox(tmp_path / "sb")
+    (sb / "bridge" / "cursor-bridge" / "zz-rf.py").write_text(
+        _argparse_program('    p.add_argument("--x", help="in " + HERE)\n'), encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    for args in ((), ("--check",)):
+        p = _run(sb, *args, cwd=elsewhere)
+        out = p.stdout + p.stderr
+        assert p.returncode == 1 and "zz-rf.py" in out and "--x" in out and "Traceback" not in out, (args, out)
+    assert not (sb / JSON_REL).exists()
