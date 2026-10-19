@@ -17,7 +17,7 @@ import sys
 
 import pytest
 
-from test_conformance_check import make_workspace, verdict
+from test_conformance_check import VERSION, make_workspace, verdict
 from test_workflows_line_check import conformance, inventory, workflows_lines
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -61,7 +61,6 @@ SHAPES = {
         "workflows": ["Web App Development " + ARROW + " Local Web App; traits: Has screens, Installable, Long-running process"],
     },
 }
-VERSION_VALUE = "2026.10.18a"
 FILLER = ("an invented value " + DASH + " it names a stage, an increment and a pull request (#12), says what is next "
           "and why; it holds colons: and semicolons; and the words Phase and Workflows in the middle of a sentence")
 
@@ -73,7 +72,9 @@ def _value(field, repeat):
     if field == "Phase":
         return "building"
     if field == "Bridge version":
-        return VERSION_VALUE
+        return VERSION
+    if field == "Stage":
+        return "Stage 1 (%s)" % FILLER   # make_workspace's project.json names Stage 1
     if field == "Layout":
         return "Workspace=<project root>\\Workspace  Documents=<project root>\\Documents"
     return "; ".join([FILLER] * (repeat if field in LONG_FIELDS else 1))
@@ -139,8 +140,24 @@ def test_fix002_inventory_check_judges_a_shaped_status_file_by_its_line_alone(tm
     assert "MISSING: absent-inventory.md does not exist" in lines and lines[-1] == "RESULT: 1 problem(s)", lines
 
 
+def notes(out):
+    return [l for l in out.splitlines() if l.strip().startswith("NOTE")]
+
+
+def plain_notes(tmp_path):
+    """conformance-check.py's NOTE lines on make_workspace's own minimal status file, in this environment (some
+    NOTEs depend on it: the session's environment, --offline): any other NOTE on a shaped file is about the file."""
+    root = tmp_path / "plain"
+    root.mkdir()
+    make_workspace(root)
+    rc, out, err = conformance(root)
+    assert rc == 0 and out.splitlines()[-1] == "RESULT: CONFORMANT", out
+    return notes(out)
+
+
 @pytest.mark.parametrize("shape", sorted(SHAPES))
 def test_fix002_conformance_check_judges_a_shaped_status_file_by_its_line_alone(tmp_path, shape):
+    """A valid constructed line: the Workflows-line row OK, and no row, MISSING or NOTE, that the minimal file lacks."""
     root = tmp_path / "proj"
     root.mkdir()
     make_workspace(root)
@@ -149,6 +166,7 @@ def test_fix002_conformance_check_judges_a_shaped_status_file_by_its_line_alone(
     assert "Traceback" not in err, err
     assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
     assert rc == 0 and out.splitlines()[-1] == "RESULT: CONFORMANT", out
+    assert notes(out) == plain_notes(tmp_path), out
 
 
 BROKEN = {
@@ -182,6 +200,7 @@ def test_fix002_a_broken_line_in_a_shaped_file_is_the_one_finding(tmp_path, shap
     assert v == "MISSING" and reason in shown, out
     assert [l for l in out.splitlines() if l.strip().startswith("MISSING")] == [l for l in out.splitlines()
                                                                                  if "Workflows line" in l], out
+    assert notes(out) == plain_notes(tmp_path), out
 
 
 def test_fix002_the_bridge_status_line_fails_for_the_stated_reasons_only():
