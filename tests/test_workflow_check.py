@@ -480,8 +480,11 @@ FILE_EXACT = {
     # A file of an unknown key still has its changes checked (round 6: tests, fixtures 2). A key of another table is no
     # key of this one (TASK-006 Requirement 4, `unknown`: "not a Product types key", "not a Traits key"): a sub-type key
     # and a trait key at a type file's path, a product type key at a trait file's (stage B2's review, round 11:
-    # fixtures 3, blocking; a sub-workflow saved at a type's path would otherwise pass as a type workflow).
+    # fixtures 3, blocking; a sub-workflow saved at a type's path would otherwise pass as a type workflow), and a
+    # sub-type key at a trait file's (round 12: fixtures 3, should-fix; a sub-workflow saved under traits/ would
+    # otherwise pass as a trait workflow).
     'unknown-trait-file': [
+        'FAIL (unknown) {root}/traits/claude-code-extension.md: claude-code-extension - not a trait key',
         'FAIL (unknown) {root}/traits/not-a-trait.md: not-a-trait - not a trait key',
         'FAIL (a) {root}/traits/not-a-trait.md: nowhere.at-all - point is not in the extension-point registry',
         'FAIL (unknown) {root}/traits/web-app.md: web-app - not a trait key',
@@ -494,9 +497,10 @@ FILE_EXACT = {
     ],
 }
 
-# The single-line status files have no Phase line: only check_status reads them, and workflow-check.py never runs
-# check_placement (inventory-check.py and conformance-check.py do), so a placement check added to it would need a
-# Phase line in each (round 7: fixtures 5, consider). The prefix of a name is the case's subject, not always its
+# The status files have no Phase line, the single-line ones and the multi-line ones alike: only check_status reads
+# them, and workflow-check.py never runs check_placement (inventory-check.py and conformance-check.py do), so a
+# placement check added to it would need a Phase line in each (round 7: fixtures 5, consider; round 12: fixtures 4
+# and 5, the multi-line files named too). The prefix of a name is the case's subject, not always its
 # finding code: form-traits-none-case, form-traits-none-first, form-traits-none-last and form-unclassified-with-traits
 # are cases of the traits text's and the unclassified line's form, read as unknown names (round 11: fixtures 5,
 # consider).
@@ -675,6 +679,90 @@ def test_r014_every_case_has_its_exact_findings():
     """Every fixture under fail/ and status/ has an entry, so a new case states its whole output."""
     assert sorted(FILE_EXACT) == sorted(p.name for p in (REPO / FIX / "fail").iterdir())
     assert sorted(STATUS_EXACT) == sorted(p.name for p in (REPO / FIX / "status").iterdir() if p.name != "open-list.md")
+
+
+# What the bridge's own open list and registry say of every key, point and module a fail root names. The fail roots
+# are checked against those two tables, so a later row there (a new point, a module made replaceable, a key moved)
+# can change a case's findings; this test then names the entry, and the fix is to the fixtures and FILE_EXACT, never
+# to the program (stage B2's review, round 12: fixtures 1 and 2, converging, and tests, consider). A key is listed by
+# the tables that hold it, a point by its Changes cell, a module by its Replaceable cell; None is a name in no table.
+# A delivery kind (a `for` kind, a Set at intake.delivery-kind value as the program normalizes it) is listed by whether
+# the program's own DELIVERY_KINDS holds it: the registry's list changes with that constant (extension-points.md),
+# so a kind added there turns a case red too (BUG-014's gate, Review A, should-fix).
+FAIL_ROOT_NAMES = {
+    "keys": {
+        "browser-extension": ["sub-type of host-extension"],
+        "claude-code-extension": ["sub-type of host-extension"],
+        "has-screens": ["trait"],
+        "host-extension": ["type"],
+        "installable": ["trait"],
+        "web-app": ["type"],
+    },
+    "points": {
+        "intake.delivery-kind": "add, set",
+        "intake.delivery-kinds": None,
+        "intake.question": None,
+        "intake.questions": "add",
+        "intake.requirement-sources": "add",
+        "intake.target-environment": "add, set",
+        "nowhere.at-all": None,
+        "nowhere.point": None,
+        "project-end.delivery": "add",
+    },
+    "modules": {"design": "no", "interface": "yes", "testing": None},
+    "kinds": {"": False, "##": False, "`": False, "`installer": False, "deployment": False, "docker-image": False,
+              "installer": True, "installer`": False},
+}
+
+
+def test_r014_the_bridge_tables_still_say_what_the_fail_roots_rely_on():
+    """The precondition of every FILE_EXACT case: each key, point and module a fail root names, read from the fixtures,
+    has the entry FAIL_ROOT_NAMES records in the bridge's open list and registry (a new name in a fixture is added
+    there too)."""
+    spec = importlib.util.spec_from_file_location("workflow_check_tables", str(REPO / PROG))
+    wc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(wc)
+    ol = REPO / "bridge/cursor-bridge/workflow/open-list.md"
+    rg = REPO / "bridge/cursor-bridge/workflow/extension-points.md"
+    tables, errors = wc.load_tables(ol.read_text(encoding="utf-8"), str(ol), rg.read_text(encoding="utf-8"), str(rg))
+    assert errors == [], errors
+    keys, points, modules, kinds = set(), set(), set(), set()
+    for path in (REPO / FIX / "fail").rglob("*"):
+        rel = path.relative_to(REPO / FIX / "fail").parts[1:]
+        if not rel:
+            continue
+        if path.is_dir():
+            keys.add(path.name)
+        elif path.suffix == ".md":
+            keys.add(path.name[:-3])
+            # Read as the program reads a file (utf-8-sig, its own heading and fence reading), so a name inside a
+            # fence is no reliance and a first line after a byte-order mark is one.
+            spans, _ = wc.heading_spans(path.read_text(encoding="utf-8-sig", errors="replace"))
+            for line, body in spans:
+                parsed = wc.parse_heading(line)
+                if parsed is None:
+                    continue
+                kind, target, for_kind = parsed
+                (modules if kind == "replace" else points).add(target)
+                if for_kind is not None:
+                    kinds.add(for_kind)
+                elif kind == "set" and target == wc.DELIVERY_SET and wc.first_nonblank(body) is not None:
+                    kinds.add(wc.normalize_kind(wc.first_nonblank(body)))
+
+    def held_by(key):
+        held = ["type"] if key in tables["product_by_key"] else []
+        if key in tables["sub_by_key"]:
+            held.append("sub-type of " + tables["sub_by_key"][key]["Of type"])
+        return held + (["trait"] if key in tables["trait_keys"] else [])
+
+    found = {
+        "keys": {k: held_by(k) for k in sorted(keys) if held_by(k)},
+        "points": {p: tables["point_changes"].get(p, {}).get("Changes") for p in sorted(points)},
+        "modules": {m: tables["module_replaceable"].get(m, {}).get("Replaceable") for m in sorted(modules)},
+        "kinds": {k: k in wc.DELIVERY_KIND_SET for k in sorted(kinds)},
+    }
+    assert found == FAIL_ROOT_NAMES, "the bridge's open list or registry changed an entry a fail root relies on: " \
+        "update the fixtures under tests/fixtures/workflows/fail/ and FILE_EXACT"
 
 
 @pytest.mark.parametrize("case", sorted(FILE_EXACT))
@@ -3085,7 +3173,7 @@ def test_r014_a_delivery_kind_value_is_stripped_then_unwrapped(tmp_path, value, 
 
 
 def test_r014_an_indented_heading_line_stays_in_its_section(tmp_path):
-    """extension-points.md:72: a heading is `##` at the start of a line, so a line indented four spaces is text and
+    """extension-points.md:72: a heading is `##` after at most three spaces, so a line indented four spaces is text and
     does not end the section it stands in: the Set's first non-blank line is that line (stage B2's review, round 11:
     tests, should-fix; the heading candidate matched on the line stripped of its indent, which ends the section)."""
     root, shown = _one_file_root(tmp_path, "types/host-extension.md", "## Set at intake.delivery-kind\n    ## note\ninstaller\n")
@@ -3118,8 +3206,8 @@ def test_r014_a_backtick_anywhere_in_the_info_opens_no_fence(tmp_path):
 
 
 def test_r014_a_head_split_on_a_comma_without_its_space(tmp_path):
-    """supervisor.md, "Project state": names are joined by a comma and a space; the program splits a head on the comma
-    alone and strips each name, so `Web App Development,Has screens` names a type and a trait and breaks the head's
+    """handoff/TASK-006.md Requirement 11: the head is split on `→`, then on `,`, and each name is stripped (the comma
+    and a space of supervisor.md, "Project state", join the traits; the head has no comma), so `Web App Development,Has screens` names a type and a trait and breaks the head's
     shape (stage B2's review, round 11: tests, should-fix; the head split on ", ", which reads one unknown name)."""
     status = tmp_path / "s.md"
     status.write_text("Workflows: Web App Development,Has screens; traits: none\n", encoding="utf-8", newline="\n")
@@ -3309,9 +3397,11 @@ def test_r014_a_key_is_looked_up_as_written(tmp_path):
     its folder's sub-workflow and traits/Installable.md the conditional workflows of those entries (the string sweep's
     lines 547, 566 and 568, the key lowered before its lookup). Such an open list breaks its own rule, and no document
     says what the program does with it; the test pins the program's reading (as
-    test_r014_a_product_key_named_like_a_file_is_a_type_folder does)."""
-    text = (REPO / "bridge/cursor-bridge/workflow/open-list.md").read_text(encoding="utf-8")
-    assert text.count("| host-extension |") == 3 and text.count("| installable |") == 7, "precondition: the keys' cells"
+    test_r014_a_product_key_named_like_a_file_is_a_type_folder does). The open list rewritten is the status cases' own,
+    so a later row of the bridge's open list does not change the cells counted (stage B2's review, round 12: tests,
+    consider, converging with fixtures 1 and 2 on the fixtures' reliance on the bridge's tables)."""
+    text = (REPO / STATUS_LIST).read_text(encoding="utf-8")
+    assert text.count("| host-extension |") == 3 and text.count("| installable |") == 5, "precondition: the keys' cells"
     upper = tmp_path / "upper.md"
     upper.write_text(text.replace("| host-extension |", "| Host-Extension |").replace("| installable |", "| Installable |"),
                      encoding="utf-8", newline="\n")

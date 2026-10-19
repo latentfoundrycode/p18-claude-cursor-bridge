@@ -574,6 +574,31 @@ On the final tests the sweep leaves 202 survivors of 433 (run/supervisor/sweep_s
 
 Every test was added or strengthened and none removed or loosened, so the earlier sweeps' and drivers' kills stand.
 
+## Stage B2 — the stage review (round 12, 2026-10-19)
+
+Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46fa67f14d), judged by defect class under standing rule 6 (the maintainer agreeing, 2026-10-19). **Review B** (grok-4.7-medium, the native profile): APPROVE with no findings; it ran the stage's test modules (678 passed, 4 skipped) and the CI step. **Review A** in nine parts: all nine APPROVE, no blocking item, one should-fix (fixtures 3) and considers. No reviewer rejected, so the stage review does not run again from its step 1 (the stage close's step 7 runs it again after a REJECT); the convergent items and the should-fix are fixed as BUG-014, through its own gate, before the stage closes.
+
+**Convergent, so blocking (the code gate's convergence rule), fixed in BUG-014:**
+- The fail roots and one test rely on the bridge's own open list and registry (fixtures 1, noted; fixtures 2, consider; tests, consider): a later row there changes a case's output, loudly. test_r014_the_bridge_tables_still_say_what_the_fail_roots_rely_on reads every key, point, module and delivery kind the fail roots name, as the program reads a file (utf-8-sig, its own heading and fence reading), and pins what the two tables say of each, and for a kind whether the program's DELIVERY_KINDS holds it, the registry's list changing with that constant (FAIL_ROOT_NAMES), so such a change names the entry (the kinds at BUG-014's gate: Review A, should-fix); test_r014_a_key_is_looked_up_as_written rewrites the status cases' own open list instead of the bridge's.
+- The STATUS_EXACT comment said only the single-line status files have no Phase line (fixtures 4 and 5): it names the multi-line ones too.
+
+**Should-fix, taken in BUG-014:** fixtures 3: no case had a sub-type's key at a trait file's path (568 reading the sub-types' keys as well survived 622 tests); unknown-trait-file gains traits/claude-code-extension.md, pinned in FILE_EXACT. That mutant, the tables test's (the interface module made not replaceable; `docker-image` added to DELIVERY_KINDS) and the key test's (568's key lowered) are killed (run/supervisor/bug014_mutants.py, on a copy).
+
+**Considers, taken in BUG-014 (tests' wording):** test_r014_an_indented_heading_line_stays_in_its_section's docstring says at most three spaces (extension-points.md:72); test_r014_a_head_split_on_a_comma_without_its_space's cites TASK-006 Requirement 11 for the head's split.
+
+**Survivors, recorded (rule 6, the test-strength class; the tests part's throwaway mutants on a copy):**
+- 368's sort key lowered: `types/Zed.md` and `types/alpha.md` print in the other order, where TASK-006 Requirement 4 says sorted path order. Round 11's string-method class, at a sort-key lambda the sweep's node selection did not reach.
+- The order of two ERROR lines swapped: the registry read before the open list (779-784), the status-file loop above the roots loop (793-818), the registry's table specs before the open list's (249-255 with 266). Round 9's statement-order class, by operators sweep_flow.py lacks (blocks that are not neighbours swapped, a tuple's elements reordered); round 7 records that no document fixes the ERROR lines' order.
+- The programs part ran 58 mutants of operators no sweep names (each change word, trailing-punctuation mark and delivery kind dropped; exception tuples narrowed; the byte-order mark kept; the walk following links; the sort dropped or reversed; the escape widths; the judges' handlers): all killed.
+
+**Considers, recorded, not taken (leads for the next change of workflow-check.py; BUG-014 changes no program):**
+- Programs: with standard output open but not writable (a reader that closes the pipe early) the check ends with a traceback, exit 1, or 120 where 0 or 2 was due; every outcome stays non-zero, so nothing that should fail passes. The stream class of rounds 7 and 9. The fix: catch the write error and keep the planned exit code, or say the promise holds while standard output can be written.
+- Programs: argparse's abbreviations (`--stat`, `--open`, `--reg`) are accepted though the usage names only the full forms; `allow_abbrev=False` would make the surface what the docstring says.
+- Texts: the docstring, which is the `--help` text (30-36), lists the causes of exit 2 without a conditional-workflow file that cannot be read, which the program and extension-points.md include.
+- Fixtures 6: form-unclassified-with-traits (`not yet classified; traits: none`) is reported as an unknown name and a part naming no product type, neither naming the rule it breaks (supervisor.md, "Project state"): a wording lead.
+
+**Incident:** the texts part ran the full suite in the checkout while Review B ran (caches only; the tree clean, verify OK). A feedback lead: a stage part's prompt says not to run the suite while Review B runs.
+
 ## Hotfix 2026.10.18a — the design critique's ceiling (HOTFIX-001, merged on release/2026.10.11 as 4624421, PR #39; carried onto main 2026-10-19)
 
 **Leads (the code gate, three rounds; recorded, not taken):**
