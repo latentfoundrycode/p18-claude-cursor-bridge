@@ -339,7 +339,8 @@ def test_r029_a_malformed_exceptions_file_is_not_checked(tmp_path):
         entries(root, line)
         rc, lines = run(root)
         assert rc == 2 and lines[-1] == "RESULT: not checked", (line, lines)
-        assert any(l.startswith("ERROR: ") and "line 6" in l for l in lines), (line, lines)
+        assert any(l.startswith("ERROR: bridge/cursor-bridge/workflow/trace-exceptions.md: line 6: ")
+                   for l in lines), (line, lines)
     write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", "# Trace exceptions\n\nNo entries heading.\n")
     rc, lines = run(root)
     assert rc == 2 and lines[-1] == "RESULT: not checked", lines
@@ -450,7 +451,7 @@ def test_r029_a_usage_error_prints_an_error_line(tmp_path):
     root = make_repo(tmp_path)
     rc, lines = run(root, "--bogus")
     assert rc == 2 and lines[-1] == "RESULT: not checked", lines
-    assert any(l.startswith("ERROR: ") for l in lines), lines
+    assert any(l.startswith("ERROR: usage: ") and "--bogus" in l for l in lines), lines
 
 
 def test_r029_printed_paths_are_ascii(tmp_path):
@@ -459,6 +460,12 @@ def test_r029_printed_paths_are_ascii(tmp_path):
     rc, lines = run(root)
     assert rc == 1 and fails(lines) == ["FAIL (new) %scaf\\xe9.md: Cafe - A passage no baseline holds." % PHASES], lines
     assert all(l.isascii() for l in lines), lines
+    # a MAP line's home and a copy finding's paths go through the same escaping (Review A round 2, blocking 2)
+    write(root, PHASES + "caf" + chr(0xE9) + ".md", "# Cafe\n\n" + INTAKE_WRAPPED)
+    rc, lines = run(root, "--map")
+    assert all(l.isascii() for l in lines), lines
+    assert any(l.startswith("FAIL (copy) %s, %scaf\\xe9.md: " % (CORE, PHASES)) for l in lines), lines
+    assert any(l.startswith("MAP %s, %scaf\\xe9.md: " % (CORE, PHASES)) for l in lines), lines
 
 
 def test_r029_a_linked_file_under_workflow_is_not_read(tmp_path):
@@ -472,7 +479,8 @@ def test_r029_a_linked_file_under_workflow_is_not_read(tmp_path):
     except (OSError, NotImplementedError):
         pytest.skip("this account cannot create a symbolic link")
     rc, lines = run(root)
-    assert not any("Text from outside" in l for l in lines), lines
+    assert rc == 0 and lines[-1] == "RESULT: OK", lines
+    assert not any("Text from outside" in l or "phases/linked" in l for l in lines), lines
 
 
 def _link_folder(link, target):
@@ -522,7 +530,8 @@ def test_r029_a_linked_folder_under_workflow_is_not_read(tmp_path):
     try:
         assert (link / "moved.md").exists()
         rc, lines = run(root)
-        assert not any("Text from outside" in l or "linked" in l for l in lines), lines
+        assert rc == 0 and lines[-1] == "RESULT: OK", lines
+        assert not any("Text from outside" in l or "phases/linked" in l for l in lines), lines
     finally:
         os.rmdir(str(link))
 
@@ -534,20 +543,96 @@ def _load_program():
     return module
 
 
-def test_r029_a_git_failure_after_the_start_is_not_checked(tmp_path, monkeypatch, capsys):
-    """Requirement 9: a git command that cannot run (here ls-tree, after the first commands ran) ends in exit 2 with
-    an ERROR line naming the reason, never a traceback."""
+def _run_with_git_failing(root, monkeypatch, capsys, sub_command, error):
+    """main() in-process with subprocess.run raising `error` for one git sub-command (the others run for real)."""
+    program = _load_program()
+    real = subprocess.run
+    calls = []
+
+    def run_or_fail(args, *a, **kw):
+        if args[:1] == ["git"] and sub_command in args:
+            calls.append(list(args))
+            raise error(args)
+        return real(args, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", run_or_fail)
+    rc = program.main(["--repo", str(root)])
+    monkeypatch.undo()
+    return rc, capsys.readouterr().out.splitlines(), calls
+
+
+def test_r029_a_git_timeout_after_the_start_is_not_checked(tmp_path, monkeypatch, capsys):
+    """Requirement 3 of round 2: a git command that times out (here ls-tree, after the first commands ran) ends in
+    exit 2 with `ERROR: git ls-tree: timed out after <n> s`, never a traceback."""
+    root = make_repo(tmp_path)
+    rc, out, _ = _run_with_git_failing(root, monkeypatch, capsys, "ls-tree",
+                                       lambda args: subprocess.TimeoutExpired(args, 120))
+    assert rc == 2 and out[-1] == "RESULT: not checked", out
+    assert [l for l in out if l.startswith("ERROR: ")] and all(
+        re.fullmatch(r"ERROR: git ls-tree: timed out after \d+ s", l) for l in out if l.startswith("ERROR: ")), out
+
+
+def test_r029_git_that_cannot_start_stops_at_the_first_failure(tmp_path, monkeypatch, capsys):
+    """Requirement 3 of round 2 and Review A round 2 (should-fix 6): `git show` that cannot start is reported once,
+    `ERROR: git show: cannot be started (...)`, and no further git show is tried (each could wait the full timeout)."""
+    root = make_repo(tmp_path)
+    rc, out, calls = _run_with_git_failing(root, monkeypatch, capsys, "show",
+                                           lambda args: FileNotFoundError(2, "No such file or directory"))
+    errors = [l for l in out if l.startswith("ERROR: ")]
+    assert rc == 2 and out[-1] == "RESULT: not checked", out
+    assert len(errors) == 1 and errors[0].startswith("ERROR: git show: cannot be started ("), out
+    assert len(calls) == 1, calls
+
+
+def test_r029_ref_findings_on_one_line_are_in_file_order(tmp_path):
+    """Round 1's Requirement 8: ref findings in path order, then file order, never sorted by their text (Review A
+    round 2, blocking 3)."""
+    root = make_repo(tmp_path)
+    text, numbers = core_plus("Both ~/.claude/zz-missing and ~/.claude/aa-missing here")
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == ["FAIL (ref) %s:%d: ~/.claude/zz-missing" % (CORE, numbers[0]),
+                                        "FAIL (ref) %s:%d: ~/.claude/aa-missing" % (CORE, numbers[0])], lines
+
+
+def test_r029_a_chain_is_read_after_the_closing_quote(tmp_path):
+    """Review A round 2 (consider 9): a quoted X holding an arrow does not hide the chain's next citation."""
+    root = make_repo(tmp_path)
+    text, _ = core_plus('(see "Supervisor %s " %s "Nope Y")' % (ARROW, ARROW))
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Standing rules - "Supervisor \\u2192 "' % CORE,
+                                        'FAIL (cite) %s: Standing rules - "Nope Y"' % CORE], lines
+
+
+def test_r029_a_name_windows_rewrites_does_not_resolve(tmp_path):
+    """Review A round 2 (consider 10): Windows drops a trailing dot and maps device names (any case, with or without an
+    extension), so such a segment would resolve to a file it does not name; it is a ref finding on every platform. (A
+    trailing space cannot occur: whitespace ends a reference.)"""
+    root = make_repo(tmp_path)
+    refs = ["~/.claude/commands./supervisor.md", "~/.claude/NUL", "~/.claude/cursor-bridge/com1.md", "~/.claude/aux",
+            "~/.claude/cursor-bridge/Lpt9.txt/x"]
+    text, numbers = core_plus(*("Read %s`" % r for r in refs))
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 1 and [l.split(": ", 1)[0] for l in fails(lines)] == \
+        ["FAIL (ref) %s:%d" % (CORE, n) for n in numbers], lines
+
+
+def test_r029_a_refused_reference_touches_no_file(tmp_path, monkeypatch):
+    """Security (round 1 FAIL; round 2 advisory A3): the segment rule decides before any file-system call, so a UNC or
+    drive form never reaches the network or another drive. resolve_ref(rest, root) is called in-process with the file
+    system's lookups recording every call."""
     root = make_repo(tmp_path)
     program = _load_program()
-    real = program.git_run
-
-    def failing_ls_tree(where, args):
-        if args and args[0] == "ls-tree":
-            return None, "timed out"
-        return real(where, args)
-
-    monkeypatch.setattr(program, "git_run", failing_ls_tree)
-    rc = program.main(["--repo", str(root)])
-    out = capsys.readouterr().out.splitlines()
-    assert rc == 2 and out[-1] == "RESULT: not checked", out
-    assert any(l.startswith("ERROR: ") and "timed out" in l for l in out), out
+    calls = []
+    for name in ("realpath", "exists", "isdir", "isfile", "islink", "lexists"):
+        real = getattr(os.path, name)
+        monkeypatch.setattr(os.path, name, lambda *a, _n=name, _r=real, **k: calls.append(_n) or _r(*a, **k))
+    for name in ("stat", "lstat", "scandir", "listdir"):
+        real = getattr(os, name)
+        monkeypatch.setattr(os, name, lambda *a, _n=name, _r=real, **k: calls.append(_n) or _r(*a, **k))
+    results = [program.resolve_ref(rest, str(root)) for rest in
+               ("\\\\host\\share\\x", "//host/share/x", "C:/Windows", "../README.md", "a/../../x", "cmd/<x>/../..")]
+    monkeypatch.undo()
+    assert results == [False] * 6 and calls == [], (results, calls)
