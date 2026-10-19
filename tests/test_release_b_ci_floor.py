@@ -109,10 +109,13 @@ WORKFLOW_PIN = {True: {'pull_request': None, 'push': {'branches': ['main']}},
                                   {'run': 'python -m pip install -r requirements.lock'},
                                   {'run': 'python -m pytest tests -q'},
                                   {'name': "windowless check over the bridge's programs",
-                                   'run': 'python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge'},
+                                   'run': 'python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge '
+                                          '.cursor/hooks'},
                                   {'name': 'the manifest matches the tree',
                                    'run': 'python bridge/cursor-bridge/bridge-check.py --root bridge --sources '
                                           '--quiet'},
+                                  {'name': 'the command reference docs/cli-reference.json matches the programs',
+                                   'run': 'python tools/dump-cli.py --check'},
                                   {'name': "workflow check over the bridge's workflow files and the sample "
                                            'fixtures',
                                    'run': 'python bridge/cursor-bridge/workflow-check.py '

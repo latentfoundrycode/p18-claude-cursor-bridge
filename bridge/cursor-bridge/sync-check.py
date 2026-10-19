@@ -55,13 +55,17 @@ def ok(*args):
     return git(*args)[0] == 0
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(description="Compare local <base> with the remote's <base>.")
     ap.add_argument("--apply", action="store_true", help="fast-forward local <base> when BEHIND")
     ap.add_argument("--strict", action="store_true", help="project end: OFFLINE/UNPUBLISHED fail")
     ap.add_argument("--base", default="main")
     ap.add_argument("--remote", default="origin")
-    a = ap.parse_args()
+    return ap
+
+
+def main():
+    a = build_parser().parse_args()
     base, remote = a.base, a.remote
     rbase = "%s/%s" % (remote, base)
 

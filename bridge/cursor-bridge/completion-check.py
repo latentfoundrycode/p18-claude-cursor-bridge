@@ -93,12 +93,16 @@ def parse_register(text):
     return header, rows
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(description="Check requirements coverage and shipped stand-ins.")
     ap.add_argument("--mode", choices=("plan", "done"), default="done")
     ap.add_argument("--requirements", default="docs/REQUIREMENTS.md")
     ap.add_argument("--only", default="", help="comma-separated requirement IDs; the run is limited to them")
-    a = ap.parse_args()
+    return ap
+
+
+def main():
+    a = build_parser().parse_args()
     only = set(ID_RX.findall(a.only))
     fails, notes = [], []
     done = a.mode == "done"

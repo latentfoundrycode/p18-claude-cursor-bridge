@@ -1,0 +1,967 @@
+{
+  "commands": [
+    {
+      "name": "bench-check.py",
+      "path": "bridge/cursor-bridge/bench-check.py",
+      "source": "docstring",
+      "usage": "bench-check: compare benchmark results against budgets and a committed baseline.\n\n  python bench-check.py bench/budgets.json bench/baseline.json bench/results/latest.json [--update-baseline]\n\nPer budget (Performance-Conventions.md section 3):\n  OVER BUDGET   value exceeds max (or falls below min)                -> FAIL\n  REGRESSION    worse than baseline by more than tolerance_pct        -> FAIL\n  NOT MEASURED  the budget's benchmark/metric is absent from results  -> FAIL\n  IMPROVED      better than baseline by more than tolerance_pct       -> note (move the baseline in an optimization commit)\n  OK            within budget and within the band\nMetrics present in the baseline but without a budget are regression-checked with a\ndefault 10% band. Results with neither budget nor baseline are listed as NEW.\n--update-baseline writes the results into the baseline file (optimization commits only).\nExit 0 = no FAIL, 1 = at least one FAIL, 2 = cannot read an input.\nASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "name": "boundary-check.py",
+      "path": "bridge/cursor-bridge/boundary-check.py",
+      "source": "docstring",
+      "usage": "Workspace-boundary detector for the Cursor afterFileEdit hook (advisory).\n\nReads the hook's JSON from stdin, takes the edited file's path and the workspace\nroot(s), and records any edit that landed OUTSIDE the workspace to\n<workspace>/docs/BOUNDARY_VIOLATIONS.md. The supervisor reads that file at\nstep 4 (Inspect) of the delegation loop and treats an entry like SCOPE DRIFT.\n\nThis hook runs AFTER the edit, so it cannot prevent it - it detects. Always\nexits 0 (advisory; never fail-closed). ASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "name": "bridge-check.py",
+      "path": "bridge/cursor-bridge/bridge-check.py",
+      "source": "docstring",
+      "usage": "bridge-check: verify that the installed bridge tree matches its manifest.\n\nThe maintainer ships MANIFEST.json (file -> sha256, plus the version) with every\nbridge release. This script hashes the live tree it is installed in and reports,\nper file: OK, STALE (content differs), MISSING (not installed), and any EXTRA\ngovernance files not in the manifest (informational). Line endings are normalized\nbefore hashing, so a CRLF copy of an LF file is still OK.\n\nTwo files are not fingerprinted but compared by content (KP-030, KP-032):\n- settings.json is shared with Claude Code and the owner, so only the bridge-owned entries\n  (cursor-bridge/settings.bridge.json: allow and deny rules, hooks) must be present;\n  everything else in it is the owner's and is ignored, except a hook that runs a\n  cursor-bridge program which is not installed: that is reported, because it blocks;\n- the cursor-agent shim at %LOCALAPPDATA%/cursor-agent/cursor-agent must equal\n  cursor-bridge/cursor-agent.shim (Windows only);\n- the agent's home folder %USERPROFILE%/.cursor-bridge/agent-home must hold its .cursor\n  link (KP-038; Windows only).\n\nUsage:  python ~/.claude/cursor-bridge/bridge-check.py [--root <path-to-.claude>] [--quiet]\n        python bridge/cursor-bridge/bridge-check.py --root bridge --sources [--quiet]\n\n--sources checks a source tree (the `bridge/` folder of the bridge's repository) against its\nown manifest and nothing more: a source tree has no settings.json, since the owner's file is\nnot part of it, and the shim is a matter of the machine a release is installed on. In a\nsource tree a file the manifest does not list (EXTRA) fails the check as well.\nExit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;\n        2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "name": "bridge-install.py",
+      "path": "bridge/cursor-bridge/bridge-install.py",
+      "source": "docstring",
+      "usage": "bridge-install: install or update the bridge into ~/.claude from a release folder, and\ntake a release back.\n\n  python <release>/cursor-bridge/bridge-install.py [--target <path-to-.claude>] [--dry-run] [--anyway]\n  python <release>/cursor-bridge/bridge-install.py --rollback [--target <path-to-.claude>] [--dry-run]\n\nThe release folder is the one this file lives in (its parent is the release tree: commands/,\nagents/, skills/, cursor-bridge/; in the bridge's repository that tree is `bridge/`). Both\ncommands are run from a release folder, never from the installed copy: the installed copy\nis replaced during a rollback, and a rollback that was interrupted could not be finished\nwith it when the release it restores has an installer that does not know the command.\n\nInstalling:\n\n  0. REFUSES A FOLDER THAT IS NOT A RELEASE: every file must equal the fingerprint in the\n     folder's own manifest and no file may be unlisted; and when the folder is a checkout of\n     the bridge's repository it must be `main` as merged (on main, equal to origin/main,\n     nothing uncommitted), because the install check cannot tell a merged release from a\n     stamped branch. --anyway installs a checkout's state as it is (the maintainer's\n     rehearsals, with --target);\n  1. KEEPS THE PREVIOUS RELEASE: when the target holds a bridge of another version, the\n     files its manifest lists are saved to <target>/cursor-bridge-previous/<that version>/\n     first (one previous release is kept; an older saved one is removed; a kept copy of\n     the same version is never written twice, see save_previous), and the kept copy is\n     compared with that release's fingerprints: a file that was changed on this computer\n     is named, because the way back refuses a copy that is not the release as shipped;\n  2. REPLACES the installed release by this one (replace_release): the allow and deny\n     rules and the hooks only the replaced release owned leave the target's settings.json,\n     the files its manifest listed that this release no longer ships are removed,\n     commands/, agents/, skills/ and cursor-bridge/ are copied file by file (every other\n     file is left alone), and the bridge-owned settings (cursor-bridge/settings.bridge.json)\n     are MERGED into settings.json: every allow and deny entry and every hook the bridge\n     needs is added if missing, entries the bridge has RETIRED (its \"retired\" list) are\n     removed, and every key the owner or Claude Code wrote there is kept untouched\n     (KP-030). The previous settings.json is saved beside it as\n     settings.json.bak-<date>-<time> before its first change;\n  3. installs the cursor-agent shim (cursor-bridge/cursor-agent.shim) at\n     %LOCALAPPDATA%/cursor-agent/cursor-agent, the file Claude Code's Bash tool runs for\n     `cursor-agent` on Windows (KP-032), when that folder exists, keeping a different\n     previous file as cursor-agent.bak-<date>-<time>, and prepares the home folder builder\n     and reviewer runs get, %USERPROFILE%/.cursor-bridge/agent-home (KP-038);\n  4. runs bridge-check.py on the result and prints its verdict.\n\nTaking a release back (--rollback) is the same replacement with the kept release as its\nsource, so every install exercises the way back: the files, the allow and deny entries and\nthe hooks only the newer release added go, the owner's keys stay, the kept release's shim\nis installed. The \"If rolled back\" items of the release taken back are written to\ncursor-bridge/ROLLED-BACK.md for /calibrate-bridge (the restored changelog no longer holds\nthem; the next install removes the note), bridge-check.py runs on the result, and the kept\ncopy is removed only when that check passes. A kept copy that is not complete, or not the\nrelease as shipped, is refused before anything changes.\n\nThe bridge is installed once per computer, so an install and a rollback reach every project:\nthe release's changelog entry says what a project that had calibrated forward must restore\n(\"If rolled back\"), and /calibrate-bridge applies it.\n\nExit 0 = installed (or rolled back) and verified; 1 = verification failed; 2 = refused,\nstopped by a file that could not be read or written (the same command can be run again),\nor nothing to roll back to. ASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "name": "bridge-run.py",
+      "path": "bridge/cursor-bridge/bridge-run.py",
+      "source": "docstring",
+      "usage": "bridge-run: run one of the loop's commands under a hard time limit that kills its whole\nprocess tree.\n\n  python ~/.claude/cursor-bridge/bridge-run.py --limit <seconds|auto> [--kind <kind>] [--key-file <path>] -- <command> [args...]\n  python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id> [--kind <kind>]\n\nWhy it exists (KP-033): a background builder, reviewer or watch that hangs holds the loop\nuntil the owner notices, and on Windows a plain timeout kills only the first process while\nits children (node under cmd.exe, a dev server under npx) live on and keep the output pipe\nopen, so the supervisor is never woken. This program puts ITSELF into a Windows Job Object\nwith \"kill on close\" before it starts the command, so every process the command creates is\nborn inside the job: at the limit the job is terminated and every member dies with it, the\npipe closes, and the supervisor wakes with exit code 124; at a normal end, closing the job\nkills any orphan the command left behind. On other platforms the command runs in its own\nprocess group, killed as a whole.\n\nWhat it accepts (release 0a review, F6; release A2): only the commands the loop runs through\nit, each by name: `cursor-agent \u2026` (a builder, or Review B with `--kind review`), `gh pr\nchecks \u2026` (the CI watch) and the test suites the supervisor awaits (`pytest`, `python -m\npytest`, `python -m unittest`, `uv run pytest`, `npm test`, `npm run test*`, `pnpm test`,\n`yarn test`, `npx vitest`, `npx jest`, `npx playwright test`, `node --test`, `go test`,\n`cargo test`, `dotnet test`); an option that would run another program or delete a folder\n(`-exec`, `-p`, `-c`, `--config`, `--basetemp`) is refused, an `npx` tool is accepted only\nwhen it is installed in the project (`node_modules/.bin/`), and `--key-file` is refused with\n`cursor-agent` (a key must never reach the builder); anything else is refused with exit 125,\nso the launcher's allow rule cannot become a way to run arbitrary commands unseen. A\nbenchmark or a runner the launcher does not know runs directly in the background, marked\n`# wake`. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers through it.\n\nCeilings (release A2, plan 10.3): every run is logged to `run/launcher/runs.jsonl` under the\nfolder the launcher is started in (kind, limit, seconds, exit; never the prompt). `--limit\nauto` takes the kind's default (builder 7200, review 3600, watch 3600, test 1800) or, once a\nHEALTHY run of that kind is on record, one and a half times the longest healthy run, never\nbelow the default and never above twice it unless `docs/RUN_PARAMETERS.md` carries the\nowner's words on a line `Ceiling above twice: <kind> <seconds> (<their words>, <date>)`. The\nsupervisor marks a run healthy with `--healthy <run id>` once its work passed the gate (the\nid is the launch time on the first stderr line, given whole or as a prefix that fits exactly\none run; a run ended at its limit whose kept work merged counts too, so the ceiling can grow);\na test run that exits 0 is marked by the launcher itself. The run that raised a ceiling is\nnamed when the ceiling is chosen. A slow but healthy task is never ended before its ceiling.\nAn owner's cap below twice the default is ignored with a note: the line says \"above twice\".\nRefuses a design critique round above the ceiling (exit 125, `design ceiling:`).\n\n`--key-file <path>` (release A2): a file of `NAME=value` lines, outside the Workspace, whose\nvalues reach the child's environment only; names are printed, values never (the owner's\nrule of 2026-10-05: no secret through the environment the owner sets).\n\n- stdout and stderr are inherited, so `2> run/agent/TASK-nnn.err` works unchanged.\n- The first line on stderr is `bridge-run: started <UTC time>Z`, which is what\n  pr-activity-check.py's --since needs; the last is `bridge-run: exit <code>`, which\n  review-guard.py reads to tell a review that reached a verdict from one that failed.\n- The exit code is the command's own; 124 = the limit was hit; 125 = refused or could not\n  start.\n- `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the\n  owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`\n  withholds it for any other accepted command too.\n\nASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "name": "bridge-stop.py",
+      "path": "bridge/cursor-bridge/bridge-stop.py",
+      "source": "docstring",
+      "usage": "bridge-stop: end a background task's whole process tree (release A4 follow-up, 2026.10.11c).\n\n  python bridge-stop.py <run id>          a run of the launcher: its child's tree, then the launcher\n  python bridge-stop.py --pid <pid>       any process and everything under it\n\nRun from the Workspace root. The launcher's run log (`run/launcher/runs.jsonl`) carries each\nrun's `pid` (the launcher) and `child_pid` (the command it started) since 2026.10.11c; a run\nid is exact or a unique prefix. On Windows the tree is ended with `taskkill /T /F`; elsewhere\nthe process group is signalled with SIGKILL, then the process itself. Stopping a verification\nloop this way never advances it into its next driver, since the loop and its children end\ntogether (KP-056); the app's own TaskStop ends the loop only. Prints what it ended and whether\nanything of the tree survived. Exit 0 = ended or already gone, 1 = something survived,\n2 = no such run or bad arguments. Windowless. Never writes the run log.\n"
+    },
+    {
+      "description": "Check requirements coverage and shipped stand-ins.",
+      "name": "completion-check.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": [
+            "plan",
+            "done"
+          ],
+          "default": "done",
+          "dest": "mode",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--mode"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "docs/REQUIREMENTS.md",
+          "dest": "requirements",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--requirements"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "",
+          "dest": "only",
+          "help": "comma-separated requirement IDs; the run is limited to them",
+          "nargs": null,
+          "option_strings": [
+            "--only"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
+      "path": "bridge/cursor-bridge/completion-check.py",
+      "positionals": [],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
+      "name": "conformance-check.py",
+      "path": "bridge/cursor-bridge/conformance-check.py",
+      "source": "docstring",
+      "usage": "conformance-check: does this project's configuration carry the floors the bridge requires?\n\n  python ~/.claude/cursor-bridge/conformance-check.py [<project root or Workspace>] [--screens] [--installable] [--offline] [--quiet]\n\nWhy (plan review R4): the bridge added floors over time (the security scanners in the gate,\nSHA-pinned actions, the workspace boundary, the records), and nothing compared a project\nconfigured before a floor existed with what the bridge now requires; the video factory ran\nits gate with no scanner and actions pinned by tag while the Project Summary said the floor\napplied everywhere. This check reads the project's files and reports, per floor, OK, MISSING\nor NOTE. It runs at every calibration and every reflection point; each MISSING is a\ncalibration item, applied as configuration work in the next stage. It never changes anything.\n\nWhat it checks, with the file it reads (the 0b review corrected several of these):\n  - the gate workflows (.github/workflows/*.yml), step by step: a step runs Semgrep,\n    OSV-Scanner and Socket; a scanner step guarded by `if:` is MISSING (it is skipped\n    silently when its condition is false); Semgrep runs the bridge rules or the Pro engine\n    (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner\n    without a pinned version is a NOTE (rule 14); every `uses:` is pinned by a 40-character\n    commit; the runner is Linux (a note otherwise);\n  - on GitHub, read-only through `gh` unless --offline: the default branch has a required\n    status check (N6), and the repository's visibility (a public repository is a NOTE);\n  - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in\n    .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen\n    secure-coding rule (.cursor/rules/secure-coding.mdc);\n  - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for\n    a root requirements.txt (direct pins alone are not a lock; KP-018);\n  - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,\n    ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and\n    docs/diagrams/INDEX.md (missing = a diagram retrofit item);\n  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or not right after\n    Phase: is MISSING (R-015);\n  - with --screens (or a docs/mockups folder): the design detector in the gate;\n  - release A1b: a spending limit recorded for every key, account or provider that can charge\n    (the inventory's Resources rows); the inventory's `Development data:` decision; every\n    adapter of a listed provider tested against recorded replies (the providers from the\n    inventory's chargeable rows, one word each; the adapters among the project's own tracked\n    files, naming the provider in a string of code, not a comment; the evidence a cassette or\n    fixture file the adapter's test loads, a recording library, or a test that names cassettes\n    in a repository that tracks a cassettes folder); `run/` ignored (a NOTE);\n  - release A2: project.json at the Workspace root (name, purpose, kind, version, state), its\n    keys and its phase against the status file;\n  - with --installable (or docs/cli-reference.json present): the CLI reference and a check\n    of it, in CI or in the test suite;\n  - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the\n    examples) and <folder>/.env that look like account keys or tokens are MISSING; local\n    service passwords the tests need (POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD, ...) are a\n    NOTE; values are never read or printed (KP-032); the advice is a key file outside the\n    Workspace, never the Windows user environment; key-like variable NAMES in the session's\n    own environment are a NOTE (the launcher withholds them from builder and reviewer runs);\n  - the private memory notes Claude Code keeps for this project (names only; calibration\n    step 2b reviews them, rule 41);\n  - the recorded bridge version against the installed one (calibration due).\nExit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.\nASCII-only on purpose (cp1252 consoles). Never writes.\n"
+    },
+    {
+      "description": "Check the normative design diagrams.",
+      "name": "diagram-check.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": [
+            "design",
+            "code",
+            "done"
+          ],
+          "default": "design",
+          "dest": "mode",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--mode"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "docs/diagrams/INDEX.md",
+          "dest": "index",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--index"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "docs/REQUIREMENTS.md",
+          "dest": "requirements",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--requirements"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
+      "path": "bridge/cursor-bridge/diagram-check.py",
+      "positionals": [],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
+      "description": "evaluate-reports: the report cycle's program (restructuring plan, section 12; release A3).",
+      "name": "evaluate-reports.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
+      "path": "bridge/cursor-bridge/evaluate-reports.py",
+      "positionals": [],
+      "source": "argparse",
+      "subcommands": [
+        {
+          "description": null,
+          "name": "collect",
+          "options": [
+            {
+              "choices": null,
+              "default": "==SUPPRESS==",
+              "dest": "help",
+              "help": "show this help message and exit",
+              "nargs": 0,
+              "option_strings": [
+                "-h",
+                "--help"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "ledger",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--ledger"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project_root",
+              "help": "one project root instead of the three (tests)",
+              "nargs": null,
+              "option_strings": [
+                "--project-root"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project_name",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--project-name"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "home",
+              "help": "the folder holding .claude/projects (tests)",
+              "nargs": null,
+              "option_strings": [
+                "--home"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "out",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--out"
+              ],
+              "required": false,
+              "type": null
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "description": null,
+          "name": "record",
+          "options": [
+            {
+              "choices": null,
+              "default": "==SUPPRESS==",
+              "dest": "help",
+              "help": "show this help message and exit",
+              "nargs": 0,
+              "option_strings": [
+                "-h",
+                "--help"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "ledger",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--ledger"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project_root",
+              "help": "one project root instead of the three (tests)",
+              "nargs": null,
+              "option_strings": [
+                "--project-root"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project_name",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--project-name"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "home",
+              "help": "the folder holding .claude/projects (tests)",
+              "nargs": null,
+              "option_strings": [
+                "--home"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "reason",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--reason"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": false,
+              "dest": "force",
+              "help": null,
+              "nargs": 0,
+              "option_strings": [
+                "--force"
+              ],
+              "required": false,
+              "type": null
+            }
+          ],
+          "positionals": [
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project",
+              "help": null,
+              "nargs": null,
+              "option_strings": [],
+              "required": true,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "id",
+              "help": null,
+              "nargs": null,
+              "option_strings": [],
+              "required": true,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "outcome",
+              "help": null,
+              "nargs": null,
+              "option_strings": [],
+              "required": true,
+              "type": null
+            }
+          ]
+        },
+        {
+          "description": null,
+          "name": "seed",
+          "options": [
+            {
+              "choices": null,
+              "default": "==SUPPRESS==",
+              "dest": "help",
+              "help": "show this help message and exit",
+              "nargs": 0,
+              "option_strings": [
+                "-h",
+                "--help"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "ledger",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--ledger"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project_root",
+              "help": "one project root instead of the three (tests)",
+              "nargs": null,
+              "option_strings": [
+                "--project-root"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project_name",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--project-name"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "home",
+              "help": "the folder holding .claude/projects (tests)",
+              "nargs": null,
+              "option_strings": [
+                "--home"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "date",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--date"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "evaluations",
+              "help": "the folder of the first evaluation's tables (default Reports/Evaluations/2026-10-04)",
+              "nargs": null,
+              "option_strings": [
+                "--evaluations"
+              ],
+              "required": false,
+              "type": null
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "description": null,
+          "name": "extract",
+          "options": [
+            {
+              "choices": null,
+              "default": "==SUPPRESS==",
+              "dest": "help",
+              "help": "show this help message and exit",
+              "nargs": 0,
+              "option_strings": [
+                "-h",
+                "--help"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "ledger",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--ledger"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project_root",
+              "help": "one project root instead of the three (tests)",
+              "nargs": null,
+              "option_strings": [
+                "--project-root"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "project_name",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--project-name"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "home",
+              "help": "the folder holding .claude/projects (tests)",
+              "nargs": null,
+              "option_strings": [
+                "--home"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "out",
+              "help": null,
+              "nargs": null,
+              "option_strings": [
+                "--out"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "since",
+              "help": "a date; default the ledger's last extract, else the newest evaluation folder",
+              "nargs": null,
+              "option_strings": [
+                "--since"
+              ],
+              "required": false,
+              "type": null
+            }
+          ],
+          "positionals": []
+        }
+      ]
+    },
+    {
+      "description": "Check the project's current-state record.",
+      "name": "inventory-check.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "docs/INVENTORY.md",
+          "dest": "inventory",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--inventory"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "docs/PROJECT_STATUS.md",
+          "dest": "status",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--status"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "docs/CHANGES.md",
+          "dest": "changes",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--changes"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": 120,
+          "dest": "max_lines",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--max-lines"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 12000,
+          "dest": "max_chars",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--max-chars"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "bridge/cursor-bridge/inventory-check.py",
+      "positionals": [],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
+      "name": "invisible-check.py",
+      "path": "bridge/cursor-bridge/invisible-check.py",
+      "source": "docstring",
+      "usage": "invisible-check: characters a reader cannot see in the files a diff changed (release A4, 13.1).\n\n  python invisible-check.py [<base-ref>] [--all]\n\nRun from the Workspace root. Reads the text files changed against <base-ref> (default HEAD:\nthe checkpoint) plus the untracked ones, or every tracked text file with --all, and lists\neach line holding a zero-width character (U+200B..U+200D, U+2060, U+FEFF after the first\ncharacter), a bidirectional control (U+202A..U+202E, U+2066..U+2069: the \"Trojan Source\"\nreordering), a soft hyphen (U+00AD) or a word joiner. Such a character hides a token from a\nreviewer's eye and from a grep, and reorders what a reviewer reads. Exit 0 = none, 1 = at\nleast one, 2 = cannot verify. ASCII output; the character is named by its code point.\n"
+    },
+    {
+      "name": "lock-check.py",
+      "path": "bridge/cursor-bridge/lock-check.py",
+      "source": "docstring",
+      "usage": "lock-check: a dependency manifest changed, so the lockfile CI installs from must have too.\n\nReviewers read what IS in a diff; this checks for what is MISSING from it. If a\ndependency manifest changed against <base> and its lockfile did not, the resolved\nclosure CI installs is stale and the build will fail at import/collection time\n(ISS-004, Known-Pitfalls KP-017).\n\n  python lock-check.py <base-ref> [--lock <path>]...\n\nKnown pairs (manifest -> any of these lockfiles):\n  pyproject.toml / requirements.in / setup.cfg -> requirements.lock, requirements.txt,\n        uv.lock, poetry.lock, Pipfile.lock, pdm.lock\n  package.json -> package-lock.json, pnpm-lock.yaml, yarn.lock, bun.lockb\n  Cargo.toml -> Cargo.lock;  go.mod -> go.sum;  Gemfile -> Gemfile.lock\n  composer.json -> composer.lock;  pubspec.yaml -> pubspec.lock;  *.csproj -> packages.lock.json\n--lock adds a project-specific lockfile path to the candidate list.\nA manifest changed outside its dependencies (a version bump, a tool setting) needs no lockfile\nchange; a folder with no lockfile in use beside the manifest has nothing to go stale (release\nA4, 13.1: the false alarms). Exit 0 = consistent (or no manifest changed), 1 = manifest changed\nwithout its lockfile, 2 = cannot verify. Untracked lockfiles count as changed. ASCII-only.\n"
+    },
+    {
+      "name": "loop-guard.py",
+      "path": "bridge/cursor-bridge/loop-guard.py",
+      "source": "docstring",
+      "usage": "loop-guard: a Claude Code Stop hook that keeps a bridge supervisor from ending its turn\nwhile the build loop has work and nothing is going to wake it.\n\nRegistered in the bridge's settings.json (hooks -> Stop). Reads the hook's JSON on stdin.\nIt BLOCKS the stop - exit code 2 with the reason on stderr, which Claude Code feeds back to\nthe model (documented; code.claude.com hooks reference) - only when ALL hold:\n\n  1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;\n  2. its `Phase:` is building or changing;\n  3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner);\n  (and, in every phase: a turn whose last message holds a shell block and names no terminal\n  is sent back once, because a run sheet without its terminal cannot be followed, rule 27);\n  4. nothing is pending that will wake the session. Since release A2 the hook's own lists\n     decide: a background command *of a kind that finishes* (a builder run, a CI watch, a\n     command run through bridge-run.py, or one marked `# wake`) counts until its limit plus a\n     grace; a background agent counts only under its ceiling (an hour, or `Agent ceiling:` in\n     the run parameters) AND only while a wake-timer command that ends no later than that\n     ceiling is running, because a hung agent never completes and nothing else would wake the session\n     (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the\n     session is idle). A background command of any other kind (a dev server, a worker, a\n     probe) is NOT a wake source: a server never finishes (KP-031). When the hook hands no\n     lists, the transcript is read as before, within GRACE_HOURS;\n  5. this is not already a continuation forced by this hook (`stop_hook_active`), so it\n     nudges at most once per stop sequence and can never trap the session.\n\nEverything else - any other folder, any other phase, an owner question outstanding, a\nbackground task pending, a missing or unreadable file - ALLOWS the stop. The guard fails\nopen: a parse problem never blocks. ASCII output only. Never writes anything.\n"
+    },
+    {
+      "name": "permission-guard.py",
+      "path": "bridge/cursor-bridge/permission-guard.py",
+      "source": "docstring",
+      "usage": "permission-guard: a Claude Code PreToolUse hook for the Bash and PowerShell tools that\nrefuses the two actions the loop must never take, in every permission mode (KP-032):\n\n  - merging a pull request past the repository's rules: `gh pr merge \u2026 --admin`, and the\n    REST route `gh api \u2026 /pulls/<n>/merge` with a method that writes;\n  - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,\n    `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;\n  - any `git worktree remove` (rule 19, release A1b): Git for Windows follows a gitignored\n    junction or symbolic link inside the worktree into its target in an ordinary removal\n    as in a forced one; `worktree-teardown.py` removes a worktree and refuses while a link\n    is inside (it runs git as its own child, which this hook never sees);\n  - a merge without the pre-merge check's record (release A1b): `gh pr merge` must carry\n    `--match-head-commit <sha>`, and `review-guard.py premerge` must have written the record\n    `<git common dir>/bridge/premerge/<sha>` for that sha when it printed OK; `--disable-auto`\n    and `--help` pass; a `gh api graphql` call carrying a merge mutation is refused.\n\nA command behind a wrapper shell (`bash -c`, `bash -lc`, `sh -c`, `cmd /c`, `cmd /k`,\n`powershell -Command`), quoted or not, is checked as the command it is; a single `&` and the\nPowerShell call operator `&`, joined or not, separate commands; `{`, `if`, `then`, `xargs` and\nits options are dropped like `env` and `timeout`; a here-document's body is data (a commit\nmessage that quotes a forbidden command is not a command); a `git -c alias.<x>=...` whose\nvalue starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`\nfor a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a\n`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document\nread by a shell (`bash <<EOF`) is that shell's script and is checked; one read by any other\nprogram (a commit message) is data. `powershell` without `-Command` runs the rest of its line,\n`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,\nand `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a\nGraphQL query built by a command substitution are refused unread.\n  - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands\n    (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command\n    wrapped in `cd \u2026` (rule 8: one command per call; a chain once built an increment on a\n    merged branch; release A4). A pipe into a reader and a chain of reads pass.\n  - a commit or push that skips its checks: `--no-verify`, commit's `-n`, or a\n    `-c core.hooksPath=\u2026` override (rule 4; release A4), except the two snapshots the merge\n    policy allows: the pre-delegation checkpoint, whose subject starts with \"checkpoint\" and\n    names the increment (`checkpoint before TASK-nnn`, with a round or a note after it,\n    `checkpoint: \u2026 before TASK-nnn \u2026`) and carries no accept, merge or release word; and a\n    builder's hand-off (\"\u2026 hand-off\") made inside a worktree (`-C \u2026/Worktrees/\u2026`).\n  - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,\n    `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or\n    `powershell`), which would run it with the owner's real home and identity (KP-038): the\n    agent is started as `cursor-agent`, or through bridge-run.py.\n\nIt parses the command rather than matching a pattern, so chains, wrappers and quoting do\nnot hide the action, and `git commit -m \"never use --force\"` is not refused. Deny rules in\nsettings.bridge.json cover the common spellings as a second layer; this hook is the one\nthat reads the whole command.\n\nRegistered by bridge-install.py from settings.bridge.json (hooks.PreToolUse, matcher\n\"Bash|PowerShell\"). Reads the hook's JSON on stdin; exit 2 with the reason on stderr blocks\nthe call (documented), exit 0 lets it through. Fails open on anything unexpected: a guard\nthat cannot read its input never blocks the loop. ASCII-only on purpose. Never writes.\n"
+    },
+    {
+      "description": "Validate the build plan and list ready increments.",
+      "name": "plan-check.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "docs/BUILD_PLAN*.md",
+          "dest": "plan",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--plan"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "origin/main",
+          "dest": "base",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--base"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": false,
+          "dest": "no_git",
+          "help": "skip deriving merged increments from git",
+          "nargs": 0,
+          "option_strings": [
+            "--no-git"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "handoff",
+          "dest": "briefs",
+          "help": "folder of the briefs compared with their increments",
+          "nargs": null,
+          "option_strings": [
+            "--briefs"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
+      "path": "bridge/cursor-bridge/plan-check.py",
+      "positionals": [],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
+      "name": "pr-activity-check.py",
+      "path": "bridge/cursor-bridge/pr-activity-check.py",
+      "source": "docstring",
+      "usage": "pr-activity-check: prove that nobody wrote to a pull request as the owner during a run.\n\n  python ~/.claude/cursor-bridge/pr-activity-check.py <pr-number> --since <ISO-8601 UTC> [--repo owner/name]\n\nWhy (KP-032): the cross-family reviewer and the builder run as `cursor-agent` processes on\nthe owner's machine. Before release 2026.10.04a they inherited the owner's GitHub login, and\na reviewer twice posted its verdict on a pull request under the owner's name. The shim and\nbridge-run.py now withhold that login; this check is the proof, run after every Review B\nand before every merge: it lists every comment, review and review comment on the pull\nrequest created at or after --since and flags any written by the account `gh` is logged\nin as (the owner); it then reads the owner's own GitHub events since --since and flags, in\nthe same repository, what an agent would do and a supervisor would not during a review: a\ncomment or review on any other pull request or issue, a merge, a push straight to main.\nThe supervisor's own pushes to task branches and its opening of pull requests, which go on\nwhile a review runs, are not flagged. A read-only check: `gh api` GET calls only.\n\n--since must carry a time zone (`2026-10-04T13:14:33Z`): the launcher prints exactly that\nas its first stderr line, `bridge-run: started <time>Z`. A timestamp without a zone is\nrefused, because a local time read as UTC would open the window hours late (fail open).\n\nExit 0 = nothing written as the owner since --since; 1 = GATE-INTEGRITY, something was;\n2 = cannot verify (gh not logged in, API error, bad timestamp) - never treat as clean.\nWhat it cannot see: edits to an older comment, a change of title or body, a label; the\nidentity withheld from the agents (KP-032) is what stops those, this check is the proof\nfor the likely cases, not a boundary.\nASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "name": "refactor-check.py",
+      "path": "bridge/cursor-bridge/refactor-check.py",
+      "source": "docstring",
+      "usage": "refactor-check: deterministic purity check for a REFACTORING diff.\n\nA refactoring increment must keep the same functionality. Three things are\ncheckable without judgement, and this script checks them against a base ref:\n\n  1. No test file changed.  Tests pin behaviour; a refactoring diff that edits\n     one may be changing what \"correct\" means. (Characterization tests the\n     supervisor writes are committed BEFORE the base ref, so they are not in\n     the diff.)\n  2. docs/CHANGES.md did not change.  That log records behaviour changes; a\n     refactoring diff has none to record.\n  3. The diff is within the size budget one reviewer can hold well\n     (default 400 changed lines = insertions + deletions).\n\nUsage:  python refactor-check.py <base-ref> [--max-lines N] [--allow-test <path> ...] [--lane tests]\n        --allow-test lists test files the brief explicitly allowed (a mechanical\n        rename or an import path), each of which the reviewer must then read.\n        --lane tests   the TEST-INFRASTRUCTURE lane: the supervisor consolidating its own\n        test helpers. Inverts the rule - no production file may change, test files may;\n        the supervisor separately proves the collected test set is identical before and\n        after (e.g. `pytest --collect-only -q`). Still no docs/CHANGES.md change.\n\nPrints PURE or IMPURE with the reasons. Exit 0 = pure, 1 = impure, 2 = cannot\nverify (not a git repo, bad ref). ASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "name": "review-guard.py",
+      "path": "bridge/cursor-bridge/review-guard.py",
+      "source": "docstring",
+      "usage": "review-guard: the committed checkpoint a reviewer with execution runs on, snapshotted\nbefore the launch, verified and restored after it, and checked once more before the merge.\n\n  python ~/.claude/cursor-bridge/review-guard.py snapshot <nnn>          before launching Review B\n  python ~/.claude/cursor-bridge/review-guard.py verify   <nnn>          after it returns\n  python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> [<pr>]   after the review files are removed, committed and pushed\n\nWhy (release 0b review, finding 2 and its second pass): Review B keeps `--force` so it can\nrun the tests and build reproductions (the owner's decision), and it acts after Review A and\nright before the merge, so what it leaves behind has no gate after it. `git status` followed\nby `git checkout -- .` and `git clean -fd` restores tracked and untracked files only: it does\nnot see a moved HEAD, a commit, a new ref or stash, a changed `.git/config` or hook (which\nwould make the supervisor's next git command run the reviewer's program with the owner's\nidentity), or a changed ignored file (`.env`, a record a project keeps gitignored, a brief).\n\nWhat each step does:\n  snapshot  refuses a dirty tree (commit first); records HEAD, the branch, every ref, the\n            stash list, a hash of `.git/config`, of every file in the ACTIVE hooks folder\n            (`core.hooksPath`, read from the config file, or `.git/hooks`) and in\n            `.git/hooks`, and every ignored file with its size and mtime (cache folders\n            such as `.venv`, `node_modules` and `__pycache__` are skipped); writes\n            <git common dir>/bridge/review-<nnn>.json and prints that file's hash.\n  verify    reads the configuration and the hooks folders FIRST, as files, without running\n            git: a change is GATE-INTEGRITY and nothing else runs. Every git command the\n            guard runs is given `-c core.hooksPath=<an empty folder> -c core.fsmonitor=false`,\n            so no hook of the repository runs inside the guard. It then compares HEAD, the\n            branch, the local refs (heads, tags, stash) and the stashes - a difference is\n            GATE-INTEGRITY, and each ref is put back - restores the tree (`git reset --hard\n            <sha>`, `git clean -fd`, keeping the launcher's own `run/review/REVIEW-<nnn>.err`,\n            whose first line it prints), lists what it removed, and compares the ignored\n            files: a change under docs/, handoff/, run/review/ or to `.env*` is\n            GATE-INTEGRITY, any other is LEFT BEHIND. A moved remote-tracking ref (a fetch)\n            is a note. It prints the snapshot file's hash again: compare it with the one\n            `snapshot` printed, since the reviewer could rewrite the snapshot.\n  premerge  needs the verified mark `verify` wrote for this snapshot (release A1b, second and\n            third passes: Review B launched after the snapshot through the launcher and ended\n            with exit 0, the last `verify` OK; `snapshot` and `verify` remove an older mark), so a\n            merge that skipped the cross-family review has no way through; refuses a dirty\n            tree; the head about to merge must descend from the reviewed head and differ from\n            it only under run/review/ (the review files removed with `git rm`); with <pr>, the\n            pull request's head on GitHub must equal the local HEAD (push first; a branch\n            updated from main needs the reviews again). It writes the record the permission\n            guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command\n            with `--match-head-commit`.\n\nExit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);\n2 = cannot verify (no snapshot, dirty tree, git or gh failure). Never prints a value of\nanything. ASCII-only.\n\nWhat it does not cover, said plainly (KP-032): the contents of cache folders, anything\noutside the checkout (the owner's profile, the installed bridge, other projects), and a\nreviewer that deliberately reaches for the credential store. It is a guard against what a\nreviewer does in passing, not a sandbox.\n"
+    },
+    {
+      "name": "roster-check.py",
+      "path": "bridge/cursor-bridge/roster-check.py",
+      "source": "docstring",
+      "usage": "roster-check: resolve which models fill the builder / Review A / Review B roles today,\nprove three distinct families, and (optionally) prove each model answers.\n\n  python roster-check.py docs/ROSTER.json [--command \"<delegate command>\"] [--no-probe] [--out docs/ROSTER.resolved.json] [--run-log run/launcher/runs.jsonl]\n\ndocs/ROSTER.json (v2):\n{\n  \"other_pool\": \"available\" | \"exhausted\",      <- Cursor's \"Other Models\" usage pool (every\n                                                    third-party model). Set automatically by\n                                                    --record-failure, restored on reset_day, or\n                                                    by the owner (--mark-exhausted/--mark-reset).\n                                                    A probe cannot see 1% remaining.\n  \"review_a\": \"claude-opus-5-5\",                  <- Review A runs in Claude Code, not Cursor.\n  \"profiles\": [                                   <- tried in order; the first usable one wins\n    {\"name\": \"full\",   \"builder\": \"grok-4.7-high\", \"review_b\": \"gpt-5.6-sol-high\"},\n    {\"name\": \"native\", \"builder\": \"composer-2.5\",  \"review_b\": \"grok-4.7-high\"}\n  ]\n}\nA model entry is an id string or {\"model\": id, \"family\": name, \"pool\": \"native\"|\"other\"}.\nPool is inferred from the id per Cursor's docs: Grok (any effort/host prefix) and Composer are\nthe \"Cursor Models\" pool (native); every third-party model is \"Other Models\".\nA profile is skipped when other_pool is \"exhausted\" and any of its models is in the other\npool. Unless --no-probe, the builder and Review B of a candidate profile are each sent a\none-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply, or\ntimeout marks the profile unusable (this catches hard failures only, never a nearly-empty\nquota). The chosen profile's three families must be distinct. The result is written to\ndocs/ROSTER.resolved.json for the delegate and Review B commands to read.\n--record-failure <model> --stderr-file <path> [--stdout-file <path>]\n  Classify a failed cursor-agent call. <model> must be a model id of this roster (a wrong\n  argument exits 2 and changes nothing). USAGE-LIMIT (a usage/quota/limit message) or a\n  second failure of the same model within 2 hours marks the model's pool exhausted in\n  docs/ROSTER.json automatically (auto_exhausted_at / auto_exhausted_reason) and exits 3 =\n  \"re-resolve and restart the step\". A connection error (lost, reset, reconnect, 5xx, 429)\n  or a hit run limit (bridge-run's LIMIT line) is not the model's fault: exit 4 = \"retry\n  the same step once\", twice per window, then exit 5 = \"stop and tell the owner\" (no\n  switch helps a dead line). A first other failure is exit 4 too. The counts expire after\n  8 hours, longer than any run limit, and --record-success <model> clears them. An\n  automatic \"unavailable\" mark expires after 6 hours.\nThe changing state (pool, marks, counts) is kept in <git common dir>/bridge/roster-state.json,\nnever in the tracked roster, so a reset of the working tree cannot erase a switch; a roster\nfrom an older release seeds the state file once.\n--mark-exhausted   the owner said \"usage exhausted\": stamp other_pool exhausted now (UTC).\n--mark-reset       the owner said \"usage reset\": restore other_pool and clear marks now.\nAutomatic reset: \"reset_day\" (day of month, UTC; e.g. 16) in the roster. When other_pool is\nexhausted and the current UTC time is at or past 00:00 UTC of the first reset_day strictly\nafter exhausted_at, the check restores other_pool to \"available\" by itself, clears the\nunavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NOW=<ISO UTC>\noverrides \"now\" for tests.\nExit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;\n2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;\n4 = transient, retry once; 5 = repeated connection failures or time-outs, tell the owner.\nASCII-only on purpose.\n"
+    },
+    {
+      "name": "run-hidden.py",
+      "path": "bridge/cursor-bridge/run-hidden.py",
+      "source": "docstring",
+      "usage": "run-hidden: launch a console command with NO visible console window (Windows).\n\nUse it to wrap any direct-command hook entry in .cursor/hooks.json (the design\ndetector, Semgrep, a linter) so the child process cannot pop a terminal window on\nthe user's desktop. On non-Windows it is a transparent pass-through.\n\n  <python.exe> .cursor/hooks/run-hidden.py <command> [args...]\n\n- stdin (the hook's JSON payload) is inherited by the child unchanged.\n- stdout / stderr / exit code are relayed unchanged, so hook semantics are kept.\n- A .cmd/.bat executable (npx, semgrep shims) is run via cmd.exe /d /c, hidden.\n- Never use this for a process the user is meant to watch or interact with.\n\nASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "name": "scope-check.py",
+      "path": "bridge/cursor-bridge/scope-check.py",
+      "source": "docstring",
+      "usage": "\nBridge scope check - deterministic changeset-vs-brief verification.\n\nAfter a delegation (run from the clean checkpoint commit), this compares what the builder\nACTUALLY changed - derived from git, never from the builder's own summary - against the\nScope the handoff brief declared. Any changed file outside that Scope is SCOPE DRIFT, and\nit is surfaced deterministically here rather than discovered by eyeballing a diff.\n\nWhy git-derived: the builder's printed \"files I changed\" list is a self-report and has been\nwrong in practice (claimed fixes not made, unrequested edits described as requested ones).\nThe working tree is the only trustworthy manifest. Region-level drift *within* an in-scope\nfile is still diff-reviewer's judgement; this tool owns the file-level floor.\n\nUsage:\n    python scope-check.py handoff/TASK-<nnn>.md [--base <git-ref>]\n\n    --base   commit to diff against. Default: the commit that FIRST added the brief (the\n             checkpoint commits the brief; a brief fixed and committed later never moves the\n             base past the builder's commits); HEAD when the brief is not committed.\n\nOutput lines: BASE (with how it was chosen), SCOPE, NOT READ AS A PATH (a Scope bullet that\nnames no path, reported and ignored), CHANGED, BOOKKEEPING (the files a builder must write),\nRECORDS (the supervisor's record files changed only by commits that touched records alone\nsince the checkpoint: not drift; a commit that mixes code with a record is the builder's),\nIN SCOPE, SCOPE DRIFT, VERDICT. The Scope is the brief's top-level bullets up to the first\nline that is neither a bullet nor blank (a bold note, prose): sub-bullets are not paths.\n\nExit codes:\n    0  every changed file is inside the declared Scope\n    1  SCOPE DRIFT - one or more changed files are outside Scope (listed on stdout)\n    2  cannot verify (brief missing, no Scope section, or git failed) - treat as\n       needs-attention; do NOT proceed as if scope were clean.\n\nScope entries (bullets under \"## Scope\", up to the next heading of any level) may be exact\nfiles, directories (trailing \"/\" or a bare directory name), or globs (* and ?; brackets are\nliteral, as in a route folder `[id]`). A bullet may name several paths (commas, \"and\"),\nquoted or in backticks; prose after a path is dropped; an ellipsis cannot be verified.\nThe bookkeeping files a builder must write (docs/BUILDER_NOTES.md, docs/BOUNDARY_VIOLATIONS.md,\nanything under run/, its report file handoff/<brief>-rN-report.md) are never drift. Paths are compared with forward slashes.\n"
+    },
+    {
+      "name": "session-start.py",
+      "path": "bridge/cursor-bridge/session-start.py",
+      "source": "docstring",
+      "usage": "session-start: a Claude Code SessionStart hook (matchers: compact, resume, fork) that puts\nthe supervisor's core rules back after a compaction, a resume or a fork (KP-035).\n\nWhy: when a session's context is compacted, Claude Code re-attaches only the first part of\nan invoked command (measured: 20,000 of the supervisor's 150,000 characters, 13%), so the\nsupervisor carried on for hours without its loop, its gate and its standing rules, and the\nrecord shows the rule-breaking that followed.\n\nClaude Code caps every hook's plain stdout at 10,000 characters and, above that, replaces it\nwith a file path and a 2,000-character preview. The two things this hook prints do not fit\ntogether under that cap on a real project (the 0b review measured 9,841 characters, and the\npart that was cut was the pointers), so the bridge registers the hook TWICE for the same\nevent, each run printing one part under its own cap:\n\n  --part pointers   the project's phase from docs/PROJECT_STATUS.md (the \"awaiting\" text\n                    capped), the exact sections of supervisor.md to re-read before the next\n                    action with their line ranges, the conventions that phase relies on, and\n                    whether to continue or to wait for the owner;\n  --part digest     the digest at the top of ~/.claude/commands/supervisor.md (between the\n                    markers <!-- digest:start --> and <!-- digest:end -->), the one text the\n                    maintainer keeps as the condensed core.\n\nWithout --part both are printed (tests, manual runs). It prints nothing outside a bridge\nproject (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,\nor a worktree). It FAILS OPEN on purpose: a session that is not the project's supervisor\n(a review or a planning session opened in a project folder) is told to ignore the message,\nbecause a gate on the transcript silenced the hook on two of three live supervisor sessions\n(one invoked through the Skill tool, one continuing an earlier transcript; the 0b review's\nsecond pass, S1), and a silent supervisor is the failure this hook exists to prevent. A\nforked session is told not to continue the loop (S8). It never blocks (exit 0 always), never\nwrites anything, and keeps each part under the cap. ASCII-only apart from what it quotes.\n"
+    },
+    {
+      "name": "shell-guard.py",
+      "path": "bridge/cursor-bridge/shell-guard.py",
+      "source": "docstring",
+      "usage": "\nBridge shell guard \u2014 a fail-closed `beforeShellExecution` hook for the headless\nCursor builder (cursor-agent). It runs BEFORE the builder executes any shell command\nand DENIES a tight, high-confidence set of genuinely dangerous / irreversible /\ndata-exfil commands. Everything else passes untouched.\n\nThis is the ONE deliberately fail-closed hook in the bridge (the linter/design/security\ndetect hooks are advisory/fail-open). Wire it in `.cursor/hooks.json` with\n`\"failClosed\": true` so a crash/timeout/bad-JSON BLOCKS \u2014 Cursor has a documented bug\nwhere a malformed hook response silently ALLOWS, so this script also defaults to DENY on\nany internal error (belt-and-suspenders).\n\nContract (Cursor hooks):\n  - stdin  : JSON payload for the beforeShellExecution event (carries the command string).\n             On Windows, Cursor prefixes it with a UTF-8 BOM \u2014 decode utf-8-sig.\n  - stdout : {\"permission\": \"allow\"|\"deny\", \"user_message\": ..., \"agent_message\": ...}\n  - exit   : 0 = proceed, 2 = block (equivalent to permission:\"deny\").\n\nScope note: this governs the BUILDER's shell (cursor-agent). The supervisor's own\n`git reset --hard HEAD` recovery runs through Claude's Bash tool, NOT cursor-agent, so it\nis unaffected \u2014 which is why blocking destructive git here is safe.\n\nThe deny-list below is the auditable policy. Keep it tight: an over-broad guard that\nstalls normal builds is the fastest way to get a safety control switched off.\n"
+    },
+    {
+      "description": "Compare local <base> with the remote's <base>.",
+      "name": "sync-check.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": false,
+          "dest": "apply",
+          "help": "fast-forward local <base> when BEHIND",
+          "nargs": 0,
+          "option_strings": [
+            "--apply"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": false,
+          "dest": "strict",
+          "help": "project end: OFFLINE/UNPUBLISHED fail",
+          "nargs": 0,
+          "option_strings": [
+            "--strict"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "main",
+          "dest": "base",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--base"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "origin",
+          "dest": "remote",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--remote"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
+      "path": "bridge/cursor-bridge/sync-check.py",
+      "positionals": [],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
+      "name": "wake-timer.py",
+      "path": "bridge/cursor-bridge/wake-timer.py",
+      "source": "docstring",
+      "usage": "wake-timer: a background command that ends at an agent's ceiling, so that its completion\nwakes the session (release A4, KP-043).\n\n  python wake-timer.py <seconds> \"<what it bounds>\"\n\nStarted in the background (the app's run-in-background Bash), it sleeps for <seconds> and\nprints one line. A scheduled wake-up (CronCreate) does not fire while a background agent is\nrunning, since the session is not idle for the scheduler (proven 2026-10-11, ISS-021 on\nreAngle); a background command's completion notification does arrive, so this is the bound\nof every waited-on background agent. The loop guard counts an agent as bounded only while a\ntimer that ends no later than the agent's ceiling is running. Windowless: spawns nothing.\nExit 0 after the sleep; 2 on bad arguments.\n"
+    },
+    {
+      "name": "windowless-check.py",
+      "path": "bridge/cursor-bridge/windowless-check.py",
+      "source": "docstring",
+      "usage": "windowless-check: flag console subprocess launches that would pop a terminal\nwindow on Windows.\n\nScans hook scripts and agent tooling (default: .cursor/hooks) plus any extra paths\ngiven, and reports every Python subprocess.* / os.system / os.popen call and every\nNode child_process spawn/exec call that does not carry the windowless flag:\n\n  Python : creationflags=subprocess.CREATE_NO_WINDOW   (0 on non-Windows)\n  Node   : { windowsHide: true }\n\nA call may be exempted with a comment on the same line or the line above:\n\n  # windowless: visible-ok <reason the window serves the user>\n  // windowless: visible-ok <reason>\n\nSignal caveat: a call that sets CREATE_NEW_PROCESS_GROUP (a CTRL_BREAK stop path)\nis reported as NOTE, not FAIL, when it lacks CREATE_NO_WINDOW - hiding it must be\nverified against the stop path, not flipped blindly.\n\nExit 0 = clean (NOTEs allowed), 1 = at least one FAIL, 2 = nothing scanned.\nUsage: python windowless-check.py [path ...]\nASCII-only on purpose (cp1252 consoles).\n"
+    },
+    {
+      "description": "workflow-check: keep conditional workflows honest against the open list and the extension-point registry (R-014, R-033).\n\n  python workflow-check.py [--open-list FILE] [--registry FILE] [--status FILE]... [ROOT ...]\n\nOne program, run at three times: at intake (the project's status file), at every bridge release\n(CI, over the bridge's workflow folder and the sample fixtures) and at every calibration (the\ninstalled workflow folder and the project's status file).\n\nROOT is zero or more workflow folders. Files under ROOT/types/ and ROOT/traits/ are the\nconditional workflows; nothing else in a root is read. With no ROOT and no --status, the root\nis the workflow folder beside this program. With --status and no ROOT, only the status files\nare checked. --open-list defaults to workflow/open-list.md beside this program, and --registry\nto workflow/extension-points.md beside this program. --status FILE may be repeated. The same\ntwo tables are used for every root and every status file of one run.\n\nFinding lines, then one RESULT line:\n  FAIL (a)        an Add at or Set at names a point key that is not a Key of the registry\n  FAIL (b)        a trait file contains a Set at or a Replace heading\n  FAIL (c)        a Replace names a module that is missing or whose Replaceable is not yes\n  FAIL (d)        a sub-workflow's type folder, type file, or sub-type does not match\n  FAIL (e)        a Workflows line's product type, sub-type, or part name is wrong\n  FAIL (f)        a Workflows line names a product type or sub-type whose Written is not yes\n  FAIL (set)      a Set at names a point whose Changes cell does not contain set\n  FAIL (kind)     a delivery-kind heading or intake.delivery-kind value is missing or unlisted\n  FAIL (unknown)  a file key or a Workflows name is not in the open list\n  FAIL (form)     a file, a change heading, or a Workflows line has the wrong shape\n  FLAG (trait)    a trait on a Workflows line is not yet written; flagged, work continues (non-fatal)\n\nExit 0 when no FAIL line was printed (FLAG lines may have been printed). Exit 1 when at least\none FAIL line was printed. Exit 2 when the check cannot run: a ROOT that is not a folder, a\nfolder under a root that cannot be listed, a types/ or traits/ path that cannot be examined,\nan open list, registry, or status file that does not\nexist or cannot be read as UTF-8, a required heading or required column missing, a table with\nno separator row, or a table row whose cell count differs from its header. On exit 2 the\nprogram prints ERROR lines and RESULT: not checked, and no traceback. A command-line usage\nerror also exits 2; the usage line argparse prints stays as it is, argparse's message is\nescaped the same way as a printed field, and the last line on standard output is\nRESULT: not checked.\n",
+      "name": "workflow-check.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "<bridge folder>/workflow/open-list.md",
+          "dest": "open_list",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--open-list"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": "<bridge folder>/workflow/extension-points.md",
+          "dest": "registry",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--registry"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": [],
+          "dest": "status",
+          "help": null,
+          "nargs": null,
+          "option_strings": [
+            "--status"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
+      "path": "bridge/cursor-bridge/workflow-check.py",
+      "positionals": [
+        {
+          "choices": null,
+          "default": null,
+          "dest": "roots",
+          "help": null,
+          "nargs": "*",
+          "option_strings": [],
+          "required": false,
+          "type": null
+        }
+      ],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
+      "name": "worktree-teardown.py",
+      "path": "bridge/cursor-bridge/worktree-teardown.py",
+      "source": "docstring",
+      "usage": "worktree-teardown: remove a git worktree safely (supervisor rule 19, release A1b).\n\n  python ~/.claude/cursor-bridge/worktree-teardown.py <worktree path> [--dry-run]\n\n`git worktree remove` follows a gitignored junction or symbolic link inside the worktree\n(a per-worktree venv, a linked node_modules) and deletes the real target, in an ordinary\nremoval as in a forced one (Git for Windows 2.53, verified 2026-10-06); one project lost\nits main checkout's installed packages that way, and forced the removal fourteen times in\nfour days. The permission guard refuses the git command; this program is the one way:\n\n  1. every entry inside the folder is looked at without following links, whether git still\n     lists it or not (a leftover of a failed removal too); a junction or a symbolic link\n     anywhere inside refuses the teardown and is listed with its target, so the link can be\n     removed by itself first (rmdir on the link, never through it);\n  2. the path must be a worktree of the repository the current folder belongs to: a leftover\n     (a folder whose .git file points to a git folder that is gone, or under Worktrees/) is\n     named as such, and a folder that holds a registered worktree is refused;\n  3. `git worktree remove <path>` without --force; git's own refusal (a dirty or locked\n     worktree) is printed and ends the program, because forcing is what destroys data;\n  4. `git worktree prune`, and the path must be gone.\n\nExit 0 = removed; 1 = git refused (commit or clean the worktree, never force); 2 = refused\nhere (not a worktree, or a link inside). ASCII-only on purpose (cp1252 consoles).\n"
+    }
+  ]
+}

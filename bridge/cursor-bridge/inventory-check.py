@@ -232,14 +232,18 @@ def judge_workflows_line(path, text):
         return "not-checked", [ascii_text("%s: %s" % (shown, type(err).__name__))]
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(description="Check the project's current-state record.")
     ap.add_argument("--inventory", default="docs/INVENTORY.md")
     ap.add_argument("--status", default="docs/PROJECT_STATUS.md")
     ap.add_argument("--changes", default="docs/CHANGES.md")
     ap.add_argument("--max-lines", type=int, default=120)
     ap.add_argument("--max-chars", type=int, default=12000)
-    a = ap.parse_args()
+    return ap
+
+
+def main():
+    a = build_parser().parse_args()
     fails, notes = [], []
 
     # 1. status cap
