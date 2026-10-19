@@ -887,6 +887,44 @@ Compare local <base> with the remote's <base>.
 - `--base`; default: "main"; required: false
 - `--remote`; default: "origin"; required: false
 
+## trace-check.py
+
+Path: `bridge/cursor-bridge/trace-check.py`
+
+```
+trace-check: mechanical traceability from a pinned pre-split baseline (R-029).
+
+  python trace-check.py [--repo DIR] [--map]
+
+Compares every passage unit of bridge/commands/supervisor.md at the pinned baseline
+commit with the working tree: the core and every *.md under bridge/cursor-bridge/workflow/
+except trace-exceptions.md. Module files under workflow/phases/, workflow/types/, and
+workflow/traits/ are checked for undeclared new text. Exceptions are listed in
+workflow/trace-exceptions.md.
+
+Finding lines, then TRACED and RESULT:
+  FAIL (dropped)  a baseline passage is missing everywhere
+  FAIL (copy)     a passage appears more often than at baseline (excused sections excluded)
+  FAIL (new)      undeclared text in a module file
+  FAIL (ref)      a ~/.claude/... reference does not resolve under bridge/
+  FAIL (cite)     a cited section heading does not resolve in any current home
+  NOTE (reword)   a dropped passage excused by a reword entry
+  MAP             with --map, each baseline passage and its current home(s)
+
+Exit 0 when no FAIL line was printed. Exit 1 when at least one FAIL was printed.
+Exit 2 when the check cannot run: not a git work tree, git unavailable, missing or
+invalid trace-baseline.txt, baseline commit absent (a shallow clone is the likely cause),
+missing supervisor.md, invalid trace-exceptions.md, a home not readable as UTF-8, or a
+usage error. Then ERROR lines and RESULT: not checked are printed, with no traceback.
+The check needs the baseline commit's object history.
+```
+
+### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--repo`; default: null; required: false
+- `--map`; default: false; required: false
+
 ## wake-timer.py
 
 Path: `bridge/cursor-bridge/wake-timer.py`

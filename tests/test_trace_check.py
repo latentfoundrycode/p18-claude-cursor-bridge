@@ -14,7 +14,6 @@ import sys
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 TRACE_CHECK = REPO / "bridge" / "cursor-bridge" / "trace-check.py"
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 DASH = chr(0x2014)
 INTAKE = "Phase 1 " + DASH + " Intake"
 CORE = "bridge/commands/supervisor.md"
@@ -47,7 +46,8 @@ EXCEPTIONS = "# Trace exceptions\n\nEntries are appended by the increment that r
 def git(root, *args):
     p = subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
                         "-c", "core.autocrlf=false", *args],
-                       capture_output=True, text=True, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
+                       capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     assert p.returncode == 0, p.stderr
     return p.stdout.strip()
 
@@ -89,7 +89,7 @@ def entries(root, *lines):
 
 def run(root, *args):
     p = subprocess.run([sys.executable, str(TRACE_CHECK), "--repo", str(root), *args], capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, creationflags=NO_WINDOW,
+                       encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                        timeout=120)
     assert "Traceback" not in p.stderr, p.stderr
     return p.returncode, p.stdout.splitlines()
@@ -246,6 +246,46 @@ def test_r029_reword_entries_excuse_the_vanished_and_the_new_text(tmp_path):
     assert any(l.startswith("TRACED: ") and l.endswith(" dropped, 1 excused") for l in lines), lines
 
 
+def test_r029_a_reword_entry_names_the_baseline_section_even_when_the_core_renamed_it(tmp_path):
+    """Requirement 6: a reword entry's vanished text is looked up in the baseline file's section; here the core has
+    no section of that name any more (the builder's mutation (e) survived without this case)."""
+    root = make_repo(tmp_path)
+    renamed = BASE_CORE.replace("## " + INTAKE + "\n", "## Phase 1 " + DASH + " Start\n")
+    write(root, CORE, renamed.replace("what the software does", "what the product does"))
+    rc, lines = run(root)
+    assert rc == 1 and [l.split(" ")[1] for l in fails(lines)] == ["(dropped)"], lines
+    entries(root, "- reword TASK-010 %s %s" % (CORE, INTAKE))
+    rc, lines = run(root)
+    assert rc == 0 and fails(lines) == [], lines
+    assert any(l.startswith("NOTE (reword TASK-010) %s: Phase 1 \\u2014 Intake - " % CORE) for l in lines), lines
+
+
+def test_r029_a_reword_entry_for_another_file_does_not_excuse_a_core_drop(tmp_path):
+    """Requirement 6: a reword entry excuses vanished text only in the section of the baseline file it names; an entry
+    naming a module, under the core's heading text, excuses nothing in the core."""
+    root = make_repo(tmp_path)
+    write(root, CORE, BASE_CORE.replace("what the software does", "what the product does"))
+    entries(root, "- reword TASK-010 %sintake.md %s" % (PHASES, INTAKE))
+    rc, lines = run(root)
+    assert rc == 1 and [l.split(" ")[1] for l in fails(lines)] == ["(dropped)"], lines
+
+
+def test_r029_module_text_from_any_baseline_home_is_not_new(tmp_path):
+    """Requirement 5: new text is judged against the units of all baseline homes, the workflow files included, not
+    the core alone (the builder's mutation (f) survived without this case)."""
+    root = make_repo(tmp_path)
+    write(root, PHASES + "intake.md", "# Intake\n\nThe open list names every product type.\n")
+    rc, lines = run(root)
+    assert rc == 0 and fails(lines) == [], lines
+
+
+def test_r029_a_word_ending_in_see_per_or_under_is_not_a_citation(tmp_path):
+    root = make_repo(tmp_path)
+    write(root, CORE, BASE_CORE + "\nWe understand \"No such section\" and hyper \"Nor this\" and foresee \"Nor that\".\n")
+    rc, lines = run(root)
+    assert rc == 0 and fails(lines) == [], lines
+
+
 def test_r029_a_new_entry_excuses_new_text_but_not_a_dropped_passage(tmp_path):
     root = make_repo(tmp_path)
     write(root, PHASES + "intake.md", "# Intake\n\nA passage no baseline holds.\n")
@@ -270,7 +310,8 @@ def test_r029_a_missing_baseline_commit_is_not_checked(tmp_path):
     root = make_repo(tmp_path)
     write(root, "bridge/cursor-bridge/workflow/trace-baseline.txt", "0" * 40 + "\n")
     rc, lines = run(root)
-    assert rc == 2 and lines[-1] == "RESULT: not checked" and any(l.startswith("ERROR: ") for l in lines), lines
+    assert rc == 2 and lines[-1] == "RESULT: not checked", lines
+    assert any(l.startswith("ERROR: ") and "shallow clone" in l for l in lines), lines   # Requirement 9 names the cause
     assert not fails(lines), lines
 
 
