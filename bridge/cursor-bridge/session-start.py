@@ -45,11 +45,16 @@ refuses that candidate. A module reached through a linked ``phases/`` folder or 
 still named but its pointer lines are not read. The open list and registry are read only when
 ``workflow/``, ``workflow/open-list.md`` and ``workflow/extension-points.md`` are not links.
 
-Failing open: if the installed workflow-check.py cannot be loaded, cannot be used at run time
-(``cannot be used`` and the exception's type name), or the open list or registry cannot be
-read, no conditional file and no pointer-line file is named; one plain line states what could
-not be read (only when a phase module file exists or a classified Workflows line needed that
-read). A path returned by the checker is never printed as given. The hook still never blocks.
+Failing open: if the installed workflow-check.py cannot be loaded (``cannot be loaded`` and
+the exception's type name or ``an exception``), cannot be used at run time (``cannot be used``
+and the type name or ``an exception``), reports ``an unexpected table error``, says ``its
+tables are not at their installed paths``, or a table file ``is a link``, or the open list or
+registry cannot be read, no conditional file and no pointer-line file is named; one plain line
+states what could not be read (only when a phase module file exists or a classified Workflows
+line needed that read). A path returned by the checker is never printed; a reason or exception
+type name appears only in the plain character forms above. The hook guards against a partial,
+mismatched or hand-edited install, not a hostile checker, which runs in-process and could write
+to its output directly. The hook still never blocks.
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
@@ -99,6 +104,9 @@ OPEN_SHOWN = WORKFLOW_PREFIX + "open-list.md"
 REG_SHOWN = WORKFLOW_PREFIX + "extension-points.md"
 POINTER_PATH = re.compile(r"^[a-z0-9-]+(/[a-z0-9-]+)*\.md$")
 KEY_PATTERN = re.compile(r"^[a-z0-9-]+$")
+PLAIN_REASON = re.compile(r"[A-Za-z0-9 #().,'-]+")
+PLAIN_TYPE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+TABLES_NOT_INSTALLED = "%s: cannot be used (its tables are not at their installed paths)" % CHECKER_SHOWN
 PROJECT_END_NOTE = "(read at the close of the plan's last stage)"
 TRAITS_MARK = "; traits: "
 ARROW = "\u2192"
@@ -191,18 +199,35 @@ def load_checker_module():
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
     except (Exception, SystemExit) as err:
-        return None, "%s: cannot be loaded (%s)" % (CHECKER_SHOWN, type(err).__name__)
+        return None, "%s: cannot be loaded (%s)" % (CHECKER_SHOWN, safe_exc_type_name(err))
     finally:
         sys.dont_write_bytecode = previous
     return mod, None
 
 
 def safe_reason(reason):
-    if reason is None:
-        return "cannot be read"
-    if any(c in reason for c in ("/", "\\", ":")):
+    if not isinstance(reason, str) or not PLAIN_REASON.fullmatch(reason):
         return "cannot be read"
     return reason
+
+
+def safe_exc_type_name(err):
+    name = type(err).__name__
+    if PLAIN_TYPE_NAME.fullmatch(name):
+        return name
+    return "an exception"
+
+
+def installed_table_abspath(filename):
+    return os.path.normcase(os.path.abspath(os.path.join(workflow_root(), filename)))
+
+
+def tables_at_installed_paths(wc):
+    if installed_table_abspath("open-list.md") != os.path.normcase(os.path.abspath(wc.DEFAULT_OPEN)):
+        return False
+    if installed_table_abspath("extension-points.md") != os.path.normcase(os.path.abspath(wc.DEFAULT_REGISTRY)):
+        return False
+    return True
 
 
 def table_file_shown(wc, path):
@@ -451,30 +476,33 @@ def pointers_part(status, source):
                 read_error = load_err
             else:
                 try:
-                    link_err = workflow_table_link_error(wc)
-                    if link_err:
-                        read_error = link_err
+                    if not tables_at_installed_paths(wc):
+                        read_error = TABLES_NOT_INSTALLED
                     else:
-                        tables, table_err = load_tables_from_checker(wc)
-                        if table_err:
-                            read_error = table_err
+                        link_err = workflow_table_link_error(wc)
+                        if link_err:
+                            read_error = link_err
                         else:
-                            for key in module_keys:
-                                block = []
-                                if can_read_module_pointers(wc, key):
-                                    mod_path = phase_module_installed(key)
-                                    text, _shown, err = wc.read_utf8(mod_path)
-                                    if err is None:
-                                        for rel in pointer_paths_from_module(text, wc):
-                                            shown = PHASE_PREFIX + rel
-                                            if shown not in printed_paths:
-                                                printed_paths.add(shown)
-                                                block.append("  - %s" % shown)
-                                pointer_blocks.append(block)
-                            conditional_lines = ["  - %s" % p for p in collect_conditional_files(
-                                wc, tables, module_keys, status, printed_paths)]
+                            tables, table_err = load_tables_from_checker(wc)
+                            if table_err:
+                                read_error = table_err
+                            else:
+                                for key in module_keys:
+                                    block = []
+                                    if can_read_module_pointers(wc, key):
+                                        mod_path = phase_module_installed(key)
+                                        text, _shown, err = wc.read_utf8(mod_path)
+                                        if err is None:
+                                            for rel in pointer_paths_from_module(text, wc):
+                                                shown = PHASE_PREFIX + rel
+                                                if shown not in printed_paths:
+                                                    printed_paths.add(shown)
+                                                    block.append("  - %s" % shown)
+                                    pointer_blocks.append(block)
+                                conditional_lines = ["  - %s" % p for p in collect_conditional_files(
+                                    wc, tables, module_keys, status, printed_paths)]
                 except (Exception, SystemExit) as err:
-                    read_error = "%s: cannot be used (%s)" % (CHECKER_SHOWN, type(err).__name__)
+                    read_error = "%s: cannot be used (%s)" % (CHECKER_SHOWN, safe_exc_type_name(err))
                     pointer_blocks = []
                     conditional_lines = []
         if not pointer_blocks:

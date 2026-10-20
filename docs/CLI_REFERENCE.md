@@ -853,11 +853,16 @@ refuses that candidate. A module reached through a linked ``phases/`` folder or 
 still named but its pointer lines are not read. The open list and registry are read only when
 ``workflow/``, ``workflow/open-list.md`` and ``workflow/extension-points.md`` are not links.
 
-Failing open: if the installed workflow-check.py cannot be loaded, cannot be used at run time
-(``cannot be used`` and the exception's type name), or the open list or registry cannot be
-read, no conditional file and no pointer-line file is named; one plain line states what could
-not be read (only when a phase module file exists or a classified Workflows line needed that
-read). A path returned by the checker is never printed as given. The hook still never blocks.
+Failing open: if the installed workflow-check.py cannot be loaded (``cannot be loaded`` and
+the exception's type name or ``an exception``), cannot be used at run time (``cannot be used``
+and the type name or ``an exception``), reports ``an unexpected table error``, says ``its
+tables are not at their installed paths``, or a table file ``is a link``, or the open list or
+registry cannot be read, no conditional file and no pointer-line file is named; one plain line
+states what could not be read (only when a phase module file exists or a classified Workflows
+line needed that read). A path returned by the checker is never printed; a reason or exception
+type name appears only in the plain character forms above. The hook guards against a partial,
+mismatched or hand-edited install, not a hostile checker, which runs in-process and could write
+to its output directly. The hook still never blocks.
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
