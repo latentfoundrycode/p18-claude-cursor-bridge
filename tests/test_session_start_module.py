@@ -716,13 +716,21 @@ def test_r005_a_pointer_path_is_taken_as_written_between_separators(tmp_path, ho
 def test_r005_the_docstring_states_the_grammar_and_the_streams_as_the_code_reads_them():
     """FIX-003: the docstring says what the code does after the fix (docs/HARDENING.md, Stage B3, TASK-010 with
     TASK-015: the security audit's lead that "what the checker prints is discarded" read wider than the two streams
-    the redirection covers, and the grammar's whitespace rule)."""
+    the redirection covers, and the grammar's whitespace rule). FIX-003 r2 (Review A's should-fix and considers): the
+    old wording is gone, the non-str sentence names only the module lines the hook checks, and the edited paragraphs
+    keep the docstring's wrap of at most 95 characters a line."""
     import ast
-    doc = re.sub(r"\s+", " ", ast.get_docstring(ast.parse(open(PROG, encoding="utf-8").read())))
+    raw = ast.get_docstring(ast.parse(open(PROG, encoding="utf-8").read()), clean=False)
+    doc = re.sub(r"\s+", " ", raw)
     assert ("Each path is taken exactly as written between separators (only whitespace at the end of the line is "
             "ignored) and must match") in doc
     assert "what the checker prints through sys.stdout and sys.stderr is discarded" in doc
-    assert "A line the checker's file_lines gives that is not an exact str makes the checker unusable" in doc
+    assert ("A line of a phase module file that the checker's file_lines gives and that is not an exact str makes "
+            "the checker unusable (``cannot be used (TypeError)``).") in doc
+    assert "ignoring trailing whitespace on the line" not in doc
+    assert "what the checker prints is discarded" not in doc
+    assert "A line the checker's file_lines gives that is not" not in doc
+    assert max(len(line) for line in raw.splitlines()) <= 95
 
 
 def test_r005_what_the_checker_writes_is_not_the_hooks_output(tmp_path, home):
