@@ -88,12 +88,20 @@ def test_r005_the_table_maps_every_template_phase_value():
     assert sorted(TEMPLATE_PHASES) == sorted(EXPECTED), TEMPLATE_PHASES
 
 
+# the files a module's own pointer lines name after it, in the installed bridge (TASK-012: the interface variants)
+POINTED = {
+    "interface": ["interface/mockups.md", "interface/command-design.md", "interface/contract-design.md",
+                  "interface/playable-prototype.md"],
+}
+IFACE = [P + "interface.md"] + [P + f for f in POINTED["interface"]]
+
+
 @pytest.mark.parametrize("phase", sorted(EXPECTED))
 def test_r005_each_phase_names_its_modules_in_order_and_its_conventions(tmp_path, home, phase):
     modules, convs = EXPECTED[phase]
     out = pointers(project(tmp_path, "Phase: %s (Stage 2)" % phase, "Workflows: not yet classified"), home)
     assert "BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:" in out, out
-    assert named(out) == [P + m + ".md" for m in modules], out
+    assert named(out) == [P + f for m in modules for f in [m + ".md"] + POINTED.get(m, [])], out
     assert conventions(out) == convs, out
     assert "lines " not in out, "no line ranges: a module is read whole"
     assert "Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41)." in out
@@ -147,8 +155,8 @@ def test_r034_the_conditional_files_follow_the_order_additions_apply_in(tmp_path
     is not their alphabetical order)."""
     conditionals(home)
     out = pointers(project(tmp_path, "Phase: mockups", LINE), home)
-    assert named(out) == [P + "interface.md", W + "types/host-extension/claude-code-extension.md",
-                          W + "traits/installable.md", W + "traits/external-services.md"], out
+    assert named(out) == IFACE + [W + "types/host-extension/claude-code-extension.md",
+                                   W + "traits/installable.md", W + "traits/external-services.md"], out
 
 
 def test_r005_a_file_two_parts_share_is_named_once_in_the_first_parts_place(tmp_path, home):
@@ -175,15 +183,15 @@ def test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_modul
     write(home, "phases/delegation-loop/merge.md", "## Merge\n")
     write(home, "phases/delegation-loop/inspect.md", "## Inspect\n")
     interface = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "interface.md")
-    interface.write_text(interface.read_text(encoding="utf-8") + "\nVariants: interface/mockups.md; interface/command-design.md\n",
+    # a module of its own, its Variants: line in another order than the installed module's (TASK-012), so the order
+    # printed is the order written
+    interface.write_text("## Phase 3 — Interface\n\nVariants: interface/command-design.md; interface/mockups.md\n",
                          encoding="utf-8")
-    write(home, "phases/interface/mockups.md", "## Mockups\n")
-    write(home, "phases/interface/command-design.md", "## Command design\n")
     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/merge.md", P + "delegation-loop/inspect.md",
                           P + "reflection.md", P + "project-end.md"], out
     out = pointers(project(tmp_path, "Phase: mockups", "Workflows: not yet classified"), home)
-    assert named(out) == [P + "interface.md", P + "interface/mockups.md", P + "interface/command-design.md"], out
+    assert named(out) == [P + "interface.md", P + "interface/command-design.md", P + "interface/mockups.md"], out
 
 
 def test_r005_a_pointer_line_names_no_file_outside_its_module_folder(tmp_path, home):
@@ -441,9 +449,9 @@ def test_r005_a_folder_link_on_the_way_to_a_conditional_file_names_nothing(tmp_p
     shutil.move(str(workflow.joinpath(*linked.split("/"))), str(outside))
     _link_folder(workflow.joinpath(*linked.split("/")), outside)
     out = pointers(project(tmp_path, "Phase: mockups", LINE), home)
-    expected = {"types": [P + "interface.md", W + "traits/installable.md", W + "traits/external-services.md"],
-                "traits": [P + "interface.md", W + "types/host-extension/claude-code-extension.md"],
-                "types/host-extension": [P + "interface.md", W + "traits/installable.md", W + "traits/external-services.md"]}
+    expected = {"types": IFACE + [W + "traits/installable.md", W + "traits/external-services.md"],
+                "traits": IFACE + [W + "types/host-extension/claude-code-extension.md"],
+                "types/host-extension": IFACE + [W + "traits/installable.md", W + "traits/external-services.md"]}
     assert named(out) == expected[linked], out
 
 

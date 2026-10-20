@@ -1,5 +1,15 @@
 ## Phase 4 — Build plan
 
+### What must survive a compaction
+
+After a compaction or a resume in this phase, read these before your next action:
+
+- this module, whole;
+- the approved design and what the interface phase approved: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`, `docs/diagrams/INDEX.md` and every diagram it lists, and the approved artifacts under `docs/design/` and `docs/mockups/`, whole: every increment satisfies requirements of the register and cites what it implements;
+- `docs/BUILD_PLAN.md` as drafted so far, whole, and each Issues file the owner named at Step 0, whole (its path stands in the plan's Prior-project lessons section, written there as soon as the owner names it);
+- `docs/DESIGN_CRITIQUE.md`, whole, while the plan critique runs, with `docs/RUN_PARAMETERS.md` and the round's files under `run/review/` (`DESIGN-plan-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in flight: the plan critique counts its rounds as the design critique does;
+- `docs/PROJECT_STATUS.md`, whole: its `Awaiting user on:` line says whether Step 0's question or the plan's gate waits for the owner.
+
 ### Step 0 — Prior-project lessons (ask before drafting)
 
 Before you draft the plan, ask the user — once, explicitly — whether an earlier project
@@ -108,3 +118,10 @@ what was accepted with its reason) as one of its separate decisions.
 Its second line, right after the approval question, is the model switch that follows
 approval: *on approval, set this session to Opus 5.5 in the model menu* (rule 48) — the run
 parameters and everything after them run on it.
+
+## Extension points
+
+This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
+
+- `planning.stages` — stages every plan for the part must hold, such as a packaging stage, written into the plan beside the stages "The plan" asks for, each with its increments and its `Demonstration:` line.
+- `planning.critic-lenses` — lenses the plan critique adds to those "The plan" lists, made once for the whole project and given to both critics with the plan.

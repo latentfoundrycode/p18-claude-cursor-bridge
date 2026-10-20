@@ -18,11 +18,12 @@ PHASES = os.path.join(BRIDGE, "cursor-bridge", "workflow", "phases")
 REGISTRY = os.path.join(BRIDGE, "cursor-bridge", "workflow", "extension-points.md")
 INSTALL = os.path.join(BRIDGE, "cursor-bridge", "bridge-install.py")
 
-# each module and the heading it opens with: the phase's own heading from the core, kept (project end has its own)
+# each module and the heading it opens with: the phase's own heading from the core, kept (project end has its own,
+# and the interface module names the phase since TASK-012 made its mockups one of four variants)
 MODULES = {
     "intake": "## Phase 1 — Intake",
     "design": "## Phase 2 — Design",
-    "interface": "## Phase 3 — UI mockups",
+    "interface": "## Phase 3 — Interface",
     "planning": "## Phase 4 — Build plan",
     "run-parameters": "## Run parameters — asked once, after the plan is approved, before configuration",
     "configuration": "## Phase 5 — Configure the Cursor build environment",
@@ -124,18 +125,21 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 
 # the traceability check's result on this tree, every excuse it uses named (PR #52's gate, Review A, the carve's part:
 # a reword entry excuses a whole section, so a later drop there would show only as a NOTE with RESULT: OK)
-TRACED = "TRACED: 424 passages of baseline 0a186da; 157 in supervisor.md, 263 under workflow/, 0 dropped, 4 excused"
+# (TASK-012: the design gate's sentence reworded, "the UI mockups" -> "the interface phase", so one passage moves from
+# traced to excused; the mockup passages traced in their new home, workflow/phases/interface/mockups.md)
+TRACED = "TRACED: 424 passages of baseline 0a186da; 157 in supervisor.md, 262 under workflow/, 0 dropped, 5 excused"
 NOTES = [
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
+    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
 ]
 
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the four passages of the three rewords this carve declares, so an increment that excuses anything more changes this
+    excused ones exactly the five passages of the four rewords the carve and TASK-012 declare, so an increment that excuses anything more changes this
     test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))

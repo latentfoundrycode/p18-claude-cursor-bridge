@@ -105,7 +105,7 @@ Every project runs the main workflow. What differs by product lives in condition
 | **Sub-workflow** | For one sub-type: a more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
 | **Trait additions** | For one trait: what it adds, whatever the product type | Their additions to the current phase, when the part has the trait |
 
-Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in or a conditional workflow that does not apply, except a module "The phase modules" says is read outside its own phase. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
+Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, whose module declares its four variants (mockups, command design, contract design, a playable prototype), each in a file of its own; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in or a conditional workflow that does not apply, except a module "The phase modules" says is read outside its own phase. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
 
 **Three kinds of change.** Each change a conditional workflow makes is one of these:
 
@@ -214,7 +214,7 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
 |---|---|
 | Intake (Phase 1) | `~/.claude/cursor-bridge/workflow/phases/intake.md` |
 | Design (Phase 2) | `~/.claude/cursor-bridge/workflow/phases/design.md` |
-| The interface phase (Phase 3, today the UI mockups) | `~/.claude/cursor-bridge/workflow/phases/interface.md` |
+| The interface phase (Phase 3: one variant per kind of interface, the mockups among them) | `~/.claude/cursor-bridge/workflow/phases/interface.md` and its variant files under `~/.claude/cursor-bridge/workflow/phases/interface/` |
 | Planning (Phase 4, the build plan) | `~/.claude/cursor-bridge/workflow/phases/planning.md` |
 | Run parameters | `~/.claude/cursor-bridge/workflow/phases/run-parameters.md` |
 | Configuration (Phase 5) | `~/.claude/cursor-bridge/workflow/phases/configuration.md` |
@@ -223,7 +223,7 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
 | Reflection points | `~/.claude/cursor-bridge/workflow/phases/reflection.md` |
 | Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
 
-Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module.
+Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`.
 
 **Modules read outside their own phase.** Some procedures run outside the phase whose `Phase:` value names their module; they are read whenever they apply, whatever the phase:
 - `reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;
