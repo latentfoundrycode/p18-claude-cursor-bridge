@@ -191,6 +191,211 @@ def test_r005_a_pointer_line_names_no_file_outside_its_module_folder(tmp_path, h
     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/ok.md", P + "reflection.md", P + "project-end.md"], out
 
 
+def test_r005_a_pointer_path_outside_the_pattern_is_ignored_even_in_lower_case(tmp_path, home):
+    """handoff/TASK-015.md Requirement 4: letters, digits, hyphens and `/` only; no `.` or `..` segment, no drive, no
+    leading `/`, no empty segment (the other test's bad paths hold capitals, which a looser pattern refuses too)."""
+    loop = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md")
+    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: ../escape.md; ./here.md; c:/x.md; /root.md; "
+                    "a//b.md; a.b/c.md; under_score.md; delegation-loop/ok.md\n", encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
+    assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/ok.md", P + "reflection.md", P + "project-end.md"], out
+
+
+def test_r005_a_conditional_file_that_is_a_link_is_not_named(tmp_path, home):
+    """handoff/TASK-015.md Requirement 5: a candidate that is a link is not named (a file link needs a privilege
+    Windows accounts often lack; the test runs where the link can be made, on Linux CI at least)."""
+    real = tmp_path / "outside.md"
+    real.write_text("# Outside\n\n## Add at intake.questions\n\nq\n", encoding="utf-8")
+    link = home / ".claude" / "cursor-bridge" / "workflow" / "types" / "host-extension.md"
+    link.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.symlink(str(real), str(link))
+    except (OSError, NotImplementedError):
+        pytest.skip("this account cannot make a file link")
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: Host Extension Development; traits: none"), home)
+    assert named(out) == [P + "intake.md"], out
+
+
+def test_r005_a_set_heading_touches_the_phase_like_an_add(tmp_path, home):
+    """handoff/TASK-015.md Requirement 5: an `add` or `set` whose target's module is one of the phase's modules."""
+    write(home, "types/host-extension.md", "# Host extension\n\n## Set at intake.target-environment\n\nWindows.\n")
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: Host Extension Development; traits: none"), home)
+    assert named(out) == [P + "intake.md", W + "types/host-extension.md"], out
+    out = pointers(project(tmp_path, "Phase: design", "Workflows: Host Extension Development; traits: none"), home)
+    assert named(out) == [P + "design.md"], out
+
+
+def test_r005_a_path_two_modules_name_is_listed_once(tmp_path, home):
+    """handoff/TASK-015.md Requirements 2 and 4: no path is printed twice in the file list."""
+    for key in ("delegation-loop", "reflection"):
+        module = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / (key + ".md")
+        module.write_text(module.read_text(encoding="utf-8") + "\nSub-files: shared/checklist.md\n", encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
+    assert named(out) == [P + "delegation-loop.md", P + "shared/checklist.md", P + "reflection.md", P + "project-end.md"], out
+
+
+def add_intake_sub_file(home):
+    intake = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "intake.md"
+    intake.write_text(intake.read_text(encoding="utf-8") + "\nSub-files: intake/questions.md\n", encoding="utf-8")
+
+
+def cannot_read_lines(out):
+    lines = out.split("\n")
+    at = lines.index("BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:")
+    rest = lines[at + 1:lines.index("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")]
+    return [l for l in rest if not l.startswith("  - ")]
+
+
+BROKEN = {
+    "open-list": ("workflow/open-list.md", None, "open-list.md"),
+    "registry": ("workflow/extension-points.md", "# Extension points\n\nno table here\n", "extension-points.md"),
+    "workflow-check": ("workflow-check.py", "raise SystemExit(3)\n", "workflow-check.py"),
+    # round 2 (Review A S1, the security audit's first advisory, convergent): an installed checker whose functions do
+    # not match the hook's (a partial or hand-edited install) fails after the load, never silences the part
+    "checker-skew": ("workflow-check.py", None, "workflow-check.py"),
+}
+
+
+@pytest.mark.parametrize("broken", sorted(BROKEN))
+def test_r005_an_unreadable_open_list_or_checker_names_no_conditional_file_and_says_so(tmp_path, home, broken):
+    """handoff/TASK-015.md Requirement 7 (and handoff/TASK-015-r2.md Requirement R2-2): no conditional or pointer-line
+    file, exactly one line saying what could not be read (not a file line), and the rest of the pointers part as
+    usual. The phase's module has a Sub-files: line, so "no pointer-line file" is shown with its precondition."""
+    conditionals(home)
+    add_intake_sub_file(home)
+    bridge = home / ".claude" / "cursor-bridge"
+    rel, text, shown = BROKEN[broken]
+    target = bridge.joinpath(*rel.split("/"))
+    if broken == "open-list":
+        target.unlink()
+    elif broken == "checker-skew":
+        source = target.read_text(encoding="utf-8")
+        assert "def load_tables(" in source and "def heading_spans(" in source
+        target.write_text(source.replace("def load_tables(", "def load_tables_renamed(")
+                          .replace("def heading_spans(", "def heading_spans_renamed("), encoding="utf-8")
+    else:
+        target.write_text(text, encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert named(out) == [P + "intake.md"], out
+    extra = cannot_read_lines(out)
+    assert len(extra) == 1 and shown in extra[0], out
+    assert "Continue from where the status file says the work is." in out
+
+
+def test_r005_the_cannot_read_line_names_its_file_in_the_home_form(tmp_path, home):
+    """handoff/TASK-015-r2.md Requirement R2-3 (Review A S3): every path the pointers part prints is in the `~/...`
+    form; the home folder's absolute path never appears."""
+    conditionals(home)
+    (home / ".claude" / "cursor-bridge" / "workflow" / "open-list.md").unlink()
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    extra = cannot_read_lines(out)
+    assert len(extra) == 1 and "~/.claude/cursor-bridge/workflow/open-list.md" in extra[0], out
+    for form in {str(home), str(home).replace("\\", "/"), os.path.realpath(str(home)).replace("\\", "/")}:
+        assert form not in out, out
+
+
+def test_r005_a_run_leaves_no_bytecode_under_the_home(tmp_path, home):
+    """handoff/TASK-015.md Requirement 7: the hook writes nothing, so loading the installed checker leaves no
+    __pycache__ under ~/.claude."""
+    conditionals(home)
+    for d, dirs, files in os.walk(str(home)):
+        assert "__pycache__" not in dirs, d   # the precondition: the copied tree holds none
+    pointers(project(tmp_path, "Phase: building", LINE), home)
+    for d, dirs, files in os.walk(str(home)):
+        assert "__pycache__" not in dirs, d
+
+
+def test_r005_a_pointer_line_naming_a_module_of_the_phase_prints_it_once_in_its_place(tmp_path, home):
+    """handoff/TASK-015-r2.md Requirement R2-1 (Review A B1): no path is printed twice; a pointer line that names one
+    of the phase's own modules names nothing, and the module keeps its place and its note."""
+    loop = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md"
+    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: project-end.md; reflection.md; delegation-loop.md; "
+                    "delegation-loop/merge.md\n", encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
+    assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/merge.md", P + "reflection.md",
+                          P + "project-end.md"], out
+    end = [l for l in out.split("\n") if l.startswith("  - " + P + "project-end.md")]
+    assert len(end) == 1 and "last stage" in end[0], out
+
+
+def _link_folder(link, target):
+    """A folder link: a junction on Windows (no privilege needed), a symbolic link elsewhere; skip if neither works."""
+    try:
+        if sys.platform == "win32":
+            import _winapi
+            _winapi.CreateJunction(str(target), str(link))
+        else:
+            os.symlink(str(target), str(link), target_is_directory=True)
+    except (OSError, NotImplementedError, AttributeError):
+        pytest.skip("this account cannot create a folder link")
+
+
+@pytest.mark.parametrize("linked", ["types", "traits", "types/host-extension"])
+def test_r005_a_folder_link_on_the_way_to_a_conditional_file_names_nothing(tmp_path, home, linked):
+    """handoff/TASK-015-r2.md Requirement R2-4 (Review A S2, the security audit's third advisory, convergent): a link at
+    any folder between ~/.claude/cursor-bridge/workflow/ and a candidate file refuses the candidate, as
+    workflow-check.py's own walk refuses a linked types/, traits/ or types/<key>/ folder."""
+    conditionals(home)
+    workflow = home / ".claude" / "cursor-bridge" / "workflow"
+    outside = tmp_path / "outside"
+    shutil.move(str(workflow.joinpath(*linked.split("/"))), str(outside))
+    _link_folder(workflow.joinpath(*linked.split("/")), outside)
+    out = pointers(project(tmp_path, "Phase: mockups", LINE), home)
+    expected = {"types": [P + "interface.md", W + "traits/installable.md", W + "traits/external-services.md"],
+                "traits": [P + "interface.md", W + "types/host-extension/claude-code-extension.md"],
+                "types/host-extension": [P + "interface.md", W + "traits/installable.md", W + "traits/external-services.md"]}
+    assert named(out) == expected[linked], out
+
+
+def test_r005_a_linked_phases_folder_contributes_no_pointer_line(tmp_path, home):
+    """handoff/TASK-015-r2.md Requirement R2-4 (the security audit's fourth advisory): a module reached through a link
+    (here the phases/ folder itself) is still named, but its pointer lines are not read."""
+    add_intake_sub_file(home)
+    workflow = home / ".claude" / "cursor-bridge" / "workflow"
+    outside = tmp_path / "outside-phases"
+    shutil.move(str(workflow / "phases"), str(outside))
+    _link_folder(workflow / "phases", outside)
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: not yet classified"), home)
+    assert named(out) == [P + "intake.md"], out
+
+
+def test_r005_an_open_list_key_outside_the_key_pattern_names_no_file(tmp_path, home):
+    """handoff/TASK-015-r2.md Requirement R2-5 (the security audit's second advisory): only a key of lower-case
+    letters, digits and hyphens becomes a path part; a key that would climb out of workflow/ names nothing."""
+    open_list = home / ".claude" / "cursor-bridge" / "workflow" / "open-list.md"
+    text = open_list.read_text(encoding="utf-8")
+    row = [l for l in text.split("\n") if l.startswith("| host-extension |")]
+    assert len(row) == 1, "the precondition: the open list has the host-extension row"
+    open_list.write_text(text.replace(row[0], row[0].replace("| host-extension |", "| ../../escape |", 1)), encoding="utf-8")
+    (home / ".claude" / "cursor-bridge" / "escape.md").write_text("# Escape\n\n## Add at intake.questions\n\nq\n", encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: Host Extension Development; traits: none"), home)
+    assert named(out) == [P + "intake.md"] and "escape" not in out, out
+    assert cannot_read_lines(out) == [], "the open list still reads: the key is refused, not the list"
+
+
+def test_r005_the_docstring_is_ascii():
+    """handoff/TASK-015.md Requirement 10 (Review A S4): the docstring, which dump-cli.py renders into the command
+    reference, is ASCII as the program holds it at run time."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("session_start_doc", PROG)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.__doc__ and mod.__doc__.isascii()
+
+
+def test_r005_no_cannot_read_line_when_nothing_needed_the_read(tmp_path):
+    """handoff/TASK-015.md Requirement 7: the line is printed only when a module file of the phase exists or a
+    Workflows: line is classified; a home without the installed workflow folder prints the modules alone."""
+    h = tmp_path / "home"
+    shutil.copytree(os.path.join(BRIDGE, "commands"), str(h / ".claude" / "commands"))
+    out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), h)
+    lines = out.split("\n")
+    at = lines.index("BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:")
+    rest = lines[at + 1:lines.index("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")]
+    assert all(l.startswith("  - ") for l in rest), out
+    assert named(out) == [P + "delegation-loop.md", P + "reflection.md", P + "project-end.md"], out
+
+
 def test_r005_both_parts_stay_under_the_cap_with_many_conditionals(tmp_path, home):
     conditionals(home)
     parts = ["Workflows: part%d: Host Extension Development → Claude Code Extension; traits: Installable, External services" % i
