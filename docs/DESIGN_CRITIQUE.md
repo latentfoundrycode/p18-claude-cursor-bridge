@@ -594,6 +594,8 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 
 **The gate** (2026-10-20, the owner, in this session's chat): "1. Approve" — the four increments and R-039 to R-041 as critiqued; "2. (a)" — the Node runners' default deferred past release B; "3. (a)" — the rate limit is one heavy job at a time. The `run/review/DESIGN-windowless-*` files are removed in the commit that records it.
 
+**After the gate** (supervisor, at the records' code gate, Review A of PR #57): TASK-030's Scope gains `bridge/agents/diff-reviewer.md` and `bridge/agents/spec-packager.md`, which state the settled driver sentence too, so the reword reaches every file that holds it; no design changes. Not criticised by the two critics; reviewed at the code gate with the whole diff.
+
 ## Subject: ceiling — after the critique
 
 **After the critique** (supervisor, at the brief, for the code gate's reviewers): the change log's and KP-062's migration notes gain one sentence, a round file named other than by its number (`-confirm`) is refused and its next file takes the next number (the spec-packager's note: release B's own plan critique used `DESIGN-plan-confirm.md`); the brief matches `run`, `review` and `DESIGN-` in any case, with a test. Not criticised by the two critics; reviewed at the code gate with the whole diff.
