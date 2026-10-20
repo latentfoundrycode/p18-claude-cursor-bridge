@@ -18,7 +18,7 @@ approved, everything the change touches goes through its gate again, and nothing
 re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md` under
 `Change cycle:` with a short name and the date.
 
-Keep the step the change has reached on the `Change cycle:` line, rewritten as each step's gate passes, so that a resume after a compaction starts where the change stands and asks no approval twice.
+Keep the step the change has reached on the `Change cycle:` line, rewritten as each step is reached or its gate passes, so that a resume after a compaction starts where the change stands and asks no approval twice.
 
 1. **Intake of the change** (Phase 1, scaled). The session is on Opus 5.5 from the build:
    your first report leads with *set this session to Fable 5.1 before the design work* (rule
@@ -37,7 +37,7 @@ Keep the step the change has reached on the `Change cycle:` line, rewritten as e
    context, or delivery, and why; the unchanged design is referenced, not rewritten. **Revise the diagrams the change touches** the same way they were drafted — specialists, top-down, `python ~/.claude/cursor-bridge/diagram-check.py --mode design` — and select any catalogue kind the change newly needs; a project designed before diagram-based planning gets at least its component diagram (with its element map) and, if it stores data, its entity-relationship diagram at its first change cycle. Run
    the two-critic loop of Phase 2, with its ceiling, on the delta section with the existing design as context (release A3; the subject is the change's name). Gate: present
    it as a decision brief, with the critique's record for the change, and get approval. Patch the Project Summary at this gate.
-3. **The interface variants** (Phase 3) **only for the kinds of interface the change touches** — screens, commands, a protocol other software calls, play — each kind by the variant `interface.md` gives it ("The variants", "Which variants a part runs"), and each run only for the screens and states, the commands or the operations the change adds or alters. An artifact already approved is amended, not replaced (for screens, the mockups and the visual system); an artifact the part does not have yet is written for what the change touches; a kind the change does not touch is not re-presented. Gate as in Phase 3, for the variants run.
+3. **The interface variants** (Phase 3) **only for the kinds of interface the change touches** — screens, commands, a protocol other software calls, play — each kind by the variant `interface.md` gives it ("The variants", "Which variants a part runs"), or by the replacement of a part whose type workflow replaces the interface phase, and each run only for the screens and states, the commands or the operations the change adds or alters. An artifact already approved is amended, not replaced (for screens, the mockups and the visual system); an artifact the part does not have yet is written for what the change touches; a kind the change does not touch is not re-presented. Gate as in Phase 3, for the variants run; a change that touches no kind of interface runs no variant and holds no interface gate.
 4. **Plan addendum** (Phase 4, scaled). Append one or more new **stages** to
    `docs/BUILD_PLAN.md` for the change, with the same increment discipline, and bump the
    **version** in the single version source (a fix → patch; a feature → minor; a change

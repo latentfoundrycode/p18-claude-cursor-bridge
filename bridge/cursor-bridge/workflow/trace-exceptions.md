@@ -22,7 +22,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md The gate
 - new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md Extension points
 - new TASK-014 bridge/cursor-bridge/workflow/phases/interface/mockups.md What this variant is
-- new TASK-012 bridge/cursor-bridge/workflow/phases/interface/mockups.md The design-tooling flow
+- new TASK-014 bridge/cursor-bridge/workflow/phases/interface/mockups.md The design-tooling flow
 - new TASK-014 bridge/cursor-bridge/workflow/phases/interface/command-design.md What this variant is
 - new TASK-014 bridge/cursor-bridge/workflow/phases/interface/contract-design.md What this variant is
 - new TASK-014 bridge/cursor-bridge/workflow/phases/interface/playable-prototype.md What this variant is

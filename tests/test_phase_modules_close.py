@@ -109,7 +109,7 @@ SURVIVAL = {
         "(\"Keeping the position\"), and, while the stage review's Review B runs, the position the delegation loop's step 8 "
         "keeps there;",
         "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Stage:` line's `Last reflection:` names "
-        "the reflection point before this one, from which items 1, 2 and 4 count, and `Open issues:` the issues item 1 "
+        "the reflection point before this one, from which items 1 and 4 count, and `Open issues:` the issues item 1 "
         "completes; the inventory holds the decisions and resources the Project Summary's patch reports;",
         "`docs/RUN_PARAMETERS.md`: whether the refactoring pass runs before a stage closes, and `Stage pause`, which item 6 "
         "obeys;",
@@ -283,7 +283,11 @@ def test_r036_the_promotion_pass_puts_the_flagged_traits_forward():
                  "write it: for a new trait, its entry in the open list (`~/.claude/cursor-bridge/workflow/open-list.md`), "
                  "with its definition; for a new trait and an unwritten one alike, its additions, each under the `## Add "
                  "at <point key>` heading of the extension point at which the project's design handled it, drafted from "
-                 "that handling and naming the design section and the row they come from. The maintainer writes the "
+                 "that handling and naming the design section and the row they come from. Each is written in general "
+                 "terms, for every project the trait may reach: no path of this computer, no key and none of the "
+                 "project's data (rules 53 and 54); and each proposed file stands in a fenced block whose first line "
+                 "reads `Proposal — not in force`, so that no later reading of the Feedback document takes its `## Add "
+                 "at` headings for additions in force. The maintainer writes the "
                  "trait or not; you write no trait file and change nothing in the open list (the open list, \"A new trait "
                  "is flagged, and the work continues\").")
     end = flat(module("project-end"))
@@ -318,11 +322,13 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
     item3 = [l for l in proc.split("\n") if l.startswith("3. ")]
     assert item3 == ["3. **The interface variants** (Phase 3) **only for the kinds of interface the change touches** — "
                      "screens, commands, a protocol other software calls, play — each kind by the variant `interface.md` "
-                     "gives it (\"The variants\", \"Which variants a part runs\"), and each run only for the screens and "
-                     "states, the commands or the operations the change adds or alters. An artifact already approved is "
+                     "gives it (\"The variants\", \"Which variants a part runs\"), or by the replacement of a part whose type "
+                     "workflow replaces the interface phase, and each run only for the screens and states, the "
+                     "commands or the operations the change adds or alters. An artifact already approved is "
                      "amended, not replaced (for screens, the mockups and the visual system); an artifact the part does "
                      "not have yet is written for what the change touches; a kind the change does not touch is not "
-                     "re-presented. Gate as in Phase 3, for the variants run."], item3
+                     "re-presented. Gate as in Phase 3, for the variants run; a change that touches no kind of interface runs "
+                     "no variant and holds no interface gate."], item3
     assert "**only if the change touches the UI**" not in proc
     assert ("The gates of a change cycle are the same approvals the original build had — the change design, the artifact "
             "of each interface variant the change runs, the plan addendum.") in flat(proc)
@@ -330,9 +336,11 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
 
 
 # sha256 of the change cycle's procedure as TASK-014 leaves it (from its heading to the file's end, LF, the whitespace at
-# its end stripped; 6,094 characters): the trace entry on "The procedure" excuses new text anywhere under it, so CI holds
-# the section's text here (trace-check has no CI step, INVENTORY Decisions); a later reword updates this with its record
-PROCEDURE_SHA256 = "13d899566e54047361783cd57d3c6f61ae3886c51f59de2fc87e2baaca0c6cab"
+# its end stripped; 6,280 characters): the trace entry on "The procedure" excuses new text anywhere under it, so CI holds
+# the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this pin is reviewed as a new
+# trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the increment's record names
+# each passage it adds or rewords under the procedure
+PROCEDURE_SHA256 = "03af47299032e37bbf106e72bcb0ec1784241ce16948aec3591ddb97d094f40a"
 
 
 def test_the_change_cycles_procedure_is_pinned():
@@ -340,7 +348,7 @@ def test_the_change_cycles_procedure_is_pinned():
     one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
     text = module("change-cycle")
     proc = text[text.index("### The procedure"):].rstrip()
-    assert len(proc) == 6094 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
+    assert len(proc) == 6280 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
 
 
 def test_r004_the_positions_the_survival_lists_name_are_kept():
@@ -348,8 +356,8 @@ def test_r004_the_positions_the_survival_lists_name_are_kept():
     its `Change cycle:` line; the reflection point's and project end's finished steps in run/supervisor/in-flight.md,
     since what the items write under Documents/ is not under git."""
     cc = flat(section(module("change-cycle"), "The procedure", 3))
-    assert ("Keep the step the change has reached on the `Change cycle:` line, rewritten as each step's gate passes, so "
-            "that a resume after a compaction starts where the change stands and asks no approval twice.") in cc
+    assert ("Keep the step the change has reached on the `Change cycle:` line, rewritten as each step is reached or its "
+            "gate passes, so that a resume after a compaction starts where the change stands and asks no approval twice.") in cc
     r = flat(section(module("reflection"), "Keeping the position", 3)).strip()
     assert r == ("As each step above finishes (the stage review, the demonstration, each numbered item), write one line to "
                  "`run/supervisor/in-flight.md` naming the reflection point and the step finished, and name the file on "
@@ -396,3 +404,39 @@ def test_the_glossary_names_the_modules_as_files():
     assert ("Each is a file of its own under `workflow/phases/`; a module too long to be read whole keeps a step in a "
             "sub-file under `workflow/phases/<module>/` (the delegation loop's step 9), and the interface phase keeps one "
             "file per variant under `workflow/phases/interface/`.") in g
+
+
+# sha256 of each variant-file section a `new` trace entry excuses (from its heading to the next heading of its level or
+# higher, LF, the whitespace at its end stripped), as TASK-014 leaves it: an entry excuses new text anywhere in its
+# section, so CI holds each section's text here (Review A, TASK-014, should-fix 3). A change to a pin is reviewed as a
+# new trace exception (TASK-022 writes the command and contract designs' bodies under headings of their own, with their
+# own entries, and leaves these sections as they are)
+EXCUSED_SECTIONS = {
+    ("interface/mockups.md", "What this variant is"): (620, "6d539112c3b10ecf7e20bdc5b76fcbcd6fdb2e4786212f2af947176914ce1298"),
+    ("interface/mockups.md", "The design-tooling flow"): (3200, "d878dbcca05094b316960040e468e376b8b5bf76b9c64908a3be88c9efa5416e"),
+    ("interface/command-design.md", "What this variant is"): (563, "bfc7ccc3704ff6b69361cc8ee16eb568a809634fa869b046b0b67a7d8ad87bd3"),
+    ("interface/contract-design.md", "What this variant is"): (673, "00c28cc73cb732979930405822ee1f7a35f17e70fd540b73baf0d31fe0d16589"),
+    ("interface/playable-prototype.md", "What this variant is"): (993, "b4cfca71dad76f4d3abaa1ee356b1c025c1d922626887958a84c45a3b5ca48eb"),
+}
+
+
+@pytest.mark.parametrize("rel,title", sorted(EXCUSED_SECTIONS))
+def test_each_excused_variant_section_is_pinned(rel, title):
+    """The trace exceptions' lead (HARDENING Stage B3; Review A, TASK-014, should-fix 3): each variant-file section a
+    `new` entry excuses is fixed here, so a paragraph added to it, or a copy of a passage into it, fails in CI; and every
+    `new` entry on a variant file is one of these sections."""
+    text = module(rel)
+    lines = text.split("\n")
+    start = lines.index("### " + title)
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        h = re.match(r"^(#{1,6}) ", lines[i])
+        if h and len(h.group(1)) <= 3:
+            end = i
+            break
+    body = "\n".join(lines[start:end]).rstrip()
+    assert (len(body), hashlib.sha256(body.encode("utf-8")).hexdigest()) == EXCUSED_SECTIONS[(rel, title)], len(body)
+    prefix = "- new TASK-014 bridge/cursor-bridge/workflow/phases/"
+    entries = [l[len(prefix):] for l in read(EXCEPTIONS).split("\n") if l.startswith("- new ") and "/phases/interface/" in l]
+    assert all(l.startswith(prefix) for l in read(EXCEPTIONS).split("\n") if l.startswith("- new ") and "/phases/interface/" in l)
+    assert sorted(entries) == sorted("%s %s" % k for k in EXCUSED_SECTIONS), entries
