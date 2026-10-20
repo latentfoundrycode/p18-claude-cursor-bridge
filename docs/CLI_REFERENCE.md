@@ -898,15 +898,16 @@ trace-check: mechanical traceability from a pinned pre-split baseline (R-029).
 
 Compares every passage unit of bridge/commands/supervisor.md at the pinned baseline
 commit with the working tree: the core and every *.md under bridge/cursor-bridge/workflow/
-except trace-exceptions.md. Module files under workflow/phases/, workflow/types/, and
-workflow/traits/ are checked for undeclared new text. Exceptions are listed in
-workflow/trace-exceptions.md.
+except bridge/cursor-bridge/workflow/trace-exceptions.md (the only home left out). Module files under
+workflow/phases/, workflow/types/, and workflow/traits/ are checked for undeclared new text. Exceptions are
+listed in workflow/trace-exceptions.md. A ~/.claude/... reference must name a path inside bridge/ with no
+symbolic link, junction, or other reparse point on the way.
 
 Finding lines, then TRACED and RESULT:
   FAIL (dropped)  a baseline passage is missing everywhere
   FAIL (copy)     a passage appears more often than at baseline (excused sections excluded)
   FAIL (new)      undeclared text in a module file
-  FAIL (ref)      a ~/.claude/... reference does not resolve under bridge/
+  FAIL (ref)      a ~/.claude/... reference does not resolve to a path inside bridge/ with no link on the way
   FAIL (cite)     a cited section heading does not resolve in any current home
   NOTE (reword)   a dropped passage excused by a reword entry
   MAP             with --map, each baseline passage and its current home(s)

@@ -5,15 +5,16 @@
 
 Compares every passage unit of bridge/commands/supervisor.md at the pinned baseline
 commit with the working tree: the core and every *.md under bridge/cursor-bridge/workflow/
-except trace-exceptions.md. Module files under workflow/phases/, workflow/types/, and
-workflow/traits/ are checked for undeclared new text. Exceptions are listed in
-workflow/trace-exceptions.md.
+except bridge/cursor-bridge/workflow/trace-exceptions.md (the only home left out). Module files under
+workflow/phases/, workflow/types/, and workflow/traits/ are checked for undeclared new text. Exceptions are
+listed in workflow/trace-exceptions.md. A ~/.claude/... reference must name a path inside bridge/ with no
+symbolic link, junction, or other reparse point on the way.
 
 Finding lines, then TRACED and RESULT:
   FAIL (dropped)  a baseline passage is missing everywhere
   FAIL (copy)     a passage appears more often than at baseline (excused sections excluded)
   FAIL (new)      undeclared text in a module file
-  FAIL (ref)      a ~/.claude/... reference does not resolve under bridge/
+  FAIL (ref)      a ~/.claude/... reference does not resolve to a path inside bridge/ with no link on the way
   FAIL (cite)     a cited section heading does not resolve in any current home
   NOTE (reword)   a dropped passage excused by a reword entry
   MAP             with --map, each baseline passage and its current home(s)
@@ -28,6 +29,7 @@ The check needs the baseline commit's object history.
 import argparse
 import os
 import re
+import stat
 import subprocess
 import sys
 
@@ -40,18 +42,18 @@ WORKFLOW_PREFIX = "bridge/cursor-bridge/workflow/"
 ENTRY_RE = re.compile(
     r"^- (reword|new) ([A-Z][A-Z0-9]*-[0-9]+) (\S+\.md) (.+)$"
 )
-ID_RE = re.compile(r"^[A-Z][A-Z0-9]*-[0-9]+$")
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6}) (.*)$")
 FENCE_OPEN_RE = re.compile(r"^(`{3,}|~{3,})")
 LIST_ITEM_RE = re.compile(r"^([-*+]|[0-9]+[.)])\s")
 REF_RE = re.compile(r"~/\.claude/([^\s`\"'()\[\],;]+)")
-CITE_RE = re.compile(
-    r'\b(see|per|under) "([^"]+)"(?: \u2192 "([^"]+)")*',
-    re.IGNORECASE,
-)
 EM_DASH = "\u2014"
 PLACEHOLDER_CHARS = frozenset("<>*\u2026")
 REF_STRIP = ".:"
+WIN_DEVICE_NAMES = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + ["COM%d" % i for i in range(1, 10)]
+    + ["LPT%d" % i for i in range(1, 10)]
+)
 
 
 def slash(path):
@@ -254,6 +256,33 @@ def decode_git_bytes(data):
     return data.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
 
 
+def is_path_link(path):
+    if os.path.islink(path):
+        return True
+    if hasattr(os.path, "isjunction") and os.path.isjunction(path):
+        return True
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    attrs = getattr(st, "st_file_attributes", None)
+    if attrs is not None and (attrs & stat.FILE_ATTRIBUTE_REPARSE_POINT):
+        return True
+    return False
+
+
+def segment_refused(seg):
+    if seg == "" or seg == "." or seg == "..":
+        return True
+    if "\\" in seg or ":" in seg:
+        return True
+    if seg.endswith(".") and seg not in (".", ".."):
+        return True
+    if seg.split(".", 1)[0].upper() in WIN_DEVICE_NAMES:
+        return True
+    return False
+
+
 def read_utf8_path(path):
     shown = slash(path)
     if not os.path.isfile(path):
@@ -269,14 +298,27 @@ def read_utf8_path(path):
         return None, shown, "cannot be read (%s)" % (err.strerror or err)
 
 
-def collect_md_paths(root, under_workflow):
+def collect_md_paths(root, under_workflow, walk_errors):
     found = []
-    for dirpath, _dirnames, filenames in os.walk(under_workflow):
+
+    def onerror(err):
+        walk_errors.append((
+            slash(err.filename),
+            "cannot be read (%s)" % (err.strerror or err),
+        ))
+
+    for dirpath, dirnames, filenames in os.walk(under_workflow, onerror=onerror):
+        keep = []
+        for name in dirnames:
+            full = os.path.join(dirpath, name)
+            if not is_path_link(full):
+                keep.append(name)
+        dirnames[:] = keep
         for name in filenames:
             if not name.endswith(".md"):
                 continue
             full = os.path.join(dirpath, name)
-            if os.path.islink(full):
+            if is_path_link(full):
                 continue
             rel = slash(os.path.relpath(full, root))
             if rel == EXCEPTIONS_REL:
@@ -326,12 +368,7 @@ def parse_exceptions(text, errors):
             ))
             return None
         kind, inc_id, file_rel, heading = m.group(1), m.group(2), m.group(3), m.group(4)
-        if (
-            not ID_RE.match(inc_id)
-            or " " in file_rel
-            or not valid_exception_file(file_rel)
-            or not heading.strip()
-        ):
+        if not valid_exception_file(file_rel) or not heading.strip():
             errors.append((
                 EXCEPTIONS_REL,
                 "line %d: malformed entry (requirement 6)" % line_no,
@@ -383,41 +420,62 @@ def resolve_ref(rest, root):
         rest = rest[:-1]
     bridge_root = os.path.join(root, "bridge")
     if rest == "":
-        return bridge_contains(root, bridge_root) and (
-            os.path.isdir(bridge_root) or os.path.isfile(bridge_root)
-        )
+        if is_path_link(bridge_root):
+            return False
+        try:
+            os.lstat(bridge_root)
+            return True
+        except OSError:
+            return False
     segments = rest.split("/")
     for seg in segments:
-        if seg == "" or seg == "." or seg == ".." or "\\" in seg or ":" in seg:
+        if segment_refused(seg):
             return False
     resolved = []
     for seg in segments:
         if seg == "..." or any(c in PLACEHOLDER_CHARS for c in seg):
             break
         resolved.append(seg)
-    bridge_path = os.path.join(root, "bridge", *resolved)
-    if not bridge_contains(root, bridge_path):
+    current = bridge_root
+    if is_path_link(current):
         return False
-    return os.path.exists(bridge_path)
+    for seg in resolved:
+        current = os.path.join(current, seg)
+        try:
+            os.lstat(current)
+        except OSError:
+            return False
+        if is_path_link(current):
+            return False
+    if not bridge_contains(root, current):
+        return False
+    return True
 
 
 def find_refs_in_file(rel, text, root, findings_ref):
     lines = file_lines(text)
     for no, line in enumerate(lines, 1):
         for m in REF_RE.finditer(line):
-            rest = m.group(1)
-            shown = rest.rstrip(REF_STRIP)
+            rest = m.group(1).rstrip(REF_STRIP)
             if not resolve_ref(rest, root):
-                findings_ref.append((rel, no, "~/.claude/" + shown))
+                findings_ref.append((rel, no, "~/.claude/" + rest))
 
 
 def citation_strings(normal):
     out = []
-    for m in CITE_RE.finditer(normal):
-        quotes = [m.group(2)]
-        span = m.group(0)
-        for qm in re.finditer(r' \u2192 "([^"]+)"', span):
-            quotes.append(qm.group(1))
+    for m in re.finditer(r'\b(see|per|under) "', normal, re.IGNORECASE):
+        start = m.end()
+        end = normal.find('"', start)
+        if end < 0:
+            continue
+        quotes = [normal[start:end]]
+        pos = end + 1
+        while True:
+            chain_m = re.match(r' \u2192 "([^"]*)"', normal[pos:])
+            if not chain_m:
+                break
+            quotes.append(chain_m.group(1))
+            pos += chain_m.end()
         out.append(quotes)
     return out
 
@@ -440,16 +498,15 @@ def check_citations(rel, units, all_headings, findings_cite):
 def load_baseline_file(root, sha, rel, errors):
     proc, err = git_run(root, ["show", "%s:%s" % (sha, rel)])
     if proc is None:
-        errors.append(("git show", err))
-        return None
+        return None, err
     if proc.returncode != 0:
         errors.append((rel, "missing at baseline commit"))
-        return None
+        return None, None
     try:
-        return decode_git_bytes(proc.stdout)
+        return decode_git_bytes(proc.stdout), None
     except UnicodeDecodeError:
         errors.append((rel, "cannot be read as UTF-8 at baseline"))
-        return None
+        return None, None
 
 
 class CheckArgumentParser(argparse.ArgumentParser):
@@ -487,16 +544,16 @@ def main(argv=None):
 
     proc, err = git_run(root, ["rev-parse", "--is-inside-work-tree"])
     if proc is None:
-        errors.append(("git rev-parse", err))
-    elif proc.returncode != 0 or proc.stdout.decode("ascii", "replace").strip() != "true":
+        print("ERROR: git rev-parse: %s" % escape_field(err))
+        print("RESULT: not checked")
+        return 2
+    if proc.returncode != 0 or proc.stdout.decode("ascii", "replace").strip() != "true":
         errors.append((slash(root), "not a git work tree"))
 
     baseline_path = os.path.join(root, BASELINE_REL)
     bl_text, bl_shown, bl_err = read_utf8_path(baseline_path)
     if bl_err:
         errors.append((bl_shown, bl_err if bl_err != "does not exist" else "missing"))
-    elif bl_text is None:
-        errors.append((bl_shown, "missing"))
     else:
         bl_lines = file_lines(bl_text)
         if len(bl_lines) != 1 or not SHA_RE.match(bl_lines[0]):
@@ -507,8 +564,10 @@ def main(argv=None):
     if sha and not errors:
         proc, err = git_run(root, ["cat-file", "-e", "%s^{commit}" % sha])
         if proc is None:
-            errors.append(("git cat-file", err))
-        elif proc.returncode != 0:
+            print("ERROR: git cat-file: %s" % escape_field(err))
+            print("RESULT: not checked")
+            return 2
+        if proc.returncode != 0:
             errors.append((
                 sha,
                 "baseline commit is absent from this repository; a shallow clone is the likely cause",
@@ -563,16 +622,28 @@ def main(argv=None):
 
     baseline_homes = [CORE_REL] + baseline_workflow_paths
     current_workflow = os.path.join(root, WORKFLOW_PREFIX.rstrip("/"))
-    current_workflow_paths = collect_md_paths(root, current_workflow) if os.path.isdir(
-        current_workflow
-    ) else []
+    walk_errors = []
+    current_workflow_paths = (
+        collect_md_paths(root, current_workflow, walk_errors)
+        if os.path.isdir(current_workflow)
+        else []
+    )
+    if walk_errors:
+        path, reason = walk_errors[0]
+        print("ERROR: %s: %s" % (escape_field(path), escape_field(reason)))
+        print("RESULT: not checked")
+        return 2
     current_homes = [CORE_REL] + current_workflow_paths
 
     baseline_units_by_norm = {}
     baseline_supervisor_traced = []
 
     for rel in baseline_homes:
-        text = load_baseline_file(root, sha, rel, errors)
+        text, git_err = load_baseline_file(root, sha, rel, errors)
+        if git_err is not None:
+            print("ERROR: git show: %s" % escape_field(git_err))
+            print("RESULT: not checked")
+            return 2
         if text is None:
             continue
         units, _heads = parse_units(text)
@@ -676,7 +747,7 @@ def main(argv=None):
                 dropped_count += 1
                 seen_norm_finding.add(nf)
         elif c > b:
-            paths = sorted(current_paths_for_norm.get(nf, current_paths_all.get(nf, [])))
+            paths = sorted(current_paths_for_norm.get(nf, []))
             fails_copy.append(
                 "FAIL (copy) %s: %s - %s"
                 % (", ".join(escape_field(p) for p in paths), bh, excerpt(nf))
@@ -699,7 +770,7 @@ def main(argv=None):
                     "FAIL (new) %s: %s - %s" % (escape_field(rel), h, excerpt(nf))
                 )
 
-    for rel, line_no, ref in sorted(findings_ref):
+    for rel, line_no, ref in findings_ref:
         fails_ref.append(
             "FAIL (ref) %s:%d: %s" % (escape_field(rel), line_no, escape_field(ref))
         )
@@ -715,7 +786,7 @@ def main(argv=None):
         for traced in baseline_supervisor_traced:
             nf = traced["normal"]
             paths = sorted(current_paths_all.get(nf, []))
-            home = ", ".join(paths) if paths else "-"
+            home = ", ".join(escape_field(p) for p in paths) if paths else "-"
             print(
                 "MAP %s: %s - %s"
                 % (home, traced["baseline_heading"], excerpt(nf))

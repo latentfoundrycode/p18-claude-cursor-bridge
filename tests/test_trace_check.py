@@ -626,13 +626,63 @@ def test_r029_a_refused_reference_touches_no_file(tmp_path, monkeypatch):
     root = make_repo(tmp_path)
     program = _load_program()
     calls = []
-    for name in ("realpath", "exists", "isdir", "isfile", "islink", "lexists"):
-        real = getattr(os.path, name)
+    for name in ("realpath", "exists", "isdir", "isfile", "islink", "lexists", "isjunction"):
+        real = getattr(os.path, name, None)
+        if real is None:
+            continue
         monkeypatch.setattr(os.path, name, lambda *a, _n=name, _r=real, **k: calls.append(_n) or _r(*a, **k))
     for name in ("stat", "lstat", "scandir", "listdir"):
         real = getattr(os, name)
         monkeypatch.setattr(os, name, lambda *a, _n=name, _r=real, **k: calls.append(_n) or _r(*a, **k))
-    results = [program.resolve_ref(rest, str(root)) for rest in
-               ("\\\\host\\share\\x", "//host/share/x", "C:/Windows", "../README.md", "a/../../x", "cmd/<x>/../..")]
+    rests = ("\\\\host\\share\\x", "//host/share/x", "C:/Windows", "../README.md", "a/../../x", "cmd/<x>/../..",
+             "commands./supervisor.md", "NUL", "cursor-bridge/com1.md")
+    results = [program.resolve_ref(rest, str(root)) for rest in rests]
     monkeypatch.undo()
-    assert results == [False] * 6 and calls == [], (results, calls)
+    assert results == [False] * len(rests) and calls == [], (results, calls)
+
+
+def test_r029_a_link_on_the_way_is_refused_before_realpath(tmp_path, monkeypatch):
+    """Round 3, requirement 1 (security round 2 advisory A1): a component that is a link makes the reference a finding
+    at once, with no realpath, which would follow the link (and a broken link's target) before containment is tested.
+    Kills the builder's mutation (v), the walk's link test skipped, which the containment guard alone hides."""
+    root = make_repo(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "Target.md").write_bytes(b"# Target\n")
+    link = root / "bridge" / "cursor-bridge" / "linked"
+    _link_folder(link, outside)
+    try:
+        program = _load_program()
+        seen = []
+        real = os.path.realpath
+        monkeypatch.setattr(os.path, "realpath", lambda *a, **k: seen.append(a[0]) or real(*a, **k))
+        result = program.resolve_ref("cursor-bridge/linked/Target.md", str(root))
+        monkeypatch.undo()
+        assert result is False and seen == [], (result, seen)
+    finally:
+        os.rmdir(str(link))   # removes the link itself, never its target
+
+
+def test_r029_an_unreadable_folder_under_workflow_is_not_checked(tmp_path, monkeypatch, capsys):
+    """Round 3, requirement 9: a folder under workflow/ that cannot be listed is `ERROR: <path>: cannot be read
+    (<reason>)`, exit 2, never a silent skip. main() in-process, with os.scandir (which os.walk lists through) refusing
+    that one folder."""
+    root = make_repo(tmp_path)
+    hidden = root / "bridge" / "cursor-bridge" / "workflow" / "sealed"
+    hidden.mkdir(parents=True)
+    (hidden / "x.md").write_bytes(b"# X\n\nText.\n")
+    program = _load_program()
+    real = os.scandir
+
+    def scandir_or_refuse(path=".", *a, **k):
+        if os.path.basename(os.fspath(path)) == "sealed":
+            raise PermissionError(13, "Access is denied", os.fspath(path))
+        return real(path, *a, **k)
+
+    monkeypatch.setattr(os, "scandir", scandir_or_refuse)
+    rc = program.main(["--repo", str(root)])
+    monkeypatch.undo()
+    out = capsys.readouterr().out.splitlines()
+    errors = [l for l in out if l.startswith("ERROR: ")]
+    assert rc == 2 and out[-1] == "RESULT: not checked", out
+    assert len(errors) == 1 and errors[0].endswith("/bridge/cursor-bridge/workflow/sealed: cannot be read (Access is denied)"), out
