@@ -78,26 +78,28 @@ def section(text, title, level):
 
 STRUCTURE = {
     "interface": [(2, "Phase 3 — Interface"), (3, "What must survive a compaction"), (3, "The variants"),
-                  (3, "Which variants a part runs"), (3, "The gate"), (2, "Extension points")],
+                  (3, "Which variants a part runs"), (3, "The interface notes"), (3, "The gate"),
+                  (2, "Extension points")],
     "planning": [(2, "Phase 4 — Build plan"), (3, "What must survive a compaction"),
-                 (3, "Step 0 — Prior-project lessons (ask before drafting)"), (3, "The plan"), (2, "Extension points")],
+                 (3, "Step 0 — Prior-project lessons (ask before drafting)"),
+                 (3, "What the interface phase hands to the plan"), (3, "The plan"), (2, "Extension points")],
 }
 
 SURVIVAL = {
     "interface": [
-        "this module and the file of every variant a part runs, each whole (the session-start hook names this module "
-        "and every variant file);",
-        "the approved design: `docs/DESIGN.md`, `docs/REQUIREMENTS.md` and `docs/INVENTORY.md`, whole: each variant "
-        "maps onto the agreed functionality and adds its screens, commands or operations to the register;",
+        "this module and every variant file, each whole (the session-start hook names all four; a variant no part runs "
+        "is read only to know it does not apply);",
+        "the approved design: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`, and `docs/diagrams/INDEX.md` "
+        "with every diagram it lists, whole: each variant maps onto the agreed functionality, adds its screens, commands "
+        "or operations to the register, and agrees with the diagrams (the mockups with the operational activity "
+        "diagram's screens);",
         "what each running variant has produced so far: `docs/design/DESIGN.md` and `docs/mockups/` for the mockups, "
         "`docs/design/COMMANDS.md` for the command design, `docs/design/CONTRACT.md` and the contract file it names for "
         "the contract design;",
-        "`run/supervisor/interface-notes.md`: every change the owner asked for on a variant's artifact and whether it "
-        "is made, written there as each request arrives, because the conversation that held them does not survive a "
-        "compaction (rule 54);",
-        "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, whose additions "
-        "at `interface.variants` say which variants run, and its `Awaiting user on:` line says which variant waits for "
-        "the owner.",
+        "`run/supervisor/interface-notes.md` (\"The interface notes\"), whole;",
+        "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which activate "
+        "variants at `interface.variants` beside the kinds of interface the design shows, and its `Awaiting user on:` "
+        "line says which variant waits for the owner.",
     ],
     "planning": [
         "this module, whole;",
@@ -106,10 +108,12 @@ SURVIVAL = {
         "`docs/design/` and `docs/mockups/`, whole: every increment satisfies requirements of the register and cites "
         "what it implements;",
         "`docs/BUILD_PLAN.md` as drafted so far, whole, and each Issues file the owner named at Step 0, whole (its path "
-        "stands in the plan's Prior-project lessons section, written there as soon as the owner names it);",
+        "stands in the plan's Prior-project lessons section, Step 0);",
         "`docs/DESIGN_CRITIQUE.md`, whole, while the plan critique runs, with `docs/RUN_PARAMETERS.md` and the round's "
         "files under `run/review/` (`DESIGN-plan-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in "
-        "flight: the plan critique counts its rounds as the design critique does;",
+        "flight, and `~/.claude/cursor-bridge/workflow/phases/design.md`'s \"The procedure\", whose two-critic loop, "
+        "stop rule, ceiling, confirming read and resolution round the plan critique runs: it counts its rounds as the "
+        "design critique does;",
         "`docs/PROJECT_STATUS.md`, whole: its `Awaiting user on:` line says whether Step 0's question or the plan's "
         "gate waits for the owner.",
     ],
@@ -203,7 +207,9 @@ def test_r010_the_mockups_are_an_addition_the_trait_has_screens_activates():
     runs = flat(section(module("interface"), "Which variants a part runs", 3))
     assert ("The mockups are activated by the trait *has screens*, which a part with screens has by its definition; a "
             "part whose design shows screens without the trait on its `Workflows:` line has a trait missing, which the "
-            "design gate settles (`design.md`, \"Traits at the design gate\") before this phase begins.") in runs
+            "design gate settles (`design.md`, \"Traits at the design gate\") before this phase begins, and a missing trait "
+            "found during this phase goes back to the owner as that same decision, asked on its own, before any mockup is "
+            "approved.") in runs
 
 
 def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_conditions():
@@ -233,30 +239,56 @@ def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_con
     assert "Build an HTML/CSS mockup" not in module("interface")
 
 
-def test_r012_command_and_contract_design_say_what_the_owner_approves():
-    """R-012 and §6.9: the command design writes the commands, their help text and their output formats; the contract
-    design the protocol's operations, their inputs, outputs and errors, and how the contract is versioned, as a contract
-    file that tests enforce; each maps onto the design in both directions and has its own gate."""
-    c = flat(module("interface/command-design.md"))
-    for s in ("Write it to `docs/design/COMMANDS.md`, one section per command (and per subcommand)",
-              "**the help text,** word for word as `--help` will print it;",
-              "**the output:** what it prints on success",
-              "**the failures:** each error the owner can cause",
-              "maps onto the agreed functionality **with no gaps, in both directions**, as a mockup does",
-              "**Gate:** present the example sessions and the help texts to the owner and get explicit approval of the "
-              "command design before writing the build plan."):
-        assert s in c, s
-    k = flat(module("interface/contract-design.md"))
-    for s in ("**`docs/design/CONTRACT.md`**, in plain words: every operation the part offers",
-              "**The contract file**, at the path `CONTRACT.md` names, in the protocol's own machine-readable form",
-              "State in `CONTRACT.md` how the version changes: what counts as a breaking change",
-              "The build plan then carries the increment whose tests check the built part against the contract file, so "
-              "that the contract is enforced, never only described.",
-              "Where the part also has commands a person types (a service's administrative commands), those get the "
-              "command design too (`interface/command-design.md`).",
-              "**Gate:** present `CONTRACT.md`'s operations, in plain words with their example calls, to the owner and "
-              "get explicit approval of what the part offers before writing the build plan."):
-        assert s in k, s
+def test_r010_no_text_calls_the_mockups_a_replacement():
+    """R-010, the negative side (Review A's consider): neither the interface module nor the mockups file calls the
+    mockups a replacement of anything; only a type workflow or sub-workflow replaces, and it replaces the phase."""
+    called = re.compile(r"[Mm]ockups?\b[^.;:,]*\b(is|are) a replacement")
+    replacing = re.compile(r"[Mm]ockups? (replace|replaces)\b")
+    assert called.search("the mockups are a replacement for it") and replacing.search("the mockups replace it")
+    for rel in ("interface.md", "interface/mockups.md"):
+        text = flat(module(rel))
+        assert called.search(text) is None and replacing.search(text) is None, rel
+
+
+def test_r004_the_interface_notes_are_written_by_the_procedure_and_no_key_among_them():
+    """R-004 (the survival list names the interface notes) and Review A's should-fix: writing them is an instruction
+    of the procedure, the file is named on Working files: (rule 54), and the security audit's advisory: a pasted key is
+    never written there (rule 53)."""
+    s = flat(section(module("interface"), "The interface notes", 3))
+    assert ("Write every change the owner asks for on a variant's artifact, and whether it is made, to "
+            "`run/supervisor/interface-notes.md` as each request arrives, and name the file on the status file's "
+            "`Working files:` line (rule 54).") in s
+    assert ("A key, token or password the owner pastes is never written there: rule 53 applies to it, and the note says "
+            "only that one was given.") in s
+
+
+def test_r004_the_issues_paths_are_written_by_step_0():
+    """R-004 (the planning survival list names the Issues files by the paths in the plan) and Review A's should-fix:
+    Step 0 writes each path into the plan as soon as the owner names it."""
+    s = flat(section(module("planning"), "Step 0 — Prior-project lessons (ask before drafting)", 3))
+    assert ("Write each path the owner names into the plan's Prior-project lessons section as soon as they name it, "
+            "before you read the file: the conversation that held it does not survive a compaction (rule 54).") in s
+
+
+def test_r012_the_gate_asks_for_every_variant_and_for_none():
+    """R-012 and rule 5: the phase passes when every variant every part runs is approved, each as its own question;
+    when no part runs any variant the owner's word is still asked (Review A's consider)."""
+    s = flat(section(module("interface"), "The gate", 3))
+    assert "each variant's approval asked as a question of its own in the app's question form" in s
+    assert ("When no part runs any variant, the gate still asks the owner's word, that no part has an interface to judge "
+            "before the build (rule 5).") in s
+    assert "The phase passes when every variant every part runs is approved." in s
+
+
+def test_r012_the_plan_builds_against_what_the_interface_phase_approved():
+    """R-012 with the planning module (Review A's should-fix: the contract-enforcement increment is a Phase 4 duty,
+    stated where Phase 4 reads it): every approved contract gets an increment whose tests check the built part against
+    the contract file."""
+    s = flat(section(module("planning"), "What the interface phase hands to the plan", 3))
+    assert ("for every contract the contract design approved (`docs/design/CONTRACT.md`), the plan carries an increment "
+            "whose tests check the built part against the contract file, so that the contract is enforced, never only "
+            "described.") in s
+    assert "every increment that builds a command cites the approved command design's section for it" in s
 
 
 def standin_rx():
@@ -275,6 +307,9 @@ def test_the_playable_prototype_is_a_declared_pointer_with_no_stand_in_wording()
     assert "Its procedure belongs to the Game Development type workflow, which replaces this phase" in p
     assert "The main workflow holds no procedure for play beyond this pointer." in p
     rx = standin_rx()
+    # the precondition (Review A's blocking item): the patterns catch a stand-in, so their silence below means something
+    assert rx.search("this screen arrives in a later release")
+    assert rx.search("coming soon")
     for rel in ["interface.md"] + [v[2] for v in VARIANTS]:
         hit = rx.search(module(rel))
         assert hit is None, (rel, hit and hit.group(0))

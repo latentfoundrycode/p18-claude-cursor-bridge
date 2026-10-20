@@ -59,7 +59,7 @@ a judgement layer — not as a new human gate.
   required states) is a correctness class and behaves like any other REJECT.
 - **No new human gate.** Design correctness never reaches the owner. Only a genuine *intent*
   question — how the UI should look or behave — does, and that routes through the
-  approved-mockup rule in `supervisor.md` Phase 3, not through this policy.
+  approved-mockup rule in `~/.claude/cursor-bridge/workflow/phases/interface/mockups.md` (Phase 3), not through this policy.
 
 ---
 

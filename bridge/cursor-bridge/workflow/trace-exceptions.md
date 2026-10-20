@@ -29,3 +29,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md Extension points
 - reword TASK-012 bridge/commands/supervisor.md Phase 2 — Design
 - new TASK-012 bridge/cursor-bridge/workflow/phases/design.md The gate
+- new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md The interface notes
+- new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md What the interface phase hands to the plan
+- reword TASK-012 bridge/commands/supervisor.md The design-tooling flow
+- new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md Step 0 — Prior-project lessons (ask before drafting)

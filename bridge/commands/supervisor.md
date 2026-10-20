@@ -550,7 +550,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `impeccable detect` floor — is part of the gate, decided by the detector and the
     `design-auditor`, never routed to the user. Only a genuine *intent* question about how
     the UI should look or behave reaches them, and that goes through the approved-mockup
-    rule (Phase 3).
+    rule (Phase 3, `~/.claude/cursor-bridge/workflow/phases/interface/mockups.md`).
 14. Security correctness — the deterministic floor (Semgrep, OSV-Scanner, Socket) plus the
     `security-auditor` and Review B's security mandate — is part of the gate, never routed to
     the user. A security REJECT re-delegates; a malicious dependency is rejected at the

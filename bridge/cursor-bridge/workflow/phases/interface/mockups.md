@@ -1,6 +1,6 @@
 ## Mockups
 
-The mockups are the interface phase's variant for screens a person sees (`interface.md`, "The variants"). They are an addition, never a replacement: the trait *has screens* activates them at `interface.variants` for each part that has screens, beside any other variant the part runs, together with its design tooling below. The build-phase conditions of screens (the frozen interface rules in every brief, the design auditor's review, the observability tests of the running interface) are not this file's: they belong to the build modules, where the trait *has screens* gathers them.
+The mockups are the interface phase's variant for screens a person sees (`interface.md`, "The variants"). They are an addition, never a replacement: the trait *has screens* activates them at `interface.variants` for each part that has screens, beside any other variant the part runs, together with its design tooling below. The build-phase conditions of screens (the frozen interface rules in every brief, the design auditor's review, the observability tests of the running interface) are not this file's: they are the build phases' part of the trait *has screens*, read with the build modules.
 
 After the design is approved and before the build plan, turn the agreed design into
 something the user can *see*. Build an HTML/CSS mockup of the interface — a static,
@@ -44,7 +44,7 @@ For a UI-bearing project, build the mockup through the design tooling rather tha
    together** — that pair is the visual contract the builder must not stray from.
 
 Save the mockup files under `docs/mockups/` (one file per screen or view is fine). The
-design documents already live under `docs/`. Saving these concludes the planning stage.
+design documents already live under `docs/`. Saving these concludes the mockups; the phase concludes when every variant the parts run is approved (`interface.md`, "The gate").
 
 **Before the gate, make the mockup and the operational activity diagram agree** — every mockup screen is a `scr_` node and every `scr_` node is a mockup screen — **and add every mockup screen and every required state on it to `docs/REQUIREMENTS.md`** as its own row (Source: mockup screen "<name>"), unless an existing row already covers it — a screen in the mockup is a promise to the owner, and a tab that exists only as a picture is how a Settings screen went unbuilt (KP-029).
 

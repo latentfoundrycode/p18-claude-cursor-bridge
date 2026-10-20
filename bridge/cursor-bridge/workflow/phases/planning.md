@@ -6,8 +6,8 @@ After a compaction or a resume in this phase, read these before your next action
 
 - this module, whole;
 - the approved design and what the interface phase approved: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`, `docs/diagrams/INDEX.md` and every diagram it lists, and the approved artifacts under `docs/design/` and `docs/mockups/`, whole: every increment satisfies requirements of the register and cites what it implements;
-- `docs/BUILD_PLAN.md` as drafted so far, whole, and each Issues file the owner named at Step 0, whole (its path stands in the plan's Prior-project lessons section, written there as soon as the owner names it);
-- `docs/DESIGN_CRITIQUE.md`, whole, while the plan critique runs, with `docs/RUN_PARAMETERS.md` and the round's files under `run/review/` (`DESIGN-plan-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in flight: the plan critique counts its rounds as the design critique does;
+- `docs/BUILD_PLAN.md` as drafted so far, whole, and each Issues file the owner named at Step 0, whole (its path stands in the plan's Prior-project lessons section, Step 0);
+- `docs/DESIGN_CRITIQUE.md`, whole, while the plan critique runs, with `docs/RUN_PARAMETERS.md` and the round's files under `run/review/` (`DESIGN-plan-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in flight, and `~/.claude/cursor-bridge/workflow/phases/design.md`'s "The procedure", whose two-critic loop, stop rule, ceiling, confirming read and resolution round the plan critique runs: it counts its rounds as the design critique does;
 - `docs/PROJECT_STATUS.md`, whole: its `Awaiting user on:` line says whether Step 0's question or the plan's gate waits for the owner.
 
 ### Step 0 — Prior-project lessons (ask before drafting)
@@ -20,6 +20,8 @@ platform, the kinds of subsystems — a video pipeline, an auth layer, a desktop
 they can judge overlap against projects they remember. Point them at the bridge's
 `Claude-Cursor Bridge Issues Index.md` in the bridge's own `Documents/` if they keep one.
 If they name none, record "Prior-project lessons: none" in the plan and move on.
+
+Write each path the owner names into the plan's Prior-project lessons section as soon as they name it, before you read the file: the conversation that held it does not survive a compaction (rule 54).
 
 For each file they give you, read it whole (it is the size of a report, not a codebase),
 then produce a short **Prior-project lessons** section at the top of `docs/BUILD_PLAN.md`:
@@ -39,6 +41,10 @@ then produce a short **Prior-project lessons** section at the top of `docs/BUILD
 configuration item. Do not paste the old file's prose into the plan; the plan carries the
 consequence, not the story. If a lesson is generalizable beyond both projects, say so in
 your report — it is a candidate for `Known-Pitfalls.md`, which is the maintainer's call.
+
+### What the interface phase hands to the plan
+
+Each variant the interface phase approved is a source the plan builds against. Every increment that builds a screen cites its approved mockup screen ("The plan", below); every increment that builds a command cites the approved command design's section for it; and for every contract the contract design approved (`docs/design/CONTRACT.md`), the plan carries an increment whose tests check the built part against the contract file, so that the contract is enforced, never only described.
 
 ### The plan
 
