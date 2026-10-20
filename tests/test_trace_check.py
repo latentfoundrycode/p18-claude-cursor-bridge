@@ -510,7 +510,7 @@ def test_r029_a_linked_workflow_folder_is_not_read(tmp_path):
         rc, lines = run(root)
         _assert_link_stops_the_run(root, "bridge/cursor-bridge/workflow", lines, rc)
     finally:
-        os.rmdir(str(workflow))
+        _remove_folder_link(workflow)
 
 
 def test_r029_a_linked_folder_on_the_way_to_the_core_is_not_read(tmp_path):
@@ -530,7 +530,7 @@ def test_r029_a_linked_folder_on_the_way_to_the_core_is_not_read(tmp_path):
         _assert_link_stops_the_run(root, "bridge/commands", lines, rc)
         assert not any('"Nope"' in l or "Outside" in l for l in lines), lines   # what the outside core would print
     finally:
-        os.rmdir(str(commands))
+        _remove_folder_link(commands)
 
 
 @pytest.mark.parametrize("rel", ["bridge/commands/supervisor.md", "bridge/cursor-bridge/workflow/trace-exceptions.md",
@@ -563,7 +563,7 @@ def test_r029_a_linked_bridge_folder_resolves_no_reference(tmp_path):
         program = _load_program()
         assert [program.resolve_ref(rest, str(root)) for rest in ("commands/supervisor.md", "")] == [False, False]
     finally:
-        os.rmdir(str(bridge))
+        _remove_folder_link(bridge)
 
 
 def test_r029_the_placeholder_segment_is_kept(tmp_path):
@@ -611,6 +611,15 @@ def _link_folder(link, target):
         pytest.skip("this account cannot create a folder link")
 
 
+def _remove_folder_link(link):
+    """Removes the link _link_folder made, never its target: a junction with rmdir on Windows, a symbolic link with
+    unlink elsewhere (rmdir refuses a symbolic link on Linux)."""
+    if sys.platform == "win32":
+        os.rmdir(str(link))
+    else:
+        os.unlink(str(link))
+
+
 def test_r029_a_reference_through_a_link_out_of_the_bridge_folder_does_not_resolve(tmp_path):
     """Requirement 1 of round 2: a reference whose segments are all plain still fails when its real path leaves
     bridge/ (here through a folder link inside it); the builder's mutation (l), the containment check dropped, survived
@@ -629,7 +638,7 @@ def test_r029_a_reference_through_a_link_out_of_the_bridge_folder_does_not_resol
         assert rc == 1 and fails(lines) == ["FAIL (ref) %s:%d: ~/.claude/cursor-bridge/linked/Target.md"
                                             % (CORE, numbers[0])], lines
     finally:
-        os.rmdir(str(link))   # removes the link itself, never its target
+        _remove_folder_link(link)   # removes the link itself, never its target
 
 
 def test_r029_a_linked_folder_under_workflow_is_not_read(tmp_path):
@@ -648,7 +657,7 @@ def test_r029_a_linked_folder_under_workflow_is_not_read(tmp_path):
         rc, lines = run(root)
         _assert_link_stops_the_run(root, "bridge/cursor-bridge/workflow/phases/linked", lines, rc)
     finally:
-        os.rmdir(str(link))
+        _remove_folder_link(link)
 
 
 def _load_program():
@@ -782,7 +791,7 @@ def test_r029_a_link_on_the_way_is_refused_before_realpath(tmp_path, monkeypatch
         assert result is False and refused_seen == [], (result, refused_seen)
         assert control is True and len(seen) > 0, (control, seen)
     finally:
-        os.rmdir(str(link))   # removes the link itself, never its target
+        _remove_folder_link(link)   # removes the link itself, never its target
 
 
 def test_r029_an_unreadable_folder_under_workflow_is_not_checked(tmp_path, monkeypatch, capsys):
