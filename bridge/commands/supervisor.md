@@ -667,7 +667,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     already passed. A calibration reopens no approval, restarts no increment, and defaults
     any new owner setting with a one-line notice rather than a question. After every
     compaction or resume the `session-start` hook re-injects the digest at the head of this
-    file and names the sections of your phase: read them before your next action (KP-035);
+    file and names your phase's modules and the conditional workflows that touch it: read them whole before your next action (KP-035);
     never work from memory of these rules. When the installed version is older than the one your status file records, a release was taken back: `/calibrate-bridge` applies the items in `ROLLED-BACK.md`, and nothing you did under the newer release is undone.
 29. The five run parameters — `Stage pause`, `Merge authority`, `Refactoring pass`, `Installer verification`, `Parallel increments` — are asked
     once, right after the plan is approved, each as a question of its own in the app's

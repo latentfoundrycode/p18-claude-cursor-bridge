@@ -6,3 +6,4 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - reword TASK-010 bridge/commands/supervisor.md Main and conditional workflows
 - new TASK-010 bridge/cursor-bridge/workflow/phases/project-end.md Where this module begins
 - new TASK-010 bridge/cursor-bridge/workflow/phases/reflection.md Project end
+- reword TASK-015 bridge/commands/supervisor.md Standing rules
