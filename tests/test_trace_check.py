@@ -11,6 +11,7 @@ import importlib.util
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 
@@ -469,6 +470,8 @@ def test_r029_printed_paths_are_ascii(tmp_path):
 
 
 def test_r029_a_linked_file_under_workflow_is_not_read(tmp_path):
+    """Round 4, requirement 1: a linked .md file under workflow/ is `ERROR: <path>: is a link`, exit 2, and is not
+    read (round 3 skipped it silently, which hid its text from the check)."""
     root = make_repo(tmp_path)
     outside = tmp_path / "outside.md"
     outside.write_bytes(b"# Outside\n\nText from outside the repository.\n")
@@ -479,8 +482,120 @@ def test_r029_a_linked_file_under_workflow_is_not_read(tmp_path):
     except (OSError, NotImplementedError):
         pytest.skip("this account cannot create a symbolic link")
     rc, lines = run(root)
+    assert rc == 2 and lines[-2:] == ["ERROR: bridge/cursor-bridge/workflow/phases/linked.md: is a link",
+                                      "RESULT: not checked"], lines
+    assert not any("Text from outside" in l for l in lines), lines
+
+
+def _assert_link_stops_the_run(root, rel, lines, rc):
+    assert rc == 2 and [l for l in lines if l.startswith("ERROR: ")] == ["ERROR: %s: is a link" % rel], lines
+    assert lines[-1] == "RESULT: not checked", lines
+    assert not any("Text from outside" in l for l in lines), lines
+
+
+def test_r029_a_linked_workflow_folder_is_not_read(tmp_path):
+    """Round 4, requirement 1 (security round 3 blocking; Review A round 3, convergent): the folder the walk starts
+    from is checked before the walk, since os.walk always enters its top folder; reproduced by the security re-check,
+    which printed text from outside the repository."""
+    root = make_repo(tmp_path)
+    workflow = root / "bridge" / "cursor-bridge" / "workflow"
+    outside = tmp_path / "outside"
+    shutil.copytree(str(workflow), str(outside))
+    (outside / "phases").mkdir()
+    (outside / "phases" / "leak.md").write_bytes(b"# Outside\n\nText from outside the repository.\n")
+    shutil.rmtree(str(workflow))
+    _link_folder(workflow, outside)
+    try:
+        assert (workflow / "phases" / "leak.md").exists()   # the precondition: without the check it would be read
+        rc, lines = run(root)
+        _assert_link_stops_the_run(root, "bridge/cursor-bridge/workflow", lines, rc)
+    finally:
+        os.rmdir(str(workflow))
+
+
+def test_r029_a_linked_folder_on_the_way_to_the_core_is_not_read(tmp_path):
+    """Round 4, requirement 1: every folder on the way to a file read by name is checked; a link at bridge/commands
+    made the program read an outside supervisor.md and print its text (the security re-check's second reproduction)."""
+    root = make_repo(tmp_path)
+    commands = root / "bridge" / "commands"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "supervisor.md").write_bytes(BASE_CORE.encode("utf-8")
+                                            + b"\n## Outside\n\nText from outside the repository, see \"Nope\".\n")
+    shutil.rmtree(str(commands))
+    _link_folder(commands, outside)
+    try:
+        assert (commands / "supervisor.md").exists()
+        rc, lines = run(root)
+        _assert_link_stops_the_run(root, "bridge/commands", lines, rc)
+    finally:
+        os.rmdir(str(commands))
+
+
+@pytest.mark.parametrize("rel", ["bridge/commands/supervisor.md", "bridge/cursor-bridge/workflow/trace-exceptions.md",
+                                 "bridge/cursor-bridge/workflow/trace-baseline.txt"])
+def test_r029_a_linked_file_read_by_name_is_not_read(tmp_path, rel):
+    """Round 4, requirement 1: each of the three files read by name is checked on its own path too."""
+    root = make_repo(tmp_path)
+    target = root / rel
+    outside = tmp_path / "outside-file"
+    outside.write_bytes(target.read_bytes())
+    target.unlink()
+    try:
+        os.symlink(str(outside), str(target))
+    except (OSError, NotImplementedError):
+        pytest.skip("this account cannot create a symbolic link")
+    rc, lines = run(root)
+    _assert_link_stops_the_run(root, rel, lines, rc)
+
+
+def test_r029_a_linked_bridge_folder_resolves_no_reference(tmp_path):
+    """Round 3, requirement 1 (Review A round 3, should-fix): bridge/ itself being a link makes every reference a
+    finding; the containment guard alone cannot see it, both its sides passing through the same link."""
+    root = make_repo(tmp_path)
+    bridge = root / "bridge"
+    real_bridge = tmp_path / "real-bridge"
+    shutil.move(str(bridge), str(real_bridge))
+    _link_folder(bridge, real_bridge)
+    try:
+        assert (bridge / "commands" / "supervisor.md").exists()
+        program = _load_program()
+        assert [program.resolve_ref(rest, str(root)) for rest in ("commands/supervisor.md", "")] == [False, False]
+    finally:
+        os.rmdir(str(bridge))
+
+
+def test_r029_the_placeholder_segment_is_kept(tmp_path):
+    """Round 4, requirement 2 (Review A round 3, blocking): `...` is round 1's placeholder (Requirement 7), not a
+    trailing-dot segment: the walk stops at it."""
+    root = make_repo(tmp_path)
+    program = _load_program()
+    assert program.resolve_ref("cursor-bridge/.../Glossary.md", str(root)) is True
+    assert program.resolve_ref("nope/.../x", str(root)) is False
+    text, _ = core_plus("Read ~/.claude/cursor-bridge/.../Anything.md here")
+    write(root, CORE, text)
+    rc, lines = run(root)
     assert rc == 0 and lines[-1] == "RESULT: OK", lines
-    assert not any("Text from outside" in l or "phases/linked" in l for l in lines), lines
+
+
+def test_r029_a_citation_is_read_once(tmp_path):
+    """Round 4, requirement 5 (Review A round 3, consider): the search resumes after a citation, never inside its
+    quoted text, so `see "what to see " and then "Other"` holds one citation."""
+    root = make_repo(tmp_path)
+    text, _ = core_plus('(see "what to see " and then "Other")')
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Standing rules - "what to see "' % CORE], lines
+
+
+def test_r029_an_empty_quote_is_not_a_citation(tmp_path):
+    """Round 4, requirement 6 (round 1's pattern, `[^"]+`): `see ""` is not a citation, and a chain stops before an
+    empty quote."""
+    root = make_repo(tmp_path)
+    text, _ = core_plus('(see "" here)', '(see "Nope A" %s "" %s "Nope B")' % (ARROW, ARROW))
+    write(root, CORE, text)
+    rc, lines = run(root)
+    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Standing rules - "Nope A"' % CORE], lines
 
 
 def _link_folder(link, target):
@@ -518,7 +633,7 @@ def test_r029_a_reference_through_a_link_out_of_the_bridge_folder_does_not_resol
 
 def test_r029_a_linked_folder_under_workflow_is_not_read(tmp_path):
     """Requirement 11 of round 2: links are not read, a folder link included; on Windows that is a junction, which
-    os.walk enters unless the program refuses it."""
+    os.walk enters unless the program refuses it. Round 4, requirement 1: such a folder is an error, not a skip."""
     root = make_repo(tmp_path)
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -530,8 +645,7 @@ def test_r029_a_linked_folder_under_workflow_is_not_read(tmp_path):
     try:
         assert (link / "moved.md").exists()
         rc, lines = run(root)
-        assert rc == 0 and lines[-1] == "RESULT: OK", lines
-        assert not any("Text from outside" in l or "phases/linked" in l for l in lines), lines
+        _assert_link_stops_the_run(root, "bridge/cursor-bridge/workflow/phases/linked", lines, rc)
     finally:
         os.rmdir(str(link))
 
@@ -637,8 +751,11 @@ def test_r029_a_refused_reference_touches_no_file(tmp_path, monkeypatch):
     rests = ("\\\\host\\share\\x", "//host/share/x", "C:/Windows", "../README.md", "a/../../x", "cmd/<x>/../..",
              "commands./supervisor.md", "NUL", "cursor-bridge/com1.md")
     results = [program.resolve_ref(rest, str(root)) for rest in rests]
+    refused_calls = list(calls)
+    control = program.resolve_ref("commands/supervisor.md", str(root))   # the positive control: the hooks record
     monkeypatch.undo()
-    assert results == [False] * len(rests) and calls == [], (results, calls)
+    assert results == [False] * len(rests) and refused_calls == [], (results, refused_calls)
+    assert control is True and len(calls) > 0, (control, calls)
 
 
 def test_r029_a_link_on_the_way_is_refused_before_realpath(tmp_path, monkeypatch):
@@ -656,9 +773,13 @@ def test_r029_a_link_on_the_way_is_refused_before_realpath(tmp_path, monkeypatch
         seen = []
         real = os.path.realpath
         monkeypatch.setattr(os.path, "realpath", lambda *a, **k: seen.append(a[0]) or real(*a, **k))
+        assert (link / "Target.md").exists()   # the precondition: through the link the target exists
         result = program.resolve_ref("cursor-bridge/linked/Target.md", str(root))
+        refused_seen = list(seen)
+        control = program.resolve_ref("cursor-bridge/Glossary.md", str(root))   # the containment guard's realpath
         monkeypatch.undo()
-        assert result is False and seen == [], (result, seen)
+        assert result is False and refused_seen == [], (result, refused_seen)
+        assert control is True and len(seen) > 0, (control, seen)
     finally:
         os.rmdir(str(link))   # removes the link itself, never its target
 
