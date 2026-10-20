@@ -568,4 +568,18 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 
 **Resolution**: none due. Nothing is open after the confirming read: no Blocking finding and no non-convergence in any round, so no resolution round runs, and the subject goes to its gate.
 
+## Subject: windowless (the window flood's fix: windowless launches and a rate limit, a scoped revision mid-build, 2026-10-20)
+
+**What is criticised:** a scoped revision of release B's plan at the owner's decision (ISS-011), one subject holding both its design revision — three rows of the register, R-039 to R-041, and the INVENTORY Decisions rows that record the owner's words — and its plan addendum: TASK-028, TASK-029 and TASK-030 in stage B5 before TASK-025, the stage's demonstration extended, TASK-025's and TASK-027's lines amended. The design revision is three rows because the design is the owner's words as relayed and confirmed; the subject is one because a scoped revision mid-build is one change (design.md, "The procedure": the subjects). The critics read `run/review/DESIGN-windowless-<round>.md`, built from the committed records.
+
+**Accepted** (finding, critic, round, the reason):
+- (none yet)
+
+**Rounds** (round, kind, the commit its file was built from, critic, Blocking / Should fix / Consider, what was fixed):
+- (none yet)
+
+**Resolution**: (none yet)
+
+## Subject: ceiling — after the critique
+
 **After the critique** (supervisor, at the brief, for the code gate's reviewers): the change log's and KP-062's migration notes gain one sentence, a round file named other than by its number (`-confirm`) is refused and its next file takes the next number (the spec-packager's note: release B's own plan critique used `DESIGN-plan-confirm.md`); the brief matches `run`, `review` and `DESIGN-` in any case, with a test. Not criticised by the two critics; reviewed at the code gate with the whole diff.
