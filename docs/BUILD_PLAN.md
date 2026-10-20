@@ -122,7 +122,7 @@ Parent: none
 Depends on: TASK-003, TASK-005, TASK-007
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_trace_check.py
+Scope: bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_trace_check.py; docs/cli-reference.json; docs/CLI_REFERENCE.md
 Satisfies: R-029
 Done when: `trace-baseline.txt` pins the commit before the carve (after TASK-003/005/007's core edits); `trace-check.py` maps every standing rule and conditional passage (the project-layout/Workspace-boundary section included) from that baseline to its home — a home is `supervisor.md` (for a rule that stays in the core) or any file under `workflow/**`; a passage found verbatim in **more than one** home fails as a **COPY** unless a `reword`/`new` entry explains it (so "moves, not copies" is enforced for every increment, not only where a per-increment test asserts absence); a two-hop move (baseline→module→trait, the source emptied) passes; verbatim moves are required except `reword` entries in `trace-exceptions.md`; text new to the modules is flagged unless a `new` entry declares it; every `~/.claude/...` reference and cited section still resolves; it runs incrementally; the empty `trace-exceptions.md` is scaffolded here; `test_trace_check.py` (names R-029) covers a clean move, a two-hop move, a **copy into two homes (fails)**, a silent reword (fails), an undeclared new passage (fails), a dropped boundary section (fails), a dangling reference (fails), and both exception kinds.
 
@@ -184,7 +184,7 @@ Depends on: TASK-010, TASK-006, TASK-007
 Parallel: no
 Diagrams: none
 Merge unit: merged with TASK-010 as one PR (see TASK-010) so the suite is never red on `main` between the carve and this hook.
-Scope: bridge/cursor-bridge/session-start.py; bridge/cursor-bridge/MANIFEST.json; tests/test_session_start_module.py; tests/test_session_start.py
+Scope: bridge/cursor-bridge/session-start.py; bridge/cursor-bridge/MANIFEST.json; tests/test_session_start_module.py; tests/test_session_start.py; docs/cli-reference.json; docs/CLI_REFERENCE.md
 Satisfies: R-005
 Done when: given a project's `Phase:` and `Workflows:` lines the hook re-injects the digest and, as a **second run** (neither near the 10,000-char cap), names the current phase's module(s), the conditional files (type/sub-type/trait) touching that phase, and the table's further files, listing a split module's sub-files and a phase's variant files from the module's own declared-variants/pointer line (no table entry names a variant file directly, so the table never points at `interface/mockups.md` before TASK-012 creates it); the shared Phase→module table maps **every template value**: intake→intake; design→design; mockups→interface (+ the mockups variant); planning→planning+run-parameters; configuration→configuration; building→delegation-loop+reflection (+project-end at the last stage close); done→change-cycle (a request on a done project is a change cycle); changing→change-cycle+delegation-loop+reflection+project-end; plus the convention re-reads (merge-policy+pitfalls while building/changing; diagram-conventions+glossary at design; project-config+pitfalls at configuration); emits trait files in the R-034 order; `test_session_start.py`'s former heading/line-range assertions are re-pointed to the module table here (never weakened; the 9,500-char digest and status-at-limits cases kept); `test_session_start_module.py` (names R-005) covers every template phase value, a phase with and without conditionals, a split module (two sub-files), the convention files, and the trait order, using the TASK-006 fixtures.
 
@@ -270,7 +270,7 @@ Parent: none
 Depends on: TASK-023, TASK-006, TASK-008
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_calibrate_program.py
+Scope: bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_calibrate_program.py; docs/cli-reference.json; docs/CLI_REFERENCE.md
 Satisfies: R-027, R-033
 Done when: `conformance-check.py` runs `workflow-check` at calibration over a running project's status file and reports an unclassified line or one naming an unwritten workflow; `test_calibrate_program.py` (names R-027, R-033) covers a classified and an unclassified project.
 
