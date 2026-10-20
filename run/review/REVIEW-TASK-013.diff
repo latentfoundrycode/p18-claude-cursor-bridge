@@ -1,0 +1,1007 @@
+diff --git a/bridge/commands/supervisor.md b/bridge/commands/supervisor.md
+index ae7e6fb..0dfecc4 100644
+--- a/bridge/commands/supervisor.md
++++ b/bridge/commands/supervisor.md
+@@ -218,12 +218,12 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
+ | Planning (Phase 4, the build plan) | `~/.claude/cursor-bridge/workflow/phases/planning.md` |
+ | Run parameters | `~/.claude/cursor-bridge/workflow/phases/run-parameters.md` |
+ | Configuration (Phase 5) | `~/.claude/cursor-bridge/workflow/phases/configuration.md` |
+-| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` |
++| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` and its sub-file under `~/.claude/cursor-bridge/workflow/phases/delegation-loop/` |
+ | The change cycle | `~/.claude/cursor-bridge/workflow/phases/change-cycle.md` |
+ | Reflection points | `~/.claude/cursor-bridge/workflow/phases/reflection.md` |
+ | Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
+ 
+-Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`.
++Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`. A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 9 is in `delegation-loop/refactoring-pass.md`.
+ 
+ **Modules read outside their own phase.** Some procedures run outside the phase whose `Phase:` value names their module; they are read whenever they apply, whatever the phase:
+ - `reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 6e4f333..a74778a 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.18a",
+-  "generated": "2026-10-20 12:47",
++  "generated": "2026-10-20 13:51",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -14,7 +14,7 @@
+     "agents/test-runner.md": "8358d18b3e8d109d7643ce2610ee433aa5668c4d9601976ece28a4d914f62649",
+     "commands/calibrate-bridge.md": "5ccdaa582af3a0084c6ceb20d62ac4dc1998ec86e085aa8688af4dc7ee59294a",
+     "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
+-    "commands/supervisor.md": "7d70641c9c5f7a29ba731684552f19a58af87a1405ad6b55128535b92f842f87",
++    "commands/supervisor.md": "02c7d83f5731690b5316760589cccf6f517d06d2abe5ef52ee685006968906ff",
+     "cursor-bridge/CHANGELOG.md": "4e5dd4878aec6a49eb37c9f1183f6a765204aad40560730cb28c25615f6a8d25",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
+@@ -107,8 +107,9 @@
+     "cursor-bridge/workflow/extension-points.md": "d62447f21dd4acff615d4260ed40baa86d8d2f0567f928a1689a9a4cbb98fb8b",
+     "cursor-bridge/workflow/open-list.md": "6d37ec2741ab10f6238aa3a2eb0c4e46f57defd109a80a2b08209c1cfcce8840",
+     "cursor-bridge/workflow/phases/change-cycle.md": "b0c1c6400e0b5b26eb7bbc7f1b3c0528736b432bba273aba61fe9af58ed4bbea",
+-    "cursor-bridge/workflow/phases/configuration.md": "c03b8b0b5538435f2057ef71ec84a94317b8a072a4136310ea428c6a1ced223d",
+-    "cursor-bridge/workflow/phases/delegation-loop.md": "7377f0ad71ed79f77c1d8cbaef623c52948808827caf1eddb7aebca01093d38f",
++    "cursor-bridge/workflow/phases/configuration.md": "929f0be47fd76d6bb39817585a1ee49d9384c2cd227df538935c5cdc4e756c04",
++    "cursor-bridge/workflow/phases/delegation-loop.md": "dc3c27b85acfdfea8520a01e4278961a6366a59a8079f9fc0c8a9636caeda5ee",
++    "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "40065539a1b0a098569db3d6c35198e0cff7179725ba2bba019287cfa175d987",
+     "cursor-bridge/workflow/phases/design.md": "1785619496f523e51c5472052899c9c74fa5a612a094dd648878b5c5a3dd7a2c",
+     "cursor-bridge/workflow/phases/intake.md": "a915bf1e11b8a515e5e4e05fe861fa45c2acf3dd919c16d29785214f4d78e06f",
+     "cursor-bridge/workflow/phases/interface.md": "0af009932c49b75c0e1f3ecf73cd51356290d04bbeb6dee4f6d7f03fdecef500",
+@@ -119,9 +120,9 @@
+     "cursor-bridge/workflow/phases/planning.md": "6a5a52844bf94dac2a671dabbbca2fcd8abd9315d9a0b02832fc8e52ee1882d6",
+     "cursor-bridge/workflow/phases/project-end.md": "3f9e66aec318328644e8ceb75dde9d15d5044e3e1099bd443caedd77c4cf3b79",
+     "cursor-bridge/workflow/phases/reflection.md": "62484e4baddcd9ed45a1b5803290f9ca2db4980bd5a6a83c12f1a2864d4afecd",
+-    "cursor-bridge/workflow/phases/run-parameters.md": "e2007da223deeff89d9963f9cf59b4cb08719c04d06a1f2754ed42ec20b9e1f2",
++    "cursor-bridge/workflow/phases/run-parameters.md": "7d37e1c3ab4dac2b2069b80998b28e6dfe1f8c68a849afa7a3bf415a2a9f73ed",
+     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
+-    "cursor-bridge/workflow/trace-exceptions.md": "02b3cd32ab5ef430a363a62e798be5ab201ca4f914dea23c3cd99ae9755926f6",
++    "cursor-bridge/workflow/trace-exceptions.md": "3da628228dbd32cb2e934510c4a326fd6fb9495170af04ca12aafc047d17f77e",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/workflow/phases/configuration.md b/bridge/cursor-bridge/workflow/phases/configuration.md
+index ce051c8..4d3ad56 100644
+--- a/bridge/cursor-bridge/workflow/phases/configuration.md
++++ b/bridge/cursor-bridge/workflow/phases/configuration.md
+@@ -1,5 +1,16 @@
+ ## Phase 5 — Configure the Cursor build environment
+ 
++### What must survive a compaction
++
++After a compaction or a resume in this phase, read these before your next action:
++
++- this module, whole, with `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole (the session-start hook names both for this phase);
++- the approved design and plan: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/BUILD_PLAN.md` and `docs/RUN_PARAMETERS.md`, whole: only the items that are load-bearing for this project are applied;
++- `docs/PROJECT_STATUS.md`, whole: its `Next:` line names the items configured so far and the next one ("Keeping the position"), its `Awaiting user on:` line an escalation that waits for the owner, and its `Workflows:` line the conditional workflows that add items at `configuration.items`;
++- `docs/INVENTORY.md`, whole: its Resources rows record each pinned tool and version, each mode in force and each spending limit as the items are configured.
++
++### The procedure
++
+ Once, after the plan is approved and before the first delegation, set up the headless
+ builder so it can produce and self-correct good code. Work through
+ `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` — read it by that absolute path;
+@@ -97,3 +108,13 @@ row without one. A limit the owner names is theirs: ask for the figure in the qu
+ account, or a dependency carrying a consequence the owner bears (money, privacy, lock-in) —
+ resolve it with the user before delegating. Routine technical configuration choices you decide
+ yourself and record; do not escalate them.
++
++### Keeping the position
++
++While the phase runs, keep the status file's `Next:` line naming the items configured so far and the next one, rewritten as each is finished, so that a resume after a compaction neither redoes an item nor skips one. It names each item by its name only, never a key's value or a path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the line names the first increment, and what was configured stands in the status file, as "Commit the configuration as its own checkpoint" above asks, with each tool's pinned version in `docs/INVENTORY.md` (Resources).
++
++## Extension points
++
++This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
++
++- `configuration.items` — configuration items, tools and checks a conditional workflow adds to those above, each worked as they are: written by **cursor-configurator** on your instruction, each tool's pinned version recorded in `docs/INVENTORY.md` (Resources), and committed with the configuration's checkpoint; made once for the whole project.
+diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop.md b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
+index bbafe3a..b9055a2 100644
+--- a/bridge/cursor-bridge/workflow/phases/delegation-loop.md
++++ b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
+@@ -1,5 +1,22 @@
+ ## Phase 6 — The delegation loop
+ 
++### What must survive a compaction
++
++After a compaction or a resume in this phase, read these before your next action:
++
++- this module and its sub-file, each whole (the session-start hook names both), with `~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole, and the other files the hook names;
++- `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of `run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the background runs that will wake you and what waits for the owner; while Review B runs the status file is not written and the position is kept in `in-flight.md` (step 8);
++- the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` with every revision of it, and each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);
++- `docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass runs and whether increments run in parallel, and the models the delegate command and Review B name;
++- the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, `run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message (step 4), and `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background; and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, `ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` needs), whole;
++- while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's "Keeping the pass's position"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.
++
++### The procedure
++
++Steps 1 to 8 below run for every increment; step 9, the refactoring and optimization pass at a stage's close, is in a sub-file of this module, read whole with it wherever the module is read:
++
++Sub-files: delegation-loop/refactoring-pass.md
++
+ For each increment, in order:
+ 
+ ### 1. Checkpoint
+@@ -547,75 +564,10 @@ the change log, not by a gate the user cannot operate. If the watch completes re
+ 
+ **After every merge, mark the increment's runs healthy and bring local `main` along.** `python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id>` for the builder run and for Review B, the id being the launch time on the first line of each `.err` file, given whole (a test run that passed is marked by the launcher itself): a healthy run is what the launcher learns a ceiling from, and a run never marked never raises one (release A2). Then `git switch main`, then `python ~/.claude/cursor-bridge/sync-check.py --apply`; it must end IN SYNC or FAST-FORWARDED before anything else happens, and the next branch starts from there. Under `Merge authority: owner`, do the same at the first resume after the owner has merged. A worktree the merged branch had is torn down now (rule 39).
+ 
+-### 9. Refactoring and optimization pass (at stage close)
+-
+-When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says
+-**Refactoring pass: on** for that stage, run one refactoring pass **before** the stage's reflection point.
+-"Refactoring" means one thing here: removing duplication or simplifying code while keeping
+-the same functionality. Every per-increment review saw one diff at a time, so a helper
+-written twice in two increments was invisible to both; this is the only step that looks at
+-the stage as a whole. Cursor's runs are cheap; the gate is not — so the pass is designed
+-around **one gate pass per stage**. **Normative diagrams are constraints on it:** a candidate that would change what a diagram draws — a component boundary, a class a Level 4 diagram fixes, a schema — is a design change, raised as an objection, never slipped in as a refactoring.
+-
+-1. **Deterministic floor.** Run the duplicate detector over the source tree and the
+-   project's linter complexity rules in report-only mode:
+-   ```bash
+-   npx --yes jscpd@<pinned> <src-dirs> --min-lines 5 --min-tokens 50 --reporters json --output docs/refactor/<stage> --silent
+-   ```
+-   Record the pinned `jscpd` version in `docs/INVENTORY.md` (Resources); verify-first on the first
+-   use (KP-008). The report is input for the scout, not a verdict.
+-2. **Scout.** Delegate to **refactor-scout** with the stage base commit, the detector
+-   report, the complexity report, and the size budget (default **400 changed lines**) —
+-   and, where budgets exist, the **performance inputs**: `bench/budgets.json`,
+-   `bench/baseline.json`, the latest `bench/results/latest.json`, and a profile of each
+-   budgeted operation (`scripts/profile.ps1 <benchmark>` → `bench/profiles/<benchmark>.txt`;
+-   `Performance-Conventions.md` §5). It returns two ranked lists — refactoring candidates
+-   and **optimization candidates ranked by measured impact on a budgeted metric**, each
+-   naming the benchmark that will prove it — marked COVERED or UNCOVERED, costed in lines,
+-   cut at the size budget together. **NO CANDIDATES** is a normal result — skip to the
+-   reflection point.
+-3. **Cover first.** For an UNCOVERED candidate you want, write characterization tests that
+-   pin its current behaviour (you may write tests), run them green, and **commit them on
+-   `main` through the gate before the refactoring branch is cut** — so they sit under the
+-   base ref and the purity check does not see them as test edits. Or skip the candidate.
+-3b. **The test-infrastructure lane.** Duplication in the *tests* — helpers copied across
+-   test files — is yours to consolidate, since you own the tests. Do it in its own commit on
+-   the same branch, checked with `refactor-check.py <base> --lane tests` (no production file
+-   may change) and by proving the **collected test set is identical** before and after
+-   (`pytest --collect-only -q` or the stack's equivalent, diffed). Never mix it into a
+-   production-lane commit; the two lanes share the one gate pass.
+-4. **One branch, many small commits.** Cut `refactor/<stage>` from `main`. For each
+-   candidate, in payoff order: package a **refactoring brief** (`handoff/REFAC-<nnn>.md`,
+-   spec-packager's refactoring variant), delegate, inspect (git-derived changeset + scope
+-   check as always), run the full test suite, and commit that candidate alone. A candidate
+-   that fails its tests or drifts is re-delegated or dropped — a Cursor round is cheap,
+-   so be strict. Never mix a candidate into a feature increment.
+-   An **optimization candidate** is a refactoring candidate with numbers: its brief names
+-   the metric, the current value, and the target; its commit message states before and
+-   after; the same commit moves `bench/baseline.json` with `--update-baseline`; a gain
+-   inside the tolerance band, or complexity added without a measured gain, is dropped — the
+-   minimal-code rule wins. Never touch `bench/budgets.json`, a benchmark, its dataset, or
+-   its seed in this pass.
+-5. **Purity check — deterministic, before any reviewer:**
+-   ```bash
+-   python ~/.claude/cursor-bridge/refactor-check.py main --max-lines 400
+-   ```
+-   It fails the branch on any test-file change (unless a mechanical rename was listed in
+-   the brief with `--allow-test`, which the reviewer must then read), on any
+-   `docs/CHANGES.md` change, or on exceeding the size budget. `IMPURE` never reaches a
+-   reviewer: drop or fix the offending commit first.
+-6. **One gate pass.** The whole branch goes through step 8 once as a single pure
+-   refactoring diff: `diff-reviewer` in refactoring mode (behaviour preservation, every
+-   caller updated, no smuggled behaviour change), `secret-sentinel`, `security-auditor` or
+-   `design-auditor` only if the diff touches their surface, CI, and Review B with the
+-   explicit question "is this behaviour-preserving?". Merge as one squash. No
+-   `CHANGES.md` entry — there is no behaviour change to log; the refactoring is noted in
+-   the Project Summary at the reflection point instead.
+-7. **Beyond budget** candidates go to `docs/HARDENING.md` under the stage name, and are
+-   the first thing the next stage's scout reads.
+-
+-The pass never escalates. It never introduces an abstraction for hypothetical reuse, never
+-touches a required security, observability, or accessibility control because it "looks
+-repetitive", and never changes a public interface other callers use unless every caller is
+-inside the diff. At **project end** run one final pass over the whole tree before the User
+-Manual is written.
++## Extension points
++
++This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
++
++- `delegation-loop.inspect-checks` — checks and reviews a conditional workflow adds to the inspect step, on every change of the part the loop checks (an increment, a fix, a refactoring candidate, or the refactoring branch's gate pass in step 9), each placed at the step that runs it: beside the scope and design-conformance checks or among the reviewer passes (step 4), or with the secret scan and the dependency admission (steps 5 and 5b); a finding is handled as that step handles its own: a blocking one re-delegates (step 7), a builder's objection goes to "Objections — bottom-up escalation", and a consequence the owner bears goes to the owner (rule 56).
++- `delegation-loop.test-checks` — tests and checks run with the tests of every change of the part the loop checks (step 4: the change's tests, the suite, the new tests against the checkpoint), such as the observability tests of a part with screens or the benchmark floor (step 6); a failing one is a correctness-class block, re-delegated like any defect (step 7).
++- `delegation-loop.brief-constraints` — constraints every brief for the part carries beside spec-packager's template, such as a frozen rule the builder must follow, written into the brief at step 2 and checked by `diff-reviewer` with the rest of the brief.
+diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md b/bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md
+new file mode 100644
+index 0000000..d758810
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md
+@@ -0,0 +1,82 @@
++## The refactoring pass (Phase 6, step 9)
++
++### Where this sub-file belongs
++
++This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 9, which runs at a stage's close, before the stage's reflection point (`reflection.md`), when `docs/RUN_PARAMETERS.md` turns the refactoring pass on for the stage. When the scout returns its lists (item 2), write them down as "Keeping the pass's position", after the step, says.
++
++### 9. Refactoring and optimization pass (at stage close)
++
++When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says
++**Refactoring pass: on** for that stage, run one refactoring pass **before** the stage's reflection point.
++"Refactoring" means one thing here: removing duplication or simplifying code while keeping
++the same functionality. Every per-increment review saw one diff at a time, so a helper
++written twice in two increments was invisible to both; this is the only step that looks at
++the stage as a whole. Cursor's runs are cheap; the gate is not — so the pass is designed
++around **one gate pass per stage**. **Normative diagrams are constraints on it:** a candidate that would change what a diagram draws — a component boundary, a class a Level 4 diagram fixes, a schema — is a design change, raised as an objection, never slipped in as a refactoring.
++
++1. **Deterministic floor.** Run the duplicate detector over the source tree and the
++   project's linter complexity rules in report-only mode:
++   ```bash
++   npx --yes jscpd@<pinned> <src-dirs> --min-lines 5 --min-tokens 50 --reporters json --output docs/refactor/<stage> --silent
++   ```
++   Record the pinned `jscpd` version in `docs/INVENTORY.md` (Resources); verify-first on the first
++   use (KP-008). The report is input for the scout, not a verdict.
++2. **Scout.** Delegate to **refactor-scout** with the stage base commit, the detector
++   report, the complexity report, and the size budget (default **400 changed lines**) —
++   and, where budgets exist, the **performance inputs**: `bench/budgets.json`,
++   `bench/baseline.json`, the latest `bench/results/latest.json`, and a profile of each
++   budgeted operation (`scripts/profile.ps1 <benchmark>` → `bench/profiles/<benchmark>.txt`;
++   `Performance-Conventions.md` §5). It returns two ranked lists — refactoring candidates
++   and **optimization candidates ranked by measured impact on a budgeted metric**, each
++   naming the benchmark that will prove it — marked COVERED or UNCOVERED, costed in lines,
++   cut at the size budget together. **NO CANDIDATES** is a normal result — skip to the
++   reflection point.
++3. **Cover first.** For an UNCOVERED candidate you want, write characterization tests that
++   pin its current behaviour (you may write tests), run them green, and **commit them on
++   `main` through the gate before the refactoring branch is cut** — so they sit under the
++   base ref and the purity check does not see them as test edits. Or skip the candidate.
++3b. **The test-infrastructure lane.** Duplication in the *tests* — helpers copied across
++   test files — is yours to consolidate, since you own the tests. Do it in its own commit on
++   the same branch, checked with `refactor-check.py <base> --lane tests` (no production file
++   may change) and by proving the **collected test set is identical** before and after
++   (`pytest --collect-only -q` or the stack's equivalent, diffed). Never mix it into a
++   production-lane commit; the two lanes share the one gate pass.
++4. **One branch, many small commits.** Cut `refactor/<stage>` from `main`. For each
++   candidate, in payoff order: package a **refactoring brief** (`handoff/REFAC-<nnn>.md`,
++   spec-packager's refactoring variant), delegate, inspect (git-derived changeset + scope
++   check as always), run the full test suite, and commit that candidate alone. A candidate
++   that fails its tests or drifts is re-delegated or dropped — a Cursor round is cheap,
++   so be strict. Never mix a candidate into a feature increment.
++   An **optimization candidate** is a refactoring candidate with numbers: its brief names
++   the metric, the current value, and the target; its commit message states before and
++   after; the same commit moves `bench/baseline.json` with `--update-baseline`; a gain
++   inside the tolerance band, or complexity added without a measured gain, is dropped — the
++   minimal-code rule wins. Never touch `bench/budgets.json`, a benchmark, its dataset, or
++   its seed in this pass.
++5. **Purity check — deterministic, before any reviewer:**
++   ```bash
++   python ~/.claude/cursor-bridge/refactor-check.py main --max-lines 400
++   ```
++   It fails the branch on any test-file change (unless a mechanical rename was listed in
++   the brief with `--allow-test`, which the reviewer must then read), on any
++   `docs/CHANGES.md` change, or on exceeding the size budget. `IMPURE` never reaches a
++   reviewer: drop or fix the offending commit first.
++6. **One gate pass.** The whole branch goes through step 8 once as a single pure
++   refactoring diff: `diff-reviewer` in refactoring mode (behaviour preservation, every
++   caller updated, no smuggled behaviour change), `secret-sentinel`, `security-auditor` or
++   `design-auditor` only if the diff touches their surface, CI, and Review B with the
++   explicit question "is this behaviour-preserving?". Merge as one squash. No
++   `CHANGES.md` entry — there is no behaviour change to log; the refactoring is noted in
++   the Project Summary at the reflection point instead.
++7. **Beyond budget** candidates go to `docs/HARDENING.md` under the stage name, and are
++   the first thing the next stage's scout reads.
++
++The pass never escalates. It never introduces an abstraction for hypothetical reuse, never
++touches a required security, observability, or accessibility control because it "looks
++repetitive", and never changes a public interface other callers use unless every caller is
++inside the diff. At **project end** run one final pass over the whole tree before the User
++Manual is written.
++
++### Keeping the pass's position
++
++Write the scout's two ranked lists to `run/supervisor/refactor-<stage>-candidates.md` as it returns them, and mark each candidate there as committed, dropped or beyond budget as the pass reaches it; name the file on the status file's `Working files:` line (rule 54). The lists are in the scout's reply alone, which a compaction does not keep, and the detector's report, the briefs and the branch's commits do not say which candidates remain.
+diff --git a/bridge/cursor-bridge/workflow/phases/run-parameters.md b/bridge/cursor-bridge/workflow/phases/run-parameters.md
+index 3ab517b..7541cef 100644
+--- a/bridge/cursor-bridge/workflow/phases/run-parameters.md
++++ b/bridge/cursor-bridge/workflow/phases/run-parameters.md
+@@ -1,5 +1,16 @@
+ ## Run parameters — asked once, after the plan is approved, before configuration
+ 
++### What must survive a compaction
++
++After a compaction or a resume in this step, read these before your next action:
++
++- this module, whole;
++- `docs/RUN_PARAMETERS.md` as written so far, whole: each answer is written there as the owner gives it ("Writing the answers down"), so the questions still to ask are the parameters it does not yet hold;
++- `docs/BUILD_PLAN.md`, the approved plan, whole: a refactoring answer may name its stages, and parallel increments apply only where the plan marks increments `Parallel: yes`;
++- `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which add parameters at `run-parameters.parameters` and show whether a part is installable, as installer verification needs, and its `Awaiting user on:` line names the question that waits for the owner.
++
++### The procedure
++
+ The plan says *what* will be built; the run parameters say *how the loop proceeds* while
+ building it. They are the owner's settings, asked **once, right after the plan gate and
+ before Phase 5, each as a question of its own in the app's question form** (`AskUserQuestion`,
+@@ -72,3 +83,13 @@ stop the loop whether stage pause is `run` or `pause`. Project end always stops.
+ parameter loosens the gate: `run` means *no waiting between stages*, never *less checking
+ within them*. The owner may change a parameter mid-project by saying so; you update the
+ file and apply it from the next stage close or merge on, never retroactively.
++
++### Writing the answers down
++
++Write each answer into `docs/RUN_PARAMETERS.md` as the owner gives it, in the form above, the `Set:` line with the first: a compaction between two questions then loses no answer, and a resume asks only the parameters the file does not yet hold. A parameter that does not apply to the project, such as installer verification for software that installs nothing, is written as `n/a` when it is passed over, so a resume does not ask it. A parameter a conditional workflow adds at `run-parameters.parameters` is asked and written the same way. A parameter is a setting, never a key: a key, token or password the owner pastes in an answer is never written to the file, rule 53 applies to it, and no path on this computer is written there either (rule 54).
++
++## Extension points
++
++This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
++
++- `run-parameters.parameters` — parameters a conditional workflow adds to the five above, each asked as a question of its own in the same form with its default named first, and written as a line of its own in `docs/RUN_PARAMETERS.md`; made once for the whole project.
+diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
+index 5b518f7..dbeee29 100644
+--- a/bridge/cursor-bridge/workflow/trace-exceptions.md
++++ b/bridge/cursor-bridge/workflow/trace-exceptions.md
+@@ -33,3 +33,14 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
+ - new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md What the interface phase hands to the plan
+ - reword TASK-012 bridge/commands/supervisor.md The design-tooling flow
+ - new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md Step 0 — Prior-project lessons (ask before drafting)
++- new TASK-013 bridge/cursor-bridge/workflow/phases/run-parameters.md What must survive a compaction
++- new TASK-013 bridge/cursor-bridge/workflow/phases/run-parameters.md Writing the answers down
++- new TASK-013 bridge/cursor-bridge/workflow/phases/run-parameters.md Extension points
++- new TASK-013 bridge/cursor-bridge/workflow/phases/configuration.md What must survive a compaction
++- new TASK-013 bridge/cursor-bridge/workflow/phases/configuration.md Keeping the position
++- new TASK-013 bridge/cursor-bridge/workflow/phases/configuration.md Extension points
++- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md What must survive a compaction
++- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md The procedure
++- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md Extension points
++- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md Where this sub-file belongs
++- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md Keeping the pass's position
+diff --git a/docs/BUILD_PLAN.md b/docs/BUILD_PLAN.md
+index e9da5e9..b2c256e 100644
+--- a/docs/BUILD_PLAN.md
++++ b/docs/BUILD_PLAN.md
+@@ -163,7 +163,7 @@ Parent: none
+ Depends on: TASK-010
+ Parallel: no
+ Diagrams: none
+-Scope: bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_build.py
++Scope: bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_build.py; bridge/commands/supervisor.md; tests/test_session_start_module.py (widened 2026-10-20 for the split: the core's module table names the delegation loop's sub-file folder and the sentence under it where a split module's step keeps its heading; the hook's tests expect the sub-file after delegation-loop.md for `Phase: building` and `Phase: changing`, and the tests of the pointer-line grammar write a delegation-loop module of their own, since the installed one now has a `Sub-files:` line)
+ Satisfies: R-004, R-006, R-032
+ Done when: each module opens with its compaction-survival list, declares its extension points, and is within the R-032 bound — the delegation-loop module split into sub-files under `workflow/phases/delegation-loop/` if it would exceed the bound, each sub-file named by the module's own pointer line; `trace-check` green; `test_phase_modules_build.py` (names R-004, R-006, R-032) asserts the structure and, if split, the sub-file pointer.
+ 
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 50fbf56..506f7e4 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -142,9 +142,15 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
+ 
+ - **Review A, round 1: REJECT**, one blocking item, taken: the stand-in test asserted the patterns find nothing without showing they find anything (a weakened pattern would pass any wording); it now matches two stand-ins first. Five should-fix items, all taken: the interface survival list names the diagram index and its diagrams (the mockups reconcile with the operational activity diagram before their gate); writing the interface notes is an instruction of its own section, on `Working files:`, and Step 0 writes each Issues path into the plan as the owner names it, so neither survival item names a file the procedure never wrote; the plan critique's survival item names design.md's "The procedure", whose loop it runs; the contract-enforcement increment is stated in planning.md ("What the interface phase hands to the plan"), where Phase 4 reads it; the moved "Saving these concludes the planning stage" now says the mockups conclude and the phase concludes when every variant is approved. Considers taken: every variant file is read, one no part runs only to know it does not apply (the hook names all four); a shared artifact is made and approved once and cited by each part; a missing *has screens* found during the phase goes back to the owner as the design gate's decision; the gate asks the owner's word when no part runs a variant (rule 5); additions add to a variant's procedure, not its file; the phase runs under `Phase: mockups`; a negative test that no text calls the mockups a replacement; rule 13 and the merge policy re-pointed to `interface/mockups.md`. Noted and taken: the command- and contract-design bodies are TASK-022's (BUILD_PLAN: "this fills their bodies", R-026), so TASK-012 keeps each file's heading and declaring paragraph and the drafts wait for TASK-022 with the security audit's three advisories on them (an added operation escalates; each operation says who may call it; a secret is never a command's option value, and example sessions use placeholders). The security audit PASS; its fourth advisory taken (no pasted key in the interface notes). The secret scan CLEAR. The drafts are kept in run/supervisor/drafts/task012/ (gitignored) and in commit 552458b, PR #55's first head; the three advisories and the artifact names are in TASK-022's Done when (Review A round 2 and the security re-check, convergent). Round 2: Review A APPROVE with two should-fix items, both taken: the declaring paragraphs name their artifacts (`docs/design/COMMANDS.md`; `docs/design/CONTRACT.md` and the contract file) and their approval at the phase's gate, so interface.md's survival list and gate and planning.md cite no artifact nothing defines; TASK-022's Done when binds the names, the gates and the advisories. Its consider taken: the stand-in check scans planning.md too. The security re-check PASS, its three advisories the same two items and a third, recorded here: until TASK-022 the two variants state only their artifact and their approval, and no project runs this staging state, since release B installs at stage B6 after TASK-022 merges (INVENTORY, Decisions, R-038). The secret scan CLEAR. Review A's confirming read APPROVE, its should-fix (this record's stand-in lead) and consider (this paragraph's order) taken.
+ - **Lead (Review A, for TASK-014):** change-cycle.md item 3 runs only "UI mockups (Phase 3) only if the change touches the UI", with "Gate as in Phase 3". The plan (§6.8) says the contract and command design apply to a project from its next design phase or change cycle, so a local service's next change would skip its contract design. Check: TASK-014's change-cycle enrichment runs the variant of every interface kind the change touches.
+-- **Lead (the trace exceptions):** the reword entries "Phase 2 — Design" and "The design-tooling flow" excuse every passage of those baseline sections, and the `new` entries for design.md "The gate" and planning.md "Step 0" excuse any later new text there; trace-check still prints a NOTE for each excused passage, and tests/test_core_carve.py pins the NOTE lines, so a later excuse changes a test. design.md's resume sentence (Review B's should-fix at PR #53) is excused by TASK-011's "Traits at the design gate" entry, and rule 13's re-pointing by TASK-015's "Standing rules" entry, whose label its NOTE carries.
++- **Lead (the trace exceptions):** the reword entries "Phase 2 — Design" and "The design-tooling flow" excuse every passage of those baseline sections, and the `new` entries for design.md "The gate" and planning.md "Step 0" excuse any later new text there. A baseline passage a `reword` entry excuses prints a NOTE, and tests/test_core_carve.py pins the NOTE lines, so a later reword there changes a test; new text a `new` entry excuses prints nothing (trace-check.py skips it, :822-823), so a later paragraph in those sections leaves the result and the pinned lines unchanged and only a reviewer's reading of the section sees it (Review B, PR #55, should-fix, corrected on TASK-013's branch). design.md's resume sentence (Review B's should-fix at PR #53) is excused by TASK-011's "Traits at the design gate" entry, and rule 13's re-pointing by TASK-015's "Standing rules" entry, whose label its NOTE carries.
+ - **Lead (the stand-in check):** completion-check.py reads code files only, so a stand-in in a governance Markdown file is seen by no program; the TASK-012 test applies its patterns to the interface and planning modules and the variant files only, since project-end.md quotes them as the rule's text. Check: if a later increment writes a variant body, its test applies the patterns too (TASK-022).
+ 
++### TASK-013, the build-phase modules and the delegation loop's split (2026-10-20)
++
++- **The split:** delegation-loop.md was 56,457 characters (94% of R-032's 60,000). Round 1's additions came to 2,967 characters, which would have left it at about 59,165 unsplit (98.6%, inside the bound), so the split rested then on TASK-010's recorded decision that an enrichment adding to the module splits it first (INVENTORY, Decisions, the core's size); with round 2's additions the unsplit module would be about 60,500, past the bound itself. Its step 9, the stage-close refactoring pass, moved verbatim into delegation-loop/refactoring-pass.md, named by the module's `Sub-files:` line, the first real one; the module is 54,965 characters (92%) and the sub-file 6,515. Step 9 was chosen because it runs once per stage, after the stage's last merge, and is cited only by its number (the core's sentence under the module table says a sub-file keeps its step's heading); steps 3b and 8 stay in the module, which the core names as the steps the design critique reads.
++- **Review A, round 1: REJECT**, two blocking items, both taken. B1: the configuration survival list put the inventory item (pinned versions recorded) on the line before the status-file item, which tests/test_text_consistency.py's guard against sending a pin to the status file reads as one window; the full suite showed it too (1 failed, 1,932 passed); the status item now comes first, the guard unchanged. B2, convergent with the security audit's first advisory: the `delegation-loop.inspect-checks` line confined the point to step 4 before the first reviewer and sent every failure to the builder, "never to the owner", against the registry (the inspect step is every check or review other than the running of the tests, the reviewer passes, the secret scan and the dependency admission among them, on every change the loop checks, each addition at the step that runs it) and against step 4's objection route and rule 56; the line now places additions at their step and keeps each step's routes, and a test holds the registry's words beside it. Should-fix items, all taken: S1, the `new` entry on the sub-file's `##` heading excused all of step 9, since an entry matches every heading on a passage's chain (a passage added to step 9, or a copy of one elsewhere, would have passed); the opening paragraph now has its own heading, "Where this sub-file belongs", and step 9 is traced in its new home; S2, this record's growth figure (above); S3, the loop's survival list names the assumptions file, the suite's output and step 9's position, and the sub-file's "Keeping the pass's position" writes the scout's lists to run/supervisor/refactor-<stage>-candidates.md; S4, the configuration's position moved from `In flight:`, whose grammar the core's template fixes, to `Next:`, with the final record named; S5, the point-line test reads each point's Applies cell. Considers taken: C1, step 9's text pinned by its sha256 in the test, since trace-check has no CI step; C2, a parameter that does not apply is written `n/a`; C3, the loop's list names the other files the hook names. The security audit PASS, its three advisories taken (B2's; no key and no computer path in docs/RUN_PARAMETERS.md, rules 53 and 54; the configuration's position names items by name only). The secret scan CLEAR. Round 2: Review A's confirming read APPROVE with two considers, both taken (the sub-file's opening paragraph points ahead to "Keeping the pass's position", which step 9's item 2 needs; the R-004 evidence names three tests, not two); the security re-check PASS with no findings; the full suite 1,936 passed, 33 skipped.
++- **Lead (the trace exceptions, from S1):** a `new` entry on a file's `##` heading excuses every passage under it, sub-headings included. TASK-012's entries on interface/mockups.md "Mockups" and the other three variant files' headings do so: the moved mockup procedure is traced (no passage dropped), but a passage added under it, or a copy of one in another file, passes unseen. Check: at TASK-014 or the next increment that edits a variant file, move each declaring paragraph under a heading of its own and re-point the entry, as TASK-013 did for its sub-file.
++
+ ## Stage B2 — carried to its close (test lane)
+ - Done on BUG-002 (stage B2's review fixes), not in the refactoring pass, whose test lane only consolidates: tests/test_open_list.py pins "filled, including" and its comment at :25 is corrected (TASK-004 r3 Consider); tests/test_extension_points.py pins the configuration.items CI route, the inspect step's members and the placement sentence (TASK-005 r6 Consider).
+ 
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 3135a80..0cc0bfd 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -24,6 +24,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The phase modules | The supervisor's procedure, one file per part of the workflow, moved verbatim from the core: intake, design, interface, planning, run-parameters, configuration, delegation-loop, change-cycle, reflection, project-end (carved out of the reflection points as a declared split); the core keeps the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state and the standing rules, and names every module, and when a module is read outside its own phase (reflection at every reflection point, its Issues section whenever an issue is detected, project end at the last stage's close, another phase's module whole for a step a module runs by its heading: the change cycle's scaled Phases 1 to 4, the design critique's use of the delegation loop's steps 3b and 8); the modules install from the manifest with no installer change | bridge/cursor-bridge/workflow/phases/*.md; bridge/commands/supervisor.md | tests/test_core_carve.py; trace-check.py (424 passages, 0 dropped) | release B (TASK-010) |
+ | Classification at intake and traits at the design gate | Each part classified against the open list at intake, its product type and sub-type fixed there, its traits and its type's default traits proposed there and settled as a decision of their own at the design gate; the `Workflows:` line written and `workflow-check.py --status` run; a part that fits no type, two equally, two sub-types equally or an unwritten type or sub-type pauses the project before design (a run sheet to the maintainer; resumed after the release and the calibration, classified again before the gate); a new or unwritten trait's handling written into the design and flagged at the gate, where the owner may pause, kept as a `Flagged trait:` row for the promotion pass; each part's delivery kind confirmed at intake and recorded as a `Delivery kind:` row; the intake questions and answers kept in run/supervisor/intake-notes.md, never a key; intake.md and design.md open with their compaction-survival lists and declare their extension points | bridge/cursor-bridge/workflow/phases/intake.md; bridge/cursor-bridge/workflow/phases/design.md | tests/test_phase_modules_intake_design.py | release B (TASK-011) |
+ | The interface variants | The interface phase runs one variant per kind of interface a part has, each an addition: mockups for screens (today's Phase 3 procedure, activated by the trait has screens), command design for commands and contract design for a protocol other software calls (each declared with its heading and purpose; their procedures are TASK-022's), and a playable prototype for play (a pointer to the Game Development workflow, release E); interface.md declares them in a table and one `Variants:` line the session-start hook names after it; the owner's change requests are kept in run/supervisor/interface-notes.md, never a key; the owner approves each variant's artifact, the phase passing when all are approved, and the owner's word is asked even when no part runs a variant; the plan builds against what the phase approved (planning.md, "What the interface phase hands to the plan": every approved contract gets the increment whose tests enforce it); interface.md and planning.md open with their compaction-survival lists and declare their extension points | bridge/cursor-bridge/workflow/phases/interface.md; .../interface/*.md; .../planning.md | tests/test_phase_modules_interface_planning.py | release B (TASK-012) |
++| The build-phase modules | run-parameters.md, configuration.md and delegation-loop.md open with their compaction-survival lists and declare their extension points (run-parameters.parameters; configuration.items; delegation-loop.inspect-checks, .test-checks and .brief-constraints), each point's line saying where a conditional workflow's additions are made; each run-parameter answer is written to docs/RUN_PARAMETERS.md as the owner gives it (`n/a` for one that does not apply; never a key or a computer path), and the configuration's position is kept on the status file's `Next:` line; the delegation loop's step 9, the stage-close refactoring pass, is in delegation-loop/refactoring-pass.md, which the module's `Sub-files:` line and the session-start hook name after it, and the pass's candidates are kept in run/supervisor/refactor-<stage>-candidates.md | bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/refactoring-pass.md | tests/test_phase_modules_build.py | release B (TASK-013) |
+ | The hook's module pointers | After a compaction, resume or fork the session-start hook names the current phase's module files (one Phase→module table, every template value), the files a module's `Sub-files:` and `Variants:` lines name, and the type, sub-type and trait files that touch the phase, in the order additions apply; it reads the open list and the registry only at their installed paths and through no link; a table or checker it cannot read or use gives one plain line and names no conditional or pointer-line file; nothing the checker returns is printed except as an exact str matching its pattern, what the checker prints through sys.stdout and sys.stderr is discarded (an exception's type name included, which is read inside a redirection of its own), a phase module line from the checker's file_lines that is not an exact str makes the checker unusable (the one plain line), each pointer path is taken exactly as written between `; ` separators (only the line's end is stripped), and the hook exits 0 | bridge/cursor-bridge/session-start.py | tests/test_session_start_module.py; tests/test_session_start.py | release B (TASK-015; hardened by FIX-003 before the first pointer line) |
+ 
+ ## Resources
+@@ -76,12 +77,13 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | The traceability check traces every passage of the core (424 at the baseline), not only the standing rules and the conditional passages R-029 names | tracing them all costs nothing more and leaves no passage to be classed by hand; a passage that leaves the core without a home takes a `reword` entry the design review sees | 2026-10-20, supervisor (TASK-016) | a split increment needs a passage deleted outright |
+ | The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
+ | TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
+-| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters); the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters | TASK-010's Done when asks for the measurement | 2026-10-20, supervisor (TASK-010) | a module nears the bound (delegation-loop.md is at 94% of its characters: an enrichment that adds to it splits it into sub-files first) |
++| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters); the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 92% of its characters after its split: a further addition moves another step into a sub-file first) |
+ | The session-start hook's threat model is a partial, mismatched or hand-edited install, not a hostile checker: workflow-check.py runs in the hook's process and could write to its output directly. Inside it, nothing the checker returns reaches the output except as an exact str matching its pattern; what lies outside it is docs/HARDENING.md's (Stage B3, TASK-010 with TASK-015) | seven review rounds converged there; every guard past the model narrows a channel an in-process program can open another way | 2026-10-20, supervisor (TASK-015, by-class line) | the hook loads code other than the installed checker, or a finding inside the model |
+ | The hook reads the workflow tables only at their installed paths (`~/.claude/cursor-bridge/workflow/open-list.md` and `extension-points.md`), only once the checker's own table paths compare equal to them, and refuses them behind a link at workflow/ or at either file | the link test and the read then concern the same files on every platform (TASK-015 R3-3, R4-3, R5-1) | 2026-10-20, supervisor (TASK-015) | the tables move |
+ | Three records the plan does not name, added by TASK-011: run/supervisor/intake-notes.md (intake's questions and answers, on the Working files: line; gitignored, so a resume on another computer loses it), and two Decisions rows a project's inventory carries, `Flagged trait:` (a new or unwritten trait the design handles, read by the promotion pass, TASK-014) and `Delivery kind:` (each part's key, which project end's delivery procedure applies by) | R-004 needs intake's answers somewhere a compaction leaves them, and rule 54's place is run/supervisor/; R-036's promotion pass and the registry's "recorded by its key" each need a durable record, and the inventory's `Development data:` row is the pattern | 2026-10-20, supervisor (TASK-011, Review A's should-fixes) | the promotion pass reads another record, or a project needs its intake notes on a second computer |
+ | The bridge's settings allow `python ~/.claude/cursor-bridge/workflow-check.py`, as they allow the other read-only checkers | intake runs it on the status file; it only reads files and prints (the security audit, TASK-011) | 2026-10-20, supervisor (TASK-011) | the checker gains a write or an argument that runs code |
+ | A record the plan does not name, added by TASK-012: run/supervisor/interface-notes.md, every change the owner asks for on a variant's artifact and whether it is made (gitignored, on the Working files: line) | the interface phase iterates with the owner and the requests live only in the conversation, which a compaction does not keep (R-004; rule 54's place, as intake-notes.md) | 2026-10-20, supervisor (TASK-012) | the requests move into a tracked record |
++| A record the plan does not name, added by TASK-013: run/supervisor/refactor-<stage>-candidates.md, the refactoring scout's two ranked lists and each candidate's outcome (committed, dropped, beyond budget) while the stage-close pass runs (gitignored, on the Working files: line) | the lists are returned only in the scout's reply, which a compaction does not keep, and no other file says which candidates remain (R-004; Review A, TASK-013 round 1, S3; rule 54's place, as intake-notes.md) | 2026-10-20, supervisor (TASK-013) | the pass's candidates move into a tracked record |
+ | The hook's docstring says a non-str line from the checker's file_lines makes the checker unusable for the lines of a phase module file only, since the hook calls file_lines in one place, pointer_paths_from_module (FIX-003's round-2 assumption, accepted) | the sentence is narrowed to what the code checks (Review A, FIX-003 round 1); no test sees a second call site | 2026-10-20, supervisor (FIX-003) | the hook calls file_lines elsewhere |
+ | No diagram index for release B | the design is the plan's prose and its §6.2 layering / §6.11 file layout tables; this is governance text, not a code architecture with components to draw | 2026-10-11, supervisor | a later release adds code whose architecture is load-bearing |
+ 
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 48ccac1..66ba291 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,23 +3,22 @@ Last updated: 2026-10-20
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at the merge of TASK-012 (PR #55); TASK-013, the enrichment of the run-parameters, configuration and delegation-loop modules, is next
+-Last accepted: TASK-012 (PR #55, at its merge): the interface phase's four variants declared in interface.md, each in its own file, the mockups an addition the trait has screens activates (R-012 built, R-010 in part), interface.md and planning.md with their survival lists and extension points; before it FIX-003 (PR #54, the hook hardened before the first pointer line), TASK-011 (PR #53, the intake and design modules), TASK-010 with TASK-015 (PR #52, the core carved into its phase modules; the hook naming them), TASK-016 (PR #51), FIX-002 (PR #50), CONFIG-B3b (PR #49), FIX-001 (PR #48) and CFG-B3 (PR #47); main holds TASK-001 to TASK-012, TASK-015, TASK-016, BUG-001 to BUG-016, the refactoring pass, HOTFIX-001, CFG-B3, CONFIG-B3b, FIX-001 to FIX-003
+-Awaiting user on: nothing
+-Previously: stage B1 closed 2026-10-19 after four stage-review rounds — round 1 (2026-10-16) both REJECT (BUG-001); round 2 Review A REJECT (the bootstrap tests checked a word, not a record: BUG-015); round 3 Review B REJECT, Review A the same item, convergent (this file on main described its own pull request before the gate: BUG-016, ISS-009); round 4 both APPROVE.
+-Next: TASK-013 (enrich the run-parameters, configuration and delegation-loop modules; delegation-loop.md is at 94% of R-032's characters, so it is split into sub-files under workflow/phases/delegation-loop/ first if it grows): a branch from origin/main, the supervisor's text and tests, trace-check.py at RESULT: OK, the pointer sweep for its modules. Then TASK-014 (change cycle, reflection, project end: its change cycle runs the variant of every interface kind a change touches, docs/HARDENING.md, Stage B3, TASK-012), then TASK-022 with the drafts in run/supervisor/drafts/.
++Increment: none — this file states the position at the merge of TASK-013 (PR #56); next is the plan revision the owner approved on 2026-10-20, on Fable 5.1, then TASK-014
++Last accepted: TASK-013 (PR #56, at its merge): the run-parameters, configuration and delegation-loop modules with their survival lists and extension points, the delegation loop's step 9 in its first sub-file, delegation-loop/refactoring-pass.md; before it TASK-012 (PR #55, the interface phase's four variants and the planning module) and stage B3's earlier pull requests, #47 to #54; main holds TASK-001 to TASK-013, TASK-015, TASK-016, BUG-001 to BUG-016, the refactoring pass, HOTFIX-001, CFG-B3, CONFIG-B3b, FIX-001 to FIX-003
++Awaiting user on: the switch of this session to Fable 5.1 for the plan revision (the owner's word of 2026-10-20: pause before design and planning so they can switch) — say go once switched
++Next: the plan revision, on Fable 5.1: a records branch from origin/main adding the requirements and two stage-B5 increments before TASK-025 — TASK-028, windowless launches (one mechanism the bridge ships that every project's suite and every supervisor driver runs through, its conformance floor and calibration's step) and TASK-029, a rate limit with no loss of coverage (bridge-run's machine-wide slot for heavy jobs; drivers rerun only changed mutants, every mutant against the final code before the gate) — and an INVENTORY Decisions row for a post-B release running builders and suites where no window can exist (WSL); plan-critic on the new entries; the gate (run/supervisor/maintainer-windowless.md). Then back to Opus 5.5 and TASK-014 (its change cycle runs the variant of every interface kind a change touches; the variant files' declaring paragraphs under headings of their own: docs/HARDENING.md, Stage B3), then TASK-022 with the drafts in run/supervisor/drafts/.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 4's; -r3.md, -r2.md and -r1.md the earlier rounds) for stage B1's review, closed; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs (read it first on a resume); the closed gates' files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, status_<id>.py) of stage B3's increments, TASK-012's closed at this merge; the mutation drivers fix002_mutants.py (nine mutants; a scratch copy as its second argument), task016_mutants.py (27 mutants, 23 killed; same arguments) and task015_mutants.py (63 mutants; the Workspace, a scratch folder outside it, the round's checkpoint); drafts/task012/ (TASK-012's first drafts: the command- and contract-design bodies and their test, for TASK-022) and drafts/task022-notes.md (what TASK-022 carries: the security audit's three advisories); CONFIG-B3b-r3-partial.diff (round 3's partial work at the crash, discarded, for reference) and the CONFIG-B3b checks cfgb3b_parsers.py, docstring_paths.py, cfgb3b_oracle_check.py; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 4's; -r3.md, -r2.md and -r1.md the earlier rounds) for stage B1's review, closed; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs (read it first on a resume); the closed gates' files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, status_<id>.py) of stage B3's increments, TASK-013's closed at this merge; maintainer-windowless.md (the maintainer's request of 2026-10-20, the owner's yes and the placement); the mutation drivers fix002_mutants.py (nine mutants; a scratch copy as its second argument), task016_mutants.py (27 mutants, 23 killed; same arguments) and task015_mutants.py (63 mutants; the Workspace, a scratch folder outside it, the round's checkpoint); drafts/task012/ (TASK-012's first drafts: the command- and contract-design bodies and their test, for TASK-022) and drafts/task022-notes.md (what TASK-022 carries: the security audit's three advisories); CONFIG-B3b-r3-partial.diff (round 3's partial work at the crash, discarded, for reference) and the CONFIG-B3b checks cfgb3b_parsers.py, docstring_paths.py, cfgb3b_oracle_check.py; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #55, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — under way: its configuration items, the traceability check, the carve, the hook, the intake and design modules (TASK-011), the hook's hardening (FIX-003) and the interface and planning modules (TASK-012) merged; TASK-013 and TASK-014 next. Last reflection: stage B1's close, 2026-10-19 (demonstration passed; conformance then 17 OK / 6 MISSING / 5 NOTE; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
+-Open issues: ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; FIX-001 makes the suite's launches windowless). ISS-010 open (the project's afterFileEdit hook never runs in the bridge's headless builder runs; not relied on; docs/HARDENING.md, Stage B3, CFG-B3). ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25. Owed at the next reflection point: a Feedback entry on the status template's Layout: line, which puts this computer's drive and project paths on public main against rule 54; a Feedback entry on the session-start hook reading any Awaiting user on: value but nothing, none, empty or - as a wait ("none (resumed ...)" told a resumed supervisor to wait; docs/HARDENING.md, Stage B3); a Feedback entry on the convergence rule, which admits no exception for a finding both reviewers class outside a component's stated threat model, while the by-class line records such a tail (TASK-015's line departed from the rule's wording; docs/HARDENING.md, Stage B3)
+-Maintainer requests: none open (Release B2's request answered as FB-021 at stage B2's close, 2026-10-19; recorded as a post-B release in INVENTORY.md, Decisions)
++Remote sync: main at the merge of PR #56, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — under way: its configuration items, the traceability check, the carve, the hook, the intake and design modules (TASK-011), the hook's hardening (FIX-003), the interface and planning modules (TASK-012) and the build-phase modules with the delegation loop's split (TASK-013) merged; the plan revision (TASK-028, TASK-029) and TASK-014 next. Last reflection: stage B1's close, 2026-10-19 (demonstration passed; conformance then 17 OK / 6 MISSING / 5 NOTE; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
++Open issues: ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; FIX-001 makes the suite's launches windowless; the maintainer's process-start record of 06:54-10:20 local on 2026-10-20 shows no window but 52k launches of session-start.py by run/supervisor/task015_mutants.py, up to 758 a minute; the owner's fix is planned as TASK-028 and TASK-029). ISS-010 open (the project's afterFileEdit hook never runs in the bridge's headless builder runs; not relied on; docs/HARDENING.md, Stage B3, CFG-B3). ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25. Owed at the next reflection point: a Feedback entry on the status template's Layout: line, which puts this computer's drive and project paths on public main against rule 54; a Feedback entry on the session-start hook reading any Awaiting user on: value but nothing, none, empty or - as a wait ("none (resumed ...)" told a resumed supervisor to wait; docs/HARDENING.md, Stage B3); a Feedback entry on the convergence rule, which admits no exception for a finding both reviewers class outside a component's stated threat model, while the by-class line records such a tail (TASK-015's line departed from the rule's wording; docs/HARDENING.md, Stage B3)
++Maintainer requests: the windowless launches and rate limit (2026-10-20), approved by the owner in this session's chat the same day and placed as TASK-028, TASK-029 and a post-B release, written into the plan next (Release B2's request answered as FB-021 at stage B2's close, 2026-10-19; recorded as a post-B release in INVENTORY.md, Decisions)
+ Bridge version: 2026.10.18a
+ Calibrated: 2026-10-19 from 2026.10.11d to 2026.10.18a — applied: the design critique's ceiling (no design, plan or change critique is running here: release B's plan critique and the hotfix's both closed at their gates, so no subject takes a token and no round file is renamed; it does not reach a code-gate stage review, which stays under standing rule 6's by-class brake), project.json's state; pending: none (the conformance MISSING items were applied at stage B3's start by CFG-B3 and CONFIG-B3b, below); not applied (gate passed): none
+ Calibration pending: none (the conformance check after CONFIG-B3b, 2026-10-19: 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE). Applied 2026-10-19 by CONFIG-B3b (PR #49): the generated command reference docs/cli-reference.json and its CI check (rule 32). Applied 2026-10-19 by CFG-B3: the Workspace boundary rule, the secure-coding rule (ASVS 5.0.0, L2), the boundary-check hook (configured; it does not run in builder runs, ISS-010) and the windowless pre-commit gate (conformance then 21 OK / 2 MISSING: the command reference and the recorded no-diagram-index decision; one of the OK floors, the boundary-check hook, is a floor configured but not engaging, ISS-010 and FB-025, and the supervisor's outside-write check stands in for it, INVENTORY Decisions)
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 4c70ef4..af688cc 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -7,9 +7,9 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-001 | The bridge is set up as a supervised project: a status file, a requirements register drawn from this plan, a resolved model roster, run parameters, and a `project.json`. | DESIGN §15 condition 6 | built | tests/test_release_b_bootstrap.py (TASK-001, merged 9e181e6; tightened by BUG-001, 6743b25, BUG-015, 1b8c8da, and BUG-016, ba1e181) |
+ | R-002 | The security floor (Semgrep, OSV-Scanner, Socket) runs in the bridge's own CI gate, pinned by commit, installing from a committed lockfile, alongside the tests it already runs. | DESIGN §15 condition 6 (P2) | built | tests/test_release_b_ci_floor.py (TASK-002, merged fba63bc; tightened by BUG-001 after stage B1's review, merged 6743b25, and its round-6 follow-up, merged 4d0f77b) |
+ | R-003 | The supervisor's instructions are split into the main-workflow core and per-phase modules; the core holds the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state, and the standing rules that hold in every phase. | DESIGN §6.2 | built | tests/test_core_carve.py (the test_r003_ tests: the core's section set, no phase procedure left in it, the registry's modules each opening with its heading and named by the core, project-end carved out of the reflection points, the modules installed from the manifest; TASK-010); trace-check.py at the baseline 0a186da: 424 passages, 0 dropped, RESULT: OK |
+-| R-004 | Each phase module holds its phase's whole procedure and opens with the short list of what must survive a compaction. | DESIGN §16; §6.2 | planned | intake.md and design.md: tests/test_phase_modules_intake_design.py (the test_r004_ tests; TASK-011); interface.md and planning.md: tests/test_phase_modules_interface_planning.py (the test_r004_ tests; TASK-012); the other modules follow in TASK-013–014 |
++| R-004 | Each phase module holds its phase's whole procedure and opens with the short list of what must survive a compaction. | DESIGN §16; §6.2 | planned | intake.md and design.md: tests/test_phase_modules_intake_design.py (the test_r004_ tests; TASK-011); interface.md and planning.md: tests/test_phase_modules_interface_planning.py (the test_r004_ tests; TASK-012); run-parameters.md, configuration.md and delegation-loop.md: tests/test_phase_modules_build.py (the test_r004_ tests and the three that the procedure writes what the lists name: the run parameters, the configuration's position, the refactoring pass's candidates; TASK-013); the other modules follow in TASK-014 |
+ | R-005 | The compaction/session-start hook names the current phase's module(s) to re-read after a compaction (one for most phases; planning and building map to two), plus the conditional-workflow files (type, sub-type, trait) that touch the current phase; it carries the Phase→module table for every template phase value, including the reflection and project-end modules and any further files the phase re-reads. | DESIGN §16; §6.2 | built | tests/test_session_start_module.py (the test_r005_ tests: every template phase value, its modules in order and its conventions, the project-end note, pointer-line sub-files and variants, conditional files in the R-034 order, an unreadable table or checker naming none of them with one plain line, links, the cap; test_r034_ the trait order); tests/test_session_start.py (the table re-pointed; the digest and status-at-limits cases kept); TASK-015; FIX-003 (a module line that is not an exact str makes the checker unusable, the exception's type name read where the checker cannot print, a pointer path taken as written between separators, the docstring stating the grammar and the streams) |
+-| R-006 | Extension points are declared — a canonical registry (the §6.4 initial set, including Definition of done and Delivery) naming which phase module declares each, and, in each phase module, the points that phase offers. | DESIGN §6.4 | planned | the registry: tests/test_extension_points.py (TASK-005); intake.md's and design.md's declarations: tests/test_phase_modules_intake_design.py (the test_r006_ tests; TASK-011); interface.md's and planning.md's: tests/test_phase_modules_interface_planning.py (the test_r006_ tests; TASK-012); the other modules' follow in TASK-013–014 |
++| R-006 | Extension points are declared — a canonical registry (the §6.4 initial set, including Definition of done and Delivery) naming which phase module declares each, and, in each phase module, the points that phase offers. | DESIGN §6.4 | planned | the registry: tests/test_extension_points.py (TASK-005); intake.md's and design.md's declarations: tests/test_phase_modules_intake_design.py (the test_r006_ tests; TASK-011); interface.md's and planning.md's: tests/test_phase_modules_interface_planning.py (the test_r006_ tests; TASK-012); run-parameters.md's, configuration.md's and delegation-loop.md's: tests/test_phase_modules_build.py (the test_r006_ tests; TASK-013); the other modules' follow in TASK-014 |
+ | R-007 | The conditional-workflow layering is in force: main core, phase modules, type workflow, sub-workflow, trait additions; each layer inherits what it does not mention and is read only when it applies. | DESIGN §6.2 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-008 | Only type workflows and sub-workflows may replace or set; trait additions may only add; no conditional workflow can remove a founding rule, weaken the merge gate, or skip the register, the inventory, or the reviews. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-009 | A sub-workflow inherits its type workflow and may override its replacement or setting; siblings are exclusive; two levels (type and sub-type) only. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+@@ -35,7 +35,7 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-029 | Every standing rule and every conditional passage — the project-layout / Workspace-boundary section included — is traceable from a pinned pre-split baseline commit to its new file by a mechanical comparison: moves are verbatim, any reword is a listed exception the design review sees, text new to the modules is declared new by its increment, and every `~/.claude/...` reference and cited section still resolves. | DESIGN release B "Accepted when" | built | tests/test_trace_check.py (the test_r029_ tests: moves, two-hop moves, copies, rewords, new text, the dropped boundary section, references and citations, both exception kinds, links, git failures, output order; TASK-016); bridge/cursor-bridge/trace-check.py on the repository at the baseline 0a186da traces 424 passages, RESULT: OK |
+ | R-030 | A new project walked from intake to configuration reads only its core, its current phase module, and its own conditional workflows. | DESIGN release B "Accepted when" | planned | — |
+ | R-031 | The bridge, reAngle, the video factory, and the TDP each classify under §6.3 (checked on committed fixtures) and calibrate onto the new structure, none pausing, without reopening a gate: reAngle live as the release-B trial, the bridge by running the release, the video factory and the TDP when they resume per the owner's standing pause/resume policy (one calibration each). | DESIGN §6.3; release B "Accepted when" | planned | — |
+-| R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | planned | the bound: tests/test_core_carve.py test_r032_each_module_is_read_whole (TASK-010; the largest module, delegation-loop.md, 621 lines and 56,457 characters) and the digest's limit in tests/test_session_start.py; the hook's side of a split: tests/test_session_start_module.py test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_module (TASK-015); the modules' own Sub-files: pointers follow in TASK-011 to TASK-014 (intake.md and design.md, enriched, within the bound and needing none: tests/test_phase_modules_intake_design.py test_r032_, TASK-011; interface.md, planning.md and the four variant files, interface.md naming its variants on a Variants: line: tests/test_phase_modules_interface_planning.py test_r032_, TASK-012) |
++| R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | planned | the bound: tests/test_core_carve.py test_r032_each_module_is_read_whole (TASK-010; the largest module, delegation-loop.md, 621 lines and 56,457 characters) and the digest's limit in tests/test_session_start.py; the hook's side of a split: tests/test_session_start_module.py test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_module (TASK-015); the modules' own Sub-files: pointers follow in TASK-011 to TASK-014 (intake.md and design.md, enriched, within the bound and needing none: tests/test_phase_modules_intake_design.py test_r032_, TASK-011; interface.md, planning.md and the four variant files, interface.md naming its variants on a Variants: line: tests/test_phase_modules_interface_planning.py test_r032_, TASK-012; the first split, delegation-loop.md with its step 9 in delegation-loop/refactoring-pass.md named by its Sub-files: line and followed by the hook, and run-parameters.md and configuration.md within the bound: tests/test_phase_modules_build.py test_r032_ and test_r005_the_hook_names_the_delegation_loop_and_its_sub_file, TASK-013) |
+ | R-033 | The workflow check runs at every bridge release (CI) and at every calibration. | DESIGN §6.6 | planned | the release half: tests/test_workflow_check.py (TASK-006, the CI step); the calibration half is TASK-024's |
+ | R-034 | Trait additions from several conditional workflows are applied together in a stated order. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-035 | Traits are proposed at intake and settled at the design gate; a product type's default traits are proposals settled at the same gate. | DESIGN §6.3 | built | tests/test_phase_modules_intake_design.py (test_r035_traits_are_proposed_at_intake_and_settled_at_the_design_gate; TASK-011) |
+diff --git a/docs/ROSTER.resolved.json b/docs/ROSTER.resolved.json
+index 4f0a2e4..4138ed0 100644
+--- a/docs/ROSTER.resolved.json
++++ b/docs/ROSTER.resolved.json
+@@ -10,6 +10,6 @@
+   },
+   "other_pool": "exhausted",
+   "probed": true,
+-  "resolved_at": "2026-10-20T10:55 UTC",
++  "resolved_at": "2026-10-20T11:53 UTC",
+   "reset_day": 16
+ }
+diff --git a/tests/test_phase_modules_build.py b/tests/test_phase_modules_build.py
+new file mode 100644
+index 0000000..e888658
+--- /dev/null
++++ b/tests/test_phase_modules_build.py
+@@ -0,0 +1,406 @@
++"""TASK-013: the run-parameters, configuration and delegation-loop modules enriched (R-004, R-006, R-032).
++
++enforces: docs/REQUIREMENTS.md R-004 (each phase module opens with the short list of what must survive a compaction),
++R-006 (each phase module declares the points the registry names it as declaring), R-032 (each module read whole: the
++delegation-loop module, at 94% of the bound's characters before this increment, is split, its step 9 in a sub-file under
++workflow/phases/delegation-loop/ that the module's own `Sub-files:` line names and the session-start hook follows);
++docs/BUILD_PLAN.md TASK-013's Done when, and the pointer sweep for the split (the core's module table)."""
++import json
++import os
++import re
++import shutil
++import subprocess
++import sys
++
++import pytest
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
++CB = os.path.join(BRIDGE, "cursor-bridge")
++PHASES = os.path.join(CB, "workflow", "phases")
++REGISTRY = os.path.join(CB, "workflow", "extension-points.md")
++CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
++HOOK = os.path.join(CB, "session-start.py")
++
++SUB = "delegation-loop/refactoring-pass.md"
++STEP9 = "9. Refactoring and optimization pass (at stage close)"
++
++
++def read(path):
++    return open(path, encoding="utf-8").read().replace("\r\n", "\n")
++
++
++def module(rel):
++    return read(os.path.join(PHASES, rel if rel.endswith(".md") else rel + ".md"))
++
++
++def flat(text):
++    return re.sub(r"\s+", " ", text)
++
++
++def headings(text):
++    """(level, title) of every heading outside fenced blocks, in order."""
++    out, fence = [], None
++    for line in text.split("\n"):
++        m = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
++        if m:
++            if fence is None:
++                fence = m.group(1)[0]
++            elif m.group(1)[0] == fence:
++                fence = None
++            continue
++        if fence is None:
++            h = re.match(r"^(#{1,6}) (.*)$", line)
++            if h:
++                out.append((len(h.group(1)), h.group(2).strip()))
++    return out
++
++
++def section(text, title, level):
++    """The body of the heading `title` at `level`, to the next heading of that level or higher."""
++    lines = text.split("\n")
++    start = lines.index("#" * level + " " + title) + 1
++    end = len(lines)
++    for i in range(start, len(lines)):
++        h = re.match(r"^(#{1,6}) ", lines[i])
++        if h and len(h.group(1)) <= level:
++            end = i
++            break
++    return "\n".join(lines[start:end])
++
++
++LOOP_STEPS = ["1. Checkpoint", "2. Package the brief", "3. Delegate to Cursor",
++              "3b. A model fails mid-step — switch automatically, restart the step, never wait", "4. Inspect", "5. Scan",
++              "5b. Dependency-admission gate", "6. Benchmarks and observability", "7. Decide (accept the increment)",
++              "8. Merge (the verified gate)"]
++
++STRUCTURE = {
++    "run-parameters": [(2, "Run parameters — asked once, after the plan is approved, before configuration"),
++                       (3, "What must survive a compaction"), (3, "The procedure"), (3, "Writing the answers down"),
++                       (2, "Extension points")],
++    "configuration": [(2, "Phase 5 — Configure the Cursor build environment"), (3, "What must survive a compaction"),
++                      (3, "The procedure"), (3, "Keeping the position"), (2, "Extension points")],
++    "delegation-loop": [(2, "Phase 6 — The delegation loop"), (3, "What must survive a compaction"), (3, "The procedure")]
++                       + [(3, s) for s in LOOP_STEPS] + [(2, "Extension points")],
++}
++
++INTRO = {
++    "run-parameters": "After a compaction or a resume in this step, read these before your next action:",
++    "configuration": "After a compaction or a resume in this phase, read these before your next action:",
++    "delegation-loop": "After a compaction or a resume in this phase, read these before your next action:",
++}
++
++SURVIVAL = {
++    "run-parameters": [
++        "this module, whole;",
++        "`docs/RUN_PARAMETERS.md` as written so far, whole: each answer is written there as the owner gives it "
++        "(\"Writing the answers down\"), so the questions still to ask are the parameters it does not yet hold;",
++        "`docs/BUILD_PLAN.md`, the approved plan, whole: a refactoring answer may name its stages, and parallel "
++        "increments apply only where the plan marks increments `Parallel: yes`;",
++        "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which add "
++        "parameters at `run-parameters.parameters` and show whether a part is installable, as installer verification "
++        "needs, and its `Awaiting user on:` line names the question that waits for the owner.",
++    ],
++    "configuration": [
++        "this module, whole, with `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` and "
++        "`~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole (the session-start hook names both for this phase);",
++        "the approved design and plan: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/BUILD_PLAN.md` and "
++        "`docs/RUN_PARAMETERS.md`, whole: only the items that are load-bearing for this project are applied;",
++        "`docs/PROJECT_STATUS.md`, whole: its `Next:` line names the items configured so far and the next one (\"Keeping "
++        "the position\"), its `Awaiting user on:` line an escalation that waits for the owner, and its `Workflows:` line "
++        "the conditional workflows that add items at `configuration.items`;",
++        "`docs/INVENTORY.md`, whole: its Resources rows record each pinned tool and version, each mode in force and each "
++        "spending limit as the items are configured.",
++    ],
++    "delegation-loop": [
++        "this module and its sub-file, each whole (the session-start hook names both), with "
++        "`~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each "
++        "whole, and the other files the hook names;",
++        "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of "
++        "`run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the "
++        "background runs that will wake you and what waits for the owner; while Review B runs the status file is not "
++        "written and the position is kept in `in-flight.md` (step 8);",
++        "the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` with every revision of it, and "
++        "each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report "
++        "holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);",
++        "`docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass "
++        "runs and whether increments run in parallel, and the models the delegate command and Review B name;",
++        "the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, "
++        "`run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message "
++        "(step 4), and `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background; "
++        "and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, "
++        "`ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` "
++        "needs), whole;",
++        "while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's \"Keeping the "
++        "pass's position\"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief "
++        "with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.",
++    ],
++}
++
++KEYS = ["run-parameters", "configuration", "delegation-loop"]
++
++
++@pytest.mark.parametrize("key", KEYS)
++def test_r004_the_module_opens_with_its_compaction_survival_list(key):
++    """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
++    exactly what a resumed session in that phase reads before its next action."""
++    text = module(key)
++    assert headings(text) == STRUCTURE[key], headings(text)
++    lines = text.split("\n")
++    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
++    body = section(text, "What must survive a compaction", 3).strip().split("\n")
++    assert body[0] == INTRO[key]
++    assert all(l.startswith("- ") for l in body[1:] if l), body
++    assert [l[2:] for l in body[1:] if l] == SURVIVAL[key]
++
++
++def registry_points(module_key):
++    text = read(REGISTRY)
++    table = text.split("\n## Extension points\n", 1)[1].split("\n## ", 1)[0]
++    rows = [l for l in table.split("\n") if l.startswith("|")]
++    header = [c.strip() for c in rows[0].strip("|").split("|")]
++    out = []
++    for row in rows[2:]:
++        cells = dict(zip(header, [c.strip() for c in row.strip("|").split("|")]))
++        if cells["Declared by"] == module_key:
++            out.append(cells["Key"])
++    return out
++
++
++@pytest.mark.parametrize("key", KEYS)
++def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_order(key):
++    """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
++    per point giving its key, exactly the points the registry names this module as declaring, in the table's order."""
++    body = section(module(key), "Extension points", 2).strip().split("\n")
++    lines = [l for l in body if l.startswith("- ")]
++    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in lines]
++    want = registry_points(key)
++    assert want and keys == want, (keys, want)
++    prose = flat(" ".join(l for l in body if l and not l.startswith("- ")))
++    assert prose == ("This module offers the points below, each by its key in the extension-point registry "
++                     "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each "
++                     "accepts and whether it applies per part or per project. A conditional workflow's additions at a "
++                     "point are made where the point's line places them, in the order the core states in \"Main and "
++                     "conditional workflows\".")
++    assert "may set" not in "\n".join(body)
++
++
++POINTS = {
++    "run-parameters.parameters": "parameters a conditional workflow adds to the five above, each asked as a question of "
++                                 "its own in the same form with its default named first, and written as a line of its "
++                                 "own in `docs/RUN_PARAMETERS.md`; made once for the whole project.",
++    "configuration.items": "configuration items, tools and checks a conditional workflow adds to those above, each "
++                           "worked as they are: written by **cursor-configurator** on your instruction, each tool's "
++                           "pinned version recorded in `docs/INVENTORY.md` (Resources), and committed with the "
++                           "configuration's checkpoint; made once for the whole project.",
++    "delegation-loop.inspect-checks": "checks and reviews a conditional workflow adds to the inspect step, on every "
++                                      "change of the part the loop checks (an increment, a fix, a refactoring "
++                                      "candidate, or the refactoring branch's gate pass in step 9), each placed at the "
++                                      "step that runs it: beside the scope and design-conformance checks or among the "
++                                      "reviewer passes (step 4), or with the secret scan and the dependency admission "
++                                      "(steps 5 and 5b); a finding is handled as that step handles its own: a blocking "
++                                      "one re-delegates (step 7), a builder's objection goes to \"Objections — bottom-up "
++                                      "escalation\", and a consequence the owner bears goes to the owner (rule 56).",
++    "delegation-loop.test-checks": "tests and checks run with the tests of every change of the part the loop checks "
++                                   "(step 4: the change's tests, the suite, the new tests against the checkpoint), such "
++                                   "as the observability tests of a part with screens or the benchmark floor (step 6); a "
++                                   "failing one is a correctness-class block, re-delegated like any defect (step 7).",
++    "delegation-loop.brief-constraints": "constraints every brief for the part carries beside spec-packager's template, "
++                                         "such as a frozen rule the builder must follow, written into the brief at step "
++                                         "2 and checked by `diff-reviewer` with the rest of the brief.",
++}
++
++
++def registry_applies():
++    text = read(REGISTRY)
++    table = text.split("\n## Extension points\n", 1)[1].split("\n## ", 1)[0]
++    rows = [l for l in table.split("\n") if l.startswith("|")]
++    header = [c.strip() for c in rows[0].strip("|").split("|")]
++    return {cells["Key"]: cells["Applies"] for cells in
++            (dict(zip(header, [c.strip() for c in row.strip("|").split("|")])) for row in rows[2:])}
++
++
++@pytest.mark.parametrize("key", KEYS)
++def test_r006_each_point_says_where_its_additions_are_made(key):
++    """R-006 and the registry's "How a phase module declares its points": each point's line places the additions a
++    conditional workflow makes there, and says what the registry's Applies cell states: a point that applies per
++    project is made once for the whole project; one that applies per part names the part (Review A, round 1, S5)."""
++    applies = registry_applies()
++    body = section(module(key), "Extension points", 2).strip().split("\n")
++    for line in [l for l in body if l.startswith("- ")]:
++        k = re.match(r"^- `([a-z0-9.-]+)` — ", line).group(1)
++        assert line == "- `%s` — %s" % (k, POINTS[k]), line
++        if applies[k] == "project":
++            assert line.endswith("; made once for the whole project."), (k, line)
++        else:
++            assert applies[k] == "part" and re.search(r"\b(of|for) the part\b", line), (k, applies[k], line)
++            assert "whole project" not in line, line
++
++
++def test_r006_the_inspect_point_spans_every_step_the_registry_gives_it():
++    """R-006 and the registry's paragraph on the inspect and test steps (extension-points.md): the inspect step is
++    every check or review that is not the running of the tests (the reviewer passes, the secret scan and the dependency
++    admission among them), on every change the loop checks, and an addition is placed at the step that runs it; its
++    findings keep the routes their step gives them (Review A, round 1, B2, convergent with the security audit)."""
++    line = flat(section(module("delegation-loop"), "Extension points", 2)).split("- `delegation-loop.inspect-checks`")[1]
++    line = line.split("- `delegation-loop.test-checks`")[0]
++    for part in ("among the reviewer passes (step 4)", "with the secret scan and the dependency admission (steps 5 and 5b)",
++                 "a refactoring candidate, or the refactoring branch's gate pass in step 9",
++                 "each placed at the step that runs it", "a builder's objection goes to \"Objections — bottom-up escalation\"",
++                 "a consequence the owner bears goes to the owner (rule 56)"):
++        assert part in line, part
++    assert "before the first reviewer" not in line and "never to the owner" not in line
++    registry = flat(read(REGISTRY))
++    assert ("the reviewer passes (such as the design auditor the trait *has screens* carries), the secret scan and the "
++            "dependency admission") in registry
++    assert "An addition at either point is placed in the delegation loop's text at the step that runs it." in registry
++
++
++def pointer_lines(text):
++    return [l for l in text.split("\n") if l.startswith("Sub-files: ") or l.startswith("Variants: ")]
++
++
++def test_r032_the_delegation_loop_names_its_sub_file_on_its_pointer_line():
++    """R-032: the delegation-loop module names its one sub-file on a `Sub-files:` line, in the grammar session-start.py
++    reads (a line at column 0, paths relative to workflow/phases/ separated by `; `), in its procedure; every file under
++    workflow/phases/delegation-loop/ is named there, so no sub-file goes unread."""
++    text = module("delegation-loop")
++    assert pointer_lines(text) == ["Sub-files: " + SUB], pointer_lines(text)
++    proc = section(text, "The procedure", 3)
++    assert "\nSub-files: " + SUB + "\n" in proc
++    assert flat(proc).strip() == ("Steps 1 to 8 below run for every increment; step 9, the refactoring and optimization "
++                                  "pass at a stage's close, is in a sub-file of this module, read whole with it wherever "
++                                  "the module is read: Sub-files: " + SUB + " For each increment, in order:")
++    folder = os.path.join(PHASES, "delegation-loop")
++    assert sorted(os.listdir(folder)) == [os.path.basename(SUB)]
++
++
++def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
++    """R-032: the sub-file opens with its own heading and a paragraph that says it is part of the module and when its
++    step runs; it holds step 9 under its heading as the core had it, and no other file under workflow/phases/ holds
++    the step's heading or its passages."""
++    sub = module(SUB)
++    assert headings(sub) == [(2, "The refactoring pass (Phase 6, step 9)"), (3, "Where this sub-file belongs"),
++                             (3, STEP9), (3, "Keeping the pass's position")], headings(sub)
++    assert flat(section(sub, "Where this sub-file belongs", 3)).strip() == (
++        "This file is a sub-file of the delegation-loop module (`delegation-loop.md`, \"The procedure\"), read whole "
++        "with it. It holds the loop's step 9, which runs at a stage's close, before the stage's reflection point "
++        "(`reflection.md`), when `docs/RUN_PARAMETERS.md` turns the refactoring pass on for the stage. When the scout "
++        "returns its lists (item 2), write them down as \"Keeping the pass's position\", after the step, says.")
++    fs = flat(sub)
++    passages = (
++        "When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says **Refactoring pass: on** for "
++        "that stage, run one refactoring pass **before** the stage's reflection point.",
++        "**Scout.** Delegate to **refactor-scout** with the stage base commit",
++        "**Purity check — deterministic, before any reviewer:**",
++        "python ~/.claude/cursor-bridge/refactor-check.py main --max-lines 400",
++        "**Beyond budget** candidates go to `docs/HARDENING.md` under the stage name",
++        "At **project end** run one final pass over the whole tree before the User Manual is written.",
++    )
++    for p in passages:
++        assert p in fs, p
++    for root, _dirs, files in os.walk(PHASES):
++        for f in files:
++            rel = os.path.relpath(os.path.join(root, f), PHASES).replace(os.sep, "/")
++            if rel == SUB:
++                continue
++            text = read(os.path.join(root, f))
++            assert "### " + STEP9 not in text.split("\n"), rel
++            for p in passages:
++                assert p not in flat(text), (rel, p)
++
++
++# sha256 of step 9 as the delegation-loop module held it at origin/main 5bed396 (from its heading to its last line, LF,
++# trailing whitespace stripped; 5,542 characters): the step moved verbatim, and trace-check, which would see a change,
++# has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword updates this with its record
++STEP9_SHA256 = "43584d2cbcec544785ddfcff165ed636da09101ffe47af8d836845aef9d70a50"
++
++
++def test_r032_step_9_is_verbatim():
++    """R-032 (Review A, round 1, C1): the sub-file's step 9 is the module's step 9 as it was before the split, character
++    for character."""
++    import hashlib
++    sub = module(SUB)
++    step = sub[sub.index("### " + STEP9):sub.index("### Keeping the pass's position")].rstrip()
++    assert len(step) == 5542 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
++
++
++def test_the_refactoring_passs_position_is_written_down():
++    """R-004 (Review A, round 1, S3): the delegation loop's survival list names the pass's candidates file, so the
++    sub-file writes the scout's lists there as they arrive and marks each candidate as the pass reaches it."""
++    s = flat(section(module(SUB), "Keeping the pass's position", 3)).strip()
++    assert s == ("Write the scout's two ranked lists to `run/supervisor/refactor-<stage>-candidates.md` as it returns "
++                 "them, and mark each candidate there as committed, dropped or beyond budget as the pass reaches it; name "
++                 "the file on the status file's `Working files:` line (rule 54). The lists are in the scout's reply "
++                 "alone, which a compaction does not keep, and the detector's report, the briefs and the branch's "
++                 "commits do not say which candidates remain.")
++
++
++def test_the_run_parameters_are_written_as_each_answer_is_given():
++    """R-004: the survival list names docs/RUN_PARAMETERS.md as written so far, so the procedure writes each answer as
++    it arrives (as intake writes its notes, TASK-011); a parameter that does not apply is written n/a so a resume does
++    not ask it (Review A, round 1, C2); and, as intake's and the interface phase's notes, no key and no computer path
++    is written there (the security audit, round 1, rules 53 and 54)."""
++    s = flat(section(module("run-parameters"), "Writing the answers down", 3))
++    assert s.strip() == ("Write each answer into `docs/RUN_PARAMETERS.md` as the owner gives it, in the form above, the "
++                         "`Set:` line with the first: a compaction between two questions then loses no answer, and a "
++                         "resume asks only the parameters the file does not yet hold. A parameter that does not apply to "
++                         "the project, such as installer verification for software that installs nothing, is written as "
++                         "`n/a` when it is passed over, so a resume does not ask it. A parameter a conditional workflow "
++                         "adds at `run-parameters.parameters` is asked and written the same way. A parameter is a "
++                         "setting, never a key: a key, token or password the owner pastes in an answer is never written "
++                         "to the file, rule 53 applies to it, and no path on this computer is written there either "
++                         "(rule 54).")
++
++
++def test_the_configurations_position_is_kept_on_next():
++    """R-004: the survival list names the status file's Next: line, so the procedure keeps it while the phase runs; not
++    In flight:, whose grammar the core's template fixes for a running increment or agent (Review A, round 1, S4); each
++    item by its name only (the security audit, round 1, rules 53 and 54); and the final record named."""
++    s = flat(section(module("configuration"), "Keeping the position", 3))
++    assert s.strip() == ("While the phase runs, keep the status file's `Next:` line naming the items configured so far "
++                         "and the next one, rewritten as each is finished, so that a resume after a compaction neither "
++                         "redoes an item nor skips one. It names each item by its name only, never a key's value or a "
++                         "path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the "
++                         "line names the first increment, and what was configured stands in the status file, as \"Commit "
++                         "the configuration as its own checkpoint\" above asks, with each tool's pinned version in "
++                         "`docs/INVENTORY.md` (Resources).")
++    assert "Commit the configuration as its own checkpoint before `TASK-001`, and record in" in module("configuration")
++    assert "`In flight:`" not in module("configuration")
++
++
++@pytest.mark.parametrize("rel", ["run-parameters.md", "configuration.md", "delegation-loop.md", SUB])
++def test_r032_the_module_and_its_sub_file_are_read_whole(rel):
++    """R-032: each enriched module and the sub-file stay within the bound a module is read whole by."""
++    text = module(rel)
++    assert text.count("\n") <= 1500 and len(text) <= 60000, (rel, text.count("\n"), len(text))
++
++
++def test_r005_the_hook_names_the_delegation_loop_and_its_sub_file(tmp_path):
++    """R-005 with R-032, the first real Sub-files: line: for `Phase: building` the installed hook names
++    delegation-loop.md, then its sub-file, then the reflection and project-end modules."""
++    home = tmp_path / "home"
++    shutil.copytree(os.path.join(BRIDGE, "commands"), str(home / ".claude" / "commands"))
++    shutil.copytree(CB, str(home / ".claude" / "cursor-bridge"), ignore=shutil.ignore_patterns("__pycache__"))
++    ws = tmp_path / "proj" / "Workspace"
++    (ws / "docs").mkdir(parents=True)
++    (ws / "docs" / "PROJECT_STATUS.md").write_text(
++        "# Project Status\nPhase: building\nWorkflows: not yet classified\nAwaiting user on: nothing\n", encoding="utf-8")
++    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
++    data = {"cwd": str(ws), "hook_event_name": "SessionStart", "source": "compact"}
++    p = subprocess.run([sys.executable, HOOK, "--part", "pointers"], input=json.dumps(data), capture_output=True,
++                       text=True, encoding="utf-8", env=env)
++    assert p.returncode == 0 and p.stderr == "", p.stderr
++    w = "~/.claude/cursor-bridge/workflow/phases/"
++    named = [re.match(r"  - (\S+)", l).group(1) for l in p.stdout.split("\n") if l.startswith("  - " + w)]
++    assert named == [w + "delegation-loop.md", w + SUB, w + "reflection.md", w + "project-end.md"], p.stdout
++
++
++def test_the_core_names_the_delegation_loops_sub_file():
++    """The pointer sweep for the split: the core's module table names the delegation loop's sub-file folder, and the
++    sentence under the table says where a split module's step keeps its heading."""
++    core = flat(read(CORE))
++    assert ("| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` and its "
++            "sub-file under `~/.claude/cursor-bridge/workflow/phases/delegation-loop/` |") in core
++    assert ("A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 9 is in "
++            "`delegation-loop/refactoring-pass.md`.") in core
+diff --git a/tests/test_session_start_module.py b/tests/test_session_start_module.py
+index 468efef..31e33f7 100644
+--- a/tests/test_session_start_module.py
++++ b/tests/test_session_start_module.py
+@@ -88,12 +88,22 @@ def test_r005_the_table_maps_every_template_phase_value():
+     assert sorted(TEMPLATE_PHASES) == sorted(EXPECTED), TEMPLATE_PHASES
+ 
+ 
+-# the files a module's own pointer lines name after it, in the installed bridge (TASK-012: the interface variants)
++# the files a module's own pointer lines name after it, in the installed bridge (TASK-012: the interface variants;
++# TASK-013: the delegation loop's sub-file)
+ POINTED = {
+     "interface": ["interface/mockups.md", "interface/command-design.md", "interface/contract-design.md",
+                   "interface/playable-prototype.md"],
++    "delegation-loop": ["delegation-loop/refactoring-pass.md"],
+ }
+ IFACE = [P + "interface.md"] + [P + f for f in POINTED["interface"]]
++LOOP = [P + "delegation-loop.md"] + [P + f for f in POINTED["delegation-loop"]]
++
++
++def own_loop(home, pointer_lines):
++    """A delegation-loop module of the test's own, holding only its heading and the given lines, so a test of the
++    pointer-line grammar sees no line but its own (the installed module names its sub-file, TASK-013)."""
++    loop = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md"
++    loop.write_text("## Phase 6 — The delegation loop\n" + pointer_lines, encoding="utf-8")
+ 
+ 
+ @pytest.mark.parametrize("phase", sorted(EXPECTED))
+@@ -146,8 +156,8 @@ def test_r005_the_conditional_files_that_touch_the_phase_are_named_after_its_mod
+     assert named(out) == [P + "intake.md", W + "types/host-extension.md"], out
+     out = pointers(project(tmp_path, "Phase: building", LINE), home)
+     # a heading inside a fenced block changes nothing: the type does not touch the delegation loop
+-    assert named(out) == [P + "delegation-loop.md", P + "reflection.md", P + "project-end.md",
+-                          W + "traits/installable.md", W + "traits/external-services.md"], out
++    assert named(out) == LOOP + [P + "reflection.md", P + "project-end.md",
++                                 W + "traits/installable.md", W + "traits/external-services.md"], out
+ 
+ 
+ def test_r034_the_conditional_files_follow_the_order_additions_apply_in(tmp_path, home):
+@@ -164,8 +174,8 @@ def test_r005_a_file_two_parts_share_is_named_once_in_the_first_parts_place(tmp_
+     out = pointers(project(tmp_path, "Phase: building",
+                            "Workflows: app: Host Extension Development; traits: External services",
+                            "Workflows: tool: Host Extension Development → Claude Code Extension; traits: Installable, External services"), home)
+-    assert named(out) == [P + "delegation-loop.md", P + "reflection.md", P + "project-end.md",
+-                          W + "traits/external-services.md", W + "traits/installable.md"], out
++    assert named(out) == LOOP + [P + "reflection.md", P + "project-end.md",
++                                 W + "traits/external-services.md", W + "traits/installable.md"], out
+ 
+ 
+ def test_r005_a_named_workflow_that_is_not_written_is_not_named(tmp_path, home):
+@@ -177,9 +187,8 @@ def test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_modul
+     """A module names its sub-files on a `Sub-files:` line and its variant files on a `Variants:` line, each path
+     relative to workflow/phases/, separated by `; ` (handoff/TASK-015.md); the hook lists them after the module, in
+     the order written; a line inside a fenced block names nothing."""
+-    loop = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md")
+-    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: delegation-loop/merge.md; delegation-loop/inspect.md\n\n"
+-                    "```\nSub-files: delegation-loop/not-this.md\n```\n", encoding="utf-8")
++    own_loop(home, "\nSub-files: delegation-loop/merge.md; delegation-loop/inspect.md\n\n"
++                   "```\nSub-files: delegation-loop/not-this.md\n```\n")
+     write(home, "phases/delegation-loop/merge.md", "## Merge\n")
+     write(home, "phases/delegation-loop/inspect.md", "## Inspect\n")
+     interface = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "interface.md")
+@@ -195,9 +204,7 @@ def test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_modul
+ 
+ 
+ def test_r005_a_pointer_line_names_no_file_outside_its_module_folder(tmp_path, home):
+-    loop = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md")
+-    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: ../../Known-Pitfalls.md; delegation-loop/ok.md; C:/x.md\n",
+-                    encoding="utf-8")
++    own_loop(home, "\nSub-files: ../../Known-Pitfalls.md; delegation-loop/ok.md; C:/x.md\n")
+     write(home, "phases/delegation-loop/ok.md", "## Ok\n")
+     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
+     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/ok.md", P + "reflection.md", P + "project-end.md"], out
+@@ -206,9 +213,8 @@ def test_r005_a_pointer_line_names_no_file_outside_its_module_folder(tmp_path, h
+ def test_r005_a_pointer_path_outside_the_pattern_is_ignored_even_in_lower_case(tmp_path, home):
+     """handoff/TASK-015.md Requirement 4: letters, digits, hyphens and `/` only; no `.` or `..` segment, no drive, no
+     leading `/`, no empty segment (the other test's bad paths hold capitals, which a looser pattern refuses too)."""
+-    loop = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md")
+-    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: ../escape.md; ./here.md; c:/x.md; /root.md; "
+-                    "a//b.md; a.b/c.md; under_score.md; delegation-loop/ok.md\n", encoding="utf-8")
++    own_loop(home, "\nSub-files: ../escape.md; ./here.md; c:/x.md; /root.md; "
++                   "a//b.md; a.b/c.md; under_score.md; delegation-loop/ok.md\n")
+     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
+     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/ok.md", P + "reflection.md", P + "project-end.md"], out
+ 
+@@ -250,9 +256,9 @@ def test_r005_a_replace_heading_touches_the_phase_of_the_module_it_replaces(tmp_
+ 
+ def test_r005_a_path_two_modules_name_is_listed_once(tmp_path, home):
+     """handoff/TASK-015.md Requirements 2 and 4: no path is printed twice in the file list."""
+-    for key in ("delegation-loop", "reflection"):
+-        module = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / (key + ".md")
+-        module.write_text(module.read_text(encoding="utf-8") + "\nSub-files: shared/checklist.md\n", encoding="utf-8")
++    own_loop(home, "\nSub-files: shared/checklist.md\n")
++    module = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "reflection.md"
++    module.write_text(module.read_text(encoding="utf-8") + "\nSub-files: shared/checklist.md\n", encoding="utf-8")
+     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
+     assert named(out) == [P + "delegation-loop.md", P + "shared/checklist.md", P + "reflection.md", P + "project-end.md"], out
+ 
+@@ -416,9 +422,7 @@ def test_r005_a_run_leaves_no_bytecode_under_the_home(tmp_path, home):
+ def test_r005_a_pointer_line_naming_a_module_of_the_phase_prints_it_once_in_its_place(tmp_path, home):
+     """handoff/TASK-015-r2.md Requirement R2-1 (Review A B1): no path is printed twice; a pointer line that names one
+     of the phase's own modules names nothing, and the module keeps its place and its note."""
+-    loop = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md"
+-    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: project-end.md; reflection.md; delegation-loop.md; "
+-                    "delegation-loop/merge.md\n", encoding="utf-8")
++    own_loop(home, "\nSub-files: project-end.md; reflection.md; delegation-loop.md; delegation-loop/merge.md\n")
+     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
+     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/merge.md", P + "reflection.md",
+                           P + "project-end.md"], out
