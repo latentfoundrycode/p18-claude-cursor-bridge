@@ -36,15 +36,20 @@ Conditional files: for each ``Workflows: `` line in file order, after dropping a
 ``<part>: `` prefix, skipping ``not yet classified`` and malformed lines, map type, optional
 sub-type (U+2192 between names), and traits to keys through the installed open list;
 candidates are types/<key>.md, then types/<type>/<sub>.md, then traits/<key>.md for traits
-sorted by the open list's trait order. A file is named only when it exists under the
-installed workflow folder as a regular readable UTF-8 file, is not a link, and touches the
-phase (an add/set heading's module key or a replace target matches a phase module key;
-headings inside fences do not count).
+sorted by the open list's trait order. Only a key matching ``^[a-z0-9-]+$`` becomes a path
+part. A file is named only when it exists under the installed workflow folder as a regular
+readable UTF-8 file, is not a link, and touches the phase (an add/set heading's module key or
+a replace target matches a phase module key; headings inside fences do not count). A link at
+``workflow/``, at ``types/``, ``traits/`` or ``types/<type key>/`` on the way to a candidate
+refuses that candidate. A module reached through a linked ``phases/`` folder or module file is
+still named but its pointer lines are not read. The open list and registry are read only when
+``workflow/``, ``workflow/open-list.md`` and ``workflow/extension-points.md`` are not links.
 
-Failing open: if the installed workflow-check.py cannot be loaded or the open list or registry
-cannot be read, no conditional file and no pointer-line file is named; one plain line states
-what could not be read (only when a phase module file exists or a classified Workflows line
-needed that read). The hook still never blocks.
+Failing open: if the installed workflow-check.py cannot be loaded, cannot be used at run time
+(``cannot be used`` and the exception's type name), or the open list or registry cannot be
+read, no conditional file and no pointer-line file is named; one plain line states what could
+not be read (only when a phase module file exists or a classified Workflows line needed that
+read). A path returned by the checker is never printed as given. The hook still never blocks.
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
@@ -192,30 +197,55 @@ def load_checker_module():
     return mod, None
 
 
-def table_error_shown(path):
-    p = path.replace("\\", "/")
-    if p.endswith("workflow/open-list.md"):
+def safe_reason(reason):
+    if reason is None:
+        return "cannot be read"
+    if any(c in reason for c in ("/", "\\", ":")):
+        return "cannot be read"
+    return reason
+
+
+def table_file_shown(wc, path):
+    p = wc.slash(path)
+    if p == wc.slash(wc.DEFAULT_OPEN):
         return OPEN_SHOWN
-    if p.endswith("workflow/extension-points.md"):
+    if p == wc.slash(wc.DEFAULT_REGISTRY):
         return REG_SHOWN
-    root = bridge_root().replace("\\", "/")
-    if p.startswith(root + "/"):
-        return "~/.claude/cursor-bridge/" + p[len(root) + 1:]
-    return p
+    return None
+
+
+def table_read_error_line(wc, path, reason):
+    shown = table_file_shown(wc, path)
+    if shown is None:
+        return "%s: cannot be used (an unexpected table error)" % CHECKER_SHOWN
+    return "%s: %s" % (shown, safe_reason(reason))
+
+
+def workflow_table_link_error(wc):
+    root = workflow_root()
+    if wc.is_link(root):
+        return WORKFLOW_PREFIX.rstrip("/") + "/: is a link"
+    open_path = os.path.join(root, "open-list.md")
+    if wc.is_link(open_path):
+        return "%s: is a link" % OPEN_SHOWN
+    reg_path = os.path.join(root, "extension-points.md")
+    if wc.is_link(reg_path):
+        return "%s: is a link" % REG_SHOWN
+    return None
 
 
 def load_tables_from_checker(wc):
     """Return (tables, error_line). error_line is None on success."""
     open_text, _open_shown, open_err = wc.read_utf8(wc.DEFAULT_OPEN)
     if open_err:
-        return None, "%s: %s" % (OPEN_SHOWN, open_err)
+        return None, table_read_error_line(wc, wc.DEFAULT_OPEN, open_err)
     reg_text, _reg_shown, reg_err = wc.read_utf8(wc.DEFAULT_REGISTRY)
     if reg_err:
-        return None, "%s: %s" % (REG_SHOWN, reg_err)
+        return None, table_read_error_line(wc, wc.DEFAULT_REGISTRY, reg_err)
     tables, errors = wc.load_tables(open_text, wc.DEFAULT_OPEN, reg_text, wc.DEFAULT_REGISTRY)
     if errors:
         path, reason = errors[0]
-        return None, "%s: %s" % (table_error_shown(path), reason)
+        return None, table_read_error_line(wc, path, reason)
     return tables, None
 
 
@@ -315,7 +345,7 @@ def pointer_paths_from_module(text, wc):
                 rest = line[len(prefix):].rstrip()
                 for part in rest.split("; "):
                     p = part.rstrip()
-                    if POINTER_PATH.match(p) and p not in seen:
+                    if POINTER_PATH.fullmatch(p) and p not in seen:
                         seen.add(p)
                         paths.append(p)
     return paths
@@ -350,20 +380,20 @@ def conditional_candidates(wc, tables, type_name, sub_name, trait_names):
     if not row:
         return paths
     type_key = row["Key"]
-    if KEY_PATTERN.match(type_key):
+    if KEY_PATTERN.fullmatch(type_key):
         paths.append("types/%s.md" % type_key)
     if sub_name:
         sub_row = tables["sub_by_name"].get(sub_name)
-        if sub_row and KEY_PATTERN.match(type_key):
+        if sub_row and KEY_PATTERN.fullmatch(type_key):
             sub_key = sub_row["Key"]
-            if KEY_PATTERN.match(sub_key):
+            if KEY_PATTERN.fullmatch(sub_key):
                 paths.append("types/%s/%s.md" % (type_key, sub_key))
     trait_keys = []
     for name in trait_names:
         trow = tables["trait_by_name"].get(name)
         if trow:
             tkey = trow["Key"]
-            if KEY_PATTERN.match(tkey):
+            if KEY_PATTERN.fullmatch(tkey):
                 trait_keys.append((tables["trait_order"].get(name, 999999), tkey))
     trait_keys.sort(key=lambda pair: pair[0])
     for _, tkey in trait_keys:
@@ -421,29 +451,33 @@ def pointers_part(status, source):
                 read_error = load_err
             else:
                 try:
-                    tables, table_err = load_tables_from_checker(wc)
-                    if table_err:
-                        read_error = table_err
+                    link_err = workflow_table_link_error(wc)
+                    if link_err:
+                        read_error = link_err
                     else:
-                        for key in module_keys:
-                            block = []
-                            if can_read_module_pointers(wc, key):
-                                mod_path = phase_module_installed(key)
-                                text, _shown, err = wc.read_utf8(mod_path)
-                                if err is None:
-                                    for rel in pointer_paths_from_module(text, wc):
-                                        shown = PHASE_PREFIX + rel
-                                        if shown not in printed_paths:
-                                            printed_paths.add(shown)
-                                            block.append("  - %s" % shown)
-                            pointer_blocks.append(block)
-                        conditional_lines = ["  - %s" % p for p in collect_conditional_files(
-                            wc, tables, module_keys, status, printed_paths)]
-                except Exception as err:
+                        tables, table_err = load_tables_from_checker(wc)
+                        if table_err:
+                            read_error = table_err
+                        else:
+                            for key in module_keys:
+                                block = []
+                                if can_read_module_pointers(wc, key):
+                                    mod_path = phase_module_installed(key)
+                                    text, _shown, err = wc.read_utf8(mod_path)
+                                    if err is None:
+                                        for rel in pointer_paths_from_module(text, wc):
+                                            shown = PHASE_PREFIX + rel
+                                            if shown not in printed_paths:
+                                                printed_paths.add(shown)
+                                                block.append("  - %s" % shown)
+                                pointer_blocks.append(block)
+                            conditional_lines = ["  - %s" % p for p in collect_conditional_files(
+                                wc, tables, module_keys, status, printed_paths)]
+                except (Exception, SystemExit) as err:
                     read_error = "%s: cannot be used (%s)" % (CHECKER_SHOWN, type(err).__name__)
                     pointer_blocks = []
                     conditional_lines = []
-        if not pointer_blocks and module_keys:
+        if not pointer_blocks:
             pointer_blocks = [[] for _ in module_keys]
         for i, key in enumerate(module_keys):
             line = "  - %s%s.md" % (PHASE_PREFIX, key)

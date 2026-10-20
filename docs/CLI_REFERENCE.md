@@ -844,15 +844,20 @@ Conditional files: for each ``Workflows: `` line in file order, after dropping a
 ``<part>: `` prefix, skipping ``not yet classified`` and malformed lines, map type, optional
 sub-type (U+2192 between names), and traits to keys through the installed open list;
 candidates are types/<key>.md, then types/<type>/<sub>.md, then traits/<key>.md for traits
-sorted by the open list's trait order. A file is named only when it exists under the
-installed workflow folder as a regular readable UTF-8 file, is not a link, and touches the
-phase (an add/set heading's module key or a replace target matches a phase module key;
-headings inside fences do not count).
+sorted by the open list's trait order. Only a key matching ``^[a-z0-9-]+$`` becomes a path
+part. A file is named only when it exists under the installed workflow folder as a regular
+readable UTF-8 file, is not a link, and touches the phase (an add/set heading's module key or
+a replace target matches a phase module key; headings inside fences do not count). A link at
+``workflow/``, at ``types/``, ``traits/`` or ``types/<type key>/`` on the way to a candidate
+refuses that candidate. A module reached through a linked ``phases/`` folder or module file is
+still named but its pointer lines are not read. The open list and registry are read only when
+``workflow/``, ``workflow/open-list.md`` and ``workflow/extension-points.md`` are not links.
 
-Failing open: if the installed workflow-check.py cannot be loaded or the open list or registry
-cannot be read, no conditional file and no pointer-line file is named; one plain line states
-what could not be read (only when a phase module file exists or a classified Workflows line
-needed that read). The hook still never blocks.
+Failing open: if the installed workflow-check.py cannot be loaded, cannot be used at run time
+(``cannot be used`` and the exception's type name), or the open list or registry cannot be
+read, no conditional file and no pointer-line file is named; one plain line states what could
+not be read (only when a phase module file exists or a classified Workflows line needed that
+read). A path returned by the checker is never printed as given. The hook still never blocks.
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
