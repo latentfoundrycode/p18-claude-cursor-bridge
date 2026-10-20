@@ -82,14 +82,15 @@ def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when
 
 def test_r007_each_phase_module_is_a_file_the_core_names():
     """R-007, as carved (TASK-010): the plan's phase names map to module files, each keeping its heading from this
-    file, and the core's table names each one."""
+    file (the interface module naming its phase since TASK-012), and the core's table names each one."""
     s = flat(model())
     assert ("Each phase's procedure is its phase module, one file per phase (see \"The phase modules\"): the interface "
-            "phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, "
-            "the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own") in s
+            "phase is Phase 3, whose module declares its four variants (mockups, command design, contract design, a "
+            "playable prototype), each in a file of its own; planning is Phase 4, configuration is Phase 5, the "
+            "delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own") in s
     phases = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "workflow", "phases")
     for name, heading in (("intake", "## Phase 1 — Intake"), ("design", "## Phase 2 — Design"),
-                          ("interface", "## Phase 3 — UI mockups"), ("planning", "## Phase 4 — Build plan"),
+                          ("interface", "## Phase 3 — Interface"), ("planning", "## Phase 4 — Build plan"),
                           ("run-parameters", "## Run parameters"), ("configuration", "## Phase 5 — Configure"),
                           ("delegation-loop", "## Phase 6 — The delegation loop"), ("change-cycle", "## The change cycle"),
                           ("reflection", "## Reflection points"), ("project-end", "## Project end")):

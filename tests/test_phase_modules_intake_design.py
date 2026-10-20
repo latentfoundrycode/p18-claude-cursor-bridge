@@ -250,8 +250,10 @@ def test_r036_a_new_or_unwritten_trait_is_flagged_at_the_design_gate_with_the_ow
             "with the handling in the design, or the owner may still choose to pause the project.") in s
     assert "`Awaiting user on: paused at the design gate — <the trait> needs additions the bridge has not written`" in s
     # Review A's should-fix: after the pause, a new trait joins the line and the check runs, or its additions never apply
-    assert ("On resuming, a new trait, now in the open list, is added to each part's `Workflows:` line that has it, the "
-            "check is run again, and the trait's additions take the place of the design's section.") in s
+    # Review B's should-fix at PR #53, taken in TASK-012: an unwritten trait already on the line resumes the same way
+    assert ("On resuming, a new trait, now in the open list, is added to each part's `Workflows:` line that has it; for "
+            "a new trait and for an unwritten one already on the line alike, the check is run again, and the trait's "
+            "additions, now written, take the place of the design's section.") in s
     assert ("Record each flagged trait in `docs/INVENTORY.md` → Decisions as a row that begins `Flagged trait:`, naming "
             "the trait, the parts that have it and the design section that handles it, so that the promotion pass at "
             "project end puts it forward") in s
