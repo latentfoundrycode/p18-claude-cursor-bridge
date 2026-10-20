@@ -1,13 +1,19 @@
 diff --git a/bridge/commands/supervisor.md b/bridge/commands/supervisor.md
-index 1fe1bcc..5896324 100644
+index 1fe1bcc..ca70a97 100644
 --- a/bridge/commands/supervisor.md
 +++ b/bridge/commands/supervisor.md
-@@ -105,7 +105,7 @@ Every project runs the main workflow. What differs by product lives in condition
+@@ -100,12 +100,12 @@ Every project runs the main workflow. What differs by product lives in condition
+ | Layer | Holds | Read when |
+ |---|---|---|
+ | **The main workflow's core** | The roles and the division of labour; the founding rules; the loop's shape; escalation and reporting; project state; the standing rules that hold in every phase | Always, whole, at every start and calibration |
+-| **Phase modules** | The procedure for one phase each: intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end | The current phase's module or modules, whole, on entering the phase and at every calibration |
++| **Phase modules** | The procedure for one phase each: intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end | The current phase's module or modules, whole, on entering the phase and at every calibration; a module read outside its own phase when "The phase modules" says |
+ | **Type workflow** | For one product type: its changes at named extension points | Its changes to the current phase, whole, alongside the phase's module or modules |
  | **Sub-workflow** | For one sub-type: a more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
  | **Trait additions** | For one trait: what it adds, whatever the product type | Their additions to the current phase, when the part has the trait |
  
 -Until the phases are moved into files of their own, each phase's section of this file is its phase module (the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; reflection points include project end), and rule 28 governs the reading as it does today: this file is read whole at every start, resume and calibration, and after every compaction or resume you read the sections the session-start hook names before your next action. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits. Once the phases are modules, the core is still read whole at those same points, and with it the current phase's module or modules and the conditional workflows that apply; you never read a phase you are not in, or a conditional workflow that does not apply.
-+Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in, or a conditional workflow that does not apply. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
++Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in or a conditional workflow that does not apply, except a module "The phase modules" says is read outside its own phase. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
  
  **Three kinds of change.** Each change a conditional workflow makes is one of these:
  
@@ -20,7 +26,7 @@ index 1fe1bcc..5896324 100644
  
  A conditional workflow can never remove a founding rule, weaken the merge gate, or skip the requirements register, the inventory, or the reviews. Those belong to the core and are not extension points; a conditional workflow's text that would do any of these does not apply, and on these points the core governs.
  
-@@ -206,1516 +206,24 @@ to a maintainer's request, rule 57, are the exceptions) — never mid-stage, so
+@@ -206,1516 +206,30 @@ to a maintainer's request, rule 57, are the exceptions) — never mid-stage, so
  
  ---
  
@@ -1549,10 +1555,16 @@ index 1fe1bcc..5896324 100644
 +| Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
 +
 +Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module.
++
++**Modules read outside their own phase.** Some procedures run outside the phase whose `Phase:` value names their module; they are read whenever they apply, whatever the phase:
++- `reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;
++- its section "Issues — what counts, and where it is written" is read whenever an issue is detected, in any phase;
++- `project-end.md` is read whole at the close of the plan's last stage;
++- a module that runs another phase's procedure by its heading reads that phase's module whole for that step: the change cycle runs Phases 1 to 4, scaled; the design critique's failed launch follows the delegation loop's step 3b, and its review launch follows step 8.
  
  ---
  
-@@ -2159,7 +667,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep
+@@ -2159,7 +673,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep
      already passed. A calibration reopens no approval, restarts no increment, and defaults
      any new owner setting with a one-line notice rather than a question. After every
      compaction or resume the `session-start` hook re-injects the digest at the head of this
@@ -1562,14 +1574,14 @@ index 1fe1bcc..5896324 100644
  29. The five run parameters — `Stage pause`, `Merge authority`, `Refactoring pass`, `Installer verification`, `Parallel increments` — are asked
      once, right after the plan is approved, each as a question of its own in the app's
 diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
-index a88cef6..f1f2104 100644
+index a88cef6..88a3ff2 100644
 --- a/bridge/cursor-bridge/MANIFEST.json
 +++ b/bridge/cursor-bridge/MANIFEST.json
 @@ -1,6 +1,6 @@
  {
    "version": "2026.10.18a",
 -  "generated": "2026-10-20 02:26",
-+  "generated": "2026-10-20 08:13",
++  "generated": "2026-10-20 09:11",
    "files": {
      "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
      "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -1578,7 +1590,7 @@ index a88cef6..f1f2104 100644
      "commands/calibrate-bridge.md": "5ccdaa582af3a0084c6ceb20d62ac4dc1998ec86e085aa8688af4dc7ee59294a",
      "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
 -    "commands/supervisor.md": "c192e132321e567a17e1de2c31924f84401f184dfcf4f898a60ca35f4f04d338",
-+    "commands/supervisor.md": "6ee5990e30a64e58b0c030a40a1d0e021d46f6d3398cdd42b2148d15be6bfe69",
++    "commands/supervisor.md": "ce17570b2c7ae2a65357d7645592dc2a609989cef00fc204d1441791a4510499",
      "cursor-bridge/CHANGELOG.md": "4e5dd4878aec6a49eb37c9f1183f6a765204aad40560730cb28c25615f6a8d25",
      "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
      "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
@@ -1607,7 +1619,7 @@ index a88cef6..f1f2104 100644
 +    "cursor-bridge/workflow/phases/run-parameters.md": "e2007da223deeff89d9963f9cf59b4cb08719c04d06a1f2754ed42ec20b9e1f2",
      "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
 -    "cursor-bridge/workflow/trace-exceptions.md": "4ba69398c05caedd5d6a320be742d0f76bc194f89517ffad0063b121591caa63",
-+    "cursor-bridge/workflow/trace-exceptions.md": "3a71b8249a4085b4ab43517f34c3545f2732205c74429af7b09b79c6275db7f2",
++    "cursor-bridge/workflow/trace-exceptions.md": "8ba6c802a8efd4bdb7b02a3439d24f1b1c54e7dfe3716994cfe1729bbb3b5ce3",
      "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
      "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
      "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
@@ -3712,10 +3724,10 @@ index 0000000..3ab517b
 +within them*. The owner may change a parameter mid-project by saying so; you update the
 +file and apply it from the next stage close or merge on, never retroactively.
 diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
-index 1f9232a..435e19d 100644
+index 1f9232a..7bc12c9 100644
 --- a/bridge/cursor-bridge/workflow/trace-exceptions.md
 +++ b/bridge/cursor-bridge/workflow/trace-exceptions.md
-@@ -3,3 +3,7 @@
+@@ -3,3 +3,8 @@
  Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword` or `new`, `<id>` is the increment id (e.g. `TASK-010`), `<file>` is a repository-relative path to the core or a workflow Markdown file, and `<heading>` is the section heading text. The supervisor-text increment that rewords or adds appends each entry after `## Entries`.
  
  ## Entries
@@ -3723,6 +3735,7 @@ index 1f9232a..435e19d 100644
 +- new TASK-010 bridge/cursor-bridge/workflow/phases/project-end.md Where this module begins
 +- new TASK-010 bridge/cursor-bridge/workflow/phases/reflection.md Project end
 +- reword TASK-015 bridge/commands/supervisor.md Standing rules
++- new TASK-010 bridge/commands/supervisor.md The phase modules
 diff --git a/docs/BUILD_PLAN.md b/docs/BUILD_PLAN.md
 index 6f24db0..c60d202 100644
 --- a/docs/BUILD_PLAN.md
@@ -3804,44 +3817,49 @@ index 26d5433..57cce14 100644
  project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
  or a worktree). It FAILS OPEN on purpose: a session that is not the project's supervisor
 diff --git a/docs/HARDENING.md b/docs/HARDENING.md
-index 5368110..f8bc4fb 100644
+index 5368110..9ba594d 100644
 --- a/docs/HARDENING.md
 +++ b/docs/HARDENING.md
-@@ -100,6 +100,24 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
+@@ -100,6 +100,29 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
  - **Accepted (mutation (ab), the builder's assumption):** the link test of the walk's start folder is shadowed by the test of the baseline file, whose path runs through the same folder and is checked first; it stays as the brief's guard. Reopens if a file read by name moves out of `workflow/`.
  - **For TASK-010 (Review A round 1's design point):** an exceptions entry names a file and a heading, so an entry naming a level-1 heading or the digest's heading excuses every passage under it; the design review of each split increment reads every entry's heading for that reach.
  
 +### TASK-010 with TASK-015, the carve and the hook's module pointers (2026-10-20)
-+- **The carve (TASK-010, the supervisor's governance text):** every phase section moved verbatim from bridge/commands/supervisor.md into its module under workflow/phases/, project-end carved out of the reflection points as a declared split; trace-check.py: 424 passages of baseline 0a186da, 158 in the core, 263 under workflow/, 0 dropped, 3 excused (two TASK-010 rewords in "Main and conditional workflows", one TASK-015 reword of rule 28).
++- **The carve (TASK-010, the supervisor's governance text):** every phase section moved verbatim from bridge/commands/supervisor.md into its module under workflow/phases/, project-end carved out of the reflection points as a declared split; trace-check.py: 424 passages of baseline 0a186da, 157 in the core, 263 under workflow/, 0 dropped, 4 excused (three passages of "Main and conditional workflows" under its TASK-010 reword entry, the layering table's among them since the gate's round 2; one TASK-015 reword of rule 28).
 +- **Rounds (TASK-015, composer-2.5):** seven builder rounds, each opened by the supervisor's tests, red against the round before. Round 1: a path printed twice, a part silenced by a checker failure, folder links followed (Review A). Round 2: a checker that exits, a path the checker returned printed, the intact precondition unshown (convergent). Round 3: a reason with a line break, an exception's type name, the link test and the read reaching different files (convergent). Round 4: a `..` after a linked folder read another file than the link test tested, on Linux (convergent). Round 5: reading a type name could itself raise (Review A REJECT, convergent with the security audit), a str subclass printing its `__str__`; and the release stamp left stale, which failed 39 install tests and errored 9. Round 6: pointer lines took a str subclass, a BaseException escaped (convergent). Round 7: Review A APPROVE 0/2/4, both should-fix the supervisor's (a plain-subclass case for R7-1, a driver label), taken; the security audit PASS with four advisories.
-+- **By-class line (step 7), drawn after round 7:** the tail is a checker written to defeat the hook, which the docstring puts out of scope ("not a hostile checker, which runs in-process and could write to its output directly"). Review A and the security audit both named the first two leads below, each placing them outside the threat model; the convergence rule makes a finding blocking, and the supervisor holds that a convergence on a finding both reviewers class outside the stated model is not one, since the hook's own docstring already declares the class and every further guard narrows a channel an in-process program can open another way. A finding inside the model (a partial, mismatched or hand-edited install) still blocks.
++- **By-class line (step 7), drawn after round 7:** the tail is a checker written to defeat the hook, which the docstring puts out of scope ("not a hostile checker, which runs in-process and could write to its output directly"). Review A and the security audit both named the first two leads below, each placing them outside the threat model. The merge policy's convergence rule (Merge-Verification-Policy.md, "Convergence is a signal": two reviewers naming the same defect make it blocking "even if each alone marked it advisory") admits no exception for a threat model, so this line departs from its wording; the supervisor takes the by-class rule's reading (step 7: the long tail of one hard subsystem goes to this file unless it is a new class or defeats a safety mechanism the increment relies on), since the hook's docstring already declares the class, every further guard narrows a channel an in-process program can open another way, and the second lead's fix (ending the process before the checker's objects are freed, or a child process) is a new mechanism, not a correction. The first lead's fix is one line and is taken at the hook's next edit. The gap between the two rules is a Feedback entry owed (PROJECT_STATUS.md). A finding inside the model (a partial, mismatched or hand-edited install) still blocks, unless nothing can reach it yet: the fence lead below is latent (no module has a pointer line) and accepted until the first pointer line, whose increment fixes it first.
 +- **Lead (both reviewers, round 7):** the exception's type name is read in the `except` handler, after the redirection ends (session-start.py, `load_checker_module` and the use handler of `pointers_part`), so a metaclass whose `__name__` prints writes to the hook's output. Check: call `safe_exc_type_name` inside a short redirection of its own.
 +- **Lead (both reviewers, round 7):** a `__del__` on checker objects freed when the handler ends, an `atexit` callback the checker registers, or a thread it starts runs after the redirection, after the hook's own write, uncapped. Check: flush and end with `os._exit(0)` after the write, or run the checker in a child process with its output captured.
-+- **Lead (the security audit, round 7):** the redirection covers writes through `sys.stdout` and `sys.stderr` only; `sys.__stdout__`, `os.write(1, ...)` and a child process inheriting the streams pass it. The docstring's "what the checker prints is discarded" reads wider than that. Check: the docstring names the two streams at the next edit of the hook.
++- **Lead (the security audit, round 7):** the redirection covers writes through `sys.stdout` and `sys.stderr` only; `sys.__stdout__`, `os.write(1, ...)` and a child process inheriting the streams pass it. The docstring's "what the checker prints is discarded" reads wider than that (INVENTORY's row names the two streams). Check: the docstring names the two streams at the next edit of the hook.
 +- **Lead (the security audit, round 7):** the discard buffers are unbounded; a checker printing in a loop grows memory rather than being cut. Check: a bounded sink if a checker ever prints.
-+- **Lead (Review A, round 7):** the exact-str test of R7-1 runs before the fence logic, so a non-str opening fence line is skipped by the fence tracking too and a pointer line inside that fence is read. A mismatched checker returns one type for every line, so every line is skipped then. Check: test the type after the fence logic if a checker can return mixed lines.
-+- **Lead (Review A, round 7, an assumption the builder did not list):** the checker is loaded under a `StringIO` standard output, so a checker that touches `sys.stdout.buffer` or calls `reconfigure` at import fails to load (`cannot be loaded (AttributeError)`, closed); workflow-check.py does both only under its `__main__` guard today.
-+- **Lead (rounds 1 to 4):** `dont_write_bytecode` stops the hook writing a `.pyc` but not reading one: a cached `__pycache__` copy of workflow-check.py, fresh by its timestamp, is loaded instead of the source. The installer writes none. Check: load with `SourceFileLoader` from the source text, or refuse a `__pycache__` under the bridge folder.
++- **Lead (Review A, round 7 and the gate; inside the model, latent, accepted until the first pointer line):** the exact-str test of R7-1 runs before the fence logic. A mismatched checker whose `file_lines` returns lines of another type (bytes, say) has every line skipped: no pointer-line file is named and no cannot-be-used line says so, against the feature's "one plain line" (INVENTORY Features). Nothing is affected today, since no module has a `Sub-files:` or `Variants:` line; a checker returning mixed lines would also skip a non-str opening fence and read a pointer line inside it. Check, before TASK-012 or TASK-013 adds the first pointer line: a non-str line from `file_lines` raises inside the handler (so the part says `cannot be used`), with a test of the uniform case.
++- **Lead (Review A, round 7, an assumption the builder did not list; inside the model, accepted as failing closed):** the checker is loaded under a `StringIO` standard output, so a checker that touches `sys.stdout.buffer` or calls `reconfigure` at import fails to load (`cannot be loaded (AttributeError)`, closed); workflow-check.py does both only under its `__main__` guard today.
++- **Lead (rounds 1 to 4):** `dont_write_bytecode` stops the hook writing a `.pyc` but not reading one: a cached `__pycache__` copy of workflow-check.py whose recorded source mtime and size match the source is loaded instead of it, which inside the model means an edit of the same size within the same second, or a restore that keeps the old mtime. The installer writes none. Check: load with `SourceFileLoader` from the source text, or refuse a `__pycache__` under the bridge folder.
 +- **Lead (rounds 3 and 4):** between the link test and the read a path can be swapped for a link (the same race as TASK-016's lead); whoever can swap it can edit the files the hook reads. Check: open with no-follow and compare `fstat` with the `lstat`.
-+- **Lead (round 2):** `parse_workflows_tail` re-implements the Workflows line's grammar beside workflow-check.py's own judge (`check_status`, `prefix_of`); a grammar change made in one would leave the other. Check: the hook calls the checker's parser once the checker exports one for a single line (a refactoring candidate for stage B3's pass).
++- **Lead (round 2; inside the model, as version skew, accepted until a grammar change):** `parse_workflows_tail` re-implements the Workflows line's grammar beside workflow-check.py's own judge (`check_status`, `prefix_of`); a grammar change made in one would leave the other. Check: the hook calls the checker's parser once the checker exports one for a single line (a refactoring candidate for stage B3's pass).
 +- **Recorded:** the root-link test in `conditional_path_accessible` is redundant since R3-3 (a linked workflow/ stops the tables first) and kept as defence in depth (the driver's r2-4-workflow-root-link-dropped survives as labelled); three mutants are equivalent (f, r, r3-4); three are killed only where a file link can be made (h and the two r3-3 mutants: the link tests skip on this account and run on Linux CI).
 +- **Accepted (Review A round 6, C3):** a table key that is not an exact str is skipped like a key outside the key pattern, with no cannot-read line; before round 6 a non-string key raised TypeError and printed `cannot be used (TypeError)`. The checker validates the keys; a key of another type is a crafted table, and naming no file fails closed. Reopens if a checker returns keys of another type by design.
 +- **Lead (seen at this compaction, a usability defect):** the hook reads any `Awaiting user on:` value other than nothing, none, empty or `-` as a wait, so "none (resumed 2026-10-20 on the owner's word)" told the resumed supervisor to wait. Check: the status file writes `nothing` (done at this merge); a hook that reads only the field's first word is a bridge feedback lead.
++- **Taken at the gate (Review A, the hook's part):** the no-bytecode test passed with bytecode writing switched off by the runner's environment (PYTHONDONTWRITEBYTECODE), so it proved nothing on this computer: the test helper now drops the variable and the test shows the checker was loaded; the replace clause of Requirement 5 had no test: one added. Both with driver mutants (gate-bytecode-written, gate-replace-ignored). Recorded: TASK-015's Done when says the module test uses the TASK-006 fixtures; the tests write their own conditional files in each test's home instead (each case needs a heading the fixtures do not pair with its phase), so the fixtures' look-alike headings (`## Replacement history`, `## Add-ons`) are not run through the hook. Check: one case over tests/fixtures/workflows/pass/ at the next edit of the test file.
++- **Leads (Review A, the hook's part, consider):** the read of the workflow folder triggered by a classified Workflows line alone (no module installed) is untested (`needs_workflow_read`; a standard install always has the modules); each pointer path is right-stripped where the docstring's grammar strips only the line's end, so `Sub-files: a.md ; b.md` names `a.md` (harmless, the pattern still applies; TASK-012 and TASK-013 write pointer lines against the docstring's grammar, so one of the two is made to agree first); `printed_paths` holds the phase modules' display forms and the conditional files' relative paths in one set, correct only because they cannot overlap; `pointers_part`'s failure paths nest eight levels, where a function returning (blocks, lines, error) would give each a plain return and make the `i < len(pointer_blocks)` guard go (a refactoring candidate for stage B3's pass).
++- **Taken at the gate (Review A, the carve's part, blocking):** after the carve a reader reads the current phase's modules and "never a phase you are not in", so the procedures that run outside their own `Phase:` value had no reader: the reflection points at each approved phase gate, an issue detected outside building, the change cycle's scaled Phases 1 to 4. The core's "The phase modules" now says when each is read ("Modules read outside their own phase", a `new` entry in trace-exceptions.md), the "never a phase you are not in" sentence names the exception (inside the section's existing reword), and test_r003_a_module_read_outside_its_own_phase_is_named_with_when pins both. Should-fix taken: test_r003_the_carve_traces_with_exactly_its_excuses runs trace-check.py on the repository and pins its TRACED line and its three NOTE lines, so an increment that excuses more changes the test (skipped where the baseline commit is absent: CI's depth-1 checkout).
++- **Lead (Review A, the carve's part):** the session-start hook names reflection.md only for `building` and `changing`, so a compaction during a reflection point at an earlier phase's gate re-reads the phase's module but not reflection.md; the core's rule tells the supervisor to read it on entering the reflection point. Check: whether PHASE_MODULES names reflection.md for every phase value, at the next edit of the hook.
++- **Leads (Review A, the carve's part, consider):** the digest's "(see "The change cycle" after Phase 6)" (supervisor.md, "The core, in brief") describes a place that is now change-cycle.md; it resolves through the module table but misleads, and is fixed at the next reword of that section. project-end.md's bridging paragraph explains its first paragraph's cross-references but not the User Manual bullet's "(item 4)", which cites reflection.md. Rule 28's reword is filed under TASK-015 in trace-exceptions.md although the text is the supervisor's (commit ee856a5, made with TASK-015's brief): the label matches the commit. test_r003_no_phase_procedure_remains_in_the_core checks headings and two project-end strings only; the traceability check's copy test, pinned now, catches a paragraph left behind. All 58 standing rules stayed in the core, phase-specific ones (29, 31, 33) included, since the digest cites them by number: the conservative reading of R-003's "the standing rules that hold in every phase", for the design review of TASK-025 to rule on.
 +- **Lead (the carve, for the enrichment increments):** governance files outside the core still name core sections that moved to modules (the merge policy's and the pitfalls' pointers to "Phase 6 step N", the agent and skill definitions, calibrate-bridge's re-read list, a bridge-run.py message); each still resolves to text that exists, now in a module, but names the wrong file. Check: a pointer sweep in TASK-011 to TASK-014, each module's increment re-pointing what names it, and calibration reading the modules (TASK-023).
 +
  ## Stage B2 — carried to its close (test lane)
  - Done on BUG-002 (stage B2's review fixes), not in the refactoring pass, whose test lane only consolidates: tests/test_open_list.py pins "filled, including" and its comment at :25 is corrected (TASK-004 r3 Consider); tests/test_extension_points.py pins the configuration.items CI route, the inspect step's members and the placement sentence (TASK-005 r6 Consider).
  
 diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
-index e6b8432..e3361d5 100644
+index e6b8432..b9d6640 100644
 --- a/docs/INVENTORY.md
 +++ b/docs/INVENTORY.md
 @@ -21,6 +21,8 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
  | The generated command reference | Every bridge program's command line (argparse programs from their `build_parser()`; hand-parsed ones from the docstring's usage), written to a JSON file and a Markdown rendering of it; defaults and choices under the bridge's folder as `<bridge folder>/...`; any string holding the repository, home or current folder (any case, any run of separators, with or without the drive) refused, the remaining forms and folders being leads in docs/HARDENING.md (Stage B3, CONFIG-B3b); `--check` fails a stale file, in CI's tests job and the pre-commit gate | tools/dump-cli.py; docs/cli-reference.json; docs/CLI_REFERENCE.md; .github/workflows/tests.yml; .githooks/pre-commit | tests/test_dump_cli.py | release B (CONFIG-B3b; rule 32) |
  | The glossary's workflow terms | The closed set of release B's terms (main workflow core, phase module, extension point, product type, sub-type, trait, the conditional workflows, add/replace/set, the open list, workflow and sub-workflow names, the workflow check, the compaction-survival list), and a Phase entry listing all eight status values | bridge/cursor-bridge/Glossary.md, "Main and conditional workflows" | tests/test_glossary_terms.py | release B (TASK-009) |
  | The traceability check | Compares every passage of the core (bridge/commands/supervisor.md) at the pinned baseline commit with its current homes, the core and every module under bridge/cursor-bridge/workflow/: a passage dropped everywhere, a passage in more homes than at baseline, undeclared new text in a module, a `~/.claude/...` reference that does not name a path inside bridge/ with no link on the way, and a cited heading that resolves nowhere are FAIL lines; `reword` and `new` entries in trace-exceptions.md excuse a reworded or new passage; `--map` prints each passage's home; a link met on any path it reads, an unreadable folder, a git failure or the baseline commit missing (a shallow clone) stop it with exit 2. Only git rev-parse, cat-file, ls-tree and show run; nothing is written | bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt (the baseline, 0a186da); bridge/cursor-bridge/workflow/trace-exceptions.md | tests/test_trace_check.py | release B (TASK-016) |
-+| The phase modules | The supervisor's procedure, one file per part of the workflow, moved verbatim from the core: intake, design, interface, planning, run-parameters, configuration, delegation-loop, change-cycle, reflection, project-end (carved out of the reflection points as a declared split); the core keeps the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state and the standing rules, and names every module; the modules install from the manifest with no installer change | bridge/cursor-bridge/workflow/phases/*.md; bridge/commands/supervisor.md | tests/test_core_carve.py; trace-check.py (424 passages, 0 dropped) | release B (TASK-010) |
-+| The hook's module pointers | After a compaction, resume or fork the session-start hook names the current phase's module files (one Phase→module table, every template value), the files a module's `Sub-files:` and `Variants:` lines name, and the type, sub-type and trait files that touch the phase, in the order additions apply; it reads the open list and the registry only at their installed paths and through no link; a table or checker it cannot read or use gives one plain line and names no conditional or pointer-line file; nothing the checker returns is printed except as an exact str matching its pattern, what the checker prints is discarded, and the hook exits 0 | bridge/cursor-bridge/session-start.py | tests/test_session_start_module.py; tests/test_session_start.py | release B (TASK-015) |
++| The phase modules | The supervisor's procedure, one file per part of the workflow, moved verbatim from the core: intake, design, interface, planning, run-parameters, configuration, delegation-loop, change-cycle, reflection, project-end (carved out of the reflection points as a declared split); the core keeps the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state and the standing rules, and names every module, and when a module is read outside its own phase (reflection at every reflection point, its Issues section whenever an issue is detected, project end at the last stage's close, another phase's module whole for a step a module runs by its heading: the change cycle's scaled Phases 1 to 4, the design critique's use of the delegation loop's steps 3b and 8); the modules install from the manifest with no installer change | bridge/cursor-bridge/workflow/phases/*.md; bridge/commands/supervisor.md | tests/test_core_carve.py; trace-check.py (424 passages, 0 dropped) | release B (TASK-010) |
++| The hook's module pointers | After a compaction, resume or fork the session-start hook names the current phase's module files (one Phase→module table, every template value), the files a module's `Sub-files:` and `Variants:` lines name, and the type, sub-type and trait files that touch the phase, in the order additions apply; it reads the open list and the registry only at their installed paths and through no link; a table or checker it cannot read or use gives one plain line and names no conditional or pointer-line file; nothing the checker returns is printed except as an exact str matching its pattern, what the checker prints through sys.stdout and sys.stderr is discarded, and the hook exits 0 | bridge/cursor-bridge/session-start.py | tests/test_session_start_module.py; tests/test_session_start.py | release B (TASK-015) |
  
  ## Resources
  | Name | Kind | Where it lives | Used by | Provided |
@@ -3849,14 +3867,14 @@ index e6b8432..e3361d5 100644
  | The traceability check traces every passage of the core (424 at the baseline), not only the standing rules and the conditional passages R-029 names | tracing them all costs nothing more and leaves no passage to be classed by hand; a passage that leaves the core without a home takes a `reword` entry the design review sees | 2026-10-20, supervisor (TASK-016) | a split increment needs a passage deleted outright |
  | The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
  | TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
-+| The core's size after the carve: 850 lines and 94,119 characters (before: 2,342 lines and 224,615 characters); the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters | TASK-010's Done when asks for the measurement | 2026-10-20, supervisor (TASK-010) | a module nears the bound (delegation-loop.md is at 94% of its characters: an enrichment that adds to it splits it into sub-files first) |
++| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters); the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters | TASK-010's Done when asks for the measurement | 2026-10-20, supervisor (TASK-010) | a module nears the bound (delegation-loop.md is at 94% of its characters: an enrichment that adds to it splits it into sub-files first) |
 +| The session-start hook's threat model is a partial, mismatched or hand-edited install, not a hostile checker: workflow-check.py runs in the hook's process and could write to its output directly. Inside it, nothing the checker returns reaches the output except as an exact str matching its pattern; what lies outside it is docs/HARDENING.md's (Stage B3, TASK-010 with TASK-015) | seven review rounds converged there; every guard past the model narrows a channel an in-process program can open another way | 2026-10-20, supervisor (TASK-015, by-class line) | the hook loads code other than the installed checker, or a finding inside the model |
 +| The hook reads the workflow tables only at their installed paths (`~/.claude/cursor-bridge/workflow/open-list.md` and `extension-points.md`), only once the checker's own table paths compare equal to them, and refuses them behind a link at workflow/ or at either file | the link test and the read then concern the same files on every platform (TASK-015 R3-3, R4-3, R5-1) | 2026-10-20, supervisor (TASK-015) | the tables move |
  | No diagram index for release B | the design is the plan's prose and its §6.2 layering / §6.11 file layout tables; this is governance text, not a code architecture with components to draw | 2026-10-11, supervisor | a later release adds code whose architecture is load-bearing |
  
  ## Deferred
 diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
-index 5f3c3ba..9700a70 100644
+index 5f3c3ba..2fb02de 100644
 --- a/docs/PROJECT_STATUS.md
 +++ b/docs/PROJECT_STATUS.md
 @@ -3,22 +3,22 @@ Last updated: 2026-10-20
@@ -3867,7 +3885,7 @@ index 5f3c3ba..9700a70 100644
 -Last accepted: TASK-016 (PR #51, at its merge): the traceability check, R-029 built (bridge/cursor-bridge/trace-check.py, the baseline pinned at 0a186da, the empty exceptions scaffold; 424 passages traced, RESULT: OK; four builder rounds; no CI step, it runs at step 4 of every split increment); before it FIX-002 at 0a186da (PR #50): stage B2's least-confident items 2 and 3 settled by tests; before it CONFIG-B3b at 944e64b (PR #49): the generated command reference (tools/dump-cli.py; `--check` in CI and the pre-commit gate; four builder rounds); before it FIX-001 at 42b1c40 (PR #48): every launch the test suite makes without creation flags of its own is windowless on Windows, and a test fails on a launch around that default (tests/conftest.py, tests/test_tests_windowless.py; ISS-011, the crash of 2026-10-19, cause not confirmed); before it CFG-B3 at 2b10bfe (PR #47), the builder's configuration; main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001, CFG-B3, FIX-001, CONFIG-B3b, FIX-002, TASK-016
 -Awaiting user on: none (resumed 2026-10-20 on the owner's word)
 +Increment: none — this file states the position at the merge of TASK-010 with TASK-015 (PR #52); TASK-011, the enrichment of the intake and design modules, is next
-+Last accepted: TASK-010 with TASK-015 (PR #52, at its merge): the core carved into its phase modules under bridge/cursor-bridge/workflow/phases/ (R-003, R-032 built; the core 850 lines and 94,119 characters, from 2,342 and 224,615; trace-check 424 passages, 0 dropped, 3 excused) and the session-start hook naming the phase's modules, their pointer-line files and the conditional workflows that touch the phase (R-005 built; seven builder rounds; a by-class line after round 7, its leads in docs/HARDENING.md, Stage B3); before it TASK-016 (PR #51): the traceability check, R-029 built (bridge/cursor-bridge/trace-check.py, the baseline pinned at 0a186da; no CI step, it runs at step 4 of every split increment); before it FIX-002 at 0a186da (PR #50): stage B2's least-confident items 2 and 3 settled by tests; before it CONFIG-B3b at 944e64b (PR #49): the generated command reference (tools/dump-cli.py; `--check` in CI and the pre-commit gate; four builder rounds); before it FIX-001 at 42b1c40 (PR #48): every launch the test suite makes without creation flags of its own is windowless on Windows, and a test fails on a launch around that default (tests/conftest.py, tests/test_tests_windowless.py; ISS-011, the crash of 2026-10-19, cause not confirmed); before it CFG-B3 at 2b10bfe (PR #47), the builder's configuration; main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001, CFG-B3, FIX-001, CONFIG-B3b, FIX-002, TASK-016, TASK-010, TASK-015
++Last accepted: TASK-010 with TASK-015 (PR #52, at its merge): the core carved into its phase modules under bridge/cursor-bridge/workflow/phases/ (R-003 built; R-032's bound in force, the modules' own Sub-files: pointers to come in TASK-011 to TASK-014; the core 856 lines and 95,005 characters, from 2,342 and 223,501; trace-check 424 passages, 0 dropped, 4 excused) and the session-start hook naming the phase's modules, their pointer-line files and the conditional workflows that touch the phase (R-005 built; seven builder rounds; a by-class line after round 7, its leads in docs/HARDENING.md, Stage B3); before it TASK-016 (PR #51), the traceability check, R-029 built; before it FIX-002 (PR #50), CONFIG-B3b (PR #49), FIX-001 (PR #48; ISS-011, the crash of 2026-10-19, cause not confirmed) and CFG-B3 (PR #47); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001, CFG-B3, FIX-001, CONFIG-B3b, FIX-002, TASK-016, TASK-010, TASK-015
 +Awaiting user on: nothing
  Previously: stage B1 closed 2026-10-19 after four stage-review rounds — round 1 (2026-10-16) both REJECT (BUG-001); round 2 Review A REJECT (the bootstrap tests checked a word, not a record: BUG-015); round 3 Review B REJECT, Review A the same item, convergent (this file on main described its own pull request before the gate: BUG-016, ISS-009); round 4 both APPROVE.
 -Next: TASK-010 with TASK-015: a branch from origin/main, spec-packager's brief (its reality check against the core as built and the traceability check), plan-check, the delegation; trace-check.py runs at its step 4 and must print RESULT: OK. Then TASK-011 to TASK-014.
@@ -3886,12 +3904,12 @@ index 5f3c3ba..9700a70 100644
 -Open issues: ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; FIX-001 makes the suite's launches windowless). ISS-010 open (the project's afterFileEdit hook never runs in the bridge's headless builder runs; not relied on; docs/HARDENING.md, Stage B3, CFG-B3). ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25. Owed at the next reflection point: a Feedback entry on the status template's Layout: line, which puts this computer's drive and project paths on public main against rule 54
 +Remote sync: main at the merge of PR #52, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
 +Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — under way: its configuration items, the traceability check, the carve and the hook merged; the enrichment of the modules (TASK-011 to TASK-014) next. Last reflection: stage B1's close, 2026-10-19 (demonstration passed; conformance then 17 OK / 6 MISSING / 5 NOTE; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
-+Open issues: ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; FIX-001 makes the suite's launches windowless). ISS-010 open (the project's afterFileEdit hook never runs in the bridge's headless builder runs; not relied on; docs/HARDENING.md, Stage B3, CFG-B3). ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25. Owed at the next reflection point: a Feedback entry on the status template's Layout: line, which puts this computer's drive and project paths on public main against rule 54; a Feedback entry on the session-start hook reading any Awaiting user on: value but nothing, none, empty or - as a wait ("none (resumed ...)" told a resumed supervisor to wait; docs/HARDENING.md, Stage B3)
++Open issues: ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; FIX-001 makes the suite's launches windowless). ISS-010 open (the project's afterFileEdit hook never runs in the bridge's headless builder runs; not relied on; docs/HARDENING.md, Stage B3, CFG-B3). ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25. Owed at the next reflection point: a Feedback entry on the status template's Layout: line, which puts this computer's drive and project paths on public main against rule 54; a Feedback entry on the session-start hook reading any Awaiting user on: value but nothing, none, empty or - as a wait ("none (resumed ...)" told a resumed supervisor to wait; docs/HARDENING.md, Stage B3); a Feedback entry on the convergence rule, which admits no exception for a finding both reviewers class outside a component's stated threat model, while the by-class line records such a tail (TASK-015's line departed from the rule's wording; docs/HARDENING.md, Stage B3)
  Maintainer requests: none open (Release B2's request answered as FB-021 at stage B2's close, 2026-10-19; recorded as a post-B release in INVENTORY.md, Decisions)
  Bridge version: 2026.10.18a
  Calibrated: 2026-10-19 from 2026.10.11d to 2026.10.18a — applied: the design critique's ceiling (no design, plan or change critique is running here: release B's plan critique and the hotfix's both closed at their gates, so no subject takes a token and no round file is renamed; it does not reach a code-gate stage review, which stays under standing rule 6's by-class brake), project.json's state; pending: none (the conformance MISSING items were applied at stage B3's start by CFG-B3 and CONFIG-B3b, below); not applied (gate passed): none
 diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
-index bd24bbb..98b89e2 100644
+index bd24bbb..497bf2f 100644
 --- a/docs/REQUIREMENTS.md
 +++ b/docs/REQUIREMENTS.md
 @@ -6,9 +6,9 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
@@ -3911,7 +3929,7 @@ index bd24bbb..98b89e2 100644
  | R-030 | A new project walked from intake to configuration reads only its core, its current phase module, and its own conditional workflows. | DESIGN release B "Accepted when" | planned | — |
  | R-031 | The bridge, reAngle, the video factory, and the TDP each classify under §6.3 (checked on committed fixtures) and calibrate onto the new structure, none pausing, without reopening a gate: reAngle live as the release-B trial, the bridge by running the release, the video factory and the TDP when they resume per the owner's standing pause/resume policy (one calibration each). | DESIGN §6.3; release B "Accepted when" | planned | — |
 -| R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | planned | — |
-+| R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | built | tests/test_core_carve.py (test_r032_each_module_is_read_whole; the largest module, delegation-loop.md, 621 lines and 56,457 characters); tests/test_session_start.py (test_digest_is_at_the_head_and_within_what_a_compaction_keeps); TASK-010 |
++| R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | planned | the bound: tests/test_core_carve.py test_r032_each_module_is_read_whole (TASK-010; the largest module, delegation-loop.md, 621 lines and 56,457 characters) and the digest's limit in tests/test_session_start.py; the hook's side of a split: tests/test_session_start_module.py test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_module (TASK-015); the modules' own Sub-files: pointers follow in TASK-011 to TASK-014 |
  | R-033 | The workflow check runs at every bridge release (CI) and at every calibration. | DESIGN §6.6 | planned | the release half: tests/test_workflow_check.py (TASK-006, the CI step); the calibration half is TASK-024's |
  | R-034 | Trait additions from several conditional workflows are applied together in a stated order. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
  | R-035 | Traits are proposed at intake and settled at the design gate; a product type's default traits are proposals settled at the same gate. | DESIGN §6.3 | planned | — |
@@ -5091,10 +5109,10 @@ index 64d6327..a36ed9b 100644
                 "pytest ", "cat ~/.claude/", "powershell -NoProfile")
 diff --git a/tests/test_core_carve.py b/tests/test_core_carve.py
 new file mode 100644
-index 0000000..3a2f5ac
+index 0000000..29c0105
 --- /dev/null
 +++ b/tests/test_core_carve.py
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,174 @@
 +"""TASK-010: the core and its phase modules (R-003, R-032).
 +
 +enforces: docs/REQUIREMENTS.md R-003 (the core holds the roles and division of labour, the founding rules, the loop's
@@ -5199,6 +5217,54 @@ index 0000000..3a2f5ac
 +    assert "### Issues — what counts, and where it is written" in reflection.split("\n")
 +
 +
++def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
++    """PR #52's gate (Review A, the carve's part, blocking): before the carve every procedure was in the one file read
++    whole; after it a reader reads the current phase's modules and "never a phase you are not in". The procedures that
++    run outside their own Phase: value (reflection points at every phase gate, an issue in any phase, project end, the
++    change cycle's scaled Phases 1 to 4) are named in the core with when they are read."""
++    core = read(CORE)
++    section = core.split("\n## The phase modules\n", 1)[1].split("\n## ", 1)[0]
++    rule = section.split("**Modules read outside their own phase.**", 1)[1]
++    assert "`reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;" in rule
++    assert "its section \"Issues — what counts, and where it is written\" is read whenever an issue is detected, in any phase;" in rule
++    assert "`project-end.md` is read whole at the close of the plan's last stage;" in rule
++    assert ("reads that phase's module whole for that step: the change cycle runs Phases 1 to 4, scaled; the design "
++            "critique's failed launch follows the delegation loop's step 3b, and its review launch follows step 8.") in rule
++    assert ("You never read a phase you are not in or a conditional workflow that does not apply, except a module "
++            "\"The phase modules\" says is read outside its own phase.") in core
++    layering = core.split("\n## Main and conditional workflows\n", 1)[1].split("\n## ", 1)[0]
++    assert ("on entering the phase and at every calibration; a module read outside its own phase when \"The phase "
++            "modules\" says |") in layering
++
++
++# the traceability check's result on this tree, every excuse it uses named (PR #52's gate, Review A, the carve's part:
++# a reword entry excuses a whole section, so a later drop there would show only as a NOTE with RESULT: OK)
++TRACED = "TRACED: 424 passages of baseline 0a186da; 157 in supervisor.md, 263 under workflow/, 0 dropped, 4 excused"
++NOTES = [
++    "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
++    "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
++    "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
++    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
++]
++
++
++def test_r003_the_carve_traces_with_exactly_its_excuses():
++    """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
++    excused ones exactly the four passages of the three rewords this carve declares, so an increment that excuses anything more changes this
++    test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
++    the supervisor's checkout."""
++    repo = os.path.abspath(os.path.join(HERE, os.pardir))
++    have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
++    if have.returncode != 0:
++        import pytest
++        pytest.skip("the baseline commit is not in this clone (a shallow checkout)")
++    p = subprocess.run([sys.executable, os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")], cwd=repo,
++                       capture_output=True, text=True, encoding="utf-8")
++    assert p.returncode == 0, p.stdout + p.stderr
++    lines = p.stdout.strip().split("\n")
++    assert lines == NOTES + [TRACED, "RESULT: OK"], p.stdout
++
++
 +def test_r032_each_module_is_read_whole():
 +    for key in MODULES:
 +        text = read(os.path.join(PHASES, key + ".md"))
@@ -5280,10 +5346,10 @@ index 3d6f773..d6b3079 100644
  def test_fork_source_is_named(tmp_path, home):
 diff --git a/tests/test_session_start_module.py b/tests/test_session_start_module.py
 new file mode 100644
-index 0000000..410585b
+index 0000000..b35adef
 --- /dev/null
 +++ b/tests/test_session_start_module.py
-@@ -0,0 +1,699 @@
+@@ -0,0 +1,717 @@
 +"""TASK-015: after a compaction, a resume or a fork, the session-start hook names the current phase's module or
 +modules, the conditional workflows (type, sub-type, trait) that touch that phase, and the further files the phase
 +re-reads (R-005).
@@ -5350,6 +5416,10 @@ index 0000000..410585b
 +
 +def pointers(cwd, home, source="compact"):
 +    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
++    # bytecode writing left on, so the no-bytecode test cannot pass because the runner turned it off (PR #52's gate,
++    # Review A B1)
++    env.pop("PYTHONDONTWRITEBYTECODE", None)
++    env.pop("PYTHONPYCACHEPREFIX", None)
 +    data = {"cwd": str(cwd), "hook_event_name": "SessionStart", "source": source}
 +    p = subprocess.run([sys.executable, PROG, "--part", "pointers"], input=json.dumps(data), capture_output=True,
 +                       text=True, encoding="utf-8", env=env)
@@ -5511,6 +5581,17 @@ index 0000000..410585b
 +    assert named(out) == [P + "design.md"], out
 +
 +
++def test_r005_a_replace_heading_touches_the_phase_of_the_module_it_replaces(tmp_path, home):
++    """handoff/TASK-015.md Requirement 5: a `replace` whose module is one of the phase's modules touches the phase
++    (PR #52's gate, Review A S1: no test held the replace clause). The file holds no other heading, so only the
++    replace can name it; at another phase it is not named."""
++    write(home, "types/host-extension.md", "# Host extension\n\n## Replace interface\n\nThe whole interface module.\n")
++    out = pointers(project(tmp_path, "Phase: mockups", "Workflows: Host Extension Development; traits: none"), home)
++    assert W + "types/host-extension.md" in named(out), out
++    out = pointers(project(tmp_path, "Phase: intake", "Workflows: Host Extension Development; traits: none"), home)
++    assert named(out) == [P + "intake.md"], out
++
++
 +def test_r005_a_path_two_modules_name_is_listed_once(tmp_path, home):
 +    """handoff/TASK-015.md Requirements 2 and 4: no path is printed twice in the file list."""
 +    for key in ("delegation-loop", "reflection"):
@@ -5664,11 +5745,14 @@ index 0000000..410585b
 +
 +def test_r005_a_run_leaves_no_bytecode_under_the_home(tmp_path, home):
 +    """handoff/TASK-015.md Requirement 7: the hook writes nothing, so loading the installed checker leaves no
-+    __pycache__ under ~/.claude."""
++    __pycache__ under ~/.claude. The preconditions (PR #52's gate, Review A B1): the copied tree holds none, the run
++    has bytecode writing on (pointers() drops PYTHONDONTWRITEBYTECODE), and the run loaded the checker, since it names
++    conditional files."""
 +    conditionals(home)
 +    for d, dirs, files in os.walk(str(home)):
-+        assert "__pycache__" not in dirs, d   # the precondition: the copied tree holds none
-+    pointers(project(tmp_path, "Phase: building", LINE), home)
++        assert "__pycache__" not in dirs, d
++    out = pointers(project(tmp_path, "Phase: building", LINE), home)
++    assert W + "traits/installable.md" in named(out), out
 +    for d, dirs, files in os.walk(str(home)):
 +        assert "__pycache__" not in dirs, d
 +
@@ -6028,10 +6112,19 @@ index 342cfdb..e300318 100644
 +        for i, line in enumerate(open(path, encoding="utf-8").read().split("\n")):
 +            assert not re.search(r"(is|and) a `FAIL`|A (review )?`FAIL`", line), "%s:%d %s" % (os.path.basename(path), i + 1, line.strip()[:120])
 diff --git a/tests/test_workflow_model.py b/tests/test_workflow_model.py
-index e3e499f..d9f8718 100644
+index e3e499f..152f69e 100644
 --- a/tests/test_workflow_model.py
 +++ b/tests/test_workflow_model.py
-@@ -64,29 +64,36 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
+@@ -57,36 +57,46 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
+     assert holds[4] == "For one trait: what it adds, whatever the product type"
+     read_when = [r[2] for r in rows]
+     assert read_when[0] == "Always, whole, at every start and calibration"
+-    assert read_when[1] == "The current phase's module or modules, whole, on entering the phase and at every calibration"
++    assert read_when[1] == ("The current phase's module or modules, whole, on entering the phase and at every calibration; "
++                            "a module read outside its own phase when \"The phase modules\" says")
+     assert read_when[2] == "Its changes to the current phase, whole, alongside the phase's module or modules"
+     assert read_when[3] == "Alongside its type workflow, when the part has a sub-type"
+     assert read_when[4] == "Their additions to the current phase, when the part has the trait"
  
  
  def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when_it_applies():
@@ -6049,7 +6142,9 @@ index e3e499f..d9f8718 100644
 +    assert ("This file, the core, is read whole at every start, resume and calibration, and with it the current "
 +            "phase's module or modules and the conditional workflows that apply; after every compaction or resume you "
 +            "read what the session-start hook names before your next action (rule 28)") in s, "the core stays whole; phases and conditionals add"
-+    assert "You never read a phase you are not in, or a conditional workflow that does not apply" in s
++    # the exception names where the modules read outside their own phase are listed (PR #52's gate, Review A)
++    assert ("You never read a phase you are not in or a conditional workflow that does not apply, except a module "
++            "\"The phase modules\" says is read outside its own phase") in s
      assert "reading only the current phase" not in s, "the core is never replaced by a phase-only read"
 +    assert "Until the phases are moved into files of their own" not in s, "the transitional reading is gone with the carve"
  
