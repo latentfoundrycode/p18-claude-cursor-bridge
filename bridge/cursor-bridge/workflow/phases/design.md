@@ -1,5 +1,17 @@
 ## Phase 2 — Design
 
+### What must survive a compaction
+
+After a compaction or a resume in this phase, read these before your next action:
+
+- this module, `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` and `~/.claude/cursor-bridge/Glossary.md`, each whole (the session-start hook names all three);
+- what the design has written so far: `docs/DESIGN.md`, `docs/diagrams/INDEX.md` and every diagram it lists, and `docs/REQUIREMENTS.md` and `docs/INVENTORY.md` once written;
+- `docs/DESIGN_CRITIQUE.md`, whole, while the critique runs: its rounds and its accepted list are what the stop rule and the four-round ceiling count, so that a resumed session never runs a round twice or raises an accepted finding again;
+- the owner's Initial Design Draft and `run/supervisor/intake-notes.md`, whole: the design answers them;
+- `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line holds the traits proposed at intake, which this phase's gate settles.
+
+### The procedure
+
 **The design is a Project Design Document: the text of `docs/DESIGN.md` plus the normative diagrams in `docs/diagrams/`, produced by diagram-based planning** (`~/.claude/cursor-bridge/Diagram-Planning-Conventions.md`, read whole by that absolute path; terms per `~/.claude/cursor-bridge/Glossary.md`). The text carries what diagrams cannot — purpose, non-goals, rationale, the **target environment**, the **technology selection** with the alternatives considered, constraints, budgets, failure modes, the security context. The diagrams carry what prose lets slip — every component, connection, state, entity, and interaction — in a form `diagram-check.py` verifies. The procedure (conventions §5):
 
 1. **Select.** Write `docs/diagrams/INDEX.md`: every catalogue kind selected or omitted with a one-line reason, IDs assigned, each selected diagram tied to the requirement IDs it realizes and to what enforces it. Levels 4 and 5 only where a detail is **load-bearing** (concurrency, security, integrity — every persistent schema — performance, protocol, prior-failure), each with its reason; everything else stays the builder's free implementation space.
@@ -203,6 +215,14 @@ never recorded as a person's. A per-item approval step inside the product is dec
 of another model family than the one that produced the item, with a person as an optional
 override; the design says which judge and which family.
 
+### Traits at the design gate
+
+The traits proposed at intake, the default traits of each part's product type and sub-type among them, are settled at this gate (intake's "Classifying each part"). Before presenting the design, weigh each part's traits again against the open list's definitions (`~/.claude/cursor-bridge/workflow/open-list.md`) in the light of the design: a trait the design now shows is added (the product needs accounts: *personal data*), and a proposed or default trait the design shows does not apply is dropped, each with its reason. At the gate each part's traits are a decision of their own, asked in the question form: each trait with its definition in one line and, in plain words, the work it adds. Once the owner has settled them, rewrite the part's `Workflows:` line if they changed, and run `python ~/.claude/cursor-bridge/workflow-check.py --status docs/PROJECT_STATUS.md` again.
+
+**A new or unwritten trait is flagged, and the work continues.** A property that adds work and fits no trait's definition is a new trait; a trait whose open-list row reads `no` under Written (the check's `FLAG (trait)`) is defined but not yet written. Traits only add, so the main workflow and the part's product type still cover everything essential: write the extra handling into `docs/DESIGN.md`, a section of its own for each such trait saying what it adds and in which phases, and flag it at the gate as a decision of its own: the work continues with the handling in the design, or the owner may still choose to pause the project. On a pause the trait goes to the bridge's maintainer as an unwritten product type does at intake: `Awaiting user on: paused at the design gate — <the trait> needs additions the bridge has not written`, the run sheet with your reasons, the release, the calibration, and the owner's word to resume, after which the trait's additions take the place of the design's section. A new trait is not named on the `Workflows:` line, which names only the open list's entries; its handling lives in the design. Record each flagged trait in `docs/INVENTORY.md` → Decisions as a row that begins `Flagged trait:`, naming the trait, the parts that have it and the design section that handles it, so that the promotion pass at project end puts it forward, from which the maintainer may write it as trait additions.
+
+### The gate
+
 **Gate:** present the design to the user. Do not proceed to the UI mockups until they
 approve it. Present it as a decision brief (`explain-for-decision` skill): the choices the
 design makes that are theirs to approve, the concepts those rest on, and what you decide
@@ -232,3 +252,11 @@ layout") and is patched at every reflection point from here on. It is a translat
 Present the register with the design: the owner confirms the list is complete — a requirement missing here is missing from everything downstream.
 
 At the same moment create **`docs/INVENTORY.md`** (format under "Project state"): the design's decisions, each with the reason that made it right, and every resource known so far — each key, token, account, or tool the owner has provided or will be asked for. Features fill in as increments merge. From here on, anything the owner provides is entered the moment they provide it.
+
+## Extension points
+
+This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
+
+- `design.sections` — additional design sections, written into `docs/DESIGN.md` with the sections this module lists.
+- `design.diagram-catalogue` — additions to the diagram catalogue the Select step chooses from, made once for the whole project.
+- `design.mandatory-diagrams` — diagram kinds the Select step must select for the part, never omit.

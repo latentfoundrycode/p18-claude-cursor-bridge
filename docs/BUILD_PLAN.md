@@ -143,7 +143,7 @@ Parent: none
 Depends on: TASK-010
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/phases/intake.md; bridge/cursor-bridge/workflow/phases/design.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_intake_design.py
+Scope: bridge/cursor-bridge/workflow/phases/intake.md; bridge/cursor-bridge/workflow/phases/design.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_intake_design.py; bridge/cursor-bridge/Merge-Verification-Policy.md; bridge/agents/plan-critic.md (widened 2026-10-20 for the carve's pointer sweep, docs/HARDENING.md, Stage B3: the two files' pointers to the design phase named `supervisor.md` and now name `workflow/phases/design.md`); bridge/cursor-bridge/settings.bridge.json (widened 2026-10-20: intake now runs `workflow-check.py --status`, so the read-only checker gets the allow rule every other checker the instructions name has, tests/test_allowlist.py)
 Satisfies: R-004, R-006, R-013, R-032, R-035, R-036
 Done when: intake.md and design.md each open with their compaction-survival list and declare their extension points; intake.md carries the pause for an unfit/unwritten product type (R-013) and that traits are proposed at intake (R-035); design.md carries that traits and a type's default traits are settled at the design gate (R-035) and the new-trait flag with the owner's pause option (R-036, the design-gate half only — the promotion pass is TASK-014's); within the R-032 bound; `trace-check` green for the moved sections; `test_phase_modules_intake_design.py` (names R-004, R-006, R-013, R-032, R-035, R-036) asserts the structure and those passages.
 
