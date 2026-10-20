@@ -1,0 +1,2789 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 614a657..a88cef6 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.18a",
+-  "generated": "2026-10-19 18:41",
++  "generated": "2026-10-20 02:26",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -99,12 +99,15 @@
+     "cursor-bridge/settings.bridge.json": "133480024f3e1409fcc4d5fac30dbfefb3dc99c5619bec98cf9989959b31ee54",
+     "cursor-bridge/shell-guard.py": "6abdc15bd149afdf1561997512b75253a154f58ddb05355577b4ebbcec36c67b",
+     "cursor-bridge/sync-check.py": "41d4e74931b150bba23a67a1a024b640f95673a490b3a6522af3f9d6ff43e0de",
++    "cursor-bridge/trace-check.py": "f3c246b9134ddc535f4f856cd8ced1a237d2005b53fd8499a42615493797a022",
+     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/workflow-check.py": "ff87680ca972eb50abbda822443420f7c650b5fee9e8b607cdf9e6fcf27c9d73",
+     "cursor-bridge/workflow/extension-points.md": "d62447f21dd4acff615d4260ed40baa86d8d2f0567f928a1689a9a4cbb98fb8b",
+     "cursor-bridge/workflow/open-list.md": "6d37ec2741ab10f6238aa3a2eb0c4e46f57defd109a80a2b08209c1cfcce8840",
++    "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
++    "cursor-bridge/workflow/trace-exceptions.md": "4ba69398c05caedd5d6a320be742d0f76bc194f89517ffad0063b121591caa63",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/trace-check.py b/bridge/cursor-bridge/trace-check.py
+new file mode 100644
+index 0000000..a1926ad
+--- /dev/null
++++ b/bridge/cursor-bridge/trace-check.py
+@@ -0,0 +1,893 @@
++#!/usr/bin/env python3
++"""trace-check: mechanical traceability from a pinned pre-split baseline (R-029).
++
++  python trace-check.py [--repo DIR] [--map]
++
++Compares every passage unit of bridge/commands/supervisor.md at the pinned baseline
++commit with the working tree: the core and every *.md under bridge/cursor-bridge/workflow/
++except bridge/cursor-bridge/workflow/trace-exceptions.md (the only home left out). Module files under
++workflow/phases/, workflow/types/, and workflow/traits/ are checked for undeclared new text. Exceptions are
++listed in workflow/trace-exceptions.md. A ~/.claude/... reference must name a path inside bridge/ with no
++symbolic link, junction, or other reparse point on the way.
++
++Finding lines, then TRACED and RESULT:
++  FAIL (dropped)  a baseline passage is missing everywhere
++  FAIL (copy)     a passage appears more often than at baseline (excused sections excluded)
++  FAIL (new)      undeclared text in a module file
++  FAIL (ref)      a ~/.claude/... reference does not resolve to a path inside bridge/ with no link on the way
++  FAIL (cite)     a cited section heading does not resolve in any current home
++  NOTE (reword)   a dropped passage excused by a reword entry
++  MAP             with --map, each baseline passage and its current home(s)
++
++Exit 0 when no FAIL line was printed. Exit 1 when at least one FAIL was printed.
++Exit 2 when the check cannot run: not a git work tree, git unavailable, missing or
++invalid trace-baseline.txt, baseline commit absent (a shallow clone is the likely cause),
++missing supervisor.md, invalid trace-exceptions.md, a folder under bridge/cursor-bridge/workflow/
++that cannot be read, a symbolic link, junction, or other reparse point met on a path the program
++reads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked
++are printed, with no traceback.
++The check needs the baseline commit's object history.
++"""
++import argparse
++import os
++import re
++import stat
++import subprocess
++import sys
++
++GIT_TIMEOUT = 120
++SHA_RE = re.compile(r"^[0-9a-f]{40}$")
++BASELINE_REL = "bridge/cursor-bridge/workflow/trace-baseline.txt"
++EXCEPTIONS_REL = "bridge/cursor-bridge/workflow/trace-exceptions.md"
++CORE_REL = "bridge/commands/supervisor.md"
++WORKFLOW_PREFIX = "bridge/cursor-bridge/workflow/"
++ENTRY_RE = re.compile(
++    r"^- (reword|new) ([A-Z][A-Z0-9]*-[0-9]+) (\S+\.md) (.+)$"
++)
++HEADING_RE = re.compile(r"^ {0,3}(#{1,6}) (.*)$")
++FENCE_OPEN_RE = re.compile(r"^(`{3,}|~{3,})")
++LIST_ITEM_RE = re.compile(r"^([-*+]|[0-9]+[.)])\s")
++REF_RE = re.compile(r"~/\.claude/([^\s`\"'()\[\],;]+)")
++EM_DASH = "\u2014"
++PLACEHOLDER_CHARS = frozenset("<>*\u2026")
++REF_STRIP = ".:"
++WIN_DEVICE_NAMES = frozenset(
++    ["CON", "PRN", "AUX", "NUL"]
++    + ["COM%d" % i for i in range(1, 10)]
++    + ["LPT%d" % i for i in range(1, 10)]
++)
++
++
++def slash(path):
++    return path.replace("\\", "/")
++
++
++def escape_field(value):
++    text = "" if value is None else str(value)
++    parts = []
++    for char in text:
++        code = ord(char)
++        if code < 0x20 or code == 0x7f:
++            parts.append("\\x%02x" % code)
++        elif code < 128:
++            parts.append(char)
++        elif code < 256:
++            parts.append("\\x%02x" % code)
++        elif code <= 0xFFFF:
++            parts.append("\\u%04x" % code)
++        else:
++            parts.append("\\U%08x" % code)
++    return "".join(parts)
++
++
++def excerpt(normal):
++    return escape_field(normal[:60])
++
++
++def deepest_heading(chain):
++    if not chain:
++        return "-"
++    return escape_field(chain[-1][1])
++
++
++def file_lines(text):
++    lines = text.split("\n")
++    if lines and lines[-1] == "":
++        del lines[-1]
++    return lines
++
++
++def is_thematic_break(stripped):
++    if len(stripped) < 3:
++        return False
++    if stripped == stripped[0] * len(stripped) and stripped[0] in "-*_":
++        return True
++    return False
++
++
++def normal_form_paragraph(lines):
++    parts = []
++    for line in lines:
++        parts.append(line.strip())
++    joined = " ".join(parts)
++    return re.sub(r"\s+", " ", joined).strip()
++
++
++def normal_form_fence(lines):
++    return "\n".join(line.rstrip() for line in lines)
++
++
++def parse_units(text):
++    """Return (units, headings_outside_fences).
++
++    units: list of dicts normal_form, chain, raw_lines.
++    headings_outside_fences: list of heading texts in file order.
++    """
++    lines = file_lines(text)
++    units = []
++    headings_out = []
++    chain = []
++    in_fence = False
++    fence_char = None
++    fence_min = 0
++    fence_lines = []
++    current_para = None
++    table_lines = None
++
++    def end_unit():
++        nonlocal current_para, table_lines
++        if table_lines is not None:
++            units.append({
++                "normal": normal_form_paragraph(table_lines),
++                "chain": list(chain),
++                "kind": "table",
++            })
++            table_lines = None
++        elif current_para is not None:
++            if current_para["fence"]:
++                units.append({
++                    "normal": normal_form_fence(current_para["lines"]),
++                    "chain": list(chain),
++                    "kind": "fence",
++                })
++            else:
++                units.append({
++                    "normal": normal_form_paragraph(current_para["lines"]),
++                    "chain": list(chain),
++                    "kind": "para",
++                })
++            current_para = None
++
++    for line in lines:
++        stripped = line.strip()
++        content = line.lstrip()
++
++        if in_fence:
++            fence_lines.append(line)
++            if FENCE_OPEN_RE.match(stripped):
++                run = FENCE_OPEN_RE.match(stripped).group(1)
++                if run[0] == fence_char and len(run) >= fence_min:
++                    in_fence = False
++                    current_para = {"fence": True, "lines": fence_lines}
++                    end_unit()
++                    fence_lines = []
++            continue
++
++        if content.startswith("```") or content.startswith("~~~"):
++            run_m = FENCE_OPEN_RE.match(stripped)
++            if run_m:
++                end_unit()
++                in_fence = True
++                fence_char = run_m.group(1)[0]
++                fence_min = len(run_m.group(1))
++                fence_lines = [line]
++                continue
++
++        hm = HEADING_RE.match(line)
++        if hm:
++            end_unit()
++            level = len(hm.group(1))
++            title = hm.group(2).strip()
++            while chain and chain[-1][0] >= level:
++                chain.pop()
++            chain.append((level, title))
++            headings_out.append(title)
++            continue
++
++        if stripped == "":
++            end_unit()
++            continue
++
++        if is_thematic_break(stripped):
++            end_unit()
++            continue
++
++        if stripped.startswith("|"):
++            if table_lines is None:
++                end_unit()
++                table_lines = [line]
++            else:
++                table_lines.append(line)
++            continue
++
++        if table_lines is not None:
++            end_unit()
++
++        if LIST_ITEM_RE.match(stripped):
++            end_unit()
++            current_para = {"fence": False, "lines": [line]}
++            continue
++
++        if current_para is None:
++            current_para = {"fence": False, "lines": [line]}
++        else:
++            current_para["lines"].append(line)
++
++    if in_fence:
++        current_para = {"fence": True, "lines": fence_lines}
++    end_unit()
++    return units, headings_out
++
++
++def in_section(chain, heading_text):
++    for _level, text in chain:
++        if text == heading_text:
++            return True
++    return False
++
++
++def git_run(root, args):
++    try:
++        proc = subprocess.run(
++            ["git", "-C", root, *args],
++            capture_output=True,
++            stdin=subprocess.DEVNULL,
++            timeout=GIT_TIMEOUT,
++            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
++        )
++    except subprocess.TimeoutExpired:
++        return None, "timed out after %d s" % GIT_TIMEOUT
++    except OSError as err:
++        return None, "cannot be started (%s)" % err
++    return proc, None
++
++
++def decode_git_bytes(data):
++    if data.startswith(b"\xef\xbb\xbf"):
++        data = data[3:]
++    return data.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
++
++
++def is_path_link(path):
++    if os.path.islink(path):
++        return True
++    if hasattr(os.path, "isjunction") and os.path.isjunction(path):
++        return True
++    try:
++        st = os.lstat(path)
++    except OSError:
++        return False
++    attrs = getattr(st, "st_file_attributes", None)
++    if attrs is not None and (attrs & stat.FILE_ATTRIBUTE_REPARSE_POINT):
++        return True
++    return False
++
++
++def first_link_on_rel_path(root, rel):
++    """Return the repo-relative path of the first link along rel from root, or None."""
++    parts = [p for p in slash(rel).split("/") if p]
++    current = root
++    for part in parts:
++        current = os.path.join(current, part)
++        try:
++            os.lstat(current)
++        except OSError:
++            return None
++        if is_path_link(current):
++            return slash(os.path.relpath(current, root))
++    return None
++
++
++def segment_refused(seg):
++    if seg == "" or seg == "." or seg == "..":
++        return True
++    if "\\" in seg or ":" in seg:
++        return True
++    if seg.endswith(".") and seg != "...":
++        return True
++    if seg.split(".", 1)[0].upper() in WIN_DEVICE_NAMES:
++        return True
++    return False
++
++
++def read_utf8_path(path):
++    shown = slash(path)
++    if not os.path.isfile(path):
++        if os.path.exists(path):
++            return None, shown, "cannot be read"
++        return None, shown, "does not exist"
++    try:
++        with open(path, encoding="utf-8-sig") as handle:
++            return handle.read(), shown, None
++    except UnicodeDecodeError:
++        return None, shown, "cannot be read as UTF-8"
++    except OSError as err:
++        return None, shown, "cannot be read (%s)" % (err.strerror or err)
++
++
++def collect_md_paths(root, under_workflow, walk_errors):
++    found = []
++
++    def onerror(err):
++        walk_errors.append((
++            slash(err.filename),
++            "cannot be read (%s)" % (err.strerror or err),
++        ))
++
++    for dirpath, dirnames, filenames in os.walk(under_workflow, onerror=onerror):
++        keep = []
++        for name in dirnames:
++            full = os.path.join(dirpath, name)
++            if is_path_link(full):
++                walk_errors.append((
++                    slash(os.path.relpath(full, root)),
++                    "is a link",
++                ))
++                return found
++            keep.append(name)
++        dirnames[:] = keep
++        for name in filenames:
++            if not name.endswith(".md"):
++                continue
++            full = os.path.join(dirpath, name)
++            if is_path_link(full):
++                walk_errors.append((
++                    slash(os.path.relpath(full, root)),
++                    "is a link",
++                ))
++                return found
++            rel = slash(os.path.relpath(full, root))
++            if rel == EXCEPTIONS_REL:
++                continue
++            found.append(rel)
++    found.sort()
++    return found
++
++
++def is_module_path(rel):
++    rest = rel[len(WORKFLOW_PREFIX):] if rel.startswith(WORKFLOW_PREFIX) else ""
++    for prefix in ("phases/", "types/", "traits/"):
++        if rest.startswith(prefix):
++            return True
++    return False
++
++
++def valid_exception_file(rel):
++    if rel == CORE_REL:
++        return True
++    if rel.startswith(WORKFLOW_PREFIX) and rel.endswith(".md"):
++        return True
++    return False
++
++
++def parse_exceptions(text, errors):
++    entries = []
++    lines = file_lines(text)
++    entries_idx = None
++    for idx, line in enumerate(lines):
++        if line == "## Entries":
++            entries_idx = idx
++            break
++    if entries_idx is None:
++        errors.append((EXCEPTIONS_REL, "no ## Entries line (requirement 6)"))
++        return None
++    for idx in range(entries_idx + 1, len(lines)):
++        line = lines[idx]
++        line_no = idx + 1
++        if line.strip() == "":
++            continue
++        m = ENTRY_RE.match(line)
++        if not m:
++            errors.append((
++                EXCEPTIONS_REL,
++                "line %d: malformed entry (requirement 6)" % line_no,
++            ))
++            return None
++        kind, inc_id, file_rel, heading = m.group(1), m.group(2), m.group(3), m.group(4)
++        if not valid_exception_file(file_rel) or not heading.strip():
++            errors.append((
++                EXCEPTIONS_REL,
++                "line %d: malformed entry (requirement 6)" % line_no,
++            ))
++            return None
++        entries.append({
++            "kind": kind,
++            "id": inc_id,
++            "file": file_rel,
++            "heading": heading.strip(),
++        })
++    return entries
++
++
++def build_excuse_index(entries):
++    """Return (excused_current, reword_baseline)."""
++    excused_current = []
++    reword_baseline = []
++    for ent in entries:
++        excused_current.append((ent["file"], ent["heading"]))
++        if ent["kind"] == "reword":
++            reword_baseline.append((ent["file"], ent["heading"], ent["id"]))
++    return excused_current, reword_baseline
++
++
++def unit_excused(path, unit, excused_current):
++    for file_rel, heading in excused_current:
++        if file_rel == path and in_section(unit["chain"], heading):
++            return True
++    return False
++
++
++def bridge_contains(root, bridge_path):
++    bridge_root = os.path.join(root, "bridge")
++    try:
++        real_target = os.path.realpath(bridge_path)
++        real_bridge = os.path.realpath(bridge_root)
++    except OSError:
++        return False
++    try:
++        return os.path.commonpath([real_target, real_bridge]) == real_bridge
++    except ValueError:
++        return False
++
++
++def resolve_ref(rest, root):
++    rest = rest.rstrip(REF_STRIP)
++    if rest.endswith("/"):
++        rest = rest[:-1]
++    bridge_root = os.path.join(root, "bridge")
++    if rest == "":
++        if first_link_on_rel_path(root, "bridge"):
++            return False
++        try:
++            os.lstat(bridge_root)
++            return True
++        except OSError:
++            return False
++    segments = rest.split("/")
++    for seg in segments:
++        if segment_refused(seg):
++            return False
++    resolved = []
++    for seg in segments:
++        if seg == "..." or any(c in PLACEHOLDER_CHARS for c in seg):
++            break
++        resolved.append(seg)
++    bridge_rel = "bridge" if not resolved else "bridge/" + "/".join(resolved)
++    if first_link_on_rel_path(root, bridge_rel):
++        return False
++    current = bridge_root
++    for seg in resolved:
++        current = os.path.join(current, seg)
++        try:
++            os.lstat(current)
++        except OSError:
++            return False
++    if not bridge_contains(root, current):
++        return False
++    return True
++
++
++def find_refs_in_file(rel, text, root, findings_ref):
++    lines = file_lines(text)
++    for no, line in enumerate(lines, 1):
++        for m in REF_RE.finditer(line):
++            rest = m.group(1).rstrip(REF_STRIP)
++            if not resolve_ref(rest, root):
++                findings_ref.append((rel, no, "~/.claude/" + rest))
++
++
++def citation_strings(normal):
++    out = []
++    pos = 0
++    while pos < len(normal):
++        m = re.search(r'\b(see|per|under) "', normal[pos:], re.IGNORECASE)
++        if not m:
++            break
++        start = pos + m.end()
++        end = normal.find('"', start)
++        if end < 0:
++            break
++        if end == start:
++            pos = end + 1
++            continue
++        quotes = [normal[start:end]]
++        chain_pos = end + 1
++        while True:
++            chain_m = re.match(r' \u2192 "([^"]+)"', normal[chain_pos:])
++            if not chain_m:
++                break
++            quotes.append(chain_m.group(1))
++            chain_pos += chain_m.end()
++        out.append(quotes)
++        pos = chain_pos
++    return out
++
++
++def heading_resolves(title, all_headings):
++    for h in all_headings:
++        if h == title or h.startswith(title + " " + EM_DASH + " "):
++            return True
++    return False
++
++
++def check_citations(rel, units, all_headings, findings_cite):
++    for unit in units:
++        for quote_chain in citation_strings(unit["normal"]):
++            for q in quote_chain:
++                if not heading_resolves(q, all_headings):
++                    findings_cite.append((rel, deepest_heading(unit["chain"]), q))
++
++
++def load_baseline_file(root, sha, rel, errors):
++    proc, err = git_run(root, ["show", "%s:%s" % (sha, rel)])
++    if proc is None:
++        return None, err
++    if proc.returncode != 0:
++        errors.append((rel, "missing at baseline commit"))
++        return None, None
++    try:
++        return decode_git_bytes(proc.stdout), None
++    except UnicodeDecodeError:
++        errors.append((rel, "cannot be read as UTF-8 at baseline"))
++        return None, None
++
++
++class CheckArgumentParser(argparse.ArgumentParser):
++    def error(self, message):
++        self.print_usage(sys.stderr)
++        if sys.stderr is not None:
++            sys.stderr.write("%s: error: %s\n" % (self.prog, message))
++        print("ERROR: usage: %s" % escape_field(message))
++        print("RESULT: not checked")
++        if sys.stdout is not None:
++            sys.stdout.flush()
++        self.exit(2)
++
++
++def build_parser():
++    parser = CheckArgumentParser(
++        prog="trace-check.py",
++        description=__doc__,
++        formatter_class=argparse.RawDescriptionHelpFormatter,
++    )
++    parser.add_argument("--repo", default=None, metavar="DIR")
++    parser.add_argument("--map", action="store_true")
++    return parser
++
++
++def main(argv=None):
++    args = build_parser().parse_args(argv)
++    if args.repo is not None:
++        root = os.path.abspath(args.repo)
++    else:
++        here = os.path.abspath(__file__)
++        root = os.path.dirname(os.path.dirname(os.path.dirname(here)))
++
++    errors = []
++
++    proc, err = git_run(root, ["rev-parse", "--is-inside-work-tree"])
++    if proc is None:
++        print("ERROR: git rev-parse: %s" % escape_field(err))
++        print("RESULT: not checked")
++        return 2
++    if proc.returncode != 0 or proc.stdout.decode("ascii", "replace").strip() != "true":
++        errors.append((slash(root), "not a git work tree"))
++
++    link_rel = first_link_on_rel_path(root, BASELINE_REL)
++    if link_rel:
++        print("ERROR: %s: is a link" % escape_field(link_rel))
++        print("RESULT: not checked")
++        return 2
++
++    baseline_path = os.path.join(root, BASELINE_REL)
++    bl_text, bl_shown, bl_err = read_utf8_path(baseline_path)
++    if bl_err:
++        errors.append((bl_shown, bl_err if bl_err != "does not exist" else "missing"))
++    else:
++        bl_lines = file_lines(bl_text)
++        if len(bl_lines) != 1 or not SHA_RE.match(bl_lines[0]):
++            errors.append((bl_shown, "not a single 40-character lowercase commit id"))
++
++    sha = bl_lines[0] if bl_text and not errors else None
++
++    if sha and not errors:
++        proc, err = git_run(root, ["cat-file", "-e", "%s^{commit}" % sha])
++        if proc is None:
++            print("ERROR: git cat-file: %s" % escape_field(err))
++            print("RESULT: not checked")
++            return 2
++        if proc.returncode != 0:
++            errors.append((
++                sha,
++                "baseline commit is absent from this repository; a shallow clone is the likely cause",
++            ))
++
++    link_rel = first_link_on_rel_path(root, EXCEPTIONS_REL)
++    if link_rel:
++        print("ERROR: %s: is a link" % escape_field(link_rel))
++        print("RESULT: not checked")
++        return 2
++
++    exc_path = os.path.join(root, EXCEPTIONS_REL)
++    exc_text, exc_shown, exc_err = read_utf8_path(exc_path)
++    if exc_err:
++        errors.append((exc_shown, exc_err if exc_err != "does not exist" else "missing"))
++    entries = None
++    if exc_text is not None and not errors:
++        entries = parse_exceptions(exc_text, errors)
++
++    link_rel = first_link_on_rel_path(root, CORE_REL)
++    if link_rel:
++        print("ERROR: %s: is a link" % escape_field(link_rel))
++        print("RESULT: not checked")
++        return 2
++
++    core_path = os.path.join(root, CORE_REL)
++    core_text, core_shown, core_err = read_utf8_path(core_path)
++    if core_err:
++        errors.append((core_shown, core_err))
++
++    if errors:
++        for path, reason in errors:
++            print("ERROR: %s: %s" % (escape_field(path), escape_field(reason)))
++        print("RESULT: not checked")
++        return 2
++
++    excused_current, reword_baseline = build_excuse_index(entries or [])
++
++    baseline_workflow_paths = []
++    proc, err = git_run(root, [
++        "ls-tree", "-r", "-z", "--name-only", sha, "--", WORKFLOW_PREFIX,
++    ])
++    if proc is None:
++        print("ERROR: git ls-tree: %s" % escape_field(err))
++        print("RESULT: not checked")
++        return 2
++    if proc.returncode != 0:
++        print("ERROR: git ls-tree: command failed")
++        print("RESULT: not checked")
++        return 2
++    raw = proc.stdout
++    for part in raw.split(b"\0"):
++        if not part:
++            continue
++        try:
++            rel = part.decode("utf-8")
++        except UnicodeDecodeError:
++            print("ERROR: %s: cannot be read as UTF-8" % escape_field(part.decode("latin-1")))
++            print("RESULT: not checked")
++            return 2
++        if rel.endswith(".md") and rel != EXCEPTIONS_REL:
++            baseline_workflow_paths.append(rel)
++    baseline_workflow_paths.sort()
++
++    baseline_homes = [CORE_REL] + baseline_workflow_paths
++    workflow_rel = WORKFLOW_PREFIX.rstrip("/")
++    link_rel = first_link_on_rel_path(root, workflow_rel)
++    if link_rel:
++        print("ERROR: %s: is a link" % escape_field(link_rel))
++        print("RESULT: not checked")
++        return 2
++
++    current_workflow = os.path.join(root, workflow_rel)
++    walk_errors = []
++    current_workflow_paths = (
++        collect_md_paths(root, current_workflow, walk_errors)
++        if os.path.isdir(current_workflow)
++        else []
++    )
++    if walk_errors:
++        path, reason = walk_errors[0]
++        print("ERROR: %s: %s" % (escape_field(path), escape_field(reason)))
++        print("RESULT: not checked")
++        return 2
++    current_homes = [CORE_REL] + current_workflow_paths
++
++    baseline_units_by_norm = {}
++    baseline_supervisor_traced = []
++
++    for rel in baseline_homes:
++        text, git_err = load_baseline_file(root, sha, rel, errors)
++        if git_err is not None:
++            print("ERROR: git show: %s" % escape_field(git_err))
++            print("RESULT: not checked")
++            return 2
++        if text is None:
++            continue
++        units, _heads = parse_units(text)
++        for u in units:
++            nf = u["normal"]
++            baseline_units_by_norm[nf] = baseline_units_by_norm.get(nf, 0) + 1
++            if rel == CORE_REL:
++                baseline_supervisor_traced.append({
++                    "normal": nf,
++                    "chain": u["chain"],
++                    "baseline_heading": deepest_heading(u["chain"]),
++                })
++
++    if errors:
++        for path, reason in errors:
++            print("ERROR: %s: %s" % (escape_field(path), escape_field(reason)))
++        print("RESULT: not checked")
++        return 2
++
++    current_file_units = {}
++    headings_by_file = {}
++    findings_ref = []
++
++    for rel in current_homes:
++        full = os.path.join(root, rel.replace("/", os.sep))
++        text, shown, err = read_utf8_path(full)
++        if err:
++            print("ERROR: %s: %s" % (escape_field(shown), escape_field(err)))
++            print("RESULT: not checked")
++            return 2
++        units, heads = parse_units(text)
++        current_file_units[rel] = units
++        headings_by_file[rel] = heads
++        find_refs_in_file(rel, text, root, findings_ref)
++
++    all_headings = []
++    for rel in current_homes:
++        all_headings.extend(headings_by_file[rel])
++
++    findings_cite = []
++    for rel in current_homes:
++        check_citations(rel, current_file_units[rel], all_headings, findings_cite)
++
++    current_counts_all = {}
++    current_paths_all = {}
++    current_counts_c = {}
++    current_paths_for_norm = {}
++    for rel, units in current_file_units.items():
++        for u in units:
++            nf = u["normal"]
++            current_counts_all[nf] = current_counts_all.get(nf, 0) + 1
++            if rel not in current_paths_all.get(nf, []):
++                current_paths_all.setdefault(nf, []).append(rel)
++            if not unit_excused(rel, u, excused_current):
++                current_counts_c[nf] = current_counts_c.get(nf, 0) + 1
++                if rel not in current_paths_for_norm.get(nf, []):
++                    current_paths_for_norm.setdefault(nf, []).append(rel)
++
++    fails_dropped = []
++    fails_copy = []
++    fails_new = []
++    fails_ref = []
++    fails_cite = []
++    notes = []
++    seen_norm_finding = set()
++    dropped_count = 0
++    excused_count = 0
++
++    def reword_excuses_drop(traced):
++        chain = traced["chain"]
++        for file_rel, heading, inc_id in reword_baseline:
++            if file_rel != CORE_REL:
++                continue
++            if in_section(chain, heading):
++                return inc_id
++        return None
++
++    for traced in baseline_supervisor_traced:
++        nf = traced["normal"]
++        b = baseline_units_by_norm.get(nf, 0)
++        c_all = current_counts_all.get(nf, 0)
++        c = current_counts_c.get(nf, 0)
++        bh = traced["baseline_heading"]
++
++        if nf in seen_norm_finding:
++            continue
++
++        if c_all == 0:
++            rid = reword_excuses_drop(traced)
++            if rid:
++                notes.append(
++                    "NOTE (reword %s) %s: %s - %s"
++                    % (rid, CORE_REL, bh, excerpt(nf))
++                )
++                excused_count += 1
++                seen_norm_finding.add(nf)
++            else:
++                fails_dropped.append(
++                    "FAIL (dropped) %s: %s - %s" % (CORE_REL, bh, excerpt(nf))
++                )
++                dropped_count += 1
++                seen_norm_finding.add(nf)
++        elif c > b:
++            paths = sorted(current_paths_for_norm.get(nf, []))
++            fails_copy.append(
++                "FAIL (copy) %s: %s - %s"
++                % (", ".join(escape_field(p) for p in paths), bh, excerpt(nf))
++            )
++            seen_norm_finding.add(nf)
++
++    module_files = sorted(
++        rel for rel in current_workflow_paths if is_module_path(rel)
++    )
++    baseline_set = set(baseline_units_by_norm.keys())
++
++    for rel in module_files:
++        for u in current_file_units.get(rel, []):
++            if unit_excused(rel, u, excused_current):
++                continue
++            nf = u["normal"]
++            if nf not in baseline_set:
++                h = deepest_heading(u["chain"])
++                fails_new.append(
++                    "FAIL (new) %s: %s - %s" % (escape_field(rel), h, excerpt(nf))
++                )
++
++    for rel, line_no, ref in findings_ref:
++        fails_ref.append(
++            "FAIL (ref) %s:%d: %s" % (escape_field(rel), line_no, escape_field(ref))
++        )
++
++    for rel, h, q in findings_cite:
++        fails_cite.append(
++            'FAIL (cite) %s: %s - "%s"' % (escape_field(rel), h, escape_field(q))
++        )
++
++    fails = fails_dropped + fails_copy + fails_new + fails_ref + fails_cite
++
++    if args.map:
++        for traced in baseline_supervisor_traced:
++            nf = traced["normal"]
++            paths = sorted(current_paths_all.get(nf, []))
++            home = ", ".join(escape_field(p) for p in paths) if paths else "-"
++            print(
++                "MAP %s: %s - %s"
++                % (home, traced["baseline_heading"], excerpt(nf))
++            )
++
++    for line in fails:
++        print(line)
++    for line in notes:
++        print(line)
++
++    k_super = 0
++    k_workflow = 0
++    for traced in baseline_supervisor_traced:
++        nf = traced["normal"]
++        if any(u["normal"] == nf for u in current_file_units.get(CORE_REL, [])):
++            k_super += 1
++        if any(
++            u["normal"] == nf
++            for r in current_workflow_paths
++            for u in current_file_units.get(r, [])
++        ):
++            k_workflow += 1
++    n_traced = len(baseline_supervisor_traced)
++    print(
++        "TRACED: %d passages of baseline %s; %d in supervisor.md, %d under workflow/, %d dropped, %d excused"
++        % (
++            n_traced,
++            sha[:7],
++            k_super,
++            k_workflow,
++            dropped_count,
++            excused_count,
++        )
++    )
++    if fails:
++        print("RESULT: %d problem(s)" % len(fails))
++        return 1
++    print("RESULT: OK")
++    return 0
++
++
++if __name__ == "__main__":
++    for stream in (sys.stdout, sys.stderr):
++        if hasattr(stream, "reconfigure"):
++            stream.reconfigure(errors="backslashreplace")
++    sys.exit(main())
+diff --git a/bridge/cursor-bridge/workflow/trace-baseline.txt b/bridge/cursor-bridge/workflow/trace-baseline.txt
+new file mode 100644
+index 0000000..cf367a1
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/trace-baseline.txt
+@@ -0,0 +1 @@
++0a186da42ad01352dcd46f8524a1b3db0858dea5
+diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
+new file mode 100644
+index 0000000..1f9232a
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/trace-exceptions.md
+@@ -0,0 +1,5 @@
++# Trace exceptions
++
++Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword` or `new`, `<id>` is the increment id (e.g. `TASK-010`), `<file>` is a repository-relative path to the core or a workflow Markdown file, and `<heading>` is the section heading text. The supervisor-text increment that rewords or adds appends each entry after `## Entries`.
++
++## Entries
+diff --git a/docs/BUILD_PLAN.md b/docs/BUILD_PLAN.md
+index 175e544..6f24db0 100644
+--- a/docs/BUILD_PLAN.md
++++ b/docs/BUILD_PLAN.md
+@@ -122,7 +122,7 @@ Parent: none
+ Depends on: TASK-003, TASK-005, TASK-007
+ Parallel: no
+ Diagrams: none
+-Scope: bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_trace_check.py
++Scope: bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_trace_check.py; docs/cli-reference.json; docs/CLI_REFERENCE.md
+ Satisfies: R-029
+ Done when: `trace-baseline.txt` pins the commit before the carve (after TASK-003/005/007's core edits); `trace-check.py` maps every standing rule and conditional passage (the project-layout/Workspace-boundary section included) from that baseline to its home — a home is `supervisor.md` (for a rule that stays in the core) or any file under `workflow/**`; a passage found verbatim in **more than one** home fails as a **COPY** unless a `reword`/`new` entry explains it (so "moves, not copies" is enforced for every increment, not only where a per-increment test asserts absence); a two-hop move (baseline→module→trait, the source emptied) passes; verbatim moves are required except `reword` entries in `trace-exceptions.md`; text new to the modules is flagged unless a `new` entry declares it; every `~/.claude/...` reference and cited section still resolves; it runs incrementally; the empty `trace-exceptions.md` is scaffolded here; `test_trace_check.py` (names R-029) covers a clean move, a two-hop move, a **copy into two homes (fails)**, a silent reword (fails), an undeclared new passage (fails), a dropped boundary section (fails), a dangling reference (fails), and both exception kinds.
+ 
+@@ -184,7 +184,7 @@ Depends on: TASK-010, TASK-006, TASK-007
+ Parallel: no
+ Diagrams: none
+ Merge unit: merged with TASK-010 as one PR (see TASK-010) so the suite is never red on `main` between the carve and this hook.
+-Scope: bridge/cursor-bridge/session-start.py; bridge/cursor-bridge/MANIFEST.json; tests/test_session_start_module.py; tests/test_session_start.py
++Scope: bridge/cursor-bridge/session-start.py; bridge/cursor-bridge/MANIFEST.json; tests/test_session_start_module.py; tests/test_session_start.py; docs/cli-reference.json; docs/CLI_REFERENCE.md
+ Satisfies: R-005
+ Done when: given a project's `Phase:` and `Workflows:` lines the hook re-injects the digest and, as a **second run** (neither near the 10,000-char cap), names the current phase's module(s), the conditional files (type/sub-type/trait) touching that phase, and the table's further files, listing a split module's sub-files and a phase's variant files from the module's own declared-variants/pointer line (no table entry names a variant file directly, so the table never points at `interface/mockups.md` before TASK-012 creates it); the shared Phase→module table maps **every template value**: intake→intake; design→design; mockups→interface (+ the mockups variant); planning→planning+run-parameters; configuration→configuration; building→delegation-loop+reflection (+project-end at the last stage close); done→change-cycle (a request on a done project is a change cycle); changing→change-cycle+delegation-loop+reflection+project-end; plus the convention re-reads (merge-policy+pitfalls while building/changing; diagram-conventions+glossary at design; project-config+pitfalls at configuration); emits trait files in the R-034 order; `test_session_start.py`'s former heading/line-range assertions are re-pointed to the module table here (never weakened; the 9,500-char digest and status-at-limits cases kept); `test_session_start_module.py` (names R-005) covers every template phase value, a phase with and without conditionals, a split module (two sub-files), the convention files, and the trait order, using the TASK-006 fixtures.
+ 
+@@ -270,7 +270,7 @@ Parent: none
+ Depends on: TASK-023, TASK-006, TASK-008
+ Parallel: no
+ Diagrams: none
+-Scope: bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_calibrate_program.py
++Scope: bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_calibrate_program.py; docs/cli-reference.json; docs/CLI_REFERENCE.md
+ Satisfies: R-027, R-033
+ Done when: `conformance-check.py` runs `workflow-check` at calibration over a running project's status file and reports an unclassified line or one naming an unwritten workflow; `test_calibrate_program.py` (names R-027, R-033) covers a classified and an unclassified project.
+ 
+diff --git a/docs/CLI_REFERENCE.md b/docs/CLI_REFERENCE.md
+index 330c2e4..26d5433 100644
+--- a/docs/CLI_REFERENCE.md
++++ b/docs/CLI_REFERENCE.md
+@@ -887,6 +887,47 @@ Compare local <base> with the remote's <base>.
+ - `--base`; default: "main"; required: false
+ - `--remote`; default: "origin"; required: false
+ 
++## trace-check.py
++
++Path: `bridge/cursor-bridge/trace-check.py`
++
++```
++trace-check: mechanical traceability from a pinned pre-split baseline (R-029).
++
++  python trace-check.py [--repo DIR] [--map]
++
++Compares every passage unit of bridge/commands/supervisor.md at the pinned baseline
++commit with the working tree: the core and every *.md under bridge/cursor-bridge/workflow/
++except bridge/cursor-bridge/workflow/trace-exceptions.md (the only home left out). Module files under
++workflow/phases/, workflow/types/, and workflow/traits/ are checked for undeclared new text. Exceptions are
++listed in workflow/trace-exceptions.md. A ~/.claude/... reference must name a path inside bridge/ with no
++symbolic link, junction, or other reparse point on the way.
++
++Finding lines, then TRACED and RESULT:
++  FAIL (dropped)  a baseline passage is missing everywhere
++  FAIL (copy)     a passage appears more often than at baseline (excused sections excluded)
++  FAIL (new)      undeclared text in a module file
++  FAIL (ref)      a ~/.claude/... reference does not resolve to a path inside bridge/ with no link on the way
++  FAIL (cite)     a cited section heading does not resolve in any current home
++  NOTE (reword)   a dropped passage excused by a reword entry
++  MAP             with --map, each baseline passage and its current home(s)
++
++Exit 0 when no FAIL line was printed. Exit 1 when at least one FAIL was printed.
++Exit 2 when the check cannot run: not a git work tree, git unavailable, missing or
++invalid trace-baseline.txt, baseline commit absent (a shallow clone is the likely cause),
++missing supervisor.md, invalid trace-exceptions.md, a folder under bridge/cursor-bridge/workflow/
++that cannot be read, a symbolic link, junction, or other reparse point met on a path the program
++reads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked
++are printed, with no traceback.
++The check needs the baseline commit's object history.
++```
++
++### Options
++
++- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
++- `--repo`; default: null; required: false
++- `--map`; default: false; required: false
++
+ ## wake-timer.py
+ 
+ Path: `bridge/cursor-bridge/wake-timer.py`
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 46f414e..5368110 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -87,6 +87,19 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
+ - **Lead (Review B, the records round 2, noted):** the Windows 8.3 short-name form of a folder (`C:\Users\ABCDEF~1`, which Windows can give a folder whose name is longer than eight characters) is not matched, so a program naming its folder that way would pass. The likely source is the temporary folder (`%TEMP%` and `tempfile.gettempdir()` often hold the short form, whose first six characters come from the user's name) and a current folder started in that form; no bridge program or tools/dump-cli.py calls `gettempdir` (Review A, FIX-002). Check: compare `GetLongPathNameW` of path-like parts too, if a program ever defaults to the temporary folder.
+ - **Lead (Review A round 4, noted):** the filesystem-root skip in `forbidden_path_fragments` is now close to dead code (the canonical `/` skip covers it off Windows; `c:/` never appears in the reference), and the root tests cannot fail on either leg; on Linux the three drive-less cases test the separator folding only, the drive mechanism being exercised on the Windows leg alone.
+ 
++### TASK-016, the traceability check (2026-10-20)
++- **Rounds:** four builder rounds (composer-2.5). Round 1 traced the 424 passages right (Review A checked them independently) and was rejected for chained citations unchecked, a traceback at `git ls-tree`, findings out of order and an entry's line number off by one, and failed by the security auditor: a `~/.claude/` reference was not contained in `bridge/` (a `..`, drive or network form probed outside it). Round 2 contained references; Review A then found a Windows junction under `workflow/` followed by `os.walk` (round 2's brief had wrongly said it is not), MAP homes unescaped (convergent with the security re-check) and references sorted by text. Round 3 refused links below the walk's start and refused `...` by mistake (its brief's trailing-dot rule); both reviewers then found the start folder, the folders above it and the three files read by name unchecked (a junction at `workflow/` or `bridge/commands` printed outside text; convergent). Round 4: one helper checks every component of every path read, a link is `ERROR`, exit 2. Review A APPROVE 0/0/5, the security re-check PASS; a by-class line drawn on the leads below (step 7).
++- **Lead (security re-check, rounds 3 and 4, agreed as leads):** a race between the link test and the read: a path swapped for a link between `lstat` and `open()` is read, and `bridge_contains` calls `realpath` after the component walk, which follows a link swapped in meanwhile. Local only, and whoever can swap a path during a run can edit the files the check reads. Check: open with no-follow (`O_NOFOLLOW`; `FILE_FLAG_OPEN_REPARSE_POINT` on Windows) and compare `fstat` with the earlier `lstat`.
++- **Lead (security re-check, round 4):** a hard link is not a link to the check: a `.md` under `workflow/` hard-linked to a file elsewhere on the drive is read. git never creates hard links on checkout. Check: refuse a file with `st_nlink > 1`.
++- **Lead (security re-check, round 4):** the refusals of a linked file (a `.md` under `workflow/`, the three files read by name) are proven only on CI: this Windows account cannot make a symbolic link to a file, so those four tests are skipped here; the code tests the last component of every path the same way. Check: CI's run of tests/test_trace_check.py, which skips none of them on Linux.
++- **Lead (Review A round 4, consider):** with two or more links under `workflow/`, which one the ERROR names follows `os.walk`'s listing order (NTFS name order on Windows, the file system's hash order on Linux), so two computers can print different ERROR lines for one tree; the exit (2) is the same. Check: sort `dirnames` and `filenames` in place before testing them.
++- **Lead (Review A round 4, consider; unreachable from main):** a reference whose first segment is a placeholder (`~/.claude/.../x`, `~/.claude/<x>/y`) never tests that `bridge/` exists, so `resolve_ref` answers yes on a root without `bridge/`; `main` reads the core under `bridge/` first, so it cannot happen there. Check: an `lstat` of `bridge/` if `resolve_ref` is reused.
++- **Lead (Review A round 4, consider):** the docstring's exit-2 list names "git unavailable" but not a git command that times out or fails after it started (`ERROR: git ls-tree: timed out after <n> s`), which also ends in exit 2.
++- **Lead (Review A round 4, noted):** the walk tests each entry with `is_path_link` rather than the whole-path helper (equivalent: the walk is top-down from a folder already checked); `resolve_ref` walks a reference's components twice (the helper answers "no link" for a missing component too, so existence is walked again); an unreadable folder's ERROR prints the absolute path where a link's prints the repository-relative one.
++- **Lead (Review A round 3, noted):** the device names refused are the brief's (`CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`, `LPT1`-`LPT9`), narrower than Python 3.13's reserved set (`CONIN$`, `CONOUT$`, `COM` and `LPT` with a superscript digit); on this computer `lstat` fails for all of those, so they do not resolve anyway.
++- **Accepted (mutation (ab), the builder's assumption):** the link test of the walk's start folder is shadowed by the test of the baseline file, whose path runs through the same folder and is checked first; it stays as the brief's guard. Reopens if a file read by name moves out of `workflow/`.
++- **For TASK-010 (Review A round 1's design point):** an exceptions entry names a file and a heading, so an entry naming a level-1 heading or the digest's heading excuses every passage under it; the design review of each split increment reads every entry's heading for that reach.
++
+ ## Stage B2 — carried to its close (test lane)
+ - Done on BUG-002 (stage B2's review fixes), not in the refactoring pass, whose test lane only consolidates: tests/test_open_list.py pins "filled, including" and its comment at :25 is corrected (TASK-004 r3 Consider); tests/test_extension_points.py pins the configuration.items CI route, the inspect step's members and the placement sentence (TASK-005 r6 Consider).
+ 
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index db8f360..e6b8432 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -1,6 +1,6 @@
+ # Inventory — Claude-Cursor Bridge
+ Reflected through: none
+-Updated: 2026-10-19
++Updated: 2026-10-20
+ 
+ The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
+ 
+@@ -20,6 +20,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The design critique's ceiling | A design, plan or change critique stops after four rounds, one confirming read if the text changed and one resolution round, whatever is still open; the launcher refuses any cursor-agent launch naming a round file above five, a second resolution round, or a round file whose name cannot be read, unless the owner's `Design rounds above five:` line lifts that subject once | bridge/commands/supervisor.md, Phase 2; bridge/cursor-bridge/bridge-run.py (design_ceiling) | tests/test_bridge_run_design_ceiling.py | hotfix 2026.10.18a (HOTFIX-001; on main 2026-10-19) |
+ | The generated command reference | Every bridge program's command line (argparse programs from their `build_parser()`; hand-parsed ones from the docstring's usage), written to a JSON file and a Markdown rendering of it; defaults and choices under the bridge's folder as `<bridge folder>/...`; any string holding the repository, home or current folder (any case, any run of separators, with or without the drive) refused, the remaining forms and folders being leads in docs/HARDENING.md (Stage B3, CONFIG-B3b); `--check` fails a stale file, in CI's tests job and the pre-commit gate | tools/dump-cli.py; docs/cli-reference.json; docs/CLI_REFERENCE.md; .github/workflows/tests.yml; .githooks/pre-commit | tests/test_dump_cli.py | release B (CONFIG-B3b; rule 32) |
+ | The glossary's workflow terms | The closed set of release B's terms (main workflow core, phase module, extension point, product type, sub-type, trait, the conditional workflows, add/replace/set, the open list, workflow and sub-workflow names, the workflow check, the compaction-survival list), and a Phase entry listing all eight status values | bridge/cursor-bridge/Glossary.md, "Main and conditional workflows" | tests/test_glossary_terms.py | release B (TASK-009) |
++| The traceability check | Compares every passage of the core (bridge/commands/supervisor.md) at the pinned baseline commit with its current homes, the core and every module under bridge/cursor-bridge/workflow/: a passage dropped everywhere, a passage in more homes than at baseline, undeclared new text in a module, a `~/.claude/...` reference that does not name a path inside bridge/ with no link on the way, and a cited heading that resolves nowhere are FAIL lines; `reword` and `new` entries in trace-exceptions.md excuse a reworded or new passage; `--map` prints each passage's home; a link met on any path it reads, an unreadable folder, a git failure or the baseline commit missing (a shallow clone) stop it with exit 2. Only git rev-parse, cat-file, ls-tree and show run; nothing is written | bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt (the baseline, 0a186da); bridge/cursor-bridge/workflow/trace-exceptions.md | tests/test_trace_check.py | release B (TASK-016) |
+ 
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+@@ -68,6 +69,9 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | Every launch the test suite makes that sets no creation flags is windowless by one default in tests/conftest.py (FIX-001): on Windows such a launch gets CREATE_NO_WINDOW, and stdin=DEVNULL where it redirects no stream (so its output reaches the suite); a launch with its own flags keeps them. tests/test_tests_windowless.py proves a child gets a console of its own with no window and its child shares it, and fails on a launch in tests/ that bypasses subprocess (os.system, os.startfile, os.spawn*, os.exec*, multiprocessing, a process pool, CreateProcess) or sets flags without CREATE_NO_WINDOW. windowless-check.py is not run over tests/: its per-site rule would flag the suite's hundreds of call sites, which the default already covers | rule 24 / KP-014: 32 of 34 launching test files passed no flag, so a suite run from a process with no console (a headless builder) could open a window per launch; on 2026-10-19 a builder's suite run coincided with a crash after a flood of terminal windows (cause not proven; the owner's process-start recording will show it) | 2026-10-19, supervisor (FIX-001; owner agreed to the plan) | a test starts a program other than through subprocess (os.system, os.startfile), or the recording shows windows from the suite after FIX-001 |
+ | The command reference's path check covers three folders of this computer: the repository, the home folder and the current folder, each in any case, with any run of separators and with or without its drive; an absolute default or choice equal to a program's own folder is refused. Other folders (the repository's parent, other drives), a link at an output file, and contrived encodings are leads in docs/HARDENING.md (Stage B3, CONFIG-B3b) | rule 54 in a public repository: the folders that can carry the owner's name; four review rounds converged there and the remaining findings fail closed or are contrived | 2026-10-19, supervisor (CONFIG-B3b; by-class line, step 7) | a program names another folder of this computer, or a lead's form appears in a program |
+ | Stage B2's least-confident item 2 is tested on shapes of the other projects' status files, built in the test, never copies of the files (FIX-002, tests/test_b2_least_confident.py): each shape keeps what the judges read (line endings, field names in their order, headed sections, size, non-ASCII text), read from the real files on 2026-10-19 as counts and names only; the content is invented | the real files hold those projects' records and this computer's paths, and this repository is public (rule 54) | 2026-10-19, supervisor (FIX-002) | a judge reads something of a status file the shapes do not keep, or a project's status file changes shape (stage B4's classifications commit their own fixtures) |
++| The traceability check traces every passage of the core (424 at the baseline), not only the standing rules and the conditional passages R-029 names | tracing them all costs nothing more and leaves no passage to be classed by hand; a passage that leaves the core without a home takes a `reword` entry the design review sees | 2026-10-20, supervisor (TASK-016) | a split increment needs a passage deleted outright |
++| The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
++| TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
+ | No diagram index for release B | the design is the plan's prose and its §6.2 layering / §6.11 file layout tables; this is governance text, not a code architecture with components to draw | 2026-10-11, supervisor | a later release adds code whose architecture is load-bearing |
+ 
+ ## Deferred
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 9dcf6a2..5f3c3ba 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -1,20 +1,20 @@
+ # Project Status
+-Last updated: 2026-10-19
++Last updated: 2026-10-20
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at FIX-002's merge (PR #50); TASK-016, stage B3's first plan delegation, is next
+-Last accepted: FIX-002 (PR #50, at its merge): stage B2's least-confident items 2 and 3 settled by tests (tests/test_b2_least_confident.py: the two judges on status files shaped like the other projects', built rather than copied, and the bridge's own status line pinned to its two (f) findings and one FLAG; no defect found); before it CONFIG-B3b at 944e64b (PR #49): the generated command reference (tools/dump-cli.py writes docs/cli-reference.json and docs/CLI_REFERENCE.md from the bridge programs; `--check` in CI's tests job and the pre-commit gate; a string holding the repository, home or current folder is refused in any case, with any run of separators and with or without the drive, other forms and folders being HARDENING leads; four builder rounds); before it FIX-001 at 42b1c40 (PR #48): every launch the test suite makes without creation flags of its own is windowless on Windows, and a test fails on a launch around that default (tests/conftest.py, tests/test_tests_windowless.py; ISS-011, the crash of 2026-10-19, cause not confirmed); before it CFG-B3 at 2b10bfe (PR #47): the builder's configuration (the boundary and secure-coding rules; the boundary-check hook, configured but not running in builder runs, ISS-010; the windowless pre-commit gate); main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001, CFG-B3, FIX-001, CONFIG-B3b, FIX-002
+-Awaiting user on: none
++Increment: none — this file states the position at TASK-016's merge (PR #51); TASK-010 with TASK-015, the carve of the core and the phase sections, is next
++Last accepted: TASK-016 (PR #51, at its merge): the traceability check, R-029 built (bridge/cursor-bridge/trace-check.py, the baseline pinned at 0a186da, the empty exceptions scaffold; 424 passages traced, RESULT: OK; four builder rounds; no CI step, it runs at step 4 of every split increment); before it FIX-002 at 0a186da (PR #50): stage B2's least-confident items 2 and 3 settled by tests; before it CONFIG-B3b at 944e64b (PR #49): the generated command reference (tools/dump-cli.py; `--check` in CI and the pre-commit gate; four builder rounds); before it FIX-001 at 42b1c40 (PR #48): every launch the test suite makes without creation flags of its own is windowless on Windows, and a test fails on a launch around that default (tests/conftest.py, tests/test_tests_windowless.py; ISS-011, the crash of 2026-10-19, cause not confirmed); before it CFG-B3 at 2b10bfe (PR #47), the builder's configuration; main holds TASK-001 to TASK-009, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001, CFG-B3, FIX-001, CONFIG-B3b, FIX-002, TASK-016
++Awaiting user on: none (resumed 2026-10-20 on the owner's word)
+ Previously: stage B1 closed 2026-10-19 after four stage-review rounds — round 1 (2026-10-16) both REJECT (BUG-001); round 2 Review A REJECT (the bootstrap tests checked a word, not a record: BUG-015); round 3 Review B REJECT, Review A the same item, convergent (this file on main described its own pull request before the gate: BUG-016, ISS-009); round 4 both APPROVE.
+-Next: stage B3 (docs/BUILD_PLAN.md), its configuration items and stage B2's least-confident tests done: TASK-016, B3's first plan delegation (spec-packager packages handoff/TASK-016.md, plan-check.py compares it with its increment); then TASK-010 with TASK-015, then TASK-011 to TASK-014.
++Next: TASK-010 with TASK-015: a branch from origin/main, spec-packager's brief (its reality check against the core as built and the traceability check), plan-check, the delegation; trace-check.py runs at its step 4 and must print RESULT: OK. Then TASK-011 to TASK-014.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 4's; -r3.md, -r2.md and -r1.md the earlier rounds) for stage B1's review, closed; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs (read it first on a resume); write_review_fix001.py with SCOPE-FIX-001.md and pr-fix-001.md (FIX-001's gate, closed); write_review_config_b3b.py with SCOPE-CONFIG-B3b.md and pr-config-b3b.md (CONFIG-B3b's gate, closed); write_review_fix002.py with SCOPE-FIX-002.md and pr-fix-002.md (FIX-002's gate, closed at this merge) and its mutation driver fix002_mutants.py (nine mutants, run on a scratch copy given as its second argument); CONFIG-B3b-r3-partial.diff (round 3's partial work at the crash, discarded, for reference) and the CONFIG-B3b checks cfgb3b_parsers.py, docstring_paths.py, cfgb3b_oracle_check.py; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 4's; -r3.md, -r2.md and -r1.md the earlier rounds) for stage B1's review, closed; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs (read it first on a resume); write_review_fix001.py with SCOPE-FIX-001.md and pr-fix-001.md (FIX-001's gate, closed); write_review_config_b3b.py with SCOPE-CONFIG-B3b.md and pr-config-b3b.md (CONFIG-B3b's gate, closed); write_review_fix002.py with SCOPE-FIX-002.md and pr-fix-002.md (FIX-002's gate, closed at this merge) and its mutation driver fix002_mutants.py (nine mutants, run on a scratch copy given as its second argument); TASK-016's gate files write_review_task016.py, SCOPE-TASK-016.md and pr-task-016.md (closed at this merge), its driver task016_mutants.py (27 mutants, 23 killed; same arguments), its commit messages msg-task016-*.txt and TASK-016-r2-partial.diff; CONFIG-B3b-r3-partial.diff (round 3's partial work at the crash, discarded, for reference) and the CONFIG-B3b checks cfgb3b_parsers.py, docstring_paths.py, cfgb3b_oracle_check.py; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
+ Delegated gates: none
+ Remote sync: main at the merge of PR #50, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+ Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — under way, its configuration items first. Last reflection: stage B1's close, 2026-10-19 (demonstration passed; conformance then 17 OK / 6 MISSING / 5 NOTE; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 7110f5b..bd24bbb 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -32,7 +32,7 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-026 | The new interface text — contract design (local service) and command design (CLI) — written. | DESIGN §6.8, §6.9 | planned | — |
+ | R-027 | Calibration is aware of conditional workflows: it applies a conditional workflow to running projects of that product type by phase, reopening no gate; the applied text takes effect from a project's next design phase or change cycle. | DESIGN §6.10; §6.8 (R-026 clause) | planned | — |
+ | R-028 | The glossary gains the terms of this plan. | DESIGN release B scope; Glossary | built | tests/test_glossary_terms.py (TASK-009) |
+-| R-029 | Every standing rule and every conditional passage — the project-layout / Workspace-boundary section included — is traceable from a pinned pre-split baseline commit to its new file by a mechanical comparison: moves are verbatim, any reword is a listed exception the design review sees, text new to the modules is declared new by its increment, and every `~/.claude/...` reference and cited section still resolves. | DESIGN release B "Accepted when" | planned | — |
++| R-029 | Every standing rule and every conditional passage — the project-layout / Workspace-boundary section included — is traceable from a pinned pre-split baseline commit to its new file by a mechanical comparison: moves are verbatim, any reword is a listed exception the design review sees, text new to the modules is declared new by its increment, and every `~/.claude/...` reference and cited section still resolves. | DESIGN release B "Accepted when" | built | tests/test_trace_check.py (the test_r029_ tests: moves, two-hop moves, copies, rewords, new text, the dropped boundary section, references and citations, both exception kinds, links, git failures, output order; TASK-016); bridge/cursor-bridge/trace-check.py on the repository at the baseline 0a186da traces 424 passages, RESULT: OK |
+ | R-030 | A new project walked from intake to configuration reads only its core, its current phase module, and its own conditional workflows. | DESIGN release B "Accepted when" | planned | — |
+ | R-031 | The bridge, reAngle, the video factory, and the TDP each classify under §6.3 (checked on committed fixtures) and calibrate onto the new structure, none pausing, without reopening a gate: reAngle live as the release-B trial, the bridge by running the release, the video factory and the TDP when they resume per the owner's standing pause/resume policy (one calibration each). | DESIGN §6.3; release B "Accepted when" | planned | — |
+ | R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | planned | — |
+diff --git a/docs/ROSTER.resolved.json b/docs/ROSTER.resolved.json
+index bb5c28e..0d7a001 100644
+--- a/docs/ROSTER.resolved.json
++++ b/docs/ROSTER.resolved.json
+@@ -10,6 +10,6 @@
+   },
+   "other_pool": "exhausted",
+   "probed": true,
+-  "resolved_at": "2026-10-19T19:57 UTC",
++  "resolved_at": "2026-10-20T00:24 UTC",
+   "reset_day": 16
+ }
+diff --git a/docs/cli-reference.json b/docs/cli-reference.json
+index b1cddc0..0342a61 100644
+--- a/docs/cli-reference.json
++++ b/docs/cli-reference.json
+@@ -875,6 +875,53 @@
+       "source": "argparse",
+       "subcommands": []
+     },
++    {
++      "description": "trace-check: mechanical traceability from a pinned pre-split baseline (R-029).\n\n  python trace-check.py [--repo DIR] [--map]\n\nCompares every passage unit of bridge/commands/supervisor.md at the pinned baseline\ncommit with the working tree: the core and every *.md under bridge/cursor-bridge/workflow/\nexcept bridge/cursor-bridge/workflow/trace-exceptions.md (the only home left out). Module files under\nworkflow/phases/, workflow/types/, and workflow/traits/ are checked for undeclared new text. Exceptions are\nlisted in workflow/trace-exceptions.md. A ~/.claude/... reference must name a path inside bridge/ with no\nsymbolic link, junction, or other reparse point on the way.\n\nFinding lines, then TRACED and RESULT:\n  FAIL (dropped)  a baseline passage is missing everywhere\n  FAIL (copy)     a passage appears more often than at baseline (excused sections excluded)\n  FAIL (new)      undeclared text in a module file\n  FAIL (ref)      a ~/.claude/... reference does not resolve to a path inside bridge/ with no link on the way\n  FAIL (cite)     a cited section heading does not resolve in any current home\n  NOTE (reword)   a dropped passage excused by a reword entry\n  MAP             with --map, each baseline passage and its current home(s)\n\nExit 0 when no FAIL line was printed. Exit 1 when at least one FAIL was printed.\nExit 2 when the check cannot run: not a git work tree, git unavailable, missing or\ninvalid trace-baseline.txt, baseline commit absent (a shallow clone is the likely cause),\nmissing supervisor.md, invalid trace-exceptions.md, a folder under bridge/cursor-bridge/workflow/\nthat cannot be read, a symbolic link, junction, or other reparse point met on a path the program\nreads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked\nare printed, with no traceback.\nThe check needs the baseline commit's object history.\n",
++      "name": "trace-check.py",
++      "options": [
++        {
++          "choices": null,
++          "default": "==SUPPRESS==",
++          "dest": "help",
++          "help": "show this help message and exit",
++          "nargs": 0,
++          "option_strings": [
++            "-h",
++            "--help"
++          ],
++          "required": false,
++          "type": null
++        },
++        {
++          "choices": null,
++          "default": null,
++          "dest": "repo",
++          "help": null,
++          "nargs": null,
++          "option_strings": [
++            "--repo"
++          ],
++          "required": false,
++          "type": null
++        },
++        {
++          "choices": null,
++          "default": false,
++          "dest": "map",
++          "help": null,
++          "nargs": 0,
++          "option_strings": [
++            "--map"
++          ],
++          "required": false,
++          "type": null
++        }
++      ],
++      "path": "bridge/cursor-bridge/trace-check.py",
++      "positionals": [],
++      "source": "argparse",
++      "subcommands": []
++    },
+     {
+       "name": "wake-timer.py",
+       "path": "bridge/cursor-bridge/wake-timer.py",
+diff --git a/handoff/TASK-016-r1-report.md b/handoff/TASK-016-r1-report.md
+new file mode 100644
+index 0000000..b258ef7
+--- /dev/null
++++ b/handoff/TASK-016-r1-report.md
+@@ -0,0 +1,62 @@
++# TASK-016 round 1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/trace-check.py` (new)
++- `bridge/cursor-bridge/workflow/trace-baseline.txt` (new)
++- `bridge/cursor-bridge/workflow/trace-exceptions.md` (new)
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated)
++- `docs/cli-reference.json` (regenerated)
++- `docs/CLI_REFERENCE.md` (regenerated)
++- `handoff/TASK-016-r1-report.md` (this file)
++
++## Summary
++
++Implemented `trace-check.py` (R-029): it pins baseline commit `0a186da42ad01352dcd46f8524a1b3db0858dea5`, cuts Markdown into comparable units, traces every baseline `supervisor.md` passage against current homes (core plus workflow `*.md` except `trace-exceptions.md`), flags dropped/copy/new text in module paths, validates `~/.claude/` references and section citations, and reads `trace-exceptions.md` for `reword`/`new` excuses. Scaffolded the baseline and empty exceptions files. On this tree the check reports 424 traced passages with `RESULT: OK`. All 22 tests in `tests/test_trace_check.py` pass. Full `pytest tests` reports two failures that require supervisor updates to test allowlists (not fixable under Scope): `test_dump_cli.py` needs `trace-check.py` in the `ARGPARSE` tuple, and `test_tests_windowless.py` flags `test_trace_check.py` subprocess lines that use `NO_WINDOW` without the literal substring `CREATE_NO_WINDOW`.
++
++## Mutation checks
++
++| Mutation | Description | Caught by |
++|----------|-------------|-----------|
++| (a) | Compare first line only instead of normal form (no join/collapse) | `test_r029_a_hard_wrapped_passage_moved_onto_one_line_passes` |
++| (b) | Copy only when passage stands in two different files | `test_r029_a_copy_within_one_file_fails` |
++| (c) | Count units in excused sections toward `c` | Multiple tests (22 failed) |
++| (d) | Let a `new` entry excuse a dropped passage | `test_r029_a_new_entry_excuses_new_text_but_not_a_dropped_passage` |
++| (e) | `reword` drop excuse looks only at current file, not baseline CORE | Not caught (attempted: skip `file_rel != CORE_REL` guard; no test failed) |
++| (f) | New-text check uses baseline `supervisor.md` units only, not all baseline homes | Not caught (fixture baseline has no extra workflow-only units) |
++| (g) | Resolve `~/.claude/<rest>` at repository root instead of `bridge/` | Reference tests (18 failed) |
++| (h) | Drop placeholder segment rule | `test_r029_a_placeholder_reference_resolves_by_its_folder` and related |
++| (i) | Skip citation check | `test_r029_a_dangling_cited_section_fails` |
++| (j) | Omit baseline-missing error (still fails later on `cat-file`) | Not caught as exit 0 (`test_r029_a_missing_baseline_commit_is_not_checked` still gets exit 2) |
++
++## Verification commands
++
++1. `git rev-parse 0a186da` — exit 0, `0a186da42ad01352dcd46f8524a1b3db0858dea5`. `git diff --stat 0a186da HEAD -- bridge/commands/supervisor.md bridge/cursor-bridge/workflow` — exit 0, no output.
++
++2. `python bridge/cursor-bridge/trace-check.py` — exit 0. Last lines: `TRACED: 424 passages of baseline 0a186da; 424 in supervisor.md, 0 under workflow/, 0 dropped, 0 excused` and `RESULT: OK`.
++
++3. `python bridge/cursor-bridge/trace-check.py --map` — exit 0, 426 lines (424 `MAP` lines plus `TRACED:` and `RESULT: OK`). `TRACED: 424 passages of baseline 0a186da; 424 in supervisor.md, 0 under workflow/, 0 dropped, 0 excused`.
++
++4. `python bridge/cursor-bridge/trace-check.py --help` — exit 0 (usage printed).
++
++5. `python -m pytest tests/test_trace_check.py -q` — exit 0, `22 passed`.
++
++6. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks tools` — exit 0, `RESULT: OK`.
++
++7. `python tools/make-manifest.py` then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0, `RESULT: SOURCES MATCH bridge 2026.10.18a`.
++
++8. `python tools/dump-cli.py` then `python tools/dump-cli.py --check` — exit 0.
++
++9. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` — exit 0.
++
++10. `python -m pytest tests -q` — exit 1, `2 failed, 1761 passed, 25 skipped`: `test_cfgb3b_docstring_entries_hold_the_whole_docstring` (trace-check.py listed as hand-maintained but has `build_parser`), `test_fix001_no_test_starts_a_program_around_the_default` (`test_trace_check.py` uses `creationflags=NO_WINDOW` without `CREATE_NO_WINDOW` in the line).
++
++11. `git status` / `git diff --stat` — new bridge files untracked; manifest and CLI reference modified as above.
++
++## Assumed, not verified
++
++- List-item continuation lines that are not themselves list items join the preceding list unit (no blockquote-nested list fixtures in `test_trace_check.py`) · Requirement 4 paragraph/list rules · A crafted blockquote plus list in a temp repo.
++- Heading titles with trailing `#` characters are taken as part of the title text after the first space following the `#` run · CommonMark allows closing hashes · No sample in tests or brief.
++- `git ls-tree -z` on Windows yields UTF-8 path bytes decoded with `utf-8` replace on failure · Git for Windows behavior · Exercised only on this host's successful runs.
++- `GIT_TIMEOUT = 120` seconds is enough for largest `git show` of `supervisor.md` on slow disks · Chosen to match other bridge git helpers · A timeout failure on huge repos would confirm or refute.
++- Citation regex `\b(see|per|under) "X"` with chained `\u2192 "Y"` matches every cite form in the real core without false positives on words like `understand` · Brief examples only · Full supervisor scan passed `RESULT: OK`.
+diff --git a/handoff/TASK-016-r2-report.md b/handoff/TASK-016-r2-report.md
+new file mode 100644
+index 0000000..8862ad8
+--- /dev/null
++++ b/handoff/TASK-016-r2-report.md
+@@ -0,0 +1,42 @@
++# TASK-016 round 2 report
++
++## Files changed
++
++- `bridge/cursor-bridge/trace-check.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated by `python tools/make-manifest.py`)
++
++## Summary
++
++Round 2 hardens `trace-check.py` against path escape and review findings: `~/.claude/` references are validated segment-by-segment and confined under `bridge/` before any `exists` call, chained arrow citations are all checked with a fixed tail parser, git failures (including `ls-tree`) exit 2 with `ERROR: git <sub-command>: <reason>` and no traceback, findings print in dropped → copy → new → ref → cite order with cite in file order, exceptions parsing uses an exact `## Entries` line and correct 1-based line numbers, only the workflow `trace-exceptions.md` path is excluded, symlinked workflow homes are skipped, usage errors print `ERROR: usage:` on stdout, and printed fields go through `escape_field`. Dead code from round 1 was removed.
++
++## Mutation checks (round 2)
++
++- (k) drop segment rule, keep containment — `test_r029_a_reference_outside_the_bridge_folder_never_resolves`
++- (l) drop containment, keep segment rule — none
++- (m) stop chain after first citation — `test_r029_each_heading_of_an_arrow_chain_is_a_citation`
++- (n) stop chain after unresolved citation — `test_r029_each_heading_of_an_arrow_chain_is_a_citation`
++- (o) print copy before dropped — `test_r029_dropped_findings_come_before_copy_findings`
++- (p) sort cite findings by text — `test_r029_cite_findings_are_in_file_order`
++- (q) count entry lines from 0 — `test_r029_a_malformed_exceptions_file_is_not_checked`
++- (r) find `## Entries` with `endswith` — `test_r029_an_unchanged_tree_passes_and_traces_every_passage` (and related marker tests)
++- (s) leave out every `trace-exceptions.md` by basename — `test_r029_only_the_workflow_folders_own_exceptions_file_is_left_out`
++- (t) print paths without escaping — `test_r029_printed_paths_are_ascii`
++
++## Verification
++
++1. `git rev-parse 0a186da` — exit 0, `0a186da42ad01352dcd46f8524a1b3db0858dea5`. `git diff --stat 0a186da HEAD -- bridge/commands/supervisor.md bridge/cursor-bridge/workflow` — only `trace-baseline.txt` and `trace-exceptions.md` added (six lines), as expected for TASK-016 on this branch.
++2. `python bridge/cursor-bridge/trace-check.py` — exit 0; `TRACED: 424 passages of baseline 0a186da; 424 in supervisor.md, 0 under workflow/, 0 dropped, 0 excused`; `RESULT: OK`.
++3. `python bridge/cursor-bridge/trace-check.py --map` — exit 0; 426 lines (424 `MAP` lines plus `TRACED:` and `RESULT:`); same `TRACED:` line as step 2.
++4. `python bridge/cursor-bridge/trace-check.py --help` — exit 0.
++5. `python -m pytest tests/test_trace_check.py -q` — exit 0; 37 passed, 1 skipped.
++6. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks tools` — exit 0; `0 FAIL`.
++7. `python tools/make-manifest.py` then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0; `SOURCES MATCH`.
++8. `python tools/dump-cli.py` then `python tools/dump-cli.py --check` — exit 0; `RESULT: OK` (no diff in `docs/cli-reference.json` or `docs/CLI_REFERENCE.md`).
++9. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` — exit 0.
++10. `python -m pytest tests -q` — exit 0; 1779 passed, 26 skipped in ~381 s.
++11. `git status` / `git diff --stat` — modified: `bridge/cursor-bridge/trace-check.py`, `bridge/cursor-bridge/MANIFEST.json`; report added under `handoff/`.
++
++## Assumed, not verified
++
++- Mutation (l) (containment only, no segment rule) is not caught by the supervisor tests on this tree · a reference that passes segment checks but escapes via `realpath` on a permitted-looking path would need a fixture the tests do not include · a targeted test with a symlink or junction under `bridge/` would confirm.
++- `ls-tree` path bytes that are not valid UTF-8 are escaped for the error line via `latin-1` decode then `escape_field` · the brief does not define byte-level display for invalid UTF-8 path names · a repository with such a tree entry would show whether the message is acceptable.
+diff --git a/handoff/TASK-016-r2.md b/handoff/TASK-016-r2.md
+new file mode 100644
+index 0000000..db39b81
+--- /dev/null
++++ b/handoff/TASK-016-r2.md
+@@ -0,0 +1,78 @@
++# TASK-016 round 2: containment of references, citation chains, output order, error handling
++
++## Objective
++Round 1 (`handoff/TASK-016.md`, your report `handoff/TASK-016-r1-report.md`) is committed. Its trace count is right (Review A cut the core independently and found the same 424 units), but two reviews rejected it. The security review found that a `~/.claude/...` reference is joined to the bridge folder without a containment check, so a reference can probe any path of the computer, and on Windows a network-share form makes the existence check contact another machine. Review A found that a chained citation's second heading is never checked, that one git failure ends in a traceback, that findings are printed out of the order Requirement 8 sets, and that a malformed entry's line number is off by one. This round fixes those and the smaller items below, all in `bridge/cursor-bridge/trace-check.py`.
++
++Satisfies: R-029 (as in round 1).
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/trace-check.py
++- bridge/cursor-bridge/MANIFEST.json (regenerated by `python tools/make-manifest.py`, never by hand)
++- docs/cli-reference.json (regenerated by `python tools/dump-cli.py`, never by hand)
++- docs/CLI_REFERENCE.md (regenerated by `python tools/dump-cli.py`, never by hand)
++- docs/BUILDER_NOTES.md
++- handoff/TASK-016-r2-report.md
++
++Do not modify anything else.
++
++## Written by the supervisor; do not edit
++`tests/test_trace_check.py`. The supervisor added round-2 tests after the line `# --- round 2`, and tightened one assertion (the malformed entry's error must say `line 6`). Eleven of them fail today; one (a linked file) is skipped where the account cannot create a symbolic link. If a supervisor test contradicts this brief, stop, change no test, and report the contradiction.
++
++## Out of scope
++As in round 1: everything outside Scope, every test file, `bridge/commands/supervisor.md`, `workflow/open-list.md`, `workflow/extension-points.md`, `trace-baseline.txt` and `trace-exceptions.md` (both stay as committed), CI configuration, `.githooks/`, `.cursor/`, `tools/`.
++
++## Context
++- Round 1's brief, `handoff/TASK-016.md`, holds wherever this file does not change it. Read it again whole, then `trace-check.py` whole.
++- The reviews' findings name these places in the committed `trace-check.py` (7d9974b): `resolve_ref` and `REF_RE` (lines 49, 374-386), `citation_strings` and `check_citations` (398-436), the ls-tree call (536-539), the findings lists and printing (647-718), `parse_exceptions` (302-354), the home lists (274-283, 548), the error handler of the parser (453-461), `git_run` (239-251).
++- On Windows, `os.path.exists` on a path such as `\\host\share\x` opens a network connection to `host` and sends an authentication attempt. `os.path.join(root, "bridge", "C:", "Windows")` gives `C:Windows`, a path relative to the current folder of drive C. `os.path.join(root, "bridge", "..", "..", "x")` leaves the repository. None of this may happen.
++
++## Requirements
++
++### Blocking (both reviews)
++1. **References stay inside `bridge/` (security, blocking).** After the reference is cut and stripped as Requirement 7 of round 1 says, split the rest at `/`. One trailing `/` is allowed (a folder) and is removed before the split. Then, before any file-system call:
++   - if any segment is empty, `.` or `..`, or contains `\` or `:`, the reference is a **ref** finding, with no file-system lookup at all;
++   - otherwise apply round 1's placeholder rule, build the path under `<root>/bridge/`, and require that `os.path.realpath` of it lies inside `os.path.realpath(<root>/bridge)` (`os.path.commonpath` of the two equals the latter); a path outside is a **ref** finding without `exists`; only then call `os.path.exists`.
++   An empty rest still means `bridge/` itself. Escape the `.` of `.claude` in `REF_RE`, so that `~/xclaude/` is not a reference.
++2. **Every citation of an arrow chain is checked.** After `see "X"` (or `per`, `under`), each directly following ` → "Y"` (space, U+2192, space, a double-quoted string) is a citation too, however many there are. A citation X that does not resolve does not stop the check of the Ys after it: each is checked and reported on its own.
++3. **No traceback, anywhere.** A `git_run` that returns no process (git cannot start, or the timeout ran out) at any call, the ls-tree call included, ends in exit 2 with `ERROR: git <sub-command>: <reason>` and `RESULT: not checked`. The reason says what happened: a timeout reads `timed out after <n> s`, a failure to start reads `cannot be started (<error>)`. Report the reason `git_run` gives as it is.
++4. **The output order of Requirement 8.** All dropped findings first (baseline order), then all copy findings (baseline order), then new, then ref, then cite. Cite findings are in sorted path order and, within a file, in file order (the order the units stand in), never sorted by their text.
++5. **The line number of a malformed entry.** The error names the line's number in the file, counted from 1: `ERROR: bridge/cursor-bridge/workflow/trace-exceptions.md: line <n>: <reason>`.
++
++### Should fix (Review A)
++6. **A usage error prints an ERROR line.** On stdout: `ERROR: usage: <argparse's message>`, then `RESULT: not checked`, exit 2. What argparse prints on stderr may stay.
++7. **The `## Entries` marker.** It is the first line whose text, with the line ending removed, is exactly `## Entries`; it may be the file's first line. No other test finds it (no `endswith`, no search that needs a line before it).
++8. **Only one exceptions file is left out.** The homes leave out exactly `bridge/cursor-bridge/workflow/trace-exceptions.md`, compared as the whole repository-relative path, in the working tree and at the baseline. A file of that name anywhere else under `workflow/` is a home like any other.
++9. **The printed reference** is the stripped reference (no trailing `.` or `:`): strip once, use the result for the lookup and the output.
++10. **Every printed field is ASCII and printable.** Every path, heading, excerpt, reference and quoted citation printed goes through one escaping function, which writes a non-ASCII character as Python's `backslashreplace` does (`é` as `\xe9`, `—` as `—`) and an ASCII control character (below 0x20, and 0x7f) as `\x` and two hexadecimal digits.
++11. **Links are not read.** A file or folder under `bridge/cursor-bridge/workflow/` that is a symbolic link (`os.path.islink`) is not a home and is not read; `os.walk` does not follow folder links (its default). The baseline is read through git and is unaffected.
++12. **Dead code goes** (minimal-code rule): the `if`/`else` with identical arms (563-566), the second read of the baseline core whose result is unused (586-591), the never-set `list_done` and its branch (219-221), the checks that repeat what `ENTRY_RE` already enforces (329, 335), the unreachable fallback (673).
++
++### Smaller
++13. The window flag is written `creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)` at the launch, as round 1's Requirement 10 spells it.
++14. A path listed by `ls-tree` that is not valid UTF-8 is an input error, `ERROR: <path as escaped>: cannot be read as UTF-8`, exit 2 (decode strictly, never with `replace`).
++15. On today's tree the check still prints `RESULT: OK` with 424 passages traced, and `--map` still lists 424 MAP lines.
++
++## Acceptance criteria
++- [ ] All 38 tests of `tests/test_trace_check.py` pass (one may be skipped where links cannot be made), the eleven round-2 failures among them.
++- [ ] `python bridge/cursor-bridge/trace-check.py` exits 0 with `TRACED: 424 passages ...` and `RESULT: OK`.
++- [ ] `python tools/dump-cli.py --check`, `windowless-check.py`, `bridge-check.py --sources` and `workflow-check.py` pass, as in round 1.
++- [ ] `python -m pytest tests -q` passes in full.
++
++## Constraints
++Round 1's Constraints all hold (ASCII program text, standard library only, windowless launches with timeouts, no git command of yours but status, diff, log, show and rev-parse, nothing outside the Workspace, no edit to any test, one paragraph per line in Markdown, BUILDER_NOTES lines dated, the minimum code). Run round 1's verification commands 2 to 11 in order, last the full suite.
++
++**Mutation check, by hand, in your own run.** Apply each, run `python -m pytest tests/test_trace_check.py -q`, record what caught it or that nothing did, and restore the code. No mutation script in the diff.
++- (k) drop the segment rule of Requirement 1 (keep the containment check);
++- (l) drop the containment check (keep the segment rule);
++- (m) stop the chain after the first citation;
++- (n) stop the chain after a citation that does not resolve;
++- (o) print copy findings before dropped ones;
++- (p) sort cite findings by their text again;
++- (q) count entry lines from 0;
++- (r) find `## Entries` with `endswith` again;
++- (s) leave out every file named `trace-exceptions.md`;
++- (t) print paths without the escaping function.
++
++## Done
++Your report is `handoff/TASK-016-r2-report.md`, written as you go. When you finish it holds the files you changed (only those with a content diff), a one-paragraph summary, the mutation list with what caught each, every verification command's result, and a section headed exactly `Assumed, not verified` (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`). Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/TASK-016-r3-report.md b/handoff/TASK-016-r3-report.md
+new file mode 100644
+index 0000000..8eec67d
+--- /dev/null
++++ b/handoff/TASK-016-r3-report.md
+@@ -0,0 +1,37 @@
++# TASK-016 round 3 report
++
++## Files changed
++
++- `bridge/cursor-bridge/trace-check.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated by `python tools/make-manifest.py`)
++- `docs/cli-reference.json` (regenerated by `python tools/dump-cli.py`)
++- `docs/CLI_REFERENCE.md` (regenerated by `python tools/dump-cli.py`)
++
++## Summary
++
++Round 3 hardens `trace-check.py` so junctions and other reparse points are never entered during the workflow homes walk or followed while resolving `~/.claude/` references (component-wise `lstat` with `is_path_link`, no terminal `exists`), MAP home paths are escaped like other printed fields, ref findings stay in discovery order on each line, arrow citation chains parse only after each closing quote, Windows device-name and trailing-dot segments are refused without I/O, unreadable workflow folders surface as a single `ERROR` and exit 2, the first `git` start failure stops with one `ERROR` line, and dead code from earlier rounds was removed. The module docstring and regenerated CLI reference describe link-free resolution under `bridge/`.
++
++## Mutation checks (round 3)
++
++- (u) the walk keeps junction folders (test only `os.path.islink`) — `test_r029_a_linked_folder_under_workflow_is_not_read`
++- (v) the reference walk skips its link test (keep containment) — none (containment via `realpath` still rejects the junction target)
++- (w) the MAP line's homes unescaped — `test_r029_printed_paths_are_ascii`
++- (x) ref findings sorted by text again — `test_r029_ref_findings_on_one_line_are_in_file_order`
++- (y) the chain scanned from the start of the whole match again — `test_r029_a_chain_is_read_after_the_closing_quote`
++- (z) the device-name rule dropped — `test_r029_a_name_windows_rewrites_does_not_resolve`
++- (aa) every git failure printed and the run continued — `test_r029_git_that_cannot_start_stops_at_the_first_failure`
++
++## Verification
++
++1. `python bridge/cursor-bridge/trace-check.py` — exit 0; `TRACED: 424 passages of baseline 0a186da; 424 in supervisor.md, 0 under workflow/, 0 dropped, 0 excused`; `RESULT: OK`.
++2. `python bridge/cursor-bridge/trace-check.py --map` — exit 0; 426 lines (424 `MAP` lines plus `TRACED:` and `RESULT:`).
++3. `python -m pytest tests/test_trace_check.py -q` — exit 0; 44 passed, 1 skipped.
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks tools` — exit 0; `0 FAIL`.
++5. `python tools/make-manifest.py` then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0; `SOURCES MATCH`.
++6. `python tools/dump-cli.py` then `python tools/dump-cli.py --check` — exit 0; `RESULT: OK`.
++7. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` — exit 0; `RESULT: OK`.
++8. `python -m pytest tests -q` — exit 0; 1786 passed, 26 skipped in ~404 s.
++
++## Assumed, not verified
++
++- Mutation (v) is not caught by the supervisor suite on this tree · `bridge_contains` still calls `realpath` and rejects the out-of-bridge junction target · a test that asserts `realpath` is never invoked on a link-only refusal would confirm the stricter round-3 behavior.
+diff --git a/handoff/TASK-016-r3.md b/handoff/TASK-016-r3.md
+new file mode 100644
+index 0000000..3364030
+--- /dev/null
++++ b/handoff/TASK-016-r3.md
+@@ -0,0 +1,70 @@
++# TASK-016 round 3: links refused everywhere, every printed path escaped, file order for references
++
++## Objective
++Round 2 (`handoff/TASK-016-r2.md`, your report `handoff/TASK-016-r2-report.md`) is committed as 6af5b54. The security re-check passed it: every form of reference text now stays inside `bridge/`. Review A rejected it on three items, two of which the security re-check also named. First, a folder link under `workflow/` is still followed on Windows, so text from outside the repository is read and printed. Round 2's brief was wrong to say `os.walk` does not follow folder links: on Windows a junction is not a symbolic link to `os.path.islink`, and `os.walk` enters it. Second, the MAP line prints its paths unescaped. Third, two references on one line are reported sorted by their text. This round fixes those and the smaller items below, all in `bridge/cursor-bridge/trace-check.py`.
++
++Satisfies: R-029 (as in rounds 1 and 2).
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/trace-check.py
++- bridge/cursor-bridge/MANIFEST.json (regenerated by `python tools/make-manifest.py`, never by hand)
++- docs/cli-reference.json (regenerated by `python tools/dump-cli.py`, never by hand)
++- docs/CLI_REFERENCE.md (regenerated by `python tools/dump-cli.py`, never by hand)
++- docs/BUILDER_NOTES.md
++- handoff/TASK-016-r3-report.md
++
++Do not modify anything else.
++
++## Written by the supervisor; do not edit
++`tests/test_trace_check.py` (45 tests). The supervisor added round-3 tests and tightened round-2 ones; six fail against 6af5b54, and one is skipped where the account cannot create a symbolic link to a file. The tests call `resolve_ref(rest, root)` and `main(argv)` in-process; keep both names and signatures (`rest` is the text after `~/.claude/`, stripped or not; `root` the repository root). If a supervisor test contradicts this brief, stop, change no test, and report the contradiction.
++
++## Out of scope
++As in rounds 1 and 2.
++
++## Context
++- Rounds 1 and 2's briefs hold wherever this file does not change them. Read `trace-check.py` whole first.
++- On Windows, `os.path.islink` is false for a junction; `os.path.isjunction` (Python 3.12, which CI pins) is true for it. A reparse point of any kind shows as `stat.FILE_ATTRIBUTE_REPARSE_POINT` in `os.lstat(p).st_file_attributes` (Windows only; the attribute does not exist elsewhere). `os.path.realpath` follows links (and a broken link's target) before it returns, so it can open a network path a link names before any containment test runs.
++- Windows drops a trailing `.` from a path component, and maps the device names `CON`, `PRN`, `AUX`, `NUL`, `COM1` to `COM9` and `LPT1` to `LPT9`, in any case and with or without an extension (`com1.md`), to devices, so such a segment can "exist" while naming no file.
++
++## Requirements
++
++### Blocking (Review A round 2; the security re-check's A1 and A2)
++1. **No link is followed, anywhere the program walks or resolves.** One helper decides whether a path is a link: `os.path.islink(p)`, or `os.path.isjunction(p)`, or (where `st_file_attributes` exists) the reparse-point attribute of `os.lstat(p)`. Use it in two places:
++   - **The homes walk.** While walking `bridge/cursor-bridge/workflow/`, remove from the walk's folder list, in place, every folder the helper calls a link, and skip every file it calls a link. A linked file or folder is neither read nor printed.
++   - **References.** After the segment rule, walk the reference's components from `<root>/bridge` down with `os.lstat`, one component at a time, and stop at the first missing one. A component the helper calls a link makes the reference a **ref** finding at once, with no `realpath` and no further lookup. So does `bridge/` itself being a link. A reference whose every component exists and none is a link resolves; one with a missing component does not. Keep the containment check of round 2 as a second guard. The final existence answer comes from this walk, not from a second `os.path.exists` on another form of the path (the security re-check's A4).
++2. **Every printed path is escaped**, the MAP line's homes and the copy finding's paths included: each through the escaping function of round 2's Requirement 10.
++3. **Ref findings are in file order.** In sorted path order and, within a file, by line and then by position on the line, never by their text: drop the sort by text.
++
++### Should fix (Review A round 2)
++4. **Dead code goes:** `ID_RE` and its check and the `" " in file_rel` check in `parse_exceptions` (`ENTRY_RE` already enforces both); the unreachable fallback in the copy finding's path list; the `elif bl_text is None` branch that cannot run; on the empty-rest branch of `resolve_ref`, the containment call that is always true. Keep `not heading.strip()`.
++5. **One strip** (round 2's Requirement 9 as written): strip the reference once in `find_refs_in_file` and pass the stripped text to `resolve_ref` for the lookup and to the output; `resolve_ref` itself also accepts unstripped text (the tests pass both).
++6. **Stop at the first git failure.** When `git_run` returns no process for any call, the program prints that one ERROR line and stops: no further git command runs and no ERROR line repeats.
++
++### Smaller (Review A round 2's considers, taken)
++7. **A chain is read after each closing quote.** After `see "X"`, read the chain from just after X's closing quote, one ` → "Y"` at a time, each anchored where the previous one ended; the text inside X is never scanned for arrows.
++8. **Names Windows rewrites never resolve.** In the segment rule, a segment that ends in `.` (other than the whole segments `.` and `..`, already refused), or whose part before its first `.` is a device name of the Context (any case), is refused like a `..`: a **ref** finding with no file-system call.
++9. **An unreadable folder is an error.** Give the walk an `onerror` handler: a folder under `workflow/` that cannot be listed is `ERROR: <path>: cannot be read (<reason>)`, exit 2, not a silent skip.
++10. **The docstring** says that a reference must name a path inside `bridge/` with no link on the way, and that only `bridge/cursor-bridge/workflow/trace-exceptions.md` is left out of the homes. Then regenerate the command reference.
++11. On today's tree the check still prints `RESULT: OK` with 424 passages traced and 424 MAP lines with `--map`.
++
++## Acceptance criteria
++- [ ] All 45 tests of `tests/test_trace_check.py` pass (one may be skipped where file links cannot be made), the six failing today among them.
++- [ ] `python bridge/cursor-bridge/trace-check.py` exits 0 with `TRACED: 424 passages ...` and `RESULT: OK`.
++- [ ] `python tools/dump-cli.py --check`, `windowless-check.py`, `bridge-check.py --sources` and `workflow-check.py` pass.
++- [ ] `python -m pytest tests -q` passes in full.
++
++## Constraints
++Rounds 1 and 2's Constraints all hold. Run round 1's verification commands 2 to 11 in order, last the full suite.
++
++**Mutation check, by hand, in your own run.** Apply each, run `python -m pytest tests/test_trace_check.py -q`, record what caught it or that nothing did, and restore the code. No mutation script in the diff.
++- (u) the walk keeps junction folders (test only `os.path.islink`);
++- (v) the reference walk skips its link test (keep containment);
++- (w) the MAP line's homes unescaped;
++- (x) ref findings sorted by text again;
++- (y) the chain scanned from the start of the whole match again;
++- (z) the device-name rule dropped;
++- (aa) every git failure printed and the run continued.
++
++## Done
++Your report is `handoff/TASK-016-r3-report.md`, written as you go, with the files changed (only those with a content diff), a one-paragraph summary, the mutation list with what caught each, every verification command's result, and a section headed exactly `Assumed, not verified` (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`). Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/TASK-016-r4-report.md b/handoff/TASK-016-r4-report.md
+new file mode 100644
+index 0000000..d0d275a
+--- /dev/null
++++ b/handoff/TASK-016-r4-report.md
+@@ -0,0 +1,37 @@
++# TASK-016 round 4 report
++
++## Files changed
++
++- `bridge/cursor-bridge/trace-check.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated by `python tools/make-manifest.py`)
++- `docs/cli-reference.json` (regenerated by `python tools/dump-cli.py`)
++- `docs/CLI_REFERENCE.md` (regenerated by `python tools/dump-cli.py`)
++
++## Summary
++
++Round 4 adds `first_link_on_rel_path`, a component-wise `lstat`/`is_path_link` walk from the repository root along every path the program reads: the three named inputs, the workflow walk root, each folder and `.md` under workflow (link → `ERROR: <path>: is a link`, exit 2, no further I/O), and `resolve_ref` (link → ref finding, with `bridge_contains` unchanged as the second guard). The trailing-dot rule no longer refuses the `...` placeholder segment; citation parsing resumes after each chain and requires non-empty quoted segments (`[^"]+` on chain links). The module docstring exit-2 list names unreadable workflow folders and links met before reading.
++
++## Mutation checks (round 4)
++
++- (ab) the link test dropped for the walk's start folder — nothing (dedicated pre-walk check only; `first_link_on_rel_path` on `bridge/cursor-bridge/workflow/trace-baseline.txt` still hits the same junction first)
++- (ac) the link test dropped for the three files read by name — `test_r029_a_linked_folder_on_the_way_to_the_core_is_not_read` (and the parametrized linked-file cases when all four pre-read checks are removed)
++- (ad) a linked file under `workflow/` skipped silently again — `test_r029_a_linked_folder_under_workflow_is_not_read` (folder junction in walk; file symlink test skipped on this account)
++- (ae) the test of `bridge/` itself being a link dropped from `resolve_ref` — `test_r029_a_linked_bridge_folder_resolves_no_reference`
++- (af) `...` refused by the trailing-dot rule again — `test_r029_the_placeholder_segment_is_kept`
++- (ag) the citation search resuming at the start of the previous citation's quoted text — `test_r029_a_citation_is_read_once`
++- (ah) `[^"]*` in place of `[^"]+` — `test_r029_an_empty_quote_is_not_a_citation`
++
++## Verification
++
++1. `python bridge/cursor-bridge/trace-check.py` — exit 0; `TRACED: 424 passages of baseline 0a186da; 424 in supervisor.md, 0 under workflow/, 0 dropped, 0 excused`; `RESULT: OK`.
++2. `python bridge/cursor-bridge/trace-check.py --map` — exit 0; 424 `MAP` lines (plus `TRACED:` and `RESULT:`).
++3. `python -m pytest tests/test_trace_check.py -q` — exit 0; 52 passed, 4 skipped.
++4. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks tools` — exit 0; `0 FAIL`.
++5. `python tools/make-manifest.py` then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0; `SOURCES MATCH`.
++6. `python tools/dump-cli.py` then `python tools/dump-cli.py --check` — exit 0.
++7. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` — exit 0; `RESULT: OK`.
++8. `python -m pytest tests -q` — exit 0; 1794 passed, 29 skipped in ~398 s.
++
++## Assumed, not verified
++
++- Mutation (ab) is not caught by `test_r029_a_linked_workflow_folder_is_not_read` alone · the baseline file path shares the workflow junction and is checked earlier · a test that removes only the pre-walk workflow check while using a baseline path that does not traverse `workflow/` would confirm the dedicated check independently.
+diff --git a/handoff/TASK-016-r4.md b/handoff/TASK-016-r4.md
+new file mode 100644
+index 0000000..1c0ab25
+--- /dev/null
++++ b/handoff/TASK-016-r4.md
+@@ -0,0 +1,67 @@
++# TASK-016 round 4: no link anywhere the program reads, the placeholder kept, citations read once
++
++## Objective
++Round 3 (`handoff/TASK-016-r3.md`, your report `handoff/TASK-016-r3-report.md`) is committed as 8e32c99. Review A rejected it and the security re-check failed it, converging on one item: a link is refused below the folder the walk starts from, but never on that folder, the folders above it, or on the way to the three files the program reads by name, so a link at `bridge/cursor-bridge/workflow/` or at `bridge/commands/` makes the program read and print text from outside the repository (both reproduced). Review A also found that round 3's trailing-dot rule refuses the `...` placeholder segment that round 1's Requirement 7 defines; round 3's brief caused it. This round fixes those and the smaller items below, all in `bridge/cursor-bridge/trace-check.py`.
++
++Satisfies: R-029 (as in rounds 1 to 3).
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/trace-check.py
++- bridge/cursor-bridge/MANIFEST.json (regenerated by `python tools/make-manifest.py`, never by hand)
++- docs/cli-reference.json (regenerated by `python tools/dump-cli.py`, never by hand)
++- docs/CLI_REFERENCE.md (regenerated by `python tools/dump-cli.py`, never by hand)
++- docs/BUILDER_NOTES.md
++- handoff/TASK-016-r4-report.md
++
++Do not modify anything else.
++
++## Written by the supervisor; do not edit
++`tests/test_trace_check.py` (56 tests). The supervisor changed two round-3 tests (a linked file or folder under `workflow/` is now an error, Requirement 1) and added round-4 tests; six of them fail against 8e32c99 (the linked workflow folder, the linked folder on the way to the core, the linked folder under workflow/, the placeholder, a citation read once, an empty quote), and the tests that need a symbolic link to a file are skipped where the account cannot make one. The tests call `resolve_ref(rest, root)` and `main(argv)` in-process; keep both names and signatures. If a supervisor test contradicts this brief, stop, change no test, and report the contradiction.
++
++## Out of scope
++As in rounds 1 to 3.
++
++## Context
++- Rounds 1 to 3's briefs hold wherever this file does not change them. Read `trace-check.py` whole first.
++- `os.walk(top)` always enters `top` itself; `os.path.isdir`, `os.path.isfile` and `open()` follow links. The link helper of round 3 (`is_path_link`) is the one test of whether a path is a link; keep it.
++
++## Requirements
++
++### Blocking
++1. **No link anywhere the program reads.** One helper walks a repository-relative path's components from `<root>` down with `os.lstat` and `is_path_link`, one component at a time (`bridge`, then `bridge/cursor-bridge`, and so on; `<root>` itself is not tested). Use it:
++   - before reading each of the three files the program reads by name (`bridge/commands/supervisor.md`, `bridge/cursor-bridge/workflow/trace-baseline.txt`, `bridge/cursor-bridge/workflow/trace-exceptions.md`), on the file's whole path;
++   - before walking `bridge/cursor-bridge/workflow/`, on that folder's path;
++   - in the walk, for every folder and every `.md` file it meets (in place of round 3's silent skip);
++   - in `resolve_ref`, as its component walk (round 3's Requirement 1 for references stays: a link there is a **ref** finding, not an error).
++   A link met before reading is `ERROR: <path>: is a link`, where `<path>` is the link's repository-relative path with `/` separators, through the escaping function; the run stops at the first one (one ERROR line, then `RESULT: not checked`, exit 2), and nothing under or through the link is read. A missing component keeps the meaning it has today (a missing file is the error it is today; a missing workflow folder is no homes under it).
++2. **The `...` placeholder is not a trailing-dot segment.** The trailing-dot rule of round 3's Requirement 8 refuses a segment that ends in `.` other than `.`, `..` and `...`; `.` and `..` are refused by the rule before it, so the clause that excepts them in the trailing-dot test is dead and goes. `~/.claude/cursor-bridge/.../Glossary.md` resolves when `bridge/cursor-bridge` exists (round 1's Requirement 7: the walk stops at the placeholder); `~/.claude/nope/.../x` does not.
++
++### Should fix
++3. **The docstring's exit-2 list** names every cause: a folder under `workflow/` that cannot be read (round 3's Requirement 9) and a link met before reading (Requirement 1). Then regenerate the command reference.
++4. **Keep the containment check** (`bridge_contains`, with its `realpath`) as the second guard after the component walk, as round 3 said; do not replace it.
++
++### Smaller (Review A round 3's considers, taken)
++5. **A citation is read once.** After a citation and its chain are read, the search for the next `see "`, `per "` or `under "` resumes after the end of that chain, never inside its quoted text: in `see "what to see " and then "Other"`, the only citation is `what to see `.
++6. **A quoted citation holds at least one character**, as round 1's pattern had it (`[^"]+`), for the first quote and for each link of a chain: `see ""` is not a citation, and a chain stops before `→ ""`.
++
++## Acceptance criteria
++- [ ] All 56 tests of `tests/test_trace_check.py` pass (those needing a symbolic link to a file may be skipped where the account cannot make one), the six failing today among them.
++- [ ] `python bridge/cursor-bridge/trace-check.py` exits 0 with `TRACED: 424 passages ...` and `RESULT: OK`; 424 MAP lines with `--map`.
++- [ ] `python tools/dump-cli.py --check`, `windowless-check.py`, `bridge-check.py --sources` and `workflow-check.py` pass.
++- [ ] `python -m pytest tests -q` passes in full.
++
++## Constraints
++Rounds 1 to 3's Constraints all hold. Run round 1's verification commands 2 to 11 in order, last the full suite.
++
++**Mutation check, by hand, in your own run.** Apply each, run `python -m pytest tests/test_trace_check.py -q`, record what caught it or that nothing did, and restore the code. No mutation script in the diff.
++- (ab) the link test dropped for the walk's start folder;
++- (ac) the link test dropped for the three files read by name;
++- (ad) a linked file under `workflow/` skipped silently again;
++- (ae) the test of `bridge/` itself being a link dropped from `resolve_ref`;
++- (af) `...` refused by the trailing-dot rule again;
++- (ag) the citation search resuming at the start of the previous citation's quoted text;
++- (ah) `[^"]*` in place of `[^"]+`.
++
++## Done
++Your report is `handoff/TASK-016-r4-report.md`, written as you go, with the files changed (only those with a content diff), a one-paragraph summary, the mutation list with what caught each, every verification command's result, and a section headed exactly `Assumed, not verified` (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`). Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/TASK-016.md b/handoff/TASK-016.md
+new file mode 100644
+index 0000000..371dc49
+--- /dev/null
++++ b/handoff/TASK-016.md
+@@ -0,0 +1,323 @@
++# TASK-016: The traceability comparison (built first)
++
++## Objective
++Release B splits the supervisor's instructions, `bridge/commands/supervisor.md` (the "core", about 2,340 lines), into phase modules under `bridge/cursor-bridge/workflow/phases/` (TASK-010 to TASK-014). Later increments move some passages a second time, out of the phase modules into trait files under `bridge/cursor-bridge/workflow/traits/` (TASK-017, TASK-018). The release is accepted only if nothing is lost in the move. This increment builds the tool that proves it, before any text moves: `bridge/cursor-bridge/trace-check.py`. It compares a pinned pre-split baseline commit of the core with the working tree as it stands. Every passage of the baseline core must still be found, verbatim, in exactly as many places as before: in the core or in a file under `workflow/`. A passage that vanished, that now stands in two places, or new text in a module fails, unless an entry in `bridge/cursor-bridge/workflow/trace-exceptions.md` declares it. Every `~/.claude/...` reference and every cited section must still resolve. The increment also pins the baseline (`workflow/trace-baseline.txt`) and scaffolds the empty exceptions file. Every later split increment runs this check and must leave it green.
++
++Satisfies:
++- R-029 — Every standing rule and every conditional passage — the project-layout / Workspace-boundary section included — is traceable from a pinned pre-split baseline commit to its new file by a mechanical comparison: moves are verbatim, any reword is a listed exception the design review sees, text new to the modules is declared new by its increment, and every `~/.claude/...` reference and cited section still resolves.
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/trace-check.py (new)
++- bridge/cursor-bridge/workflow/trace-baseline.txt (new)
++- bridge/cursor-bridge/workflow/trace-exceptions.md (new)
++- bridge/cursor-bridge/MANIFEST.json (regenerated by `python tools/make-manifest.py`, never by hand)
++- docs/cli-reference.json (regenerated by `python tools/dump-cli.py`, never by hand)
++- docs/CLI_REFERENCE.md (regenerated by `python tools/dump-cli.py`, never by hand)
++- docs/BUILDER_NOTES.md
++- handoff/TASK-016-r1-report.md
++
++Do not modify anything else.
++
++## Written by the supervisor; do not edit
++This file is committed with this brief. Do not edit, move, rename or add to it:
++- `tests/test_trace_check.py` (names R-029). It builds small git repositories in temporary folders, with the repository layout below, and runs your program on them with `--repo`.
++
++Suppose a supervisor test contradicts this brief, or cannot pass without breaking a requirement below. Then stop, change no test, and report the contradiction: the test name, the brief requirement, and what each says.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration (`.github/workflows/`) and `.githooks/`. This increment adds no CI step (see Context, "Where the check runs").
++- docs/ and handoff/, except the files the Scope section names
++- Everything under `bridge/` except the four `bridge/` files in Scope. In particular these stay unedited: `bridge/commands/supervisor.md`, `workflow/open-list.md`, `workflow/extension-points.md`, every other program, `CHANGELOG.md`, `VERSION`.
++- Moving, rewording or adding any governance text. The carve is TASK-010, the supervisor's.
++- Every file under `tests/`, `tools/` and `.cursor/`.
++
++## Context
++The repository root is the folder you were started in. Paths are relative to it.
++
++**The design, quoted.** This is the whole of what you need from it. The Restructuring Plan, release B, "Accepted when": "Nothing is lost in the move: every standing rule and every conditional passage is traceable from its old place to its new file, verified by a mechanical comparison". Its "Risk": "A rule could be dropped in the move (met by the traceability comparison)". The build plan's standing constraints (docs/BUILD_PLAN.md):
++- "Moves, not copies: text moved in the split (including a trait's gathered passages) *moves* — it leaves its old home; the main workflow shrinks. A passage may move twice (baseline → phase module → trait file); `trace-check` accepts it found verbatim anywhere under `workflow/**`."
++- "Trace exceptions: `bridge/cursor-bridge/workflow/trace-exceptions.md` carries two entry kinds — `reword <TASK> <file> <heading>` and `new <TASK> <file> <heading>` — appended by the supervisor-text increment that rewords or adds."
++
++TASK-016's Done when (docs/BUILD_PLAN.md) is the source of the Requirements below.
++
++**What exists today (checked).**
++- `bridge/cursor-bridge/workflow/` holds exactly two files: `open-list.md` and `extension-points.md`. There is no `phases/`, `types/` or `traits/` yet. TASK-010 creates `phases/<module>.md` for the ten modules of `extension-points.md`'s "Phase modules" table: intake, design, interface, planning, run-parameters, configuration, delegation-loop, change-cycle, reflection, project-end. Later increments add sub-files: `phases/interface/<variant>.md` and possibly `phases/delegation-loop/<part>.md`, then `traits/<key>.md` and `types/...`.
++- `bridge/commands/supervisor.md` has these parts:
++  - YAML front matter (lines 1–4);
++  - the compaction digest between `<!-- digest:start -->` and `<!-- digest:end -->` (lines 9–25). It includes a one-paragraph summary of every standing rule, starting `**Standing rules.** 1 Never write implementation code. ...`;
++  - "## Founding rules", list items N1–N9;
++  - "## Main and conditional workflows";
++  - "## The project layout". It holds the Workspace boundary as the paragraph starting `**The Workspace boundary.**`;
++  - the phase sections "## Phase 1 — Intake" to "## Phase 6 — The delegation loop", with "###" sub-sections;
++  - "## The change cycle — a request on a finished project";
++  - "## Reflection points — stage close, phase gates, project end";
++  - "## Escalate to the user when", "## Reporting to the user", "## Project state";
++  - "## Standing rules" (line 1988 to the end): 58 numbered list items `1.` to `58.`. Many are hard-wrapped, with continuation lines indented three or four spaces. There is a blank line between items 47 and 48.
++
++  Much of the file's prose is hard-wrapped. Several fenced code blocks hold templates, and their lines include `#` headings, for example `# Project Status` at line 1878. Those lines are not headings of the file.
++- **There is no marker for a "conditional passage".** The design counts them in prose: "12 for interface projects, 12 for installable software, 30 mentions of performance budgets, 7 for external services", and the passages say "for a UI-bearing project", "for installable software", "where budgets exist". Nothing in the text tags them. So this check traces **every passage of the baseline core** (Requirement 3). That covers every standing rule and every conditional passage without classifying any of them.
++- **`~/.claude/...` references.** The install (`bridge/cursor-bridge/bridge-install.py`, `SUBDIRS = ("commands", "agents", "skills", "cursor-bridge")`) copies the release tree `bridge/` into `~/.claude/`. So `~/.claude/<rest>` is `bridge/<rest>` in this repository: `~/.claude/commands/supervisor.md` is `bridge/commands/supervisor.md`, and `~/.claude/cursor-bridge/X` is `bridge/cursor-bridge/X`. Today the references in the core are all `~/.claude/cursor-bridge/<file>`, plus two placeholder forms:
++  - line 155: `python ~/.claude/…` (with U+2026 HORIZONTAL ELLIPSIS);
++  - line 572: `~/.claude/cursor-bridge/design-seeds/<brand>/DESIGN.md` (the folder `bridge/cursor-bridge/design-seeds/` exists, with one folder per brand).
++- **Cited sections.** The core cites its own sections by quoted heading text after "see", "per" or "under", for example:
++  - `(see "The change cycle" after Phase 6)`, whose heading is `## The change cycle — a request on a finished project`;
++  - `(see "Reflection points" → "Issues")`, whose headings are `## Reflection points — stage close, phase gates, project end` and `### Issues — what counts, and where it is written`;
++  - `per "Objections — bottom-up escalation"`;
++  - `under "Project state"`;
++  - `see "The project layout"`;
++  - `see "Main and conditional workflows"`.
++
++  After the carve such a heading may stand in a module, not in the core.
++- **The house style of the bridge's programs.** See `bridge/cursor-bridge/workflow-check.py`:
++  - Python 3.12, standard library only.
++  - A module docstring that is the usage text.
++  - Deterministic, read-only, ASCII output.
++  - Finding lines, then one final `RESULT:` line.
++  - Exit `0`/`1`, and `2` for a usage or input error, with `ERROR:` lines and `RESULT: not checked`.
++  - The `if __name__ == "__main__":` block reconfigures stdout/stderr with `errors="backslashreplace"`, then `sys.exit(main())`.
++  - `workflow-check.py` has a module-level `def build_parser():` that `main(argv=None)` calls. Follow that pattern.
++  - Bridge programs that launch git define `NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0` or use `creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)`. Either form satisfies `windowless-check.py`.
++- **The generated command reference covers your program automatically** (`tools/dump-cli.py`, checked). It finds every `*.py` directly under `bridge/cursor-bridge/` that has an `if __name__ == "__main__":` block. It discovers them when it runs, from no list. Its rules:
++  - A program with a top-level `def build_parser():` (found with `ast`, without running anything) is an argparse entry. The generator imports the program and calls `build_parser()`.
++  - A program without one is a docstring entry.
++  - A program whose source contains `ArgumentParser` but has no top-level `build_parser()` makes the generator exit 1.
++  - So does any parser default that is an absolute path.
++
++  Therefore:
++  - if you use argparse, define `build_parser()` at module level;
++  - every default in it is a constant (`None`, `False`), never a path computed from the program's location;
++  - importing the module runs nothing but definitions.
++
++  After your last change run `python tools/dump-cli.py`, which rewrites `docs/cli-reference.json` and `docs/CLI_REFERENCE.md`; `--check` must then pass.
++- **The manifest.** Any change under `bridge/` regenerates `bridge/cursor-bridge/MANIFEST.json` with `python tools/make-manifest.py`, run with no arguments after your last edit under `bridge/`. It stamps the newest `## <version>` of `bridge/cursor-bridge/CHANGELOG.md` and rewrites `VERSION` with that same content, which must come out byte-identical. Do not edit the CHANGELOG. Its changes must be exactly the three new entries (`cursor-bridge/trace-check.py`, `cursor-bridge/workflow/trace-baseline.txt`, `cursor-bridge/workflow/trace-exceptions.md`) and the `generated` stamp. CI checks the manifest with `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`. Never let a `__pycache__` under `bridge/` into it: make-manifest skips it.
++- **Where the check runs.** The check needs the baseline commit's objects, so it runs in a checkout with history. That is the supervisor's checkout: at step 4 of every split increment from TASK-010 on, and over the finished split at TASK-025. It also runs in the supervisor's tests, which build their own temporary repositories. CI's `tests` job checks out with depth 1 and gets no CI step here, so there the baseline commit is absent. That case must end in exit 2 with a clear `ERROR:` line (Requirement 9), never in a pass.
++- **The baseline commit (decided by the supervisor).** `trace-baseline.txt` pins `0a186da`, the head of `origin/main` that this branch (`task-016`) was cut from. Write its full 40-character id, which you get with `git rev-parse 0a186da`. The reason: the core and `workflow/` last changed at `e1a97de` (HOTFIX-001, PR #40), and `0a186da` holds the same core and the same `workflow/` files. It is the newest commit on `main` before the carve, it already includes TASK-003, TASK-005 and TASK-007's core edits, and TASK-010 branches only after this increment merges. If `git rev-parse 0a186da` fails, or `git diff --stat 0a186da HEAD -- bridge/commands/supervisor.md bridge/cursor-bridge/workflow` shows any change before your edits, stop and report it.
++- **Security context.** ASVS level 2 (`docs/INVENTORY.md`, Decisions). `.cursor/rules/secure-coding.mdc` and `.cursor/rules/workspace-boundary.mdc` are in force.
++  - Trust boundary: the files read are maintainer-authored Markdown in this repository and the same files at the baseline commit, read through git. Nothing read is executed, imported or evaluated.
++  - The one external program is `git`, started with an argument list (never a shell), with fixed sub-commands. Every value passed to it is first validated: the commit id as exactly 40 lowercase hexadecimal characters, and the paths as fixed repository-relative strings.
++  - There is no network, no secret and no write.
++- **Development data** (copied from `docs/INVENTORY.md` Decisions): "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet." For you this means:
++  - run the program and the tests from this repository's sources only;
++  - never against `~/.claude` or any other project;
++  - never run `bridge-install.py`.
++
++  `tests/conftest.py` already redirects `HOME`/`USERPROFILE` for every test.
++
++## Diagrams
++None. The build plan names no diagram for this increment (INVENTORY Decisions: no diagram index for release B).
++
++## Requirements
++
++### Command line and files
++1. The command line is `python trace-check.py [--repo DIR] [--map]`.
++   - `--repo` names the repository root. Without it, the root is the folder three levels above the program file: the folder that holds `bridge/`, i.e. `os.path.dirname` applied three times to `os.path.abspath(__file__)`. Compute it in `main`, not as a parser default.
++   - Inside the root, the program reads:
++     - `bridge/cursor-bridge/workflow/trace-baseline.txt`, the baseline;
++     - `bridge/cursor-bridge/workflow/trace-exceptions.md`, the exceptions;
++     - the homes, from the working tree on disk (uncommitted edits included) and from the baseline commit through git.
++   - `--map` adds the MAP lines of Requirement 8.
++   - The module docstring is the usage text. It states:
++     - the command line;
++     - what is compared;
++     - each finding code of Requirement 8;
++     - the exit codes;
++     - that the check needs the baseline commit's history (a shallow clone gives exit 2);
++     - that it names R-029.
++2. `trace-baseline.txt` is exactly one line: 40 lowercase hexadecimal characters and a line feed. `trace-exceptions.md` follows Requirement 6.
++   - Scaffold the exceptions file with a short heading, one paragraph per line stating the entry grammar of Requirement 6 and who appends entries (the supervisor-text increment that rewords or adds), then the line `## Entries` and nothing after it.
++   - Neither file is read by `workflow-check.py`, which reads only `types/` and `traits/`. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass` must still pass.
++
++### What is compared
++3. **Homes.** The *current homes* are:
++   - `bridge/commands/supervisor.md` in the working tree;
++   - every `*.md` file under `bridge/cursor-bridge/workflow/`, recursively, except `bridge/cursor-bridge/workflow/trace-exceptions.md`.
++
++   The *baseline homes* are the same paths at the baseline commit: `bridge/commands/supervisor.md` and every `*.md` path that `git ls-tree` lists under `bridge/cursor-bridge/workflow/` there, except `trace-exceptions.md`.
++
++   The *traced passages* are the units (Requirement 4) of the baseline `bridge/commands/supervisor.md`, every one of them. The *baseline unit set* is the units of all baseline homes.
++
++   The *module files*, the only files checked for new text, are the current `*.md` files under `bridge/cursor-bridge/workflow/phases/`, `workflow/types/` and `workflow/traits/`, recursively.
++4. **Units.** A file is read as UTF-8 with universal newlines, with any byte-order mark dropped. It is cut into units line by line, in this order of tests:
++   - **Fenced block.** A line whose content after stripping leading spaces starts with three or more backticks or three or more tildes opens a fenced block. The block closes at the next line whose stripped content starts with at least as many of the same character. An unclosed block runs to the end of the file. The whole block, opening and closing lines included, is one unit. Nothing inside it is a heading.
++   - **Heading.** Outside a fenced block, a line matching `^ {0,3}#{1,6} ` is a heading. It is never a unit. It ends the current unit and sets the section (below). Its *text* is the part after the `#` run and the space, stripped.
++   - **Not a unit.** A blank line ends the current unit. So does a line that, stripped, is three or more of only `-`, only `*` or only `_` (a thematic break, including front-matter fences). Neither is a unit.
++   - **Table.** A run of consecutive lines whose stripped content starts with `|` is one unit.
++   - **List item.** A line whose stripped content matches `^([-*+]|[0-9]+[.)])\s` starts a new unit.
++   - **Paragraph.** Any other line continues the current paragraph or list-item unit, or starts a new paragraph unit.
++
++   A unit's **normal form** for comparison:
++   - for a fenced block, each line with trailing whitespace removed, joined with `\n`;
++   - for every other unit, each line stripped, joined with one space, and every run of whitespace collapsed to one space.
++
++   So a hard-wrapped paragraph and the same paragraph written on one line are equal. That matters because rule 30 forbids hard wraps in new Markdown.
++
++   Each unit has a **heading chain**: the texts of the headings above it that are still open, from level 1 down. A heading closes every open heading of its level or deeper. A unit is *in section H* of its file when H is one of the texts in its chain.
++5. **The findings.** Counts compare normal forms exactly. For a traced passage `t`:
++   - `b` is the number of units equal to `t` in the baseline homes;
++   - `c_all` is the number of equal units in the current homes;
++   - `c` is the same count leaving out units that stand in an excused section (Requirement 6).
++
++   Each traced passage `t` with distinct normal form gets exactly one finding at most:
++   - **dropped**: `c_all == 0`, unless a `reword` entry excuses it (Requirement 6). A dropped passage that an entry excuses prints a NOTE line, not a FAIL.
++   - **copy**: `c > b`. The passage stands in more places than at the baseline, whether in one file or several.
++
++   Then, for each unit of a module file whose normal form is not in the baseline unit set and which does not stand in an excused section:
++   - **new**: the unit is new text in a module.
++
++   Text that is new in `bridge/commands/supervisor.md`, or in `.md` files directly under `workflow/`, is not flagged: R-029 asks for new text "to the modules".
++
++   The comparison is **incremental** in this sense: it always compares the fixed baseline with the tree as it stands, so it is valid at every intermediate state of the split. A passage not yet moved is found in the core, its home. A passage moved once is found in its module. A passage moved twice, with its earlier home emptied, is found once under `workflow/`. Each increment from TASK-010 on runs the check and must leave it green. It never compares with the previous increment or with any commit but the baseline.
++6. **The exceptions file.** Everything up to the first line that is exactly `## Entries` is prose and is not read. Every non-blank line after it must be an entry of exactly this form:
++
++   `- <kind> <id> <file> <heading>`
++
++   - `<kind>` is `reword` or `new`.
++   - `<id>` is the increment's id, matching `[A-Z][A-Z0-9]*-[0-9]+` (e.g. `TASK-010`).
++   - `<file>` is a repository-relative path with `/` separators and no spaces. It is either `bridge/commands/supervisor.md` or a path ending `.md` under `bridge/cursor-bridge/workflow/`.
++   - `<heading>` is the rest of the line, stripped and non-empty: a heading's text as Requirement 4 defines it, e.g. `- reword TASK-010 bridge/commands/supervisor.md Main and conditional workflows`.
++   - Single spaces separate the first four fields.
++
++   Any other line after `## Entries` is an input error (Requirement 9) naming the line number. So is a file with no `## Entries` line.
++
++   What an entry excuses:
++   - **Both kinds.** Every unit of the *current* `<file>` that is in section `<heading>` stands in an *excused section*. It is never reported **new**, and it is not counted in `c`. That is how an entry explains a copy.
++   - **`reword` only.** Every traced passage that is in section `<heading>` of the *baseline* `<file>`, and is found nowhere now (`c_all == 0`), is excused from **dropped**. A `new` entry never excuses a dropped passage.
++
++   An entry whose file or heading exists in neither the current nor the baseline tree excuses nothing and is not itself a finding. A passage reworded while it moves needs two `reword` entries:
++   - one naming its baseline place (`bridge/commands/supervisor.md` and its baseline heading), for the vanished text;
++   - one naming its new place, for the new text.
++
++   The dropped and new findings print exactly those file and heading pairs (Requirement 8).
++7. **References and citations**, in every current home file:
++   - **`~/.claude/` references.** A reference is `~/.claude/` followed by the longest run of characters that are none of: whitespace, `` ` ``, `'`, `"`, `(`, `)`, `[`, `]`, `,`, `;`. Then strip any trailing `.` and `:`. Map it to `bridge/<rest>` under the repository root.
++     - If a `/`-separated segment contains `<`, `>`, `*` or U+2026, or is `...`, it is a placeholder. The reference then resolves when the folder made of the segments before the first placeholder exists.
++     - Otherwise it resolves when `bridge/<rest>` exists as a file or a folder. An empty rest means `bridge/` itself.
++
++     Search the file's raw lines, fenced blocks included. A reference that does not resolve is **ref**. Both of today's placeholder forms resolve.
++   - **Citations.** In each unit's normal form, a citation is the word `see`, `per` or `under` (any case, as a whole word), one space, then a double-quoted string `"X"`. Each further ` → "Y"` that follows directly is also a citation.
++     - A citation resolves when some heading (outside fenced blocks) in any current home has text equal to X, or beginning with X followed by ` — ` (space, U+2014, space).
++     - One that does not resolve is **cite**.
++
++   Write the non-ASCII characters as escapes in the source (`"…"`, `"—"`, `"→"`). The program text stays ASCII.
++
++### Output and exit codes
++8. Output, in this order:
++   - With `--map`, one line per traced passage in baseline order: `MAP <home>[, <home>...]: <baseline heading> - <excerpt>`. `<home>` is each current path where it stands; for a dropped passage it reads `-`.
++   - The findings, in this order: dropped (baseline order), copy (baseline order), new (module files in sorted path order, then file order), ref, cite (both in sorted path order, then file order). Each finding has one of these forms:
++     - `FAIL (dropped) bridge/commands/supervisor.md: <baseline heading> - <excerpt>`
++     - `FAIL (copy) <path>, <path>[, ...]: <baseline heading> - <excerpt>` (every current path where it is counted)
++     - `FAIL (new) <path>: <heading> - <excerpt>`
++     - `FAIL (ref) <path>:<line>: <reference>`
++     - `FAIL (cite) <path>: <heading> - "<X>"`
++   - For each excused dropped passage: `NOTE (reword <id>) bridge/commands/supervisor.md: <baseline heading> - <excerpt>`.
++   - A summary line: `TRACED: <n> passages of baseline <first 7 characters of the commit>; <k> in supervisor.md, <m> under workflow/, <d> dropped, <e> excused`.
++   - The final line: `RESULT: OK` when no FAIL line was printed, else `RESULT: <n> problem(s)`.
++
++   The `<baseline heading>` and `<heading>` fields:
++   - `<baseline heading>` is the deepest heading text of the passage's baseline chain;
++   - `<heading>` is the deepest of the unit's current chain;
++   - either reads `-` when the chain is empty.
++
++   `<excerpt>` is the first 60 characters of the normal form. Every printed field is ASCII: a non-ASCII character is written as its backslash escape (`—`), as Python's `backslashreplace` writes it. Output order is deterministic.
++9. Exit codes:
++   - `0` when no FAIL line is printed; NOTE lines may be.
++   - `1` when there is at least one FAIL line.
++   - `2` when the check cannot run. Then print `ERROR: <what>: <reason>` lines and `RESULT: not checked`, and never a traceback. The causes:
++     - the root is not a git work tree;
++     - `git` cannot be started;
++     - `trace-baseline.txt` is missing or not in the form of Requirement 2;
++     - the baseline commit is absent from the repository. Say so, naming a shallow clone as the likely cause;
++     - `bridge/commands/supervisor.md` is missing at the baseline or now;
++     - the exceptions file is missing or breaks Requirement 6;
++     - a home cannot be read as UTF-8 (now or at the baseline);
++     - a usage error.
++10. **Git.** The program may run exactly these, each as `["git", "-C", <root>, ...]`, with `capture_output`, `stdin=subprocess.DEVNULL`, a timeout, and `creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)`:
++    - `rev-parse --is-inside-work-tree`
++    - `cat-file -e <sha>^{commit}`
++    - `ls-tree -r -z --name-only <sha> -- bridge/cursor-bridge/workflow/`
++    - `show <sha>:<path>` for a path `ls-tree` listed or `bridge/commands/supervisor.md`
++
++    Baseline file bytes are decoded as UTF-8 (BOM dropped, `\r\n` read as `\n`). Nothing else is launched.
++11. On today's tree, with the baseline pinned at `0a186da`, the check prints `RESULT: OK` and exits 0. If it does not, find out why before you change anything. If the cause is a reference or citation in today's text that does not resolve, or a Requirement here that today's text cannot meet, stop and report it. Do not edit `supervisor.md` or any `workflow/` text, and do not loosen a rule.
++
++### The manifest and the command reference
++12. After your last edit under `bridge/`, run `python tools/make-manifest.py` (Context, "The manifest"). After your last change to the program, run `python tools/dump-cli.py`. Edit neither generated file by hand.
++
++## Acceptance criteria
++- [ ] `python bridge/cursor-bridge/trace-check.py` exits 0 on this repository with `RESULT: OK`, and its `TRACED:` line reports every passage in `supervisor.md`, 0 dropped, 0 excused.
++- [ ] `--map` lists every traced passage with its home, including the 58 standing rules and the `**The Workspace boundary.**` paragraph.
++- [ ] The supervisor's `tests/test_trace_check.py` passes. It covers at least these cases, each on a temporary repository:
++  - a clean move (a passage moved from the core into a phase module passes);
++  - a hard-wrapped passage moved and written on one line passes;
++  - a two-hop move (baseline → module → trait, the module emptied) passes;
++  - a copy into two homes fails with `FAIL (copy)`;
++  - a silent reword fails with `FAIL (dropped)`;
++  - an undeclared new passage in a module fails with `FAIL (new)`;
++  - a dropped Workspace-boundary paragraph fails with `FAIL (dropped)`;
++  - a dangling `~/.claude/` reference fails with `FAIL (ref)`;
++  - a dangling cited section fails with `FAIL (cite)`;
++  - a `reword` entry excuses its dropped passage (NOTE, exit 0) and its new text;
++  - a `new` entry excuses its new text but not a dropped passage;
++  - a copy explained by an entry passes;
++  - a missing baseline commit exits 2 with `RESULT: not checked`;
++  - a malformed exceptions line exits 2.
++- [ ] `trace-baseline.txt` holds the full id of `0a186da`. `trace-exceptions.md` is scaffolded with `## Entries` and no entry.
++- [ ] `python tools/dump-cli.py --check` passes, and the reference has an entry for `trace-check.py`.
++- [ ] `windowless-check.py`, `bridge-check.py --sources` and `workflow-check.py` pass. `VERSION` is unchanged.
++- [ ] `python -m pytest tests -q` passes in full.
++- [ ] R-029 is fully met: no stand-in, placeholder or "arrives in a later stage" text. The supervisor's test names R-029, and your docstring names it too.
++
++## Constraints
++- Do not add dependencies: standard library only.
++- ASCII-only program text. Non-ASCII characters the program matches are written as `\u` escapes.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
++- If the brief, the rules, or the tooling got in your way, append one dated line describing it to `docs/BUILDER_NOTES.md`. That covers an instruction that contradicted another, a check that fired wrongly, or a step that cost time for no reason. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write (the exceptions file, your report, notes), never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- Any console process your code launches on Windows is created windowless: `creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)`. The only launches are the git commands of Requirement 10. Each is bounded by a timeout, and its pipes are captured and closed when it ends.
++- Never start a server, a watcher or a daemon that outlives a test.
++- This increment talks to no external service.
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data (see Development data). Never run the check on `~/.claude` or another project.
++- No value in this brief is marked as the owner's.
++- Follow existing conventions in the files you touch: the house style in Context, `build_parser()` at module level, and constant parser defaults.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff`, `git log`, `git show` and `git rev-parse` only. The program itself runs only the commands of Requirement 10.
++- Do not edit `tests/test_trace_check.py` or any other test file. If a test outside it fails because a new program was added (for instance a test that counts the bridge's programs), stop and report it. Do not edit the test.
++- No number is parsed from any input. The commit id is matched against its form, never converted.
++- Prefer reuse over new code (the standard library; `workflow-check.py`'s patterns) and write the minimum that meets the acceptance criteria (`minimal-code.mdc` is in force). One program, one baseline file, one exceptions file. No helper module, no configuration file.
++- Run these verification commands exactly, from the repository root (the folder you were started in), in this order:
++  1. `git rev-parse 0a186da`, then `git diff --stat 0a186da HEAD -- bridge/commands/supervisor.md bridge/cursor-bridge/workflow` (expected: no output from the second)
++  2. `python bridge/cursor-bridge/trace-check.py` (expected exit 0, `RESULT: OK`)
++  3. `python bridge/cursor-bridge/trace-check.py --map`. Report the exit code, the line count and the `TRACED:` line, not every line.
++  4. `python bridge/cursor-bridge/trace-check.py --help`
++  5. `python -m pytest tests/test_trace_check.py -q`
++  6. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks tools`
++  7. `python tools/make-manifest.py`, then `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++  8. `python tools/dump-cli.py`, then `python tools/dump-cli.py --check`
++  9. `python bridge/cursor-bridge/workflow-check.py bridge/cursor-bridge/workflow tests/fixtures/workflows/pass`
++  10. `python -m pytest tests -q`, last, before you finish
++  11. `git status` and `git diff --stat`. Expected files: the three new `bridge/` files, the manifest, the two reference files, your report, and possibly `docs/BUILDER_NOTES.md`.
++- **Mutation check, by hand, in your own run.** Once the tests pass, apply each mutation below to `trace-check.py` by hand. Run `python -m pytest tests/test_trace_check.py -q`, record which test caught it (or that none did), and restore the code. No mutation script goes in the diff. The mutations:
++  - (a) Compare raw unit text instead of the normal form (no joining, no whitespace collapse).
++  - (b) Report copy only when the passage stands in two different files (ignore `c > b` within one file).
++  - (c) Count units in excused sections in `c`.
++  - (d) Let a `new` entry excuse a dropped passage.
++  - (e) Look up a `reword` entry's section only in the current file, never in the baseline.
++  - (f) Check the module files for new text against the baseline `supervisor.md` alone, not against all baseline homes.
++  - (g) Resolve `~/.claude/<rest>` against the repository root instead of `bridge/`.
++  - (h) Drop the placeholder rule (resolve `design-seeds/<brand>/DESIGN.md` as a literal path).
++  - (i) Skip the citation check.
++  - (j) Exit 0 instead of 2 when the baseline commit is absent.
++
++  List each in your report with its result. A mutation no test caught is reported, not fixed by editing a test.
++
++## Done
++Your report is the file `handoff/TASK-016-r1-report.md`. Write it as you go, so that nothing is lost if your run ends early: what you did, what you changed, what you ran and what it printed, and what you could not do. When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- the mutation list with what caught each mutation;
++- each verification command above with its exit code and its relevant printed lines;
++- a section headed exactly `Assumed, not verified`. List every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: a unit-cutting rule you read one way where Markdown allows two (a list item inside a blockquote, a table preceded by text on the same block), how a heading with trailing `#` characters is read, git's output encoding of `ls-tree -z` on Windows, or a timeout value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message; a message printed earlier and followed by more work is lost.
+diff --git a/tests/test_dump_cli.py b/tests/test_dump_cli.py
+index affbf93..1da2e68 100644
+--- a/tests/test_dump_cli.py
++++ b/tests/test_dump_cli.py
+@@ -29,7 +29,7 @@ JSON_REL = "docs/cli-reference.json"
+ MD_REL = "docs/CLI_REFERENCE.md"
+ EXTRACTED = ("completion-check.py", "diagram-check.py", "evaluate-reports.py", "inventory-check.py", "plan-check.py",
+              "sync-check.py")
+-ARGPARSE = EXTRACTED + ("workflow-check.py",)
++ARGPARSE = EXTRACTED + ("workflow-check.py", "trace-check.py")
+ ACTION_KEYS = {"option_strings", "dest", "nargs", "type", "default", "required", "choices", "help"}
+ CHECK_CMD = "python tools/dump-cli.py --check"
+ BRIDGE_PLACEHOLDER = "<bridge folder>/"
+diff --git a/tests/test_trace_check.py b/tests/test_trace_check.py
+new file mode 100644
+index 0000000..420f8a7
+--- /dev/null
++++ b/tests/test_trace_check.py
+@@ -0,0 +1,810 @@
++"""TASK-016: the traceability comparison, bridge/cursor-bridge/trace-check.py.
++
++enforces: docs/REQUIREMENTS.md R-029 (every standing rule and conditional passage traceable from a pinned pre-split
++baseline commit to its new file by a mechanical comparison: moves verbatim, a reword a listed exception, text new to the
++modules declared new, every ~/.claude/... reference and cited section resolving) and docs/BUILD_PLAN.md, TASK-016's
++Done when (a clean move, a two-hop move, a copy into two homes fails, a silent reword fails, an undeclared new passage
++fails, a dropped boundary section fails, a dangling reference fails, both exception kinds), as handoff/TASK-016.md
++specifies the program's output. Each case builds a small git repository in a temporary folder. Supervisor-authored.
++"""
++import importlib.util
++import os
++import pathlib
++import re
++import shutil
++import subprocess
++import sys
++
++import pytest
++
++REPO = pathlib.Path(__file__).resolve().parent.parent
++TRACE_CHECK = REPO / "bridge" / "cursor-bridge" / "trace-check.py"
++DASH = chr(0x2014)
++INTAKE = "Phase 1 " + DASH + " Intake"
++CORE = "bridge/commands/supervisor.md"
++PHASES = "bridge/cursor-bridge/workflow/phases/"
++
++INTAKE_WRAPPED = "Intake asks the owner what the software does\nand records it in the requirements register.\n"
++INTAKE_ONE_LINE = "Intake asks the owner what the software does and records it in the requirements register.\n"
++BOUNDARY = "**The Workspace boundary.** Every artifact the loop writes lives in the Workspace;\nnothing is written outside it.\n"
++
++BASE_CORE = (
++    "---\nname: supervisor\n---\n\n"
++    "# Supervisor\n\n"
++    "## The project layout\n\n"
++    + BOUNDARY + "\n"
++    "## " + INTAKE + "\n\n"
++    + INTAKE_WRAPPED + "\n"
++    "- A list item that\n  continues on a second line.\n\n"
++    "| a | b |\n|---|---|\n| 1 | 2 |\n\n"
++    "```text\n# Not a heading\n```\n\n"
++    "Terms are in ~/.claude/cursor-bridge/Glossary.md (see \"The project layout\"), and seeds in\n"
++    "~/.claude/cursor-bridge/design-seeds/<brand>/DESIGN.md, per \"Phase 1\".\n\n"
++    "## Standing rules\n\n"
++    "1. Never write implementation code.\n"
++    "2. Reports lead with the owner's decision,\n   and the technical part follows.\n"
++)
++OPEN_LIST = "# The open list\n\nThe open list names every product type.\n"
++EXCEPTIONS = "# Trace exceptions\n\nEntries are appended by the increment that rewords or adds.\n\n## Entries\n"
++
++
++def git(root, *args):
++    p = subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
++                        "-c", "core.autocrlf=false", *args],
++                       capture_output=True, text=True, stdin=subprocess.DEVNULL,
++                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
++    assert p.returncode == 0, p.stderr
++    return p.stdout.strip()
++
++
++def write(root, rel, text):
++    path = root / rel
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_bytes(text.encode("utf-8"))
++
++
++def make_repo(tmp_path):
++    """A repository in the bridge's layout, its baseline commit, and the pinned baseline and empty exceptions."""
++    root = tmp_path / "repo"
++    root.mkdir()
++    git(root, "init", "-q")
++    write(root, CORE, BASE_CORE)
++    write(root, "bridge/cursor-bridge/workflow/open-list.md", OPEN_LIST)
++    write(root, "bridge/cursor-bridge/Glossary.md", "# Glossary\n")
++    write(root, "bridge/cursor-bridge/design-seeds/acme/DESIGN.md", "# Acme\n")
++    git(root, "add", "-A")
++    git(root, "commit", "-q", "-m", "baseline")
++    sha = git(root, "rev-parse", "HEAD")
++    write(root, "bridge/cursor-bridge/workflow/trace-baseline.txt", sha + "\n")
++    write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", EXCEPTIONS)
++    return root
++
++
++def core_without(*parts):
++    text = BASE_CORE
++    for part in parts:
++        assert text.count(part) == 1, part
++        text = text.replace(part, "")
++    return text
++
++
++def entries(root, *lines):
++    write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", EXCEPTIONS + "".join(l + "\n" for l in lines))
++
++
++def run(root, *args):
++    p = subprocess.run([sys.executable, str(TRACE_CHECK), "--repo", str(root), *args], capture_output=True, text=True,
++                       encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
++                       timeout=120)
++    assert "Traceback" not in p.stderr, p.stderr
++    return p.returncode, p.stdout.splitlines()
++
++
++def fails(lines):
++    return [l for l in lines if l.startswith("FAIL ")]
++
++
++def test_r029_an_unchanged_tree_passes_and_traces_every_passage(tmp_path):
++    root = make_repo(tmp_path)
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [] and lines[-1] == "RESULT: OK", lines
++    traced = [l for l in lines if l.startswith("TRACED: ")]
++    # the units: the front matter's line, the boundary paragraph, the intake paragraph, the list item, the table, the fenced block, the
++    # references paragraph, and the two standing rules
++    assert traced and re.match(r"TRACED: 9 passages of baseline [0-9a-f]{7}; 9 in supervisor\.md, 0 under workflow/, "
++                               r"0 dropped, 0 excused$", traced[0]), lines
++
++
++def test_r029_map_lists_each_passage_with_its_home(tmp_path):
++    root = make_repo(tmp_path)
++    rc, lines = run(root, "--map")
++    maps = [l for l in lines if l.startswith("MAP ")]
++    assert rc == 0 and len(maps) == 9, lines
++    assert all(l.startswith("MAP " + CORE + ": ") for l in maps), maps
++    assert any("**The Workspace boundary.**" in l and ": The project layout - " in l for l in maps), maps
++    assert any(": Standing rules - 1. Never write implementation code." in l for l in maps), maps
++
++
++def test_r029_a_clean_move_into_a_phase_module_passes(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, core_without(INTAKE_WRAPPED + "\n"))
++    write(root, PHASES + "intake.md", "# Intake\n\n" + INTAKE_WRAPPED)
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [] and lines[-1] == "RESULT: OK", lines
++    assert any(l.startswith("TRACED: 9 passages") and "; 8 in supervisor.md, 1 under workflow/, 0 dropped" in l
++               for l in lines), lines
++
++
++def test_r029_a_hard_wrapped_passage_moved_onto_one_line_passes(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, core_without(INTAKE_WRAPPED + "\n"))
++    write(root, PHASES + "intake.md", "# Intake\n\n" + INTAKE_ONE_LINE)
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++
++
++def test_r029_a_two_hop_move_with_the_module_emptied_passes(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, core_without(INTAKE_WRAPPED + "\n"))
++    write(root, PHASES + "intake.md", "# Intake\n")
++    write(root, "bridge/cursor-bridge/workflow/traits/installable.md", "# Installable\n\n" + INTAKE_ONE_LINE)
++    rc, lines = run(root, "--map")
++    assert rc == 0 and fails(lines) == [], lines
++    assert any(l.startswith("MAP bridge/cursor-bridge/workflow/traits/installable.md: " + INTAKE.replace(DASH, "\\u2014"))
++               for l in lines), lines
++
++
++def test_r029_a_copy_into_two_homes_fails(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, PHASES + "intake.md", "# Intake\n\n" + INTAKE_WRAPPED)
++    rc, lines = run(root)
++    assert rc == 1 and lines[-1] == "RESULT: 1 problem(s)", lines
++    assert fails(lines) == ["FAIL (copy) %s, %sintake.md: Phase 1 \\u2014 Intake - Intake asks the owner what the "
++                            "software does and records it " % (CORE, PHASES)], lines
++
++
++def test_r029_a_copy_within_one_file_fails(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, BASE_CORE.replace(INTAKE_WRAPPED, INTAKE_WRAPPED + "\n" + INTAKE_ONE_LINE))
++    rc, lines = run(root)
++    assert rc == 1 and len(fails(lines)) == 1 and fails(lines)[0].startswith("FAIL (copy) " + CORE), lines
++
++
++def test_r029_a_silent_reword_fails_as_dropped(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, BASE_CORE.replace("what the software does", "what the product does"))
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (dropped) %s: Phase 1 \\u2014 Intake - Intake asks the owner what the "
++                                        "software does and records it " % CORE], lines
++
++
++def test_r029_an_undeclared_new_passage_in_a_module_fails(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, PHASES + "intake.md", "# Intake\n\nA passage no baseline holds.\n")
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (new) %sintake.md: Intake - A passage no baseline holds." % PHASES], lines
++
++
++def test_r029_new_text_in_the_core_or_beside_the_modules_is_not_flagged(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, BASE_CORE + "\nA sentence the core gained.\n")
++    write(root, "bridge/cursor-bridge/workflow/open-list.md", OPEN_LIST + "\nA row the open list gained.\n")
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++
++
++def test_r029_a_dropped_workspace_boundary_paragraph_fails(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, core_without(BOUNDARY + "\n"))
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (dropped) %s: The project layout - **The Workspace boundary.** Every "
++                                        "artifact the loop writes l" % CORE], lines
++
++
++def test_r029_a_dangling_claude_reference_fails(tmp_path):
++    root = make_repo(tmp_path)
++    (root / "bridge" / "cursor-bridge" / "Glossary.md").unlink()
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (ref) %s:28: ~/.claude/cursor-bridge/Glossary.md" % CORE], lines
++
++
++def test_r029_a_placeholder_reference_resolves_by_its_folder(tmp_path):
++    root = make_repo(tmp_path)
++    for path in (root / "bridge" / "cursor-bridge" / "design-seeds").rglob("*"):
++        if path.is_file():
++            path.unlink()
++    (root / "bridge" / "cursor-bridge" / "design-seeds" / "acme").rmdir()
++    rc, lines = run(root)
++    assert rc == 0, lines
++    (root / "bridge" / "cursor-bridge" / "design-seeds").rmdir()
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (ref) %s:29: ~/.claude/cursor-bridge/design-seeds/<brand>/DESIGN.md"
++                                        % CORE], lines
++
++
++def test_r029_a_dangling_cited_section_fails(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, BASE_CORE.replace("## The project layout\n", "## The layout of a project\n"))
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Phase 1 \\u2014 Intake - "The project layout"' % CORE], lines
++
++
++def test_r029_a_cited_section_resolves_in_a_module(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, BASE_CORE.replace("## The project layout\n\n" + BOUNDARY + "\n", ""))
++    write(root, PHASES + "intake.md", "# The project layout\n\n" + BOUNDARY)
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++
++
++def test_r029_reword_entries_excuse_the_vanished_and_the_new_text(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, core_without(INTAKE_WRAPPED + "\n"))
++    write(root, PHASES + "intake.md", "# Intake\n\nIntake asks the owner what the product does.\n")
++    rc, lines = run(root)
++    assert rc == 1 and [l.split(" ")[1] for l in fails(lines)] == ["(dropped)", "(new)"], lines
++    entries(root, "- reword TASK-010 %s %s" % (CORE, INTAKE), "- reword TASK-010 %sintake.md Intake" % PHASES)
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [] and lines[-1] == "RESULT: OK", lines
++    assert ("NOTE (reword TASK-010) %s: Phase 1 \\u2014 Intake - Intake asks the owner what the software does and "
++            "records it " % CORE) in lines, lines
++    assert any(l.startswith("TRACED: ") and l.endswith(" dropped, 1 excused") for l in lines), lines
++
++
++def test_r029_a_reword_entry_names_the_baseline_section_even_when_the_core_renamed_it(tmp_path):
++    """Requirement 6: a reword entry's vanished text is looked up in the baseline file's section; here the core has
++    no section of that name any more (the builder's mutation (e) survived without this case)."""
++    root = make_repo(tmp_path)
++    renamed = BASE_CORE.replace("## " + INTAKE + "\n", "## Phase 1 " + DASH + " Start\n")
++    write(root, CORE, renamed.replace("what the software does", "what the product does"))
++    rc, lines = run(root)
++    assert rc == 1 and [l.split(" ")[1] for l in fails(lines)] == ["(dropped)"], lines
++    entries(root, "- reword TASK-010 %s %s" % (CORE, INTAKE))
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++    assert any(l.startswith("NOTE (reword TASK-010) %s: Phase 1 \\u2014 Intake - " % CORE) for l in lines), lines
++
++
++def test_r029_a_reword_entry_for_another_file_does_not_excuse_a_core_drop(tmp_path):
++    """Requirement 6: a reword entry excuses vanished text only in the section of the baseline file it names; an entry
++    naming a module, under the core's heading text, excuses nothing in the core."""
++    root = make_repo(tmp_path)
++    write(root, CORE, BASE_CORE.replace("what the software does", "what the product does"))
++    entries(root, "- reword TASK-010 %sintake.md %s" % (PHASES, INTAKE))
++    rc, lines = run(root)
++    assert rc == 1 and [l.split(" ")[1] for l in fails(lines)] == ["(dropped)"], lines
++
++
++def test_r029_module_text_from_any_baseline_home_is_not_new(tmp_path):
++    """Requirement 5: new text is judged against the units of all baseline homes, the workflow files included, not
++    the core alone (the builder's mutation (f) survived without this case)."""
++    root = make_repo(tmp_path)
++    write(root, PHASES + "intake.md", "# Intake\n\nThe open list names every product type.\n")
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++
++
++def test_r029_a_word_ending_in_see_per_or_under_is_not_a_citation(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, CORE, BASE_CORE + "\nWe understand \"No such section\" and hyper \"Nor this\" and foresee \"Nor that\".\n")
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++    # the positive control: the same text with the word itself is a citation
++    write(root, CORE, BASE_CORE + "\nWe understand \"No such section\"; see \"No such section\".\n")
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Standing rules - "No such section"' % CORE], lines
++
++
++def test_r029_a_new_entry_excuses_new_text_but_not_a_dropped_passage(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, PHASES + "intake.md", "# Intake\n\nA passage no baseline holds.\n")
++    entries(root, "- new TASK-010 %sintake.md Intake" % PHASES)
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++    write(root, CORE, core_without(INTAKE_WRAPPED + "\n"))
++    entries(root, "- new TASK-010 %sintake.md Intake" % PHASES, "- new TASK-010 %s %s" % (CORE, INTAKE))
++    rc, lines = run(root)
++    assert rc == 1 and [l.split(" ")[1] for l in fails(lines)] == ["(dropped)"], lines
++
++
++def test_r029_a_copy_explained_by_an_entry_passes(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, PHASES + "intake.md", "# Intake\n\n" + INTAKE_WRAPPED)
++    entries(root, "- new TASK-010 %sintake.md Intake" % PHASES)
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++
++
++def test_r029_a_missing_baseline_commit_is_not_checked(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, "bridge/cursor-bridge/workflow/trace-baseline.txt", "0" * 40 + "\n")
++    rc, lines = run(root)
++    assert rc == 2 and lines[-1] == "RESULT: not checked", lines
++    assert any(l.startswith("ERROR: ") and "shallow clone" in l for l in lines), lines   # Requirement 9 names the cause
++    assert not fails(lines), lines
++
++
++def test_r029_a_malformed_baseline_file_is_not_checked(tmp_path):
++    root = make_repo(tmp_path)
++    for text in ("HEAD\n", "0" * 39 + "\n", ("A" * 40) + "\n", "0" * 40 + "\n" + "0" * 40 + "\n"):
++        write(root, "bridge/cursor-bridge/workflow/trace-baseline.txt", text)
++        rc, lines = run(root)
++        assert rc == 2 and lines[-1] == "RESULT: not checked", (text, lines)
++
++
++def test_r029_a_malformed_exceptions_file_is_not_checked(tmp_path):
++    root = make_repo(tmp_path)
++    for line in ("- rewrite TASK-010 %s %s" % (CORE, INTAKE), "- reword task-010 %s %s" % (CORE, INTAKE),
++                 "- reword TASK-010 %s" % CORE, "reword TASK-010 %s %s" % (CORE, INTAKE),
++                 "- reword TASK-010 docs/other.md Intake"):
++        entries(root, line)
++        rc, lines = run(root)
++        assert rc == 2 and lines[-1] == "RESULT: not checked", (line, lines)
++        assert any(l.startswith("ERROR: bridge/cursor-bridge/workflow/trace-exceptions.md: line 6: ")
++                   for l in lines), (line, lines)
++    write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", "# Trace exceptions\n\nNo entries heading.\n")
++    rc, lines = run(root)
++    assert rc == 2 and lines[-1] == "RESULT: not checked", lines
++
++
++def test_r029_a_folder_that_is_not_a_repository_is_not_checked(tmp_path):
++    rc, lines = run(tmp_path)
++    assert rc == 2 and lines[-1] == "RESULT: not checked", lines
++
++
++# --- round 2 (Review A's REJECT and the security auditor's FAIL on 7d9974b; handoff/TASK-016-r2.md) ---------------
++
++ARROW = chr(0x2192)
++
++
++def core_plus(*paragraphs):
++    """The baseline core with paragraphs appended under Standing rules, and the line number of each."""
++    text = BASE_CORE
++    numbers = []
++    for p in paragraphs:
++        text += "\n"
++        numbers.append(text.count("\n") + 1)
++        text += p + "\n"
++    return text, numbers
++
++
++def test_r029_each_heading_of_an_arrow_chain_is_a_citation(tmp_path):
++    root = make_repo(tmp_path)
++    text, _ = core_plus('(see "The project layout" %s "No such sub-section")' % ARROW,
++                        '(see "Nope A" %s "Nope B")' % ARROW)
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == [
++        'FAIL (cite) %s: Standing rules - "No such sub-section"' % CORE,
++        'FAIL (cite) %s: Standing rules - "Nope A"' % CORE,
++        'FAIL (cite) %s: Standing rules - "Nope B"' % CORE,
++    ], lines
++
++
++def test_r029_an_arrow_chain_that_resolves_passes(tmp_path):
++    root = make_repo(tmp_path)
++    text, _ = core_plus('(see "Supervisor" %s "The project layout")' % ARROW)
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 0 and fails(lines) == [], lines
++
++
++def test_r029_cite_findings_are_in_file_order(tmp_path):
++    root = make_repo(tmp_path)
++    text, _ = core_plus('First see "Zzz missing".', 'Then see "Aaa missing".')
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert [l.rsplit(" - ", 1)[1] for l in fails(lines)] == ['"Zzz missing"', '"Aaa missing"'], lines
++
++
++def test_r029_dropped_findings_come_before_copy_findings(tmp_path):
++    root = make_repo(tmp_path)
++    rule_2 = "2. Reports lead with the owner's decision,\n   and the technical part follows.\n"
++    write(root, CORE, core_without(rule_2))
++    write(root, PHASES + "intake.md", "# Intake\n\n" + BOUNDARY)
++    rc, lines = run(root)
++    assert rc == 1 and [l.split(" ")[1] for l in fails(lines)] == ["(dropped)", "(copy)"], lines
++
++
++def test_r029_a_printed_reference_is_stripped_of_its_trailing_stop(tmp_path):
++    root = make_repo(tmp_path)
++    text, numbers = core_plus("Read ~/.claude/cursor-bridge/Nope.md.")
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (ref) %s:%d: ~/.claude/cursor-bridge/Nope.md" % (CORE, numbers[0])], lines
++
++
++def test_r029_a_reference_outside_the_bridge_folder_never_resolves(tmp_path):
++    """Security (round 1 FAIL): a reference resolves only to a path inside bridge/; a `..`, `.` or empty segment, a
++    backslash or a colon is a ref finding without any file-system lookup (a UNC form would otherwise reach the network
++    on Windows). README.md exists at the root, so `../README.md` would resolve without the rule."""
++    root = make_repo(tmp_path)
++    write(root, "README.md", "# Readme\n")
++    refs = ["~/.claude/../README.md", "~/.claude/C:/Windows", "~/.claude/" + "\\\\host\\share\\x",
++            "~/.claude/cursor-bridge/./Glossary.md", "~/.claude/cursor-bridge//Glossary.md"]
++    text, numbers = core_plus(*("Read %s here" % r for r in refs))
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 1 and [l.split(": ", 1)[0] for l in fails(lines)] == \
++        ["FAIL (ref) %s:%d" % (CORE, n) for n in numbers], lines
++
++
++def test_r029_only_the_workflow_folders_own_exceptions_file_is_left_out(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, PHASES + "trace-exceptions.md", "# Intake\n\nA passage no baseline holds.\n")
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (new) %strace-exceptions.md: Intake - A passage no baseline holds."
++                                        % PHASES], lines
++
++
++def test_r029_the_entries_marker_is_a_line_that_is_exactly_it(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", "## Entries\n")
++    rc, lines = run(root)
++    assert rc == 0 and lines[-1] == "RESULT: OK", lines
++    for text in ("# Trace exceptions\n\n### Entries\n", "# Trace exceptions\n\nfoo ## Entries\n"):
++        write(root, "bridge/cursor-bridge/workflow/trace-exceptions.md", text)
++        rc, lines = run(root)
++        assert rc == 2 and lines[-1] == "RESULT: not checked", (text, lines)
++
++
++def test_r029_a_usage_error_prints_an_error_line(tmp_path):
++    root = make_repo(tmp_path)
++    rc, lines = run(root, "--bogus")
++    assert rc == 2 and lines[-1] == "RESULT: not checked", lines
++    assert any(l.startswith("ERROR: usage: ") and "--bogus" in l for l in lines), lines
++
++
++def test_r029_printed_paths_are_ascii(tmp_path):
++    root = make_repo(tmp_path)
++    write(root, PHASES + "caf" + chr(0xE9) + ".md", "# Cafe\n\nA passage no baseline holds.\n")
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (new) %scaf\\xe9.md: Cafe - A passage no baseline holds." % PHASES], lines
++    assert all(l.isascii() for l in lines), lines
++    # a MAP line's home and a copy finding's paths go through the same escaping (Review A round 2, blocking 2)
++    write(root, PHASES + "caf" + chr(0xE9) + ".md", "# Cafe\n\n" + INTAKE_WRAPPED)
++    rc, lines = run(root, "--map")
++    assert all(l.isascii() for l in lines), lines
++    assert any(l.startswith("FAIL (copy) %s, %scaf\\xe9.md: " % (CORE, PHASES)) for l in lines), lines
++    assert any(l.startswith("MAP %s, %scaf\\xe9.md: " % (CORE, PHASES)) for l in lines), lines
++
++
++def test_r029_a_linked_file_under_workflow_is_not_read(tmp_path):
++    """Round 4, requirement 1: a linked .md file under workflow/ is `ERROR: <path>: is a link`, exit 2, and is not
++    read (round 3 skipped it silently, which hid its text from the check)."""
++    root = make_repo(tmp_path)
++    outside = tmp_path / "outside.md"
++    outside.write_bytes(b"# Outside\n\nText from outside the repository.\n")
++    link = root / "bridge" / "cursor-bridge" / "workflow" / "phases" / "linked.md"
++    link.parent.mkdir(parents=True)
++    try:
++        os.symlink(str(outside), str(link))
++    except (OSError, NotImplementedError):
++        pytest.skip("this account cannot create a symbolic link")
++    rc, lines = run(root)
++    assert rc == 2 and lines[-2:] == ["ERROR: bridge/cursor-bridge/workflow/phases/linked.md: is a link",
++                                      "RESULT: not checked"], lines
++    assert not any("Text from outside" in l for l in lines), lines
++
++
++def _assert_link_stops_the_run(root, rel, lines, rc):
++    assert rc == 2 and [l for l in lines if l.startswith("ERROR: ")] == ["ERROR: %s: is a link" % rel], lines
++    assert lines[-1] == "RESULT: not checked", lines
++    assert not any("Text from outside" in l for l in lines), lines
++
++
++def test_r029_a_linked_workflow_folder_is_not_read(tmp_path):
++    """Round 4, requirement 1 (security round 3 blocking; Review A round 3, convergent): the folder the walk starts
++    from is checked before the walk, since os.walk always enters its top folder; reproduced by the security re-check,
++    which printed text from outside the repository."""
++    root = make_repo(tmp_path)
++    workflow = root / "bridge" / "cursor-bridge" / "workflow"
++    outside = tmp_path / "outside"
++    shutil.copytree(str(workflow), str(outside))
++    (outside / "phases").mkdir()
++    (outside / "phases" / "leak.md").write_bytes(b"# Outside\n\nText from outside the repository.\n")
++    shutil.rmtree(str(workflow))
++    _link_folder(workflow, outside)
++    try:
++        assert (workflow / "phases" / "leak.md").exists()   # the precondition: without the check it would be read
++        rc, lines = run(root)
++        _assert_link_stops_the_run(root, "bridge/cursor-bridge/workflow", lines, rc)
++    finally:
++        os.rmdir(str(workflow))
++
++
++def test_r029_a_linked_folder_on_the_way_to_the_core_is_not_read(tmp_path):
++    """Round 4, requirement 1: every folder on the way to a file read by name is checked; a link at bridge/commands
++    made the program read an outside supervisor.md and print its text (the security re-check's second reproduction)."""
++    root = make_repo(tmp_path)
++    commands = root / "bridge" / "commands"
++    outside = tmp_path / "outside"
++    outside.mkdir()
++    (outside / "supervisor.md").write_bytes(BASE_CORE.encode("utf-8")
++                                            + b"\n## Outside\n\nText from outside the repository, see \"Nope\".\n")
++    shutil.rmtree(str(commands))
++    _link_folder(commands, outside)
++    try:
++        assert (commands / "supervisor.md").exists()
++        rc, lines = run(root)
++        _assert_link_stops_the_run(root, "bridge/commands", lines, rc)
++        assert not any('"Nope"' in l or "Outside" in l for l in lines), lines   # what the outside core would print
++    finally:
++        os.rmdir(str(commands))
++
++
++@pytest.mark.parametrize("rel", ["bridge/commands/supervisor.md", "bridge/cursor-bridge/workflow/trace-exceptions.md",
++                                 "bridge/cursor-bridge/workflow/trace-baseline.txt"])
++def test_r029_a_linked_file_read_by_name_is_not_read(tmp_path, rel):
++    """Round 4, requirement 1: each of the three files read by name is checked on its own path too."""
++    root = make_repo(tmp_path)
++    target = root / rel
++    outside = tmp_path / "outside-file"
++    outside.write_bytes(target.read_bytes())
++    target.unlink()
++    try:
++        os.symlink(str(outside), str(target))
++    except (OSError, NotImplementedError):
++        pytest.skip("this account cannot create a symbolic link")
++    rc, lines = run(root)
++    _assert_link_stops_the_run(root, rel, lines, rc)
++
++
++def test_r029_a_linked_bridge_folder_resolves_no_reference(tmp_path):
++    """Round 3, requirement 1 (Review A round 3, should-fix): bridge/ itself being a link makes every reference a
++    finding; the containment guard alone cannot see it, both its sides passing through the same link."""
++    root = make_repo(tmp_path)
++    bridge = root / "bridge"
++    real_bridge = tmp_path / "real-bridge"
++    shutil.move(str(bridge), str(real_bridge))
++    _link_folder(bridge, real_bridge)
++    try:
++        assert (bridge / "commands" / "supervisor.md").exists()
++        program = _load_program()
++        assert [program.resolve_ref(rest, str(root)) for rest in ("commands/supervisor.md", "")] == [False, False]
++    finally:
++        os.rmdir(str(bridge))
++
++
++def test_r029_the_placeholder_segment_is_kept(tmp_path):
++    """Round 4, requirement 2 (Review A round 3, blocking): `...` is round 1's placeholder (Requirement 7), not a
++    trailing-dot segment: the walk stops at it."""
++    root = make_repo(tmp_path)
++    program = _load_program()
++    assert program.resolve_ref("cursor-bridge/.../Glossary.md", str(root)) is True
++    assert program.resolve_ref("nope/.../x", str(root)) is False
++    text, _ = core_plus("Read ~/.claude/cursor-bridge/.../Anything.md here")
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 0 and lines[-1] == "RESULT: OK", lines
++
++
++def test_r029_a_citation_is_read_once(tmp_path):
++    """Round 4, requirement 5 (Review A round 3, consider): the search resumes after a citation, never inside its
++    quoted text, so `see "what to see " and then "Other"` holds one citation."""
++    root = make_repo(tmp_path)
++    text, _ = core_plus('(see "what to see " and then "Other")')
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Standing rules - "what to see "' % CORE], lines
++
++
++def test_r029_an_empty_quote_is_not_a_citation(tmp_path):
++    """Round 4, requirement 6 (round 1's pattern, `[^"]+`): `see ""` is not a citation, and a chain stops before an
++    empty quote."""
++    root = make_repo(tmp_path)
++    text, _ = core_plus('(see "" here)', '(see "Nope A" %s "" %s "Nope B")' % (ARROW, ARROW))
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Standing rules - "Nope A"' % CORE], lines
++
++
++def _link_folder(link, target):
++    """A folder link: a junction on Windows (no privilege needed), a symbolic link elsewhere; skip if neither works."""
++    try:
++        if sys.platform == "win32":
++            import _winapi
++            _winapi.CreateJunction(str(target), str(link))
++        else:
++            os.symlink(str(target), str(link), target_is_directory=True)
++    except (OSError, NotImplementedError, AttributeError):
++        pytest.skip("this account cannot create a folder link")
++
++
++def test_r029_a_reference_through_a_link_out_of_the_bridge_folder_does_not_resolve(tmp_path):
++    """Requirement 1 of round 2: a reference whose segments are all plain still fails when its real path leaves
++    bridge/ (here through a folder link inside it); the builder's mutation (l), the containment check dropped, survived
++    without this case."""
++    root = make_repo(tmp_path)
++    outside = tmp_path / "outside"
++    outside.mkdir()
++    (outside / "Target.md").write_bytes(b"# Target\n")
++    link = root / "bridge" / "cursor-bridge" / "linked"
++    _link_folder(link, outside)
++    try:
++        assert (link / "Target.md").exists()   # the precondition: without the check the reference would resolve
++        text, numbers = core_plus("Read ~/.claude/cursor-bridge/linked/Target.md here")
++        write(root, CORE, text)
++        rc, lines = run(root)
++        assert rc == 1 and fails(lines) == ["FAIL (ref) %s:%d: ~/.claude/cursor-bridge/linked/Target.md"
++                                            % (CORE, numbers[0])], lines
++    finally:
++        os.rmdir(str(link))   # removes the link itself, never its target
++
++
++def test_r029_a_linked_folder_under_workflow_is_not_read(tmp_path):
++    """Requirement 11 of round 2: links are not read, a folder link included; on Windows that is a junction, which
++    os.walk enters unless the program refuses it. Round 4, requirement 1: such a folder is an error, not a skip."""
++    root = make_repo(tmp_path)
++    outside = tmp_path / "outside"
++    outside.mkdir()
++    (outside / "moved.md").write_bytes(b"# Outside\n\nText from outside the repository.\n")
++    phases = root / "bridge" / "cursor-bridge" / "workflow" / "phases"
++    phases.mkdir(parents=True)
++    link = phases / "linked"
++    _link_folder(link, outside)
++    try:
++        assert (link / "moved.md").exists()
++        rc, lines = run(root)
++        _assert_link_stops_the_run(root, "bridge/cursor-bridge/workflow/phases/linked", lines, rc)
++    finally:
++        os.rmdir(str(link))
++
++
++def _load_program():
++    spec = importlib.util.spec_from_file_location("trace_check_under_test", str(TRACE_CHECK))
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++def _run_with_git_failing(root, monkeypatch, capsys, sub_command, error):
++    """main() in-process with subprocess.run raising `error` for one git sub-command (the others run for real)."""
++    program = _load_program()
++    real = subprocess.run
++    calls = []
++
++    def run_or_fail(args, *a, **kw):
++        if args[:1] == ["git"] and sub_command in args:
++            calls.append(list(args))
++            raise error(args)
++        return real(args, *a, **kw)
++
++    monkeypatch.setattr(subprocess, "run", run_or_fail)
++    rc = program.main(["--repo", str(root)])
++    monkeypatch.undo()
++    return rc, capsys.readouterr().out.splitlines(), calls
++
++
++def test_r029_a_git_timeout_after_the_start_is_not_checked(tmp_path, monkeypatch, capsys):
++    """Requirement 3 of round 2: a git command that times out (here ls-tree, after the first commands ran) ends in
++    exit 2 with `ERROR: git ls-tree: timed out after <n> s`, never a traceback."""
++    root = make_repo(tmp_path)
++    rc, out, _ = _run_with_git_failing(root, monkeypatch, capsys, "ls-tree",
++                                       lambda args: subprocess.TimeoutExpired(args, 120))
++    assert rc == 2 and out[-1] == "RESULT: not checked", out
++    assert [l for l in out if l.startswith("ERROR: ")] and all(
++        re.fullmatch(r"ERROR: git ls-tree: timed out after \d+ s", l) for l in out if l.startswith("ERROR: ")), out
++
++
++def test_r029_git_that_cannot_start_stops_at_the_first_failure(tmp_path, monkeypatch, capsys):
++    """Requirement 3 of round 2 and Review A round 2 (should-fix 6): `git show` that cannot start is reported once,
++    `ERROR: git show: cannot be started (...)`, and no further git show is tried (each could wait the full timeout)."""
++    root = make_repo(tmp_path)
++    rc, out, calls = _run_with_git_failing(root, monkeypatch, capsys, "show",
++                                           lambda args: FileNotFoundError(2, "No such file or directory"))
++    errors = [l for l in out if l.startswith("ERROR: ")]
++    assert rc == 2 and out[-1] == "RESULT: not checked", out
++    assert len(errors) == 1 and errors[0].startswith("ERROR: git show: cannot be started ("), out
++    assert len(calls) == 1, calls
++
++
++def test_r029_ref_findings_on_one_line_are_in_file_order(tmp_path):
++    """Round 1's Requirement 8: ref findings in path order, then file order, never sorted by their text (Review A
++    round 2, blocking 3)."""
++    root = make_repo(tmp_path)
++    text, numbers = core_plus("Both ~/.claude/zz-missing and ~/.claude/aa-missing here")
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ["FAIL (ref) %s:%d: ~/.claude/zz-missing" % (CORE, numbers[0]),
++                                        "FAIL (ref) %s:%d: ~/.claude/aa-missing" % (CORE, numbers[0])], lines
++
++
++def test_r029_a_chain_is_read_after_the_closing_quote(tmp_path):
++    """Review A round 2 (consider 9): a quoted X holding an arrow does not hide the chain's next citation."""
++    root = make_repo(tmp_path)
++    text, _ = core_plus('(see "Supervisor %s " %s "Nope Y")' % (ARROW, ARROW))
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 1 and fails(lines) == ['FAIL (cite) %s: Standing rules - "Supervisor \\u2192 "' % CORE,
++                                        'FAIL (cite) %s: Standing rules - "Nope Y"' % CORE], lines
++
++
++def test_r029_a_name_windows_rewrites_does_not_resolve(tmp_path):
++    """Review A round 2 (consider 10): Windows drops a trailing dot and maps device names (any case, with or without an
++    extension), so such a segment would resolve to a file it does not name; it is a ref finding on every platform. (A
++    trailing space cannot occur: whitespace ends a reference.)"""
++    root = make_repo(tmp_path)
++    refs = ["~/.claude/commands./supervisor.md", "~/.claude/NUL", "~/.claude/cursor-bridge/com1.md", "~/.claude/aux",
++            "~/.claude/cursor-bridge/Lpt9.txt/x"]
++    text, numbers = core_plus(*("Read %s`" % r for r in refs))
++    write(root, CORE, text)
++    rc, lines = run(root)
++    assert rc == 1 and [l.split(": ", 1)[0] for l in fails(lines)] == \
++        ["FAIL (ref) %s:%d" % (CORE, n) for n in numbers], lines
++
++
++def test_r029_a_refused_reference_touches_no_file(tmp_path, monkeypatch):
++    """Security (round 1 FAIL; round 2 advisory A3): the segment rule decides before any file-system call, so a UNC or
++    drive form never reaches the network or another drive. resolve_ref(rest, root) is called in-process with the file
++    system's lookups recording every call."""
++    root = make_repo(tmp_path)
++    program = _load_program()
++    calls = []
++    for name in ("realpath", "exists", "isdir", "isfile", "islink", "lexists", "isjunction"):
++        real = getattr(os.path, name, None)
++        if real is None:
++            continue
++        monkeypatch.setattr(os.path, name, lambda *a, _n=name, _r=real, **k: calls.append(_n) or _r(*a, **k))
++    for name in ("stat", "lstat", "scandir", "listdir"):
++        real = getattr(os, name)
++        monkeypatch.setattr(os, name, lambda *a, _n=name, _r=real, **k: calls.append(_n) or _r(*a, **k))
++    rests = ("\\\\host\\share\\x", "//host/share/x", "C:/Windows", "../README.md", "a/../../x", "cmd/<x>/../..",
++             "commands./supervisor.md", "NUL", "cursor-bridge/com1.md")
++    results = [program.resolve_ref(rest, str(root)) for rest in rests]
++    refused_calls = list(calls)
++    control = program.resolve_ref("commands/supervisor.md", str(root))   # the positive control: the hooks record
++    monkeypatch.undo()
++    assert results == [False] * len(rests) and refused_calls == [], (results, refused_calls)
++    assert control is True and len(calls) > 0, (control, calls)
++
++
++def test_r029_a_link_on_the_way_is_refused_before_realpath(tmp_path, monkeypatch):
++    """Round 3, requirement 1 (security round 2 advisory A1): a component that is a link makes the reference a finding
++    at once, with no realpath, which would follow the link (and a broken link's target) before containment is tested.
++    Kills the builder's mutation (v), the walk's link test skipped, which the containment guard alone hides."""
++    root = make_repo(tmp_path)
++    outside = tmp_path / "outside"
++    outside.mkdir()
++    (outside / "Target.md").write_bytes(b"# Target\n")
++    link = root / "bridge" / "cursor-bridge" / "linked"
++    _link_folder(link, outside)
++    try:
++        program = _load_program()
++        seen = []
++        real = os.path.realpath
++        monkeypatch.setattr(os.path, "realpath", lambda *a, **k: seen.append(a[0]) or real(*a, **k))
++        assert (link / "Target.md").exists()   # the precondition: through the link the target exists
++        result = program.resolve_ref("cursor-bridge/linked/Target.md", str(root))
++        refused_seen = list(seen)
++        control = program.resolve_ref("cursor-bridge/Glossary.md", str(root))   # the containment guard's realpath
++        monkeypatch.undo()
++        assert result is False and refused_seen == [], (result, refused_seen)
++        assert control is True and len(seen) > 0, (control, seen)
++    finally:
++        os.rmdir(str(link))   # removes the link itself, never its target
++
++
++def test_r029_an_unreadable_folder_under_workflow_is_not_checked(tmp_path, monkeypatch, capsys):
++    """Round 3, requirement 9: a folder under workflow/ that cannot be listed is `ERROR: <path>: cannot be read
++    (<reason>)`, exit 2, never a silent skip. main() in-process, with os.scandir (which os.walk lists through) refusing
++    that one folder."""
++    root = make_repo(tmp_path)
++    hidden = root / "bridge" / "cursor-bridge" / "workflow" / "sealed"
++    hidden.mkdir(parents=True)
++    (hidden / "x.md").write_bytes(b"# X\n\nText.\n")
++    program = _load_program()
++    real = os.scandir
++
++    def scandir_or_refuse(path=".", *a, **k):
++        if os.path.basename(os.fspath(path)) == "sealed":
++            raise PermissionError(13, "Access is denied", os.fspath(path))
++        return real(path, *a, **k)
++
++    monkeypatch.setattr(os, "scandir", scandir_or_refuse)
++    rc = program.main(["--repo", str(root)])
++    monkeypatch.undo()
++    out = capsys.readouterr().out.splitlines()
++    errors = [l for l in out if l.startswith("ERROR: ")]
++    assert rc == 2 and out[-1] == "RESULT: not checked", out
++    assert len(errors) == 1 and errors[0].endswith("/bridge/cursor-bridge/workflow/sealed: cannot be read (Access is denied)"), out
