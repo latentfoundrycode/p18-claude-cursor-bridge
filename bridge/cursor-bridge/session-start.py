@@ -52,7 +52,8 @@ tables are not at their installed paths``, or a table file ``is a link``, or the
 registry cannot be read, no conditional file and no pointer-line file is named; one plain line
 states what could not be read (only when a phase module file exists or a classified Workflows
 line needed that read). A path returned by the checker is never printed; a reason or exception
-type name appears only in the plain character forms above. The hook guards against a partial,
+type name appears only when it is wholly ``[A-Za-z0-9 #().,'-]+`` (a reason) or an identifier
+``[A-Za-z_][A-Za-z0-9_]*`` (a type name). The hook guards against a partial,
 mismatched or hand-edited install, not a hostile checker, which runs in-process and could write
 to its output directly. The hook still never blocks.
 
@@ -213,9 +214,9 @@ def safe_reason(reason):
 
 def safe_exc_type_name(err):
     name = type(err).__name__
-    if PLAIN_TYPE_NAME.fullmatch(name):
-        return name
-    return "an exception"
+    if type(name) is not str or not PLAIN_TYPE_NAME.fullmatch(name):
+        return "an exception"
+    return name
 
 
 def installed_table_abspath(filename):
@@ -230,11 +231,19 @@ def tables_at_installed_paths(wc):
     return True
 
 
+def installed_open_list_path():
+    return os.path.join(workflow_root(), "open-list.md")
+
+
+def installed_registry_path():
+    return os.path.join(workflow_root(), "extension-points.md")
+
+
 def table_file_shown(wc, path):
     p = wc.slash(path)
-    if p == wc.slash(wc.DEFAULT_OPEN):
+    if p == wc.slash(installed_open_list_path()):
         return OPEN_SHOWN
-    if p == wc.slash(wc.DEFAULT_REGISTRY):
+    if p == wc.slash(installed_registry_path()):
         return REG_SHOWN
     return None
 
@@ -261,13 +270,15 @@ def workflow_table_link_error(wc):
 
 def load_tables_from_checker(wc):
     """Return (tables, error_line). error_line is None on success."""
-    open_text, _open_shown, open_err = wc.read_utf8(wc.DEFAULT_OPEN)
+    open_path = installed_open_list_path()
+    reg_path = installed_registry_path()
+    open_text, _open_shown, open_err = wc.read_utf8(open_path)
     if open_err:
-        return None, table_read_error_line(wc, wc.DEFAULT_OPEN, open_err)
-    reg_text, _reg_shown, reg_err = wc.read_utf8(wc.DEFAULT_REGISTRY)
+        return None, table_read_error_line(wc, open_path, open_err)
+    reg_text, _reg_shown, reg_err = wc.read_utf8(reg_path)
     if reg_err:
-        return None, table_read_error_line(wc, wc.DEFAULT_REGISTRY, reg_err)
-    tables, errors = wc.load_tables(open_text, wc.DEFAULT_OPEN, reg_text, wc.DEFAULT_REGISTRY)
+        return None, table_read_error_line(wc, reg_path, reg_err)
+    tables, errors = wc.load_tables(open_text, open_path, reg_text, reg_path)
     if errors:
         path, reason = errors[0]
         return None, table_read_error_line(wc, path, reason)

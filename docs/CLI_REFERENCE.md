@@ -860,7 +860,8 @@ tables are not at their installed paths``, or a table file ``is a link``, or the
 registry cannot be read, no conditional file and no pointer-line file is named; one plain line
 states what could not be read (only when a phase module file exists or a classified Workflows
 line needed that read). A path returned by the checker is never printed; a reason or exception
-type name appears only in the plain character forms above. The hook guards against a partial,
+type name appears only when it is wholly ``[A-Za-z0-9 #().,'-]+`` (a reason) or an identifier
+``[A-Za-z_][A-Za-z0-9_]*`` (a type name). The hook guards against a partial,
 mismatched or hand-edited install, not a hostile checker, which runs in-process and could write
 to its output directly. The hook still never blocks.
 
