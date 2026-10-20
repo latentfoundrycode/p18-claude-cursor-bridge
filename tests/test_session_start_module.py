@@ -284,6 +284,13 @@ BROKEN = {
     "checker-elsewhere": ("workflow-check.py", ('DEFAULT_OPEN = os.path.join(HERE, "workflow", "open-list.md")',
                                                 'DEFAULT_OPEN = os.path.join(HERE, "elsewhere", "open-list.md")'),
                           CHECKER + ": cannot be used (its tables are not at their installed paths)"),
+    # the same for the registry alone (the builder's mutation (w), the comparison on the open list only, survived)
+    "checker-registry-elsewhere": ("workflow-check.py", ('DEFAULT_REGISTRY = os.path.join(HERE, "workflow", "extension-points.md")',
+                                                         'DEFAULT_REGISTRY = os.path.join(HERE, "elsewhere", "extension-points.md")'),
+                                   CHECKER + ": cannot be used (its tables are not at their installed paths)"),
+    # R4-2 for the load line: a checker that raises at import an exception named after a folder
+    "checker-load-name": ("workflow-check.py", "import os\nraise type(os.path.dirname(os.path.abspath(__file__)), (Exception,), {})()\n",
+                          CHECKER + ": cannot be loaded (an exception)"),
 }
 
 
@@ -322,7 +329,7 @@ def test_r005_an_unreadable_open_list_or_checker_names_no_conditional_file_and_s
         target.write_text(source.replace(text[0], text[1]), encoding="utf-8")
     else:
         target.write_text(text, encoding="utf-8")
-    if broken == "checker-elsewhere":
+    if broken in ("checker-elsewhere", "checker-registry-elsewhere"):
         # the precondition: the tables it names hold the open list, so only the place refuses them
         shutil.copytree(str(bridge / "workflow"), str(bridge / "elsewhere"))
     out = pointers(project(tmp_path, "Phase: intake", LINE), home)   # pointers() asserts exit 0 and an empty stderr
@@ -438,6 +445,50 @@ def test_r005_a_linked_open_list_or_registry_is_not_read(tmp_path, home, names):
     out = pointers(project(tmp_path, "Phase: intake", LINE), home)
     assert named(out) == [P + "intake.md"], out
     assert cannot_read_lines(out) == [W + names[0] + ": is a link"], out
+
+
+def test_r005_the_tables_are_read_at_the_hooks_own_paths(tmp_path, home):
+    """handoff/TASK-015-r5.md R5-1 (Review A round 4's first consider, the security audit's first advisory,
+    convergent): once the checker's table paths compare equal to the installed ones, the hook reads its own paths, so
+    a `..` after a linked folder in the checker's path cannot make the read reach another file than R3-3's link test
+    tested. Windows collapses `..` by text, so there both readings agree and the test holds trivially; on Linux CI the
+    checker's own path would read the copy beside the link's target."""
+    conditionals(home)
+    bridge = home / ".claude" / "cursor-bridge"
+    workflow = bridge / "workflow"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    shutil.move(str(workflow / "phases"), str(outside / "phases"))
+    _link_folder(workflow / "phases", outside / "phases")
+    text = (workflow / "open-list.md").read_text(encoding="utf-8")
+    assert "| Host Extension Development |" in text
+    (outside / "open-list.md").write_text(text.replace("| Host Extension Development |", "| Other Development |"), encoding="utf-8")
+    shutil.copy(str(workflow / "extension-points.md"), str(outside / "extension-points.md"))
+    checker = bridge / "workflow-check.py"
+    source = checker.read_text(encoding="utf-8")
+    old = 'DEFAULT_OPEN = os.path.join(HERE, "workflow", "open-list.md")'
+    assert source.count(old) == 1
+    checker.write_text(source.replace(old, 'DEFAULT_OPEN = os.path.join(HERE, "workflow", "phases", "..", "open-list.md")'),
+                       encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: Host Extension Development; traits: none"), home)
+    assert named(out) == [P + "intake.md", W + "types/host-extension.md"], out
+    assert cannot_read_lines(out) == [], out
+
+
+def test_r005_a_type_name_that_is_not_a_string_is_an_exception(tmp_path, home):
+    """handoff/TASK-015-r5.md R5-3 (Review A round 4's second consider): a type name the checker's exception class
+    gives as something other than a string prints as `an exception`; the hook never fails with a traceback."""
+    conditionals(home)
+    checker = home / ".claude" / "cursor-bridge" / "workflow-check.py"
+    source = checker.read_text(encoding="utf-8")
+    assert source.count("def heading_spans(") == 1
+    odd = ("class _OddMeta(type):\n    @property\n    def __name__(cls):\n        return 7\n\n\n"
+           "class _Odd(Exception, metaclass=_OddMeta):\n    pass\n\n\n"
+           "def heading_spans(*args, **kwargs):\n    raise _Odd()\n\n\ndef heading_spans_old(")
+    checker.write_text(source.replace("def heading_spans(", odd), encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)   # pointers() asserts exit 0 and an empty stderr
+    assert named(out) == [P + "intake.md"], out
+    assert cannot_read_lines(out) == [CHECKER + ": cannot be used (an exception)"], out
 
 
 def test_r005_a_linked_phases_folder_contributes_no_pointer_line(tmp_path, home):
