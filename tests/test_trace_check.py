@@ -528,6 +528,7 @@ def test_r029_a_linked_folder_on_the_way_to_the_core_is_not_read(tmp_path):
         assert (commands / "supervisor.md").exists()
         rc, lines = run(root)
         _assert_link_stops_the_run(root, "bridge/commands", lines, rc)
+        assert not any('"Nope"' in l or "Outside" in l for l in lines), lines   # what the outside core would print
     finally:
         os.rmdir(str(commands))
 
