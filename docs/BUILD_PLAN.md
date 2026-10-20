@@ -163,7 +163,7 @@ Parent: none
 Depends on: TASK-010
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_build.py
+Scope: bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_build.py; bridge/commands/supervisor.md; tests/test_session_start_module.py (widened 2026-10-20 for the split: the core's module table names the delegation loop's sub-file folder and the sentence under it where a split module's step keeps its heading; the hook's tests expect the sub-file after delegation-loop.md for `Phase: building` and `Phase: changing`, and the tests of the pointer-line grammar write a delegation-loop module of their own, since the installed one now has a `Sub-files:` line)
 Satisfies: R-004, R-006, R-032
 Done when: each module opens with its compaction-survival list, declares its extension points, and is within the R-032 bound — the delegation-loop module split into sub-files under `workflow/phases/delegation-loop/` if it would exceed the bound, each sub-file named by the module's own pointer line; `trace-check` green; `test_phase_modules_build.py` (names R-004, R-006, R-032) asserts the structure and, if split, the sub-file pointer.
 

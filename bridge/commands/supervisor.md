@@ -218,12 +218,12 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
 | Planning (Phase 4, the build plan) | `~/.claude/cursor-bridge/workflow/phases/planning.md` |
 | Run parameters | `~/.claude/cursor-bridge/workflow/phases/run-parameters.md` |
 | Configuration (Phase 5) | `~/.claude/cursor-bridge/workflow/phases/configuration.md` |
-| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` |
+| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` and its sub-file under `~/.claude/cursor-bridge/workflow/phases/delegation-loop/` |
 | The change cycle | `~/.claude/cursor-bridge/workflow/phases/change-cycle.md` |
 | Reflection points | `~/.claude/cursor-bridge/workflow/phases/reflection.md` |
 | Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
 
-Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`.
+Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`. A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 9 is in `delegation-loop/refactoring-pass.md`.
 
 **Modules read outside their own phase.** Some procedures run outside the phase whose `Phase:` value names their module; they are read whenever they apply, whatever the phase:
 - `reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;

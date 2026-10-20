@@ -1,5 +1,22 @@
 ## Phase 6 — The delegation loop
 
+### What must survive a compaction
+
+After a compaction or a resume in this phase, read these before your next action:
+
+- this module and its sub-file, each whole (the session-start hook names both), with `~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole, and the other files the hook names;
+- `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of `run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the background runs that will wake you and what waits for the owner; while Review B runs the status file is not written and the position is kept in `in-flight.md` (step 8);
+- the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` with every revision of it, and each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);
+- `docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass runs and whether increments run in parallel, and the models the delegate command and Review B name;
+- the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, `run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message (step 4), and `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background; and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, `ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` needs), whole;
+- while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's "Keeping the pass's position"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.
+
+### The procedure
+
+Steps 1 to 8 below run for every increment; step 9, the refactoring and optimization pass at a stage's close, is in a sub-file of this module, read whole with it wherever the module is read:
+
+Sub-files: delegation-loop/refactoring-pass.md
+
 For each increment, in order:
 
 ### 1. Checkpoint
@@ -547,75 +564,10 @@ the change log, not by a gate the user cannot operate. If the watch completes re
 
 **After every merge, mark the increment's runs healthy and bring local `main` along.** `python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id>` for the builder run and for Review B, the id being the launch time on the first line of each `.err` file, given whole (a test run that passed is marked by the launcher itself): a healthy run is what the launcher learns a ceiling from, and a run never marked never raises one (release A2). Then `git switch main`, then `python ~/.claude/cursor-bridge/sync-check.py --apply`; it must end IN SYNC or FAST-FORWARDED before anything else happens, and the next branch starts from there. Under `Merge authority: owner`, do the same at the first resume after the owner has merged. A worktree the merged branch had is torn down now (rule 39).
 
-### 9. Refactoring and optimization pass (at stage close)
+## Extension points
 
-When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says
-**Refactoring pass: on** for that stage, run one refactoring pass **before** the stage's reflection point.
-"Refactoring" means one thing here: removing duplication or simplifying code while keeping
-the same functionality. Every per-increment review saw one diff at a time, so a helper
-written twice in two increments was invisible to both; this is the only step that looks at
-the stage as a whole. Cursor's runs are cheap; the gate is not — so the pass is designed
-around **one gate pass per stage**. **Normative diagrams are constraints on it:** a candidate that would change what a diagram draws — a component boundary, a class a Level 4 diagram fixes, a schema — is a design change, raised as an objection, never slipped in as a refactoring.
+This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
 
-1. **Deterministic floor.** Run the duplicate detector over the source tree and the
-   project's linter complexity rules in report-only mode:
-   ```bash
-   npx --yes jscpd@<pinned> <src-dirs> --min-lines 5 --min-tokens 50 --reporters json --output docs/refactor/<stage> --silent
-   ```
-   Record the pinned `jscpd` version in `docs/INVENTORY.md` (Resources); verify-first on the first
-   use (KP-008). The report is input for the scout, not a verdict.
-2. **Scout.** Delegate to **refactor-scout** with the stage base commit, the detector
-   report, the complexity report, and the size budget (default **400 changed lines**) —
-   and, where budgets exist, the **performance inputs**: `bench/budgets.json`,
-   `bench/baseline.json`, the latest `bench/results/latest.json`, and a profile of each
-   budgeted operation (`scripts/profile.ps1 <benchmark>` → `bench/profiles/<benchmark>.txt`;
-   `Performance-Conventions.md` §5). It returns two ranked lists — refactoring candidates
-   and **optimization candidates ranked by measured impact on a budgeted metric**, each
-   naming the benchmark that will prove it — marked COVERED or UNCOVERED, costed in lines,
-   cut at the size budget together. **NO CANDIDATES** is a normal result — skip to the
-   reflection point.
-3. **Cover first.** For an UNCOVERED candidate you want, write characterization tests that
-   pin its current behaviour (you may write tests), run them green, and **commit them on
-   `main` through the gate before the refactoring branch is cut** — so they sit under the
-   base ref and the purity check does not see them as test edits. Or skip the candidate.
-3b. **The test-infrastructure lane.** Duplication in the *tests* — helpers copied across
-   test files — is yours to consolidate, since you own the tests. Do it in its own commit on
-   the same branch, checked with `refactor-check.py <base> --lane tests` (no production file
-   may change) and by proving the **collected test set is identical** before and after
-   (`pytest --collect-only -q` or the stack's equivalent, diffed). Never mix it into a
-   production-lane commit; the two lanes share the one gate pass.
-4. **One branch, many small commits.** Cut `refactor/<stage>` from `main`. For each
-   candidate, in payoff order: package a **refactoring brief** (`handoff/REFAC-<nnn>.md`,
-   spec-packager's refactoring variant), delegate, inspect (git-derived changeset + scope
-   check as always), run the full test suite, and commit that candidate alone. A candidate
-   that fails its tests or drifts is re-delegated or dropped — a Cursor round is cheap,
-   so be strict. Never mix a candidate into a feature increment.
-   An **optimization candidate** is a refactoring candidate with numbers: its brief names
-   the metric, the current value, and the target; its commit message states before and
-   after; the same commit moves `bench/baseline.json` with `--update-baseline`; a gain
-   inside the tolerance band, or complexity added without a measured gain, is dropped — the
-   minimal-code rule wins. Never touch `bench/budgets.json`, a benchmark, its dataset, or
-   its seed in this pass.
-5. **Purity check — deterministic, before any reviewer:**
-   ```bash
-   python ~/.claude/cursor-bridge/refactor-check.py main --max-lines 400
-   ```
-   It fails the branch on any test-file change (unless a mechanical rename was listed in
-   the brief with `--allow-test`, which the reviewer must then read), on any
-   `docs/CHANGES.md` change, or on exceeding the size budget. `IMPURE` never reaches a
-   reviewer: drop or fix the offending commit first.
-6. **One gate pass.** The whole branch goes through step 8 once as a single pure
-   refactoring diff: `diff-reviewer` in refactoring mode (behaviour preservation, every
-   caller updated, no smuggled behaviour change), `secret-sentinel`, `security-auditor` or
-   `design-auditor` only if the diff touches their surface, CI, and Review B with the
-   explicit question "is this behaviour-preserving?". Merge as one squash. No
-   `CHANGES.md` entry — there is no behaviour change to log; the refactoring is noted in
-   the Project Summary at the reflection point instead.
-7. **Beyond budget** candidates go to `docs/HARDENING.md` under the stage name, and are
-   the first thing the next stage's scout reads.
-
-The pass never escalates. It never introduces an abstraction for hypothetical reuse, never
-touches a required security, observability, or accessibility control because it "looks
-repetitive", and never changes a public interface other callers use unless every caller is
-inside the diff. At **project end** run one final pass over the whole tree before the User
-Manual is written.
+- `delegation-loop.inspect-checks` — checks and reviews a conditional workflow adds to the inspect step, on every change of the part the loop checks (an increment, a fix, a refactoring candidate, or the refactoring branch's gate pass in step 9), each placed at the step that runs it: beside the scope and design-conformance checks or among the reviewer passes (step 4), or with the secret scan and the dependency admission (steps 5 and 5b); a finding is handled as that step handles its own: a blocking one re-delegates (step 7), a builder's objection goes to "Objections — bottom-up escalation", and a consequence the owner bears goes to the owner (rule 56).
+- `delegation-loop.test-checks` — tests and checks run with the tests of every change of the part the loop checks (step 4: the change's tests, the suite, the new tests against the checkpoint), such as the observability tests of a part with screens or the benchmark floor (step 6); a failing one is a correctness-class block, re-delegated like any defect (step 7).
+- `delegation-loop.brief-constraints` — constraints every brief for the part carries beside spec-packager's template, such as a frozen rule the builder must follow, written into the brief at step 2 and checked by `diff-reviewer` with the rest of the brief.

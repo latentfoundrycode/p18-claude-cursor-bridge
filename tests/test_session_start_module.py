@@ -88,12 +88,22 @@ def test_r005_the_table_maps_every_template_phase_value():
     assert sorted(TEMPLATE_PHASES) == sorted(EXPECTED), TEMPLATE_PHASES
 
 
-# the files a module's own pointer lines name after it, in the installed bridge (TASK-012: the interface variants)
+# the files a module's own pointer lines name after it, in the installed bridge (TASK-012: the interface variants;
+# TASK-013: the delegation loop's sub-file)
 POINTED = {
     "interface": ["interface/mockups.md", "interface/command-design.md", "interface/contract-design.md",
                   "interface/playable-prototype.md"],
+    "delegation-loop": ["delegation-loop/refactoring-pass.md"],
 }
 IFACE = [P + "interface.md"] + [P + f for f in POINTED["interface"]]
+LOOP = [P + "delegation-loop.md"] + [P + f for f in POINTED["delegation-loop"]]
+
+
+def own_loop(home, pointer_lines):
+    """A delegation-loop module of the test's own, holding only its heading and the given lines, so a test of the
+    pointer-line grammar sees no line but its own (the installed module names its sub-file, TASK-013)."""
+    loop = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md"
+    loop.write_text("## Phase 6 — The delegation loop\n" + pointer_lines, encoding="utf-8")
 
 
 @pytest.mark.parametrize("phase", sorted(EXPECTED))
@@ -146,8 +156,8 @@ def test_r005_the_conditional_files_that_touch_the_phase_are_named_after_its_mod
     assert named(out) == [P + "intake.md", W + "types/host-extension.md"], out
     out = pointers(project(tmp_path, "Phase: building", LINE), home)
     # a heading inside a fenced block changes nothing: the type does not touch the delegation loop
-    assert named(out) == [P + "delegation-loop.md", P + "reflection.md", P + "project-end.md",
-                          W + "traits/installable.md", W + "traits/external-services.md"], out
+    assert named(out) == LOOP + [P + "reflection.md", P + "project-end.md",
+                                 W + "traits/installable.md", W + "traits/external-services.md"], out
 
 
 def test_r034_the_conditional_files_follow_the_order_additions_apply_in(tmp_path, home):
@@ -164,8 +174,8 @@ def test_r005_a_file_two_parts_share_is_named_once_in_the_first_parts_place(tmp_
     out = pointers(project(tmp_path, "Phase: building",
                            "Workflows: app: Host Extension Development; traits: External services",
                            "Workflows: tool: Host Extension Development → Claude Code Extension; traits: Installable, External services"), home)
-    assert named(out) == [P + "delegation-loop.md", P + "reflection.md", P + "project-end.md",
-                          W + "traits/external-services.md", W + "traits/installable.md"], out
+    assert named(out) == LOOP + [P + "reflection.md", P + "project-end.md",
+                                 W + "traits/external-services.md", W + "traits/installable.md"], out
 
 
 def test_r005_a_named_workflow_that_is_not_written_is_not_named(tmp_path, home):
@@ -177,9 +187,8 @@ def test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_modul
     """A module names its sub-files on a `Sub-files:` line and its variant files on a `Variants:` line, each path
     relative to workflow/phases/, separated by `; ` (handoff/TASK-015.md); the hook lists them after the module, in
     the order written; a line inside a fenced block names nothing."""
-    loop = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md")
-    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: delegation-loop/merge.md; delegation-loop/inspect.md\n\n"
-                    "```\nSub-files: delegation-loop/not-this.md\n```\n", encoding="utf-8")
+    own_loop(home, "\nSub-files: delegation-loop/merge.md; delegation-loop/inspect.md\n\n"
+                   "```\nSub-files: delegation-loop/not-this.md\n```\n")
     write(home, "phases/delegation-loop/merge.md", "## Merge\n")
     write(home, "phases/delegation-loop/inspect.md", "## Inspect\n")
     interface = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "interface.md")
@@ -195,9 +204,7 @@ def test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_modul
 
 
 def test_r005_a_pointer_line_names_no_file_outside_its_module_folder(tmp_path, home):
-    loop = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md")
-    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: ../../Known-Pitfalls.md; delegation-loop/ok.md; C:/x.md\n",
-                    encoding="utf-8")
+    own_loop(home, "\nSub-files: ../../Known-Pitfalls.md; delegation-loop/ok.md; C:/x.md\n")
     write(home, "phases/delegation-loop/ok.md", "## Ok\n")
     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/ok.md", P + "reflection.md", P + "project-end.md"], out
@@ -206,9 +213,8 @@ def test_r005_a_pointer_line_names_no_file_outside_its_module_folder(tmp_path, h
 def test_r005_a_pointer_path_outside_the_pattern_is_ignored_even_in_lower_case(tmp_path, home):
     """handoff/TASK-015.md Requirement 4: letters, digits, hyphens and `/` only; no `.` or `..` segment, no drive, no
     leading `/`, no empty segment (the other test's bad paths hold capitals, which a looser pattern refuses too)."""
-    loop = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md")
-    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: ../escape.md; ./here.md; c:/x.md; /root.md; "
-                    "a//b.md; a.b/c.md; under_score.md; delegation-loop/ok.md\n", encoding="utf-8")
+    own_loop(home, "\nSub-files: ../escape.md; ./here.md; c:/x.md; /root.md; "
+                   "a//b.md; a.b/c.md; under_score.md; delegation-loop/ok.md\n")
     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/ok.md", P + "reflection.md", P + "project-end.md"], out
 
@@ -250,9 +256,9 @@ def test_r005_a_replace_heading_touches_the_phase_of_the_module_it_replaces(tmp_
 
 def test_r005_a_path_two_modules_name_is_listed_once(tmp_path, home):
     """handoff/TASK-015.md Requirements 2 and 4: no path is printed twice in the file list."""
-    for key in ("delegation-loop", "reflection"):
-        module = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / (key + ".md")
-        module.write_text(module.read_text(encoding="utf-8") + "\nSub-files: shared/checklist.md\n", encoding="utf-8")
+    own_loop(home, "\nSub-files: shared/checklist.md\n")
+    module = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "reflection.md"
+    module.write_text(module.read_text(encoding="utf-8") + "\nSub-files: shared/checklist.md\n", encoding="utf-8")
     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
     assert named(out) == [P + "delegation-loop.md", P + "shared/checklist.md", P + "reflection.md", P + "project-end.md"], out
 
@@ -416,9 +422,7 @@ def test_r005_a_run_leaves_no_bytecode_under_the_home(tmp_path, home):
 def test_r005_a_pointer_line_naming_a_module_of_the_phase_prints_it_once_in_its_place(tmp_path, home):
     """handoff/TASK-015-r2.md Requirement R2-1 (Review A B1): no path is printed twice; a pointer line that names one
     of the phase's own modules names nothing, and the module keeps its place and its note."""
-    loop = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "delegation-loop.md"
-    loop.write_text(loop.read_text(encoding="utf-8") + "\nSub-files: project-end.md; reflection.md; delegation-loop.md; "
-                    "delegation-loop/merge.md\n", encoding="utf-8")
+    own_loop(home, "\nSub-files: project-end.md; reflection.md; delegation-loop.md; delegation-loop/merge.md\n")
     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/merge.md", P + "reflection.md",
                           P + "project-end.md"], out

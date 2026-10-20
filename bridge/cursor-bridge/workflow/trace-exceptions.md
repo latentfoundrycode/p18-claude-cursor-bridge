@@ -33,3 +33,14 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md What the interface phase hands to the plan
 - reword TASK-012 bridge/commands/supervisor.md The design-tooling flow
 - new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md Step 0 — Prior-project lessons (ask before drafting)
+- new TASK-013 bridge/cursor-bridge/workflow/phases/run-parameters.md What must survive a compaction
+- new TASK-013 bridge/cursor-bridge/workflow/phases/run-parameters.md Writing the answers down
+- new TASK-013 bridge/cursor-bridge/workflow/phases/run-parameters.md Extension points
+- new TASK-013 bridge/cursor-bridge/workflow/phases/configuration.md What must survive a compaction
+- new TASK-013 bridge/cursor-bridge/workflow/phases/configuration.md Keeping the position
+- new TASK-013 bridge/cursor-bridge/workflow/phases/configuration.md Extension points
+- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md What must survive a compaction
+- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md The procedure
+- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md Extension points
+- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md Where this sub-file belongs
+- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md Keeping the pass's position

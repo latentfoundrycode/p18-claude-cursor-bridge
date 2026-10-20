@@ -1,5 +1,16 @@
 ## Phase 5 — Configure the Cursor build environment
 
+### What must survive a compaction
+
+After a compaction or a resume in this phase, read these before your next action:
+
+- this module, whole, with `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole (the session-start hook names both for this phase);
+- the approved design and plan: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/BUILD_PLAN.md` and `docs/RUN_PARAMETERS.md`, whole: only the items that are load-bearing for this project are applied;
+- `docs/PROJECT_STATUS.md`, whole: its `Next:` line names the items configured so far and the next one ("Keeping the position"), its `Awaiting user on:` line an escalation that waits for the owner, and its `Workflows:` line the conditional workflows that add items at `configuration.items`;
+- `docs/INVENTORY.md`, whole: its Resources rows record each pinned tool and version, each mode in force and each spending limit as the items are configured.
+
+### The procedure
+
 Once, after the plan is approved and before the first delegation, set up the headless
 builder so it can produce and self-correct good code. Work through
 `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` — read it by that absolute path;
@@ -97,3 +108,13 @@ row without one. A limit the owner names is theirs: ask for the figure in the qu
 account, or a dependency carrying a consequence the owner bears (money, privacy, lock-in) —
 resolve it with the user before delegating. Routine technical configuration choices you decide
 yourself and record; do not escalate them.
+
+### Keeping the position
+
+While the phase runs, keep the status file's `Next:` line naming the items configured so far and the next one, rewritten as each is finished, so that a resume after a compaction neither redoes an item nor skips one. It names each item by its name only, never a key's value or a path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the line names the first increment, and what was configured stands in the status file, as "Commit the configuration as its own checkpoint" above asks, with each tool's pinned version in `docs/INVENTORY.md` (Resources).
+
+## Extension points
+
+This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
+
+- `configuration.items` — configuration items, tools and checks a conditional workflow adds to those above, each worked as they are: written by **cursor-configurator** on your instruction, each tool's pinned version recorded in `docs/INVENTORY.md` (Resources), and committed with the configuration's checkpoint; made once for the whole project.
