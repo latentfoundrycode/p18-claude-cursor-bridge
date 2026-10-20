@@ -29,3 +29,9 @@ No mutation driver.
 ## Expected bookkeeping and record files in the diff
 - docs/BUILD_PLAN.md (TASK-014's Scope widened; TASK-030's Scope and Done when gain Known-Pitfalls.md, carried from PR #57's Review B), docs/DESIGN_CRITIQUE.md (the windowless record's after-the-gate line extended for that carry), docs/REQUIREMENTS.md (R-004, R-006, R-032, R-036 built, their evidence), docs/INVENTORY.md (the closing modules Features row; a Decisions row for run/supervisor/in-flight.md as the reflection points' position), docs/HARDENING.md (Stage B3: three leads closed; "### TASK-014"), docs/PROJECT_STATUS.md (as at the merge of this pull request, ISS-009; its Working files wording carried from PR #57's Review B), docs/ROSTER.resolved.json (the roster's resolution stamp, if it changes)
 - run/review/ (these review files)
+
+## Review B round 1 (REJECT) and what this head does with it
+- Blocking 1, taken: change-cycle.md's survival list names step 5's modules, `run-parameters.md` with `docs/RUN_PARAMETERS.md` and `configuration.md`.
+- Blocking 2, taken: reflection.md's "Whether a compaction preceded it": `Compaction before: yes` means a compaction only; a resume or a fork is written on a line of its own; `unknown` where the hook's input names no source.
+- Should-fix, taken: HARDENING's suite counts; step 7 runs project end through `project-end.md`, scaled (a third passage of the core's change cycle reworded: the carve test's pin is 258 under workflow/, 10 excused).
+- The full suite on this head: 1,961 passed, 33 skipped.
