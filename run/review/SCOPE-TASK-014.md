@@ -38,3 +38,10 @@ No mutation driver.
 
 ## Review B round 2 (REJECT) and what this head does with it
 - Blocking, taken: project-end.md's survival list names the register (`docs/REQUIREMENTS.md`) for the "Project complete" line's deferred and dropped requirements, and the status file for the deferred increments, not the inventory's Deferred rows; tests/test_phase_modules_close.py pins it. Review A's confirming read APPROVE. The full suite on this head: 1,961 passed, 33 skipped.
+
+## Review B round 3 (REJECT) and what this head does with it
+- Blocking, taken: the core's rule 34 (bridge/commands/supervisor.md) names the interface variant of each kind the change touches and the change cycle's own gates; the Standing rules `reword` entry covers it (labelled TASK-015); tests/test_core_carve.py pins its NOTE (155 in supervisor.md, 11 excused). bridge/commands/supervisor.md joins the widened Scope.
+- Should-fix, taken: the plan's Scope note counts three reworded passages and rule 34.
+- Noted, recorded as a HARDENING lead: the status template has no field for deferred increments.
+- Also on this head: the status file's Maintainer requests line records a maintainer's pace update (2026-10-20), whose placement is the owner's (rule 57); the request is kept in run/supervisor/maintainer-pace.md (gitignored).
+- Review A's confirming read APPROVE. The full suite on this head: 1,961 passed, 33 skipped.
