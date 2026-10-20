@@ -117,7 +117,7 @@ entry, and never edit the bridge yourself.
 
 #### Whether a compaction preceded it
 
-Every entry's part written on detection also gives the time the incident happened, in UTC, and one line, `Compaction before: yes, <the compaction's time in UTC, where known>` or `Compaction before: no`: whether the session's context was compacted, or the session resumed, between your last whole reading of the governing text and the incident. The bridge's maintainer measures from these lines how often a rule is broken within an hour of a compaction, which entries carrying a date alone could not show.
+Every entry's part written on detection also gives the time the incident happened, in UTC, and one line, `Compaction before:` followed by `yes` and the compaction's time in UTC where it is known, or by `no`: whether the session's context was compacted between your last whole reading of the governing text and the incident. A resume or a fork of the session in that time is not a compaction and is written on a line of its own, `Resumed before:` or `Forked before:` with its time where known (the session-start hook's message after each says which of the three it follows, when its input names it). The bridge's maintainer measures from these lines how often a rule is broken within an hour of a compaction, which entries carrying a date alone could not show.
 
 ## Extension points
 

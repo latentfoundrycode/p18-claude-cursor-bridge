@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-20 17:52",
+  "generated": "2026-10-20 18:38",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -106,7 +106,7 @@
     "cursor-bridge/workflow-check.py": "ff87680ca972eb50abbda822443420f7c650b5fee9e8b607cdf9e6fcf27c9d73",
     "cursor-bridge/workflow/extension-points.md": "d62447f21dd4acff615d4260ed40baa86d8d2f0567f928a1689a9a4cbb98fb8b",
     "cursor-bridge/workflow/open-list.md": "6d37ec2741ab10f6238aa3a2eb0c4e46f57defd109a80a2b08209c1cfcce8840",
-    "cursor-bridge/workflow/phases/change-cycle.md": "f01c6d36ab27c48c8bc4e8000a39439fcf8f51bdd35bb3708e4f5687d711b3ac",
+    "cursor-bridge/workflow/phases/change-cycle.md": "8b4c12bd4afc80a4adcb2dfbd4ddecb0b5d20848805addd41daf6f04eeb3b37a",
     "cursor-bridge/workflow/phases/configuration.md": "929f0be47fd76d6bb39817585a1ee49d9384c2cd227df538935c5cdc4e756c04",
     "cursor-bridge/workflow/phases/delegation-loop.md": "dc3c27b85acfdfea8520a01e4278961a6366a59a8079f9fc0c8a9636caeda5ee",
     "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "40065539a1b0a098569db3d6c35198e0cff7179725ba2bba019287cfa175d987",
@@ -119,7 +119,7 @@
     "cursor-bridge/workflow/phases/interface/playable-prototype.md": "92e933746c522bb37fc71a5172a873cb7cbea3abe6ebc45c9df03c458476542c",
     "cursor-bridge/workflow/phases/planning.md": "6a5a52844bf94dac2a671dabbbca2fcd8abd9315d9a0b02832fc8e52ee1882d6",
     "cursor-bridge/workflow/phases/project-end.md": "5f0e4718496179b1fd9fc1ce86eae585d4559cca1c3431666b6185063aec2d29",
-    "cursor-bridge/workflow/phases/reflection.md": "9ee3a3f60824e62b23f94c11787d3c8c8b4652cdb177c064299b28bc5177e7d8",
+    "cursor-bridge/workflow/phases/reflection.md": "2ea0f5845c36fc20cd44635f4975558d104bdcbf9cd1ea599a731fc97482ac08",
     "cursor-bridge/workflow/phases/run-parameters.md": "7d37e1c3ab4dac2b2069b80998b28e6dfe1f8c68a849afa7a3bf415a2a9f73ed",
     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
     "cursor-bridge/workflow/trace-exceptions.md": "c6535b3e1bed467ab2dced4eddde6e839795ae718ada301a0236a062200237bc",

@@ -4,7 +4,7 @@
 
 After a compaction or a resume in a change cycle, read these before your next action:
 
-- this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its `Variants:` line names, and its plan addendum `planning.md`'s, each scaled to the change; its new stages run `delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the session-start hook names with this module while the phase is `changing`;
+- this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its `Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with `docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, each scaled to the change; its new stages run `delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the session-start hook names with this module while the phase is `changing`;
 - `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its date and the step it has reached, and `Awaiting user on:` a gate that waits for the owner; the inventory's Features answer a request already satisfied, and its Decisions name one the change reverses (item 1);
 - `docs/REQUIREMENTS.md`, with the failures `completion-check.py --mode done` printed at item 1: each is a gap in the previous delivery, reported to the owner first and planned ahead of the request unless the owner defers it;
 - the change's records as far as they are written, whole: its `Change: <name>` section of `docs/DESIGN.md`, its record in `docs/DESIGN_CRITIQUE.md` under the change's subject and under `<the change's name>-plan`, the interface artifacts it amends, and its stages in `docs/BUILD_PLAN.md`;
@@ -52,8 +52,8 @@ Keep the step the change has reached on the `Change cycle:` line, rewritten as e
    reviewers, gate, refactoring pass, reflection points. Every increment's brief states
    which existing behaviour it may change and that everything else is unchanged, and the
    tests that pin the existing behaviour must stay green.
-7. **Project end again.** The close of the addendum's last stage is project end: the User
-   Manual is patched for every `CHANGES.md` entry, the deliverable is rebuilt and verified
+7. **Project end again.** The close of the addendum's last stage is project end, run by `project-end.md` with the additions at its points, scaled to the change: the User
+   Manual is patched for every `CHANGES.md` entry, not written anew, the deliverable is rebuilt and verified
    under the new version, the release is attached, the Issues and Feedback files are
    completed, and `Phase: done` is set. Report "Project complete — <Name> <new version>".
 

@@ -88,7 +88,9 @@ SURVIVAL = {
     "change-cycle": [
         "this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s "
         "procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its "
-        "`Variants:` line names, and its plan addendum `planning.md`'s, each scaled to the change; its new stages run "
+        "`Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with "
+        "`docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, "
+        "each scaled to the change; its new stages run "
         "`delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the "
         "session-start hook names with this module while the phase is `changing`;",
         "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its "
@@ -307,11 +309,17 @@ def test_r004_an_issue_records_whether_a_compaction_preceded_it():
     assert "\n#### Whether a compaction preceded it\n" in issues
     s = flat(section(module("reflection"), "Whether a compaction preceded it", 4)).strip()
     assert s == ("Every entry's part written on detection also gives the time the incident happened, in UTC, and one "
-                 "line, `Compaction before: yes, <the compaction's time in UTC, where known>` or `Compaction before: "
-                 "no`: whether the session's context was compacted, or the session resumed, between your last whole "
-                 "reading of the governing text and the incident. The bridge's maintainer measures from these lines how "
-                 "often a rule is broken within an hour of a compaction, which entries carrying a date alone could not "
-                 "show.")
+                 "line, `Compaction before:` followed by `yes` and the compaction's time in UTC where it is known, or by "
+                 "`no`: whether the session's context was compacted between your last whole reading of the governing "
+                 "text and the incident. A resume or a fork of the session in that time is not a compaction and is "
+                 "written on a line of its own, `Resumed before:` or `Forked before:` with its time where known (the "
+                 "session-start hook's message after each says which of the three it follows, when its input names it). The "
+                 "bridge's maintainer "
+                 "measures from these lines how often a rule is broken within an hour of a compaction, which entries "
+                 "carrying a date alone could not show.")
+    # Review B, round 1: a resume is not a compaction, so `yes` names a compaction only and a resume has a line of its
+    # own (the hook tells the three apart: session-start.py's compact, resume and fork messages)
+    assert "`Compaction before:` followed by `yes`" in s and "`Resumed before:`" in s and "or the session resumed" not in s
 
 
 def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
@@ -336,11 +344,11 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
 
 
 # sha256 of the change cycle's procedure as TASK-014 leaves it (from its heading to the file's end, LF, the whitespace at
-# its end stripped; 6,280 characters): the trace entry on "The procedure" excuses new text anywhere under it, so CI holds
+# its end stripped; 6,378 characters): the trace entry on "The procedure" excuses new text anywhere under it, so CI holds
 # the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this pin is reviewed as a new
 # trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the increment's record names
 # each passage it adds or rewords under the procedure
-PROCEDURE_SHA256 = "03af47299032e37bbf106e72bcb0ec1784241ce16948aec3591ddb97d094f40a"
+PROCEDURE_SHA256 = "02c6c662783f67e65f38c3394b4f4091c742ccb06bf1541db2568b077583a4ac"
 
 
 def test_the_change_cycles_procedure_is_pinned():
@@ -348,7 +356,7 @@ def test_the_change_cycles_procedure_is_pinned():
     one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
     text = module("change-cycle")
     proc = text[text.index("### The procedure"):].rstrip()
-    assert len(proc) == 6280 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
+    assert len(proc) == 6378 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
 
 
 def test_r004_the_positions_the_survival_lists_name_are_kept():
