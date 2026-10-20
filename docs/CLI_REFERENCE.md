@@ -861,9 +861,10 @@ registry cannot be read, no conditional file and no pointer-line file is named; 
 states what could not be read (only when a phase module file exists or a classified Workflows
 line needed that read). A path returned by the checker is never printed; a reason or exception
 type name appears only when it is wholly ``[A-Za-z0-9 #().,'-]+`` (a reason) or an identifier
-``[A-Za-z_][A-Za-z0-9_]*`` (a type name). The hook guards against a partial,
-mismatched or hand-edited install, not a hostile checker, which runs in-process and could write
-to its output directly. The hook still never blocks.
+``[A-Za-z_][A-Za-z0-9_]*`` (a type name). Any exception the checker raises is caught; what
+the checker prints is discarded. The hook guards against a partial, mismatched or hand-edited
+install, not a hostile checker, which runs in-process and could write to its output directly.
+The hook still never blocks.
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,

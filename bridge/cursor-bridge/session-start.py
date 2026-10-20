@@ -53,9 +53,10 @@ registry cannot be read, no conditional file and no pointer-line file is named; 
 states what could not be read (only when a phase module file exists or a classified Workflows
 line needed that read). A path returned by the checker is never printed; a reason or exception
 type name appears only when it is wholly ``[A-Za-z0-9 #().,'-]+`` (a reason) or an identifier
-``[A-Za-z_][A-Za-z0-9_]*`` (a type name). The hook guards against a partial,
-mismatched or hand-edited install, not a hostile checker, which runs in-process and could write
-to its output directly. The hook still never blocks.
+``[A-Za-z_][A-Za-z0-9_]*`` (a type name). Any exception the checker raises is caught; what
+the checker prints is discarded. The hook guards against a partial, mismatched or hand-edited
+install, not a hostile checker, which runs in-process and could write to its output directly.
+The hook still never blocks.
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
@@ -67,7 +68,9 @@ second pass, S1), and a silent supervisor is the failure this hook exists to pre
 forked session is told not to continue the loop (S8). It never blocks (exit 0 always), never
 writes anything, and keeps each part under the cap. ASCII-only apart from what it quotes.
 """
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import re
@@ -193,13 +196,15 @@ def load_checker_module():
     checker = os.path.join(bridge_root(), "workflow-check.py")
     previous = sys.dont_write_bytecode
     sys.dont_write_bytecode = True
+    sink = io.StringIO()
     try:
-        spec = importlib.util.spec_from_file_location("workflow_check_hook", checker)
-        if spec is None or spec.loader is None:
-            raise ImportError("no loader")
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-    except (Exception, SystemExit) as err:
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            spec = importlib.util.spec_from_file_location("workflow_check_hook", checker)
+            if spec is None or spec.loader is None:
+                raise ImportError("no loader")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+    except BaseException as err:
         return None, "%s: cannot be loaded (%s)" % (CHECKER_SHOWN, safe_exc_type_name(err))
     finally:
         sys.dont_write_bytecode = previous
@@ -215,7 +220,7 @@ def safe_reason(reason):
 def safe_exc_type_name(err):
     try:
         name = type(err).__name__
-    except (Exception, SystemExit):
+    except BaseException:
         return "an exception"
     if type(name) is not str or not PLAIN_TYPE_NAME.fullmatch(name):
         return "an exception"
@@ -369,6 +374,8 @@ def pointer_paths_from_module(text, wc):
     paths, seen = [], set()
     fence = None
     for line in lines:
+        if type(line) is not str:
+            continue
         if fence is None:
             opened = wc.opening_fence(line)
             if opened is not None:
@@ -384,6 +391,8 @@ def pointer_paths_from_module(text, wc):
                 rest = line[len(prefix):].rstrip()
                 for part in rest.split("; "):
                     p = part.rstrip()
+                    if type(p) is not str:
+                        continue
                     if POINTER_PATH.fullmatch(p) and p not in seen:
                         seen.add(p)
                         paths.append(p)
@@ -489,33 +498,35 @@ def pointers_part(status, source):
             if load_err:
                 read_error = load_err
             else:
+                sink = io.StringIO()
                 try:
-                    if not tables_at_installed_paths(wc):
-                        read_error = TABLES_NOT_INSTALLED
-                    else:
-                        link_err = workflow_table_link_error(wc)
-                        if link_err:
-                            read_error = link_err
+                    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+                        if not tables_at_installed_paths(wc):
+                            read_error = TABLES_NOT_INSTALLED
                         else:
-                            tables, table_err = load_tables_from_checker(wc)
-                            if table_err:
-                                read_error = table_err
+                            link_err = workflow_table_link_error(wc)
+                            if link_err:
+                                read_error = link_err
                             else:
-                                for key in module_keys:
-                                    block = []
-                                    if can_read_module_pointers(wc, key):
-                                        mod_path = phase_module_installed(key)
-                                        text, _shown, err = wc.read_utf8(mod_path)
-                                        if err is None:
-                                            for rel in pointer_paths_from_module(text, wc):
-                                                shown = PHASE_PREFIX + rel
-                                                if shown not in printed_paths:
-                                                    printed_paths.add(shown)
-                                                    block.append("  - %s" % shown)
-                                    pointer_blocks.append(block)
-                                conditional_lines = ["  - %s" % p for p in collect_conditional_files(
-                                    wc, tables, module_keys, status, printed_paths)]
-                except (Exception, SystemExit) as err:
+                                tables, table_err = load_tables_from_checker(wc)
+                                if table_err:
+                                    read_error = table_err
+                                else:
+                                    for key in module_keys:
+                                        block = []
+                                        if can_read_module_pointers(wc, key):
+                                            mod_path = phase_module_installed(key)
+                                            text, _shown, err = wc.read_utf8(mod_path)
+                                            if err is None:
+                                                for rel in pointer_paths_from_module(text, wc):
+                                                    shown = PHASE_PREFIX + rel
+                                                    if shown not in printed_paths:
+                                                        printed_paths.add(shown)
+                                                        block.append("  - %s" % shown)
+                                        pointer_blocks.append(block)
+                                    conditional_lines = ["  - %s" % p for p in collect_conditional_files(
+                                        wc, tables, module_keys, status, printed_paths)]
+                except BaseException as err:
                     read_error = "%s: cannot be used (%s)" % (CHECKER_SHOWN, safe_exc_type_name(err))
                     pointer_blocks = []
                     conditional_lines = []

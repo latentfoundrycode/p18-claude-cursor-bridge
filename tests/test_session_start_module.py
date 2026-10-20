@@ -515,7 +515,7 @@ def test_r005_a_type_name_that_is_not_a_string_is_an_exception(tmp_path, home):
 
 
 @pytest.mark.parametrize("table", ["open-list", "registry"])
-def test_r006_a_table_error_is_mapped_by_the_hooks_own_paths(tmp_path, home, table):
+def test_r005_a_table_error_is_mapped_by_the_hooks_own_paths(tmp_path, home, table):
     """handoff/TASK-015-r5.md R5-1's mapping clause, as handoff/TASK-015-r6.md restates it (round 5, Review A's
     should-fix): with the checker's table path spelled with a `..` that compares equal to the installed one, a table
     error still names the hook's file and its reason, never "an unexpected table error". The path strings differ by
@@ -561,7 +561,7 @@ KEY_PARTS = {
 
 
 @pytest.mark.parametrize("part", sorted(KEY_PARTS))
-def test_r006_a_table_key_that_is_not_a_plain_string_names_no_file(tmp_path, home, part):
+def test_r005_a_table_key_that_is_not_a_plain_string_names_no_file(tmp_path, home, part):
     """handoff/TASK-015-r6.md R6-2 (round 5, the security audit's first advisory and Review A's consider, convergent):
     a type, sub-type or trait key the checker's tables give as a str subclass is not used, as a key outside the key
     pattern is not; its `__str__` could otherwise put any text into a path the hook prints. The precondition: the
@@ -586,11 +586,13 @@ def test_r006_a_table_key_that_is_not_a_plain_string_names_no_file(tmp_path, hom
     assert cannot_read_lines(out) == [], out
 
 
-def test_r007_a_pointer_line_that_is_not_a_plain_string_names_nothing(tmp_path, home):
+@pytest.mark.parametrize("kind", ["sly", "plain"])
+def test_r005_a_pointer_line_that_is_not_a_plain_string_names_nothing(tmp_path, home, kind):
     """handoff/TASK-015-r7.md R7-1 (round 6, Review A S1 and the security audit's first advisory, convergent): a line
     the checker's file_lines gives as a str subclass is not read for pointer paths; a subclass whose methods return
-    the subclass would otherwise decide, through __radd__, the path the hook prints. The precondition: the same
-    module line as the checker gives it today names its file."""
+    the subclass would otherwise decide, through __radd__, the path the hook prints ("sly"). A subclass that
+    overrides nothing ("plain", round 7, Review A's should-fix) slices to exact strs, so only the line test holds
+    it. The precondition: the same module line as the checker gives it today names its file."""
     add_intake_sub_file(home)
     intact = pointers(project(tmp_path, "Phase: intake", "Workflows: not yet classified"), home)
     assert named(intact) == [P + "intake.md", P + "intake/questions.md"], intact
@@ -605,13 +607,18 @@ def test_r007_a_pointer_line_that_is_not_a_plain_string_names_nothing(tmp_path, 
            "def file_lines(text):\n"
            "    return [_Sly(l) if l.startswith('Sub-files: ') else l for l in file_lines_old(text)]\n\n\n"
            "def file_lines_old(")
+    if kind == "plain":
+        sly = ("class _Sly(str):\n    pass\n\n\n"
+               "def file_lines(text):\n"
+               "    return [_Sly(l) if l.startswith('Sub-files: ') else l for l in file_lines_old(text)]\n\n\n"
+               "def file_lines_old(")
     checker.write_text(source.replace("def file_lines(", sly), encoding="utf-8")
     out = pointers(project(tmp_path, "Phase: intake", "Workflows: not yet classified"), home)
     assert named(out) == [P + "intake.md"], out
     assert cannot_read_lines(out) == [], out
 
 
-def test_r007_what_the_checker_writes_is_not_the_hooks_output(tmp_path, home):
+def test_r005_what_the_checker_writes_is_not_the_hooks_output(tmp_path, home):
     """handoff/TASK-015-r7.md R7-3 (round 6, the security audit's third advisory): a hand-edited checker that prints,
     at its load or while the hook uses it, adds nothing to the hook's output or its error stream (pointers() asserts
     an empty stderr); the part is as it would be without the prints. The precondition: the same home without the
