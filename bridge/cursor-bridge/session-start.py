@@ -207,13 +207,16 @@ def load_checker_module():
 
 
 def safe_reason(reason):
-    if not isinstance(reason, str) or not PLAIN_REASON.fullmatch(reason):
+    if type(reason) is not str or not PLAIN_REASON.fullmatch(reason):
         return "cannot be read"
     return reason
 
 
 def safe_exc_type_name(err):
-    name = type(err).__name__
+    try:
+        name = type(err).__name__
+    except (Exception, SystemExit):
+        return "an exception"
     if type(name) is not str or not PLAIN_TYPE_NAME.fullmatch(name):
         return "an exception"
     return name
@@ -259,10 +262,10 @@ def workflow_table_link_error(wc):
     root = workflow_root()
     if wc.is_link(root):
         return WORKFLOW_PREFIX.rstrip("/") + "/: is a link"
-    open_path = os.path.join(root, "open-list.md")
+    open_path = installed_open_list_path()
     if wc.is_link(open_path):
         return "%s: is a link" % OPEN_SHOWN
-    reg_path = os.path.join(root, "extension-points.md")
+    reg_path = installed_registry_path()
     if wc.is_link(reg_path):
         return "%s: is a link" % REG_SHOWN
     return None
@@ -416,20 +419,20 @@ def conditional_candidates(wc, tables, type_name, sub_name, trait_names):
     if not row:
         return paths
     type_key = row["Key"]
-    if KEY_PATTERN.fullmatch(type_key):
+    if type(type_key) is str and KEY_PATTERN.fullmatch(type_key):
         paths.append("types/%s.md" % type_key)
     if sub_name:
         sub_row = tables["sub_by_name"].get(sub_name)
-        if sub_row and KEY_PATTERN.fullmatch(type_key):
+        if sub_row and type(type_key) is str and KEY_PATTERN.fullmatch(type_key):
             sub_key = sub_row["Key"]
-            if KEY_PATTERN.fullmatch(sub_key):
+            if type(sub_key) is str and KEY_PATTERN.fullmatch(sub_key):
                 paths.append("types/%s/%s.md" % (type_key, sub_key))
     trait_keys = []
     for name in trait_names:
         trow = tables["trait_by_name"].get(name)
         if trow:
             tkey = trow["Key"]
-            if KEY_PATTERN.fullmatch(tkey):
+            if type(tkey) is str and KEY_PATTERN.fullmatch(tkey):
                 trait_keys.append((tables["trait_order"].get(name, 999999), tkey))
     trait_keys.sort(key=lambda pair: pair[0])
     for _, tkey in trait_keys:
