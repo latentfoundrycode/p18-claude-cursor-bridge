@@ -105,7 +105,7 @@ Every project runs the main workflow. What differs by product lives in condition
 | **Sub-workflow** | For one sub-type: a more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
 | **Trait additions** | For one trait: what it adds, whatever the product type | Their additions to the current phase, when the part has the trait |
 
-Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in, or a conditional workflow that does not apply. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
+Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in, except a module "The phase modules" says is read outside its own phase, or a conditional workflow that does not apply. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
 
 **Three kinds of change.** Each change a conditional workflow makes is one of these:
 
@@ -224,6 +224,12 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
 | Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
 
 Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module.
+
+**Modules read outside their own phase.** Some procedures run outside the phase whose `Phase:` value names their module; they are read whenever they apply, whatever the phase:
+- `reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;
+- its section "Issues — what counts, and where it is written" is read whenever an issue is detected, in any phase;
+- `project-end.md` is read whole at the close of the plan's last stage;
+- a module that runs another phase's procedure by its heading (the change cycle runs Phases 1 to 4, scaled) reads that phase's module whole for that step.
 
 ---
 

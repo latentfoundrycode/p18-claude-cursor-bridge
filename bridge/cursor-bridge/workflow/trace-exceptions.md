@@ -7,3 +7,4 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-010 bridge/cursor-bridge/workflow/phases/project-end.md Where this module begins
 - new TASK-010 bridge/cursor-bridge/workflow/phases/reflection.md Project end
 - reword TASK-015 bridge/commands/supervisor.md Standing rules
+- new TASK-010 bridge/commands/supervisor.md The phase modules

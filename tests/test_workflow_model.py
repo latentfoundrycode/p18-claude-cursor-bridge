@@ -72,7 +72,9 @@ def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when
     assert ("This file, the core, is read whole at every start, resume and calibration, and with it the current "
             "phase's module or modules and the conditional workflows that apply; after every compaction or resume you "
             "read what the session-start hook names before your next action (rule 28)") in s, "the core stays whole; phases and conditionals add"
-    assert "You never read a phase you are not in, or a conditional workflow that does not apply" in s
+    # the exception names where the modules read outside their own phase are listed (PR #52's gate, Review A)
+    assert ("You never read a phase you are not in, except a module \"The phase modules\" says is read outside its own "
+            "phase, or a conditional workflow that does not apply") in s
     assert "reading only the current phase" not in s, "the core is never replaced by a phase-only read"
     assert "Until the phases are moved into files of their own" not in s, "the transitional reading is gone with the carve"
 

@@ -64,6 +64,10 @@ def project(tmp_path, *status_lines):
 
 def pointers(cwd, home, source="compact"):
     env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
+    # bytecode writing left on, so the no-bytecode test cannot pass because the runner turned it off (PR #52's gate,
+    # Review A B1)
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+    env.pop("PYTHONPYCACHEPREFIX", None)
     data = {"cwd": str(cwd), "hook_event_name": "SessionStart", "source": source}
     p = subprocess.run([sys.executable, PROG, "--part", "pointers"], input=json.dumps(data), capture_output=True,
                        text=True, encoding="utf-8", env=env)
@@ -225,6 +229,17 @@ def test_r005_a_set_heading_touches_the_phase_like_an_add(tmp_path, home):
     assert named(out) == [P + "design.md"], out
 
 
+def test_r005_a_replace_heading_touches_the_phase_of_the_module_it_replaces(tmp_path, home):
+    """handoff/TASK-015.md Requirement 5: a `replace` whose module is one of the phase's modules touches the phase
+    (PR #52's gate, Review A S1: no test held the replace clause). The file holds no other heading, so only the
+    replace can name it; at another phase it is not named."""
+    write(home, "types/host-extension.md", "# Host extension\n\n## Replace interface\n\nThe whole interface module.\n")
+    out = pointers(project(tmp_path, "Phase: mockups", "Workflows: Host Extension Development; traits: none"), home)
+    assert W + "types/host-extension.md" in named(out), out
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: Host Extension Development; traits: none"), home)
+    assert named(out) == [P + "intake.md"], out
+
+
 def test_r005_a_path_two_modules_name_is_listed_once(tmp_path, home):
     """handoff/TASK-015.md Requirements 2 and 4: no path is printed twice in the file list."""
     for key in ("delegation-loop", "reflection"):
@@ -378,11 +393,14 @@ def test_r005_the_cannot_read_line_names_its_file_in_the_home_form(tmp_path, hom
 
 def test_r005_a_run_leaves_no_bytecode_under_the_home(tmp_path, home):
     """handoff/TASK-015.md Requirement 7: the hook writes nothing, so loading the installed checker leaves no
-    __pycache__ under ~/.claude."""
+    __pycache__ under ~/.claude. The preconditions (PR #52's gate, Review A B1): the copied tree holds none, the run
+    has bytecode writing on (pointers() drops PYTHONDONTWRITEBYTECODE), and the run loaded the checker, since it names
+    conditional files."""
     conditionals(home)
     for d, dirs, files in os.walk(str(home)):
-        assert "__pycache__" not in dirs, d   # the precondition: the copied tree holds none
-    pointers(project(tmp_path, "Phase: building", LINE), home)
+        assert "__pycache__" not in dirs, d
+    out = pointers(project(tmp_path, "Phase: building", LINE), home)
+    assert W + "traits/installable.md" in named(out), out
     for d, dirs, files in os.walk(str(home)):
         assert "__pycache__" not in dirs, d
 
