@@ -350,6 +350,18 @@ index 497bf2f..7ab465e 100644
 +| R-036 | A new or defined-but-unwritten trait is handled by writing its extra handling into the project's design, flagging it at the design gate (where the owner may still pause), and putting it to the promotion pass at project end. | DESIGN §6.7 | planned | the design and the gate: tests/test_phase_modules_intake_design.py (test_r036_; TASK-011, the `Flagged trait:` row); the promotion pass follows in TASK-014 |
  | R-037 | Release B is delivered: a release-level review by a fresh context (one pass, fixes, a second pass); the stamp (VERSION, a regenerated MANIFEST, a CHANGELOG entry with its "if rolled back" notes); the projects paused; `bridge-install.py` run; `bridge-check.py` green on the installed tree; the trial project (reAngle) calibrated and resumed; field acceptance met; the others resumed. | DESIGN §15 conditions 4–5; §16 | planned | — |
  | R-038 | The install mechanics while the supervisor builds on branches (installing from a second checkout that holds only `main`, or pausing and switching this checkout) are settled by the owner, recorded, and reflected in the install run sheet. | DESIGN §16 / A1a "settled at release B's intake" | planned | — |
+diff --git a/docs/ROSTER.resolved.json b/docs/ROSTER.resolved.json
+index f09a1d9..c2eeaf5 100644
+--- a/docs/ROSTER.resolved.json
++++ b/docs/ROSTER.resolved.json
+@@ -10,6 +10,6 @@
+   },
+   "other_pool": "exhausted",
+   "probed": true,
+-  "resolved_at": "2026-10-20T06:10 UTC",
++  "resolved_at": "2026-10-20T08:35 UTC",
+   "reset_day": 16
+ }
 diff --git a/tests/test_phase_modules_intake_design.py b/tests/test_phase_modules_intake_design.py
 new file mode 100644
 index 0000000..4e34593
