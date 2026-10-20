@@ -718,7 +718,7 @@ def test_r005_the_docstring_states_the_grammar_and_the_streams_as_the_code_reads
     TASK-015: the security audit's lead that "what the checker prints is discarded" read wider than the two streams
     the redirection covers, and the grammar's whitespace rule). FIX-003 r2 (Review A's should-fix and considers): the
     old wording is gone, the non-str sentence names only the module lines the hook checks, and the edited paragraphs
-    keep the docstring's wrap of at most 95 characters a line."""
+    keep the docstring's wrap of at most 94 characters a line."""
     import ast
     raw = ast.get_docstring(ast.parse(open(PROG, encoding="utf-8").read()), clean=False)
     doc = re.sub(r"\s+", " ", raw)
@@ -730,7 +730,7 @@ def test_r005_the_docstring_states_the_grammar_and_the_streams_as_the_code_reads
     assert "ignoring trailing whitespace on the line" not in doc
     assert "what the checker prints is discarded" not in doc
     assert "A line the checker's file_lines gives that is not" not in doc
-    assert max(len(line) for line in raw.splitlines()) <= 95
+    assert max(len(line) for line in raw.splitlines()) <= 94
 
 
 def test_r005_what_the_checker_writes_is_not_the_hooks_output(tmp_path, home):

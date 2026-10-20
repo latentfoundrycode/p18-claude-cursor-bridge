@@ -27,7 +27,8 @@ Pointer-line grammar (module files under workflow/phases/, read as UTF-8 with BO
 a line outside fenced blocks (opening_fence / closing_fence as workflow-check.py reads them;
 an unclosed fence runs to the end of the file) that begins at column 0 with exactly
 ``Sub-files: `` or ``Variants: ``; after the prefix, one or more paths separated by ``; ``.
-Each path is taken exactly as written between separators (only whitespace at the end of the line is ignored) and must match
+Each path is taken exactly as written between separators (only whitespace at the end of the
+line is ignored) and must match
 ``^[a-z0-9-]+(/[a-z0-9-]+)*\\.md$`` (relative to workflow/phases/). Other paths on the line
 are ignored. Sub-files and Variants lines are taken together in file order; a path already
 printed is not printed again. Named paths are not checked for existence.
@@ -54,7 +55,10 @@ states what could not be read (only when a phase module file exists or a classif
 line needed that read). A path returned by the checker is never printed; a reason or exception
 type name appears only when it is wholly ``[A-Za-z0-9 #().,'-]+`` (a reason) or an identifier
 ``[A-Za-z_][A-Za-z0-9_]*`` (a type name). Any exception the checker raises is caught; what
-the checker prints through sys.stdout and sys.stderr is discarded. A line the checker's file_lines gives that is not an exact str makes the checker unusable (``cannot be used (TypeError)``). The hook guards against a partial, mismatched or hand-edited
+the checker prints through sys.stdout and sys.stderr is discarded. A line of a phase module
+file that the checker's file_lines gives and that is not an exact str makes the checker
+unusable (``cannot be used (TypeError)``). The hook guards against a partial, mismatched or
+hand-edited
 install, not a hostile checker, which runs in-process and could write to its output directly.
 The hook still never blocks.
 
@@ -391,10 +395,7 @@ def pointer_paths_from_module(text, wc):
         for prefix in ("Sub-files: ", "Variants: "):
             if line.startswith(prefix):
                 rest = line[len(prefix):].rstrip()
-                for part in rest.split("; "):
-                    p = part
-                    if type(p) is not str:
-                        continue
+                for p in rest.split("; "):
                     if POINTER_PATH.fullmatch(p) and p not in seen:
                         seen.add(p)
                         paths.append(p)
