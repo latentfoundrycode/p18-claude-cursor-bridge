@@ -42,4 +42,5 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md What must survive a compaction
 - new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md The procedure
 - new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop.md Extension points
-- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md The refactoring pass (Phase 6, step 9)
+- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md Where this sub-file belongs
+- new TASK-013 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md Keeping the pass's position

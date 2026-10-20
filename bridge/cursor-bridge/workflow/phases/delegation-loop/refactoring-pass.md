@@ -1,5 +1,7 @@
 ## The refactoring pass (Phase 6, step 9)
 
+### Where this sub-file belongs
+
 This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 9, which runs at a stage's close, before the stage's reflection point (`reflection.md`), when `docs/RUN_PARAMETERS.md` turns the refactoring pass on for the stage.
 
 ### 9. Refactoring and optimization pass (at stage close)
@@ -74,3 +76,7 @@ touches a required security, observability, or accessibility control because it 
 repetitive", and never changes a public interface other callers use unless every caller is
 inside the diff. At **project end** run one final pass over the whole tree before the User
 Manual is written.
+
+### Keeping the pass's position
+
+Write the scout's two ranked lists to `run/supervisor/refactor-<stage>-candidates.md` as it returns them, and mark each candidate there as committed, dropped or beyond budget as the pass reaches it; name the file on the status file's `Working files:` line (rule 54). The lists are in the scout's reply alone, which a compaction does not keep, and the detector's report, the briefs and the branch's commits do not say which candidates remain.

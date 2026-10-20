@@ -6,8 +6,8 @@ After a compaction or a resume in this phase, read these before your next action
 
 - this module, whole, with `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole (the session-start hook names both for this phase);
 - the approved design and plan: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/BUILD_PLAN.md` and `docs/RUN_PARAMETERS.md`, whole: only the items that are load-bearing for this project are applied;
-- `docs/INVENTORY.md`, whole: its Resources rows record each pinned tool and version, each mode in force and each spending limit as the items are configured;
-- `docs/PROJECT_STATUS.md`, whole: its `In flight:` line names the items configured so far and the one in hand ("Keeping the position"), its `Awaiting user on:` line an escalation that waits for the owner, and its `Workflows:` line the conditional workflows that add items at `configuration.items`.
+- `docs/PROJECT_STATUS.md`, whole: its `Next:` line names the items configured so far and the next one ("Keeping the position"), its `Awaiting user on:` line an escalation that waits for the owner, and its `Workflows:` line the conditional workflows that add items at `configuration.items`;
+- `docs/INVENTORY.md`, whole: its Resources rows record each pinned tool and version, each mode in force and each spending limit as the items are configured.
 
 ### The procedure
 
@@ -111,7 +111,7 @@ yourself and record; do not escalate them.
 
 ### Keeping the position
 
-While the phase runs, keep the status file's `In flight:` line naming the items configured so far and the one in hand, rewritten as each is finished, so that a resume after a compaction neither redoes an item nor skips one; once the configuration's checkpoint is committed, the line gives way to the record of what was configured.
+While the phase runs, keep the status file's `Next:` line naming the items configured so far and the next one, rewritten as each is finished, so that a resume after a compaction neither redoes an item nor skips one. It names each item by its name only, never a key's value or a path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the line names the first increment, and what was configured stands in the status file, as "Commit the configuration as its own checkpoint" above asks, with each tool's pinned version in `docs/INVENTORY.md` (Resources).
 
 ## Extension points
 

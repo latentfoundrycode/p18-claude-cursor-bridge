@@ -106,16 +106,16 @@ SURVIVAL = {
         "`~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole (the session-start hook names both for this phase);",
         "the approved design and plan: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/BUILD_PLAN.md` and "
         "`docs/RUN_PARAMETERS.md`, whole: only the items that are load-bearing for this project are applied;",
+        "`docs/PROJECT_STATUS.md`, whole: its `Next:` line names the items configured so far and the next one (\"Keeping "
+        "the position\"), its `Awaiting user on:` line an escalation that waits for the owner, and its `Workflows:` line "
+        "the conditional workflows that add items at `configuration.items`;",
         "`docs/INVENTORY.md`, whole: its Resources rows record each pinned tool and version, each mode in force and each "
-        "spending limit as the items are configured;",
-        "`docs/PROJECT_STATUS.md`, whole: its `In flight:` line names the items configured so far and the one in hand "
-        "(\"Keeping the position\"), its `Awaiting user on:` line an escalation that waits for the owner, and its "
-        "`Workflows:` line the conditional workflows that add items at `configuration.items`.",
+        "spending limit as the items are configured.",
     ],
     "delegation-loop": [
         "this module and its sub-file, each whole (the session-start hook names both), with "
         "`~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each "
-        "whole;",
+        "whole, and the other files the hook names;",
         "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of "
         "`run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the "
         "background runs that will wake you and what waits for the owner; while Review B runs the status file is not "
@@ -125,9 +125,15 @@ SURVIVAL = {
         "holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);",
         "`docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass "
         "runs and whether increments run in parallel, and the models the delegate command and Review B name;",
-        "the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, and, while a gate is "
-        "open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, `ASSUMPTIONS-<nnn>.md`, and "
-        "`REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` needs), whole.",
+        "the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, "
+        "`run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message "
+        "(step 4), and `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background; "
+        "and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, "
+        "`ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` "
+        "needs), whole;",
+        "while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's \"Keeping the "
+        "pass's position\"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief "
+        "with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.",
     ],
 }
 
@@ -187,26 +193,67 @@ POINTS = {
                            "worked as they are: written by **cursor-configurator** on your instruction, each tool's "
                            "pinned version recorded in `docs/INVENTORY.md` (Resources), and committed with the "
                            "configuration's checkpoint; made once for the whole project.",
-    "delegation-loop.inspect-checks": "checks run at step 4 on every diff of the part, beside the scope and "
-                                      "design-conformance checks and before the first reviewer; a failing one goes back "
-                                      "to the builder with a corrected brief (step 7), never to the owner.",
-    "delegation-loop.test-checks": "tests and checks run with the part's tests before the first reviewer (step 4), such "
-                                   "as the observability tests of a part with screens (step 6); a failing one is a "
-                                   "correctness-class block, re-delegated like any defect (step 7).",
+    "delegation-loop.inspect-checks": "checks and reviews a conditional workflow adds to the inspect step, on every "
+                                      "change of the part the loop checks (an increment, a fix, a refactoring "
+                                      "candidate, or the refactoring branch's gate pass in step 9), each placed at the "
+                                      "step that runs it: beside the scope and design-conformance checks or among the "
+                                      "reviewer passes (step 4), or with the secret scan and the dependency admission "
+                                      "(steps 5 and 5b); a finding is handled as that step handles its own: a blocking "
+                                      "one re-delegates (step 7), a builder's objection goes to \"Objections — bottom-up "
+                                      "escalation\", and a consequence the owner bears goes to the owner (rule 56).",
+    "delegation-loop.test-checks": "tests and checks run with the tests of every change of the part the loop checks "
+                                   "(step 4: the change's tests, the suite, the new tests against the checkpoint), such "
+                                   "as the observability tests of a part with screens or the benchmark floor (step 6); a "
+                                   "failing one is a correctness-class block, re-delegated like any defect (step 7).",
     "delegation-loop.brief-constraints": "constraints every brief for the part carries beside spec-packager's template, "
                                          "such as a frozen rule the builder must follow, written into the brief at step "
                                          "2 and checked by `diff-reviewer` with the rest of the brief.",
 }
 
 
+def registry_applies():
+    text = read(REGISTRY)
+    table = text.split("\n## Extension points\n", 1)[1].split("\n## ", 1)[0]
+    rows = [l for l in table.split("\n") if l.startswith("|")]
+    header = [c.strip() for c in rows[0].strip("|").split("|")]
+    return {cells["Key"]: cells["Applies"] for cells in
+            (dict(zip(header, [c.strip() for c in row.strip("|").split("|")])) for row in rows[2:])}
+
+
 @pytest.mark.parametrize("key", KEYS)
 def test_r006_each_point_says_where_its_additions_are_made(key):
     """R-006 and the registry's "How a phase module declares its points": each point's line places the additions a
-    conditional workflow makes there, as the point's Applies cell states (per part or for the whole project)."""
+    conditional workflow makes there, and says what the registry's Applies cell states: a point that applies per
+    project is made once for the whole project; one that applies per part names the part (Review A, round 1, S5)."""
+    applies = registry_applies()
     body = section(module(key), "Extension points", 2).strip().split("\n")
     for line in [l for l in body if l.startswith("- ")]:
         k = re.match(r"^- `([a-z0-9.-]+)` — ", line).group(1)
         assert line == "- `%s` — %s" % (k, POINTS[k]), line
+        if applies[k] == "project":
+            assert line.endswith("; made once for the whole project."), (k, line)
+        else:
+            assert applies[k] == "part" and re.search(r"\b(of|for) the part\b", line), (k, applies[k], line)
+            assert "whole project" not in line, line
+
+
+def test_r006_the_inspect_point_spans_every_step_the_registry_gives_it():
+    """R-006 and the registry's paragraph on the inspect and test steps (extension-points.md): the inspect step is
+    every check or review that is not the running of the tests (the reviewer passes, the secret scan and the dependency
+    admission among them), on every change the loop checks, and an addition is placed at the step that runs it; its
+    findings keep the routes their step gives them (Review A, round 1, B2, convergent with the security audit)."""
+    line = flat(section(module("delegation-loop"), "Extension points", 2)).split("- `delegation-loop.inspect-checks`")[1]
+    line = line.split("- `delegation-loop.test-checks`")[0]
+    for part in ("among the reviewer passes (step 4)", "with the secret scan and the dependency admission (steps 5 and 5b)",
+                 "a refactoring candidate, or the refactoring branch's gate pass in step 9",
+                 "each placed at the step that runs it", "a builder's objection goes to \"Objections — bottom-up escalation\"",
+                 "a consequence the owner bears goes to the owner (rule 56)"):
+        assert part in line, part
+    assert "before the first reviewer" not in line and "never to the owner" not in line
+    registry = flat(read(REGISTRY))
+    assert ("the reviewer passes (such as the design auditor the trait *has screens* carries), the secret scan and the "
+            "dependency admission") in registry
+    assert "An addition at either point is placed in the delegation loop's text at the step that runs it." in registry
 
 
 def pointer_lines(text):
@@ -233,8 +280,9 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
     step runs; it holds step 9 under its heading as the core had it, and no other file under workflow/phases/ holds
     the step's heading or its passages."""
     sub = module(SUB)
-    assert headings(sub) == [(2, "The refactoring pass (Phase 6, step 9)"), (3, STEP9)], headings(sub)
-    assert flat(sub.split("\n\n")[1]) == (
+    assert headings(sub) == [(2, "The refactoring pass (Phase 6, step 9)"), (3, "Where this sub-file belongs"),
+                             (3, STEP9), (3, "Keeping the pass's position")], headings(sub)
+    assert flat(section(sub, "Where this sub-file belongs", 3)).strip() == (
         "This file is a sub-file of the delegation-loop module (`delegation-loop.md`, \"The procedure\"), read whole "
         "with it. It holds the loop's step 9, which runs at a stage's close, before the stage's reflection point "
         "(`reflection.md`), when `docs/RUN_PARAMETERS.md` turns the refactoring pass on for the stage.")
@@ -261,24 +309,63 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
                 assert p not in flat(text), (rel, p)
 
 
+# sha256 of step 9 as the delegation-loop module held it at origin/main 5bed396 (from its heading to its last line, LF,
+# trailing whitespace stripped; 5,542 characters): the step moved verbatim, and trace-check, which would see a change,
+# has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword updates this with its record
+STEP9_SHA256 = "43584d2cbcec544785ddfcff165ed636da09101ffe47af8d836845aef9d70a50"
+
+
+def test_r032_step_9_is_verbatim():
+    """R-032 (Review A, round 1, C1): the sub-file's step 9 is the module's step 9 as it was before the split, character
+    for character."""
+    import hashlib
+    sub = module(SUB)
+    step = sub[sub.index("### " + STEP9):sub.index("### Keeping the pass's position")].rstrip()
+    assert len(step) == 5542 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
+
+
+def test_the_refactoring_passs_position_is_written_down():
+    """R-004 (Review A, round 1, S3): the delegation loop's survival list names the pass's candidates file, so the
+    sub-file writes the scout's lists there as they arrive and marks each candidate as the pass reaches it."""
+    s = flat(section(module(SUB), "Keeping the pass's position", 3)).strip()
+    assert s == ("Write the scout's two ranked lists to `run/supervisor/refactor-<stage>-candidates.md` as it returns "
+                 "them, and mark each candidate there as committed, dropped or beyond budget as the pass reaches it; name "
+                 "the file on the status file's `Working files:` line (rule 54). The lists are in the scout's reply "
+                 "alone, which a compaction does not keep, and the detector's report, the briefs and the branch's "
+                 "commits do not say which candidates remain.")
+
+
 def test_the_run_parameters_are_written_as_each_answer_is_given():
     """R-004: the survival list names docs/RUN_PARAMETERS.md as written so far, so the procedure writes each answer as
-    it arrives (as intake writes its notes, TASK-011)."""
+    it arrives (as intake writes its notes, TASK-011); a parameter that does not apply is written n/a so a resume does
+    not ask it (Review A, round 1, C2); and, as intake's and the interface phase's notes, no key and no computer path
+    is written there (the security audit, round 1, rules 53 and 54)."""
     s = flat(section(module("run-parameters"), "Writing the answers down", 3))
     assert s.strip() == ("Write each answer into `docs/RUN_PARAMETERS.md` as the owner gives it, in the form above, the "
                          "`Set:` line with the first: a compaction between two questions then loses no answer, and a "
-                         "resume asks only the parameters the file does not yet hold. A parameter a conditional workflow "
-                         "adds at `run-parameters.parameters` is asked and written the same way.")
+                         "resume asks only the parameters the file does not yet hold. A parameter that does not apply to "
+                         "the project, such as installer verification for software that installs nothing, is written as "
+                         "`n/a` when it is passed over, so a resume does not ask it. A parameter a conditional workflow "
+                         "adds at `run-parameters.parameters` is asked and written the same way. A parameter is a "
+                         "setting, never a key: a key, token or password the owner pastes in an answer is never written "
+                         "to the file, rule 53 applies to it, and no path on this computer is written there either "
+                         "(rule 54).")
 
 
-def test_the_configurations_position_is_kept_on_in_flight():
-    """R-004: the survival list names the status file's In flight: line, so the procedure keeps it while the phase
-    runs."""
+def test_the_configurations_position_is_kept_on_next():
+    """R-004: the survival list names the status file's Next: line, so the procedure keeps it while the phase runs; not
+    In flight:, whose grammar the core's template fixes for a running increment or agent (Review A, round 1, S4); each
+    item by its name only (the security audit, round 1, rules 53 and 54); and the final record named."""
     s = flat(section(module("configuration"), "Keeping the position", 3))
-    assert s.strip() == ("While the phase runs, keep the status file's `In flight:` line naming the items configured so "
-                         "far and the one in hand, rewritten as each is finished, so that a resume after a compaction "
-                         "neither redoes an item nor skips one; once the configuration's checkpoint is committed, the "
-                         "line gives way to the record of what was configured.")
+    assert s.strip() == ("While the phase runs, keep the status file's `Next:` line naming the items configured so far "
+                         "and the next one, rewritten as each is finished, so that a resume after a compaction neither "
+                         "redoes an item nor skips one. It names each item by its name only, never a key's value or a "
+                         "path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the "
+                         "line names the first increment, and what was configured stands in the status file, as \"Commit "
+                         "the configuration as its own checkpoint\" above asks, with each tool's pinned version in "
+                         "`docs/INVENTORY.md` (Resources).")
+    assert "Commit the configuration as its own checkpoint before `TASK-001`, and record in" in module("configuration")
+    assert "`In flight:`" not in module("configuration")
 
 
 @pytest.mark.parametrize("rel", ["run-parameters.md", "configuration.md", "delegation-loop.md", SUB])

@@ -86,7 +86,7 @@ file and apply it from the next stage close or merge on, never retroactively.
 
 ### Writing the answers down
 
-Write each answer into `docs/RUN_PARAMETERS.md` as the owner gives it, in the form above, the `Set:` line with the first: a compaction between two questions then loses no answer, and a resume asks only the parameters the file does not yet hold. A parameter a conditional workflow adds at `run-parameters.parameters` is asked and written the same way.
+Write each answer into `docs/RUN_PARAMETERS.md` as the owner gives it, in the form above, the `Set:` line with the first: a compaction between two questions then loses no answer, and a resume asks only the parameters the file does not yet hold. A parameter that does not apply to the project, such as installer verification for software that installs nothing, is written as `n/a` when it is passed over, so a resume does not ask it. A parameter a conditional workflow adds at `run-parameters.parameters` is asked and written the same way. A parameter is a setting, never a key: a key, token or password the owner pastes in an answer is never written to the file, rule 53 applies to it, and no path on this computer is written there either (rule 54).
 
 ## Extension points
 
