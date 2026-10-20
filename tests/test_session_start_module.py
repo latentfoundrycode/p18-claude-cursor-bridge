@@ -253,16 +253,37 @@ BROKEN = {
     # round 2 (Review A S1, the security audit's first advisory, convergent): an installed checker whose functions do
     # not match the hook's (a partial or hand-edited install) fails after the load, never silences the part
     "checker-skew": ("workflow-check.py", None, "workflow-check.py"),
+    # the same, failing after the pointer-line files were found (heading_spans is first called for the conditional
+    # files): what was found before the failure is not printed either (R2-2)
+    "checker-skew-late": ("workflow-check.py", None, "workflow-check.py"),
+    # round 3 (Review A B1, the security audit's second advisory, convergent): a checker function that exits is caught
+    # like one that raises; the hook exits 0 and prints the part
+    "checker-exit": ("workflow-check.py", ("def heading_spans(", "def heading_spans(*args, **kwargs):\n    raise SystemExit(2)\n\n\ndef heading_spans_old("),
+                     "workflow-check.py"),
+    # round 3 (Review A B2, the security audit's first advisory, convergent): a table error naming a file the hook did
+    # not ask for, or a reason carrying a path, never reaches the output as given
+    "checker-path": ("workflow-check.py", ("def load_tables(", "def load_tables(*args, **kwargs):\n    return None, [(slash(os.path.realpath(os.path.join(HERE, '..', '..', 'other.md'))), 'probe')]\n\n\ndef load_tables_old("),
+                     "workflow-check.py"),
+    "checker-reason": ("workflow-check.py", ("def load_tables(", "def load_tables(*args, **kwargs):\n    return None, [(slash(DEFAULT_OPEN), 'cannot be read: ' + slash(os.path.realpath(DEFAULT_OPEN)))]\n\n\ndef load_tables_old("),
+                       "open-list.md"),
 }
+
+
+def home_forms(home):
+    return {str(home), str(home).replace("\\", "/"), os.path.realpath(str(home)), os.path.realpath(str(home)).replace("\\", "/")}
 
 
 @pytest.mark.parametrize("broken", sorted(BROKEN))
 def test_r005_an_unreadable_open_list_or_checker_names_no_conditional_file_and_says_so(tmp_path, home, broken):
-    """handoff/TASK-015.md Requirement 7 (and handoff/TASK-015-r2.md Requirement R2-2): no conditional or pointer-line
-    file, exactly one line saying what could not be read (not a file line), and the rest of the pointers part as
-    usual. The phase's module has a Sub-files: line, so "no pointer-line file" is shown with its precondition."""
+    """handoff/TASK-015.md Requirement 7 (and handoff/TASK-015-r2.md R2-2 and R2-3, handoff/TASK-015-r3.md R3-1 and
+    R3-2): no conditional or pointer-line file, exactly one line saying what could not be read (not a file line, in the
+    `~` form, no absolute path), the rest of the pointers part as usual, exit 0. The precondition: the same home intact
+    names the module's Sub-files: file and the type file (round 3, Review A B3)."""
     conditionals(home)
     add_intake_sub_file(home)
+    intact = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert named(intact) == [P + "intake.md", P + "intake/questions.md", W + "types/host-extension.md"], intact
+    assert cannot_read_lines(intact) == [], intact
     bridge = home / ".claude" / "cursor-bridge"
     rel, text, shown = BROKEN[broken]
     target = bridge.joinpath(*rel.split("/"))
@@ -273,12 +294,22 @@ def test_r005_an_unreadable_open_list_or_checker_names_no_conditional_file_and_s
         assert "def load_tables(" in source and "def heading_spans(" in source
         target.write_text(source.replace("def load_tables(", "def load_tables_renamed(")
                           .replace("def heading_spans(", "def heading_spans_renamed("), encoding="utf-8")
+    elif broken == "checker-skew-late":
+        source = target.read_text(encoding="utf-8")
+        assert "def heading_spans(" in source
+        target.write_text(source.replace("def heading_spans(", "def heading_spans_renamed("), encoding="utf-8")
+    elif isinstance(text, tuple):
+        source = target.read_text(encoding="utf-8")
+        assert source.count(text[0]) == 1
+        target.write_text(source.replace(text[0], text[1]), encoding="utf-8")
     else:
         target.write_text(text, encoding="utf-8")
-    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)   # pointers() asserts exit 0 and an empty stderr
     assert named(out) == [P + "intake.md"], out
     extra = cannot_read_lines(out)
-    assert len(extra) == 1 and shown in extra[0], out
+    assert len(extra) == 1 and shown in extra[0] and extra[0].startswith("~/.claude/cursor-bridge/"), out
+    for form in home_forms(home):
+        assert form not in out, out
     assert "Continue from where the status file says the work is." in out
 
 
@@ -290,7 +321,7 @@ def test_r005_the_cannot_read_line_names_its_file_in_the_home_form(tmp_path, hom
     out = pointers(project(tmp_path, "Phase: intake", LINE), home)
     extra = cannot_read_lines(out)
     assert len(extra) == 1 and "~/.claude/cursor-bridge/workflow/open-list.md" in extra[0], out
-    for form in {str(home), str(home).replace("\\", "/"), os.path.realpath(str(home)).replace("\\", "/")}:
+    for form in home_forms(home):
         assert form not in out, out
 
 
@@ -345,6 +376,42 @@ def test_r005_a_folder_link_on_the_way_to_a_conditional_file_names_nothing(tmp_p
                 "traits": [P + "interface.md", W + "types/host-extension/claude-code-extension.md"],
                 "types/host-extension": [P + "interface.md", W + "traits/installable.md", W + "traits/external-services.md"]}
     assert named(out) == expected[linked], out
+
+
+def test_r005_a_linked_workflow_folder_names_only_the_modules(tmp_path, home):
+    """handoff/TASK-015-r2.md Requirement R2-4: with ~/.claude/cursor-bridge/workflow/ itself a link, no conditional
+    file and no pointer-line file is named; the modules still are."""
+    conditionals(home)
+    add_intake_sub_file(home)
+    bridge = home / ".claude" / "cursor-bridge"
+    outside = tmp_path / "outside-workflow"
+    shutil.move(str(bridge / "workflow"), str(outside))
+    _link_folder(bridge / "workflow", outside)
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert named(out) == [P + "intake.md"], out
+    # round 3 (handoff/TASK-015-r3.md R3-3): the open list is not read through the link either, and the one line says so
+    extra = cannot_read_lines(out)
+    assert len(extra) == 1 and extra[0].startswith("~/.claude/cursor-bridge/workflow") and "is a link" in extra[0], out
+
+
+@pytest.mark.parametrize("name", ["open-list.md", "extension-points.md"])
+def test_r005_a_linked_open_list_or_registry_is_not_read(tmp_path, home, name):
+    """handoff/TASK-015-r3.md R3-3 (the security audit's third and Review A's noted item): the open list and the
+    registry are read only if neither is a link; otherwise the one cannot-read line names the file and says it is a
+    link, and no conditional or pointer-line file is named (a file link needs a privilege Windows accounts often lack;
+    the test runs where the link can be made, on Linux CI at least)."""
+    conditionals(home)
+    workflow = home / ".claude" / "cursor-bridge" / "workflow"
+    real = tmp_path / ("outside-" + name)
+    shutil.move(str(workflow / name), str(real))
+    try:
+        os.symlink(str(real), str(workflow / name))
+    except (OSError, NotImplementedError):
+        pytest.skip("this account cannot make a file link")
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert named(out) == [P + "intake.md"], out
+    extra = cannot_read_lines(out)
+    assert len(extra) == 1 and extra[0].startswith("~/.claude/cursor-bridge/workflow/" + name) and "is a link" in extra[0], out
 
 
 def test_r005_a_linked_phases_folder_contributes_no_pointer_line(tmp_path, home):
