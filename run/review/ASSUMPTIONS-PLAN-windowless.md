@@ -1,0 +1,5 @@
+# ASSUMPTIONS - PLAN-windowless
+
+From the branch's commit messages (`git log 8a4f3e5..HEAD --format=%B`), sections `Assumptions:`: none written: the change is the supervisor's own records, with no builder run and so no builder's list.
+
+Places to look all the same: whether the records agree with each other and with the owner's recorded words (DESIGN_CRITIQUE.md's gate paragraph, the INVENTORY rows, the Deferred row's dated deferral); whether each new requirement has an increment that satisfies it and each increment's Depends on names existing increments with no cycle; whether an increment's Scope lists every file its Done when changes (the Done when lines name files to change); whether a Done when's figures agree across increments (the ceilings and the one timeout sum in TASK-028, TASK-029 and TASK-030); whether the status file reads as at this pull request's merge; whether anything contradicts an existing INVENTORY Decision or a register row outside the revision; any computer path or secret in a committed file.
