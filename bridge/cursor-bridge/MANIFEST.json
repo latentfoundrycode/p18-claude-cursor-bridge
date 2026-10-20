@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-20 18:38",
+  "generated": "2026-10-20 18:41",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -119,7 +119,7 @@
     "cursor-bridge/workflow/phases/interface/playable-prototype.md": "92e933746c522bb37fc71a5172a873cb7cbea3abe6ebc45c9df03c458476542c",
     "cursor-bridge/workflow/phases/planning.md": "6a5a52844bf94dac2a671dabbbca2fcd8abd9315d9a0b02832fc8e52ee1882d6",
     "cursor-bridge/workflow/phases/project-end.md": "5f0e4718496179b1fd9fc1ce86eae585d4559cca1c3431666b6185063aec2d29",
-    "cursor-bridge/workflow/phases/reflection.md": "2ea0f5845c36fc20cd44635f4975558d104bdcbf9cd1ea599a731fc97482ac08",
+    "cursor-bridge/workflow/phases/reflection.md": "2071e2ad010ac812385349659a0f9051c205e6ebff40ce1391ef8cd0a2856f9a",
     "cursor-bridge/workflow/phases/run-parameters.md": "7d37e1c3ab4dac2b2069b80998b28e6dfe1f8c68a849afa7a3bf415a2a9f73ed",
     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
     "cursor-bridge/workflow/trace-exceptions.md": "c6535b3e1bed467ab2dced4eddde6e839795ae718ada301a0236a062200237bc",

@@ -313,8 +313,8 @@ def test_r004_an_issue_records_whether_a_compaction_preceded_it():
                  "`no`: whether the session's context was compacted between your last whole reading of the governing "
                  "text and the incident. A resume or a fork of the session in that time is not a compaction and is "
                  "written on a line of its own, `Resumed before:` or `Forked before:` with its time where known (the "
-                 "session-start hook's message after each says which of the three it follows, when its input names it). The "
-                 "bridge's maintainer "
+                 "session-start hook's message after each says which of the three it follows, when its input names it; where it names none, and says *compacted or resumed*, the line reads "
+                 "`Compaction before: unknown`). The bridge's maintainer "
                  "measures from these lines how often a rule is broken within an hour of a compaction, which entries "
                  "carrying a date alone could not show.")
     # Review B, round 1: a resume is not a compaction, so `yes` names a compaction only and a resume has a line of its
