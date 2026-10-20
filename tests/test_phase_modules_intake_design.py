@@ -66,9 +66,9 @@ def section(text, title, level):
 
 STRUCTURE = {
     "intake": [(2, "Phase 1 — Intake"), (3, "What must survive a compaction"), (3, "The procedure"),
-               (3, "Classifying each part"), (3, "The gate"), (2, "Extension points")],
+               (3, "The intake notes"), (3, "Classifying each part"), (3, "The gate"), (2, "Extension points")],
     "design": [(2, "Phase 2 — Design"), (3, "What must survive a compaction"), (3, "The procedure"),
-               (3, "Traits at the design gate"), (3, "The gate"), (2, "Extension points")],
+               (3, "The delivery kind"), (3, "Traits at the design gate"), (3, "The gate"), (2, "Extension points")],
 }
 
 SURVIVAL = {
@@ -89,8 +89,11 @@ SURVIVAL = {
         "`docs/REQUIREMENTS.md` and `docs/INVENTORY.md` once written;",
         "`docs/DESIGN_CRITIQUE.md`, whole, while the critique runs: its rounds and its accepted list are what the stop "
         "rule and the four-round ceiling count, so that a resumed session never runs a round twice or raises an accepted "
-        "finding again;",
-        "the owner's Initial Design Draft and `run/supervisor/intake-notes.md`, whole: the design answers them;",
+        "finding again; with it `docs/RUN_PARAMETERS.md`, where an owner's `Design rounds above five:` line lifts the "
+        "ceiling, and the round's files under `run/review/` (`DESIGN-<subject>-<round>.md` and its `REVIEW-DESIGN-` "
+        "files) while a round is in flight;",
+        "the owner's Initial Design Draft, every requirements document they supplied and "
+        "`run/supervisor/intake-notes.md`, whole: the design and the requirements register answer them;",
         "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line holds the traits proposed at intake, which this phase's "
         "gate settles.",
     ],
@@ -166,17 +169,54 @@ def test_r013_a_part_that_does_not_fit_pauses_the_project_at_intake():
     assert ("**A part that does not fit pauses the project before design.** When a part fits no product type, fits two "
             "equally, fits one whose workflow is not yet written, fits two sub-types of its type equally, or fits a "
             "sub-type whose sub-workflow is not yet written (its open-list row reads `no` under Written, and the check "
-            "prints `FAIL (f)`), stop before design: intake may finish its questions, and no design work starts for any "
-            "part.") in s
+            "prints `FAIL (f)`), the project stops before design: no design work starts for any part.") in s
     assert ("A part that fits no entry, or two equally, keeps `not yet classified` on its line; a part that fits an "
             "entry not yet written is named by it, so the check shows the pause.") in s
-    assert "Write `Awaiting user on: paused at intake — <the part> needs a workflow the bridge has not written`" in s
-    assert ("report it as the one decision, a run sheet (rule 27): the owner takes your reasons to the bridge's "
+    # the questions end before the status line is written, so that an answer is never read as the word to resume
+    assert ("Finish intake's questions first, then write `Awaiting user on: paused at intake — <the part> needs a "
+            "workflow the bridge has not written`, and put the pause at the head of your report as a run sheet (rule "
+            "27); it is not a choice put to the owner but a step they take: the owner takes your reasons to the bridge's "
             "maintainer, in the maintainer's own session (the part, the definitions you weighed it against, and why none "
             "fits, which two fit equally, or which workflow is not yet written)") in s
-    assert ("The release goes out, the project calibrates (`/calibrate-bridge`), and you resume on the owner's word: "
-            "the check passes, and intake goes on to its gate.") in s
     assert "then run " + CHECK in s
+
+
+def test_r013_the_resume_classifies_the_part_before_the_gate():
+    """R-013 (PR gate, Review A should-fix): a part kept `not yet classified` passes the check at once, so the resume
+    classifies it against the open list as it then stands and runs the check before the gate; no part reaches the gate
+    unclassified."""
+    s = flat(section(module("intake"), "Classifying each part", 3))
+    assert ("The release goes out, the project calibrates (`/calibrate-bridge`), and you resume on the owner's word: "
+            "classify the part again against the open list as it now stands, write its `Workflows:` line, and run the "
+            "check; only when it passes does intake go on to its gate. No part goes to the gate `not yet "
+            "classified`.") in s
+
+
+def test_r004_the_intake_answers_are_kept_on_disk_and_no_key_among_them():
+    """R-004 (the survival list names the intake notes) and Review A's should-fix: writing the notes is an instruction
+    of the procedure, the file is named on Working files: (rule 54), and the security audit's advisory: no key, token
+    or password is written there."""
+    s = flat(section(module("intake"), "The intake notes", 3))
+    assert ("Write every question you ask and the owner's answer to it to `run/supervisor/intake-notes.md` as each "
+            "answer arrives, and name the file on the status file's `Working files:` line (rule 54)") in s
+    assert ("A key, token or password the owner gives is never written there: note only that one was given and where it "
+            "now lives") in s
+
+
+def test_r006_the_delivery_kind_is_confirmed_for_every_part_and_recorded():
+    """R-006, `intake.delivery-kind` (the registry: where nothing sets a part's kind, the kind confirmed at intake is
+    the part's, recorded by its key; Review A's should-fix): confirmed for every part, not only installable software,
+    by a key from the registry's list, and recorded by the design as a `Delivery kind:` Decisions row."""
+    intake = flat(section(module("intake"), "Classifying each part", 3))
+    assert ("confirm with the owner the kind of delivery the part ends in, by its key from the extension-point "
+            "registry's delivery kinds (`installer`, `install-script`, `package`, `web-deployment`, `store-package`, "
+            "`host-installation`), for every part and not only for installable software") in intake
+    registry = read(REGISTRY)
+    for kind in ("installer", "install-script", "package", "web-deployment", "store-package", "host-installation"):
+        assert "`%s`" % kind in registry, kind
+    design = flat(section(module("design"), "The delivery kind", 3))
+    assert ("When you create `docs/INVENTORY.md`, record each part's delivery kind as a Decisions row that begins "
+            "`Delivery kind:`, naming each part and its kind's key from the extension-point registry") in design
 
 
 def test_r035_traits_are_proposed_at_intake_and_settled_at_the_design_gate():
@@ -190,8 +230,9 @@ def test_r035_traits_are_proposed_at_intake_and_settled_at_the_design_gate():
     design = flat(section(module("design"), "Traits at the design gate", 3)).strip()
     assert design.startswith("The traits proposed at intake, the default traits of each part's product type and "
                              "sub-type among them, are settled at this gate")
-    assert ("At the gate each part's traits are a decision of their own, asked in the question form: each trait with its "
-            "definition in one line and, in plain words, the work it adds.") in design
+    assert ("At the gate each part's traits are a decision of their own, asked in the question form beside the separate "
+            "decisions the gate below lists: each trait with its definition in one line and, in plain words, the work it "
+            "adds.") in design
     assert "rewrite the part's `Workflows:` line if they changed, and run " + CHECK + " again." in design
 
 
@@ -204,23 +245,29 @@ def test_r036_a_new_or_unwritten_trait_is_flagged_at_the_design_gate_with_the_ow
     assert ("a trait whose open-list row reads `no` under Written (the check's `FLAG (trait)`) is defined but not yet "
             "written") in s
     assert ("write the extra handling into `docs/DESIGN.md`, a section of its own for each such trait saying what it "
-            "adds and in which phases, and flag it at the gate as a decision of its own: the work continues with the "
-            "handling in the design, or the owner may still choose to pause the project.") in s
+            "adds and in which phases, and flag it at the gate as a decision of its own, saying plainly that until the "
+            "bridge writes the trait's additions the design's section is the only handling it has: the work continues "
+            "with the handling in the design, or the owner may still choose to pause the project.") in s
     assert "`Awaiting user on: paused at the design gate — <the trait> needs additions the bridge has not written`" in s
+    # Review A's should-fix: after the pause, a new trait joins the line and the check runs, or its additions never apply
+    assert ("On resuming, a new trait, now in the open list, is added to each part's `Workflows:` line that has it, the "
+            "check is run again, and the trait's additions take the place of the design's section.") in s
     assert ("Record each flagged trait in `docs/INVENTORY.md` → Decisions as a row that begins `Flagged trait:`, naming "
             "the trait, the parts that have it and the design section that handles it, so that the promotion pass at "
             "project end puts it forward") in s
+    assert "once the trait's additions are written and apply, the row is removed." in s
     intake = flat(section(module("intake"), "Classifying each part", 3))
     assert "A `FLAG (trait)` line names a trait whose additions are not yet written: the work continues" in intake
 
 
 @pytest.mark.parametrize("key", ["intake", "design"])
 def test_r032_the_module_is_read_whole(key):
+    """R-032: the enriched module stays within the bound a module is read whole by (1,500 lines, 60,000 characters)."""
     text = module(key)
     assert text.count("\n") <= 1500 and len(text) <= 60000, (key, text.count("\n"), len(text))
 
 
-def test_r004_the_design_phase_is_named_by_its_module_outside_the_core():
+def test_the_design_phase_is_named_by_its_module_outside_the_core():
     """The carve's pointer sweep for the design module (docs/HARDENING.md, Stage B3): the merge policy and the plan
     critic named the design critique's bound as `supervisor.md`'s Phase 2, which now lives in design.md."""
     for path in (POLICY, PLAN_CRITIC):
