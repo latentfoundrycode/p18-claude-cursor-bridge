@@ -1,5 +1,16 @@
 ## Run parameters — asked once, after the plan is approved, before configuration
 
+### What must survive a compaction
+
+After a compaction or a resume in this step, read these before your next action:
+
+- this module, whole;
+- `docs/RUN_PARAMETERS.md` as written so far, whole: each answer is written there as the owner gives it ("Writing the answers down"), so the questions still to ask are the parameters it does not yet hold;
+- `docs/BUILD_PLAN.md`, the approved plan, whole: a refactoring answer may name its stages, and parallel increments apply only where the plan marks increments `Parallel: yes`;
+- `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which add parameters at `run-parameters.parameters` and show whether a part is installable, as installer verification needs, and its `Awaiting user on:` line names the question that waits for the owner.
+
+### The procedure
+
 The plan says *what* will be built; the run parameters say *how the loop proceeds* while
 building it. They are the owner's settings, asked **once, right after the plan gate and
 before Phase 5, each as a question of its own in the app's question form** (`AskUserQuestion`,
@@ -72,3 +83,13 @@ stop the loop whether stage pause is `run` or `pause`. Project end always stops.
 parameter loosens the gate: `run` means *no waiting between stages*, never *less checking
 within them*. The owner may change a parameter mid-project by saying so; you update the
 file and apply it from the next stage close or merge on, never retroactively.
+
+### Writing the answers down
+
+Write each answer into `docs/RUN_PARAMETERS.md` as the owner gives it, in the form above, the `Set:` line with the first: a compaction between two questions then loses no answer, and a resume asks only the parameters the file does not yet hold. A parameter a conditional workflow adds at `run-parameters.parameters` is asked and written the same way.
+
+## Extension points
+
+This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
+
+- `run-parameters.parameters` — parameters a conditional workflow adds to the five above, each asked as a question of its own in the same form with its default named first, and written as a line of its own in `docs/RUN_PARAMETERS.md`; made once for the whole project.
