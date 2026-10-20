@@ -59,18 +59,12 @@ def test_every_template_phase_value_is_mapped():
     spec = importlib.util.spec_from_file_location("session_start", PROG)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    # TASK-015: the phases map to phase modules (files read whole), no longer to line ranges of supervisor.md
+    phases = os.path.join(CLAUDE, "cursor-bridge", "workflow", "phases")
     for phase in TEMPLATE_PHASES:
-        assert phase in mod.PHASE_SECTIONS, "template phase %r has no section pointers" % phase
-    digest, sections = mod.digest_and_sections(SV)
-    for wanted in set(sum(mod.PHASE_SECTIONS.values(), [])):
-        assert wanted in sections, "mapped heading %r is not a section of supervisor.md" % wanted
-    # a section ends at the next real heading, never at a template line inside a code block
-    design = sections["## Phase 2 — Design"]
-    mock = sections["## Phase 3 — UI mockups"]
-    assert design[1] == mock[0] - 1, "the design section must run up to the mockup heading (code-fenced '# Requirements' is not a heading)"
-    lines = TEXT.split("\n")
-    for h, (first, last) in sections.items():
-        assert lines[first - 1].strip() == h
+        assert mod.PHASE_MODULES.get(phase), "template phase %r has no module" % phase
+    for key in set(sum(mod.PHASE_MODULES.values(), [])):
+        assert os.path.isfile(os.path.join(phases, key + ".md")), "mapped module %r is not a file under workflow/phases/" % key
 
 
 def run_hook(cwd, home, part=None, source="compact", transcript=None):
@@ -119,7 +113,7 @@ def test_both_parts_fit_under_the_cap_for_every_phase_on_a_realistic_status_file
     for out in (pointers, digest):
         assert len(out) < CAP and "cut at" not in out and "truncated" not in out
     assert "PROJECT STATE: Phase: %s" % phase in pointers
-    assert "BEFORE YOUR NEXT ACTION" in pointers and re.search(r"': lines \d+-\d+", pointers)
+    assert "BEFORE YOUR NEXT ACTION" in pointers and "  - ~/.claude/cursor-bridge/workflow/phases/" in pointers   # TASK-015: modules, not line ranges
     assert "Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41)." in pointers
     assert "WAITING FOR THE OWNER" in pointers and "(read it whole in docs/PROJECT_STATUS.md)" in pointers
     assert "**Founding rules.**" in digest and "43 Never end a turn" in digest
@@ -146,16 +140,16 @@ def test_pointers_name_the_phase_sections_and_conventions(tmp_path, home):
     for cwd in (root / "Workspace", root):
         rc, out = run_hook(cwd, home)                     # both parts
         assert rc == 0
-        assert re.search(r"'Phase 6 — The delegation loop': lines \d+-\d+", out)
+        assert "  - ~/.claude/cursor-bridge/workflow/phases/delegation-loop.md" in out   # TASK-015: the module, whole
         assert "Merge-Verification-Policy.md, whole" in out
         assert "Continue from where the status file says the work is." in out and "WAITING" not in out
         assert "**Founding rules.**" in out
     (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text("**Phase:** design\n", encoding="utf-8")
     rc, out = run_hook(root / "Workspace", home, "pointers")
-    assert re.search(r"'Phase 2 — Design': lines \d+-\d+", out) and "Diagram-Planning-Conventions.md" in out
+    assert "  - ~/.claude/cursor-bridge/workflow/phases/design.md" in out and "Diagram-Planning-Conventions.md" in out
     (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text("Phase: configuration\n", encoding="utf-8")
     rc, out = run_hook(root / "Workspace", home, "pointers")
-    assert re.search(r"'Phase 5 — Configure the Cursor build environment': lines \d+-\d+", out) and "Cursor-Project-Configuration.md" in out
+    assert "  - ~/.claude/cursor-bridge/workflow/phases/configuration.md" in out and "Cursor-Project-Configuration.md" in out
 
 
 def test_fork_source_is_named(tmp_path, home):

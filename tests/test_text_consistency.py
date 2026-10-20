@@ -6,6 +6,8 @@ import os
 import re
 import subprocess
 
+from instructions import instruction_paths, instructions
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, os.pardir))
 BRIDGE = os.path.join(ROOT, "bridge")
@@ -15,7 +17,7 @@ def text(*parts):
     return open(os.path.join(BRIDGE, *parts), encoding="utf-8").read()
 
 
-SV = text("commands", "supervisor.md")
+SV = instructions()   # the core and its phase modules (TASK-010)
 CLAUSE = "Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file."
 
 
@@ -83,7 +85,7 @@ def test_no_convention_sends_a_pin_to_the_status_file():
     offenders = []
     folder = os.path.join(BRIDGE, "cursor-bridge")
     names = [n for n in sorted(os.listdir(folder)) if n.endswith(".md") and n != "CHANGELOG.md" and not n.endswith(".snapshot.md")]
-    for name in names + [os.path.join(os.pardir, "commands", "supervisor.md")]:
+    for name in names + instruction_paths():   # the core and its phase modules (TASK-010); a full path joins as itself
         lines = open(os.path.join(folder, name), encoding="utf-8").read().split("\n")
         for i, line in enumerate(lines):
             # the bridge's own version and the conformance check's notes are the status file's by its template
@@ -152,7 +154,8 @@ def test_the_design_critique_runs_the_same_loop_in_its_three_places():
 def test_no_text_calls_a_review_outcome_a_fail():
     """Review A and Review B answer APPROVE, REJECT or ESCALATE-INTENT; only the auditors and
     the test runner keep PASS and FAIL."""
-    for parts in (("commands", "supervisor.md"), ("cursor-bridge", "Diagram-Planning-Conventions.md"), ("cursor-bridge", "Glossary.md"),
-                  ("skills", "root-cause-first", "SKILL.md")):
-        for i, line in enumerate(text(*parts).split("\n")):
-            assert not re.search(r"(is|and) a `FAIL`|A (review )?`FAIL`", line), "%s:%d %s" % (parts[-1], i + 1, line.strip()[:120])
+    paths = instruction_paths() + [os.path.join(BRIDGE, *parts) for parts in (   # the core and its phase modules (TASK-010)
+        ("cursor-bridge", "Diagram-Planning-Conventions.md"), ("cursor-bridge", "Glossary.md"), ("skills", "root-cause-first", "SKILL.md"))]
+    for path in paths:
+        for i, line in enumerate(open(path, encoding="utf-8").read().split("\n")):
+            assert not re.search(r"(is|and) a `FAIL`|A (review )?`FAIL`", line), "%s:%d %s" % (os.path.basename(path), i + 1, line.strip()[:120])

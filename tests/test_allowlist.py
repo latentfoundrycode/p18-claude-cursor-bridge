@@ -1,7 +1,7 @@
 """Every command the supervisor's instructions issue must be allowed by the bridge's
 settings and denied by none of its deny rules; the deny rules must catch what they are for.
-Commands are collected from the fenced bash blocks and the inline code of supervisor.md
-and the merge policy. A placeholder such as <nnn> or <sha> is kept as text: a rule that
+Commands are collected from the fenced bash blocks and the inline code of supervisor.md, its phase
+modules (TASK-010), and the merge policy. A placeholder such as <nnn> or <sha> is kept as text: a rule that
 needs the placeholder's position to be a space is a rule that cannot match in practice."""
 import json
 import os
@@ -9,6 +9,7 @@ import re
 
 import pytest
 
+from instructions import instruction_paths
 from permission_rules import decide, rule_matches
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -16,7 +17,7 @@ CLAUDE = os.path.join(HERE, os.pardir, "bridge")
 SETTINGS = json.load(open(os.path.join(CLAUDE, "cursor-bridge", "settings.bridge.json"), encoding="utf-8"))
 ALLOW = SETTINGS["permissions"]["allow"]
 DENY = SETTINGS["permissions"]["deny"]
-DOCS = [os.path.join(CLAUDE, "commands", "supervisor.md"), os.path.join(CLAUDE, "cursor-bridge", "Merge-Verification-Policy.md")]
+DOCS = instruction_paths() + [os.path.join(CLAUDE, "cursor-bridge", "Merge-Verification-Policy.md")]   # the core and its phase modules (TASK-010)
 
 EXECUTABLES = ("git ", "gh ", "python ~/.claude/", "cursor-agent ", "npx ", "semgrep ", "osv-scanner ", "socket ",
                "pytest ", "cat ~/.claude/", "powershell -NoProfile")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """session-start: a Claude Code SessionStart hook (matchers: compact, resume, fork) that puts
-the supervisor's core rules back after a compaction, a resume or a fork (KP-035).
+the supervisor's core rules back after a compaction, a resume or a fork (KP-035, R-005).
 
 Why: when a session's context is compacted, Claude Code re-attaches only the first part of
 an invoked command (measured: 20,000 of the supervisor's 150,000 characters, 13%), so the
@@ -14,12 +14,49 @@ part that was cut was the pointers), so the bridge registers the hook TWICE for 
 event, each run printing one part under its own cap:
 
   --part pointers   the project's phase from docs/PROJECT_STATUS.md (the "awaiting" text
-                    capped), the exact sections of supervisor.md to re-read before the next
-                    action with their line ranges, the conventions that phase relies on, and
-                    whether to continue or to wait for the owner;
+                    capped), the phase module file(s) to re-read whole, any sub-files and
+                    variant files named on those modules' pointer lines, the conditional
+                    workflow files (type, then sub-type, then traits in open-list order) that
+                    touch the phase, the conventions that phase relies on, and whether to
+                    continue or to wait for the owner; no supervisor.md line ranges;
   --part digest     the digest at the top of ~/.claude/commands/supervisor.md (between the
                     markers <!-- digest:start --> and <!-- digest:end -->), the one text the
                     maintainer keeps as the condensed core.
+
+Pointer-line grammar (module files under workflow/phases/, read as UTF-8 with BOM dropped):
+a line outside fenced blocks (opening_fence / closing_fence as workflow-check.py reads them;
+an unclosed fence runs to the end of the file) that begins at column 0 with exactly
+``Sub-files: `` or ``Variants: ``; after the prefix, one or more paths separated by ``; ``.
+Each path, ignoring trailing whitespace on the line, must match
+``^[a-z0-9-]+(/[a-z0-9-]+)*\\.md$`` (relative to workflow/phases/). Other paths on the line
+are ignored. Sub-files and Variants lines are taken together in file order; a path already
+printed is not printed again. Named paths are not checked for existence.
+
+Conditional files: for each ``Workflows: `` line in file order, after dropping an optional
+``<part>: `` prefix, skipping ``not yet classified`` and malformed lines, map type, optional
+sub-type (U+2192 between names), and traits to keys through the installed open list;
+candidates are types/<key>.md, then types/<type>/<sub>.md, then traits/<key>.md for traits
+sorted by the open list's trait order. Only a key matching ``^[a-z0-9-]+$`` becomes a path
+part. A file is named only when it exists under the installed workflow folder as a regular
+readable UTF-8 file, is not a link, and touches the phase (an add/set heading's module key or
+a replace target matches a phase module key; headings inside fences do not count). A link at
+``workflow/``, at ``types/``, ``traits/`` or ``types/<type key>/`` on the way to a candidate
+refuses that candidate. A module reached through a linked ``phases/`` folder or module file is
+still named but its pointer lines are not read. The open list and registry are read only when
+``workflow/``, ``workflow/open-list.md`` and ``workflow/extension-points.md`` are not links.
+
+Failing open: if the installed workflow-check.py cannot be loaded (``cannot be loaded`` and
+the exception's type name or ``an exception``), cannot be used at run time (``cannot be used``
+and the type name or ``an exception``), reports ``an unexpected table error``, says ``its
+tables are not at their installed paths``, or a table file ``is a link``, or the open list or
+registry cannot be read, no conditional file and no pointer-line file is named; one plain line
+states what could not be read (only when a phase module file exists or a classified Workflows
+line needed that read). A path returned by the checker is never printed; a reason or exception
+type name appears only when it is wholly ``[A-Za-z0-9 #().,'-]+`` (a reason) or an identifier
+``[A-Za-z_][A-Za-z0-9_]*`` (a type name). Any exception the checker raises is caught; what
+the checker prints is discarded. The hook guards against a partial, mismatched or hand-edited
+install, not a hostile checker, which runs in-process and could write to its output directly.
+The hook still never blocks.
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
@@ -31,6 +68,9 @@ second pass, S1), and a silent supervisor is the failure this hook exists to pre
 forked session is told not to continue the loop (S8). It never blocks (exit 0 always), never
 writes anything, and keeps each part under the cap. ASCII-only apart from what it quotes.
 """
+import contextlib
+import importlib.util
+import io
 import json
 import os
 import re
@@ -39,18 +79,18 @@ import sys
 MAX_OUTPUT = 9800           # per part; Claude Code's cap is 10,000
 AWAITING_MAX = 300          # the quoted "Awaiting user on" text; the file is read whole anyway
 
-PHASE_SECTIONS = {
-    "intake": ["## Phase 1 — Intake"],
-    "design": ["## Phase 2 — Design"],
-    "mockups": ["## Phase 3 — UI mockups"],
-    "interface": ["## Phase 3 — UI mockups"],
-    "planning": ["## Phase 4 — Build plan", "## Run parameters — asked once, after the plan is approved, before configuration"],
-    "configuration": ["## Phase 5 — Configure the Cursor build environment"],
-    "configuring": ["## Phase 5 — Configure the Cursor build environment"],
-    "configure": ["## Phase 5 — Configure the Cursor build environment"],
-    "building": ["## Phase 6 — The delegation loop", "## Reflection points — stage close, phase gates, project end"],
-    "changing": ["## The change cycle — a request on a finished project", "## Phase 6 — The delegation loop"],
-    "done": ["## The change cycle — a request on a finished project"],
+PHASE_MODULES = {
+    "intake": ["intake"],
+    "design": ["design"],
+    "mockups": ["interface"],
+    "interface": ["interface"],
+    "planning": ["planning", "run-parameters"],
+    "configuration": ["configuration"],
+    "configuring": ["configuration"],
+    "configure": ["configuration"],
+    "building": ["delegation-loop", "reflection", "project-end"],
+    "done": ["change-cycle"],
+    "changing": ["change-cycle", "delegation-loop", "reflection", "project-end"],
 }
 PHASE_CONVENTIONS = {
     "building": ["~/.claude/cursor-bridge/Merge-Verification-Policy.md", "~/.claude/cursor-bridge/Known-Pitfalls.md"],
@@ -60,6 +100,20 @@ PHASE_CONVENTIONS = {
     "configuring": ["~/.claude/cursor-bridge/Cursor-Project-Configuration.md", "~/.claude/cursor-bridge/Known-Pitfalls.md"],
     "configure": ["~/.claude/cursor-bridge/Cursor-Project-Configuration.md", "~/.claude/cursor-bridge/Known-Pitfalls.md"],
 }
+
+WORKFLOW_PREFIX = "~/.claude/cursor-bridge/workflow/"
+PHASE_PREFIX = WORKFLOW_PREFIX + "phases/"
+CHECKER_SHOWN = "~/.claude/cursor-bridge/workflow-check.py"
+OPEN_SHOWN = WORKFLOW_PREFIX + "open-list.md"
+REG_SHOWN = WORKFLOW_PREFIX + "extension-points.md"
+POINTER_PATH = re.compile(r"^[a-z0-9-]+(/[a-z0-9-]+)*\.md$")
+KEY_PATTERN = re.compile(r"^[a-z0-9-]+$")
+PLAIN_REASON = re.compile(r"[A-Za-z0-9 #().,'-]+")
+PLAIN_TYPE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+TABLES_NOT_INSTALLED = "%s: cannot be used (its tables are not at their installed paths)" % CHECKER_SHOWN
+PROJECT_END_NOTE = "(read at the close of the plan's last stage)"
+TRAITS_MARK = "; traits: "
+ARROW = "\u2192"
 
 
 def status_candidates(cwd):
@@ -116,28 +170,19 @@ def supervisor_path():
     return os.path.join(home, ".claude", "commands", "supervisor.md")
 
 
-def digest_and_sections(path):
-    """The digest text and {heading: (first line, last line)} for every '## ' section.
-    Lines inside fenced code blocks are never headings (a template's '# Requirements' line
-    once cut the design section short; the 0b review, finding 3)."""
+def bridge_root():
+    return os.path.join(os.path.expanduser("~"), ".claude", "cursor-bridge")
+
+
+def workflow_root():
+    return os.path.join(bridge_root(), "workflow")
+
+
+def read_digest(path):
     with open(path, encoding="utf-8-sig", errors="replace") as f:
-        lines = f.read().split("\n")
-    text = "\n".join(lines)
+        text = f.read()
     a, b = text.find("<!-- digest:start -->"), text.find("<!-- digest:end -->")
-    digest = text[a + len("<!-- digest:start -->"):b].strip() if a >= 0 and b > a else ""
-    sections, current, fenced = {}, None, False
-    for i, line in enumerate(lines, 1):
-        if line.lstrip().startswith("```"):
-            fenced = not fenced
-            continue
-        if fenced:
-            continue
-        if line.startswith("## ") or line.startswith("# "):
-            if current:
-                sections[current][1] = i - 1
-            current = line.strip()
-            sections[current] = [i, len(lines)]
-    return digest, {k: tuple(v) for k, v in sections.items()}
+    return text[a + len("<!-- digest:start -->"):b].strip() if a >= 0 and b > a else ""
 
 
 def cap(text, limit, what):
@@ -146,7 +191,285 @@ def cap(text, limit, what):
     return text[:limit - 90] + "\n[%s cut at %d characters by the hook's cap; re-read it in the file]" % (what, limit)
 
 
-def pointers_part(status, sections, source):
+def load_checker_module():
+    """Return (mod, error_line). error_line is None on success."""
+    checker = os.path.join(bridge_root(), "workflow-check.py")
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    sink = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            spec = importlib.util.spec_from_file_location("workflow_check_hook", checker)
+            if spec is None or spec.loader is None:
+                raise ImportError("no loader")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+    except BaseException as err:
+        return None, "%s: cannot be loaded (%s)" % (CHECKER_SHOWN, safe_exc_type_name(err))
+    finally:
+        sys.dont_write_bytecode = previous
+    return mod, None
+
+
+def safe_reason(reason):
+    if type(reason) is not str or not PLAIN_REASON.fullmatch(reason):
+        return "cannot be read"
+    return reason
+
+
+def safe_exc_type_name(err):
+    try:
+        name = type(err).__name__
+    except BaseException:
+        return "an exception"
+    if type(name) is not str or not PLAIN_TYPE_NAME.fullmatch(name):
+        return "an exception"
+    return name
+
+
+def installed_table_abspath(filename):
+    return os.path.normcase(os.path.abspath(os.path.join(workflow_root(), filename)))
+
+
+def tables_at_installed_paths(wc):
+    if installed_table_abspath("open-list.md") != os.path.normcase(os.path.abspath(wc.DEFAULT_OPEN)):
+        return False
+    if installed_table_abspath("extension-points.md") != os.path.normcase(os.path.abspath(wc.DEFAULT_REGISTRY)):
+        return False
+    return True
+
+
+def installed_open_list_path():
+    return os.path.join(workflow_root(), "open-list.md")
+
+
+def installed_registry_path():
+    return os.path.join(workflow_root(), "extension-points.md")
+
+
+def table_file_shown(wc, path):
+    p = wc.slash(path)
+    if p == wc.slash(installed_open_list_path()):
+        return OPEN_SHOWN
+    if p == wc.slash(installed_registry_path()):
+        return REG_SHOWN
+    return None
+
+
+def table_read_error_line(wc, path, reason):
+    shown = table_file_shown(wc, path)
+    if shown is None:
+        return "%s: cannot be used (an unexpected table error)" % CHECKER_SHOWN
+    return "%s: %s" % (shown, safe_reason(reason))
+
+
+def workflow_table_link_error(wc):
+    root = workflow_root()
+    if wc.is_link(root):
+        return WORKFLOW_PREFIX.rstrip("/") + "/: is a link"
+    open_path = installed_open_list_path()
+    if wc.is_link(open_path):
+        return "%s: is a link" % OPEN_SHOWN
+    reg_path = installed_registry_path()
+    if wc.is_link(reg_path):
+        return "%s: is a link" % REG_SHOWN
+    return None
+
+
+def load_tables_from_checker(wc):
+    """Return (tables, error_line). error_line is None on success."""
+    open_path = installed_open_list_path()
+    reg_path = installed_registry_path()
+    open_text, _open_shown, open_err = wc.read_utf8(open_path)
+    if open_err:
+        return None, table_read_error_line(wc, open_path, open_err)
+    reg_text, _reg_shown, reg_err = wc.read_utf8(reg_path)
+    if reg_err:
+        return None, table_read_error_line(wc, reg_path, reg_err)
+    tables, errors = wc.load_tables(open_text, open_path, reg_text, reg_path)
+    if errors:
+        path, reason = errors[0]
+        return None, table_read_error_line(wc, path, reason)
+    return tables, None
+
+
+def can_read_module_pointers(wc, key):
+    root = workflow_root()
+    phases = os.path.join(root, "phases")
+    mod_path = os.path.join(phases, key + ".md")
+    if wc.is_link(root) or wc.is_link(phases) or wc.is_link(mod_path):
+        return False
+    return os.path.isfile(mod_path)
+
+
+def conditional_path_accessible(wc, rel):
+    root = workflow_root()
+    if wc.is_link(root):
+        return False
+    parts = rel.split("/")
+    if parts[0] == "types":
+        if wc.is_link(os.path.join(root, "types")):
+            return False
+        if len(parts) == 3 and wc.is_link(os.path.join(root, "types", parts[1])):
+            return False
+    elif parts[0] == "traits" and wc.is_link(os.path.join(root, "traits")):
+        return False
+    path = os.path.join(root, *parts)
+    return os.path.isfile(path) and not wc.is_link(path)
+
+
+def phase_module_installed(key):
+    return os.path.join(workflow_root(), "phases", key + ".md")
+
+
+def parse_workflows_tail(tail):
+    """Parse one Workflows line body (after 'Workflows: '). Return None or (type_name, sub_name, trait_names)."""
+    if TRAITS_MARK not in tail:
+        return None
+    head, traits_text = tail.split(TRAITS_MARK, 1)
+    if TRAITS_MARK in traits_text:
+        return None
+    head = head.strip()
+    if ": " in head:
+        head = head.split(": ", 1)[1].strip()
+    if head == "not yet classified":
+        return None
+    sub_name = None
+    if ARROW in head:
+        type_name, sub_name = head.split(ARROW, 1)
+        type_name, sub_name = type_name.strip(), sub_name.strip()
+    else:
+        type_name = head.strip()
+    traits_text = traits_text.strip()
+    if traits_text == "none":
+        traits = []
+    else:
+        traits = [t.strip() for t in traits_text.split(", ")]
+    return type_name, sub_name, traits
+
+
+def workflows_lines_parsed(status):
+    out = []
+    for line in status.split("\n"):
+        if not line.startswith("Workflows: "):
+            continue
+        parsed = parse_workflows_tail(line[len("Workflows: "):])
+        if parsed is not None:
+            out.append(parsed)
+    return out
+
+
+def needs_workflow_read(module_keys, status):
+    if workflows_lines_parsed(status):
+        return True
+    for key in module_keys:
+        if os.path.isfile(phase_module_installed(key)):
+            return True
+    return False
+
+
+def pointer_paths_from_module(text, wc):
+    """Valid relative paths from Sub-files:/Variants: lines, in file order."""
+    lines = wc.file_lines(text)
+    paths, seen = [], set()
+    fence = None
+    for line in lines:
+        if type(line) is not str:
+            continue
+        if fence is None:
+            opened = wc.opening_fence(line)
+            if opened is not None:
+                fence = opened
+                continue
+        elif wc.closing_fence(line, fence[0], fence[1]):
+            fence = None
+            continue
+        else:
+            continue
+        for prefix in ("Sub-files: ", "Variants: "):
+            if line.startswith(prefix):
+                rest = line[len(prefix):].rstrip()
+                for part in rest.split("; "):
+                    p = part.rstrip()
+                    if type(p) is not str:
+                        continue
+                    if POINTER_PATH.fullmatch(p) and p not in seen:
+                        seen.add(p)
+                        paths.append(p)
+    return paths
+
+
+def module_keys_from_heading(wc, heading_line):
+    parsed = wc.parse_heading(heading_line)
+    if parsed is None:
+        return None
+    kind, target, _for = parsed
+    if kind == "replace":
+        return target
+    if "." in target:
+        return target.split(".", 1)[0]
+    return target
+
+
+def file_touches_phase(wc, text, module_keys):
+    spans, _unclosed = wc.heading_spans(text)
+    module_set = set(module_keys)
+    for heading_line, _body in spans:
+        mod = module_keys_from_heading(wc, heading_line)
+        if mod is not None and mod in module_set:
+            return True
+    return False
+
+
+def conditional_candidates(wc, tables, type_name, sub_name, trait_names):
+    """Relative paths under workflow/ in type, sub-type, trait order."""
+    paths = []
+    row = tables["workflow_by_name"].get(type_name)
+    if not row:
+        return paths
+    type_key = row["Key"]
+    if type(type_key) is str and KEY_PATTERN.fullmatch(type_key):
+        paths.append("types/%s.md" % type_key)
+    if sub_name:
+        sub_row = tables["sub_by_name"].get(sub_name)
+        if sub_row and type(type_key) is str and KEY_PATTERN.fullmatch(type_key):
+            sub_key = sub_row["Key"]
+            if type(sub_key) is str and KEY_PATTERN.fullmatch(sub_key):
+                paths.append("types/%s/%s.md" % (type_key, sub_key))
+    trait_keys = []
+    for name in trait_names:
+        trow = tables["trait_by_name"].get(name)
+        if trow:
+            tkey = trow["Key"]
+            if type(tkey) is str and KEY_PATTERN.fullmatch(tkey):
+                trait_keys.append((tables["trait_order"].get(name, 999999), tkey))
+    trait_keys.sort(key=lambda pair: pair[0])
+    for _, tkey in trait_keys:
+        paths.append("traits/%s.md" % tkey)
+    return paths
+
+
+def collect_conditional_files(wc, tables, module_keys, status, already):
+    named = []
+    root = workflow_root()
+    for type_name, sub_name, trait_names in workflows_lines_parsed(status):
+        for rel in conditional_candidates(wc, tables, type_name, sub_name, trait_names):
+            if rel in already:
+                continue
+            if not conditional_path_accessible(wc, rel):
+                continue
+            path = os.path.join(root, *rel.split("/"))
+            text, _shown, err = wc.read_utf8(path)
+            if err:
+                continue
+            if not file_touches_phase(wc, text, module_keys):
+                continue
+            already.add(rel)
+            named.append(WORKFLOW_PREFIX + rel)
+    return named
+
+
+def pointers_part(status, source):
     phase_raw = (field(status, "Phase") or "").strip()
     phase = phase_raw.split()[0].lower() if phase_raw else ""
     awaiting = (field(status, "Awaiting user on") or "nothing").strip()
@@ -163,17 +486,64 @@ def pointers_part(status, sections, source):
            "The context was just %s, and a compaction keeps only the first part of your instructions; the core digest is re-injected beside this message." % (version, source),
            "",
            "PROJECT STATE: Phase: %s. Awaiting user on: %s." % (phase_raw or "unknown", awaiting)]
-    wanted = PHASE_SECTIONS.get(phase, [])
-    if wanted:
-        out.append("BEFORE YOUR NEXT ACTION, re-read these sections of ~/.claude/commands/supervisor.md with the Read tool (offset = first line, limit = the line count):")
-        for h in wanted:
-            rng = sections.get(h)
-            if rng:
-                out.append("  - '%s': lines %d-%d" % (h.lstrip("# ").strip(), rng[0], rng[1]))
+    module_keys = PHASE_MODULES.get(phase)
+    read_error = None
+    pointer_blocks = []
+    conditional_lines = []
+    if module_keys:
+        out.append("BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:")
+        printed_paths = {PHASE_PREFIX + key + ".md" for key in module_keys}
+        if needs_workflow_read(module_keys, status):
+            wc, load_err = load_checker_module()
+            if load_err:
+                read_error = load_err
             else:
-                out.append("  - '%s'" % h.lstrip("# ").strip())
+                sink = io.StringIO()
+                try:
+                    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+                        if not tables_at_installed_paths(wc):
+                            read_error = TABLES_NOT_INSTALLED
+                        else:
+                            link_err = workflow_table_link_error(wc)
+                            if link_err:
+                                read_error = link_err
+                            else:
+                                tables, table_err = load_tables_from_checker(wc)
+                                if table_err:
+                                    read_error = table_err
+                                else:
+                                    for key in module_keys:
+                                        block = []
+                                        if can_read_module_pointers(wc, key):
+                                            mod_path = phase_module_installed(key)
+                                            text, _shown, err = wc.read_utf8(mod_path)
+                                            if err is None:
+                                                for rel in pointer_paths_from_module(text, wc):
+                                                    shown = PHASE_PREFIX + rel
+                                                    if shown not in printed_paths:
+                                                        printed_paths.add(shown)
+                                                        block.append("  - %s" % shown)
+                                        pointer_blocks.append(block)
+                                    conditional_lines = ["  - %s" % p for p in collect_conditional_files(
+                                        wc, tables, module_keys, status, printed_paths)]
+                except BaseException as err:
+                    read_error = "%s: cannot be used (%s)" % (CHECKER_SHOWN, safe_exc_type_name(err))
+                    pointer_blocks = []
+                    conditional_lines = []
+        if not pointer_blocks:
+            pointer_blocks = [[] for _ in module_keys]
+        for i, key in enumerate(module_keys):
+            line = "  - %s%s.md" % (PHASE_PREFIX, key)
+            if key == "project-end" and phase in ("building", "changing"):
+                line += " " + PROJECT_END_NOTE
+            out.append(line)
+            if i < len(pointer_blocks):
+                out.extend(pointer_blocks[i])
+        if read_error is not None:
+            out.append(read_error)
+        out.extend(conditional_lines)
     elif phase:
-        out.append("BEFORE YOUR NEXT ACTION, re-read the section of ~/.claude/commands/supervisor.md for phase '%s' (not in the hook's map: find it by its heading)." % phase_raw)
+        out.append("BEFORE YOUR NEXT ACTION, re-read the procedure for phase '%s' (not in the hook's map: see ## The phase modules in ~/.claude/commands/supervisor.md)." % phase_raw)
     for conv in PHASE_CONVENTIONS.get(phase, []):
         out.append("  - and %s, whole" % conv)
     out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")
@@ -211,11 +581,11 @@ def main():
     if not os.path.isfile(sv):
         return 0
     source = {"compact": "compacted", "resume": "resumed", "fork": "forked from another session"}.get(data.get("source"), "compacted or resumed")
-    digest, sections = digest_and_sections(sv)
+    digest = read_digest(sv)
     version = installed_version()
     parts = []
     if part in ("pointers", "all"):
-        parts.append(cap(pointers_part(status, sections, source), MAX_OUTPUT, "the section pointers"))
+        parts.append(cap(pointers_part(status, source), MAX_OUTPUT, "the section pointers"))
     if part in ("digest", "all"):
         parts.append(cap(digest_part(digest, version), MAX_OUTPUT, "the digest"))
     sys.stdout.write("\n\n".join(parts) + "\n")
