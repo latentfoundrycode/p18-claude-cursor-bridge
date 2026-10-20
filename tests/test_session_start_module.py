@@ -303,6 +303,17 @@ BROKEN = {
     # R6-1 for the load line
     "checker-load-name-raises": ("workflow-check.py", "class _BadMeta(type):\n    @property\n    def __name__(cls):\n        raise RuntimeError('boom')\n\n\nclass _Bad(Exception, metaclass=_BadMeta):\n    pass\n\n\nraise _Bad()\n",
                                  CHECKER + ": cannot be loaded (an exception)"),
+    # round 6 (Review A S2): R6-1's SystemExit clause, which no case held (the driver's r6-1-exit-not-caught-at-the-name)
+    "checker-name-exits": ("workflow-check.py", ("def heading_spans(", "class _BadMeta(type):\n    @property\n    def __name__(cls):\n        raise SystemExit(3)\n\n\nclass _Bad(Exception, metaclass=_BadMeta):\n    pass\n\n\ndef heading_spans(*args, **kwargs):\n    raise _Bad()\n\n\ndef heading_spans_old("),
+                           CHECKER + ": cannot be used (an exception)"),
+    # round 6 (the security audit's second advisory, Review A's C2, convergent): any exception the checker raises,
+    # one that is not an Exception included, is caught at the load, at the use and at the type name
+    # (handoff/TASK-015-r7.md R7-2)
+    "checker-interrupt": ("workflow-check.py", ("def heading_spans(", "def heading_spans(*args, **kwargs):\n    raise KeyboardInterrupt\n\n\ndef heading_spans_old("),
+                          CHECKER + ": cannot be used (KeyboardInterrupt)"),
+    "checker-load-interrupt": ("workflow-check.py", "raise KeyboardInterrupt\n", CHECKER + ": cannot be loaded (KeyboardInterrupt)"),
+    "checker-name-interrupt": ("workflow-check.py", ("def heading_spans(", "class _BadMeta(type):\n    @property\n    def __name__(cls):\n        raise KeyboardInterrupt\n\n\nclass _Bad(Exception, metaclass=_BadMeta):\n    pass\n\n\ndef heading_spans(*args, **kwargs):\n    raise _Bad()\n\n\ndef heading_spans_old("),
+                               CHECKER + ": cannot be used (an exception)"),
 }
 
 
@@ -534,27 +545,92 @@ def test_r006_a_table_error_is_mapped_by_the_hooks_own_paths(tmp_path, home, tab
     assert cannot_read_lines(out) == [shown], out
 
 
-def test_r006_a_table_key_that_is_not_a_plain_string_names_no_file(tmp_path, home):
+# each part: the phase, the table and row whose key becomes a str subclass, the file the key names, and the file the
+# subclass's __str__ would name instead (written so that it touches the phase)
+KEY_PARTS = {
+    "type": ("intake", "workflow_by_name", "Host Extension Development", "types/host-extension.md", "types/sly.md",
+             "intake.questions"),
+    "sub": ("mockups", "sub_by_name", "Claude Code Extension", "types/host-extension/claude-code-extension.md",
+            "types/host-extension/sly.md", "interface.variants"),
+    "trait": ("mockups", "trait_by_name", "Installable", "traits/installable.md", "traits/sly.md", "interface.variants"),
+    # the type key's second use, in the sub-type's path (round 6, Review A C1)
+    "type-in-sub-path": ("mockups", "workflow_by_name", "Host Extension Development",
+                         "types/host-extension/claude-code-extension.md", "types/sly/claude-code-extension.md",
+                         "interface.variants"),
+}
+
+
+@pytest.mark.parametrize("part", sorted(KEY_PARTS))
+def test_r006_a_table_key_that_is_not_a_plain_string_names_no_file(tmp_path, home, part):
     """handoff/TASK-015-r6.md R6-2 (round 5, the security audit's first advisory and Review A's consider, convergent):
-    a key the checker's tables give as a str subclass is not used, as a key outside the key pattern is not; its
-    `__str__` could otherwise put any text into a path the hook prints. The precondition: the same home with the
-    tables as the checker reads them names the type file, and the file the subclass would name exists and touches
-    the phase."""
+    a type, sub-type or trait key the checker's tables give as a str subclass is not used, as a key outside the key
+    pattern is not; its `__str__` could otherwise put any text into a path the hook prints. The precondition: the
+    same home with the tables as the checker reads them names the key's file, and the file the subclass would name
+    exists and touches the phase. The sub-type and trait parts were added after round 6's run (the driver's
+    r6-2-sub-key-str-dropped and r6-2-trait-key-str-dropped)."""
+    phase, table, row_name, real, fake, point = KEY_PARTS[part]
     conditionals(home)
-    write(home, "types/sly.md", "# Sly\n\n## Add at intake.questions\n\nq\n")
-    intact = pointers(project(tmp_path, "Phase: intake", LINE), home)
-    assert named(intact) == [P + "intake.md", W + "types/host-extension.md"], intact
+    write(home, fake, "# Sly\n\n## Add at %s\n\nq\n" % point)
+    intact = named(pointers(project(tmp_path, "Phase: " + phase, LINE), home))
+    assert W + real in intact and W + fake not in intact, intact
     checker = home / ".claude" / "cursor-bridge" / "workflow-check.py"
     source = checker.read_text(encoding="utf-8")
     assert source.count("def load_tables(") == 1
     sly = ("class _Sly(str):\n    def __str__(self):\n        return 'sly'\n\n\n"
            "def load_tables(*args, **kwargs):\n    tables, errors = load_tables_old(*args, **kwargs)\n"
-           "    if tables:\n        row = tables['workflow_by_name']['Host Extension Development']\n"
-           "        row['Key'] = _Sly(row['Key'])\n    return tables, errors\n\n\ndef load_tables_old(")
+           "    if tables:\n        row = tables[%r][%r]\n"
+           "        row['Key'] = _Sly(row['Key'])\n    return tables, errors\n\n\ndef load_tables_old(") % (table, row_name)
     checker.write_text(source.replace("def load_tables(", sly), encoding="utf-8")
-    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    out = pointers(project(tmp_path, "Phase: " + phase, LINE), home)
+    assert named(out) == [p for p in intact if p != W + real], out
+    assert cannot_read_lines(out) == [], out
+
+
+def test_r007_a_pointer_line_that_is_not_a_plain_string_names_nothing(tmp_path, home):
+    """handoff/TASK-015-r7.md R7-1 (round 6, Review A S1 and the security audit's first advisory, convergent): a line
+    the checker's file_lines gives as a str subclass is not read for pointer paths; a subclass whose methods return
+    the subclass would otherwise decide, through __radd__, the path the hook prints. The precondition: the same
+    module line as the checker gives it today names its file."""
+    add_intake_sub_file(home)
+    intact = pointers(project(tmp_path, "Phase: intake", "Workflows: not yet classified"), home)
+    assert named(intact) == [P + "intake.md", P + "intake/questions.md"], intact
+    checker = home / ".claude" / "cursor-bridge" / "workflow-check.py"
+    source = checker.read_text(encoding="utf-8")
+    assert source.count("def file_lines(") == 1
+    sly = ("class _Sly(str):\n"
+           "    def split(self, *args, **kwargs):\n        return [_Sly(x) for x in str.split(self, *args, **kwargs)]\n\n"
+           "    def rstrip(self, *args, **kwargs):\n        return _Sly(str.rstrip(self, *args, **kwargs))\n\n"
+           "    def __getitem__(self, i):\n        return _Sly(str.__getitem__(self, i))\n\n"
+           "    def __radd__(self, other):\n        return other + 'sly.md'\n\n\n"
+           "def file_lines(text):\n"
+           "    return [_Sly(l) if l.startswith('Sub-files: ') else l for l in file_lines_old(text)]\n\n\n"
+           "def file_lines_old(")
+    checker.write_text(source.replace("def file_lines(", sly), encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: not yet classified"), home)
     assert named(out) == [P + "intake.md"], out
     assert cannot_read_lines(out) == [], out
+
+
+def test_r007_what_the_checker_writes_is_not_the_hooks_output(tmp_path, home):
+    """handoff/TASK-015-r7.md R7-3 (round 6, the security audit's third advisory): a hand-edited checker that prints,
+    at its load or while the hook uses it, adds nothing to the hook's output or its error stream (pointers() asserts
+    an empty stderr); the part is as it would be without the prints. The precondition: the same home without the
+    prints names the pointer-line file and the type file."""
+    conditionals(home)
+    add_intake_sub_file(home)
+    intact = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert named(intact) == [P + "intake.md", P + "intake/questions.md", W + "types/host-extension.md"], intact
+    checker = home / ".claude" / "cursor-bridge" / "workflow-check.py"
+    source = checker.read_text(encoding="utf-8")
+    assert source.count("def heading_spans(") == 1
+    noisy = ("def heading_spans(*args, **kwargs):\n    print('STRAY USE OUTPUT')\n"
+             "    sys.stderr.write('STRAY USE ERROR\\n')\n    return heading_spans_old(*args, **kwargs)\n\n\n"
+             "def heading_spans_old(")
+    checker.write_text("import sys\nprint('STRAY LOAD OUTPUT')\nsys.stderr.write('STRAY LOAD ERROR\\n')\n"
+                       + source.replace("def heading_spans(", noisy), encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert "STRAY" not in out, out
+    assert out == intact, out
 
 
 def test_r005_a_linked_phases_folder_contributes_no_pointer_line(tmp_path, home):
