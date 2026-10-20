@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-20 12:33",
+  "generated": "2026-10-20 12:47",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -112,8 +112,8 @@
     "cursor-bridge/workflow/phases/design.md": "1785619496f523e51c5472052899c9c74fa5a612a094dd648878b5c5a3dd7a2c",
     "cursor-bridge/workflow/phases/intake.md": "a915bf1e11b8a515e5e4e05fe861fa45c2acf3dd919c16d29785214f4d78e06f",
     "cursor-bridge/workflow/phases/interface.md": "0af009932c49b75c0e1f3ecf73cd51356290d04bbeb6dee4f6d7f03fdecef500",
-    "cursor-bridge/workflow/phases/interface/command-design.md": "5168da3526bad4d0c833a1c7bcc25c51d59e43f1f4929c1e70a8936bb18bced7",
-    "cursor-bridge/workflow/phases/interface/contract-design.md": "6a99eb8ad933d4582f5f0f7f7fb7c345f89f29ad3902b2f94330a2dc205b1e39",
+    "cursor-bridge/workflow/phases/interface/command-design.md": "2416000d629aea96e339358c5188c3ec45fa07f8489538d340f1ae42a17e9cd7",
+    "cursor-bridge/workflow/phases/interface/contract-design.md": "4efe2b69e6900124c097a345f0169c362352b0fbec4c6475b3a36520c201777b",
     "cursor-bridge/workflow/phases/interface/mockups.md": "5190813432fe0ddb75ad95e66b1cfae173ac1633d744001eb80c5d2099bd8478",
     "cursor-bridge/workflow/phases/interface/playable-prototype.md": "b96edcf538eef45bce79ed39b0d5b0b16966a023fc19fbfe2acf7d6d66aeda8b",
     "cursor-bridge/workflow/phases/planning.md": "6a5a52844bf94dac2a671dabbbca2fcd8abd9315d9a0b02832fc8e52ee1882d6",

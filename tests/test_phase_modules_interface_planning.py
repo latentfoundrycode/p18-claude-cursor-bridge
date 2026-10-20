@@ -239,6 +239,24 @@ def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_con
     assert "Build an HTML/CSS mockup" not in module("interface")
 
 
+def test_r012_each_variant_names_the_artifact_the_module_and_the_plan_cite():
+    """R-012 (Review A round 2, convergent with the security re-check): the artifacts interface.md's survival list and
+    planning.md cite are named by the variant that writes them, with its approval at the phase's gate, so no module
+    cites a file nothing defines; their bodies follow in TASK-022."""
+    c = flat(module("interface/command-design.md"))
+    assert ("Its artifact is `docs/design/COMMANDS.md`, one section per command, and the owner approves it at the phase's "
+            "gate (`interface.md`, \"The gate\").") in c
+    k = flat(module("interface/contract-design.md"))
+    assert ("Its artifacts are `docs/design/CONTRACT.md`, which states in plain words every operation the part offers, "
+            "and the machine-readable contract file `CONTRACT.md` names, which tests enforce; the owner approves what the "
+            "part offers, from `CONTRACT.md`, at the phase's gate (`interface.md`, \"The gate\").") in k
+    survival = flat(section(module("interface"), "What must survive a compaction", 3))
+    plan = flat(section(module("planning"), "What the interface phase hands to the plan", 3))
+    for name in ("`docs/design/COMMANDS.md`", "`docs/design/CONTRACT.md`"):
+        assert name in survival, name
+    assert "`docs/design/CONTRACT.md`" in plan and "`docs/design/COMMANDS.md`" in c and "`docs/design/CONTRACT.md`" in k
+
+
 def test_r010_no_text_calls_the_mockups_a_replacement():
     """R-010, the negative side (Review A's consider): neither the interface module nor the mockups file calls the
     mockups a replacement of anything; only a type workflow or sub-workflow replaces, and it replaces the phase."""
@@ -310,7 +328,7 @@ def test_the_playable_prototype_is_a_declared_pointer_with_no_stand_in_wording()
     # the precondition (Review A's blocking item): the patterns catch a stand-in, so their silence below means something
     assert rx.search("this screen arrives in a later release")
     assert rx.search("coming soon")
-    for rel in ["interface.md"] + [v[2] for v in VARIANTS]:
+    for rel in ["interface.md", "planning.md"] + [v[2] for v in VARIANTS]:
         hit = rx.search(module(rel))
         assert hit is None, (rel, hit and hit.group(0))
 
