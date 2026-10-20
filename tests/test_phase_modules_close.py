@@ -409,8 +409,9 @@ def test_the_glossary_names_the_modules_as_files():
 # sha256 of each variant-file section a `new` trace entry excuses (from its heading to the next heading of its level or
 # higher, LF, the whitespace at its end stripped), as TASK-014 leaves it: an entry excuses new text anywhere in its
 # section, so CI holds each section's text here (Review A, TASK-014, should-fix 3). A change to a pin is reviewed as a
-# new trace exception (TASK-022 writes the command and contract designs' bodies under headings of their own, with their
-# own entries, and leaves these sections as they are)
+# new trace exception. TASK-022 writes the command and contract designs' bodies under headings of their own, with
+# entries of their own, and leaves these sections as they are; its first entry fails the last assertion below until
+# the increment adds its section here, pinned, so every new excused section of a variant file reaches a reviewer
 EXCUSED_SECTIONS = {
     ("interface/mockups.md", "What this variant is"): (620, "6d539112c3b10ecf7e20bdc5b76fcbcd6fdb2e4786212f2af947176914ce1298"),
     ("interface/mockups.md", "The design-tooling flow"): (3200, "d878dbcca05094b316960040e468e376b8b5bf76b9c64908a3be88c9efa5416e"),
@@ -436,7 +437,8 @@ def test_each_excused_variant_section_is_pinned(rel, title):
             break
     body = "\n".join(lines[start:end]).rstrip()
     assert (len(body), hashlib.sha256(body.encode("utf-8")).hexdigest()) == EXCUSED_SECTIONS[(rel, title)], len(body)
-    prefix = "- new TASK-014 bridge/cursor-bridge/workflow/phases/"
-    entries = [l[len(prefix):] for l in read(EXCEPTIONS).split("\n") if l.startswith("- new ") and "/phases/interface/" in l]
-    assert all(l.startswith(prefix) for l in read(EXCEPTIONS).split("\n") if l.startswith("- new ") and "/phases/interface/" in l)
+    prefix = "bridge/cursor-bridge/workflow/phases/"
+    entries = [m.group(1)[len(prefix):] + " " + m.group(2) for m in
+               (re.match(r"^- new \S+ (\S+\.md) (.+)$", l) for l in read(EXCEPTIONS).split("\n"))
+               if m and m.group(1).startswith(prefix + "interface/")]
     assert sorted(entries) == sorted("%s %s" % k for k in EXCUSED_SECTIONS), entries
