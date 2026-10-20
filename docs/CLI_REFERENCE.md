@@ -915,8 +915,10 @@ Finding lines, then TRACED and RESULT:
 Exit 0 when no FAIL line was printed. Exit 1 when at least one FAIL was printed.
 Exit 2 when the check cannot run: not a git work tree, git unavailable, missing or
 invalid trace-baseline.txt, baseline commit absent (a shallow clone is the likely cause),
-missing supervisor.md, invalid trace-exceptions.md, a home not readable as UTF-8, or a
-usage error. Then ERROR lines and RESULT: not checked are printed, with no traceback.
+missing supervisor.md, invalid trace-exceptions.md, a folder under bridge/cursor-bridge/workflow/
+that cannot be read, a symbolic link, junction, or other reparse point met on a path the program
+reads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked
+are printed, with no traceback.
 The check needs the baseline commit's object history.
 ```
 

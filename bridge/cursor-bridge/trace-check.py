@@ -22,8 +22,10 @@ Finding lines, then TRACED and RESULT:
 Exit 0 when no FAIL line was printed. Exit 1 when at least one FAIL was printed.
 Exit 2 when the check cannot run: not a git work tree, git unavailable, missing or
 invalid trace-baseline.txt, baseline commit absent (a shallow clone is the likely cause),
-missing supervisor.md, invalid trace-exceptions.md, a home not readable as UTF-8, or a
-usage error. Then ERROR lines and RESULT: not checked are printed, with no traceback.
+missing supervisor.md, invalid trace-exceptions.md, a folder under bridge/cursor-bridge/workflow/
+that cannot be read, a symbolic link, junction, or other reparse point met on a path the program
+reads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked
+are printed, with no traceback.
 The check needs the baseline commit's object history.
 """
 import argparse
@@ -271,12 +273,27 @@ def is_path_link(path):
     return False
 
 
+def first_link_on_rel_path(root, rel):
+    """Return the repo-relative path of the first link along rel from root, or None."""
+    parts = [p for p in slash(rel).split("/") if p]
+    current = root
+    for part in parts:
+        current = os.path.join(current, part)
+        try:
+            os.lstat(current)
+        except OSError:
+            return None
+        if is_path_link(current):
+            return slash(os.path.relpath(current, root))
+    return None
+
+
 def segment_refused(seg):
     if seg == "" or seg == "." or seg == "..":
         return True
     if "\\" in seg or ":" in seg:
         return True
-    if seg.endswith(".") and seg not in (".", ".."):
+    if seg.endswith(".") and seg != "...":
         return True
     if seg.split(".", 1)[0].upper() in WIN_DEVICE_NAMES:
         return True
@@ -311,15 +328,24 @@ def collect_md_paths(root, under_workflow, walk_errors):
         keep = []
         for name in dirnames:
             full = os.path.join(dirpath, name)
-            if not is_path_link(full):
-                keep.append(name)
+            if is_path_link(full):
+                walk_errors.append((
+                    slash(os.path.relpath(full, root)),
+                    "is a link",
+                ))
+                return found
+            keep.append(name)
         dirnames[:] = keep
         for name in filenames:
             if not name.endswith(".md"):
                 continue
             full = os.path.join(dirpath, name)
             if is_path_link(full):
-                continue
+                walk_errors.append((
+                    slash(os.path.relpath(full, root)),
+                    "is a link",
+                ))
+                return found
             rel = slash(os.path.relpath(full, root))
             if rel == EXCEPTIONS_REL:
                 continue
@@ -420,7 +446,7 @@ def resolve_ref(rest, root):
         rest = rest[:-1]
     bridge_root = os.path.join(root, "bridge")
     if rest == "":
-        if is_path_link(bridge_root):
+        if first_link_on_rel_path(root, "bridge"):
             return False
         try:
             os.lstat(bridge_root)
@@ -436,16 +462,15 @@ def resolve_ref(rest, root):
         if seg == "..." or any(c in PLACEHOLDER_CHARS for c in seg):
             break
         resolved.append(seg)
-    current = bridge_root
-    if is_path_link(current):
+    bridge_rel = "bridge" if not resolved else "bridge/" + "/".join(resolved)
+    if first_link_on_rel_path(root, bridge_rel):
         return False
+    current = bridge_root
     for seg in resolved:
         current = os.path.join(current, seg)
         try:
             os.lstat(current)
         except OSError:
-            return False
-        if is_path_link(current):
             return False
     if not bridge_contains(root, current):
         return False
@@ -463,20 +488,28 @@ def find_refs_in_file(rel, text, root, findings_ref):
 
 def citation_strings(normal):
     out = []
-    for m in re.finditer(r'\b(see|per|under) "', normal, re.IGNORECASE):
-        start = m.end()
+    pos = 0
+    while pos < len(normal):
+        m = re.search(r'\b(see|per|under) "', normal[pos:], re.IGNORECASE)
+        if not m:
+            break
+        start = pos + m.end()
         end = normal.find('"', start)
         if end < 0:
+            break
+        if end == start:
+            pos = end + 1
             continue
         quotes = [normal[start:end]]
-        pos = end + 1
+        chain_pos = end + 1
         while True:
-            chain_m = re.match(r' \u2192 "([^"]*)"', normal[pos:])
+            chain_m = re.match(r' \u2192 "([^"]+)"', normal[chain_pos:])
             if not chain_m:
                 break
             quotes.append(chain_m.group(1))
-            pos += chain_m.end()
+            chain_pos += chain_m.end()
         out.append(quotes)
+        pos = chain_pos
     return out
 
 
@@ -550,6 +583,12 @@ def main(argv=None):
     if proc.returncode != 0 or proc.stdout.decode("ascii", "replace").strip() != "true":
         errors.append((slash(root), "not a git work tree"))
 
+    link_rel = first_link_on_rel_path(root, BASELINE_REL)
+    if link_rel:
+        print("ERROR: %s: is a link" % escape_field(link_rel))
+        print("RESULT: not checked")
+        return 2
+
     baseline_path = os.path.join(root, BASELINE_REL)
     bl_text, bl_shown, bl_err = read_utf8_path(baseline_path)
     if bl_err:
@@ -573,6 +612,12 @@ def main(argv=None):
                 "baseline commit is absent from this repository; a shallow clone is the likely cause",
             ))
 
+    link_rel = first_link_on_rel_path(root, EXCEPTIONS_REL)
+    if link_rel:
+        print("ERROR: %s: is a link" % escape_field(link_rel))
+        print("RESULT: not checked")
+        return 2
+
     exc_path = os.path.join(root, EXCEPTIONS_REL)
     exc_text, exc_shown, exc_err = read_utf8_path(exc_path)
     if exc_err:
@@ -580,6 +625,12 @@ def main(argv=None):
     entries = None
     if exc_text is not None and not errors:
         entries = parse_exceptions(exc_text, errors)
+
+    link_rel = first_link_on_rel_path(root, CORE_REL)
+    if link_rel:
+        print("ERROR: %s: is a link" % escape_field(link_rel))
+        print("RESULT: not checked")
+        return 2
 
     core_path = os.path.join(root, CORE_REL)
     core_text, core_shown, core_err = read_utf8_path(core_path)
@@ -621,7 +672,14 @@ def main(argv=None):
     baseline_workflow_paths.sort()
 
     baseline_homes = [CORE_REL] + baseline_workflow_paths
-    current_workflow = os.path.join(root, WORKFLOW_PREFIX.rstrip("/"))
+    workflow_rel = WORKFLOW_PREFIX.rstrip("/")
+    link_rel = first_link_on_rel_path(root, workflow_rel)
+    if link_rel:
+        print("ERROR: %s: is a link" % escape_field(link_rel))
+        print("RESULT: not checked")
+        return 2
+
+    current_workflow = os.path.join(root, workflow_rel)
     walk_errors = []
     current_workflow_paths = (
         collect_md_paths(root, current_workflow, walk_errors)
