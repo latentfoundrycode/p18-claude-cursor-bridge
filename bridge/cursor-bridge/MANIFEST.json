@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-20 13:41",
+  "generated": "2026-10-20 13:51",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -109,7 +109,7 @@
     "cursor-bridge/workflow/phases/change-cycle.md": "b0c1c6400e0b5b26eb7bbc7f1b3c0528736b432bba273aba61fe9af58ed4bbea",
     "cursor-bridge/workflow/phases/configuration.md": "929f0be47fd76d6bb39817585a1ee49d9384c2cd227df538935c5cdc4e756c04",
     "cursor-bridge/workflow/phases/delegation-loop.md": "dc3c27b85acfdfea8520a01e4278961a6366a59a8079f9fc0c8a9636caeda5ee",
-    "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "fbddfeb96ff89900bf7ade2c523c43b964988360ceef75ae46d96ea17f0d02fa",
+    "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "40065539a1b0a098569db3d6c35198e0cff7179725ba2bba019287cfa175d987",
     "cursor-bridge/workflow/phases/design.md": "1785619496f523e51c5472052899c9c74fa5a612a094dd648878b5c5a3dd7a2c",
     "cursor-bridge/workflow/phases/intake.md": "a915bf1e11b8a515e5e4e05fe861fa45c2acf3dd919c16d29785214f4d78e06f",
     "cursor-bridge/workflow/phases/interface.md": "0af009932c49b75c0e1f3ecf73cd51356290d04bbeb6dee4f6d7f03fdecef500",

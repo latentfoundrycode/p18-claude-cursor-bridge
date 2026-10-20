@@ -285,7 +285,8 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
     assert flat(section(sub, "Where this sub-file belongs", 3)).strip() == (
         "This file is a sub-file of the delegation-loop module (`delegation-loop.md`, \"The procedure\"), read whole "
         "with it. It holds the loop's step 9, which runs at a stage's close, before the stage's reflection point "
-        "(`reflection.md`), when `docs/RUN_PARAMETERS.md` turns the refactoring pass on for the stage.")
+        "(`reflection.md`), when `docs/RUN_PARAMETERS.md` turns the refactoring pass on for the stage. When the scout "
+        "returns its lists (item 2), write them down as \"Keeping the pass's position\", after the step, says.")
     fs = flat(sub)
     passages = (
         "When the last increment of a stage has merged and `docs/RUN_PARAMETERS.md` says **Refactoring pass: on** for "

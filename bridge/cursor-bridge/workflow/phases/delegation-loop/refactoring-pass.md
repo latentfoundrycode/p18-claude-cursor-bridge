@@ -2,7 +2,7 @@
 
 ### Where this sub-file belongs
 
-This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 9, which runs at a stage's close, before the stage's reflection point (`reflection.md`), when `docs/RUN_PARAMETERS.md` turns the refactoring pass on for the stage.
+This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 9, which runs at a stage's close, before the stage's reflection point (`reflection.md`), when `docs/RUN_PARAMETERS.md` turns the refactoring pass on for the stage. When the scout returns its lists (item 2), write them down as "Keeping the pass's position", after the step, says.
 
 ### 9. Refactoring and optimization pass (at stage close)
 
