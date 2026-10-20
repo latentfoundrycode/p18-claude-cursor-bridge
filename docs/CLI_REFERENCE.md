@@ -842,7 +842,7 @@ printed is not printed again. Named paths are not checked for existence.
 
 Conditional files: for each ``Workflows: `` line in file order, after dropping an optional
 ``<part>: `` prefix, skipping ``not yet classified`` and malformed lines, map type, optional
-sub-type (``→`` between names), and traits to keys through the installed open list;
+sub-type (U+2192 between names), and traits to keys through the installed open list;
 candidates are types/<key>.md, then types/<type>/<sub>.md, then traits/<key>.md for traits
 sorted by the open list's trait order. A file is named only when it exists under the
 installed workflow folder as a regular readable UTF-8 file, is not a link, and touches the

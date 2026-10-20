@@ -34,7 +34,7 @@ printed is not printed again. Named paths are not checked for existence.
 
 Conditional files: for each ``Workflows: `` line in file order, after dropping an optional
 ``<part>: `` prefix, skipping ``not yet classified`` and malformed lines, map type, optional
-sub-type (``\u2192`` between names), and traits to keys through the installed open list;
+sub-type (U+2192 between names), and traits to keys through the installed open list;
 candidates are types/<key>.md, then types/<type>/<sub>.md, then traits/<key>.md for traits
 sorted by the open list's trait order. A file is named only when it exists under the
 installed workflow folder as a regular readable UTF-8 file, is not a link, and touches the
@@ -89,7 +89,11 @@ PHASE_CONVENTIONS = {
 
 WORKFLOW_PREFIX = "~/.claude/cursor-bridge/workflow/"
 PHASE_PREFIX = WORKFLOW_PREFIX + "phases/"
+CHECKER_SHOWN = "~/.claude/cursor-bridge/workflow-check.py"
+OPEN_SHOWN = WORKFLOW_PREFIX + "open-list.md"
+REG_SHOWN = WORKFLOW_PREFIX + "extension-points.md"
 POINTER_PATH = re.compile(r"^[a-z0-9-]+(/[a-z0-9-]+)*\.md$")
+KEY_PATTERN = re.compile(r"^[a-z0-9-]+$")
 PROJECT_END_NOTE = "(read at the close of the plan's last stage)"
 TRAITS_MARK = "; traits: "
 ARROW = "\u2192"
@@ -170,10 +174,9 @@ def cap(text, limit, what):
     return text[:limit - 90] + "\n[%s cut at %d characters by the hook's cap; re-read it in the file]" % (what, limit)
 
 
-def load_workflow_check():
-    """Return (mod, tables, error_line). error_line is None on success."""
+def load_checker_module():
+    """Return (mod, error_line). error_line is None on success."""
     checker = os.path.join(bridge_root(), "workflow-check.py")
-    shown = checker.replace("\\", "/")
     previous = sys.dont_write_bytecode
     sys.dont_write_bytecode = True
     try:
@@ -183,20 +186,62 @@ def load_workflow_check():
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
     except (Exception, SystemExit) as err:
-        return None, None, "%s: cannot be loaded (%s)" % (shown, type(err).__name__)
+        return None, "%s: cannot be loaded (%s)" % (CHECKER_SHOWN, type(err).__name__)
     finally:
         sys.dont_write_bytecode = previous
-    open_text, open_shown, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
-    reg_text, reg_shown, reg_err = mod.read_utf8(mod.DEFAULT_REGISTRY)
+    return mod, None
+
+
+def table_error_shown(path):
+    p = path.replace("\\", "/")
+    if p.endswith("workflow/open-list.md"):
+        return OPEN_SHOWN
+    if p.endswith("workflow/extension-points.md"):
+        return REG_SHOWN
+    root = bridge_root().replace("\\", "/")
+    if p.startswith(root + "/"):
+        return "~/.claude/cursor-bridge/" + p[len(root) + 1:]
+    return p
+
+
+def load_tables_from_checker(wc):
+    """Return (tables, error_line). error_line is None on success."""
+    open_text, _open_shown, open_err = wc.read_utf8(wc.DEFAULT_OPEN)
     if open_err:
-        return mod, None, "%s: %s" % (open_shown, open_err)
+        return None, "%s: %s" % (OPEN_SHOWN, open_err)
+    reg_text, _reg_shown, reg_err = wc.read_utf8(wc.DEFAULT_REGISTRY)
     if reg_err:
-        return mod, None, "%s: %s" % (reg_shown, reg_err)
-    tables, errors = mod.load_tables(open_text, mod.DEFAULT_OPEN, reg_text, mod.DEFAULT_REGISTRY)
+        return None, "%s: %s" % (REG_SHOWN, reg_err)
+    tables, errors = wc.load_tables(open_text, wc.DEFAULT_OPEN, reg_text, wc.DEFAULT_REGISTRY)
     if errors:
         path, reason = errors[0]
-        return mod, None, "%s: %s" % (path, reason)
-    return mod, tables, None
+        return None, "%s: %s" % (table_error_shown(path), reason)
+    return tables, None
+
+
+def can_read_module_pointers(wc, key):
+    root = workflow_root()
+    phases = os.path.join(root, "phases")
+    mod_path = os.path.join(phases, key + ".md")
+    if wc.is_link(root) or wc.is_link(phases) or wc.is_link(mod_path):
+        return False
+    return os.path.isfile(mod_path)
+
+
+def conditional_path_accessible(wc, rel):
+    root = workflow_root()
+    if wc.is_link(root):
+        return False
+    parts = rel.split("/")
+    if parts[0] == "types":
+        if wc.is_link(os.path.join(root, "types")):
+            return False
+        if len(parts) == 3 and wc.is_link(os.path.join(root, "types", parts[1])):
+            return False
+    elif parts[0] == "traits" and wc.is_link(os.path.join(root, "traits")):
+        return False
+    path = os.path.join(root, *parts)
+    return os.path.isfile(path) and not wc.is_link(path)
 
 
 def phase_module_installed(key):
@@ -305,16 +350,21 @@ def conditional_candidates(wc, tables, type_name, sub_name, trait_names):
     if not row:
         return paths
     type_key = row["Key"]
-    paths.append("types/%s.md" % type_key)
+    if KEY_PATTERN.match(type_key):
+        paths.append("types/%s.md" % type_key)
     if sub_name:
         sub_row = tables["sub_by_name"].get(sub_name)
-        if sub_row:
-            paths.append("types/%s/%s.md" % (type_key, sub_row["Key"]))
+        if sub_row and KEY_PATTERN.match(type_key):
+            sub_key = sub_row["Key"]
+            if KEY_PATTERN.match(sub_key):
+                paths.append("types/%s/%s.md" % (type_key, sub_key))
     trait_keys = []
     for name in trait_names:
         trow = tables["trait_by_name"].get(name)
         if trow:
-            trait_keys.append((tables["trait_order"].get(name, 999999), trow["Key"]))
+            tkey = trow["Key"]
+            if KEY_PATTERN.match(tkey):
+                trait_keys.append((tables["trait_order"].get(name, 999999), tkey))
     trait_keys.sort(key=lambda pair: pair[0])
     for _, tkey in trait_keys:
         paths.append("traits/%s.md" % tkey)
@@ -328,9 +378,9 @@ def collect_conditional_files(wc, tables, module_keys, status, already):
         for rel in conditional_candidates(wc, tables, type_name, sub_name, trait_names):
             if rel in already:
                 continue
-            path = os.path.join(root, *rel.split("/"))
-            if not os.path.isfile(path) or wc.is_link(path):
+            if not conditional_path_accessible(wc, rel):
                 continue
+            path = os.path.join(root, *rel.split("/"))
             text, _shown, err = wc.read_utf8(path)
             if err:
                 continue
@@ -359,34 +409,52 @@ def pointers_part(status, source):
            "",
            "PROJECT STATE: Phase: %s. Awaiting user on: %s." % (phase_raw or "unknown", awaiting)]
     module_keys = PHASE_MODULES.get(phase)
-    printed_paths = set()
     read_error = None
-    wc, tables = None, None
-    if module_keys is not None and needs_workflow_read(module_keys, status):
-        wc, tables, read_error = load_workflow_check()
+    pointer_blocks = []
+    conditional_lines = []
     if module_keys:
         out.append("BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:")
-        for key in module_keys:
+        printed_paths = {PHASE_PREFIX + key + ".md" for key in module_keys}
+        if needs_workflow_read(module_keys, status):
+            wc, load_err = load_checker_module()
+            if load_err:
+                read_error = load_err
+            else:
+                try:
+                    tables, table_err = load_tables_from_checker(wc)
+                    if table_err:
+                        read_error = table_err
+                    else:
+                        for key in module_keys:
+                            block = []
+                            if can_read_module_pointers(wc, key):
+                                mod_path = phase_module_installed(key)
+                                text, _shown, err = wc.read_utf8(mod_path)
+                                if err is None:
+                                    for rel in pointer_paths_from_module(text, wc):
+                                        shown = PHASE_PREFIX + rel
+                                        if shown not in printed_paths:
+                                            printed_paths.add(shown)
+                                            block.append("  - %s" % shown)
+                            pointer_blocks.append(block)
+                        conditional_lines = ["  - %s" % p for p in collect_conditional_files(
+                            wc, tables, module_keys, status, printed_paths)]
+                except Exception as err:
+                    read_error = "%s: cannot be used (%s)" % (CHECKER_SHOWN, type(err).__name__)
+                    pointer_blocks = []
+                    conditional_lines = []
+        if not pointer_blocks and module_keys:
+            pointer_blocks = [[] for _ in module_keys]
+        for i, key in enumerate(module_keys):
             line = "  - %s%s.md" % (PHASE_PREFIX, key)
             if key == "project-end" and phase in ("building", "changing"):
                 line += " " + PROJECT_END_NOTE
             out.append(line)
-            printed_paths.add(PHASE_PREFIX + key + ".md")
-            if read_error is None and wc is not None:
-                mod_path = phase_module_installed(key)
-                if os.path.isfile(mod_path):
-                    text, _shown, err = wc.read_utf8(mod_path)
-                    if err is None:
-                        for rel in pointer_paths_from_module(text, wc):
-                            shown = PHASE_PREFIX + rel
-                            if shown not in printed_paths:
-                                printed_paths.add(shown)
-                                out.append("  - %s" % shown)
+            if i < len(pointer_blocks):
+                out.extend(pointer_blocks[i])
         if read_error is not None:
             out.append(read_error)
-        if read_error is None and wc is not None and tables is not None:
-            for path in collect_conditional_files(wc, tables, module_keys, status, printed_paths):
-                out.append("  - %s" % path)
+        out.extend(conditional_lines)
     elif phase:
         out.append("BEFORE YOUR NEXT ACTION, re-read the procedure for phase '%s' (not in the hook's map: see ## The phase modules in ~/.claude/commands/supervisor.md)." % phase_raw)
     for conv in PHASE_CONVENTIONS.get(phase, []):

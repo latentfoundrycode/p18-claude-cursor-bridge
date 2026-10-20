@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-20 04:58",
+  "generated": "2026-10-20 05:43",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -95,7 +95,7 @@
     "cursor-bridge/scope-check.py": "26c7ecf6c7b5865d88cbc9cdc2970dde38df4d075b52b3d2444e3ded3bffc977",
     "cursor-bridge/secure-coding.snapshot.md": "3f41667754917ffef6fb47308645356be6a5fd2fc362cc9c3dedf92a9457324e",
     "cursor-bridge/semgrep-bridge-rules.yml": "d4e42ff122fa33bf37127ceb2833af4097a84fe148c6674f37e61eb5cf191927",
-    "cursor-bridge/session-start.py": "c9d915c33b5a82cf00dd0ec88ab068c6748d27dde8da71489204a08e66aeb934",
+    "cursor-bridge/session-start.py": "35525641bfb1ac91705495509e7e2a0e274c172420bc1ab768aba0b37e6f4eab",
     "cursor-bridge/settings.bridge.json": "133480024f3e1409fcc4d5fac30dbfefb3dc99c5619bec98cf9989959b31ee54",
     "cursor-bridge/shell-guard.py": "6abdc15bd149afdf1561997512b75253a154f58ddb05355577b4ebbcec36c67b",
     "cursor-bridge/sync-check.py": "41d4e74931b150bba23a67a1a024b640f95673a490b3a6522af3f9d6ff43e0de",
