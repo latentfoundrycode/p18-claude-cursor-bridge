@@ -35,3 +35,6 @@ No mutation driver.
 - Blocking 2, taken: reflection.md's "Whether a compaction preceded it": `Compaction before: yes` means a compaction only; a resume or a fork is written on a line of its own; `unknown` where the hook's input names no source.
 - Should-fix, taken: HARDENING's suite counts; step 7 runs project end through `project-end.md`, scaled (a third passage of the core's change cycle reworded: the carve test's pin is 258 under workflow/, 10 excused).
 - The full suite on this head: 1,961 passed, 33 skipped.
+
+## Review B round 2 (REJECT) and what this head does with it
+- Blocking, taken: project-end.md's survival list names the register (`docs/REQUIREMENTS.md`) for the "Project complete" line's deferred and dropped requirements, and the status file for the deferred increments, not the inventory's Deferred rows; tests/test_phase_modules_close.py pins it. Review A's confirming read APPROVE. The full suite on this head: 1,961 passed, 33 skipped.
