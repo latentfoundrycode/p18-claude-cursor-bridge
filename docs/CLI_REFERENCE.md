@@ -808,7 +808,7 @@ Path: `bridge/cursor-bridge/session-start.py`
 
 ```
 session-start: a Claude Code SessionStart hook (matchers: compact, resume, fork) that puts
-the supervisor's core rules back after a compaction, a resume or a fork (KP-035).
+the supervisor's core rules back after a compaction, a resume or a fork (KP-035, R-005).
 
 Why: when a session's context is compacted, Claude Code re-attaches only the first part of
 an invoked command (measured: 20,000 of the supervisor's 150,000 characters, 13%), so the
@@ -822,12 +822,37 @@ part that was cut was the pointers), so the bridge registers the hook TWICE for 
 event, each run printing one part under its own cap:
 
   --part pointers   the project's phase from docs/PROJECT_STATUS.md (the "awaiting" text
-                    capped), the exact sections of supervisor.md to re-read before the next
-                    action with their line ranges, the conventions that phase relies on, and
-                    whether to continue or to wait for the owner;
+                    capped), the phase module file(s) to re-read whole, any sub-files and
+                    variant files named on those modules' pointer lines, the conditional
+                    workflow files (type, then sub-type, then traits in open-list order) that
+                    touch the phase, the conventions that phase relies on, and whether to
+                    continue or to wait for the owner; no supervisor.md line ranges;
   --part digest     the digest at the top of ~/.claude/commands/supervisor.md (between the
                     markers <!-- digest:start --> and <!-- digest:end -->), the one text the
                     maintainer keeps as the condensed core.
+
+Pointer-line grammar (module files under workflow/phases/, read as UTF-8 with BOM dropped):
+a line outside fenced blocks (opening_fence / closing_fence as workflow-check.py reads them;
+an unclosed fence runs to the end of the file) that begins at column 0 with exactly
+``Sub-files: `` or ``Variants: ``; after the prefix, one or more paths separated by ``; ``.
+Each path, ignoring trailing whitespace on the line, must match
+``^[a-z0-9-]+(/[a-z0-9-]+)*\.md$`` (relative to workflow/phases/). Other paths on the line
+are ignored. Sub-files and Variants lines are taken together in file order; a path already
+printed is not printed again. Named paths are not checked for existence.
+
+Conditional files: for each ``Workflows: `` line in file order, after dropping an optional
+``<part>: `` prefix, skipping ``not yet classified`` and malformed lines, map type, optional
+sub-type (``→`` between names), and traits to keys through the installed open list;
+candidates are types/<key>.md, then types/<type>/<sub>.md, then traits/<key>.md for traits
+sorted by the open list's trait order. A file is named only when it exists under the
+installed workflow folder as a regular readable UTF-8 file, is not a link, and touches the
+phase (an add/set heading's module key or a replace target matches a phase module key;
+headings inside fences do not count).
+
+Failing open: if the installed workflow-check.py cannot be loaded or the open list or registry
+cannot be read, no conditional file and no pointer-line file is named; one plain line states
+what could not be read (only when a phase module file exists or a classified Workflows line
+needed that read). The hook still never blocks.
 
 Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
 project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
