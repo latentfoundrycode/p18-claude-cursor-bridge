@@ -1,6 +1,10 @@
 ## Mockups
 
+### What this variant is
+
 The mockups are the interface phase's variant for screens a person sees (`interface.md`, "The variants"). They are an addition, never a replacement: the trait *has screens* activates them at `interface.variants` for each part that has screens, beside any other variant the part runs, together with its design tooling below. The build-phase conditions of screens (the frozen interface rules in every brief, the design auditor's review, the observability tests of the running interface) are not this file's: they are the build phases' part of the trait *has screens*, read with the build modules.
+
+### The procedure
 
 After the design is approved and before the build plan, turn the agreed design into
 something the user can *see*. Build an HTML/CSS mockup of the interface — a static,

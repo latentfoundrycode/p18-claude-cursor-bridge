@@ -180,12 +180,14 @@ def test_r012_the_four_variants_are_declared_once_in_the_interface_module():
 
 def test_r012_each_variants_text_is_in_one_place():
     """R-012: each variant file exists, opens with its variant's heading, says which interface kind it is for and points
-    back to the interface module; no other file under workflow/phases/ carries a variant's heading."""
+    back to the interface module, in a declaring paragraph under a heading of its own (TASK-014: so that the trace entry
+    excusing it excuses nothing else in the file); no other file under workflow/phases/ carries a variant's heading."""
     titles = set()
     for name, _kind, rel in VARIANTS:
         text = module(rel)
         assert text.split("\n")[0] == "## " + name, (rel, text.split("\n")[0])
-        assert "(`interface.md`, \"The variants\")" in text.split("\n\n")[1], rel
+        assert text.split("\n\n")[1] == "### What this variant is", rel
+        assert "(`interface.md`, \"The variants\")" in section(text, "What this variant is", 3).split("\n\n")[0], rel
         titles.add(name)
     for root, _dirs, files in os.walk(PHASES):
         for f in files:
@@ -201,7 +203,7 @@ def test_r010_the_mockups_are_an_addition_the_trait_has_screens_activates():
     """R-010 (§6.5, "Today's interface conditions stay together"): the mockups are an addition, not a replacement,
     activated by the trait *has screens* at `interface.variants`; a part with screens has the trait by its definition,
     and a missing trait is settled at the design gate."""
-    m = flat(module("interface/mockups.md").split("\n\n")[1])
+    m = flat(section(module("interface/mockups.md"), "What this variant is", 3))
     assert ("They are an addition, never a replacement: the trait *has screens* activates them at `interface.variants` "
             "for each part that has screens, beside any other variant the part runs") in m
     runs = flat(section(module("interface"), "Which variants a part runs", 3))
@@ -218,7 +220,8 @@ def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_con
     frozen-rule brief constraint, the design-auditor review step, the observability tests) stay in the delegation-loop
     module, where the trait *has screens* gathers them (TASK-017)."""
     m = module("interface/mockups.md")
-    assert headings(m) == [(2, "Mockups"), (3, "The design-tooling flow")], headings(m)
+    assert headings(m) == [(2, "Mockups"), (3, "What this variant is"), (3, "The procedure"),
+                           (3, "The design-tooling flow")], headings(m)
     fm = flat(m)
     for passage in (
         "Build an HTML/CSS mockup of the interface — a static, disposable design artifact for the user to judge and "

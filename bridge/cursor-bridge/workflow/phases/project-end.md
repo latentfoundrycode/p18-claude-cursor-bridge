@@ -1,5 +1,15 @@
 ## Project end
 
+### What must survive a compaction
+
+After a compaction or a resume at project end, read these before your next action:
+
+- this module and `reflection.md`, each whole: project end runs after the reflection points' items 1 to 5 at the last stage's close, in the same turn;
+- the last entries of `run/supervisor/in-flight.md`: the project-end items finished so far ("Keeping the position");
+- `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Workflows:` lines name each part's conditional workflows, whose additions at `project-end.completion-conditions` and `project-end.delivery` this module runs; the inventory's `Delivery kind:` rows give each part's delivery kind, its `Flagged trait:` rows the traits the promotion pass puts forward, and its Deferred rows the items the "Project complete" line lists;
+- `docs/REQUIREMENTS.md`, `docs/CHANGES.md` and `docs/RUN_PARAMETERS.md`: the completion check reads the register, the User Manual is written from the change log, and the installer's last verification follows the `Installer verification` parameter;
+- the Issues and Feedback documents under `Documents/`, whole: the promotion pass reads both and writes its proposals as the Feedback document's last section.
+
 ### Where this module begins
 
 This module was carved out of the reflection points (`~/.claude/cursor-bridge/workflow/phases/reflection.md`) and runs after them: "items 1–5 above" and "the project-end items below" in its first paragraph are the reflection points' items 1 to 5, in that module, and this module's own items.
@@ -51,3 +61,18 @@ whose last stage has closed without this having run is in the wrong state: run i
   symptom, fix, measure, applies to — with this project, the commit, and the numbers as
   evidence. The admission rule applies: recurring across projects or plainly will, not
   already covered, measurable.
+
+### Flagged traits in the promotion pass
+
+The promotion pass reads a third source beside the Issues and Feedback documents: every row of `docs/INVENTORY.md` → Decisions that begins `Flagged trait:`, written at the design gate for a new trait or one defined but not yet written, whose handling the project's design carries (`design.md`, "Traits at the design gate"). For each, "Proposed bridge changes" proposes the trait as the maintainer could write it: for a new trait, its entry in the open list (`~/.claude/cursor-bridge/workflow/open-list.md`), with its definition; for a new trait and an unwritten one alike, its additions, each under the `## Add at <point key>` heading of the extension point at which the project's design handled it, drafted from that handling and naming the design section and the row they come from. The maintainer writes the trait or not; you write no trait file and change nothing in the open list (the open list, "A new trait is flagged, and the work continues").
+
+### Keeping the position
+
+Keep the position as the reflection points keep theirs (`reflection.md`, "Keeping the position"): as each item above finishes, one line in `run/supervisor/in-flight.md` naming it, so that a resume after a compaction starts at the next item and writes nothing under `Documents/` twice.
+
+## Extension points
+
+This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
+
+- `project-end.completion-conditions` — completion conditions a conditional workflow adds for the part, each checked with "Prove the product is complete" above, before anything else at project end: a condition not met means, as a failure of `completion-check.py` does, that the project has not ended; a condition the plan must build toward is also added at intake (`intake.requirement-sources`), as the registry says.
+- `project-end.delivery` — the delivery procedure for the part's delivery kind, which an addition names (`## Add at project-end.delivery for <kind>`) and which runs for each part whose `Delivery kind:` row in `docs/INVENTORY.md` names that kind, beside "Deliver the installer" above and before the promotion pass; the report and the User Manual name what was delivered and where it is.
