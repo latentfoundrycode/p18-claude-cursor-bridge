@@ -64,29 +64,36 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
 
 
 def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when_it_applies():
+    """R-007, as carved (TASK-010): the core is read whole at every start, resume and calibration, and with it the
+    current phase's module or modules and the conditional workflows that apply; after a compaction or resume, what
+    the session-start hook names (rule 28)."""
     s = flat(model())
     assert "each inheriting everything it does not mention from the layers above it" in s
-    assert ("rule 28 governs the reading as it does today: this file is read whole at every start, resume and "
-            "calibration, and after every compaction or resume you read the sections the session-start hook names "
-            "before your next action") in s, "the transitional reading is rule 28's, unchanged"
-    assert ("Once the phases are modules, the core is still read whole at those same points, and with it the current "
-            "phase's module or modules and the conditional workflows that apply; you never read a phase you are not "
-            "in, or a conditional workflow that does not apply") in s, "the core stays whole; phases and conditionals add"
+    assert ("This file, the core, is read whole at every start, resume and calibration, and with it the current "
+            "phase's module or modules and the conditional workflows that apply; after every compaction or resume you "
+            "read what the session-start hook names before your next action (rule 28)") in s, "the core stays whole; phases and conditionals add"
+    assert "You never read a phase you are not in, or a conditional workflow that does not apply" in s
     assert "reading only the current phase" not in s, "the core is never replaced by a phase-only read"
+    assert "Until the phases are moved into files of their own" not in s, "the transitional reading is gone with the carve"
 
 
-def test_r007_until_the_carve_each_phase_module_is_a_named_section_of_this_file():
-    """R-007: the plan's phase names map to this file's headings, and each heading exists."""
+def test_r007_each_phase_module_is_a_file_the_core_names():
+    """R-007, as carved (TASK-010): the plan's phase names map to module files, each keeping its heading from this
+    file, and the core's table names each one."""
     s = flat(model())
-    assert ("each phase's section of this file is its phase module (the interface phase is Phase 3, which today "
-            "holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is "
-            "Phase 6; reflection points include project end)") in s
-    for heading in ("## Phase 1 — Intake", "## Phase 2 — Design", "## Phase 3 — UI mockups", "## Phase 4 — Build plan",
-                    "## Run parameters", "## Phase 5 — Configure", "## Phase 6 — The delegation loop",
-                    "## The change cycle", "## Reflection points"):
-        assert "\n" + heading in TEXT, heading
-    assert "project end" in TEXT[TEXT.index("## Reflection points"):].split("\n", 1)[0].lower()
-    assert "you never read a phase you are not in, or a conditional workflow that does not apply" in s
+    assert ("Each phase's procedure is its phase module, one file per phase (see \"The phase modules\"): the interface "
+            "phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, "
+            "the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own") in s
+    phases = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "workflow", "phases")
+    for name, heading in (("intake", "## Phase 1 — Intake"), ("design", "## Phase 2 — Design"),
+                          ("interface", "## Phase 3 — UI mockups"), ("planning", "## Phase 4 — Build plan"),
+                          ("run-parameters", "## Run parameters"), ("configuration", "## Phase 5 — Configure"),
+                          ("delegation-loop", "## Phase 6 — The delegation loop"), ("change-cycle", "## The change cycle"),
+                          ("reflection", "## Reflection points"), ("project-end", "## Project end")):
+        module = open(os.path.join(phases, name + ".md"), encoding="utf-8").read()
+        assert module.startswith(heading), name
+        assert "`~/.claude/cursor-bridge/workflow/phases/%s.md`" % name in TEXT, name
+        assert "\n" + heading + "\n" not in TEXT and "\n" + heading + " " not in TEXT, "the core keeps no phase: " + name
     assert "only at the extension points" in s, "a conditional workflow changes the procedure only at declared points"
 
 

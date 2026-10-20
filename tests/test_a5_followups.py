@@ -6,6 +6,8 @@ import re
 import subprocess
 import sys
 
+from instructions import instructions
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, os.pardir))
 BRIDGE = os.path.join(ROOT, "bridge")
@@ -19,7 +21,7 @@ def text(*parts):
     return open(os.path.join(BRIDGE, *parts), encoding="utf-8").read()
 
 
-SV = text("commands", "supervisor.md")
+SV = instructions()   # the core and its phase modules (TASK-010)
 SP = text("agents", "spec-packager.md")
 DR = text("agents", "diff-reviewer.md")
 
