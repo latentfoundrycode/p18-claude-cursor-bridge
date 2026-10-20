@@ -113,15 +113,20 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
     assert "`reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;" in rule
     assert "its section \"Issues — what counts, and where it is written\" is read whenever an issue is detected, in any phase;" in rule
     assert "`project-end.md` is read whole at the close of the plan's last stage;" in rule
-    assert "reads that phase's module whole for that step." in rule
-    assert ("You never read a phase you are not in, except a module \"The phase modules\" says is read outside its own "
-            "phase, or a conditional workflow that does not apply.") in core
+    assert ("reads that phase's module whole for that step: the change cycle runs Phases 1 to 4, scaled; the design "
+            "critique's failed launch follows the delegation loop's step 3b, and its review launch follows step 8.") in rule
+    assert ("You never read a phase you are not in or a conditional workflow that does not apply, except a module "
+            "\"The phase modules\" says is read outside its own phase.") in core
+    layering = core.split("\n## Main and conditional workflows\n", 1)[1].split("\n## ", 1)[0]
+    assert ("on entering the phase and at every calibration; a module read outside its own phase when \"The phase "
+            "modules\" says |") in layering
 
 
 # the traceability check's result on this tree, every excuse it uses named (PR #52's gate, Review A, the carve's part:
 # a reword entry excuses a whole section, so a later drop there would show only as a NOTE with RESULT: OK)
-TRACED = "TRACED: 424 passages of baseline 0a186da; 158 in supervisor.md, 263 under workflow/, 0 dropped, 3 excused"
+TRACED = "TRACED: 424 passages of baseline 0a186da; 157 in supervisor.md, 263 under workflow/, 0 dropped, 4 excused"
 NOTES = [
+    "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
@@ -130,17 +135,16 @@ NOTES = [
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the three rewords this carve declares, so an increment that excuses anything more changes this
+    excused ones exactly the four passages of the three rewords this carve declares, so an increment that excuses anything more changes this
     test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
-    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True, creationflags=flags)
+    have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
     if have.returncode != 0:
         import pytest
         pytest.skip("the baseline commit is not in this clone (a shallow checkout)")
     p = subprocess.run([sys.executable, os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")], cwd=repo,
-                       capture_output=True, text=True, encoding="utf-8", creationflags=flags)
+                       capture_output=True, text=True, encoding="utf-8")
     assert p.returncode == 0, p.stdout + p.stderr
     lines = p.stdout.strip().split("\n")
     assert lines == NOTES + [TRACED, "RESULT: OK"], p.stdout

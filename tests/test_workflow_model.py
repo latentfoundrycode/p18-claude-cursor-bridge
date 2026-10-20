@@ -57,7 +57,8 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
     assert holds[4] == "For one trait: what it adds, whatever the product type"
     read_when = [r[2] for r in rows]
     assert read_when[0] == "Always, whole, at every start and calibration"
-    assert read_when[1] == "The current phase's module or modules, whole, on entering the phase and at every calibration"
+    assert read_when[1] == ("The current phase's module or modules, whole, on entering the phase and at every calibration; "
+                            "a module read outside its own phase when \"The phase modules\" says")
     assert read_when[2] == "Its changes to the current phase, whole, alongside the phase's module or modules"
     assert read_when[3] == "Alongside its type workflow, when the part has a sub-type"
     assert read_when[4] == "Their additions to the current phase, when the part has the trait"
@@ -73,8 +74,8 @@ def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when
             "phase's module or modules and the conditional workflows that apply; after every compaction or resume you "
             "read what the session-start hook names before your next action (rule 28)") in s, "the core stays whole; phases and conditionals add"
     # the exception names where the modules read outside their own phase are listed (PR #52's gate, Review A)
-    assert ("You never read a phase you are not in, except a module \"The phase modules\" says is read outside its own "
-            "phase, or a conditional workflow that does not apply") in s
+    assert ("You never read a phase you are not in or a conditional workflow that does not apply, except a module "
+            "\"The phase modules\" says is read outside its own phase") in s
     assert "reading only the current phase" not in s, "the core is never replaced by a phase-only read"
     assert "Until the phases are moved into files of their own" not in s, "the transitional reading is gone with the carve"
 
