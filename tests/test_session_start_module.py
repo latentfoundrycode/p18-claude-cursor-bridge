@@ -633,7 +633,96 @@ def test_r005_a_pointer_line_that_is_not_a_plain_string_names_nothing(tmp_path, 
     checker.write_text(source.replace("def file_lines(", sly), encoding="utf-8")
     out = pointers(project(tmp_path, "Phase: intake", "Workflows: not yet classified"), home)
     assert named(out) == [P + "intake.md"], out
-    assert cannot_read_lines(out) == [], out
+    # FIX-003 (docs/HARDENING.md, Stage B3, the lead before the first pointer line): such a checker is unusable and the
+    # one plain line says so, where it used to name nothing silently
+    assert cannot_read_lines(out) == [CHECKER + ": cannot be used (TypeError)"], out
+
+
+@pytest.mark.parametrize("kind", ["uniform", "fence"])
+def test_r005_a_line_that_is_not_a_str_makes_the_checker_unusable(tmp_path, home, kind):
+    """FIX-003 (docs/HARDENING.md, Stage B3, TASK-010 with TASK-015: Review A's lead inside the threat model, to be
+    closed before TASK-012 or TASK-013 writes the first pointer line): a mismatched checker whose file_lines gives lines
+    of another type has every line skipped today, naming no pointer-line file and saying nothing, against the feature's
+    one plain line. Every line ("uniform", bytes) or only a fence's opening line ("fence": the pointer line inside the
+    fence is then read as if no fence were open) makes the checker unusable: no pointer-line file and no conditional file
+    is named, and the one line says `cannot be used (TypeError)`. The precondition: the same home with the checker
+    intact names the module's Sub-files: file and the type file, and not the fenced one."""
+    conditionals(home)
+    add_intake_sub_file(home)
+    intake = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "intake.md"
+    intake.write_text(intake.read_text(encoding="utf-8") + "\n```\nSub-files: intake/fenced.md\n```\n", encoding="utf-8")
+    intact = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert named(intact) == [P + "intake.md", P + "intake/questions.md", W + "types/host-extension.md"], intact
+    assert cannot_read_lines(intact) == [], intact
+    checker = home / ".claude" / "cursor-bridge" / "workflow-check.py"
+    source = checker.read_text(encoding="utf-8")
+    assert source.count("def file_lines(") == 1
+    # only the intake module's lines change, so the tables and the type file read as before and only the hook's own
+    # reading of the module can fail
+    if kind == "uniform":
+        other = ("def file_lines(text):\n    lines = file_lines_old(text)\n"
+                 "    if '## Phase 1' not in text:\n        return lines\n"
+                 "    return [l.encode('utf-8') for l in lines]\n\n\n"
+                 "def file_lines_old(")
+    else:
+        other = ("def file_lines(text):\n    lines = file_lines_old(text)\n"
+                 "    if '## Phase 1' not in text:\n        return lines\n"
+                 "    return [l.encode('utf-8') if l == '```' else l for l in lines]\n\n\n"
+                 "def file_lines_old(")
+    checker.write_text(source.replace("def file_lines(", other), encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert named(out) == [P + "intake.md"], out
+    assert cannot_read_lines(out) == [CHECKER + ": cannot be used (TypeError)"], out
+
+
+@pytest.mark.parametrize("where", ["load", "use"])
+def test_r005_the_type_name_is_read_where_the_checker_cannot_print(tmp_path, home, where):
+    """FIX-003 (docs/HARDENING.md, Stage B3, TASK-010 with TASK-015: the first lead both reviewers named after round
+    7, "taken at the hook's next edit"): the exception's type name is read inside a redirection of its own, at the
+    load and at the use, so a type name whose reading prints adds nothing to the hook's output or its error stream
+    (pointers() asserts an empty stderr); the name it returns is still printed when it is plain."""
+    conditionals(home)
+    checker = home / ".claude" / "cursor-bridge" / "workflow-check.py"
+    source = checker.read_text(encoding="utf-8")
+    loud = ("import sys\n\n\nclass _LoudMeta(type):\n    @property\n    def __name__(cls):\n"
+            "        print('STRAY NAME OUTPUT')\n        sys.stderr.write('STRAY NAME ERROR\\n')\n        return 'Fine'\n\n\n"
+            "class _Loud(Exception, metaclass=_LoudMeta):\n    pass\n\n\n")
+    if where == "load":
+        checker.write_text(loud + "raise _Loud()\n", encoding="utf-8")
+        shown = CHECKER + ": cannot be loaded (Fine)"
+    else:
+        assert source.count("def heading_spans(") == 1
+        checker.write_text(source.replace("def heading_spans(", loud + "def heading_spans(*args, **kwargs):\n    raise _Loud()\n\n\n"
+                                          "def heading_spans_old("), encoding="utf-8")
+        shown = CHECKER + ": cannot be used (Fine)"
+    out = pointers(project(tmp_path, "Phase: intake", LINE), home)
+    assert "STRAY" not in out, out
+    assert named(out) == [P + "intake.md"], out
+    assert cannot_read_lines(out) == [shown], out
+
+
+def test_r005_a_pointer_path_is_taken_as_written_between_separators(tmp_path, home):
+    """FIX-003 (docs/HARDENING.md, Stage B3, TASK-010 with TASK-015, Review A's consider: each path was right-stripped
+    where the docstring's grammar strips only the line's end, so `Sub-files: a.md ; b.md` named `a.md`; TASK-012 and
+    TASK-013 write pointer lines against the grammar, so the code is made to agree with it first): only whitespace at the
+    end of the line is ignored; a path with a space or a tab before its separator fails the pattern and is not named."""
+    intake = home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "intake.md"
+    intake.write_text(intake.read_text(encoding="utf-8") + "\nSub-files: intake/a.md ; intake/b.md\t; intake/c.md\n\n"
+                      "Variants: intake/d.md \t \n", encoding="utf-8")
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: not yet classified"), home)
+    assert named(out) == [P + "intake.md", P + "intake/c.md", P + "intake/d.md"], out
+
+
+def test_r005_the_docstring_states_the_grammar_and_the_streams_as_the_code_reads_them():
+    """FIX-003: the docstring says what the code does after the fix (docs/HARDENING.md, Stage B3, TASK-010 with
+    TASK-015: the security audit's lead that "what the checker prints is discarded" read wider than the two streams
+    the redirection covers, and the grammar's whitespace rule)."""
+    import ast
+    doc = re.sub(r"\s+", " ", ast.get_docstring(ast.parse(open(PROG, encoding="utf-8").read())))
+    assert ("Each path is taken exactly as written between separators (only whitespace at the end of the line is "
+            "ignored) and must match") in doc
+    assert "what the checker prints through sys.stdout and sys.stderr is discarded" in doc
+    assert "A line the checker's file_lines gives that is not an exact str makes the checker unusable" in doc
 
 
 def test_r005_what_the_checker_writes_is_not_the_hooks_output(tmp_path, home):
