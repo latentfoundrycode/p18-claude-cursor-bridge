@@ -132,8 +132,9 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # (TASK-014: two more move from traced to excused: the change cycle's item 3, the UI mockups -> the interface
 # variants of every kind the change touches, and its closing sentence on the gates, "the mockup if any" -> "the
 # artifact of each interface variant the change runs"; and, for Review B's should-fix, its step 7, project end now run
-# by project-end.md, scaled)
-TRACED = "TRACED: 424 passages of baseline 0a186da; 156 in supervisor.md, 258 under workflow/, 0 dropped, 10 excused"
+# by project-end.md, scaled; and, for Review B's round 3, rule 34, which stated the same procedure, excused by the
+# earlier Standing rules entry and so labelled TASK-015)
+TRACED = "TRACED: 424 passages of baseline 0a186da; 155 in supervisor.md, 258 under workflow/, 0 dropped, 11 excused"
 NOTES = [
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
@@ -145,12 +146,13 @@ NOTES = [
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - The gates of a change cycle are the same approvals the origi",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 13. Design correctness \\u2014 accessibility and interface MUSTs, ",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 34. A request on a finished project is a change cycle: the s",
 ]
 
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the ten passages of the six rewords the carve, TASK-012 and TASK-014 declare, so an increment that excuses anything more changes this
+    excused ones exactly the eleven passages of the six rewords the carve, TASK-012 and TASK-014 declare, so an increment that excuses anything more changes this
     test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))

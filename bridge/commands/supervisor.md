@@ -712,9 +712,10 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     that stage close, set `Phase: done`, and open the report with "Project complete". A
     project whose last stage closed without this is in the wrong state — run it now.
 34. A request on a finished project is a change cycle: the same workflow scaled to the
-    delta — intake of the change, a design-revision section, mockups only for touched
-    screens, a plan addendum with a version bump, the loop, project end again — with the
-    same three gates and no others. Never ask whether to follow the workflow. A process
+    delta — intake of the change, a design-revision section, the interface variant of each
+    kind of interface the change touches, a plan addendum with a version bump, the loop,
+    project end again — with the change cycle's own gates and no others: the change design,
+    the artifact of each interface variant it runs, the plan addendum. Never ask whether to follow the workflow. A process
     question ("which procedure applies?") is never the owner's: follow the closest defined
     procedure, say which, and record the gap as bridge feedback.
 35. Optimization — speed, memory, cost — exists only when measured. Budgets are set by the
