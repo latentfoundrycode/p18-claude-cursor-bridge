@@ -8,3 +8,11 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-010 bridge/cursor-bridge/workflow/phases/reflection.md Project end
 - reword TASK-015 bridge/commands/supervisor.md Standing rules
 - new TASK-010 bridge/commands/supervisor.md The phase modules
+- new TASK-011 bridge/cursor-bridge/workflow/phases/intake.md What must survive a compaction
+- new TASK-011 bridge/cursor-bridge/workflow/phases/intake.md The intake notes
+- new TASK-011 bridge/cursor-bridge/workflow/phases/intake.md Classifying each part
+- new TASK-011 bridge/cursor-bridge/workflow/phases/intake.md Extension points
+- new TASK-011 bridge/cursor-bridge/workflow/phases/design.md What must survive a compaction
+- new TASK-011 bridge/cursor-bridge/workflow/phases/design.md The delivery kind
+- new TASK-011 bridge/cursor-bridge/workflow/phases/design.md Traits at the design gate
+- new TASK-011 bridge/cursor-bridge/workflow/phases/design.md Extension points

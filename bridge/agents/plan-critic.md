@@ -24,7 +24,7 @@ fixes it or accepts it with a reason) or **Consider** (worth a thought, no round
 it). A finding that would reverse a fix recorded in that file is non-convergence: say so
 explicitly instead of raising it as new. Your reply ends with the counts per grade.
 
-**The loop is bounded** (`supervisor.md`, Phase 2): four rounds per subject at the most
+**The loop is bounded** (`~/.claude/cursor-bridge/workflow/phases/design.md`, Phase 2): four rounds per subject at the most
 (more only under the owner's line in `docs/RUN_PARAMETERS.md`, which runs the same shape once
 more), then one confirming read if the text changed (round five at the most, or `<rounds>`
 at the most under a line already written), then one resolution round for what is still Blocking or non-convergent (`R1`, or
