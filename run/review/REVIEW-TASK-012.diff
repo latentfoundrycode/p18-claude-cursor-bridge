@@ -1,0 +1,1096 @@
+diff --git a/bridge/commands/supervisor.md b/bridge/commands/supervisor.md
+index ca70a97..ae7e6fb 100644
+--- a/bridge/commands/supervisor.md
++++ b/bridge/commands/supervisor.md
+@@ -105,7 +105,7 @@ Every project runs the main workflow. What differs by product lives in condition
+ | **Sub-workflow** | For one sub-type: a more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
+ | **Trait additions** | For one trait: what it adds, whatever the product type | Their additions to the current phase, when the part has the trait |
+ 
+-Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in or a conditional workflow that does not apply, except a module "The phase modules" says is read outside its own phase. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
++Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, whose module declares its four variants (mockups, command design, contract design, a playable prototype), each in a file of its own; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in or a conditional workflow that does not apply, except a module "The phase modules" says is read outside its own phase. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
+ 
+ **Three kinds of change.** Each change a conditional workflow makes is one of these:
+ 
+@@ -214,7 +214,7 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
+ |---|---|
+ | Intake (Phase 1) | `~/.claude/cursor-bridge/workflow/phases/intake.md` |
+ | Design (Phase 2) | `~/.claude/cursor-bridge/workflow/phases/design.md` |
+-| The interface phase (Phase 3, today the UI mockups) | `~/.claude/cursor-bridge/workflow/phases/interface.md` |
++| The interface phase (Phase 3: one variant per kind of interface, the mockups among them) | `~/.claude/cursor-bridge/workflow/phases/interface.md` and its variant files under `~/.claude/cursor-bridge/workflow/phases/interface/` |
+ | Planning (Phase 4, the build plan) | `~/.claude/cursor-bridge/workflow/phases/planning.md` |
+ | Run parameters | `~/.claude/cursor-bridge/workflow/phases/run-parameters.md` |
+ | Configuration (Phase 5) | `~/.claude/cursor-bridge/workflow/phases/configuration.md` |
+@@ -223,7 +223,7 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
+ | Reflection points | `~/.claude/cursor-bridge/workflow/phases/reflection.md` |
+ | Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
+ 
+-Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module.
++Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`.
+ 
+ **Modules read outside their own phase.** Some procedures run outside the phase whose `Phase:` value names their module; they are read whenever they apply, whatever the phase:
+ - `reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;
+@@ -550,7 +550,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep
+     `impeccable detect` floor — is part of the gate, decided by the detector and the
+     `design-auditor`, never routed to the user. Only a genuine *intent* question about how
+     the UI should look or behave reaches them, and that goes through the approved-mockup
+-    rule (Phase 3).
++    rule (Phase 3, `~/.claude/cursor-bridge/workflow/phases/interface/mockups.md`).
+ 14. Security correctness — the deterministic floor (Semgrep, OSV-Scanner, Socket) plus the
+     `security-auditor` and Review B's security mandate — is part of the gate, never routed to
+     the user. A security REJECT re-delegates; a malicious dependency is rejected at the
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index d806a47..6e4f333 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.18a",
+-  "generated": "2026-10-20 11:33",
++  "generated": "2026-10-20 12:47",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -14,7 +14,7 @@
+     "agents/test-runner.md": "8358d18b3e8d109d7643ce2610ee433aa5668c4d9601976ece28a4d914f62649",
+     "commands/calibrate-bridge.md": "5ccdaa582af3a0084c6ceb20d62ac4dc1998ec86e085aa8688af4dc7ee59294a",
+     "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
+-    "commands/supervisor.md": "ce17570b2c7ae2a65357d7645592dc2a609989cef00fc204d1441791a4510499",
++    "commands/supervisor.md": "7d70641c9c5f7a29ba731684552f19a58af87a1405ad6b55128535b92f842f87",
+     "cursor-bridge/CHANGELOG.md": "4e5dd4878aec6a49eb37c9f1183f6a765204aad40560730cb28c25615f6a8d25",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
+@@ -22,7 +22,7 @@
+     "cursor-bridge/Diagram-Planning-Conventions.md": "f8e3b7839c7c7466b6bb9654f51bf9d9249973ab5ed9f8e10901ce4392f9cc4d",
+     "cursor-bridge/Glossary.md": "e9719a36d87c68dc354b05d6800d067b99a8361c9098e029ce86966ff470898d",
+     "cursor-bridge/Known-Pitfalls.md": "35cc09fa58ab1a2fdd704635673542d46f0be53e94a9d03b7a3eee380a1bff1f",
+-    "cursor-bridge/Merge-Verification-Policy.md": "d2664c295df07cb695b578e31e18c467898c58edd16e8d1258044728f6ea576a",
++    "cursor-bridge/Merge-Verification-Policy.md": "588af512fb4c9a471b47fda4a37e5fd35c83cd5aea975be3857940f601d755dc",
+     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
+     "cursor-bridge/Performance-Conventions.md": "71d5e95675f5482249538a7c17026fc997e98038d3e0f72b551505c39284f486",
+     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
+@@ -109,15 +109,19 @@
+     "cursor-bridge/workflow/phases/change-cycle.md": "b0c1c6400e0b5b26eb7bbc7f1b3c0528736b432bba273aba61fe9af58ed4bbea",
+     "cursor-bridge/workflow/phases/configuration.md": "c03b8b0b5538435f2057ef71ec84a94317b8a072a4136310ea428c6a1ced223d",
+     "cursor-bridge/workflow/phases/delegation-loop.md": "7377f0ad71ed79f77c1d8cbaef623c52948808827caf1eddb7aebca01093d38f",
+-    "cursor-bridge/workflow/phases/design.md": "84c808edf779960957c3ad86522eed671526c1555fe70095a42143b0698f9137",
++    "cursor-bridge/workflow/phases/design.md": "1785619496f523e51c5472052899c9c74fa5a612a094dd648878b5c5a3dd7a2c",
+     "cursor-bridge/workflow/phases/intake.md": "a915bf1e11b8a515e5e4e05fe861fa45c2acf3dd919c16d29785214f4d78e06f",
+-    "cursor-bridge/workflow/phases/interface.md": "ac63568da330dc45f196fcdfe50011ee7646910881876e907e798e6a2f310b09",
+-    "cursor-bridge/workflow/phases/planning.md": "c1a9def2d55a26d3ac545201235152669d1e49faf758df4cb40ec8bf58f42d40",
++    "cursor-bridge/workflow/phases/interface.md": "0af009932c49b75c0e1f3ecf73cd51356290d04bbeb6dee4f6d7f03fdecef500",
++    "cursor-bridge/workflow/phases/interface/command-design.md": "2416000d629aea96e339358c5188c3ec45fa07f8489538d340f1ae42a17e9cd7",
++    "cursor-bridge/workflow/phases/interface/contract-design.md": "4efe2b69e6900124c097a345f0169c362352b0fbec4c6475b3a36520c201777b",
++    "cursor-bridge/workflow/phases/interface/mockups.md": "5190813432fe0ddb75ad95e66b1cfae173ac1633d744001eb80c5d2099bd8478",
++    "cursor-bridge/workflow/phases/interface/playable-prototype.md": "b96edcf538eef45bce79ed39b0d5b0b16966a023fc19fbfe2acf7d6d66aeda8b",
++    "cursor-bridge/workflow/phases/planning.md": "6a5a52844bf94dac2a671dabbbca2fcd8abd9315d9a0b02832fc8e52ee1882d6",
+     "cursor-bridge/workflow/phases/project-end.md": "3f9e66aec318328644e8ceb75dde9d15d5044e3e1099bd443caedd77c4cf3b79",
+     "cursor-bridge/workflow/phases/reflection.md": "62484e4baddcd9ed45a1b5803290f9ca2db4980bd5a6a83c12f1a2864d4afecd",
+     "cursor-bridge/workflow/phases/run-parameters.md": "e2007da223deeff89d9963f9cf59b4cb08719c04d06a1f2754ed42ec20b9e1f2",
+     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
+-    "cursor-bridge/workflow/trace-exceptions.md": "dba729526a0dca634d4c718b183e295cab07a6d9b53edbd24982efe328a3a077",
++    "cursor-bridge/workflow/trace-exceptions.md": "02b3cd32ab5ef430a363a62e798be5ab201ca4f914dea23c3cd99ae9755926f6",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/Merge-Verification-Policy.md b/bridge/cursor-bridge/Merge-Verification-Policy.md
+index 1be3f4b..2448e20 100644
+--- a/bridge/cursor-bridge/Merge-Verification-Policy.md
++++ b/bridge/cursor-bridge/Merge-Verification-Policy.md
+@@ -59,7 +59,7 @@ a judgement layer — not as a new human gate.
+   required states) is a correctness class and behaves like any other REJECT.
+ - **No new human gate.** Design correctness never reaches the owner. Only a genuine *intent*
+   question — how the UI should look or behave — does, and that routes through the
+-  approved-mockup rule in `supervisor.md` Phase 3, not through this policy.
++  approved-mockup rule in `~/.claude/cursor-bridge/workflow/phases/interface/mockups.md` (Phase 3), not through this policy.
+ 
+ ---
+ 
+diff --git a/bridge/cursor-bridge/workflow/phases/design.md b/bridge/cursor-bridge/workflow/phases/design.md
+index 6fb934f..0e05969 100644
+--- a/bridge/cursor-bridge/workflow/phases/design.md
++++ b/bridge/cursor-bridge/workflow/phases/design.md
+@@ -223,11 +223,11 @@ When you create `docs/INVENTORY.md`, record each part's delivery kind as a Decis
+ 
+ The traits proposed at intake, the default traits of each part's product type and sub-type among them, are settled at this gate (intake's "Classifying each part"). Before presenting the design, weigh each part's traits again against the open list's definitions (`~/.claude/cursor-bridge/workflow/open-list.md`) in the light of the design: a trait the design now shows is added (the product needs accounts: *personal data*), and a proposed or default trait the design shows does not apply is dropped, each with its reason. At the gate each part's traits are a decision of their own, asked in the question form beside the separate decisions the gate below lists: each trait with its definition in one line and, in plain words, the work it adds. Once the owner has settled them, rewrite the part's `Workflows:` line if they changed, and run `python ~/.claude/cursor-bridge/workflow-check.py --status docs/PROJECT_STATUS.md` again.
+ 
+-**A new or unwritten trait is flagged, and the work continues.** A property that adds work and fits no trait's definition is a new trait; a trait whose open-list row reads `no` under Written (the check's `FLAG (trait)`) is defined but not yet written. Traits only add, so the main workflow and the part's product type still cover everything essential: write the extra handling into `docs/DESIGN.md`, a section of its own for each such trait saying what it adds and in which phases, and flag it at the gate as a decision of its own, saying plainly that until the bridge writes the trait's additions the design's section is the only handling it has: the work continues with the handling in the design, or the owner may still choose to pause the project. On a pause the trait goes to the bridge's maintainer as an unwritten product type does at intake: `Awaiting user on: paused at the design gate — <the trait> needs additions the bridge has not written`, the run sheet with your reasons, the release, the calibration, and the owner's word to resume. On resuming, a new trait, now in the open list, is added to each part's `Workflows:` line that has it, the check is run again, and the trait's additions take the place of the design's section. A new trait is not named on the `Workflows:` line until then, since the line names only the open list's entries; its handling lives in the design. Record each flagged trait in `docs/INVENTORY.md` → Decisions as a row that begins `Flagged trait:`, naming the trait, the parts that have it and the design section that handles it, so that the promotion pass at project end puts it forward, from which the maintainer may write it as trait additions; once the trait's additions are written and apply, the row is removed.
++**A new or unwritten trait is flagged, and the work continues.** A property that adds work and fits no trait's definition is a new trait; a trait whose open-list row reads `no` under Written (the check's `FLAG (trait)`) is defined but not yet written. Traits only add, so the main workflow and the part's product type still cover everything essential: write the extra handling into `docs/DESIGN.md`, a section of its own for each such trait saying what it adds and in which phases, and flag it at the gate as a decision of its own, saying plainly that until the bridge writes the trait's additions the design's section is the only handling it has: the work continues with the handling in the design, or the owner may still choose to pause the project. On a pause the trait goes to the bridge's maintainer as an unwritten product type does at intake: `Awaiting user on: paused at the design gate — <the trait> needs additions the bridge has not written`, the run sheet with your reasons, the release, the calibration, and the owner's word to resume. On resuming, a new trait, now in the open list, is added to each part's `Workflows:` line that has it; for a new trait and for an unwritten one already on the line alike, the check is run again, and the trait's additions, now written, take the place of the design's section. A new trait is not named on the `Workflows:` line until then, since the line names only the open list's entries; its handling lives in the design. Record each flagged trait in `docs/INVENTORY.md` → Decisions as a row that begins `Flagged trait:`, naming the trait, the parts that have it and the design section that handles it, so that the promotion pass at project end puts it forward, from which the maintainer may write it as trait additions; once the trait's additions are written and apply, the row is removed.
+ 
+ ### The gate
+ 
+-**Gate:** present the design to the user. Do not proceed to the UI mockups until they
++**Gate:** present the design to the user. Do not proceed to the interface phase until they
+ approve it. Present it as a decision brief (`explain-for-decision` skill): the choices the
+ design makes that are theirs to approve, the concepts those rest on, and what you decide
+ regardless. **Present it as separate decisions, each asked as a question of its own in the
+diff --git a/bridge/cursor-bridge/workflow/phases/interface.md b/bridge/cursor-bridge/workflow/phases/interface.md
+index b489965..0937ca0 100644
+--- a/bridge/cursor-bridge/workflow/phases/interface.md
++++ b/bridge/cursor-bridge/workflow/phases/interface.md
+@@ -1,65 +1,46 @@
+-## Phase 3 — UI mockups
+-
+-After the design is approved and before the build plan, turn the agreed design into
+-something the user can *see*. Build an HTML/CSS mockup of the interface — a static,
+-disposable design artifact for the user to judge and change, not the product's real
+-frontend. Cursor implements the real frontend later, in the delegation loop; this mockup
+-is upstream of the author/reviewer split, so writing it yourself does not compromise
+-reviewer independence. It is design documentation, not implementation.
+-
+-The mockup must map onto the agreed functionality **with no gaps, in both directions**:
+-every capability in `DESIGN.md` has a visible surface in the mockup, and every element in
+-the mockup traces back to an agreed capability — no orphan screens implying unspecified
+-features, no agreed feature with nowhere to live. Walk the design's feature list against
+-the mockup and account for each item before presenting.
+-
+-Apply the `design-sense` skill (if installed) when building the mockup: design from the
+-product rather than a default layout, and actively avoid the tells that make a UI look
+-machine-generated — including this model's own persistent house style. A mockup that looks
+-like the generic default is a signal to reconsider, not to present.
+-
+-Iterate with the user until they are satisfied — expect change requests; this is where UI
+-decisions are cheap to make. Use `AskUserQuestion` for discrete choices, plain discussion
+-otherwise.
+-
+-### The design-tooling flow
+-
+-For a UI-bearing project, build the mockup through the design tooling rather than freehand:
+-
+-1. **Direction.** Run the aesthetic-direction exchange with the user via `/impeccable
+-   shape` — in the **main session**, since subagents cannot talk to the user.
+-2. **Optional seed.** If the user gestures at a known look, pull the matching
+-   `~/.claude/cursor-bridge/design-seeds/<brand>/DESIGN.md` as a **starting target**, then
+-   adapt it into the project's own identity. Never ship a near-clone of a real brand.
+-3. **Author the visual system.** Record it via `/impeccable document` at
+-   **`docs/design/DESIGN.md`** (+ `PRODUCT.md` if used). This is the file the detector reads.
+-4. **Build the mockup** applying Impeccable's design language + the frozen Vercel interface
+-   rules + the empty/sparse/dense/error states from the Phase 1 inventory.
+-5. **Detect before sign-off.** Run `npx impeccable@<pinned> detect docs/mockups/` — now
+-   design-system-aware because `docs/design/DESIGN.md` exists — and clear it to **no primary
+-   findings** before presenting.
+-6. **Approve the pair.** The user approves the **mockup and the visual `DESIGN.md`
+-   together** — that pair is the visual contract the builder must not stray from.
+-
+-Save the mockup files under `docs/mockups/` (one file per screen or view is fine). The
+-design documents already live under `docs/`. Saving these concludes the planning stage.
+-
+-**Before the gate, make the mockup and the operational activity diagram agree** — every mockup screen is a `scr_` node and every `scr_` node is a mockup screen — **and add every mockup screen and every required state on it to `docs/REQUIREMENTS.md`** as its own row (Source: mockup screen "<name>"), unless an existing row already covers it — a screen in the mockup is a promise to the owner, and a tab that exists only as a picture is how a Settings screen went unbuilt (KP-029).
+-
+-**Gate:** present the mockup **and the visual `docs/design/DESIGN.md`** to the user and get
+-explicit approval of the pair before writing the build plan. Do not proceed on an
+-unapproved mockup, one with unaccounted gaps in either direction against the design, or one
+-with unresolved primary detector findings.
+-
+-The existing "approved mockup is guidance; wholesale divergence escalates" rule below
+-already governs when the contract is reopened. The design tooling adds **no new escalation
+-path** — a blocking design finding during the build re-delegates like any correctness
+-defect (Phase 6), it does not go to the user.
+-
+-**The approved mockup's authority:** once approved, the mockup is **guidance**, not a
+-pixel contract. Hold to it substantially, with some leeway. A reasonable design
+-improvement discovered during the build — one that serves the same agreed functionality —
+-is fine and needs no re-approval; record it in `docs/CHANGES.md`. A *wholesale* divergence
+-from what was approved is a scope question (does the software now look/behave differently
+-than agreed?) and escalates to the user. Judge by that line: same intent, better
+-execution → proceed and note it; different intent → escalate.
++## Phase 3 — Interface
++
++### What must survive a compaction
++
++After a compaction or a resume in this phase, read these before your next action:
++
++- this module and every variant file, each whole (the session-start hook names all four; a variant no part runs is read only to know it does not apply);
++- the approved design: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`, and `docs/diagrams/INDEX.md` with every diagram it lists, whole: each variant maps onto the agreed functionality, adds its screens, commands or operations to the register, and agrees with the diagrams (the mockups with the operational activity diagram's screens);
++- what each running variant has produced so far: `docs/design/DESIGN.md` and `docs/mockups/` for the mockups, `docs/design/COMMANDS.md` for the command design, `docs/design/CONTRACT.md` and the contract file it names for the contract design;
++- `run/supervisor/interface-notes.md` ("The interface notes"), whole;
++- `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which activate variants at `interface.variants` beside the kinds of interface the design shows, and its `Awaiting user on:` line says which variant waits for the owner.
++
++### The variants
++
++After the design is approved and before the build plan, turn the agreed design into something the owner can judge before it is built: each kind of interface a part has gets the variant made for it. The main workflow holds every variant once, its text in a file of its own beside this module:
++
++| Variant | For the interface kind | Its file |
++|---|---|---|
++| Mockups | screens a person sees | `interface/mockups.md` |
++| Command design | commands a person types | `interface/command-design.md` |
++| Contract design | a protocol other software calls | `interface/contract-design.md` |
++| Playable prototype | play | `interface/playable-prototype.md` |
++
++Variants: interface/mockups.md; interface/command-design.md; interface/contract-design.md; interface/playable-prototype.md
++
++Every variant is an addition, never a replacement of another: a part with screens and commands runs both the mockups and the command design. The conditional workflows add the variants that apply at `interface.variants`: the trait *has screens* adds the mockups, a sub-workflow for software met through a terminal or called through a protocol adds the command design or the contract design, and a type workflow or sub-workflow may replace the whole phase with its own (the registry marks this module replaceable), as the video game type workflow does for play. The phase runs under the status file's `Phase: mockups`, the template's value for it, whichever variants run.
++
++### Which variants a part runs
++
++Read each part's kinds of interface from the approved design: every surface a person or another program meets the part through is one of the four kinds above. A part runs the variant of every kind it has. The mockups are activated by the trait *has screens*, which a part with screens has by its definition; a part whose design shows screens without the trait on its `Workflows:` line has a trait missing, which the design gate settles (`design.md`, "Traits at the design gate") before this phase begins, and a missing trait found during this phase goes back to the owner as that same decision, asked on its own, before any mockup is approved. The command design and the contract design are activated by the part's type workflow or sub-workflow; where the design shows commands or a protocol that none of the part's written conditional workflows activates (a sub-workflow not yet written, or administrative commands beside a service's protocol), the variant runs all the same, because its text is the main workflow's, and you name it at the gate. A conditional workflow's addition at `interface.variants` adds to the variant's procedure what that workflow needs, never a second copy of it. A part whose surfaces are of none of the four kinds (a pipeline whose output is files, a backend another part calls only through the contract that part's own design states) runs no variant; say so for that part at the gate. A surface the design names that fits none of the four kinds, and that the owner would judge before it is built, is raised at the gate as a decision of its own, with your proposal for how the owner sees it before the build, never left out silently.
++
++A project with several parts runs each part's variants for that part, in the status file's order of parts. An artifact two parts share (one set of screens for both) is made and approved once, and each part's increments cite it.
++
++### The interface notes
++
++This phase iterates with the owner, and their change requests live only in the conversation until you write them down. Write every change the owner asks for on a variant's artifact, and whether it is made, to `run/supervisor/interface-notes.md` as each request arrives, and name the file on the status file's `Working files:` line (rule 54). A key, token or password the owner pastes is never written there: rule 53 applies to it, and the note says only that one was given.
++
++### The gate
++
++**Gate:** present each variant's artifact to the owner and get explicit approval of each before writing the build plan; each variant's file says what its artifact is and what its own gate requires. Do not proceed while any variant a part runs is unapproved. Present them as a decision brief (`explain-for-decision` skill), each variant's approval asked as a question of its own in the app's question form, with every part that runs no variant named in one line beside them. When no part runs any variant, the gate still asks the owner's word, that no part has an interface to judge before the build (rule 5). The phase passes when every variant every part runs is approved.
++
++## Extension points
++
++This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
++
++- `interface.variants` — the variants a part's interface phase runs: an addition there names the variant it activates for the part, from the table under "The variants", and adds to that variant's procedure what its workflow needs (the trait *has screens* activates the mockups).
+diff --git a/bridge/cursor-bridge/workflow/phases/interface/command-design.md b/bridge/cursor-bridge/workflow/phases/interface/command-design.md
+new file mode 100644
+index 0000000..a9c908e
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/phases/interface/command-design.md
+@@ -0,0 +1,3 @@
++## Command design
++
++The command design is the interface phase's variant for commands a person types in a terminal (`interface.md`, "The variants"). It turns the agreed design into the commands as the owner will meet them, before any of them is built: what each command is called, what it asks for, what it says back. It is design documentation, written by you like a mockup, upstream of the author/reviewer split. Its artifact is `docs/design/COMMANDS.md`, one section per command, and the owner approves it at the phase's gate (`interface.md`, "The gate").
+diff --git a/bridge/cursor-bridge/workflow/phases/interface/contract-design.md b/bridge/cursor-bridge/workflow/phases/interface/contract-design.md
+new file mode 100644
+index 0000000..a5b7821
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/phases/interface/contract-design.md
+@@ -0,0 +1,3 @@
++## Contract design
++
++The contract design is the interface phase's variant for a protocol other software calls, such as an MCP server's tools or a local API (`interface.md`, "The variants"). Its user is a program, so what the owner approves is what the part offers, in plain words; the contract's exact form is technical and is enforced by tests, not judged by the owner. Its artifacts are `docs/design/CONTRACT.md`, which states in plain words every operation the part offers, and the machine-readable contract file `CONTRACT.md` names, which tests enforce; the owner approves what the part offers, from `CONTRACT.md`, at the phase's gate (`interface.md`, "The gate").
+diff --git a/bridge/cursor-bridge/workflow/phases/interface/mockups.md b/bridge/cursor-bridge/workflow/phases/interface/mockups.md
+new file mode 100644
+index 0000000..1d6566e
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/phases/interface/mockups.md
+@@ -0,0 +1,67 @@
++## Mockups
++
++The mockups are the interface phase's variant for screens a person sees (`interface.md`, "The variants"). They are an addition, never a replacement: the trait *has screens* activates them at `interface.variants` for each part that has screens, beside any other variant the part runs, together with its design tooling below. The build-phase conditions of screens (the frozen interface rules in every brief, the design auditor's review, the observability tests of the running interface) are not this file's: they are the build phases' part of the trait *has screens*, read with the build modules.
++
++After the design is approved and before the build plan, turn the agreed design into
++something the user can *see*. Build an HTML/CSS mockup of the interface — a static,
++disposable design artifact for the user to judge and change, not the product's real
++frontend. Cursor implements the real frontend later, in the delegation loop; this mockup
++is upstream of the author/reviewer split, so writing it yourself does not compromise
++reviewer independence. It is design documentation, not implementation.
++
++The mockup must map onto the agreed functionality **with no gaps, in both directions**:
++every capability in `DESIGN.md` has a visible surface in the mockup, and every element in
++the mockup traces back to an agreed capability — no orphan screens implying unspecified
++features, no agreed feature with nowhere to live. Walk the design's feature list against
++the mockup and account for each item before presenting.
++
++Apply the `design-sense` skill (if installed) when building the mockup: design from the
++product rather than a default layout, and actively avoid the tells that make a UI look
++machine-generated — including this model's own persistent house style. A mockup that looks
++like the generic default is a signal to reconsider, not to present.
++
++Iterate with the user until they are satisfied — expect change requests; this is where UI
++decisions are cheap to make. Use `AskUserQuestion` for discrete choices, plain discussion
++otherwise.
++
++### The design-tooling flow
++
++For a UI-bearing project, build the mockup through the design tooling rather than freehand:
++
++1. **Direction.** Run the aesthetic-direction exchange with the user via `/impeccable
++   shape` — in the **main session**, since subagents cannot talk to the user.
++2. **Optional seed.** If the user gestures at a known look, pull the matching
++   `~/.claude/cursor-bridge/design-seeds/<brand>/DESIGN.md` as a **starting target**, then
++   adapt it into the project's own identity. Never ship a near-clone of a real brand.
++3. **Author the visual system.** Record it via `/impeccable document` at
++   **`docs/design/DESIGN.md`** (+ `PRODUCT.md` if used). This is the file the detector reads.
++4. **Build the mockup** applying Impeccable's design language + the frozen Vercel interface
++   rules + the empty/sparse/dense/error states from the Phase 1 inventory.
++5. **Detect before sign-off.** Run `npx impeccable@<pinned> detect docs/mockups/` — now
++   design-system-aware because `docs/design/DESIGN.md` exists — and clear it to **no primary
++   findings** before presenting.
++6. **Approve the pair.** The user approves the **mockup and the visual `DESIGN.md`
++   together** — that pair is the visual contract the builder must not stray from.
++
++Save the mockup files under `docs/mockups/` (one file per screen or view is fine). The
++design documents already live under `docs/`. Saving these concludes the mockups; the phase concludes when every variant the parts run is approved (`interface.md`, "The gate").
++
++**Before the gate, make the mockup and the operational activity diagram agree** — every mockup screen is a `scr_` node and every `scr_` node is a mockup screen — **and add every mockup screen and every required state on it to `docs/REQUIREMENTS.md`** as its own row (Source: mockup screen "<name>"), unless an existing row already covers it — a screen in the mockup is a promise to the owner, and a tab that exists only as a picture is how a Settings screen went unbuilt (KP-029).
++
++**Gate:** present the mockup **and the visual `docs/design/DESIGN.md`** to the user and get
++explicit approval of the pair before writing the build plan. Do not proceed on an
++unapproved mockup, one with unaccounted gaps in either direction against the design, or one
++with unresolved primary detector findings.
++
++The existing "approved mockup is guidance; wholesale divergence escalates" rule below
++already governs when the contract is reopened. The design tooling adds **no new escalation
++path** — a blocking design finding during the build re-delegates like any correctness
++defect (Phase 6), it does not go to the user.
++
++**The approved mockup's authority:** once approved, the mockup is **guidance**, not a
++pixel contract. Hold to it substantially, with some leeway. A reasonable design
++improvement discovered during the build — one that serves the same agreed functionality —
++is fine and needs no re-approval; record it in `docs/CHANGES.md`. A *wholesale* divergence
++from what was approved is a scope question (does the software now look/behave differently
++than agreed?) and escalates to the user. Judge by that line: same intent, better
++execution → proceed and note it; different intent → escalate.
+diff --git a/bridge/cursor-bridge/workflow/phases/interface/playable-prototype.md b/bridge/cursor-bridge/workflow/phases/interface/playable-prototype.md
+new file mode 100644
+index 0000000..4f46697
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/phases/interface/playable-prototype.md
+@@ -0,0 +1,5 @@
++## Playable prototype
++
++The playable prototype is the interface phase's variant for play (`interface.md`, "The variants"): a game is judged by playing it, so its interface is approved by a playtest, where the owner plays the prototype and approves its feel or sends it back. Its procedure belongs to the Game Development type workflow, which replaces this phase for every part of the product type *video game* with its own (the open list, `video-game`; release E writes it, with its Roblox sub-workflow). The main workflow holds no procedure for play beyond this pointer.
++
++No project reaches this phase needing it before that workflow exists: a part that is a video game is classified as one at intake, and a product type whose workflow is not yet written pauses the project there (`intake.md`, "Classifying each part"). Screens a game also has (menus, a shop, a settings screen) keep the mockups, approved as pictures inside the playtest's gate, as the Game Development workflow will state.
+diff --git a/bridge/cursor-bridge/workflow/phases/planning.md b/bridge/cursor-bridge/workflow/phases/planning.md
+index 3076ee0..2a1f89c 100644
+--- a/bridge/cursor-bridge/workflow/phases/planning.md
++++ b/bridge/cursor-bridge/workflow/phases/planning.md
+@@ -1,5 +1,15 @@
+ ## Phase 4 — Build plan
+ 
++### What must survive a compaction
++
++After a compaction or a resume in this phase, read these before your next action:
++
++- this module, whole;
++- the approved design and what the interface phase approved: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`, `docs/diagrams/INDEX.md` and every diagram it lists, and the approved artifacts under `docs/design/` and `docs/mockups/`, whole: every increment satisfies requirements of the register and cites what it implements;
++- `docs/BUILD_PLAN.md` as drafted so far, whole, and each Issues file the owner named at Step 0, whole (its path stands in the plan's Prior-project lessons section, Step 0);
++- `docs/DESIGN_CRITIQUE.md`, whole, while the plan critique runs, with `docs/RUN_PARAMETERS.md` and the round's files under `run/review/` (`DESIGN-plan-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in flight, and `~/.claude/cursor-bridge/workflow/phases/design.md`'s "The procedure", whose two-critic loop, stop rule, ceiling, confirming read and resolution round the plan critique runs: it counts its rounds as the design critique does;
++- `docs/PROJECT_STATUS.md`, whole: its `Awaiting user on:` line says whether Step 0's question or the plan's gate waits for the owner.
++
+ ### Step 0 — Prior-project lessons (ask before drafting)
+ 
+ Before you draft the plan, ask the user — once, explicitly — whether an earlier project
+@@ -11,6 +21,8 @@ they can judge overlap against projects they remember. Point them at the bridge'
+ `Claude-Cursor Bridge Issues Index.md` in the bridge's own `Documents/` if they keep one.
+ If they name none, record "Prior-project lessons: none" in the plan and move on.
+ 
++Write each path the owner names into the plan's Prior-project lessons section as soon as they name it, before you read the file: the conversation that held it does not survive a compaction (rule 54).
++
+ For each file they give you, read it whole (it is the size of a report, not a codebase),
+ then produce a short **Prior-project lessons** section at the top of `docs/BUILD_PLAN.md`:
+ 
+@@ -30,6 +42,10 @@ configuration item. Do not paste the old file's prose into the plan; the plan ca
+ consequence, not the story. If a lesson is generalizable beyond both projects, say so in
+ your report — it is a candidate for `Known-Pitfalls.md`, which is the maintainer's call.
+ 
++### What the interface phase hands to the plan
++
++Each variant the interface phase approved is a source the plan builds against. Every increment that builds a screen cites its approved mockup screen ("The plan", below); every increment that builds a command cites the approved command design's section for it; and for every contract the contract design approved (`docs/design/CONTRACT.md`), the plan carries an increment whose tests check the built part against the contract file, so that the contract is enforced, never only described.
++
+ ### The plan
+ 
+ Write `docs/BUILD_PLAN.md` as an ordered list of increments. Each increment must be:
+@@ -108,3 +124,10 @@ what was accepted with its reason) as one of its separate decisions.
+ Its second line, right after the approval question, is the model switch that follows
+ approval: *on approval, set this session to Opus 5.5 in the model menu* (rule 48) — the run
+ parameters and everything after them run on it.
++
++## Extension points
++
++This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
++
++- `planning.stages` — stages every plan for the part must hold, such as a packaging stage, written into the plan beside the stages "The plan" asks for, each with its increments and its `Demonstration:` line.
++- `planning.critic-lenses` — lenses the plan critique adds to those "The plan" lists, made once for the whole project and given to both critics with the plan.
+diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
+index 1b634c8..5b518f7 100644
+--- a/bridge/cursor-bridge/workflow/trace-exceptions.md
++++ b/bridge/cursor-bridge/workflow/trace-exceptions.md
+@@ -16,3 +16,20 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
+ - new TASK-011 bridge/cursor-bridge/workflow/phases/design.md The delivery kind
+ - new TASK-011 bridge/cursor-bridge/workflow/phases/design.md Traits at the design gate
+ - new TASK-011 bridge/cursor-bridge/workflow/phases/design.md Extension points
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md What must survive a compaction
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md The variants
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md Which variants a part runs
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md The gate
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md Extension points
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface/mockups.md Mockups
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface/command-design.md Command design
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface/contract-design.md Contract design
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface/playable-prototype.md Playable prototype
++- new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md What must survive a compaction
++- new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md Extension points
++- reword TASK-012 bridge/commands/supervisor.md Phase 2 — Design
++- new TASK-012 bridge/cursor-bridge/workflow/phases/design.md The gate
++- new TASK-012 bridge/cursor-bridge/workflow/phases/interface.md The interface notes
++- new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md What the interface phase hands to the plan
++- reword TASK-012 bridge/commands/supervisor.md The design-tooling flow
++- new TASK-012 bridge/cursor-bridge/workflow/phases/planning.md Step 0 — Prior-project lessons (ask before drafting)
+diff --git a/docs/BUILD_PLAN.md b/docs/BUILD_PLAN.md
+index 1b515e6..e9da5e9 100644
+--- a/docs/BUILD_PLAN.md
++++ b/docs/BUILD_PLAN.md
+@@ -153,9 +153,9 @@ Parent: none
+ Depends on: TASK-010
+ Parallel: no
+ Diagrams: none
+-Scope: bridge/cursor-bridge/workflow/phases/interface.md; .../interface/mockups.md; .../interface/command-design.md; .../interface/contract-design.md; .../interface/playable-prototype.md; .../planning.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_interface_planning.py
++Scope: bridge/cursor-bridge/workflow/phases/interface.md; .../interface/mockups.md; .../interface/command-design.md; .../interface/contract-design.md; .../interface/playable-prototype.md; .../planning.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_interface_planning.py; bridge/commands/supervisor.md; bridge/cursor-bridge/workflow/phases/design.md; tests/test_core_carve.py; tests/test_workflow_model.py; tests/test_session_start_module.py; tests/test_phase_modules_intake_design.py; bridge/cursor-bridge/Merge-Verification-Policy.md (widened 2026-10-20 for the pointer sweep, docs/HARDENING.md, Stage B3: the core's module table and its Phase 3 sentence, and design.md's gate sentence, named Phase 3 "the UI mockups", now one variant of four; rule 13 and the merge policy named the approved-mockup rule's old home; the tests that pin the interface module's heading, the trace counts and the hook's names for Phase: mockups follow; and for Review B's should-fix at PR #53, design.md's resume sentence, with the TASK-011 test that pins it)
+ Satisfies: R-004, R-006, R-010, R-012, R-032
+-Done when: interface.md declares all four variants once, each variant's text in its own file; `interface/mockups.md` holds the Phase-3 mockup procedure (today's `## Phase 3 — UI mockups`), declared an *addition* activated by the trait *has screens* (R-010) — the build-phase interface passages (the frozen-rule brief constraint, the design-auditor review step, the observability tests) are NOT here; they are gathered by the has-screens trait (TASK-017) from the build modules; planning.md and interface.md each open with their compaction-survival list and declare their extension points; the playable-prototype file is a declared pointer to the Game Development workflow (release E), worded to avoid `completion-check`'s stand-in patterns (verified by `completion-check --mode plan` reporting no stand-in on `workflow/**`); within the R-032 bound; `trace-check` green; `test_phase_modules_interface_planning.py` (names R-004, R-006, R-010, R-012, R-032) asserts both files' structure, the four variants, and the mockup-as-addition.
++Done when: interface.md declares all four variants once, each variant's text in its own file; `interface/mockups.md` holds the Phase-3 mockup procedure (today's `## Phase 3 — UI mockups`), declared an *addition* activated by the trait *has screens* (R-010) — the build-phase interface passages (the frozen-rule brief constraint, the design-auditor review step, the observability tests) are NOT here; they are gathered by the has-screens trait (TASK-017) from the build modules; planning.md and interface.md each open with their compaction-survival list and declare their extension points; the playable-prototype file is a declared pointer to the Game Development workflow (release E), worded to avoid `completion-check`'s stand-in patterns (verified by `completion-check --mode plan` reporting no stand-in on `workflow/**`; corrected at the gate, 2026-10-20: completion-check reads code files only, so the test applies its patterns to the interface module and the variant files directly); within the R-032 bound; `trace-check` green; `test_phase_modules_interface_planning.py` (names R-004, R-006, R-010, R-012, R-032) asserts both files' structure, the four variants, and the mockup-as-addition.
+ 
+ ### TASK-013 — Enrich phase modules: run parameters, configuration, the delegation loop
+ Author: supervisor.
+@@ -249,7 +249,7 @@ Parallel: no
+ Diagrams: none
+ Scope: bridge/cursor-bridge/workflow/phases/interface/contract-design.md; bridge/cursor-bridge/workflow/phases/interface/command-design.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_interface_text.py
+ Satisfies: R-026
+-Done when: contract design covers a protocol's operations/inputs/outputs/errors/versioning as a contract file tests enforce; command design covers commands, help text, output formats; `test_interface_text.py` (names R-026) asserts both files' required sections. (The variant files are declared in TASK-012; this fills their bodies.)
++Done when: contract design covers a protocol's operations/inputs/outputs/errors/versioning as a contract file tests enforce; command design covers commands, help text, output formats; `test_interface_text.py` (names R-026) asserts both files' required sections. (The variant files are declared in TASK-012, each with its heading and its declaring paragraph, which names its artifact; this fills their bodies.) Added at TASK-012's gate, 2026-10-20 (Review A and the security audit, convergent): command-design.md writes `docs/design/COMMANDS.md`, one section per command, and contract-design.md writes `docs/design/CONTRACT.md` and the contract file it names, the names interface.md and planning.md already cite; each body states its artifact and its **Gate:**; an added contract operation, like a breaking change, escalates to the owner; each operation says who may call it and how a refused call fails, so the contract-enforcement increment tests refusals as well as shapes; a secret is never a command's option value (it comes from a key file, a prompt or the product's store) and example sessions use plain placeholders; test_interface_text.py asserts those names, the gates and the three rules, and applies completion-check's stand-in patterns to both files. TASK-012's first drafts of both bodies and their test are kept in run/supervisor/drafts/task012/ (gitignored) and in commit 552458b, PR #55's first head.
+ 
+ ## Stage B5 — Calibration and acceptance
+ Demonstration: a fresh session walked intake→configuration reads only its core, its current phase module, and its own conditional workflows; the four projects each classify under §6.3 on fixtures with `workflow-check` green.
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index c1faed5..50fbf56 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -138,6 +138,13 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
+ - **Rounds (composer-2.5):** round 1 made the three code changes and the three docstring edits; Review A APPROVE with one should-fix (the two edited docstring paragraphs left at 123 and 251 characters a line) and three considers (the non-str sentence read wider than the one place the hook checks; the per-path `type(p) is not str` check could no longer fire; the docstring test checked only the new wording), the security audit PASS with one advisory (added to the `__del__` lead above), the secret scan CLEAR; all taken in round 2, with the docstring test made to check the old wording gone and the wrap. Round 2: Review A APPROVE 0/0/3, the security audit PASS with no findings, the secret scan CLEAR; Review A's consider to pin the wrap at the brief's 94 characters, not 95, taken.
+ - **Lead (Review A, round 2, consider):** the rewrap split the two long lines and left the following lines, so two short lines remain mid-paragraph (session-start.py:30 "line is ignored) and must match", :60 "hand-edited"; mirrored in docs/CLI_REFERENCE.md). Cosmetic: the docstring reads the same with whitespace collapsed. Check: a greedy reflow of those two paragraphs, no word changed, at the hook's next edit.
+ 
++### TASK-012, the interface variants and the planning module (2026-10-20)
++
++- **Review A, round 1: REJECT**, one blocking item, taken: the stand-in test asserted the patterns find nothing without showing they find anything (a weakened pattern would pass any wording); it now matches two stand-ins first. Five should-fix items, all taken: the interface survival list names the diagram index and its diagrams (the mockups reconcile with the operational activity diagram before their gate); writing the interface notes is an instruction of its own section, on `Working files:`, and Step 0 writes each Issues path into the plan as the owner names it, so neither survival item names a file the procedure never wrote; the plan critique's survival item names design.md's "The procedure", whose loop it runs; the contract-enforcement increment is stated in planning.md ("What the interface phase hands to the plan"), where Phase 4 reads it; the moved "Saving these concludes the planning stage" now says the mockups conclude and the phase concludes when every variant is approved. Considers taken: every variant file is read, one no part runs only to know it does not apply (the hook names all four); a shared artifact is made and approved once and cited by each part; a missing *has screens* found during the phase goes back to the owner as the design gate's decision; the gate asks the owner's word when no part runs a variant (rule 5); additions add to a variant's procedure, not its file; the phase runs under `Phase: mockups`; a negative test that no text calls the mockups a replacement; rule 13 and the merge policy re-pointed to `interface/mockups.md`. Noted and taken: the command- and contract-design bodies are TASK-022's (BUILD_PLAN: "this fills their bodies", R-026), so TASK-012 keeps each file's heading and declaring paragraph and the drafts wait for TASK-022 with the security audit's three advisories on them (an added operation escalates; each operation says who may call it; a secret is never a command's option value, and example sessions use placeholders). The security audit PASS; its fourth advisory taken (no pasted key in the interface notes). The secret scan CLEAR. The drafts are kept in run/supervisor/drafts/task012/ (gitignored) and in commit 552458b, PR #55's first head; the three advisories and the artifact names are in TASK-022's Done when (Review A round 2 and the security re-check, convergent). Round 2: Review A APPROVE with two should-fix items, both taken: the declaring paragraphs name their artifacts (`docs/design/COMMANDS.md`; `docs/design/CONTRACT.md` and the contract file) and their approval at the phase's gate, so interface.md's survival list and gate and planning.md cite no artifact nothing defines; TASK-022's Done when binds the names, the gates and the advisories. Its consider taken: the stand-in check scans planning.md too. The security re-check PASS, its three advisories the same two items and a third, recorded here: until TASK-022 the two variants state only their artifact and their approval, and no project runs this staging state, since release B installs at stage B6 after TASK-022 merges (INVENTORY, Decisions, R-038). The secret scan CLEAR. Review A's confirming read APPROVE, its should-fix (this record's stand-in lead) and consider (this paragraph's order) taken.
++- **Lead (Review A, for TASK-014):** change-cycle.md item 3 runs only "UI mockups (Phase 3) only if the change touches the UI", with "Gate as in Phase 3". The plan (§6.8) says the contract and command design apply to a project from its next design phase or change cycle, so a local service's next change would skip its contract design. Check: TASK-014's change-cycle enrichment runs the variant of every interface kind the change touches.
++- **Lead (the trace exceptions):** the reword entries "Phase 2 — Design" and "The design-tooling flow" excuse every passage of those baseline sections, and the `new` entries for design.md "The gate" and planning.md "Step 0" excuse any later new text there; trace-check still prints a NOTE for each excused passage, and tests/test_core_carve.py pins the NOTE lines, so a later excuse changes a test. design.md's resume sentence (Review B's should-fix at PR #53) is excused by TASK-011's "Traits at the design gate" entry, and rule 13's re-pointing by TASK-015's "Standing rules" entry, whose label its NOTE carries.
++- **Lead (the stand-in check):** completion-check.py reads code files only, so a stand-in in a governance Markdown file is seen by no program; the TASK-012 test applies its patterns to the interface and planning modules and the variant files only, since project-end.md quotes them as the rule's text. Check: if a later increment writes a variant body, its test applies the patterns too (TASK-022).
++
+ ## Stage B2 — carried to its close (test lane)
+ - Done on BUG-002 (stage B2's review fixes), not in the refactoring pass, whose test lane only consolidates: tests/test_open_list.py pins "filled, including" and its comment at :25 is corrected (TASK-004 r3 Consider); tests/test_extension_points.py pins the configuration.items CI route, the inspect step's members and the placement sentence (TASK-005 r6 Consider).
+ 
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 35f0c43..3135a80 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -23,6 +23,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The traceability check | Compares every passage of the core (bridge/commands/supervisor.md) at the pinned baseline commit with its current homes, the core and every module under bridge/cursor-bridge/workflow/: a passage dropped everywhere, a passage in more homes than at baseline, undeclared new text in a module, a `~/.claude/...` reference that does not name a path inside bridge/ with no link on the way, and a cited heading that resolves nowhere are FAIL lines; `reword` and `new` entries in trace-exceptions.md excuse a reworded or new passage; `--map` prints each passage's home; a link met on any path it reads, an unreadable folder, a git failure or the baseline commit missing (a shallow clone) stop it with exit 2. Only git rev-parse, cat-file, ls-tree and show run; nothing is written | bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt (the baseline, 0a186da); bridge/cursor-bridge/workflow/trace-exceptions.md | tests/test_trace_check.py | release B (TASK-016) |
+ | The phase modules | The supervisor's procedure, one file per part of the workflow, moved verbatim from the core: intake, design, interface, planning, run-parameters, configuration, delegation-loop, change-cycle, reflection, project-end (carved out of the reflection points as a declared split); the core keeps the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state and the standing rules, and names every module, and when a module is read outside its own phase (reflection at every reflection point, its Issues section whenever an issue is detected, project end at the last stage's close, another phase's module whole for a step a module runs by its heading: the change cycle's scaled Phases 1 to 4, the design critique's use of the delegation loop's steps 3b and 8); the modules install from the manifest with no installer change | bridge/cursor-bridge/workflow/phases/*.md; bridge/commands/supervisor.md | tests/test_core_carve.py; trace-check.py (424 passages, 0 dropped) | release B (TASK-010) |
+ | Classification at intake and traits at the design gate | Each part classified against the open list at intake, its product type and sub-type fixed there, its traits and its type's default traits proposed there and settled as a decision of their own at the design gate; the `Workflows:` line written and `workflow-check.py --status` run; a part that fits no type, two equally, two sub-types equally or an unwritten type or sub-type pauses the project before design (a run sheet to the maintainer; resumed after the release and the calibration, classified again before the gate); a new or unwritten trait's handling written into the design and flagged at the gate, where the owner may pause, kept as a `Flagged trait:` row for the promotion pass; each part's delivery kind confirmed at intake and recorded as a `Delivery kind:` row; the intake questions and answers kept in run/supervisor/intake-notes.md, never a key; intake.md and design.md open with their compaction-survival lists and declare their extension points | bridge/cursor-bridge/workflow/phases/intake.md; bridge/cursor-bridge/workflow/phases/design.md | tests/test_phase_modules_intake_design.py | release B (TASK-011) |
++| The interface variants | The interface phase runs one variant per kind of interface a part has, each an addition: mockups for screens (today's Phase 3 procedure, activated by the trait has screens), command design for commands and contract design for a protocol other software calls (each declared with its heading and purpose; their procedures are TASK-022's), and a playable prototype for play (a pointer to the Game Development workflow, release E); interface.md declares them in a table and one `Variants:` line the session-start hook names after it; the owner's change requests are kept in run/supervisor/interface-notes.md, never a key; the owner approves each variant's artifact, the phase passing when all are approved, and the owner's word is asked even when no part runs a variant; the plan builds against what the phase approved (planning.md, "What the interface phase hands to the plan": every approved contract gets the increment whose tests enforce it); interface.md and planning.md open with their compaction-survival lists and declare their extension points | bridge/cursor-bridge/workflow/phases/interface.md; .../interface/*.md; .../planning.md | tests/test_phase_modules_interface_planning.py | release B (TASK-012) |
+ | The hook's module pointers | After a compaction, resume or fork the session-start hook names the current phase's module files (one Phase→module table, every template value), the files a module's `Sub-files:` and `Variants:` lines name, and the type, sub-type and trait files that touch the phase, in the order additions apply; it reads the open list and the registry only at their installed paths and through no link; a table or checker it cannot read or use gives one plain line and names no conditional or pointer-line file; nothing the checker returns is printed except as an exact str matching its pattern, what the checker prints through sys.stdout and sys.stderr is discarded (an exception's type name included, which is read inside a redirection of its own), a phase module line from the checker's file_lines that is not an exact str makes the checker unusable (the one plain line), each pointer path is taken exactly as written between `; ` separators (only the line's end is stripped), and the hook exits 0 | bridge/cursor-bridge/session-start.py | tests/test_session_start_module.py; tests/test_session_start.py | release B (TASK-015; hardened by FIX-003 before the first pointer line) |
+ 
+ ## Resources
+@@ -80,6 +81,7 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | The hook reads the workflow tables only at their installed paths (`~/.claude/cursor-bridge/workflow/open-list.md` and `extension-points.md`), only once the checker's own table paths compare equal to them, and refuses them behind a link at workflow/ or at either file | the link test and the read then concern the same files on every platform (TASK-015 R3-3, R4-3, R5-1) | 2026-10-20, supervisor (TASK-015) | the tables move |
+ | Three records the plan does not name, added by TASK-011: run/supervisor/intake-notes.md (intake's questions and answers, on the Working files: line; gitignored, so a resume on another computer loses it), and two Decisions rows a project's inventory carries, `Flagged trait:` (a new or unwritten trait the design handles, read by the promotion pass, TASK-014) and `Delivery kind:` (each part's key, which project end's delivery procedure applies by) | R-004 needs intake's answers somewhere a compaction leaves them, and rule 54's place is run/supervisor/; R-036's promotion pass and the registry's "recorded by its key" each need a durable record, and the inventory's `Development data:` row is the pattern | 2026-10-20, supervisor (TASK-011, Review A's should-fixes) | the promotion pass reads another record, or a project needs its intake notes on a second computer |
+ | The bridge's settings allow `python ~/.claude/cursor-bridge/workflow-check.py`, as they allow the other read-only checkers | intake runs it on the status file; it only reads files and prints (the security audit, TASK-011) | 2026-10-20, supervisor (TASK-011) | the checker gains a write or an argument that runs code |
++| A record the plan does not name, added by TASK-012: run/supervisor/interface-notes.md, every change the owner asks for on a variant's artifact and whether it is made (gitignored, on the Working files: line) | the interface phase iterates with the owner and the requests live only in the conversation, which a compaction does not keep (R-004; rule 54's place, as intake-notes.md) | 2026-10-20, supervisor (TASK-012) | the requests move into a tracked record |
+ | The hook's docstring says a non-str line from the checker's file_lines makes the checker unusable for the lines of a phase module file only, since the hook calls file_lines in one place, pointer_paths_from_module (FIX-003's round-2 assumption, accepted) | the sentence is narrowed to what the code checks (Review A, FIX-003 round 1); no test sees a second call site | 2026-10-20, supervisor (FIX-003) | the hook calls file_lines elsewhere |
+ | No diagram index for release B | the design is the plan's prose and its §6.2 layering / §6.11 file layout tables; this is governance text, not a code architecture with components to draw | 2026-10-11, supervisor | a later release adds code whose architecture is load-bearing |
+ 
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index b98db8b..48ccac1 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,21 +3,21 @@ Last updated: 2026-10-20
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at the merge of FIX-003 (PR #54); TASK-012, the enrichment of the interface and planning modules, is next
+-Last accepted: FIX-003 (PR #54, at its merge): the session-start hook hardened before the first module pointer line — an exception's type name read where the checker cannot print, a phase module line that is not an exact str making the checker unusable, each pointer path taken as written, the docstring stating the grammar and the two streams (R-005; four HARDENING leads closed); before it TASK-011 (PR #53: the intake and design modules enriched, R-013 and R-035 built), TASK-010 with TASK-015 (PR #52: the core carved into its phase modules, 856 lines and 95,005 characters from 2,342 and 223,501, R-003 built; the hook naming the phase's modules, R-005 built), TASK-016 (PR #51), FIX-002 (PR #50), CONFIG-B3b (PR #49), FIX-001 (PR #48; ISS-011) and CFG-B3 (PR #47); main holds TASK-001 to TASK-011, TASK-015, TASK-016, BUG-001, the refactoring pass, BUG-002 to BUG-016, HOTFIX-001, CFG-B3, FIX-001, CONFIG-B3b, FIX-002, FIX-003
++Increment: none — this file states the position at the merge of TASK-012 (PR #55); TASK-013, the enrichment of the run-parameters, configuration and delegation-loop modules, is next
++Last accepted: TASK-012 (PR #55, at its merge): the interface phase's four variants declared in interface.md, each in its own file, the mockups an addition the trait has screens activates (R-012 built, R-010 in part), interface.md and planning.md with their survival lists and extension points; before it FIX-003 (PR #54, the hook hardened before the first pointer line), TASK-011 (PR #53, the intake and design modules), TASK-010 with TASK-015 (PR #52, the core carved into its phase modules; the hook naming them), TASK-016 (PR #51), FIX-002 (PR #50), CONFIG-B3b (PR #49), FIX-001 (PR #48) and CFG-B3 (PR #47); main holds TASK-001 to TASK-012, TASK-015, TASK-016, BUG-001 to BUG-016, the refactoring pass, HOTFIX-001, CFG-B3, CONFIG-B3b, FIX-001 to FIX-003
+ Awaiting user on: nothing
+ Previously: stage B1 closed 2026-10-19 after four stage-review rounds — round 1 (2026-10-16) both REJECT (BUG-001); round 2 Review A REJECT (the bootstrap tests checked a word, not a record: BUG-015); round 3 Review B REJECT, Review A the same item, convergent (this file on main described its own pull request before the gate: BUG-016, ISS-009); round 4 both APPROVE.
+-Next: TASK-012 (enrich the interface and planning modules, the mockup variant in its own file): a branch from origin/main, the supervisor's text and tests, trace-check.py at RESULT: OK, the pointer sweep for its modules (docs/HARDENING.md, Stage B3). Then TASK-013 (delegation-loop.md is at 94% of R-032's characters: split into sub-files first if it grows) and TASK-014.
++Next: TASK-013 (enrich the run-parameters, configuration and delegation-loop modules; delegation-loop.md is at 94% of R-032's characters, so it is split into sub-files under workflow/phases/delegation-loop/ first if it grows): a branch from origin/main, the supervisor's text and tests, trace-check.py at RESULT: OK, the pointer sweep for its modules. Then TASK-014 (change cycle, reflection, project end: its change cycle runs the variant of every interface kind a change touches, docs/HARDENING.md, Stage B3, TASK-012), then TASK-022 with the drafts in run/supervisor/drafts/.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 4's; -r3.md, -r2.md and -r1.md the earlier rounds) for stage B1's review, closed; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs (read it first on a resume); the closed gates' files write_review_<id>.py, SCOPE-<id>.md and pr-<id>.md of FIX-001, CONFIG-B3b, FIX-002, TASK-016 and TASK-010; FIX-002's driver fix002_mutants.py (nine mutants, run on a scratch copy given as its second argument); TASK-016's driver task016_mutants.py (27 mutants, 23 killed; same arguments), its commit messages msg-task016-*.txt and TASK-016-r2-partial.diff; TASK-015's driver task015_mutants.py (63 mutants; arguments: the Workspace, a scratch folder outside it, the round's checkpoint) and its commit messages msg-task015-*.txt; TASK-011's gate files write_review_task011.py, SCOPE-TASK-011.md and pr-task-011.md (closed), its commit messages msg-task011*.txt and status_task011.py; FIX-003's gate files write_review_fix003.py, SCOPE-FIX-003.md and pr-fix-003.md (closed at this merge), its commit message msg-fix003-accept.txt and status_fix003.py; CONFIG-B3b-r3-partial.diff (round 3's partial work at the crash, discarded, for reference) and the CONFIG-B3b checks cfgb3b_parsers.py, docstring_paths.py, cfgb3b_oracle_check.py; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): write_stage_b1.py with SCOPE-STAGE-B1.md (round 4's; -r3.md, -r2.md and -r1.md the earlier rounds) for stage B1's review, closed; the mutation drivers bug016_mutants.py, bug015_mutants.py, mutate_ci_floor.py, mutate_workflow_check.py, mutate_workflows_line.py and the sweeps of stage B2; demo_b2.py; drafts/; in-flight.md as the scratch log while a review runs (read it first on a resume); the closed gates' files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, status_<id>.py) of stage B3's increments, TASK-012's closed at this merge; the mutation drivers fix002_mutants.py (nine mutants; a scratch copy as its second argument), task016_mutants.py (27 mutants, 23 killed; same arguments) and task015_mutants.py (63 mutants; the Workspace, a scratch folder outside it, the round's checkpoint); drafts/task012/ (TASK-012's first drafts: the command- and contract-design bodies and their test, for TASK-022) and drafts/task022-notes.md (what TASK-022 carries: the security audit's three advisories); CONFIG-B3b-r3-partial.diff (round 3's partial work at the crash, discarded, for reference) and the CONFIG-B3b checks cfgb3b_parsers.py, docstring_paths.py, cfgb3b_oracle_check.py; the hotfix's record in hotfix-position.md and hotfix/; the owner's run sheet runsheet-socket-key-2026-10-16.md; maintainer-b2.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #54, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — under way: its configuration items, the traceability check, the carve, the hook, the intake and design modules (TASK-011) and the hook's hardening (FIX-003) merged; TASK-012 to TASK-014 next. Last reflection: stage B1's close, 2026-10-19 (demonstration passed; conformance then 17 OK / 6 MISSING / 5 NOTE; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #55, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — under way: its configuration items, the traceability check, the carve, the hook, the intake and design modules (TASK-011), the hook's hardening (FIX-003) and the interface and planning modules (TASK-012) merged; TASK-013 and TASK-014 next. Last reflection: stage B1's close, 2026-10-19 (demonstration passed; conformance then 17 OK / 6 MISSING / 5 NOTE; Issues ISS-009 completed; Feedback FB-022 to FB-024; least confident in HARDENING; Project Summary patched)
+ Open issues: ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; FIX-001 makes the suite's launches windowless). ISS-010 open (the project's afterFileEdit hook never runs in the bridge's headless builder runs; not relied on; docs/HARDENING.md, Stage B3, CFG-B3). ISS-009 fixed 2026-10-19 (BUG-016; recurred twice); ISS-007 and ISS-008 fixed 2026-10-19; ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25. Owed at the next reflection point: a Feedback entry on the status template's Layout: line, which puts this computer's drive and project paths on public main against rule 54; a Feedback entry on the session-start hook reading any Awaiting user on: value but nothing, none, empty or - as a wait ("none (resumed ...)" told a resumed supervisor to wait; docs/HARDENING.md, Stage B3); a Feedback entry on the convergence rule, which admits no exception for a finding both reviewers class outside a component's stated threat model, while the by-class line records such a tail (TASK-015's line departed from the rule's wording; docs/HARDENING.md, Stage B3)
+ Maintainer requests: none open (Release B2's request answered as FB-021 at stage B2's close, 2026-10-19; recorded as a post-B release in INVENTORY.md, Decisions)
+ Bridge version: 2026.10.18a
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 0c70dc4..4c70ef4 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -7,15 +7,15 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-001 | The bridge is set up as a supervised project: a status file, a requirements register drawn from this plan, a resolved model roster, run parameters, and a `project.json`. | DESIGN §15 condition 6 | built | tests/test_release_b_bootstrap.py (TASK-001, merged 9e181e6; tightened by BUG-001, 6743b25, BUG-015, 1b8c8da, and BUG-016, ba1e181) |
+ | R-002 | The security floor (Semgrep, OSV-Scanner, Socket) runs in the bridge's own CI gate, pinned by commit, installing from a committed lockfile, alongside the tests it already runs. | DESIGN §15 condition 6 (P2) | built | tests/test_release_b_ci_floor.py (TASK-002, merged fba63bc; tightened by BUG-001 after stage B1's review, merged 6743b25, and its round-6 follow-up, merged 4d0f77b) |
+ | R-003 | The supervisor's instructions are split into the main-workflow core and per-phase modules; the core holds the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state, and the standing rules that hold in every phase. | DESIGN §6.2 | built | tests/test_core_carve.py (the test_r003_ tests: the core's section set, no phase procedure left in it, the registry's modules each opening with its heading and named by the core, project-end carved out of the reflection points, the modules installed from the manifest; TASK-010); trace-check.py at the baseline 0a186da: 424 passages, 0 dropped, RESULT: OK |
+-| R-004 | Each phase module holds its phase's whole procedure and opens with the short list of what must survive a compaction. | DESIGN §16; §6.2 | planned | intake.md and design.md: tests/test_phase_modules_intake_design.py (the test_r004_ tests; TASK-011); the other modules follow in TASK-012–014 |
++| R-004 | Each phase module holds its phase's whole procedure and opens with the short list of what must survive a compaction. | DESIGN §16; §6.2 | planned | intake.md and design.md: tests/test_phase_modules_intake_design.py (the test_r004_ tests; TASK-011); interface.md and planning.md: tests/test_phase_modules_interface_planning.py (the test_r004_ tests; TASK-012); the other modules follow in TASK-013–014 |
+ | R-005 | The compaction/session-start hook names the current phase's module(s) to re-read after a compaction (one for most phases; planning and building map to two), plus the conditional-workflow files (type, sub-type, trait) that touch the current phase; it carries the Phase→module table for every template phase value, including the reflection and project-end modules and any further files the phase re-reads. | DESIGN §16; §6.2 | built | tests/test_session_start_module.py (the test_r005_ tests: every template phase value, its modules in order and its conventions, the project-end note, pointer-line sub-files and variants, conditional files in the R-034 order, an unreadable table or checker naming none of them with one plain line, links, the cap; test_r034_ the trait order); tests/test_session_start.py (the table re-pointed; the digest and status-at-limits cases kept); TASK-015; FIX-003 (a module line that is not an exact str makes the checker unusable, the exception's type name read where the checker cannot print, a pointer path taken as written between separators, the docstring stating the grammar and the streams) |
+-| R-006 | Extension points are declared — a canonical registry (the §6.4 initial set, including Definition of done and Delivery) naming which phase module declares each, and, in each phase module, the points that phase offers. | DESIGN §6.4 | planned | the registry: tests/test_extension_points.py (TASK-005); intake.md's and design.md's declarations: tests/test_phase_modules_intake_design.py (the test_r006_ tests; TASK-011); the other modules' follow in TASK-012–014 |
++| R-006 | Extension points are declared — a canonical registry (the §6.4 initial set, including Definition of done and Delivery) naming which phase module declares each, and, in each phase module, the points that phase offers. | DESIGN §6.4 | planned | the registry: tests/test_extension_points.py (TASK-005); intake.md's and design.md's declarations: tests/test_phase_modules_intake_design.py (the test_r006_ tests; TASK-011); interface.md's and planning.md's: tests/test_phase_modules_interface_planning.py (the test_r006_ tests; TASK-012); the other modules' follow in TASK-013–014 |
+ | R-007 | The conditional-workflow layering is in force: main core, phase modules, type workflow, sub-workflow, trait additions; each layer inherits what it does not mention and is read only when it applies. | DESIGN §6.2 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-008 | Only type workflows and sub-workflows may replace or set; trait additions may only add; no conditional workflow can remove a founding rule, weaken the merge gate, or skip the register, the inventory, or the reviews. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-009 | A sub-workflow inherits its type workflow and may override its replacement or setting; siblings are exclusive; two levels (type and sub-type) only. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+-| R-010 | The interface phase runs one variant per kind of interface a part has, and the trait *has screens* adds (activates) the mockup variant — an addition, not a replacement — keeping the frozen interface rules, the design auditor, and the running-interface tests together. | DESIGN §6.5 | planned | — |
++| R-010 | The interface phase runs one variant per kind of interface a part has, and the trait *has screens* adds (activates) the mockup variant — an addition, not a replacement — keeping the frozen interface rules, the design auditor, and the running-interface tests together. | DESIGN §6.5 | planned | the interface phase's half: tests/test_phase_modules_interface_planning.py (the test_r010_ tests: the mockups an addition the trait has screens activates, today's Phase 3 procedure in interface/mockups.md, the build-phase conditions left with the delegation loop, no text calling the mockups a replacement; TASK-012); the trait's gathering of the frozen interface rules, the design auditor and the running-interface tests follows in TASK-017 |
+ | R-011 | `workflow/open-list.md` lists every product type, sub-type, and trait with its definition and whether its workflow is written, and records the §6.10 procedure for adding or changing a conditional workflow. | DESIGN §6.3, §6.10, §6.11 | built | tests/test_open_list.py (TASK-004) |
+-| R-012 | The interface-phase variants are declared once in the main workflow's interface module (mockups for screens, command design, contract design, playable prototype), each variant's text in one place. | DESIGN §6.4, §6.9 | planned | — |
++| R-012 | The interface-phase variants are declared once in the main workflow's interface module (mockups for screens, command design, contract design, playable prototype), each variant's text in one place. | DESIGN §6.4, §6.9 | built | tests/test_phase_modules_interface_planning.py (the test_r012_ tests: the four variants in interface.md's table and its one Variants: line, each variant's text in its own file and nowhere else, the gate asking for every variant and for none, the plan building against what the phase approved; test_r005_the_hook_names_the_interface_module_and_its_four_variants); TASK-012 (the command and contract design bodies follow in TASK-022, R-026) |
+ | R-013 | A part that fits no product type, two equally, or one defined-but-unwritten pauses the project at intake and sends the owner to the maintainer. | DESIGN §6.7 | built | tests/test_phase_modules_intake_design.py (the test_r013_ tests: the five cases, the stop before design, the run sheet to the maintainer, the resume that classifies before the gate; TASK-011); the check that shows the pause, workflow-check.py's FAIL (f): tests/test_workflow_check.py (TASK-006) |
+ | R-014 | `workflow-check.py` verifies: every change targets an existing extension point; replace/set appears only in a type or sub-workflow and replace only on a replaceable phase; trait additions only add; every sub-workflow names an existing type workflow; every project's `Workflows:` line names, per part, exactly one product type, at most one sub-type of that type, and traits, all in the open list — an unwritten type or sub-type fails (pauses the project), an unwritten trait is flagged, non-fatal (§6.7). | DESIGN §6.6, §6.7 | built | tests/test_workflow_check.py (TASK-006) |
+ | R-015 | The status file records a `Workflows:` line per part (product type, sub-type, traits) beside the `Phase:` line. | DESIGN §6.2 | built | the template and grammar: tests/test_workflows_line_text.py (TASK-007); the check of the line by inventory-check.py and conformance-check.py: tests/test_workflows_line_check.py (TASK-008) |
+@@ -35,7 +35,7 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-029 | Every standing rule and every conditional passage — the project-layout / Workspace-boundary section included — is traceable from a pinned pre-split baseline commit to its new file by a mechanical comparison: moves are verbatim, any reword is a listed exception the design review sees, text new to the modules is declared new by its increment, and every `~/.claude/...` reference and cited section still resolves. | DESIGN release B "Accepted when" | built | tests/test_trace_check.py (the test_r029_ tests: moves, two-hop moves, copies, rewords, new text, the dropped boundary section, references and citations, both exception kinds, links, git failures, output order; TASK-016); bridge/cursor-bridge/trace-check.py on the repository at the baseline 0a186da traces 424 passages, RESULT: OK |
+ | R-030 | A new project walked from intake to configuration reads only its core, its current phase module, and its own conditional workflows. | DESIGN release B "Accepted when" | planned | — |
+ | R-031 | The bridge, reAngle, the video factory, and the TDP each classify under §6.3 (checked on committed fixtures) and calibrate onto the new structure, none pausing, without reopening a gate: reAngle live as the release-B trial, the bridge by running the release, the video factory and the TDP when they resume per the owner's standing pause/resume policy (one calibration each). | DESIGN §6.3; release B "Accepted when" | planned | — |
+-| R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | planned | the bound: tests/test_core_carve.py test_r032_each_module_is_read_whole (TASK-010; the largest module, delegation-loop.md, 621 lines and 56,457 characters) and the digest's limit in tests/test_session_start.py; the hook's side of a split: tests/test_session_start_module.py test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_module (TASK-015); the modules' own Sub-files: pointers follow in TASK-011 to TASK-014 (intake.md and design.md, enriched, within the bound and needing none: tests/test_phase_modules_intake_design.py test_r032_, TASK-011) |
++| R-032 | Each phase module is bounded so it can be read whole in one read (≤ 1,500 lines and ≤ 60,000 characters); a module that would exceed the bound is split into sub-files under `workflow/phases/<phase>/` named by the module's own pointer and by the hook. The core's compaction digest stays within its enforced character limit. | DESIGN §16 ("read whole"); KP-035 | planned | the bound: tests/test_core_carve.py test_r032_each_module_is_read_whole (TASK-010; the largest module, delegation-loop.md, 621 lines and 56,457 characters) and the digest's limit in tests/test_session_start.py; the hook's side of a split: tests/test_session_start_module.py test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_module (TASK-015); the modules' own Sub-files: pointers follow in TASK-011 to TASK-014 (intake.md and design.md, enriched, within the bound and needing none: tests/test_phase_modules_intake_design.py test_r032_, TASK-011; interface.md, planning.md and the four variant files, interface.md naming its variants on a Variants: line: tests/test_phase_modules_interface_planning.py test_r032_, TASK-012) |
+ | R-033 | The workflow check runs at every bridge release (CI) and at every calibration. | DESIGN §6.6 | planned | the release half: tests/test_workflow_check.py (TASK-006, the CI step); the calibration half is TASK-024's |
+ | R-034 | Trait additions from several conditional workflows are applied together in a stated order. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-035 | Traits are proposed at intake and settled at the design gate; a product type's default traits are proposals settled at the same gate. | DESIGN §6.3 | built | tests/test_phase_modules_intake_design.py (test_r035_traits_are_proposed_at_intake_and_settled_at_the_design_gate; TASK-011) |
+diff --git a/docs/ROSTER.resolved.json b/docs/ROSTER.resolved.json
+index 7cd2657..4f0a2e4 100644
+--- a/docs/ROSTER.resolved.json
++++ b/docs/ROSTER.resolved.json
+@@ -10,6 +10,6 @@
+   },
+   "other_pool": "exhausted",
+   "probed": true,
+-  "resolved_at": "2026-10-20T09:43 UTC",
++  "resolved_at": "2026-10-20T10:55 UTC",
+   "reset_day": 16
+ }
+diff --git a/tests/test_core_carve.py b/tests/test_core_carve.py
+index 29c0105..736c377 100644
+--- a/tests/test_core_carve.py
++++ b/tests/test_core_carve.py
+@@ -18,11 +18,12 @@ PHASES = os.path.join(BRIDGE, "cursor-bridge", "workflow", "phases")
+ REGISTRY = os.path.join(BRIDGE, "cursor-bridge", "workflow", "extension-points.md")
+ INSTALL = os.path.join(BRIDGE, "cursor-bridge", "bridge-install.py")
+ 
+-# each module and the heading it opens with: the phase's own heading from the core, kept (project end has its own)
++# each module and the heading it opens with: the phase's own heading from the core, kept (project end has its own,
++# and the interface module names the phase since TASK-012 made its mockups one of four variants)
+ MODULES = {
+     "intake": "## Phase 1 — Intake",
+     "design": "## Phase 2 — Design",
+-    "interface": "## Phase 3 — UI mockups",
++    "interface": "## Phase 3 — Interface",
+     "planning": "## Phase 4 — Build plan",
+     "run-parameters": "## Run parameters — asked once, after the plan is approved, before configuration",
+     "configuration": "## Phase 5 — Configure the Cursor build environment",
+@@ -124,18 +125,25 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
+ 
+ # the traceability check's result on this tree, every excuse it uses named (PR #52's gate, Review A, the carve's part:
+ # a reword entry excuses a whole section, so a later drop there would show only as a NOTE with RESULT: OK)
+-TRACED = "TRACED: 424 passages of baseline 0a186da; 157 in supervisor.md, 263 under workflow/, 0 dropped, 4 excused"
++# (TASK-012: three passages move from traced to excused: the design gate's sentence, "the UI mockups" -> "the
++# interface phase"; the mockup paragraph's "Saving these concludes the planning stage", now the mockups and the phase;
++# rule 13's pointer to the approved-mockup rule, excused by the earlier Standing rules entry and so labelled TASK-015;
++# the other mockup passages traced in their new home, workflow/phases/interface/mockups.md)
++TRACED = "TRACED: 424 passages of baseline 0a186da; 156 in supervisor.md, 261 under workflow/, 0 dropped, 7 excused"
+ NOTES = [
+     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
+     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
+     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
++    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
++    "NOTE (reword TASK-012) bridge/commands/supervisor.md: The design-tooling flow - Save the mockup files under `docs/mockups/` (one file per sc",
++    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 13. Design correctness \\u2014 accessibility and interface MUSTs, ",
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
+ ]
+ 
+ 
+ def test_r003_the_carve_traces_with_exactly_its_excuses():
+     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
+-    excused ones exactly the four passages of the three rewords this carve declares, so an increment that excuses anything more changes this
++    excused ones exactly the seven passages of the five rewords the carve and TASK-012 declare, so an increment that excuses anything more changes this
+     test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+     the supervisor's checkout."""
+     repo = os.path.abspath(os.path.join(HERE, os.pardir))
+diff --git a/tests/test_phase_modules_intake_design.py b/tests/test_phase_modules_intake_design.py
+index 4e34593..fdcd5ec 100644
+--- a/tests/test_phase_modules_intake_design.py
++++ b/tests/test_phase_modules_intake_design.py
+@@ -250,8 +250,10 @@ def test_r036_a_new_or_unwritten_trait_is_flagged_at_the_design_gate_with_the_ow
+             "with the handling in the design, or the owner may still choose to pause the project.") in s
+     assert "`Awaiting user on: paused at the design gate — <the trait> needs additions the bridge has not written`" in s
+     # Review A's should-fix: after the pause, a new trait joins the line and the check runs, or its additions never apply
+-    assert ("On resuming, a new trait, now in the open list, is added to each part's `Workflows:` line that has it, the "
+-            "check is run again, and the trait's additions take the place of the design's section.") in s
++    # Review B's should-fix at PR #53, taken in TASK-012: an unwritten trait already on the line resumes the same way
++    assert ("On resuming, a new trait, now in the open list, is added to each part's `Workflows:` line that has it; for "
++            "a new trait and for an unwritten one already on the line alike, the check is run again, and the trait's "
++            "additions, now written, take the place of the design's section.") in s
+     assert ("Record each flagged trait in `docs/INVENTORY.md` → Decisions as a row that begins `Flagged trait:`, naming "
+             "the trait, the parts that have it and the design section that handles it, so that the promotion pass at "
+             "project end puts it forward") in s
+diff --git a/tests/test_phase_modules_interface_planning.py b/tests/test_phase_modules_interface_planning.py
+new file mode 100644
+index 0000000..ed79fc7
+--- /dev/null
++++ b/tests/test_phase_modules_interface_planning.py
+@@ -0,0 +1,373 @@
++"""TASK-012: the interface and planning modules enriched (R-004, R-006, R-010, R-012, R-032).
++
++enforces: docs/REQUIREMENTS.md R-004 (each phase module opens with the short list of what must survive a compaction),
++R-006 (each phase module declares the points the registry names it as declaring), R-010 (the interface phase runs one
++variant per kind of interface a part has, and the trait *has screens* adds the mockup variant, an addition, not a
++replacement; the build-phase conditions of screens stay with the build modules), R-012 (the four variants declared
++once in the interface module, each variant's text in one place), R-032 (each module and each variant file read whole);
++docs/BUILD_PLAN.md TASK-012's Done when (the playable-prototype file a declared pointer worded clear of
++completion-check's stand-in patterns), and its pointer sweep (docs/HARDENING.md, Stage B3)."""
++import importlib.util
++import json
++import os
++import re
++import shutil
++import subprocess
++import sys
++
++import pytest
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
++CB = os.path.join(BRIDGE, "cursor-bridge")
++PHASES = os.path.join(CB, "workflow", "phases")
++REGISTRY = os.path.join(CB, "workflow", "extension-points.md")
++CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
++HOOK = os.path.join(CB, "session-start.py")
++
++VARIANTS = [
++    ("Mockups", "screens a person sees", "interface/mockups.md"),
++    ("Command design", "commands a person types", "interface/command-design.md"),
++    ("Contract design", "a protocol other software calls", "interface/contract-design.md"),
++    ("Playable prototype", "play", "interface/playable-prototype.md"),
++]
++
++
++def read(path):
++    return open(path, encoding="utf-8").read().replace("\r\n", "\n")
++
++
++def module(rel):
++    return read(os.path.join(PHASES, rel if rel.endswith(".md") else rel + ".md"))
++
++
++def flat(text):
++    return re.sub(r"\s+", " ", text)
++
++
++def headings(text):
++    """(level, title) of every heading outside fenced blocks, in order."""
++    out, fence = [], None
++    for line in text.split("\n"):
++        m = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
++        if m:
++            if fence is None:
++                fence = m.group(1)[0]
++            elif m.group(1)[0] == fence:
++                fence = None
++            continue
++        if fence is None:
++            h = re.match(r"^(#{1,6}) (.*)$", line)
++            if h:
++                out.append((len(h.group(1)), h.group(2).strip()))
++    return out
++
++
++def section(text, title, level):
++    """The body of the heading `title` at `level`, to the next heading of that level or higher."""
++    lines = text.split("\n")
++    start = lines.index("#" * level + " " + title) + 1
++    end = len(lines)
++    for i in range(start, len(lines)):
++        h = re.match(r"^(#{1,6}) ", lines[i])
++        if h and len(h.group(1)) <= level:
++            end = i
++            break
++    return "\n".join(lines[start:end])
++
++
++STRUCTURE = {
++    "interface": [(2, "Phase 3 — Interface"), (3, "What must survive a compaction"), (3, "The variants"),
++                  (3, "Which variants a part runs"), (3, "The interface notes"), (3, "The gate"),
++                  (2, "Extension points")],
++    "planning": [(2, "Phase 4 — Build plan"), (3, "What must survive a compaction"),
++                 (3, "Step 0 — Prior-project lessons (ask before drafting)"),
++                 (3, "What the interface phase hands to the plan"), (3, "The plan"), (2, "Extension points")],
++}
++
++SURVIVAL = {
++    "interface": [
++        "this module and every variant file, each whole (the session-start hook names all four; a variant no part runs "
++        "is read only to know it does not apply);",
++        "the approved design: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`, and `docs/diagrams/INDEX.md` "
++        "with every diagram it lists, whole: each variant maps onto the agreed functionality, adds its screens, commands "
++        "or operations to the register, and agrees with the diagrams (the mockups with the operational activity "
++        "diagram's screens);",
++        "what each running variant has produced so far: `docs/design/DESIGN.md` and `docs/mockups/` for the mockups, "
++        "`docs/design/COMMANDS.md` for the command design, `docs/design/CONTRACT.md` and the contract file it names for "
++        "the contract design;",
++        "`run/supervisor/interface-notes.md` (\"The interface notes\"), whole;",
++        "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which activate "
++        "variants at `interface.variants` beside the kinds of interface the design shows, and its `Awaiting user on:` "
++        "line says which variant waits for the owner.",
++    ],
++    "planning": [
++        "this module, whole;",
++        "the approved design and what the interface phase approved: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, "
++        "`docs/INVENTORY.md`, `docs/diagrams/INDEX.md` and every diagram it lists, and the approved artifacts under "
++        "`docs/design/` and `docs/mockups/`, whole: every increment satisfies requirements of the register and cites "
++        "what it implements;",
++        "`docs/BUILD_PLAN.md` as drafted so far, whole, and each Issues file the owner named at Step 0, whole (its path "
++        "stands in the plan's Prior-project lessons section, Step 0);",
++        "`docs/DESIGN_CRITIQUE.md`, whole, while the plan critique runs, with `docs/RUN_PARAMETERS.md` and the round's "
++        "files under `run/review/` (`DESIGN-plan-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in "
++        "flight, and `~/.claude/cursor-bridge/workflow/phases/design.md`'s \"The procedure\", whose two-critic loop, "
++        "stop rule, ceiling, confirming read and resolution round the plan critique runs: it counts its rounds as the "
++        "design critique does;",
++        "`docs/PROJECT_STATUS.md`, whole: its `Awaiting user on:` line says whether Step 0's question or the plan's "
++        "gate waits for the owner.",
++    ],
++}
++
++
++@pytest.mark.parametrize("key", ["interface", "planning"])
++def test_r004_the_module_opens_with_its_compaction_survival_list(key):
++    """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
++    exactly what a resumed session in that phase reads before its next action."""
++    text = module(key)
++    assert headings(text) == STRUCTURE[key], headings(text)
++    lines = text.split("\n")
++    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
++    body = section(text, "What must survive a compaction", 3).strip().split("\n")
++    assert body[0] == "After a compaction or a resume in this phase, read these before your next action:"
++    assert all(l.startswith("- ") for l in body[1:] if l), body
++    assert [l[2:] for l in body[1:] if l] == SURVIVAL[key]
++
++
++def registry_points(module_key):
++    text = read(REGISTRY)
++    table = text.split("\n## Extension points\n", 1)[1].split("\n## ", 1)[0]
++    rows = [l for l in table.split("\n") if l.startswith("|")]
++    header = [c.strip() for c in rows[0].strip("|").split("|")]
++    out = []
++    for row in rows[2:]:
++        cells = dict(zip(header, [c.strip() for c in row.strip("|").split("|")]))
++        if cells["Declared by"] == module_key:
++            out.append(cells["Key"])
++    return out
++
++
++@pytest.mark.parametrize("key", ["interface", "planning"])
++def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_order(key):
++    """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
++    per point giving its key, exactly the points the registry names this module as declaring, in the table's order."""
++    body = section(module(key), "Extension points", 2).strip().split("\n")
++    lines = [l for l in body if l.startswith("- ")]
++    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in lines]
++    want = registry_points(key)
++    assert want and keys == want, (keys, want)
++    prose = flat(" ".join(l for l in body if l and not l.startswith("- ")))
++    assert prose == ("This module offers the points below, each by its key in the extension-point registry "
++                     "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each "
++                     "accepts and whether it applies per part or per project. A conditional workflow's additions at a "
++                     "point are made where the point's line places them, in the order the core states in \"Main and "
++                     "conditional workflows\".")
++    assert "may set" not in "\n".join(body)
++
++
++def test_r012_the_four_variants_are_declared_once_in_the_interface_module():
++    """R-012: the interface module's table names the four variants, each with its interface kind and its file, and the
++    module's one `Variants:` pointer line names exactly those files in that order, in the grammar session-start.py
++    reads (a line at column 0 outside fences, paths separated by `; `)."""
++    s = section(module("interface"), "The variants", 3)
++    rows = [l for l in s.split("\n") if l.startswith("| ") and not l.startswith("| Variant ")]
++    assert rows == ["| %s | %s | `%s` |" % v for v in VARIANTS], rows
++    text = module("interface")
++    pointer = [l for l in text.split("\n") if l.startswith("Variants: ") or l.startswith("Sub-files: ")]
++    assert pointer == ["Variants: " + "; ".join(v[2] for v in VARIANTS)], pointer
++    assert "Every variant is an addition, never a replacement of another" in flat(s)
++
++
++def test_r012_each_variants_text_is_in_one_place():
++    """R-012: each variant file exists, opens with its variant's heading, says which interface kind it is for and points
++    back to the interface module; no other file under workflow/phases/ carries a variant's heading."""
++    titles = set()
++    for name, _kind, rel in VARIANTS:
++        text = module(rel)
++        assert text.split("\n")[0] == "## " + name, (rel, text.split("\n")[0])
++        assert "(`interface.md`, \"The variants\")" in text.split("\n\n")[1], rel
++        titles.add(name)
++    for root, _dirs, files in os.walk(PHASES):
++        for f in files:
++            path = os.path.join(root, f)
++            rel = os.path.relpath(path, PHASES).replace(os.sep, "/")
++            if rel in [v[2] for v in VARIANTS]:
++                continue
++            for _level, title in headings(read(path)):
++                assert title not in titles, (rel, title)
++
++
++def test_r010_the_mockups_are_an_addition_the_trait_has_screens_activates():
++    """R-010 (§6.5, "Today's interface conditions stay together"): the mockups are an addition, not a replacement,
++    activated by the trait *has screens* at `interface.variants`; a part with screens has the trait by its definition,
++    and a missing trait is settled at the design gate."""
++    m = flat(module("interface/mockups.md").split("\n\n")[1])
++    assert ("They are an addition, never a replacement: the trait *has screens* activates them at `interface.variants` "
++            "for each part that has screens, beside any other variant the part runs") in m
++    runs = flat(section(module("interface"), "Which variants a part runs", 3))
++    assert ("The mockups are activated by the trait *has screens*, which a part with screens has by its definition; a "
++            "part whose design shows screens without the trait on its `Workflows:` line has a trait missing, which the "
++            "design gate settles (`design.md`, \"Traits at the design gate\") before this phase begins, and a missing trait "
++            "found during this phase goes back to the owner as that same decision, asked on its own, before any mockup is "
++            "approved.") in runs
++
++
++def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_conditions():
++    """R-010 and TASK-012's Done when: interface/mockups.md holds today's Phase 3 mockup procedure, verbatim (its
++    passages, its design-tooling flow, its gate and the mockup's authority); the build-phase conditions of screens (the
++    frozen-rule brief constraint, the design-auditor review step, the observability tests) stay in the delegation-loop
++    module, where the trait *has screens* gathers them (TASK-017)."""
++    m = module("interface/mockups.md")
++    assert headings(m) == [(2, "Mockups"), (3, "The design-tooling flow")], headings(m)
++    fm = flat(m)
++    for passage in (
++        "Build an HTML/CSS mockup of the interface — a static, disposable design artifact for the user to judge and "
++        "change, not the product's real frontend.",
++        "The mockup must map onto the agreed functionality **with no gaps, in both directions**",
++        "**Approve the pair.** The user approves the **mockup and the visual `DESIGN.md` together**",
++        "**Gate:** present the mockup **and the visual `docs/design/DESIGN.md`** to the user and get explicit approval "
++        "of the pair before writing the build plan.",
++        "**The approved mockup's authority:** once approved, the mockup is **guidance**, not a pixel contract.",
++    ):
++        assert passage in fm, passage
++    loop = flat(module("delegation-loop"))
++    for build in ("list the frozen `vercel-interface.mdc` as an applicable rule",
++                  "For a **UI-bearing** diff, also delegate to **design-auditor** after `diff-reviewer`",
++                  "the tests you write include the **observability tests** (Tier A)"):
++        assert build in loop, build
++        assert build not in fm, build
++    assert "Build an HTML/CSS mockup" not in module("interface")
++
++
++def test_r012_each_variant_names_the_artifact_the_module_and_the_plan_cite():
++    """R-012 (Review A round 2, convergent with the security re-check): the artifacts interface.md's survival list and
++    planning.md cite are named by the variant that writes them, with its approval at the phase's gate, so no module
++    cites a file nothing defines; their bodies follow in TASK-022."""
++    c = flat(module("interface/command-design.md"))
++    assert ("Its artifact is `docs/design/COMMANDS.md`, one section per command, and the owner approves it at the phase's "
++            "gate (`interface.md`, \"The gate\").") in c
++    k = flat(module("interface/contract-design.md"))
++    assert ("Its artifacts are `docs/design/CONTRACT.md`, which states in plain words every operation the part offers, "
++            "and the machine-readable contract file `CONTRACT.md` names, which tests enforce; the owner approves what the "
++            "part offers, from `CONTRACT.md`, at the phase's gate (`interface.md`, \"The gate\").") in k
++    survival = flat(section(module("interface"), "What must survive a compaction", 3))
++    plan = flat(section(module("planning"), "What the interface phase hands to the plan", 3))
++    for name in ("`docs/design/COMMANDS.md`", "`docs/design/CONTRACT.md`"):
++        assert name in survival, name
++    assert "`docs/design/CONTRACT.md`" in plan and "`docs/design/COMMANDS.md`" in c and "`docs/design/CONTRACT.md`" in k
++
++
++def test_r010_no_text_calls_the_mockups_a_replacement():
++    """R-010, the negative side (Review A's consider): neither the interface module nor the mockups file calls the
++    mockups a replacement of anything; only a type workflow or sub-workflow replaces, and it replaces the phase."""
++    called = re.compile(r"[Mm]ockups?\b[^.;:,]*\b(is|are) a replacement")
++    replacing = re.compile(r"[Mm]ockups? (replace|replaces)\b")
++    assert called.search("the mockups are a replacement for it") and replacing.search("the mockups replace it")
++    for rel in ("interface.md", "interface/mockups.md"):
++        text = flat(module(rel))
++        assert called.search(text) is None and replacing.search(text) is None, rel
++
++
++def test_r004_the_interface_notes_are_written_by_the_procedure_and_no_key_among_them():
++    """R-004 (the survival list names the interface notes) and Review A's should-fix: writing them is an instruction
++    of the procedure, the file is named on Working files: (rule 54), and the security audit's advisory: a pasted key is
++    never written there (rule 53)."""
++    s = flat(section(module("interface"), "The interface notes", 3))
++    assert ("Write every change the owner asks for on a variant's artifact, and whether it is made, to "
++            "`run/supervisor/interface-notes.md` as each request arrives, and name the file on the status file's "
++            "`Working files:` line (rule 54).") in s
++    assert ("A key, token or password the owner pastes is never written there: rule 53 applies to it, and the note says "
++            "only that one was given.") in s
++
++
++def test_r004_the_issues_paths_are_written_by_step_0():
++    """R-004 (the planning survival list names the Issues files by the paths in the plan) and Review A's should-fix:
++    Step 0 writes each path into the plan as soon as the owner names it."""
++    s = flat(section(module("planning"), "Step 0 — Prior-project lessons (ask before drafting)", 3))
++    assert ("Write each path the owner names into the plan's Prior-project lessons section as soon as they name it, "
++            "before you read the file: the conversation that held it does not survive a compaction (rule 54).") in s
++
++
++def test_r012_the_gate_asks_for_every_variant_and_for_none():
++    """R-012 and rule 5: the phase passes when every variant every part runs is approved, each as its own question;
++    when no part runs any variant the owner's word is still asked (Review A's consider)."""
++    s = flat(section(module("interface"), "The gate", 3))
++    assert "each variant's approval asked as a question of its own in the app's question form" in s
++    assert ("When no part runs any variant, the gate still asks the owner's word, that no part has an interface to judge "
++            "before the build (rule 5).") in s
++    assert "The phase passes when every variant every part runs is approved." in s
++
++
++def test_r012_the_plan_builds_against_what_the_interface_phase_approved():
++    """R-012 with the planning module (Review A's should-fix: the contract-enforcement increment is a Phase 4 duty,
++    stated where Phase 4 reads it): every approved contract gets an increment whose tests check the built part against
++    the contract file."""
++    s = flat(section(module("planning"), "What the interface phase hands to the plan", 3))
++    assert ("for every contract the contract design approved (`docs/design/CONTRACT.md`), the plan carries an increment "
++            "whose tests check the built part against the contract file, so that the contract is enforced, never only "
++            "described.") in s
++    assert "every increment that builds a command cites the approved command design's section for it" in s
++
++
++def standin_rx():
++    spec = importlib.util.spec_from_file_location("completion_check", os.path.join(CB, "completion-check.py"))
++    mod = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(mod)
++    return mod.STANDIN_RX
++
++
++def test_the_playable_prototype_is_a_declared_pointer_with_no_stand_in_wording():
++    """TASK-012's Done when: the playable-prototype file is a declared pointer to the Game Development workflow
++    (release E), worded clear of completion-check's stand-in patterns, as are the interface module and every variant
++    file. (completion-check.py reads code files only, so its run cannot see a Markdown stand-in; the patterns are applied
++    here directly. The rest of workflow/ is not scanned: project-end.md quotes the patterns as the rule's own text.)"""
++    p = flat(module("interface/playable-prototype.md"))
++    assert "Its procedure belongs to the Game Development type workflow, which replaces this phase" in p
++    assert "The main workflow holds no procedure for play beyond this pointer." in p
++    rx = standin_rx()
++    # the precondition (Review A's blocking item): the patterns catch a stand-in, so their silence below means something
++    assert rx.search("this screen arrives in a later release")
++    assert rx.search("coming soon")
++    for rel in ["interface.md", "planning.md"] + [v[2] for v in VARIANTS]:
++        hit = rx.search(module(rel))
++        assert hit is None, (rel, hit and hit.group(0))
++
++
++@pytest.mark.parametrize("rel", ["interface.md", "planning.md"] + [v[2] for v in VARIANTS])
++def test_r032_the_module_and_each_variant_file_are_read_whole(rel):
++    """R-032: each enriched module and each variant file stays within the bound a module is read whole by."""
++    text = module(rel)
++    assert text.count("\n") <= 1500 and len(text) <= 60000, (rel, text.count("\n"), len(text))
++
++
++def test_r005_the_hook_names_the_interface_module_and_its_four_variants(tmp_path):
++    """R-005 with R-012, the first real pointer line: for `Phase: mockups` the installed hook names interface.md and,
++    after it, the four variant files in the `Variants:` line's order (FIX-003 hardened the hook for this line)."""
++    home = tmp_path / "home"
++    shutil.copytree(os.path.join(BRIDGE, "commands"), str(home / ".claude" / "commands"))
++    shutil.copytree(CB, str(home / ".claude" / "cursor-bridge"), ignore=shutil.ignore_patterns("__pycache__"))
++    ws = tmp_path / "proj" / "Workspace"
++    (ws / "docs").mkdir(parents=True)
++    (ws / "docs" / "PROJECT_STATUS.md").write_text(
++        "# Project Status\nPhase: mockups\nWorkflows: not yet classified\nAwaiting user on: nothing\n", encoding="utf-8")
++    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
++    data = {"cwd": str(ws), "hook_event_name": "SessionStart", "source": "compact"}
++    p = subprocess.run([sys.executable, HOOK, "--part", "pointers"], input=json.dumps(data), capture_output=True,
++                       text=True, encoding="utf-8", env=env)
++    assert p.returncode == 0 and p.stderr == "", p.stderr
++    w = "~/.claude/cursor-bridge/workflow/phases/"
++    named = [re.match(r"  - (\S+)", l).group(1) for l in p.stdout.split("\n") if l.startswith("  - " + w)]
++    assert named == [w + "interface.md"] + [w + v[2] for v in VARIANTS], p.stdout
++
++
++def test_the_interface_phase_is_named_by_its_variants_outside_the_module():
++    """The pointer sweep (docs/HARDENING.md, Stage B3): the core's module table and the design gate named Phase 3 as
++    "the UI mockups", which is now one variant of the interface phase."""
++    core = flat(read(CORE))
++    assert "| The interface phase (Phase 3, today the UI mockups) |" not in core
++    assert ("| The interface phase (Phase 3: one variant per kind of interface, the mockups among them) | "
++            "`~/.claude/cursor-bridge/workflow/phases/interface.md` and its variant files under "
++            "`~/.claude/cursor-bridge/workflow/phases/interface/` |") in core
++    gate = flat(section(module("design"), "The gate", 3))
++    assert "Do not proceed to the UI mockups" not in gate
++    assert "Do not proceed to the interface phase until they approve it." in gate
+diff --git a/tests/test_session_start_module.py b/tests/test_session_start_module.py
+index 4a0d5f9..468efef 100644
+--- a/tests/test_session_start_module.py
++++ b/tests/test_session_start_module.py
+@@ -88,12 +88,20 @@ def test_r005_the_table_maps_every_template_phase_value():
+     assert sorted(TEMPLATE_PHASES) == sorted(EXPECTED), TEMPLATE_PHASES
+ 
+ 
++# the files a module's own pointer lines name after it, in the installed bridge (TASK-012: the interface variants)
++POINTED = {
++    "interface": ["interface/mockups.md", "interface/command-design.md", "interface/contract-design.md",
++                  "interface/playable-prototype.md"],
++}
++IFACE = [P + "interface.md"] + [P + f for f in POINTED["interface"]]
++
++
+ @pytest.mark.parametrize("phase", sorted(EXPECTED))
+ def test_r005_each_phase_names_its_modules_in_order_and_its_conventions(tmp_path, home, phase):
+     modules, convs = EXPECTED[phase]
+     out = pointers(project(tmp_path, "Phase: %s (Stage 2)" % phase, "Workflows: not yet classified"), home)
+     assert "BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:" in out, out
+-    assert named(out) == [P + m + ".md" for m in modules], out
++    assert named(out) == [P + f for m in modules for f in [m + ".md"] + POINTED.get(m, [])], out
+     assert conventions(out) == convs, out
+     assert "lines " not in out, "no line ranges: a module is read whole"
+     assert "Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41)." in out
+@@ -147,8 +155,8 @@ def test_r034_the_conditional_files_follow_the_order_additions_apply_in(tmp_path
+     is not their alphabetical order)."""
+     conditionals(home)
+     out = pointers(project(tmp_path, "Phase: mockups", LINE), home)
+-    assert named(out) == [P + "interface.md", W + "types/host-extension/claude-code-extension.md",
+-                          W + "traits/installable.md", W + "traits/external-services.md"], out
++    assert named(out) == IFACE + [W + "types/host-extension/claude-code-extension.md",
++                                   W + "traits/installable.md", W + "traits/external-services.md"], out
+ 
+ 
+ def test_r005_a_file_two_parts_share_is_named_once_in_the_first_parts_place(tmp_path, home):
+@@ -175,15 +183,15 @@ def test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_modul
+     write(home, "phases/delegation-loop/merge.md", "## Merge\n")
+     write(home, "phases/delegation-loop/inspect.md", "## Inspect\n")
+     interface = (home / ".claude" / "cursor-bridge" / "workflow" / "phases" / "interface.md")
+-    interface.write_text(interface.read_text(encoding="utf-8") + "\nVariants: interface/mockups.md; interface/command-design.md\n",
++    # a module of its own, its Variants: line in another order than the installed module's (TASK-012), so the order
++    # printed is the order written
++    interface.write_text("## Phase 3 — Interface\n\nVariants: interface/command-design.md; interface/mockups.md\n",
+                          encoding="utf-8")
+-    write(home, "phases/interface/mockups.md", "## Mockups\n")
+-    write(home, "phases/interface/command-design.md", "## Command design\n")
+     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), home)
+     assert named(out) == [P + "delegation-loop.md", P + "delegation-loop/merge.md", P + "delegation-loop/inspect.md",
+                           P + "reflection.md", P + "project-end.md"], out
+     out = pointers(project(tmp_path, "Phase: mockups", "Workflows: not yet classified"), home)
+-    assert named(out) == [P + "interface.md", P + "interface/mockups.md", P + "interface/command-design.md"], out
++    assert named(out) == [P + "interface.md", P + "interface/command-design.md", P + "interface/mockups.md"], out
+ 
+ 
+ def test_r005_a_pointer_line_names_no_file_outside_its_module_folder(tmp_path, home):
+@@ -441,9 +449,9 @@ def test_r005_a_folder_link_on_the_way_to_a_conditional_file_names_nothing(tmp_p
+     shutil.move(str(workflow.joinpath(*linked.split("/"))), str(outside))
+     _link_folder(workflow.joinpath(*linked.split("/")), outside)
+     out = pointers(project(tmp_path, "Phase: mockups", LINE), home)
+-    expected = {"types": [P + "interface.md", W + "traits/installable.md", W + "traits/external-services.md"],
+-                "traits": [P + "interface.md", W + "types/host-extension/claude-code-extension.md"],
+-                "types/host-extension": [P + "interface.md", W + "traits/installable.md", W + "traits/external-services.md"]}
++    expected = {"types": IFACE + [W + "traits/installable.md", W + "traits/external-services.md"],
++                "traits": IFACE + [W + "types/host-extension/claude-code-extension.md"],
++                "types/host-extension": IFACE + [W + "traits/installable.md", W + "traits/external-services.md"]}
+     assert named(out) == expected[linked], out
+ 
+ 
+diff --git a/tests/test_workflow_model.py b/tests/test_workflow_model.py
+index 152f69e..abc1f44 100644
+--- a/tests/test_workflow_model.py
++++ b/tests/test_workflow_model.py
+@@ -82,14 +82,15 @@ def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when
+ 
+ def test_r007_each_phase_module_is_a_file_the_core_names():
+     """R-007, as carved (TASK-010): the plan's phase names map to module files, each keeping its heading from this
+-    file, and the core's table names each one."""
++    file (the interface module naming its phase since TASK-012), and the core's table names each one."""
+     s = flat(model())
+     assert ("Each phase's procedure is its phase module, one file per phase (see \"The phase modules\"): the interface "
+-            "phase is Phase 3, which today holds only the mockup variant; planning is Phase 4, configuration is Phase 5, "
+-            "the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own") in s
++            "phase is Phase 3, whose module declares its four variants (mockups, command design, contract design, a "
++            "playable prototype), each in a file of its own; planning is Phase 4, configuration is Phase 5, the "
++            "delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own") in s
+     phases = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "workflow", "phases")
+     for name, heading in (("intake", "## Phase 1 — Intake"), ("design", "## Phase 2 — Design"),
+-                          ("interface", "## Phase 3 — UI mockups"), ("planning", "## Phase 4 — Build plan"),
++                          ("interface", "## Phase 3 — Interface"), ("planning", "## Phase 4 — Build plan"),
+                           ("run-parameters", "## Run parameters"), ("configuration", "## Phase 5 — Configure"),
+                           ("delegation-loop", "## Phase 6 — The delegation loop"), ("change-cycle", "## The change cycle"),
+                           ("reflection", "## Reflection points"), ("project-end", "## Project end")):
