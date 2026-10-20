@@ -6,8 +6,8 @@ After a compaction or a resume at project end, read these before your next actio
 
 - this module and `reflection.md`, each whole: project end runs after the reflection points' items 1 to 5 at the last stage's close, in the same turn;
 - the last entries of `run/supervisor/in-flight.md`: the project-end items finished so far ("Keeping the position");
-- `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Workflows:` lines name each part's conditional workflows, whose additions at `project-end.completion-conditions` and `project-end.delivery` this module runs; the inventory's `Delivery kind:` rows give each part's delivery kind, its `Flagged trait:` rows the traits the promotion pass puts forward, and its Deferred rows the items the "Project complete" line lists;
-- `docs/REQUIREMENTS.md`, `docs/CHANGES.md` and `docs/RUN_PARAMETERS.md`: the completion check reads the register, the User Manual is written from the change log, and the installer's last verification follows the `Installer verification` parameter;
+- `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Workflows:` lines name each part's conditional workflows, whose additions at `project-end.completion-conditions` and `project-end.delivery` this module runs, and the deferred increments the status file lists are the ones the report lists; the inventory's `Delivery kind:` rows give each part's delivery kind, and its `Flagged trait:` rows the traits the promotion pass puts forward;
+- `docs/REQUIREMENTS.md`, `docs/CHANGES.md` and `docs/RUN_PARAMETERS.md`: the completion check reads the register, whose deferred and dropped requirements the "Project complete" line lists by ID and name, the User Manual is written from the change log, and the installer's last verification follows the `Installer verification` parameter;
 - the Issues and Feedback documents under `Documents/`, whole: the promotion pass reads both and writes its proposals as the Feedback document's last section.
 
 ### Where this module begins
