@@ -23,7 +23,7 @@ TASK-014 enriches the last three phase modules: the change cycle, the reflection
 - R-036 (the promotion pass): test_r036_the_promotion_pass_puts_the_flagged_traits_forward
 - R-032: test_r032_the_module_is_read_whole[*]
 - docs/HARDENING.md Stage B3 leads: test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches; test_the_change_cycles_procedure_is_pinned (sha256, because one `new` trace entry covers the procedure); test_no_trace_entry_excuses_a_whole_phase_file; test_each_excused_variant_section_is_pinned[*] (round 2, Review A's should-fix 3: the five variant-file sections a `new` entry excuses, by sha256, and the variant files' entries exactly those five); test_the_glossary_names_the_modules_as_files
-- changed: tests/test_core_carve.py (the pinned trace-check output: two NOTE lines added, 259 under workflow/, 9 excused); tests/test_phase_modules_interface_planning.py (the variant files' headings; the declaring paragraph read from its own section)
+- changed: tests/test_core_carve.py (the pinned trace-check output: three NOTE lines added, 258 under workflow/, 10 excused); tests/test_phase_modules_interface_planning.py (the variant files' headings; the declaring paragraph read from its own section)
 No mutation driver.
 
 ## Expected bookkeeping and record files in the diff

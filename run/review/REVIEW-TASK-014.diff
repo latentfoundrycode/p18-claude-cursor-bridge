@@ -12,14 +12,14 @@ index 4c101c5..64b18a8 100644
  | **Product type** | How a product reaches its user: where it runs, how it is delivered, and what its main interface is (a web app, a video game, a host extension). Each part has exactly one, fixed at intake, from the open list. |
  | **Sub-type** | A narrower kind within one product type (a Roblox game within video games; a Claude Code extension within host extensions), with a workflow of its own because it changes a phase, a gate, a check or the tooling. A part has at most one sub-type, of its own product type. |
 diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
-index a74778a..83e9b81 100644
+index a74778a..75f2606 100644
 --- a/bridge/cursor-bridge/MANIFEST.json
 +++ b/bridge/cursor-bridge/MANIFEST.json
 @@ -1,6 +1,6 @@
  {
    "version": "2026.10.18a",
 -  "generated": "2026-10-20 13:51",
-+  "generated": "2026-10-20 17:52",
++  "generated": "2026-10-20 18:41",
    "files": {
      "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
      "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -37,7 +37,7 @@ index a74778a..83e9b81 100644
      "cursor-bridge/workflow/extension-points.md": "d62447f21dd4acff615d4260ed40baa86d8d2f0567f928a1689a9a4cbb98fb8b",
      "cursor-bridge/workflow/open-list.md": "6d37ec2741ab10f6238aa3a2eb0c4e46f57defd109a80a2b08209c1cfcce8840",
 -    "cursor-bridge/workflow/phases/change-cycle.md": "b0c1c6400e0b5b26eb7bbc7f1b3c0528736b432bba273aba61fe9af58ed4bbea",
-+    "cursor-bridge/workflow/phases/change-cycle.md": "f01c6d36ab27c48c8bc4e8000a39439fcf8f51bdd35bb3708e4f5687d711b3ac",
++    "cursor-bridge/workflow/phases/change-cycle.md": "8b4c12bd4afc80a4adcb2dfbd4ddecb0b5d20848805addd41daf6f04eeb3b37a",
      "cursor-bridge/workflow/phases/configuration.md": "929f0be47fd76d6bb39817585a1ee49d9384c2cd227df538935c5cdc4e756c04",
      "cursor-bridge/workflow/phases/delegation-loop.md": "dc3c27b85acfdfea8520a01e4278961a6366a59a8079f9fc0c8a9636caeda5ee",
      "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "40065539a1b0a098569db3d6c35198e0cff7179725ba2bba019287cfa175d987",
@@ -56,7 +56,7 @@ index a74778a..83e9b81 100644
 -    "cursor-bridge/workflow/phases/project-end.md": "3f9e66aec318328644e8ceb75dde9d15d5044e3e1099bd443caedd77c4cf3b79",
 -    "cursor-bridge/workflow/phases/reflection.md": "62484e4baddcd9ed45a1b5803290f9ca2db4980bd5a6a83c12f1a2864d4afecd",
 +    "cursor-bridge/workflow/phases/project-end.md": "5f0e4718496179b1fd9fc1ce86eae585d4559cca1c3431666b6185063aec2d29",
-+    "cursor-bridge/workflow/phases/reflection.md": "9ee3a3f60824e62b23f94c11787d3c8c8b4652cdb177c064299b28bc5177e7d8",
++    "cursor-bridge/workflow/phases/reflection.md": "2071e2ad010ac812385349659a0f9051c205e6ebff40ce1391ef8cd0a2856f9a",
      "cursor-bridge/workflow/phases/run-parameters.md": "7d37e1c3ab4dac2b2069b80998b28e6dfe1f8c68a849afa7a3bf415a2a9f73ed",
      "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
 -    "cursor-bridge/workflow/trace-exceptions.md": "3da628228dbd32cb2e934510c4a326fd6fb9495170af04ca12aafc047d17f77e",
@@ -65,7 +65,7 @@ index a74778a..83e9b81 100644
      "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
      "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
 diff --git a/bridge/cursor-bridge/workflow/phases/change-cycle.md b/bridge/cursor-bridge/workflow/phases/change-cycle.md
-index c9cd07e..77bc91a 100644
+index c9cd07e..9aaf9b5 100644
 --- a/bridge/cursor-bridge/workflow/phases/change-cycle.md
 +++ b/bridge/cursor-bridge/workflow/phases/change-cycle.md
 @@ -1,11 +1,25 @@
@@ -75,7 +75,7 @@ index c9cd07e..77bc91a 100644
 +
 +After a compaction or a resume in a change cycle, read these before your next action:
 +
-+- this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its `Variants:` line names, and its plan addendum `planning.md`'s, each scaled to the change; its new stages run `delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the session-start hook names with this module while the phase is `changing`;
++- this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its `Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with `docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, each scaled to the change; its new stages run `delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the session-start hook names with this module while the phase is `changing`;
 +- `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its date and the step it has reached, and `Awaiting user on:` a gate that waits for the owner; the inventory's Features answer a request already satisfied, and its Decisions name one the change reverses (item 1);
 +- `docs/REQUIREMENTS.md`, with the failures `completion-check.py --mode done` printed at item 1: each is a gap in the previous delivery, reported to the owner first and planned ahead of the request unless the owner defers it;
 +- the change's records as far as they are written, whole: its `Change: <name>` section of `docs/DESIGN.md`, its record in `docs/DESIGN_CRITIQUE.md` under the change's subject and under `<the change's name>-plan`, the interface artifacts it amends, and its stages in `docs/BUILD_PLAN.md`;
@@ -105,7 +105,14 @@ index c9cd07e..77bc91a 100644
  4. **Plan addendum** (Phase 4, scaled). Append one or more new **stages** to
     `docs/BUILD_PLAN.md` for the change, with the same increment discipline, and bump the
     **version** in the single version source (a fix → patch; a feature → minor; a change
-@@ -45,6 +57,6 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
+@@ -40,11 +52,11 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
+    reviewers, gate, refactoring pass, reflection points. Every increment's brief states
+    which existing behaviour it may change and that everything else is unchanged, and the
+    tests that pin the existing behaviour must stay green.
+-7. **Project end again.** The close of the addendum's last stage is project end: the User
+-   Manual is patched for every `CHANGES.md` entry, the deliverable is rebuilt and verified
++7. **Project end again.** The close of the addendum's last stage is project end, run by `project-end.md` with the additions at its points, scaled to the change: the User
++   Manual is patched for every `CHANGES.md` entry, not written anew, the deliverable is rebuilt and verified
     under the new version, the release is attached, the Issues and Feedback files are
     completed, and `Phase: done` is set. Report "Project complete — <Name> <new version>".
  
@@ -203,7 +210,7 @@ index a67b39d..65a3e9b 100644
 +- `project-end.completion-conditions` — completion conditions a conditional workflow adds for the part, each checked with "Prove the product is complete" above, before anything else at project end: a condition not met means, as a failure of `completion-check.py` does, that the project has not ended; a condition the plan must build toward is also added at intake (`intake.requirement-sources`), as the registry says.
 +- `project-end.delivery` — the delivery procedure for the part's delivery kind, which an addition names (`## Add at project-end.delivery for <kind>`) and which runs for each part whose `Delivery kind:` row in `docs/INVENTORY.md` names that kind, beside "Deliver the installer" above and before the promotion pass; the report and the User Manual name what was delivered and where it is.
 diff --git a/bridge/cursor-bridge/workflow/phases/reflection.md b/bridge/cursor-bridge/workflow/phases/reflection.md
-index fbedc23..f023d9b 100644
+index fbedc23..89bddc3 100644
 --- a/bridge/cursor-bridge/workflow/phases/reflection.md
 +++ b/bridge/cursor-bridge/workflow/phases/reflection.md
 @@ -1,5 +1,18 @@
@@ -243,7 +250,7 @@ index fbedc23..f023d9b 100644
 +
 +#### Whether a compaction preceded it
 +
-+Every entry's part written on detection also gives the time the incident happened, in UTC, and one line, `Compaction before: yes, <the compaction's time in UTC, where known>` or `Compaction before: no`: whether the session's context was compacted, or the session resumed, between your last whole reading of the governing text and the incident. The bridge's maintainer measures from these lines how often a rule is broken within an hour of a compaction, which entries carrying a date alone could not show.
++Every entry's part written on detection also gives the time the incident happened, in UTC, and one line, `Compaction before:` followed by `yes` and the compaction's time in UTC where it is known, or by `no`: whether the session's context was compacted between your last whole reading of the governing text and the incident. A resume or a fork of the session in that time is not a compaction and is written on a line of its own, `Resumed before:` or `Forked before:` with its time where known (the session-start hook's message after each says which of the three it follows, when its input names it; where it names none, and says *compacted or resumed*, the line reads `Compaction before: unknown`). The bridge's maintainer measures from these lines how often a rule is broken within an hour of a compaction, which entries carrying a date alone could not show.
 +
 +## Extension points
 +
@@ -324,7 +331,7 @@ index d224dc6..6da0b04 100644
  ## Subject: ceiling — after the critique
  
 diff --git a/docs/HARDENING.md b/docs/HARDENING.md
-index 506f7e4..90ac1e3 100644
+index 506f7e4..b46b814 100644
 --- a/docs/HARDENING.md
 +++ b/docs/HARDENING.md
 @@ -129,7 +129,7 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
@@ -345,7 +352,7 @@ index 506f7e4..90ac1e3 100644
  - **Lead (the trace exceptions):** the reword entries "Phase 2 — Design" and "The design-tooling flow" excuse every passage of those baseline sections, and the `new` entries for design.md "The gate" and planning.md "Step 0" excuse any later new text there. A baseline passage a `reword` entry excuses prints a NOTE, and tests/test_core_carve.py pins the NOTE lines, so a later reword there changes a test; new text a `new` entry excuses prints nothing (trace-check.py skips it, :822-823), so a later paragraph in those sections leaves the result and the pinned lines unchanged and only a reviewer's reading of the section sees it (Review B, PR #55, should-fix, corrected on TASK-013's branch). design.md's resume sentence (Review B's should-fix at PR #53) is excused by TASK-011's "Traits at the design gate" entry, and rule 13's re-pointing by TASK-015's "Standing rules" entry, whose label its NOTE carries.
  - **Lead (the stand-in check):** completion-check.py reads code files only, so a stand-in in a governance Markdown file is seen by no program; the TASK-012 test applies its patterns to the interface and planning modules and the variant files only, since project-end.md quotes them as the rule's text. Check: if a later increment writes a variant body, its test applies the patterns too (TASK-022).
  
-@@ -149,7 +149,17 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
+@@ -149,7 +149,18 @@ Snapshot STAGE-B1 (4db96c3 on stage/B1, deleted after verify OK, hash 36eee28216
  
  - **The split:** delegation-loop.md was 56,457 characters (94% of R-032's 60,000). Round 1's additions came to 2,967 characters, which would have left it at about 59,165 unsplit (98.6%, inside the bound), so the split rested then on TASK-010's recorded decision that an enrichment adding to the module splits it first (INVENTORY, Decisions, the core's size); with round 2's additions the unsplit module would be about 60,500, past the bound itself. Its step 9, the stage-close refactoring pass, moved verbatim into delegation-loop/refactoring-pass.md, named by the module's `Sub-files:` line, the first real one; the module is 54,965 characters (92%) and the sub-file 6,515. Step 9 was chosen because it runs once per stage, after the stage's last merge, and is cited only by its number (the core's sentence under the module table says a sub-file keeps its step's heading); steps 3b and 8 stay in the module, which the core names as the steps the design critique reads.
  - **Review A, round 1: REJECT**, two blocking items, both taken. B1: the configuration survival list put the inventory item (pinned versions recorded) on the line before the status-file item, which tests/test_text_consistency.py's guard against sending a pin to the status file reads as one window; the full suite showed it too (1 failed, 1,932 passed); the status item now comes first, the guard unchanged. B2, convergent with the security audit's first advisory: the `delegation-loop.inspect-checks` line confined the point to step 4 before the first reviewer and sent every failure to the builder, "never to the owner", against the registry (the inspect step is every check or review other than the running of the tests, the reviewer passes, the secret scan and the dependency admission among them, on every change the loop checks, each addition at the step that runs it) and against step 4's objection route and rule 56; the line now places additions at their step and keeps each step's routes, and a test holds the registry's words beside it. Should-fix items, all taken: S1, the `new` entry on the sub-file's `##` heading excused all of step 9, since an entry matches every heading on a passage's chain (a passage added to step 9, or a copy of one elsewhere, would have passed); the opening paragraph now has its own heading, "Where this sub-file belongs", and step 9 is traced in its new home; S2, this record's growth figure (above); S3, the loop's survival list names the assumptions file, the suite's output and step 9's position, and the sub-file's "Keeping the pass's position" writes the scout's lists to run/supervisor/refactor-<stage>-candidates.md; S4, the configuration's position moved from `In flight:`, whose grammar the core's template fixes, to `Next:`, with the final record named; S5, the point-line test reads each point's Applies cell. Considers taken: C1, step 9's text pinned by its sha256 in the test, since trace-check has no CI step; C2, a parameter that does not apply is written `n/a`; C3, the loop's list names the other files the hook names. The security audit PASS, its three advisories taken (B2's; no key and no computer path in docs/RUN_PARAMETERS.md, rules 53 and 54; the configuration's position names items by name only). The secret scan CLEAR. Round 2: Review A's confirming read APPROVE with two considers, both taken (the sub-file's opening paragraph points ahead to "Keeping the pass's position", which step 9's item 2 needs; the R-004 evidence names three tests, not two); the security re-check PASS with no findings; the full suite 1,936 passed, 33 skipped.
@@ -355,9 +362,10 @@ index 506f7e4..90ac1e3 100644
 +### TASK-014, the change cycle, the reflection points and project end (2026-10-20)
 +
 +- **The text:** change-cycle.md, reflection.md and project-end.md open with their survival lists. The change cycle's item 3 runs the interface variant of every kind the change touches (the lead above, closed), and its closing sentence names each variant's artifact among the gates; its step is kept on the `Change cycle:` line, which the core's template already gives a step. The reflection points and project end keep their finished steps in run/supervisor/in-flight.md, not on `Next:` as the configuration does, because the status file is not committed on `main` and not written while a stage review's Review B runs. The issues rule's follow-up (the compaction baseline, Restructuring Plan §14.3) is a `####` heading of its own at the end of the issues section, so that its `new` entry excuses that paragraph alone. The promotion pass reads the inventory's `Flagged trait:` rows (Review A's lead for TASK-012 to TASK-014, closed). reflection.md declares `reflection.items` (after item 4, before the record) and project-end.md its two part points; the change cycle declares none and says how a conditional workflow reaches it; tests/test_phase_modules_close.py cross-checks the registry against every module.
-+- **The trace exceptions:** each variant file's declaring paragraph moved under `### What this variant is`, the mockups' procedure under `### The procedure` (a heading is not a passage, so it needs no entry), and the four `new` entries re-pointed (the lead above, closed). With the file-wide entry gone the check found what it had hidden: TASK-012's reworded paragraph in the mockups' design-tooling flow, now declared by a `new` entry on that section, labelled TASK-014, the increment that declares it. The change cycle's item 3 and closing sentence are reworded (a `reword` entry, two NOTEs pinned in tests/test_core_carve.py: 259 under workflow/, 9 excused), and its procedure, under one `new` entry, is pinned by its sha256 in the test, as TASK-013 pinned step 9; a test also refuses any `new` entry on a phase file's top heading.
++- **The trace exceptions:** each variant file's declaring paragraph moved under `### What this variant is`, the mockups' procedure under `### The procedure` (a heading is not a passage, so it needs no entry), and the four `new` entries re-pointed (the lead above, closed). With the file-wide entry gone the check found what it had hidden: TASK-012's reworded paragraph in the mockups' design-tooling flow, now declared by a `new` entry on that section, labelled TASK-014, the increment that declares it. The change cycle's item 3 and closing sentence are reworded (a `reword` entry, two NOTEs pinned in tests/test_core_carve.py: 259 under workflow/, 9 excused; three, 258 and 10 after Review B's step-7 fix, below), and its procedure, under one `new` entry, is pinned by its sha256 in the test, as TASK-013 pinned step 9; a test also refuses any `new` entry on a phase file's top heading.
 +- **The pointer sweep (the carve's lead):** the glossary's phase-module entry was stale (it said project end was part of the reflection points); it now says each module is a file, a long one keeping a step in a sub-file, the interface phase one file per variant. Review A found two more of the class, outside this increment's Scope, each a lead below.
-+- **Review A, round 1: REJECT**, one blocking item, taken: the status file, written as at this merge, named TASK-022 next and skipped stage B3's close, which this merge brings due (TASK-014 is B3's last increment; the refactoring pass is on); its `Next:`, `Increment:` and `Stage:` lines now name the close. Three should-fix items, all taken: the inventory's new Decisions row said the status file is not *written* on `main`, where rule 40 forbids committing there (reflection item 5 writes `Last reflection:` on `main`); this record's pointer-sweep claim (above); and the variant files' excused sections were not pinned, so a paragraph added to one would pass unseen: each of the five (the four `What this variant is` sections and the mockups' design-tooling flow) is now pinned by its sha256 in tests/test_phase_modules_close.py, with the entries on the variant files checked to be exactly those five. Considers taken: the change cycle's step is kept as each step is reached or its gate passes (steps 5 to 7 have no gate); item 3 names a part whose type workflow replaces the interface phase, and says a change touching no interface holds no interface gate; the design-tooling entry is labelled TASK-014, the increment that declares it, like the four it sits beside; the reflection survival list's "items 1, 2 and 4" is "items 1 and 4". The security audit PASS with four advisories, all taken: the promotion pass's trait proposals are written in general terms (no path, no key, no project data) and stand in fenced blocks headed `Proposal — not in force`; the change cycle's procedure pin says a change to it is reviewed as a new trace exception, never a routine re-pin, and the section pins say the same; its second advisory is the lead below. The secret scan CLEAR. The full suite 1,956 passed, 33 skipped.
++- **Review A, round 1: REJECT**, one blocking item, taken: the status file, written as at this merge, named TASK-022 next and skipped stage B3's close, which this merge brings due (TASK-014 is B3's last increment; the refactoring pass is on); its `Next:`, `Increment:` and `Stage:` lines now name the close. Three should-fix items, all taken: the inventory's new Decisions row said the status file is not *written* on `main`, where rule 40 forbids committing there (reflection item 5 writes `Last reflection:` on `main`); this record's pointer-sweep claim (above); and the variant files' excused sections were not pinned, so a paragraph added to one would pass unseen: each of the five (the four `What this variant is` sections and the mockups' design-tooling flow) is now pinned by its sha256 in tests/test_phase_modules_close.py, with the entries on the variant files checked to be exactly those five. Considers taken: the change cycle's step is kept as each step is reached or its gate passes (steps 5 to 7 have no gate); item 3 names a part whose type workflow replaces the interface phase, and says a change touching no interface holds no interface gate; the design-tooling entry is labelled TASK-014, the increment that declares it, like the four it sits beside; the reflection survival list's "items 1, 2 and 4" is "items 1 and 4". The security audit PASS with four advisories, all taken: the promotion pass's trait proposals are written in general terms (no path, no key, no project data) and stand in fenced blocks headed `Proposal — not in force`; the change cycle's procedure pin says a change to it is reviewed as a new trace exception, never a routine re-pin, and the section pins say the same; its second advisory is the lead below. The secret scan CLEAR. The full suite on round 1 1,956 passed, 33 skipped, and on round 2, with its five section pins, 1,961 passed, 33 skipped.
++- **Review B, round 1 (on round 2's head): REJECT**, two blocking items, both taken. The change cycle's survival list named a module for every step but step 5, the run parameters (and any new tooling), whose modules the hook does not name while the phase is `changing`; it now names `run-parameters.md` with `docs/RUN_PARAMETERS.md` and `configuration.md`. The issues rule's `Compaction before: yes` counted a resume as a compaction, which the measure it serves (a rule broken within an hour of a compaction) cannot use; `yes` now means a compaction only, and a resume or a fork has a line of its own; where the hook's input names none (its message says *compacted or resumed*) the line reads `unknown` (Review A's confirming read). Two should-fix items, both taken: this record's suite count (above); the change cycle's step 7 points at `project-end.md`, scaled (the manual patched, not written anew), so that a change cycle's close runs the whole of project end: the completion, diagram and strict sync checks, the promotion pass with its trait proposals, and the additions at both points (Review A's confirming read, noted), a third passage of the core's change cycle reworded (tests/test_core_carve.py's pin: 258 under workflow/, 10 excused). pr-activity-check OK. Its noted item, the registry's two stale sentences, is the lead below.
 +- **Lead (the trace pin, the security audit's advisory 2):** the `reword` entry on the core's "The change cycle" lets any passage of that baseline section drop with a NOTE only, and the test that pins the NOTE lines (tests/test_core_carve.py) is skipped in CI, which lacks the baseline commit (INVENTORY Decisions): the guard runs only in the supervisor's checkout, at step 4 of every increment. Check: TASK-025's full trace, or CI fetching the history.
 +- **Lead (Review A, for the next increment that edits planning.md, TASK-017):** planning.md:107 says project end is "see "Reflection points" — it is a defined trigger"; the trigger is now in project-end.md ("The trigger and what project end adds"). It still resolves, through reflection.md's "Project end" pointer, but names the wrong module; the passage is baseline text, so the re-point takes a `reword` entry.
 +- **Lead (Review A, for the registry's next edit):** extension-points.md:11 still says "Until the phases move into files of their own, each module is its phase's section of `supervisor.md`", and :78 that the two directions "are checked once every module declares its points (BUILD_PLAN TASK-014)"; they are files since TASK-010, and the check is tests/test_phase_modules_close.py's cross-check since TASK-014.
@@ -458,18 +466,19 @@ index d1bcae4..b73c359 100644
    "reset_day": 16
  }
 diff --git a/tests/test_core_carve.py b/tests/test_core_carve.py
-index 736c377..e4d2adf 100644
+index 736c377..43d9698 100644
 --- a/tests/test_core_carve.py
 +++ b/tests/test_core_carve.py
-@@ -129,13 +129,18 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
+@@ -129,13 +129,20 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
  # interface phase"; the mockup paragraph's "Saving these concludes the planning stage", now the mockups and the phase;
  # rule 13's pointer to the approved-mockup rule, excused by the earlier Standing rules entry and so labelled TASK-015;
  # the other mockup passages traced in their new home, workflow/phases/interface/mockups.md)
 -TRACED = "TRACED: 424 passages of baseline 0a186da; 156 in supervisor.md, 261 under workflow/, 0 dropped, 7 excused"
 +# (TASK-014: two more move from traced to excused: the change cycle's item 3, the UI mockups -> the interface
 +# variants of every kind the change touches, and its closing sentence on the gates, "the mockup if any" -> "the
-+# artifact of each interface variant the change runs")
-+TRACED = "TRACED: 424 passages of baseline 0a186da; 156 in supervisor.md, 259 under workflow/, 0 dropped, 9 excused"
++# artifact of each interface variant the change runs"; and, for Review B's should-fix, its step 7, project end now run
++# by project-end.md, scaled)
++TRACED = "TRACED: 424 passages of baseline 0a186da; 156 in supervisor.md, 258 under workflow/, 0 dropped, 10 excused"
  NOTES = [
      "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
      "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
@@ -477,25 +486,26 @@ index 736c377..e4d2adf 100644
      "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
      "NOTE (reword TASK-012) bridge/commands/supervisor.md: The design-tooling flow - Save the mockup files under `docs/mockups/` (one file per sc",
 +    "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 3. **UI mockups** (Phase 3) **only if the change touches the",
++    "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 7. **Project end again.** The close of the addendum's last s",
 +    "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - The gates of a change cycle are the same approvals the origi",
      "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 13. Design correctness \\u2014 accessibility and interface MUSTs, ",
      "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
  ]
-@@ -143,7 +148,7 @@ NOTES = [
+@@ -143,7 +150,7 @@ NOTES = [
  
  def test_r003_the_carve_traces_with_exactly_its_excuses():
      """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
 -    excused ones exactly the seven passages of the five rewords the carve and TASK-012 declare, so an increment that excuses anything more changes this
-+    excused ones exactly the nine passages of the six rewords the carve, TASK-012 and TASK-014 declare, so an increment that excuses anything more changes this
++    excused ones exactly the ten passages of the six rewords the carve, TASK-012 and TASK-014 declare, so an increment that excuses anything more changes this
      test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
      the supervisor's checkout."""
      repo = os.path.abspath(os.path.join(HERE, os.pardir))
 diff --git a/tests/test_phase_modules_close.py b/tests/test_phase_modules_close.py
 new file mode 100644
-index 0000000..21a845b
+index 0000000..a59eea7
 --- /dev/null
 +++ b/tests/test_phase_modules_close.py
-@@ -0,0 +1,444 @@
+@@ -0,0 +1,452 @@
 +"""TASK-014: the change-cycle, reflection and project-end modules enriched (R-004, R-006, R-032, R-036).
 +
 +enforces: docs/REQUIREMENTS.md R-004 (each phase module opens with the short list of what must survive a compaction),
@@ -586,7 +596,9 @@ index 0000000..21a845b
 +    "change-cycle": [
 +        "this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s "
 +        "procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its "
-+        "`Variants:` line names, and its plan addendum `planning.md`'s, each scaled to the change; its new stages run "
++        "`Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with "
++        "`docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, "
++        "each scaled to the change; its new stages run "
 +        "`delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the "
 +        "session-start hook names with this module while the phase is `changing`;",
 +        "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its "
@@ -805,11 +817,17 @@ index 0000000..21a845b
 +    assert "\n#### Whether a compaction preceded it\n" in issues
 +    s = flat(section(module("reflection"), "Whether a compaction preceded it", 4)).strip()
 +    assert s == ("Every entry's part written on detection also gives the time the incident happened, in UTC, and one "
-+                 "line, `Compaction before: yes, <the compaction's time in UTC, where known>` or `Compaction before: "
-+                 "no`: whether the session's context was compacted, or the session resumed, between your last whole "
-+                 "reading of the governing text and the incident. The bridge's maintainer measures from these lines how "
-+                 "often a rule is broken within an hour of a compaction, which entries carrying a date alone could not "
-+                 "show.")
++                 "line, `Compaction before:` followed by `yes` and the compaction's time in UTC where it is known, or by "
++                 "`no`: whether the session's context was compacted between your last whole reading of the governing "
++                 "text and the incident. A resume or a fork of the session in that time is not a compaction and is "
++                 "written on a line of its own, `Resumed before:` or `Forked before:` with its time where known (the "
++                 "session-start hook's message after each says which of the three it follows, when its input names it; where it names none, and says *compacted or resumed*, the line reads "
++                 "`Compaction before: unknown`). The bridge's maintainer "
++                 "measures from these lines how often a rule is broken within an hour of a compaction, which entries "
++                 "carrying a date alone could not show.")
++    # Review B, round 1: a resume is not a compaction, so `yes` names a compaction only and a resume has a line of its
++    # own (the hook tells the three apart: session-start.py's compact, resume and fork messages)
++    assert "`Compaction before:` followed by `yes`" in s and "`Resumed before:`" in s and "or the session resumed" not in s
 +
 +
 +def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
@@ -834,11 +852,11 @@ index 0000000..21a845b
 +
 +
 +# sha256 of the change cycle's procedure as TASK-014 leaves it (from its heading to the file's end, LF, the whitespace at
-+# its end stripped; 6,280 characters): the trace entry on "The procedure" excuses new text anywhere under it, so CI holds
++# its end stripped; 6,378 characters): the trace entry on "The procedure" excuses new text anywhere under it, so CI holds
 +# the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this pin is reviewed as a new
 +# trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the increment's record names
 +# each passage it adds or rewords under the procedure
-+PROCEDURE_SHA256 = "03af47299032e37bbf106e72bcb0ec1784241ce16948aec3591ddb97d094f40a"
++PROCEDURE_SHA256 = "02c6c662783f67e65f38c3394b4f4091c742ccb06bf1541db2568b077583a4ac"
 +
 +
 +def test_the_change_cycles_procedure_is_pinned():
@@ -846,7 +864,7 @@ index 0000000..21a845b
 +    one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
 +    text = module("change-cycle")
 +    proc = text[text.index("### The procedure"):].rstrip()
-+    assert len(proc) == 6280 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
++    assert len(proc) == 6378 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
 +
 +
 +def test_r004_the_positions_the_survival_lists_name_are_kept():
