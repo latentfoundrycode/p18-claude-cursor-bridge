@@ -14,6 +14,8 @@ import re
 
 import pytest
 
+from phase_modules import read, module, flat, headings, section
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
 CB = os.path.join(BRIDGE, "cursor-bridge")
@@ -21,49 +23,6 @@ PHASES = os.path.join(CB, "workflow", "phases")
 REGISTRY = os.path.join(CB, "workflow", "extension-points.md")
 EXCEPTIONS = os.path.join(CB, "workflow", "trace-exceptions.md")
 GLOSSARY = os.path.join(CB, "Glossary.md")
-
-
-def read(path):
-    return open(path, encoding="utf-8").read().replace("\r\n", "\n")
-
-
-def module(rel):
-    return read(os.path.join(PHASES, rel if rel.endswith(".md") else rel + ".md"))
-
-
-def flat(text):
-    return re.sub(r"\s+", " ", text)
-
-
-def headings(text):
-    """(level, title) of every heading outside fenced blocks, in order."""
-    out, fence = [], None
-    for line in text.split("\n"):
-        m = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
-        if m:
-            if fence is None:
-                fence = m.group(1)[0]
-            elif m.group(1)[0] == fence:
-                fence = None
-            continue
-        if fence is None:
-            h = re.match(r"^(#{1,6}) (.*)$", line)
-            if h:
-                out.append((len(h.group(1)), h.group(2).strip()))
-    return out
-
-
-def section(text, title, level):
-    """The body of the heading `title` at `level`, to the next heading of that level or higher."""
-    lines = text.split("\n")
-    start = lines.index("#" * level + " " + title) + 1
-    end = len(lines)
-    for i in range(start, len(lines)):
-        h = re.match(r"^(#{1,6}) ", lines[i])
-        if h and len(h.group(1)) <= level:
-            end = i
-            break
-    return "\n".join(lines[start:end])
 
 
 STRUCTURE = {

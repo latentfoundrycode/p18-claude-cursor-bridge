@@ -12,56 +12,14 @@ import re
 
 import pytest
 
+from phase_modules import read, module, flat, headings, section, registry_points
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
-PHASES = os.path.join(BRIDGE, "cursor-bridge", "workflow", "phases")
 REGISTRY = os.path.join(BRIDGE, "cursor-bridge", "workflow", "extension-points.md")
 POLICY = os.path.join(BRIDGE, "cursor-bridge", "Merge-Verification-Policy.md")
 PLAN_CRITIC = os.path.join(BRIDGE, "agents", "plan-critic.md")
 CHECK = "`python ~/.claude/cursor-bridge/workflow-check.py --status docs/PROJECT_STATUS.md`"
-
-
-def read(path):
-    return open(path, encoding="utf-8").read().replace("\r\n", "\n")
-
-
-def module(key):
-    return read(os.path.join(PHASES, key + ".md"))
-
-
-def flat(text):
-    return re.sub(r"\s+", " ", text)
-
-
-def headings(text):
-    """(level, title) of every heading outside fenced blocks, in order."""
-    out, fence = [], None
-    for line in text.split("\n"):
-        m = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
-        if m:
-            if fence is None:
-                fence = m.group(1)[0]
-            elif m.group(1)[0] == fence:
-                fence = None
-            continue
-        if fence is None:
-            h = re.match(r"^(#{1,6}) (.*)$", line)
-            if h:
-                out.append((len(h.group(1)), h.group(2).strip()))
-    return out
-
-
-def section(text, title, level):
-    """The body of the heading `title` at `level`, to the next heading of that level or higher."""
-    lines = text.split("\n")
-    start = lines.index("#" * level + " " + title) + 1
-    end = len(lines)
-    for i in range(start, len(lines)):
-        h = re.match(r"^(#{1,6}) ", lines[i])
-        if h and len(h.group(1)) <= level:
-            end = i
-            break
-    return "\n".join(lines[start:end])
 
 
 STRUCTURE = {
@@ -113,19 +71,6 @@ def test_r004_the_module_opens_with_its_compaction_survival_list(key):
     items = [l[2:] for l in body[1:] if l]
     assert all(l.startswith("- ") for l in body[1:] if l), body
     assert items == SURVIVAL[key], items
-
-
-def registry_points(module_key):
-    text = read(REGISTRY)
-    table = text.split("\n## Extension points\n", 1)[1].split("\n## ", 1)[0]
-    rows = [l for l in table.split("\n") if l.startswith("|")]
-    header = [c.strip() for c in rows[0].strip("|").split("|")]
-    out = []
-    for row in rows[2:]:
-        cells = dict(zip(header, [c.strip() for c in row.strip("|").split("|")]))
-        if cells["Declared by"] == module_key:
-            out.append(cells["Key"])
-    return out
 
 
 @pytest.mark.parametrize("key", ["intake", "design"])
