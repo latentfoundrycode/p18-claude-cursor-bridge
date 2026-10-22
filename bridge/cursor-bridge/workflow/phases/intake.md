@@ -8,7 +8,8 @@ After a compaction or a resume in this phase, read these before your next action
 - the owner's Initial Design Draft in `Documents/`, whole, if they wrote one, and every requirements document they supplied;
 - `run/supervisor/intake-notes.md`: every question asked so far and the owner's answer to it, written there as each answer arrives, because the conversation that held them does not survive a compaction (rule 54);
 - the open list, `~/.claude/cursor-bridge/workflow/open-list.md`, whole, until every part is classified;
-- `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line and its `Awaiting user on:` line say how far the classification and the questions have gone.
+- `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line and its `Awaiting user on:` line say how far the classification and the questions have gone;
+- once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished ("Keeping the position"), until the reflection point is done.
 
 ### The procedure
 

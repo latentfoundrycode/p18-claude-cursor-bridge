@@ -38,7 +38,10 @@ SURVIVAL = {
         "each answer arrives, because the conversation that held them does not survive a compaction (rule 54);",
         "the open list, `~/.claude/cursor-bridge/workflow/open-list.md`, whole, until every part is classified;",
         "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line and its `Awaiting user on:` line say how far the "
-        "classification and the questions have gone.",
+        "classification and the questions have gone;",
+        "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
+        "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
+        "position\"), until the reflection point is done.",
     ],
     "design": [
         "this module, `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` and `~/.claude/cursor-bridge/Glossary.md`, "
@@ -53,7 +56,13 @@ SURVIVAL = {
         "the owner's Initial Design Draft, every requirements document they supplied and "
         "`run/supervisor/intake-notes.md`, whole: the design and the requirements register answer them;",
         "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line holds the traits proposed at intake, which this phase's "
-        "gate settles.",
+        "gate settles;",
+        "`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in "
+        "flight or a launch has failed: a round is snapshotted and verified as step 8 says, and a failed launch is "
+        "handled as step 3b says;",
+        "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
+        "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
+        "position\"), until the reflection point is done.",
     ],
 }
 
