@@ -1,10 +1,24 @@
 ## The change cycle — a request on a finished project
 
+### What must survive a compaction
+
+After a compaction or a resume in a change cycle, read these before your next action:
+
+- this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its `Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with `docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, each scaled to the change; its new stages run `delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the session-start hook names with this module while the phase is `changing`;
+- `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its date and the step it has reached, and `Awaiting user on:` a gate that waits for the owner; the inventory's Features answer a request already satisfied, and its Decisions name one the change reverses (item 1);
+- `docs/REQUIREMENTS.md`, with the failures `completion-check.py --mode done` printed at item 1: each is a gap in the previous delivery, reported to the owner first and planned ahead of the request unless the owner defers it;
+- the change's records as far as they are written, whole: its `Change: <name>` section of `docs/DESIGN.md`, its record in `docs/DESIGN_CRITIQUE.md` under the change's subject and under `<the change's name>-plan`, the interface artifacts it amends, and its stages in `docs/BUILD_PLAN.md`;
+- while its intake runs, this project's own Issues file, `Documents/<Name> Issues During Development and Their Solutions.md`, whole: it takes the place of the prior-project lessons step.
+
+### The procedure
+
 A project whose status is `Phase: done` and whose owner asks for a change runs the same
 phases as the original build, **scaled to the delta**: everything already approved stays
 approved, everything the change touches goes through its gate again, and nothing else is
 re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md` under
 `Change cycle:` with a short name and the date.
+
+Keep the step the change has reached on the `Change cycle:` line, rewritten as each step is reached or its gate passes, so that a resume after a compaction starts where the change stands and asks no approval twice.
 
 1. **Intake of the change** (Phase 1, scaled). The session is on Opus 5.5 from the build:
    your first report leads with *set this session to Fable 5.1 before the design work* (rule
@@ -23,9 +37,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
    context, or delivery, and why; the unchanged design is referenced, not rewritten. **Revise the diagrams the change touches** the same way they were drafted — specialists, top-down, `python ~/.claude/cursor-bridge/diagram-check.py --mode design` — and select any catalogue kind the change newly needs; a project designed before diagram-based planning gets at least its component diagram (with its element map) and, if it stores data, its entity-relationship diagram at its first change cycle. Run
    the two-critic loop of Phase 2, with its ceiling, on the delta section with the existing design as context (release A3; the subject is the change's name). Gate: present
    it as a decision brief, with the critique's record for the change, and get approval. Patch the Project Summary at this gate.
-3. **UI mockups** (Phase 3) **only if the change touches the UI**, and only for the
-   affected screens and states; the visual system is amended, not replaced. Gate as in
-   Phase 3.
+3. **The interface variants** (Phase 3) **only for the kinds of interface the change touches** — screens, commands, a protocol other software calls, play — each kind by the variant `interface.md` gives it ("The variants", "Which variants a part runs"), or by the replacement of a part whose type workflow replaces the interface phase, and each run only for the screens and states, the commands or the operations the change adds or alters. An artifact already approved is amended, not replaced (for screens, the mockups and the visual system); an artifact the part does not have yet is written for what the change touches; a kind the change does not touch is not re-presented. Gate as in Phase 3, for the variants run; a change that touches no kind of interface runs no variant and holds no interface gate.
 4. **Plan addendum** (Phase 4, scaled). Append one or more new **stages** to
    `docs/BUILD_PLAN.md` for the change, with the same increment discipline, and bump the
    **version** in the single version source (a fix → patch; a feature → minor; a change
@@ -40,11 +52,11 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
    reviewers, gate, refactoring pass, reflection points. Every increment's brief states
    which existing behaviour it may change and that everything else is unchanged, and the
    tests that pin the existing behaviour must stay green.
-7. **Project end again.** The close of the addendum's last stage is project end: the User
-   Manual is patched for every `CHANGES.md` entry, the deliverable is rebuilt and verified
+7. **Project end again.** The close of the addendum's last stage is project end, run by `project-end.md` with the additions at its points, scaled to the change: the User
+   Manual is patched for every `CHANGES.md` entry, not written anew, the deliverable is rebuilt and verified
    under the new version, the release is attached, the Issues and Feedback files are
    completed, and `Phase: done` is set. Report "Project complete — <Name> <new version>".
 
-The gates of a change cycle are the same approvals the original build had — the change
-design, the mockup if any, the plan addendum. They are the only questions a change cycle
-asks the owner. Whether the workflow applies is not one of them.
+The gates of a change cycle are the same approvals the original build had — the change design, the artifact of each interface variant the change runs, the plan addendum. They are the only questions a change cycle asks the owner. Whether the workflow applies is not one of them.
+
+This module declares no extension points: a conditional workflow changes a change cycle through the modules whose procedures it runs, each at its own points.

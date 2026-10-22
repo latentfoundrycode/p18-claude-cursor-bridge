@@ -1,5 +1,18 @@
 ## Reflection points — stage close, phase gates, project end
 
+### What must survive a compaction
+
+After a compaction or a resume at a reflection point, read these before your next action:
+
+- this module, whole, and at the close of the plan's last stage `project-end.md` too, whole (the session-start hook names both while the phase is `building` or `changing`);
+- the last entries of `run/supervisor/in-flight.md`: the reflection point in hand and the items it has finished ("Keeping the position"), and, while the stage review's Review B runs, the position the delegation loop's step 8 keeps there;
+- `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Stage:` line's `Last reflection:` names the reflection point before this one, from which items 1 and 4 count, and `Open issues:` the issues item 1 completes; the inventory holds the decisions and resources the Project Summary's patch reports;
+- `docs/RUN_PARAMETERS.md`: whether the refactoring pass runs before a stage closes, and `Stage pause`, which item 6 obeys;
+- at a stage close, the stage's section of `docs/BUILD_PLAN.md`, whole, with its `Demonstration:` line, and, while the stage review runs, its files under `run/review/` (`STAGE-<name>.diff` with its parts, and `REVIEW-STAGE-<name>.err`);
+- the records the items read and write, whole: `docs/BUILDER_NOTES.md`, the entries of `docs/CHANGES.md` since the last reflection point, the stage's section of `docs/HARDENING.md`, and under `Documents/` the Issues document, the Feedback document, the Project Summary and, once it exists, the User Manual.
+
+### The procedure
+
 The build plan groups increments into named **stages** (Phase 4); a stage closes when its
 last increment merges — and, where the refactoring pass is on, that pass (Phase 6 step 9)
 has merged too, so the reflection describes the stage's final shape. A stage close, each
@@ -62,6 +75,10 @@ At every reflection point, run `python ~/.claude/cursor-bridge/conformance-check
    parameter, an escalation, or project end stops the loop. (An approved phase gate is a
    different thing: those are always waited on, and they are all behind you by now.)
 
+### Keeping the position
+
+As each step above finishes (the stage review, the demonstration, each numbered item), write one line to `run/supervisor/in-flight.md` naming the reflection point and the step finished, and name the file on the status file's `Working files:` line (rule 54). A resume after a compaction reads its last entries and starts at the next step, so that no Issues or Feedback entry is written twice and none is skipped: what the items write under `Documents/` is not under git, and nothing else shows how far they got.
+
 ### Project end
 
 At the close of the approved plan's last stage, project end follows these items: its trigger and its procedure are the module `~/.claude/cursor-bridge/workflow/phases/project-end.md`.
@@ -97,3 +114,13 @@ human reader; the human reads the Project Summary. There is no separate `docs/LE
 The maintainer promotes *generalizable* entries from this file into `Known-Pitfalls.md`
 when the owner brings it to them; you flag candidates by adding `generalizable: yes` to an
 entry, and never edit the bridge yourself.
+
+#### Whether a compaction preceded it
+
+Every entry's part written on detection also gives the time the incident happened, in UTC, and one line, `Compaction before:` followed by `yes` and the compaction's time in UTC where it is known, or by `no`: whether the session's context was compacted between your last whole reading of the governing text and the incident. A resume or a fork of the session in that time is not a compaction and is written on a line of its own, `Resumed before:` or `Forked before:` with its time where known (the session-start hook's message after each says which of the three it follows, when its input names it; where it names none, and says *compacted or resumed*, the line reads `Compaction before: unknown`). The bridge's maintainer measures from these lines how often a rule is broken within an hour of a compaction, which entries carrying a date alone could not show.
+
+## Extension points
+
+This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
+
+- `reflection.items` — reflection items a conditional workflow adds to the numbered items above, each run at every reflection point after item 4 and before item 5, so that the reflection point is recorded only once they are done, and each finished step kept as "Keeping the position" says; made once for the whole project.

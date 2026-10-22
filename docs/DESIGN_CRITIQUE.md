@@ -594,7 +594,7 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 
 **The gate** (2026-10-20, the owner, in this session's chat): "1. Approve" — the four increments and R-039 to R-041 as critiqued; "2. (a)" — the Node runners' default deferred past release B; "3. (a)" — the rate limit is one heavy job at a time. The `run/review/DESIGN-windowless-*` files are removed in the commit that records it.
 
-**After the gate** (supervisor, at the records' code gate, Review A of PR #57): TASK-030's Scope gains `bridge/agents/diff-reviewer.md` and `bridge/agents/spec-packager.md`, which state the settled driver sentence too, so the reword reaches every file that holds it; no design changes. Not criticised by the two critics; reviewed at the code gate with the whole diff.
+**After the gate** (supervisor, at the records' code gate, Review A of PR #57): TASK-030's Scope gains `bridge/agents/diff-reviewer.md` and `bridge/agents/spec-packager.md`, which state the settled driver sentence too, so the reword reaches every file that holds it; no design changes. Not criticised by the two critics; reviewed at the code gate with the whole diff. At Review B of PR #57 (a should-fix, carried to TASK-014's branch so that the reviewed head stayed as reviewed): TASK-030's Scope and Done when also gain `bridge/cursor-bridge/Known-Pitfalls.md`, whose KP-056 states the same driver sentence in its correction; no design changes.
 
 ## Subject: ceiling — after the critique
 
