@@ -472,6 +472,37 @@ def collect_conditional_files(wc, tables, module_keys, status, already):
     return named
 
 
+def _pointer_block_for_module(wc, key, printed_paths):
+    block = []
+    if can_read_module_pointers(wc, key):
+        mod_path = phase_module_installed(key)
+        text, _shown, err = wc.read_utf8(mod_path)
+        if err is None:
+            for rel in pointer_paths_from_module(text, wc):
+                shown = PHASE_PREFIX + rel
+                if shown not in printed_paths:
+                    printed_paths.add(shown)
+                    block.append("  - %s" % shown)
+    return block
+
+
+def _read_workflow_pointers(wc, module_keys, status, printed_paths):
+    if not tables_at_installed_paths(wc):
+        return [], [], TABLES_NOT_INSTALLED
+    link_err = workflow_table_link_error(wc)
+    if link_err:
+        return [], [], link_err
+    tables, table_err = load_tables_from_checker(wc)
+    if table_err:
+        return [], [], table_err
+    pointer_blocks = []
+    for key in module_keys:
+        pointer_blocks.append(_pointer_block_for_module(wc, key, printed_paths))
+    conditional_lines = ["  - %s" % p for p in collect_conditional_files(
+        wc, tables, module_keys, status, printed_paths)]
+    return pointer_blocks, conditional_lines, None
+
+
 def pointers_part(status, source):
     phase_raw = (field(status, "Phase") or "").strip()
     phase = phase_raw.split()[0].lower() if phase_raw else ""
@@ -504,31 +535,8 @@ def pointers_part(status, source):
                 sink = io.StringIO()
                 try:
                     with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-                        if not tables_at_installed_paths(wc):
-                            read_error = TABLES_NOT_INSTALLED
-                        else:
-                            link_err = workflow_table_link_error(wc)
-                            if link_err:
-                                read_error = link_err
-                            else:
-                                tables, table_err = load_tables_from_checker(wc)
-                                if table_err:
-                                    read_error = table_err
-                                else:
-                                    for key in module_keys:
-                                        block = []
-                                        if can_read_module_pointers(wc, key):
-                                            mod_path = phase_module_installed(key)
-                                            text, _shown, err = wc.read_utf8(mod_path)
-                                            if err is None:
-                                                for rel in pointer_paths_from_module(text, wc):
-                                                    shown = PHASE_PREFIX + rel
-                                                    if shown not in printed_paths:
-                                                        printed_paths.add(shown)
-                                                        block.append("  - %s" % shown)
-                                        pointer_blocks.append(block)
-                                    conditional_lines = ["  - %s" % p for p in collect_conditional_files(
-                                        wc, tables, module_keys, status, printed_paths)]
+                        pointer_blocks, conditional_lines, read_error = _read_workflow_pointers(
+                            wc, module_keys, status, printed_paths)
                 except BaseException as err:
                     read_error = "%s: cannot be used (%s)" % (CHECKER_SHOWN, safe_exc_type_name(err))
                     pointer_blocks = []
@@ -540,8 +548,7 @@ def pointers_part(status, source):
             if key == "project-end" and phase in ("building", "changing"):
                 line += " " + PROJECT_END_NOTE
             out.append(line)
-            if i < len(pointer_blocks):
-                out.extend(pointer_blocks[i])
+            out.extend(pointer_blocks[i])
         if read_error is not None:
             out.append(read_error)
         out.extend(conditional_lines)
