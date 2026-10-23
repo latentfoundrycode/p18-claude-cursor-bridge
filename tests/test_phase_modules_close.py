@@ -76,8 +76,9 @@ SURVIVAL = {
         "obeys;",
         "at a stage close, the stage's section of `docs/BUILD_PLAN.md`, whole, with its `Demonstration:` line, and, while "
         "the stage review runs, its files under `run/review/` (`STAGE-<name>.diff` with its parts, "
-        "`SCOPE-STAGE-<name>.md` and `REVIEW-STAGE-<name>.err`), each reviewer's verdict kept in "
-        "`run/supervisor/in-flight.md` as it returns, and the snapshot's hash, kept there at the launch;",
+        "`SCOPE-STAGE-<name>.md` and `REVIEW-STAGE-<name>.err`), each reviewer's verdict, which you write to "
+        "`run/supervisor/in-flight.md` as it returns, and the snapshot's hash, which you write there at the launch "
+        "(this list is where both writes are asked for);",
         "the records the items read and write, whole: `docs/BUILDER_NOTES.md`, the entries of `docs/CHANGES.md` since the "
         "last reflection point, the stage's section of `docs/HARDENING.md`, and under `Documents/` the Issues document, "
         "the Feedback document, the Project Summary and, once it exists, the User Manual.",

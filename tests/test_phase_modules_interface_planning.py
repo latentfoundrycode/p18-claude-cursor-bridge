@@ -78,8 +78,9 @@ SURVIVAL = {
         "`docs/PROJECT_STATUS.md`, whole: its `Awaiting user on:` line says whether Step 0's question or the plan's "
         "gate waits for the owner;",
         "`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in "
-        "flight or a launch has failed: a round is snapshotted and verified as step 8 says, and a failed launch is "
-        "handled as step 3b says;",
+        "flight or a launch has failed: a round is snapshotted and verified as step 8 says, the snapshot's hash "
+        "written to `run/supervisor/in-flight.md` at the launch, and a failed launch is handled as step 3b "
+        "says;",
         "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
         "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
         "position\"), until the reflection point is done.",

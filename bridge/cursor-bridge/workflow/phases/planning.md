@@ -9,7 +9,7 @@ After a compaction or a resume in this phase, read these before your next action
 - `docs/BUILD_PLAN.md` as drafted so far, whole, and each Issues file the owner named at Step 0, whole (its path stands in the plan's Prior-project lessons section, Step 0);
 - `docs/DESIGN_CRITIQUE.md`, whole, while the plan critique runs, with `docs/RUN_PARAMETERS.md` and the round's files under `run/review/` (`DESIGN-plan-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in flight, and `~/.claude/cursor-bridge/workflow/phases/design.md`'s "The procedure", whose two-critic loop, stop rule, ceiling, confirming read and resolution round the plan critique runs: it counts its rounds as the design critique does;
 - `docs/PROJECT_STATUS.md`, whole: its `Awaiting user on:` line says whether Step 0's question or the plan's gate waits for the owner;
-- `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in flight or a launch has failed: a round is snapshotted and verified as step 8 says, and a failed launch is handled as step 3b says;
+- `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in flight or a launch has failed: a round is snapshotted and verified as step 8 says, the snapshot's hash written to `run/supervisor/in-flight.md` at the launch, and a failed launch is handled as step 3b says;
 - once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished ("Keeping the position"), until the reflection point is done.
 
 ### Step 0 — Prior-project lessons (ask before drafting)

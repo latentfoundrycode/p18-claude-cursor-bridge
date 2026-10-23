@@ -78,8 +78,9 @@ SURVIVAL = {
         "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of "
         "`run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the "
         "background runs that will wake you and what waits for the owner; while Review B runs the status file is not "
-        "written and the position is kept in `in-flight.md` (step 8), with the snapshot's hash `review-guard.py "
-        "snapshot` printed, written there at the launch, since the hash `verify` prints must equal it;",
+        "written and the position is kept in `in-flight.md` (step 8), and at the launch you write there the snapshot's "
+        "hash `review-guard.py snapshot` printed, since the hash `verify` prints must equal it (this list is where "
+        "that write is asked for);",
         "the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` with every revision of it, and "
         "each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report "
         "holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);",
