@@ -4,11 +4,12 @@
 
 After a compaction or a resume in this phase, read these before your next action:
 
-- this module and every variant file, each whole (the session-start hook names all four; a variant no part runs is read only to know it does not apply);
+- this module and every variant file, each whole (the session-start hook names the four variant files with it; a variant no part runs is read only to know it does not apply);
 - the approved design: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`, and `docs/diagrams/INDEX.md` with every diagram it lists, whole: each variant maps onto the agreed functionality, adds its screens, commands or operations to the register, and agrees with the diagrams (the mockups with the operational activity diagram's screens);
 - what each running variant has produced so far: `docs/design/DESIGN.md` and `docs/mockups/` for the mockups, `docs/design/COMMANDS.md` for the command design, `docs/design/CONTRACT.md` and the contract file it names for the contract design;
 - `run/supervisor/interface-notes.md` ("The interface notes"), whole;
-- `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which activate variants at `interface.variants` beside the kinds of interface the design shows, and its `Awaiting user on:` line says which variant waits for the owner.
+- `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which activate variants at `interface.variants` beside the kinds of interface the design shows, and its `Awaiting user on:` line says which variant waits for the owner;
+- once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished ("Keeping the position"), until the reflection point is done.
 
 ### The variants
 

@@ -5,7 +5,7 @@ software engineer and cannot judge code correctness, so **no code-correctness de
 is ever routed to the human.** Correctness is decided by an automated, decorrelated gate;
 the human is asked only *intent* questions they are actually competent to answer.
 
-Read this alongside `supervisor.md` (Phase 6) — this file defines the gate; the
+Read this alongside the delegation loop (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`) — this file defines the gate; the
 supervisor applies it.
 
 ---
@@ -149,7 +149,7 @@ pick the strongest model each pool offers at that time — this table records th
 
 `other_pool` flips to `exhausted` in two ways: **automatically**, when a call to a model
 in that pool returns a usage-limit message or fails twice in a row
-(`roster-check.py --record-failure`, supervisor Phase 6 step 3b — the loop then re-resolves
+(`roster-check.py --record-failure`, the delegation loop's step 3b, `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` — the loop then re-resolves
 and restarts the interrupted step without waiting for anyone), or **pre-emptively by the
 owner** saying "usage exhausted" when the dashboard shows the pool nearly gone (a one-word
 probe succeeds at 1% remaining exactly as at 90%, so a nearly-empty pool cannot be
@@ -515,10 +515,10 @@ Two options for reaching it:
   first with the paragraph each enforces, and the bookkeeping files in the diff that are
   expected (`docs/BUILDER_NOTES.md`, the builder's report file under `handoff/`); the prompt itself says only that design for later increments is not this diff's
   defect, that a claim about a build is verified by building it, and that the reply is one of
-  the three verdicts (release A5; supervisor.md step 8 has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
+  the three verdicts (release A5; `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 8, has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
   real failure that has happened — the file path avoids it.) Confirm from its reply that it
-  actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<nnn>.md` — the branch's builder assumption lists with their dispositions (supervisor.md step 8) — as extra places to look, never as its scope. Per the roster above, Review B is
+  actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<nnn>.md` — the branch's builder assumption lists with their dispositions (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 8) — as extra places to look, never as its scope. Per the roster above, Review B is
   **GPT-5.6 Sol** while the builder is Grok 4.7 (full profile), or **Grok 4.7** while the builder is Composer 2.5 (native profile) — a genuine third family either way; the ids in use are always the ones in `docs/ROSTER.resolved.json`.
   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify

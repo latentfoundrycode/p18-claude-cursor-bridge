@@ -341,16 +341,19 @@ def test_r004_the_positions_the_survival_lists_name_are_kept():
 def test_no_trace_entry_excuses_a_whole_phase_file():
     """HARDENING Stage B3 (the trace exceptions, from S1): a `new` entry on a file's top heading excuses every passage in
     the file, so a passage added under it, or a copy of one, passes unseen; each variant file's declaring paragraph is
-    under a heading of its own, and no entry names the top heading of a file under workflow/phases/."""
-    entries = [l for l in read(EXCEPTIONS).split("\n") if l.startswith("- new ")]
+    under a heading of its own, and no entry names the top heading of a file under workflow/phases/. A `reword` entry
+    excuses the current text under its heading as a `new` one does (trace-check.py, build_excuse_index), so both kinds
+    are read, and an entry's heading is stripped as trace-check.py's parse_exceptions strips it (stage B3's review,
+    round 1; BUG-017's Review A)."""
+    entries = [l for l in read(EXCEPTIONS).split("\n") if l.startswith(("- new ", "- reword "))]
     prefix = "bridge/cursor-bridge/workflow/phases/"
     seen = 0
     for e in entries:
-        m = re.match(r"^- new \S+ (\S+\.md) (.+)$", e)
+        m = re.match(r"^- (?:new|reword) \S+ (\S+\.md) (.+)$", e)
         if m and m.group(1).startswith(prefix):
             seen += 1
             text = module(m.group(1)[len(prefix):])
-            assert headings(text)[0][1] != m.group(2), e
+            assert headings(text)[0][1] != m.group(2).strip(), e
     assert seen > 30, seen
     for f in ("mockups", "command-design", "contract-design", "playable-prototype"):
         assert "- new TASK-014 %sinterface/%s.md What this variant is" % (prefix, f) in entries, f
@@ -393,7 +396,8 @@ EXCUSED_SECTIONS = {
 def test_each_excused_variant_section_is_pinned(rel, title):
     """The trace exceptions' lead (HARDENING Stage B3; Review A, TASK-014, should-fix 3): each variant-file section a
     `new` entry excuses is fixed here, so a paragraph added to it, or a copy of a passage into it, fails in CI; and every
-    `new` entry on a variant file is one of these sections."""
+    `new` or `reword` entry on a variant file is one of these sections, its heading stripped as trace-check.py strips
+    it."""
     text = module(rel)
     lines = text.split("\n")
     start = lines.index("### " + title)
@@ -406,7 +410,7 @@ def test_each_excused_variant_section_is_pinned(rel, title):
     body = "\n".join(lines[start:end]).rstrip()
     assert (len(body), hashlib.sha256(body.encode("utf-8")).hexdigest()) == EXCUSED_SECTIONS[(rel, title)], len(body)
     prefix = "bridge/cursor-bridge/workflow/phases/"
-    entries = [m.group(1)[len(prefix):] + " " + m.group(2) for m in
-               (re.match(r"^- new \S+ (\S+\.md) (.+)$", l) for l in read(EXCEPTIONS).split("\n"))
+    entries = [m.group(1)[len(prefix):] + " " + m.group(2).strip() for m in
+               (re.match(r"^- (?:new|reword) \S+ (\S+\.md) (.+)$", l) for l in read(EXCEPTIONS).split("\n"))
                if m and m.group(1).startswith(prefix + "interface/")]
     assert sorted(entries) == sorted("%s %s" % k for k in EXCUSED_SECTIONS), entries
