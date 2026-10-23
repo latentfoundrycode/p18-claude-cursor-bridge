@@ -268,7 +268,8 @@ def test_r006_the_inspect_and_test_steps_divide_every_check():
     assert "the trait *performance budgets* carries the floor (§6.8)" in TEXT
     assert "The inspect step is every other check or review, before the tests or after them" in TEXT
     assert "the reviewer passes (such as the design auditor the trait *has screens* carries)" in TEXT
-    assert "The merge gate's conditions (step 8) belong to the core and offer no point" in TEXT
+    assert ("The merge gate's conditions (founding rule N6; the delegation loop applies them at its step 8) belong to "
+            "the core and offer no point") in TEXT
     assert "a CI check a conditional workflow needs is added at `configuration.items`" in TEXT
     assert ("the scope check, the diagram check, the boundary log, the triage of the builder's assumptions, the "
             "reviewer passes (such as the design auditor the trait *has screens* carries), the secret scan and the "

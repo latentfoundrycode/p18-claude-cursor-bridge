@@ -57,7 +57,7 @@ Both reviewers treat as a gate-integrity flag: raising a `max` (or lowering a `m
 
 ## 5. Optimization at stage close — the performance lens of the same pass
 
-The stage-close pass (supervisor Phase 6 step 9) gains a second lens beside duplication. `refactor-scout` receives, in addition to its usual inputs, the latest benchmark results, the baseline, the budgets, and a profile of each budgeted operation (`scripts/profile.ps1 <benchmark>` writes `bench/profiles/<benchmark>.txt`). It looks for:
+The stage-close pass (the delegation loop's step 9, `~/.claude/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md`) gains a second lens beside duplication. `refactor-scout` receives, in addition to its usual inputs, the latest benchmark results, the baseline, the budgets, and a profile of each budgeted operation (`scripts/profile.ps1 <benchmark>` writes `bench/profiles/<benchmark>.txt`). It looks for:
 
 - a budget that is failing or within its tolerance band of failing;
 - a hot spot in a profile that the stage's diff introduced or touched;

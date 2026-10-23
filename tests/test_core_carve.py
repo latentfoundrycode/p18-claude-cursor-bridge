@@ -152,8 +152,10 @@ NOTES = [
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the eleven passages of the six rewords the carve, TASK-012 and TASK-014 declare, so an increment that excuses anything more changes this
-    test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+    excused ones exactly the eleven passages of the five `reword` entries the carve (TASK-010), TASK-012, TASK-014
+    and TASK-015 declare (three in the core's "Main and conditional workflows", three standing rules, one each in the
+    design gate and the design-tooling flow, three in the change cycle), so an increment that excuses anything more
+    changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
     have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
