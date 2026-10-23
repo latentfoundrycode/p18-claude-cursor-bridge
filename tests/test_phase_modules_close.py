@@ -397,11 +397,15 @@ EXCUSED_SECTIONS = {
 @pytest.mark.parametrize("rel,title", sorted(EXCUSED_SECTIONS))
 def test_each_excused_variant_section_is_pinned(rel, title):
     """The trace exceptions' lead (HARDENING Stage B3; Review A, TASK-014, should-fix 3): each variant-file section a
-    `new` entry excuses is fixed here, so a paragraph added to it, or a copy of a passage into it, fails in CI; and every
-    `new` or `reword` entry on a variant file is one of these sections, its heading stripped as trace-check.py strips
-    it."""
+    `new` entry excuses is fixed here, so a paragraph added to it, or a copy of a passage into it, fails in CI; the
+    file has one heading of that title, at any level, since trace-check.py excuses a passage under every heading the
+    entry's title names, so a second section of that name would be excused unpinned (stage B3's review, round 3,
+    Review A tests); and every `new` or `reword` entry on a variant file is one of these sections, its heading stripped
+    as trace-check.py strips it."""
     text = module(rel)
     lines = text.split("\n")
+    same_title = [l for l in lines if re.match(r"^#{1,6} ", l) and l.split(" ", 1)[1].strip() == title]
+    assert same_title == ["### " + title], same_title
     start = lines.index("### " + title)
     end = len(lines)
     for i in range(start + 1, len(lines)):

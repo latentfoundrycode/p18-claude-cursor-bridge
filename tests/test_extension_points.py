@@ -36,8 +36,8 @@ S64 = [
     ("Intake", "Additional requirement sources", "intake.requirement-sources"),
     ("Intake", "target environment", "intake.target-environment"),
     # The two refinements of §6.4's list: §6.5 names the kind of performance budget and the delivery
-    # kind as values a type workflow or sub-workflow sets, and the core settles both at intake
-    # (supervisor.md, Phase 1), before design and planning act on them.
+    # kind as values a type workflow or sub-workflow sets, and intake settles both
+    # (workflow/phases/intake.md), before design and planning act on them.
     ("Intake", "kind of performance budget", "intake.budget-kind"),
     ("Intake", "kind of delivery", "intake.delivery-kind"),
     ("Design", "Additional design sections", "design.sections"),
