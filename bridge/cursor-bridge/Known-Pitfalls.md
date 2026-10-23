@@ -489,7 +489,7 @@ it applies.**
 ### KP-053 — The Bash tool ends a background command after thirty minutes unless its own timeout is set
 - **Surfaced:** the TDP, 2026-10-06 (TASK-157 r13d; gotcha 22): the builder, launched through `bridge-run.py --limit 7200` in the background, was killed at thirty minutes, mid-work and with no report, before the launcher's limit.
 - **Cause (observed once, not settled):** the TDP's note reads it as the app's own default timeout for a background command; reAngle's ISS-008 records a background task of 2026-10-02 that ran six hours with no timeout of its own, so the behaviour is not the same in every case (a version, a kind of command, or the app's state may decide), and no record shows a `timeout` of 7,200,000 ms honoured yet.
-- **Correction (a precaution):** the launch sets the Bash tool's `timeout` to the kind's cap in milliseconds (supervisor.md step 3; `14400000` for a builder, `7200000` for a review or a watch, `3600000` for a suite, the same on a wake-timer); a run that ended without `bridge-run: exit` in its `.err` file was killed from outside and is inspected as step 3b says; the trial of 2026.10.11b records whether a launch with the timeout passes thirty minutes.
+- **Correction (a precaution):** the launch sets the Bash tool's `timeout` to the kind's cap in milliseconds (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 3; `14400000` for a builder, `7200000` for a review or a watch, `3600000` for a suite, the same on a wake-timer); a run that ended without `bridge-run: exit` in its `.err` file was killed from outside and is inspected as step 3b says; the trial of 2026.10.11b records whether a launch with the timeout passes thirty minutes.
 - **Applies:** every background launch through the Bash tool. The sign: a run ending at exactly thirty minutes with no exit line.
 
 ### KP-054 — The installed product, run from the Workspace, ran the development code against the owner's live data
@@ -537,7 +537,7 @@ it applies.**
 ### KP-061 — A test suite over ten minutes ended inside a subagent's foreground call
 - **Surfaced:** reAngle, 2026-10-11 (the walk of release A5, PR 90): `test-runner` ran the project's suite in its own foreground call; the Bash tool ended the command at ten minutes, before the suite had finished, and the result was lost.
 - **Cause:** the Bash tool's foreground limit of 600 seconds, a different limit from the thirty-minute end of a background command (KP-053); a subagent cannot raise it past ten minutes.
-- **Correction:** a suite that takes more than ten minutes runs through the launcher in the background (`bridge-run.py --limit auto --kind test`), its output to a file under `run/`, with the Bash tool's `timeout` at the suite cap; `test-runner` reads the file afterwards and never starts such a suite itself (supervisor.md step 4, test-runner.md; release 2026.10.11d).
+- **Correction:** a suite that takes more than ten minutes runs through the launcher in the background (`bridge-run.py --limit auto --kind test`), its output to a file under `run/`, with the Bash tool's `timeout` at the suite cap; `test-runner` reads the file afterwards and never starts such a suite itself (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 4; test-runner.md; release 2026.10.11d).
 - **Applies:** every project whose suite runs longer than ten minutes. The sign: a `test-runner` report that ends with a timeout and no result.
 
 ### KP-062 — A design critique ran 45 rounds on one change, and the four-round ceiling stopped nothing

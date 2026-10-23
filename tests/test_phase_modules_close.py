@@ -75,8 +75,9 @@ SURVIVAL = {
         "`docs/RUN_PARAMETERS.md`: whether the refactoring pass runs before a stage closes, and `Stage pause`, which item 6 "
         "obeys;",
         "at a stage close, the stage's section of `docs/BUILD_PLAN.md`, whole, with its `Demonstration:` line, and, while "
-        "the stage review runs, its files under `run/review/` (`STAGE-<name>.diff` with its parts, and "
-        "`REVIEW-STAGE-<name>.err`);",
+        "the stage review runs, its files under `run/review/` (`STAGE-<name>.diff` with its parts, "
+        "`SCOPE-STAGE-<name>.md` and `REVIEW-STAGE-<name>.err`), each reviewer's verdict kept in "
+        "`run/supervisor/in-flight.md` as it returns, and the snapshot's hash, kept there at the launch;",
         "the records the items read and write, whole: `docs/BUILDER_NOTES.md`, the entries of `docs/CHANGES.md` since the "
         "last reflection point, the stage's section of `docs/HARDENING.md`, and under `Documents/` the Issues document, "
         "the Feedback document, the Project Summary and, once it exists, the User Manual.",

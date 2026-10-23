@@ -78,10 +78,14 @@ SURVIVAL = {
         "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of "
         "`run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the "
         "background runs that will wake you and what waits for the owner; while Review B runs the status file is not "
-        "written and the position is kept in `in-flight.md` (step 8);",
+        "written and the position is kept in `in-flight.md` (step 8), with the snapshot's hash `review-guard.py "
+        "snapshot` printed, written there at the launch, since the hash `verify` prints must equal it;",
         "the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` with every revision of it, and "
         "each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report "
         "holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);",
+        "for a fix (step 7, the `root-cause-first` procedure), `docs/debug/BUG-<nnn>.md`, whole: its hypotheses and the "
+        "diagnostic rounds counted toward a resolution round; the fix brief `handoff/BUG-<nnn>.md` with every revision "
+        "and report, as for a task; and `git grep DEBUG-BUG-<nnn>` for instrumentation not yet removed;",
         "`docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass "
         "runs and whether increments run in parallel, and the models the delegate command and Review B name;",
         "the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, "
