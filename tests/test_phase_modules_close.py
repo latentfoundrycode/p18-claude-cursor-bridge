@@ -396,13 +396,15 @@ EXCUSED_SECTIONS = {
 
 def trace_headings(lines):
     """(index, level, title) of each heading as trace-check.py reads one: up to three spaces before the hashes
-    (its HEADING_RE), the title stripped, and no line inside a fenced block (its FENCE_OPEN_RE, closed by a run of
-    the same character at least as long)."""
+    (its HEADING_RE), the title stripped, and no line inside a fenced block (its FENCE_OPEN_RE, closed by a line that
+    starts with a run of the same character at least as long, whatever follows the run, as trace-check.py closes
+    one)."""
     out, fence = [], None
     for i, line in enumerate(lines):
         stripped = line.strip()
         if fence:
-            if re.match(r"^%s{%d,}\s*$" % (re.escape(fence[0]), fence[1]), stripped):
+            c = re.match(r"^(`{3,}|~{3,})", stripped)
+            if c and c.group(1)[0] == fence[0] and len(c.group(1)) >= fence[1]:
                 fence = None
             continue
         f = re.match(r"^(`{3,}|~{3,})", stripped) if line.lstrip().startswith(("```", "~~~")) else None
@@ -429,7 +431,7 @@ def test_each_excused_variant_section_is_pinned(rel, title):
     found = trace_headings(lines)
     same_title = [(lines[i], level) for i, level, t in found if t == title]
     assert same_title == [("### " + title, 3)], same_title
-    start = lines.index("### " + title)
+    start = [i for i, _level, t in found if t == title][0]
     end = len(lines)
     for i, level, _t in found:
         if i > start and level <= 3:
