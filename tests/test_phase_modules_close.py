@@ -394,19 +394,47 @@ EXCUSED_SECTIONS = {
 }
 
 
+def trace_headings(lines):
+    """(index, level, title) of each heading as trace-check.py reads one: up to three spaces before the hashes
+    (its HEADING_RE), the title stripped, and no line inside a fenced block (its FENCE_OPEN_RE, closed by a line that
+    starts with a run of the same character at least as long, whatever follows the run, as trace-check.py closes
+    one)."""
+    out, fence = [], None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if fence:
+            c = re.match(r"^(`{3,}|~{3,})", stripped)
+            if c and c.group(1)[0] == fence[0] and len(c.group(1)) >= fence[1]:
+                fence = None
+            continue
+        f = re.match(r"^(`{3,}|~{3,})", stripped) if line.lstrip().startswith(("```", "~~~")) else None
+        if f:
+            fence = (f.group(1)[0], len(f.group(1)))
+            continue
+        h = re.match(r"^ {0,3}(#{1,6}) (.*)$", line)
+        if h:
+            out.append((i, len(h.group(1)), h.group(2).strip()))
+    return out
+
+
 @pytest.mark.parametrize("rel,title", sorted(EXCUSED_SECTIONS))
 def test_each_excused_variant_section_is_pinned(rel, title):
     """The trace exceptions' lead (HARDENING Stage B3; Review A, TASK-014, should-fix 3): each variant-file section a
-    `new` entry excuses is fixed here, so a paragraph added to it, or a copy of a passage into it, fails in CI; and every
-    `new` or `reword` entry on a variant file is one of these sections, its heading stripped as trace-check.py strips
-    it."""
+    `new` entry excuses is fixed here, so a paragraph added to it, or a copy of a passage into it, fails in CI; the
+    file has one heading of that title, at any level and indented as trace-check.py allows, since trace-check.py
+    excuses a passage under every heading the entry's title names, so a second section of that name would be excused
+    unpinned (stage B3's review, round 3, Review A tests; BUG-019's Review A); the section ends where trace-check.py's
+    reading ends it, a heading in a fenced block not counting; and every `new` or `reword` entry on a variant file is
+    one of these sections, its heading stripped as trace-check.py strips it."""
     text = module(rel)
     lines = text.split("\n")
-    start = lines.index("### " + title)
+    found = trace_headings(lines)
+    same_title = [(lines[i], level) for i, level, t in found if t == title]
+    assert same_title == [("### " + title, 3)], same_title
+    start = [i for i, _level, t in found if t == title][0]
     end = len(lines)
-    for i in range(start + 1, len(lines)):
-        h = re.match(r"^(#{1,6}) ", lines[i])
-        if h and len(h.group(1)) <= 3:
+    for i, level, _t in found:
+        if i > start and level <= 3:
             end = i
             break
     body = "\n".join(lines[start:end]).rstrip()
