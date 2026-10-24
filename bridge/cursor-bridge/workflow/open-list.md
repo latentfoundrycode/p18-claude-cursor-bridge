@@ -65,9 +65,9 @@ A trait is a property that adds work whatever the product type. A part may have 
 | installable | Installable | Delivered as something the user installs | yes | release B |
 | performance-budgets | Performance budgets | Speed, size or frame-rate targets are requirements | yes | release B |
 | external-services | External services | Depends on services run by others | yes | release B |
-| spends-money | Spends money | Its actions cost real money (paid APIs, purchases) | no | release B |
-| long-running-process | Long-running process | Keeps a process running between uses (a server, a watcher) | no | release B |
-| ai-models | AI models | Its results come from models, so correctness is judged by evaluation rather than by exact tests | no | release B |
+| spends-money | Spends money | Its actions cost real money (paid APIs, purchases) | yes | release B |
+| long-running-process | Long-running process | Keeps a process running between uses (a server, a watcher) | yes | release B |
+| ai-models | AI models | Its results come from models, so correctness is judged by evaluation rather than by exact tests | yes | release B |
 | personal-data | Personal data | Holds data about people: accounts, sign-in, privacy, deletion | no | when a project first needs it |
 | multiplayer | Multiplayer | Several people interact live through a server | no | release E, with the Roblox sub-workflow |
 
