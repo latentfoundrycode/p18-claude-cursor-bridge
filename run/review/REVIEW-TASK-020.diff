@@ -1,0 +1,489 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index a282eca..455788c 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.18a",
+-  "generated": "2026-10-25 00:45",
++  "generated": "2026-10-25 01:36",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -105,7 +105,7 @@
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/workflow-check.py": "ff87680ca972eb50abbda822443420f7c650b5fee9e8b607cdf9e6fcf27c9d73",
+     "cursor-bridge/workflow/extension-points.md": "b3973253f2bdf38fe9f329f1a0fb13604a221453c1d7f7bdfbd227013c0592d0",
+-    "cursor-bridge/workflow/open-list.md": "73f06206c2aab07ef2a8f63958a9cd2438198d743190133ede92eca308d6924d",
++    "cursor-bridge/workflow/open-list.md": "f1963a1ccd08b412cb233fdc5a109ef697501103da91f0c3d5dc8a617cc5863f",
+     "cursor-bridge/workflow/phases/change-cycle.md": "8b4c12bd4afc80a4adcb2dfbd4ddecb0b5d20848805addd41daf6f04eeb3b37a",
+     "cursor-bridge/workflow/phases/configuration.md": "4bcb7792438ac85fa7b3246d70c8a0e042d6f0860670e0649c4bf11a4ddf4142",
+     "cursor-bridge/workflow/phases/delegation-loop.md": "baa4e3203e2ea4ab6ee5962e07c92e2ab4bff7e6ab41b8fb0dddb4703ed73f7e",
+@@ -122,7 +122,7 @@
+     "cursor-bridge/workflow/phases/reflection.md": "101ce7f3528f8f4624432b8ae1396bc799c12c0860174fafbe19b0c9042ae121",
+     "cursor-bridge/workflow/phases/run-parameters.md": "7d37e1c3ab4dac2b2069b80998b28e6dfe1f8c68a849afa7a3bf415a2a9f73ed",
+     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
+-    "cursor-bridge/workflow/trace-exceptions.md": "e4c7e579d1d4b36d0b1758eb43499e8e037474396ee145910ad2e7eae8a10e39",
++    "cursor-bridge/workflow/trace-exceptions.md": "12bce943c469aa911a8f133a377bec19b4e3508a697af8be1e16b3d7630d4d6e",
+     "cursor-bridge/workflow/traits/ai-models.md": "05724b8355c2e0118ce8ee3c24a92729f342ea05a2dccfb836a250dc42a4216f",
+     "cursor-bridge/workflow/traits/external-services.md": "83f325922b7d816d5040e99a58f0d31e5dc05ccf5324fa3f1ce999759e068034",
+     "cursor-bridge/workflow/traits/has-screens.md": "665507e53b95f5c63feb052e0a61e6ebdfeca2edf81939ade91fb7ca8dfde82b",
+@@ -130,6 +130,8 @@
+     "cursor-bridge/workflow/traits/long-running-process.md": "8e02916276f8348b5b8dbe7cc8edae7ad7ec4a6224400094c8259b43d75291a7",
+     "cursor-bridge/workflow/traits/performance-budgets.md": "f168b3bfa513a58520a18864bdaa618b6cfb0176b1a36a709e37bde48abd000c",
+     "cursor-bridge/workflow/traits/spends-money.md": "adaf76012bc4d1a15c7b417c0b2cdb56df1ceb4a8dff5f9056da860e48215a39",
++    "cursor-bridge/workflow/types/own-computer.md": "ab6f291d4daa1b6c544b067341bef3be8a0d7abf5c9c19da9e2f2e205d8b655f",
++    "cursor-bridge/workflow/types/own-computer/local-service.md": "146b1179b8558743b6e922f2918386c10fe0efcc575c95c02c10299781a55005",
+     "cursor-bridge/workflow/types/web-app.md": "a2449437c0478bb7cc892655f666a3b2f83e93bd76ecc753da01ebfdd86188b6",
+     "cursor-bridge/workflow/types/web-app/local-web-app.md": "42e71c3d697a80e1a593733de42b5a6b4f8d442fa39910eb43ef0c25bbf6b852",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+diff --git a/bridge/cursor-bridge/workflow/open-list.md b/bridge/cursor-bridge/workflow/open-list.md
+index 9809030..8251a33 100644
+--- a/bridge/cursor-bridge/workflow/open-list.md
++++ b/bridge/cursor-bridge/workflow/open-list.md
+@@ -26,7 +26,7 @@ A product type answers one question: **how does the product reach its user?** Th
+ | mobile-app | Mobile app | Installed on a phone or tablet from an app store | Mobile App Development | has-screens, installable | no | when the first project of this type arrives |
+ | web-app | Web app | Used in a browser; keeps data for its users (accounts, saved state, runs, orders). Without a sub-type it runs on a server the owner operates and is delivered by deployment | Web App Development | has-screens, personal-data | yes | release B |
+ | website | Website | Used in a browser; presents content; keeps no data for its users | Website Development | has-screens | no | when the first project of this type arrives |
+-| own-computer | Software on your own computer | Installed and run on the user's own computer, and met through something other than a browser page | Own-Computer Software Development | installable | no | release B |
++| own-computer | Software on your own computer | Installed and run on the user's own computer, and met through something other than a browser page | Own-Computer Software Development | installable | yes | release B |
+ | backend-service | Backend service | Runs on a server, has no screen, serves other software over a network | Backend Service Development | long-running-process | no | when the first project of this type arrives |
+ | library | Library | Code that other programs include; delivered as a package | Library Development | — | no | when the first project of this type arrives |
+ | video-game | Video game | Built around a real-time play loop | Game Development | has-screens, performance-budgets | no | release E |
+@@ -46,7 +46,7 @@ A sub-type says more precisely what a part of its product type is, where that ch
+ | gui | GUI | own-computer | Met through a window | GUI Software | has-screens, installable | no | when the first project of this type arrives |
+ | cli | CLI | own-computer | Met through a terminal | CLI Software | installable | no | when the first project of this type arrives |
+ | pipeline | Pipeline | own-computer | Met through nothing: it runs jobs unattended and its output is files or records | Pipeline Software | installable | no | when the first project of this type arrives |
+-| local-service | Local service | own-computer | Other software on the same computer calls it through a protocol, such as an MCP server; its interface is a contract | Local Service Software | installable, long-running-process | no | release B |
++| local-service | Local service | own-computer | Other software on the same computer calls it through a protocol, such as an MCP server; its interface is a contract | Local Service Software | installable, long-running-process | yes | release B |
+ | roblox | Roblox | video-game | A game built for and published on Roblox | Roblox Game | has-screens, performance-budgets, multiplayer | no | release E |
+ | claude-code-extension | Claude Code extension | host-extension | Runs inside Claude Code, through its commands, agents, hooks and settings (the bridge itself) | Claude Code Extension | installable | no | release B |
+ | browser-extension | Browser extension | host-extension | Runs inside a web browser, through the browser's extension interfaces | Browser Extension | installable | no | when the first project of this type arrives |
+diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
+index edd8caa..aec1d53 100644
+--- a/bridge/cursor-bridge/workflow/trace-exceptions.md
++++ b/bridge/cursor-bridge/workflow/trace-exceptions.md
+@@ -93,3 +93,5 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
+ - new TASK-019 bridge/cursor-bridge/workflow/types/web-app.md Set at intake.delivery-kind
+ - new TASK-019 bridge/cursor-bridge/workflow/types/web-app.md Add at project-end.delivery for web-deployment
+ - new TASK-019 bridge/cursor-bridge/workflow/types/web-app/local-web-app.md Set at intake.delivery-kind
++- new TASK-020 bridge/cursor-bridge/workflow/types/own-computer.md Add at intake.questions
++- new TASK-020 bridge/cursor-bridge/workflow/types/own-computer/local-service.md Add at interface.variants
+diff --git a/bridge/cursor-bridge/workflow/types/own-computer.md b/bridge/cursor-bridge/workflow/types/own-computer.md
+new file mode 100644
+index 0000000..93edeb3
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/types/own-computer.md
+@@ -0,0 +1,5 @@
++# Software on your own computer
++
++## Add at intake.questions
++
++Software on your own computer has four sub-types, told apart by what its user meets it through: a window (GUI), a terminal (CLI), nothing, the part running jobs unattended with files or records as its output (pipeline), or other software on the same computer calling it through a protocol (local service). Ask which, where the owner's description leaves it open. A part met through several, such as a local service with administrative commands, takes the sub-type of the surface it exists for, and the interface phase runs a variant for each of its other kinds of interface; a part that exists for two equally fits two sub-types equally, which pauses the project as the classification at intake says.
+diff --git a/bridge/cursor-bridge/workflow/types/own-computer/local-service.md b/bridge/cursor-bridge/workflow/types/own-computer/local-service.md
+new file mode 100644
+index 0000000..0d900a5
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/types/own-computer/local-service.md
+@@ -0,0 +1,5 @@
++# Local service
++
++## Add at interface.variants
++
++A part of this sub-type runs the interface phase's contract design variant for the protocol other software calls it through, `~/.claude/cursor-bridge/workflow/phases/interface/contract-design.md`: the first variant this sub-workflow activates, an addition and never a replacement. Where the part also has administrative commands a person types, it runs the command design variant for them too, `~/.claude/cursor-bridge/workflow/phases/interface/command-design.md`. Each variant is added for its own kind of interface, so a part with both runs both, never one in place of the other.
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 5f55232..d045860 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -283,6 +283,18 @@ Every lead above that this revision was to place has its increment in docs/BUILD
+ - **Review A, round 10 (the confirming read of 457cfab): REJECT, one blocking and one consider, both taken.** The live restore in step 6 was never proved: a restore over a store a migration had changed could stop partway or leave the migration's tables in place and still report success, and the previous release's check cannot see missing or mixed records. Now the restored store is read back against the backup as step 3 read the copy, only a match being a restore that has succeeded, a mismatch a failed one. Each backup is kept for as long as the design's data-retention section says, the owner's choice, a design that names no period naming one before the first deployment. Review A also records that its APPROVE of affa927 read the added clause of step 5 and not the two sentences after it, which Review B's round 4 caught.
+ - **Review A, round 11 (the confirming read of de1ae69): APPROVE, one consider, taken.** The previous release's check in step 6, read as step 5's, could start a second way back on an accepted marker; now an accepted marker there is a failed check, which contains the product and starts no second way back.
+ 
++- **Review B, round 5: APPROVE,** on the whole change after Review A's rounds 10 and 11; merged as PR #70.
++
++### TASK-020, the own-computer type workflows (2026-10-25)
++- **Checkpoint run (step 4):** tests/test_type_own_computer.py and tests/test_b3_least_confident.py, with the TDP fixture, run once against 8ba0e78 in a read-only worktree: 14 failed, 92 passed; the new file's one passing test there is the guard that workflow-check.py passes over workflow/, which held before the files existed, and the two new pins and the derivation fail.
++- **The type names its sub-types at intake.questions** (intake already classifies against the open list and pauses on a misfit): the question that tells the four apart by what the user meets, and a part met through several taking the sub-type of the surface it exists for; one that exists for two equally pauses by intake's own rule, which the text points at and does not restate.
++- **Neither file sets a delivery kind:** the Done when names none, and installable's intake passage confirms a part's kind with the owner where no type or sub-type sets it (extension-points.md).
++- **Carried in this pull request:** the owner's Parallel increments: on (2026-10-25, in their words, docs/RUN_PARAMETERS.md), with test_r001_run_parameters_owner_values and the INVENTORY rows; outside the increment's Scope by the owner's decision, so that it needs no gate of its own.
++- **The TDP's status file measured (FIX-002's lead, Review A):** 11,413 characters and 43 lines today, with no `Workflows:` line yet; the fixture's line is 159 characters, so the file will hold about 11,573 of inventory-check's 12,000 once it calibrates, about 430 below the cap, not the 100 the lead feared. Measured 2026-10-25 by count only; nothing of the file is copied here (rule 54). The lead is closed.
++- **Lead (Review A, TASK-020):** phases/interface.md, "Which variants a part runs", gives administrative commands beside a service's protocol as a case no written conditional workflow activates; local service now activates the command design for them, so the example holds only for other types (a backend service). The outcome is the same (the variant runs); the sentence is reworded when its unit next pays a `reword`.
++- **Review A, round 1: APPROVE (0/2/5),** both should-fixes and four considers taken: the parallel records say no increment is marked `Parallel: yes`, so nothing runs concurrently until a plan revision marks some; the TDP's status size measured; the sub-workflow names no project and calls the contract design the first of its variants; the test's docstring claims only what it checks; the run-parameters row's date.
++- **Lead (TASK-018, still open):** a local service's lifetime against N1's idle stop, and a test instance's port of its own; TASK-020's Done when does not carry them, so they stay for the next plan revision, with the long-running-process trait.
++
+ ### Placed by the stage B4 plan revision (2026-10-24, subject `traits`)
+ The reality check before TASK-017's first edit (run/supervisor/task017-reality-check.md) is recorded in docs/DESIGN_CRITIQUE.md under the subject; its findings are in TASK-017's Scope and Done when. Leads this revision places: FIX-004's lead above (item 2's pins cover the phase modules only, the trait and type files' entries excused by nothing yet) is **TASK-017**'s and **TASK-018**'s, whose Scopes hold tests/test_b3_least_confident.py and whose Done when name the derivation of every new trace entry; stage B3's lead for planning.md's project-end pointer (planning.md:109) is **TASK-035**'s, as the pace revision placed it (above); the open list's headroom and its step 2 rewording stay the briefs' checks as recorded under stage B2. What stays in the main workflow with no increment (INVENTORY, Decisions): the configurator paragraph's performance-floor clause, the reviewer-routing table's UI-bearing row, intake's security-context paragraph, planning's two-critic paragraph with its UI clause, project end's User Manual item with its install and command-reference chapters, run-parameters.md's template fence, the refactoring pass's performance inputs and optimization candidates, the promotion pass's Performance-Patterns entries, the change cycle's packaging re-run, reflection item 2b's clause, interface.md's sentences naming what activates each variant, step 6's title and first sentence.
+ - **Lead (Review B, subject `traits`, round 1):** run-parameters.md's template gloss `n/a (not a desktop application)` misreads a command-line tool or a local server when read alone; the parameter's own item names both. Check: reword the gloss at the next edit of that fence that pays its `reword` anyway (the fence is one trace unit under a whole-phase baseline heading). Landing, in TASK-034's Done when: TASK-034 edits the paragraph directly after the fence (run-parameters.md:70), a baseline unit under the same heading, so that increment pays the whole-phase `reword` and the gloss changes with it (the resolution round of 2026-10-24, both critics voting to leave it until then).
+@@ -874,7 +886,7 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ 1. **The workflow check on real conditional workflows.** Twelve review rounds tested it on fixtures written to break one rule each; no real type workflow, sub-workflow or trait file exists yet, and the first ones (TASK-017 to TASK-021) will use headings, fences and Set values in combinations no fixture holds. Check: when TASK-017's trait files merge, the CI step's run over bridge/cursor-bridge/workflow passes, and each new file gets a FILE_EXACT-style case of its own whole output, written by the supervisor before Review A.
+ 2. **The judges on the other projects' status files.** inventory-check.py and conformance-check.py read the `Workflows:` lines only on fixtures and on this project's own status file; the TDP, reAngle and the video factory have status files of their own shape (long histories, Windows line endings, other field orders). Check: a fixture test, written before stage B3's first delegation: a copy of each project's real status file with a constructed `Workflows:` line after its `Phase:` line, run through both judges; any finding not about the line itself is a defect of the judges. Stage B4 replaces the constructed lines with each project's classification and its committed fixture: TASK-019 for reAngle and the video factory, TASK-020 for the TDP (BUILD_PLAN.md:214-233); TASK-021 classifies the bridge itself.
+    **Settled by FIX-002 (2026-10-19):** tests/test_b2_least_confident.py, with shapes built from the three real files rather than copies of them (their records and computer paths stay out of this public repository; INVENTORY Decisions): each shape keeps its file's line endings, its field names in their order (27, 26 and 23), its headed sections, its size and non-ASCII text, with bullets that start like `Phase:` and `Workflows:`. Both judges pass a valid constructed line with no other finding (conformance-check's NOTE rows equal those of make_workspace's minimal status file in the same environment), and report a broken one (an unknown name, the line after another field, no traits) with its reason and nothing else about the file. Nine mutants of the judges and of the shapes, each killed (run/supervisor/fix002_mutants.py, on a scratch copy). The real files are bounded (30 to 43 lines, about 9,500 to 11,800 characters), not long histories as written above. No defect of the judges found.
+-   - **Lead (Review A, FIX-002):** the TDP's real file is about 11,800 characters against inventory-check's 12,000 cap; its real Workflows line (TASK-020) leaves it about 100 characters from STATUS TOO LONG. Check: TASK-020's brief measures the file with its line and names the margin.
++   - **Lead (Review A, FIX-002):** the TDP's real file is about 11,800 characters against inventory-check's 12,000 cap; its real Workflows line (TASK-020) leaves it about 100 characters from STATUS TOO LONG. Check: TASK-020's brief measures the file with its line and names the margin. Closed by TASK-020: about 430 below the cap (TASK-020's section).
+    - **Lead (Review A, FIX-002):** conformance-check prints a status file's Stage text as it is in a NOTE; on Windows piped output goes out in the console code page, so an em dash there arrives as U+FFFD under a UTF-8 reader (the Workflows-line rows are ASCII-escaped and unaffected). Check: write NOTE text through the same escape as the other rows, at the next change of conformance-check.py.
+    - **Lead (Review A, FIX-002, unverifiable from the Workspace):** the shapes are as good as the reading of the real files (plain `Name: value` fields at line starts, no field inside a table or fence, reAngle alone CRLF, no leading byte but `#` or a BOM). Check: one local run of both judges over the three real files with a constructed line, results not committed; stage B4's fixtures (TASK-019, TASK-020) are the committed form.
+ 3. **The bridge's own status line fails for the stated reasons only.** `workflow-check.py --status docs/PROJECT_STATUS.md` exits 1 with the two (f) findings for the unwritten Host Extension Development and Claude Code Extension and a FLAG for Installable, and the CI run never covers the bridge's own status file (BUILD_PLAN.md:84); TASK-017 writes Installable (the FLAG goes) and TASK-021 the type and sub-type (BUILD_PLAN.md:242, `RESULT: OK`). Nothing pins that output, so a third finding would go unseen. Check: a test, written before stage B3's first delegation, that pins the whole output of that run; TASK-017's brief and TASK-021's take the test file into their Scope and change the pin (the FLAG dropped, then `RESULT: OK`).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 4471001..4933e17 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -30,6 +30,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The first trait files | has screens, installable, performance budgets and external services, each a `#` title and `## Add at <point key>` sections: the phase modules' and the plan critic's conditional passages moved there unit by unit (three split at the sentence, each split's parts equal to the baseline unit in its sentence order), new text only in a `###` sub-section after the moved units, each with a `new` entry; has screens activates the mockup variant and gathers the screen inventory, the interface ruleset, the design tooling, the frozen-rule brief constraint, the design auditor and the observability criteria and tests (founding rules N7 and N9 stay in the core); installable the delivery questions, the Delivery section, the code-signing escalation, the packaging stage with the command reference and the delivery for the kinds `installer` and `install-script`, each scoped to those kinds; performance budgets the budgets at intake, their mechanisms in the design, the benchmark increment, its lens and the benchmark floor; external services the contract capture and its lens, and as new checks the bounded remote wait and the deployed layout tested before any deployment; the registry widens `planning.stages` to increments and adds `planning.acceptance-criteria`; the plan critic keeps its design lenses and flags a missing trait; design's trait gate carries the traits' plan lenses and asks a trait added there its questions; the four open-list rows are written | bridge/cursor-bridge/workflow/traits/*.md; bridge/cursor-bridge/workflow/extension-points.md; .../phases/*.md; bridge/agents/plan-critic.md | tests/test_traits_existing.py; trace-check.py (424 passages, 0 dropped, 14 excused); tests/test_b3_least_confident.py (every excused trait section pinned) | release B (TASK-017) |
+ | The new trait files | spends money, long-running process and AI models, new text throughout, each a `#` title and `## Add at <point key>` sections, each section under its own `new` entry: spends money asks at intake which actions cost money, on which platform and account, their worst case and the owner's cap, every paid action approved first, a paid call being a remote call whose wait external services bounds (so a part that pays a remote service has that trait too), keeps paid results in a store nothing discards, records the cap, keeps paid actions out of builder runs, runs dry on a copy with a stand-in provider first, and checks that no paid action ran unapproved; long-running process points at founding rule N1 (which stays in the core) and adds the start, stop and health procedure, a run that leaves nothing running and the check of it; AI models adds evaluation sets and thresholds in place of exact tests, an Evaluation design section, pinned models, recorded outputs and the evaluation on them | bridge/cursor-bridge/workflow/traits/spends-money.md; .../long-running-process.md; .../ai-models.md | tests/test_traits_new.py; tests/test_b3_least_confident.py (every section pinned) | release B (TASK-018) |
+ | The web-app type workflows | web app sets the delivery kind `web-deployment` and adds its delivery procedure (six steps, each after the one before it has succeeded: the owner's yes, naming the pause and the way back; the pause, in a mode in which the product still answers, seen to hold; the backup taken under it, outside the repository and the Workspace, proved by a restore to a copy read back against the live store, a migration rehearsed there, the copy then deleted, a failure resuming writes on the unchanged product; the deployment, the only place the live data is migrated; the pause seen to hold again, then a check that changes no user's data; the way back with writes held, a restore only where a migration began, only once the pause is seen to have held since the backup and only proved by reading the restored store back, a write that may have landed since, or a product with no write records, making the restore the owner's question, put with what each answer costs, the answer not ending the pause, the product put back into its mode or stopped wherever the marker is accepted, the previous release deployed only after the restore has succeeded); its sub-workflow local web app overrides the kind with `install-script`, so installable's procedure for that kind applies and the type's is left behind; the default traits stay in the open list alone | bridge/cursor-bridge/workflow/types/web-app.md; .../types/web-app/local-web-app.md | tests/test_type_web_app.py; tests/test_b3_least_confident.py (every section pinned) | release B (TASK-019) |
++| The own-computer type workflows | software on your own computer names its four sub-types at intake by what the user meets (a window: GUI; a terminal: CLI; nothing, jobs run unattended: pipeline; other software through a protocol: local service), a part met through several taking the sub-type of the surface it exists for; its sub-workflow local service adds the contract design variant at interface.variants and, where the part also has administrative commands (the TDP), the command design variant, each added for its own kind of interface; the default traits stay in the open list alone | bridge/cursor-bridge/workflow/types/own-computer.md; .../types/own-computer/local-service.md | tests/test_type_own_computer.py; tests/test_b3_least_confident.py (every section pinned) | release B (TASK-020) |
+ 
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+@@ -66,7 +67,8 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | Semgrep scans diff-aware on pull requests and pushes; the tree as it stood was audited once in full on 2026-10-16 (Semgrep 1.176.1, CI's four rulesets: 189 rules, 139 files): one finding, `os.chmod(dst, 0o755)` on the cursor-agent shim in bridge-install.py, accepted | the shim must be executable; 0o755 lets only its owner write it | 2026-10-16, supervisor | a release changes the rule packs or adds code outside a diff's reach — the full audit is re-run at each release |
+ | Pull requests from forks get no secrets, so the Socket step fails and the required check blocks them | the repository is the owner's alone; outside contributions are not expected | 2026-10-16, supervisor | outside contributions are wanted |
+ | Semgrep runs the OSS engine with explicit rulesets and no token | the bridge's own code has no SQL or web surface, where the Pro engine's taint analysis earns its place | 2026-10-12, owner | the bridge gains code with a SQL or web surface |
+-| The run parameters are recorded in docs/RUN_PARAMETERS.md alone: the owner's four answers (Stage pause, Refactoring pass and Parallel increments 2026-10-11; Merge authority 2026-10-12, its own row above), fixed by test_r001_run_parameters_owner_values; Installer verification follows the product type (n/a for a host extension); kind: private (project.json) | owner's run-parameter answers; one record, so no copy can drift from it (stage B1's review rounds 3 and 4) | 2026-10-11 and 2026-10-12, owner | the owner changes a run parameter |
++| The run parameters are recorded in docs/RUN_PARAMETERS.md alone: the owner's four answers (Stage pause and Refactoring pass 2026-10-11; Parallel increments 2026-10-11, off, and changed by the owner to on 2026-10-25, the row below; Merge authority 2026-10-12, its own row above), fixed by test_r001_run_parameters_owner_values; Installer verification follows the product type (n/a for a host extension); kind: private (project.json) | owner's run-parameter answers; one record, so no copy can drift from it (stage B1's review rounds 3 and 4) | 2026-10-11, 2026-10-12 and 2026-10-25, owner | the owner changes a run parameter |
++| Builders run concurrently under `Parallel increments: on` (the owner's word, 2026-10-25) only once TASK-028 and TASK-029 have merged; until then increments plan-check.py lists TOGETHER run one after the other. No increment of docs/BUILD_PLAN.md is marked `Parallel: yes` today, and plan-check.py lists TOGETHER only increments so marked, so nothing runs concurrently until a plan revision marks some (told to the owner, 2026-10-25) | two builders run two test suites at once on the owner's computer, which crashed during a flood of terminal windows while a builder ran the suite (ISS-011); TASK-028 (windowless launches) and TASK-029 (one heavy job at a time) are that issue's fix | 2026-10-25, supervisor (told to the owner) | TASK-028 and TASK-029 have merged and a plan revision marks increments `Parallel: yes` |
+ | Governance text is the supervisor's to write; programs are the builder's | §15 condition 3, keeping N4 intact | 2026-10-11, §15 | — |
+ | Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1) | a session must never load the half-edited bridge, and an install must never run unreleased code on a running project | 2026-10-11, §15 | — |
+ | Who decided is recorded: owner / supervisor / design(the plan) / maintainer; no agent recorded as a person | rule 51 | 2026-10-11 | — |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 022a528..261833e 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -1,22 +1,22 @@
+ # Project Status
+-Last updated: 2026-10-24
++Last updated: 2026-10-25
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at the merge of TASK-019 (PR #70); next is TASK-020
+-Last accepted: TASK-019 (PR #70, at its merge): the type workflow web app and its sub-workflow local web app, R-023 built (tests/test_type_web_app.py); before it TASK-018 (PR #69): the trait files spends money, long-running process and AI models; TASK-017 (PR #68): the four trait files, R-010 and R-016 to R-019 built; the stage B4 plan revision (PR #67, approved by the owner on 2026-10-24), TASK-022 (PR #66, R-026 built), FIX-004 (PR #65) and the pace plan revision (PR #64); stage B3's close records (PR #63) and the stage's pull requests #47 to #62; main holds TASK-001 to TASK-019, TASK-022, BUG-001 to BUG-019, the refactoring passes of B2 and B3, HOTFIX-001, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Increment: none — this file states the position at the merge of TASK-020 (PR #71); next is TASK-021
++Last accepted: TASK-020 (PR #71, at its merge): the type workflow software on your own computer and its sub-workflow local service, R-024 built (tests/test_type_own_computer.py), with the owner's Parallel increments: on (2026-10-25); before it TASK-019 (PR #70): web app and local web app; TASK-018 (PR #69) and TASK-017 (PR #68): the trait files; the stage B4 plan revision (PR #67, approved by the owner on 2026-10-24), TASK-022 (PR #66, R-026 built), FIX-004 (PR #65) and the pace plan revision (PR #64); stage B3's close records (PR #63) and the stage's pull requests #47 to #62; main holds TASK-001 to TASK-020, TASK-022, BUG-001 to BUG-019, the refactoring passes of B2 and B3, HOTFIX-001, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: none
+-Next: TASK-020 (the type workflow software on your own computer and its sub-type local service, the TDP classified; supervisor-authored; on Opus 5.5; its lead in docs/HARDENING.md, TASK-018: a local service's lifetime against N1's idle stop, and a test instance's port of its own), then TASK-021. Until TASK-031's own pull request merges, plan-check.py's READY is not trusted for TASK-031 or for TASK-030 and TASK-025, which depend on it: it counts TASK-031 merged from BUG-018's title (BUILD_PLAN, TASK-031's note; ISS-013), and no pull-request title that is not an increment's names a plan ID inside its closing parenthesis.
++Next: TASK-021 (the type workflow host extension and its sub-type Claude Code extension, the bridge classified; supervisor-authored; on Opus 5.5). Builders run concurrently only once TASK-028 and TASK-029 have merged (INVENTORY, Decisions). Until TASK-031's own pull request merges, plan-check.py's READY is not trusted for TASK-031 or for TASK-030 and TASK-025, which depend on it: it counts TASK-031 merged from BUG-018's title (BUILD_PLAN, TASK-031's note; ISS-013), and no pull-request title that is not an increment's names a plan ID inside its closing parenthesis.
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer` (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); the closed gates' files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, status_<id>.py, task0nn_*.py, bug017_*.py to bug019_*.py) of stages B1 to B3; the stage reviews' writers and findings (write_stage_b1.py, write_stage_b3.py, SCOPE-STAGE-B3*.md, stage-b3-review-r1.md to -r4.md); the refactoring pass's refactor-B3-* and refac_b3_tests.py; maintainer-windowless.md, maintainer-pace.md (the pace update's request), design_windowless_file.py, design_pace_file.py (the pace critique's file writer), pace_r2/ and msg-pace-*.txt (its round texts and commit messages), pace_shares.py (the gate's rounds-per-increment figures); task017-reality-check.md (the map TASK-017 is built from), design_traits_*.py, plan_traits_*.py and msg-plan-traits-*.txt (the traits critique's files, edits and messages), write_review_plantraits.py and SCOPE-PLAN-TRAITS.md (PR #67's gate); task017_*.py (TASK-017's moves, test, pins and records; task017_b3pins.py re-takes every excused section's pin), write_review_task017.py and SCOPE-TASK-017.md; drafts/task018/, task018_*.py, write_review_task018.py, SCOPE-TASK-018.md (TASK-018); task019_*.py, write_review_task019.py, SCOPE-TASK-019.md, pr-TASK-019.md (TASK-019); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse) with stage B2's; demo_b2.py, demo_b3.py; drafts/ (drafts/task012/ and drafts/task022/: the command- and contract-design bodies TASK-022 started from; drafts/task022-notes.md: TASK-012's security audit's three advisories); CONFIG-B3b-r3-partial.diff and the CONFIG-B3b checks; hotfix-position.md and hotfix/; runsheet-socket-key-2026-10-16.md; maintainer-b2.md
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); the closed gates' files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, status_<id>.py, task0nn_*.py, bug017_*.py to bug019_*.py) of stages B1 to B3; the stage reviews' writers and findings (write_stage_b1.py, write_stage_b3.py, SCOPE-STAGE-B3*.md, stage-b3-review-r1.md to -r4.md); the refactoring pass's refactor-B3-* and refac_b3_tests.py; maintainer-windowless.md, maintainer-pace.md (the pace update's request), design_windowless_file.py, design_pace_file.py (the pace critique's file writer), pace_r2/ and msg-pace-*.txt (its round texts and commit messages), pace_shares.py (the gate's rounds-per-increment figures); task017-reality-check.md (the map TASK-017 is built from), design_traits_*.py, plan_traits_*.py and msg-plan-traits-*.txt (the traits critique's files, edits and messages), write_review_plantraits.py and SCOPE-PLAN-TRAITS.md (PR #67's gate); task017_*.py (TASK-017's moves, test, pins and records; task017_b3pins.py re-takes every excused section's pin), write_review_task017.py and SCOPE-TASK-017.md; drafts/task018/, task018_*.py, write_review_task018.py, SCOPE-TASK-018.md (TASK-018); task019_*.py, task020_*.py, write_review_task0nn.py, SCOPE-TASK-0nn.md, pr-TASK-0nn.md (TASK-019, TASK-020); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse) with stage B2's; demo_b2.py, demo_b3.py; drafts/ (drafts/task012/ and drafts/task022/: the command- and contract-design bodies TASK-022 started from; drafts/task022-notes.md: TASK-012's security audit's three advisories); CONFIG-B3b-r3-partial.diff and the CONFIG-B3b checks; hotfix-position.md and hotfix/; runsheet-socket-key-2026-10-16.md; maintainer-b2.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #70, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24 (CFG-B3, FIX-001, CONFIG-B3b, FIX-002, TASK-016, TASK-010 with TASK-015, TASK-011, FIX-003, TASK-012, TASK-013, TASK-014; REFAC-B3; the stage review's four rounds, the first three's fixes BUG-017 to BUG-019, round 4 approved); the pace plan revision approved 2026-10-24 (PR #64); stage B3's least-confident items 1 and 2 settled by FIX-004 (PR #65); B4 (the first conditional workflows) in progress: TASK-022 (PR #66); the stage's plan revised before TASK-017 (subject `traits`, approved 2026-10-24, PR #67); TASK-017 (PR #68), TASK-018 (PR #69), TASK-019 (PR #70); next TASK-020. Last reflection: stage B3's close, 2026-10-24 (demonstration passed; conformance 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-011 to ISS-013 completed; Feedback FB-026 to FB-041; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #71, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24 (CFG-B3, FIX-001, CONFIG-B3b, FIX-002, TASK-016, TASK-010 with TASK-015, TASK-011, FIX-003, TASK-012, TASK-013, TASK-014; REFAC-B3; the stage review's four rounds, the first three's fixes BUG-017 to BUG-019, round 4 approved); the pace plan revision approved 2026-10-24 (PR #64); stage B3's least-confident items 1 and 2 settled by FIX-004 (PR #65); B4 (the first conditional workflows) in progress: TASK-022 (PR #66); the stage's plan revised before TASK-017 (subject `traits`, approved 2026-10-24, PR #67); TASK-017 (PR #68), TASK-018 (PR #69), TASK-019 (PR #70), TASK-020 (PR #71); next TASK-021. Last reflection: stage B3's close, 2026-10-24 (demonstration passed; conformance 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-011 to ISS-013 completed; Feedback FB-026 to FB-041; least confident in HARDENING; Project Summary patched)
+ Open issues: ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged, 2026-10-23; the records fixed by BUG-019; the plan check's rule is TASK-033's). ISS-012 fixed (Review B's pytest caches under run/review/ voided REFAC-B3's first APPROVE, 2026-10-22; the directive sends scratch files to the system temporary folder). ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; the maintainer's process-start record of 2026-10-20 shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031, approved 2026-10-20). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
+ Maintainer requests: the pace update (2026-10-20; run/supervisor/maintainer-pace.md): a code-review round ceiling, one mutation run per increment, a pace report; placed by the owner on 2026-10-22 ("a": stage B5 beside TASK-028 to TASK-031; INVENTORY, Decisions), the maintainer told; designed as R-042 to R-044 and TASK-032 to TASK-035 and approved 2026-10-24 with the ceiling at three ("I choose three"). Earlier: the windowless fix (TASK-028 to TASK-031, PR #57); Release B2 (FB-021; INVENTORY, Decisions)
+ Bridge version: 2026.10.18a
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 6c50df0..2a6daa4 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -27,7 +27,7 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-021 | Trait *long-running process* written: it points at founding rule N1/§8.1 (which stays in the core) and adds start, stop, and health; nothing left running; the brief constraint. | DESIGN §6.8, §8.1 | built | tests/test_traits_new.py (the test_r021_ tests and the three-trait test_r020_r022_ tests: bridge/cursor-bridge/workflow/traits/long-running-process.md, new text at its points and no other, each section under its own `new` entry; TASK-018); workflow-check.py passes over workflow/ |
+ | R-022 | Trait *AI models* written: evaluation sets and thresholds in place of exact tests; pinned models; recorded outputs. | DESIGN §6.8 | built | tests/test_traits_new.py (test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_outputs and the three-trait test_r020_r022_ tests: bridge/cursor-bridge/workflow/traits/ai-models.md, new text at its points and no other, each section under its own `new` entry; TASK-018); workflow-check.py passes over workflow/ |
+ | R-023 | Type workflow *web app* and sub-type *local web app* written. | DESIGN §6.8, §6.9 | built | tests/test_type_web_app.py (the test_r023_ tests: bridge/cursor-bridge/workflow/types/web-app.md and types/web-app/local-web-app.md, the delivery kind set and overridden, the web-deployment procedure, each section under its own `new` entry; reAngle and the video factory classified from committed fixtures; TASK-019); workflow-check.py passes over workflow/ |
+-| R-024 | Type workflow *software on your own computer* and sub-type *local service* written. | DESIGN §6.8, §6.9 | planned | — |
++| R-024 | Type workflow *software on your own computer* and sub-type *local service* written. | DESIGN §6.8, §6.9 | built | tests/test_type_own_computer.py (the test_r024_ tests: bridge/cursor-bridge/workflow/types/own-computer.md, naming the GUI, CLI, pipeline and local-service sub-types at intake, and types/own-computer/local-service.md, adding the contract design and, for administrative commands, the command design at interface.variants, each section under its own `new` entry; the TDP classified from a committed fixture; TASK-020); workflow-check.py passes over workflow/ |
+ | R-025 | Type workflow *host extension* and sub-type *Claude Code extension* written: the host's behaviour as verified facts with the version checked, tests inside the real host, delivery as installation into the host. | DESIGN §6.9 | planned | — |
+ | R-026 | The new interface text — contract design (local service) and command design (CLI) — written. | DESIGN §6.8, §6.9 | built | tests/test_interface_text.py (TASK-022); the sections pinned in tests/test_phase_modules_close.py |
+ | R-027 | Calibration is aware of conditional workflows: it applies a conditional workflow to running projects of that product type by phase, reopening no gate; the applied text takes effect from a project's next design phase or change cycle. | DESIGN §6.10; §6.8 (R-026 clause) | planned | — |
+diff --git a/docs/ROSTER.resolved.json b/docs/ROSTER.resolved.json
+index 61518b7..3e306b6 100644
+--- a/docs/ROSTER.resolved.json
++++ b/docs/ROSTER.resolved.json
+@@ -10,6 +10,6 @@
+   },
+   "other_pool": "exhausted",
+   "probed": true,
+-  "resolved_at": "2026-10-24T22:53 UTC",
++  "resolved_at": "2026-10-24T23:45 UTC",
+   "reset_day": 16
+ }
+diff --git a/docs/RUN_PARAMETERS.md b/docs/RUN_PARAMETERS.md
+index 76b3c19..d62eacf 100644
+--- a/docs/RUN_PARAMETERS.md
++++ b/docs/RUN_PARAMETERS.md
+@@ -4,4 +4,4 @@ Stage pause: run
+ Merge authority: supervisor   (owner's instruction 2026-10-12: as a supervised project the bridge's supervisor completes the merge itself through the gate — the pre-supervised-project barrier, no premerge record possible, is gone; the supervisor never uses --admin or force-push, which the guard and branch rules refuse)
+ Refactoring pass: on
+ Installer verification: n/a (host extension — the bridge's install program is rehearsed on a copy and run by the owner from a run sheet, not a desktop installer-check)
+-Parallel increments: off
++Parallel increments: on   (the owner's word, 2026-10-25: "I'd like to turn on parallelism for this project then."; off from 2026-10-11 until then; builders run concurrently only once TASK-028 and TASK-029 have merged, and only increments the build plan marks `Parallel: yes`, of which there are none today, INVENTORY Decisions)
+diff --git a/project.json b/project.json
+index 725657c..cd68a02 100644
+--- a/project.json
++++ b/project.json
+@@ -5,8 +5,8 @@
+   "version": "2026.10.18a",
+   "state": {
+     "phase": "building",
+-    "stage": "B1 to B3 closed; the pace plan revision approved 2026-10-24; B4 in progress (TASK-022, TASK-017, TASK-018 and TASK-019 merged; TASK-020 next)",
++    "stage": "B1 to B3 closed; the pace plan revision approved 2026-10-24; B4 in progress (TASK-022 and TASK-017 to TASK-020 merged; TASK-021 next)",
+     "bridge": "2026.10.18a",
+-    "updated": "2026-10-24"
++    "updated": "2026-10-25"
+   }
+ }
+diff --git a/tests/fixtures/workflows/tdp.status.md b/tests/fixtures/workflows/tdp.status.md
+new file mode 100644
+index 0000000..b7eac84
+--- /dev/null
++++ b/tests/fixtures/workflows/tdp.status.md
+@@ -0,0 +1,3 @@
++# Project Status
++Phase: building
++Workflows: Own-Computer Software Development → Local Service Software; traits: Installable, External services, Spends money, Long-running process, AI models
+diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
+index 892da04..cbcbe1c 100644
+--- a/tests/test_b3_least_confident.py
++++ b/tests/test_b3_least_confident.py
+@@ -187,6 +187,8 @@ EXCUSED_MODULE_SECTIONS = {
+     ("traits/spends-money.md", "Add at delegation-loop.brief-constraints"): (986, "e4aba6a5946681595c0f1ff19dd3e3fc65b4e308e02506907fc20d877154648d"),
+     ("traits/spends-money.md", "Add at delegation-loop.inspect-checks"): (634, "21599c27ab2a9814894195f6019af8f42cef3a57a972c6595d042ff32e94ebc9"),
+     ("traits/spends-money.md", "Add at intake.questions"): (1854, "ffd8aaaf3d1562ceedfd8c2a4f070b2862bc90d4ca5b792bbf6a727dfcd82c80"),
++    ("types/own-computer.md", "Add at intake.questions"): (728, "caf1748cd3bdb56fe9109723467158c5a2dc4f319dd0fab07fb9b20180feb0b0"),
++    ("types/own-computer/local-service.md", "Add at interface.variants"): (611, "7ddcb47b124539696c5a26a884ee52b3107282dbbc6e8be76ddc092002d50015"),
+     ("types/web-app.md", "Add at project-end.delivery for web-deployment"): (6724, "689aa1ef2457273aeb2403eb876e29f788199d0760c7d8a228dd1490a159287d"),
+     ("types/web-app.md", "Set at intake.delivery-kind"): (46, "2f7f51bb4c7b463f115afedb11af271b6040aba9852194f8fc6f3b522241f7f5"),
+     ("types/web-app/local-web-app.md", "Set at intake.delivery-kind"): (46, "a1a429fb4f8905db0310a69eb9ed62f22f457d76e0e20044530163c83d2b32ee"),
+diff --git a/tests/test_release_b_bootstrap.py b/tests/test_release_b_bootstrap.py
+index b31fc7b..602aa92 100644
+--- a/tests/test_release_b_bootstrap.py
++++ b/tests/test_release_b_bootstrap.py
+@@ -248,10 +248,10 @@ def test_r001_run_parameters_parse():
+     assert _parameter_faults(good.replace("Stage pause: run", "Stage pause: later")) == ["Stage pause: 'later'"]
+ 
+ 
+-# The values the owner chose (RUN_PARAMETERS.md; INVENTORY Decisions, 2026-10-11 and 2026-10-12, owner), fixed in a test
++# The values the owner chose (RUN_PARAMETERS.md; INVENTORY Decisions, 2026-10-11, 2026-10-12 and 2026-10-25, owner), fixed in a test
+ # (rule 52). Installer verification is not among them: n/a is the product type's, not an answer of the owner's.
+ OWNER_RUN_PARAMETERS = {"Stage pause": "run", "Merge authority": "supervisor", "Refactoring pass": "on",
+-                        "Parallel increments": "off"}
++                        "Parallel increments": "on"}
+ 
+ 
+ def test_r001_run_parameters_owner_values():
+diff --git a/tests/test_type_own_computer.py b/tests/test_type_own_computer.py
+new file mode 100644
+index 0000000..069c660
+--- /dev/null
++++ b/tests/test_type_own_computer.py
+@@ -0,0 +1,213 @@
++"""TASK-020: the type workflow software on your own computer and its sub-workflow local service (R-024), new text
++throughout.
++
++enforces: docs/BUILD_PLAN.md TASK-020 (its Done when: the type names its GUI, CLI, pipeline and local-service sub-types;
++local service adds the contract design interface variant and, where the part also has administrative commands (the
++TDP), the command design variant too, variants added per interface kind, not set as one value; every section new text
++under a `new` entry; both rows written; `workflow-check.py` passing and classifying the TDP, performance budgets held
++per §6.3 until its code map carries one, without pausing); bridge/cursor-bridge/workflow/open-list.md, "Default traits"
++(the open list is the one source of a type's and a sub-type's default traits); extension-points.md, `interface.variants`
++(add only, per part); phases/interface.md, "The variants" (every variant is an addition). Supervisor-written; no builder
++run."""
++import importlib.util
++import os
++import re
++import subprocess
++import sys
++
++import pytest
++
++from phase_modules import BRIDGE, read, section
++
++REPO = os.path.dirname(BRIDGE)
++
++WORKFLOW = os.path.join(BRIDGE, "cursor-bridge", "workflow")
++TYPES = os.path.join(WORKFLOW, "types")
++TRAITS = os.path.join(WORKFLOW, "traits")
++PHASES = os.path.join(WORKFLOW, "phases")
++CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
++EXCEPTIONS = os.path.join(WORKFLOW, "trace-exceptions.md")
++OPEN_LIST = os.path.join(WORKFLOW, "open-list.md")
++REGISTRY = os.path.join(WORKFLOW, "extension-points.md")
++TRACE_CHECK = os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")
++WORKFLOW_CHECK = os.path.join(BRIDGE, "cursor-bridge", "workflow-check.py")
++FIXTURES = os.path.join(REPO, "tests", "fixtures", "workflows")
++
++# Each file's path under workflow/types/, its title and its change headings, in its order (BUILD_PLAN TASK-020).
++FILES = {
++    "own-computer": ("own-computer.md", "Software on your own computer", ["Add at intake.questions"]),
++    "local-service": ("own-computer/local-service.md", "Local service", ["Add at interface.variants"]),
++}
++SUB_TYPES = {"gui": "GUI", "cli": "CLI", "pipeline": "pipeline", "local-service": "local service"}
++
++
++def text(key):
++    return read(os.path.join(TYPES, FILES[key][0]))
++
++
++def flat(t):
++    return re.sub(r"\s+", " ", t).strip()
++
++
++def body(key, heading):
++    return section(text(key), heading, 2)
++
++
++def trace_units(t):
++    spec = importlib.util.spec_from_file_location("trace_check_type_own_computer", TRACE_CHECK)
++    mod = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(mod)
++    return [u["normal"] for u in mod.parse_units(t)[0]]
++
++
++def rows(table_heading):
++    """The open list's rows in the table under `table_heading`, each a dict of its columns, keyed by the first."""
++    lines = section(read(OPEN_LIST), table_heading, 2).split("\n")
++    table = [l for l in lines if l.startswith("|")]
++    header = [c.strip() for c in table[0].strip("|").split("|")]
++    out = {}
++    for l in table[2:]:
++        cells = [c.strip() for c in l.strip("|").split("|")]
++        out[cells[0]] = dict(zip(header, cells))
++    return out
++
++
++def traits_of(cell):
++    return set(t.strip() for t in cell.split(","))
++
++
++def run_check(*args):
++    return subprocess.run([sys.executable, WORKFLOW_CHECK] + list(args), capture_output=True, text=True,
++                          encoding="utf-8")
++
++
++@pytest.mark.parametrize("key", sorted(FILES))
++def test_r024_each_file_is_a_title_and_its_change_sections_only(key):
++    """BUILD_PLAN TASK-020: one `#` title, then the change headings named above, in that order, and nothing else, so
++    each file changes the main workflow at those points and no other: the type adds at intake, the sub-workflow adds
++    at `interface.variants`, and neither sets a value or replaces a module."""
++    lines = text(key).split("\n")
++    heads = [l for l in lines if re.match(r"^ {0,3}#", l)]
++    assert heads == ["# " + FILES[key][1]] + ["## " + h for h in FILES[key][2]], heads
++    assert lines[0] == "# " + FILES[key][1], lines[0]
++
++
++def test_r024_the_type_names_its_four_sub_types_by_what_the_user_meets():
++    """BUILD_PLAN TASK-020: the type names its GUI, CLI, pipeline and local-service sub-types, each by the surface its
++    open-list definition turns on (a window, a terminal, nothing, other software through a protocol); the open list
++    gives the type exactly these four, and each is named; a part met through several takes the sub-type of the surface
++    it exists for, and one that exists for two equally pauses as intake's classification says (phases/intake.md)."""
++    t = flat(body("own-computer", "Add at intake.questions"))
++    subs = {k: r for k, r in rows("Sub-types").items() if r["Of type"] == "own-computer"}
++    assert sorted(subs) == sorted(SUB_TYPES), sorted(subs)
++    assert "has four sub-types, told apart by what its user meets it through" in t
++    for phrase in ["a window (GUI)", "a terminal (CLI)",
++                   "nothing, the part running jobs unattended with files or records as its output (pipeline)",
++                   "other software on the same computer calling it through a protocol (local service)"]:
++        assert phrase in t, phrase
++    for key, definition in [("gui", "Met through a window"), ("cli", "Met through a terminal"),
++                            ("pipeline", "Met through nothing: it runs jobs unattended and its output is files or records"),
++                            ("local-service", "Other software on the same computer calls it through a protocol")]:
++        assert subs[key]["Definition"].startswith(definition), (key, subs[key]["Definition"])
++    assert "Ask which, where the owner's description leaves it open." in t
++    assert ("A part met through several, such as a local service with administrative commands, takes the sub-type of "
++            "the surface it exists for, and the interface phase runs a variant for each of its other kinds of interface") in t
++    assert "a part that exists for two equally fits two sub-types equally, which pauses the project as the classification at intake says" in t
++    intake = flat(read(os.path.join(PHASES, "intake.md")))
++    assert "fits two sub-types of its type equally" in intake and "the project stops before design" in intake
++
++
++def test_r024_local_service_adds_the_contract_design_and_for_commands_the_command_design():
++    """BUILD_PLAN TASK-020: local service adds the contract design variant and, where the part also has administrative
++    commands (the TDP), the command design variant too, each added for its own kind of interface and never set as one
++    value (extension-points.md: `interface.variants` accepts add only; interface.md: every variant is an addition);
++    both variant files exist where the text points."""
++    t = flat(body("local-service", "Add at interface.variants"))
++    assert ("runs the interface phase's contract design variant for the protocol other software calls it through, "
++            "`~/.claude/cursor-bridge/workflow/phases/interface/contract-design.md`: the first variant this sub-workflow "
++            "activates, an addition and never a replacement") in t
++    assert ("Where the part also has administrative commands a person types, it runs the command design "
++            "variant for them too, `~/.claude/cursor-bridge/workflow/phases/interface/command-design.md`") in t
++    assert "Each variant is added for its own kind of interface, so a part with both runs both, never one in place of the other." in t
++    assert t.index("contract-design.md") < t.index("command-design.md")
++    # Review A, round 1: procedure text installed into every project names no project.
++    assert "TDP" not in text("local-service") and "TDP" not in text("own-computer")
++    for name in ("contract-design.md", "command-design.md"):
++        assert os.path.isfile(os.path.join(PHASES, "interface", name)), name
++    line = [l for l in read(REGISTRY).split("\n") if l.startswith("| interface.variants |")]
++    assert len(line) == 1 and line[0].rstrip().endswith("| interface | add | part |"), line
++    assert "Every variant is an addition, never a replacement of another" in flat(read(os.path.join(PHASES, "interface.md")))
++
++
++@pytest.mark.parametrize("key", sorted(FILES))
++def test_r024_every_section_has_its_own_new_entry_and_no_other_entry_names_the_file(key):
++    """BUILD_PLAN TASK-020: every section of the two files is new text under a `new` entry naming the file and that
++    heading (the trace check counts the type files as modules); no `reword` entry, and none on the title."""
++    rel = "bridge/cursor-bridge/workflow/types/" + FILES[key][0]
++    got = []
++    for line in read(EXCEPTIONS).split("\n"):
++        m = re.match(r"^- (new|reword) (\S+) (\S+\.md) (.+)$", line)
++        if m and m.group(3) == rel:
++            got.append((m.group(1), m.group(2), m.group(4).strip()))
++    assert got == [("new", "TASK-020", h) for h in FILES[key][2]], got
++
++
++@pytest.mark.parametrize("key", sorted(FILES))
++def test_r024_the_text_is_new_and_copies_no_passage_of_the_main_workflow(key):
++    """BUILD_PLAN TASK-020: the files are new text throughout; no unit of one, as trace-check.py reads units, is a unit
++    of the core, of a phase module, of the plan critic, of a trait file, of another type file or of the other file."""
++    main = set(trace_units(read(CORE))) | set(trace_units(read(os.path.join(BRIDGE, "agents", "plan-critic.md"))))
++    for root in (PHASES, TRAITS, TYPES):
++        for here, _dirs, names in os.walk(root):
++            for f in names:
++                path = os.path.join(here, f)
++                if f.endswith(".md") and os.path.normcase(path) != os.path.normcase(os.path.join(TYPES, FILES[key][0])):
++                    main |= set(trace_units(read(path)))
++    assert len(main) > 300, len(main)
++    for unit in trace_units(text(key)):
++        assert unit not in main, unit[:80]
++
++
++def test_r024_both_rows_are_written_and_the_other_sub_types_are_not():
++    """BUILD_PLAN TASK-020: the type's and local service's rows flip to written in the same change as their files;
++    GUI, CLI and pipeline stay unwritten, so a part of one of them still pauses at intake (open-list.md, "When each is
++    written": when the first project of that type arrives)."""
++    types = rows("Product types")
++    subs = rows("Sub-types")
++    assert types["own-computer"]["Written"] == "yes" and subs["local-service"]["Written"] == "yes"
++    for key in ("gui", "cli", "pipeline"):
++        assert subs[key]["Written"] == "no", key
++    assert types["own-computer"]["Workflow name"] == "Own-Computer Software Development"
++    assert subs["local-service"]["Sub-workflow name"] == "Local Service Software"
++
++
++def test_r024_the_default_traits_stay_in_the_open_list():
++    """BUILD_PLAN TASK-020 and §6.3: the type's default trait is installable; local service's complete set adds
++    long-running process. The open list is the one source of both sets, so neither type file states them (open-list.md,
++    the opening paragraph and "Default traits"; INVENTORY, Decisions, TASK-019)."""
++    assert traits_of(rows("Product types")["own-computer"]["Default traits"]) == {"installable"}
++    assert traits_of(rows("Sub-types")["local-service"]["Default traits"]) == {"installable", "long-running-process"}
++    for key in FILES:
++        assert "Default traits" not in text(key) and "long-running" not in text(key).lower(), key
++
++
++def test_r024_workflow_check_passes_over_the_workflow_folder():
++    """BUILD_PLAN TASK-020: `workflow-check.py` passes over `workflow/` with the two files written."""
++    r = run_check(WORKFLOW)
++    assert r.returncode == 0 and r.stdout.strip().split("\n") == ["RESULT: OK"], r.stdout + r.stderr
++
++
++def test_r024_the_tdp_is_classified_without_pausing():
++    """BUILD_PLAN TASK-020: the committed fixture, shaped as the TDP's `Workflows:` line (§6.3's classification:
++    software on your own computer → local service, with installable, external services, spends money, long-running
++    process and AI models in the open list's order; performance budgets held until its code map carries one), passes
++    `workflow-check.py --status` with no FAIL (a part whose type or sub-type is not written pauses) and no FLAG (every
++    trait named is written)."""
++    path = os.path.join(FIXTURES, "tdp.status.md")
++    lines = read(path).replace("\r\n", "\n").split("\n")
++    wf = [l for l in lines if l.startswith("Workflows: ")]
++    assert wf == ["Workflows: Own-Computer Software Development → Local Service Software; traits: Installable, "
++                  "External services, Spends money, Long-running process, AI models"], wf
++    assert "Performance budgets" not in wf[0]
++    r = run_check("--status", path)
++    assert r.returncode == 0 and r.stdout.strip().split("\n") == ["RESULT: OK"], r.stdout + r.stderr
