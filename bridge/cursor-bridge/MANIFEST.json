@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-23 19:36",
+  "generated": "2026-10-24 15:31",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -113,8 +113,8 @@
     "cursor-bridge/workflow/phases/design.md": "c22756fc33484a9adf64259c18a0aaa50ec06da8ae1765feab1364de3c7c404d",
     "cursor-bridge/workflow/phases/intake.md": "b73a4a07516400ff81c830a60e3e64ed55a2c9873e0afeb3e2bc744432333f49",
     "cursor-bridge/workflow/phases/interface.md": "bb2858865af7959437f191392a884f2cc37216501f5e508aca106986a5fff201",
-    "cursor-bridge/workflow/phases/interface/command-design.md": "86dd604e1b7c9e649241cf0656073b60ec15181232b3e96662cbb35d893cbe44",
-    "cursor-bridge/workflow/phases/interface/contract-design.md": "558f43f5ea22ae91734442dd43cb247b49e793cdb16a49bd661bc138d9ca2f12",
+    "cursor-bridge/workflow/phases/interface/command-design.md": "d8650ac87dfb862691caf27e4751fa609ab7d38c474d031ffe39a9ea000ea220",
+    "cursor-bridge/workflow/phases/interface/contract-design.md": "869a93ca13951597a5030802f55c60fb5f60154257938e6411e3dbced817a3c1",
     "cursor-bridge/workflow/phases/interface/mockups.md": "6d4450daecb7a8d5bbb514ae90f2cfa34f5dfe570b102c670d9d8e34341ab7a5",
     "cursor-bridge/workflow/phases/interface/playable-prototype.md": "92e933746c522bb37fc71a5172a873cb7cbea3abe6ebc45c9df03c458476542c",
     "cursor-bridge/workflow/phases/planning.md": "a923896b3040b917436abb014d233731187e603c5dbd2389da87a96fadda1060",
@@ -122,7 +122,7 @@
     "cursor-bridge/workflow/phases/reflection.md": "101ce7f3528f8f4624432b8ae1396bc799c12c0860174fafbe19b0c9042ae121",
     "cursor-bridge/workflow/phases/run-parameters.md": "7d37e1c3ab4dac2b2069b80998b28e6dfe1f8c68a849afa7a3bf415a2a9f73ed",
     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
-    "cursor-bridge/workflow/trace-exceptions.md": "c6535b3e1bed467ab2dced4eddde6e839795ae718ada301a0236a062200237bc",
+    "cursor-bridge/workflow/trace-exceptions.md": "932f1d8ee808ea5ab7bf9af36aed4564188e30be18120790a3d62bc00ab5a351",
     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
