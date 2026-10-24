@@ -6,12 +6,12 @@ For a part whose results come from models, ask before design, and write each ans
 
 ## Add at design.sections
 
-The design has an **Evaluation** section: each evaluation set, where it lives and how it grows, the judge of each result (a rule a program checks, or a model of another family than the one judged, rule 51), each threshold with its source, and what a result below the threshold does to the gate.
+The design has an **Evaluation** section: each evaluation set, where it lives and how it grows, the judge of each result (a rule a program checks, or a model of another family than the one judged, rule 51), and each threshold with its source, a result below it blocking the change at the test step.
 
 ## Add at configuration.items
 
-Each model is **pinned**: its exact identifier and version, never a name that moves to a newer model, recorded in `docs/INVENTORY.md` (Resources), and changed only as a change of its own whose evaluation runs before and after. **Recorded outputs** have a home: the model's replies to the evaluation set, kept with the model's identifier and the date, under the project's test fixtures, so that the evaluation runs again without calling the model.
+Each model is **pinned**, a model judge included: its exact identifier and version, never a name that moves to a newer model, recorded in `docs/INVENTORY.md` (Resources), and changed only as a change of its own whose evaluation runs before and after. **Recorded outputs** have a home: the model's replies to the evaluation set, kept with the model's identifier and the date, under the project's test fixtures, and beside them a model judge's verdicts on them, judged again only when the outputs are recorded again, so that the evaluation runs again without calling any model.
 
 ## Add at delegation-loop.test-checks
 
-The evaluation runs against its thresholds on the recorded outputs with the change's tests: a result below a threshold is a correctness-class block (step 7), and an exact-match assertion on a model's output, where the evaluation set should judge it, is a finding of its own. A change that alters the prompt, the model or its settings records new outputs first, in a run the owner has approved where the model costs money, and the evaluation reads those.
+The evaluation runs against its thresholds on the recorded outputs and their recorded verdicts with the change's tests: a result below a threshold is a correctness-class block (step 7), and an exact-match assertion on a model's output, where the evaluation set should judge it, is a finding of its own. A change that alters the prompt, the model or its settings records new outputs first, and new verdicts on them, in a run the owner has approved where a model costs money, and the evaluation reads those.

@@ -84,12 +84,17 @@ def test_r020_r022_every_section_has_its_own_new_entry_and_no_other_entry_names_
 @pytest.mark.parametrize("key", sorted(POINTS))
 def test_r020_r022_the_text_is_new_and_copies_no_passage_of_the_main_workflow(key):
     """BUILD_PLAN TASK-018: the files are new text throughout; no unit of one, as trace-check.py reads units, is a unit
-    of the core or of a phase module (a copy would be a passage in two homes)."""
-    main = set(trace_units(read(CORE)))
+    of the core, of a phase module, of the plan critic or of another trait file (a copy would be a passage in two homes,
+    and an excused section switches the trace check's copy check off; Review A, round 1)."""
+    main = set(trace_units(read(CORE))) | set(trace_units(read(os.path.join(BRIDGE, "agents", "plan-critic.md"))))
     for root, _dirs, names in os.walk(PHASES):
         for f in names:
             if f.endswith(".md"):
                 main |= set(trace_units(read(os.path.join(root, f))))
+    others = [f for f in os.listdir(TRAITS) if f.endswith(".md") and f != key + ".md"]
+    assert len(others) >= 6, others
+    for f in others:
+        main |= set(trace_units(read(os.path.join(TRAITS, f))))
     assert len(main) > 300, len(main)
     for unit in trace_units(trait(key)):
         assert unit not in main, unit[:80]
@@ -115,10 +120,14 @@ def test_r020_spends_money_asks_for_approval_the_worst_case_the_cap_and_the_acco
     cap, and the platform and account named."""
     t = add("spends-money", "intake.questions")
     assert "**platform and account**" in t and "**worst case**" in t and "the **cap** the owner sets" in t
-    assert "No paid action runs without the owner's approval first" in t
+    assert "No paid action of the loop runs without the owner's approval first" in t
     assert "with its estimate against the worst case and the platform and account named in the same sentence" in t
     assert "an approval covers the action it names, never the next one" in t
     assert "never a silent overrun" in t
+    # Review A, round 1: which paid actions the approval covers, and who enforces the cap.
+    assert "The loop's own paid actions (a contract capture, a dry or paid run of an increment, a re-recording" in t
+    assert "tracked against the cap by the supervisor" in t
+    assert "the design states how the product enforces the cap" in t and "fixed in a test (rule 52)" in t
 
 
 def test_r020_r019_a_paid_call_is_bounded_by_external_services_and_classified_with_it():
@@ -140,14 +149,24 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     (configuration); the approval before any paid action in a builder run and the dry run on a copy with a stand-in
     provider before any paid run (brief); the check that no paid action ran unapproved (inspect)."""
     conf = add("spends-money", "configuration.items")
-    assert "**The store of paid results.**" in conf and "that nothing in the loop discards" in conf
+    assert "**The store of paid results.**" in conf
+    assert "a folder the design names, which no clean, reset, cache purge or test teardown reaches" in conf
     assert "reads the result already paid for instead of buying it again" in conf
     assert "**The cap** is recorded" in conf and "`Spending cap: " in conf
     brief = add("spends-money", "delegation-loop.brief-constraints")
     assert "The builder runs no paid action" in brief and "after the owner's approval for it" in brief
     assert "**dry**: on a copy of the data, with a stand-in provider" in brief and "charges nothing" in brief
+    # Review A, round 1, blocking: the product's paid calls go through the store; a first capture and a purchase,
+    # which have no replies to stand in, run at the smallest size instead of dry.
+    assert "Every paid call the part's code makes goes through the store of paid results" in brief
+    assert "the store read before a call is bought, so a retry never buys twice" in brief
+    assert "The first paid run of a contract capture, which has no recorded replies to stand in yet" in brief
+    assert "a paid action with no remote service behind it (a purchase)" in brief
+    assert "at the smallest size that answers them, under their own approval" in brief
     inspect = add("spends-money", "delegation-loop.inspect-checks")
-    assert inspect.startswith("No paid action ran unapproved") and "is a blocking finding" in inspect
+    assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
+    assert "neither writes its result to the store nor reads the store first" in inspect
+    assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
 
 
 def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
@@ -159,11 +178,21 @@ def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
     assert "**start, stop and health**" in conf
     for verb in ("starts it", "stops it and everything it started", "reports whether it is healthy"):
         assert verb in conf, verb
+    # Review A, round 1: a command is recorded in the increment that builds it, and N1 binds the runs the loop starts.
+    assert "in its command reference, in the increment that builds it" in conf
+    assert "Every run of the process the loop starts (a test, a demonstration, a check) meets founding rule N1" in conf
     core = flat(read(CORE))
     assert "- **N1 — Files are the truth; programs are one-shot.**" in core
-    assert "A background process is allowed only when all eight hold" in core
+    n1 = ("A background process is allowed only when all eight hold", "never writes tracked files",
+          "can be rebuilt from the files", "states the commit or version it reflects", "stops when idle",
+          "no gate depends on it", "runs no migration of the owner's live data", "unreleased code against live data",
+          "spends nothing unless asked")
+    for phrase in n1:
+        assert phrase in core, phrase
     for key in POINTS:
-        assert "A background process is allowed only when all eight hold" not in flat(trait(key)), key
+        t = flat(trait(key))
+        for phrase in n1:
+            assert phrase not in t, (key, phrase)
 
 
 def test_r021_a_run_leaves_nothing_running():
@@ -186,9 +215,12 @@ def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_output
     assert "fixed in a test (rule 52)" in intake
     design = add("ai-models", "design.sections")
     assert "**Evaluation** section" in design and "rule 51" in design
+    assert "a result below it blocking the change at the test step" in design
     conf = add("ai-models", "configuration.items")
-    assert "Each model is **pinned**" in conf and "never a name that moves to a newer model" in conf
-    assert "**Recorded outputs** have a home" in conf and "without calling the model" in conf
+    assert "Each model is **pinned**, a model judge included" in conf and "never a name that moves to a newer model" in conf
+    assert "**Recorded outputs** have a home" in conf and "without calling any model" in conf
+    assert "a model judge's verdicts on them, judged again only when the outputs are recorded again" in conf
     test = add("ai-models", "delegation-loop.test-checks")
-    assert "The evaluation runs against its thresholds on the recorded outputs" in test
+    assert "The evaluation runs against its thresholds on the recorded outputs and their recorded verdicts" in test
     assert "correctness-class block" in test and "an exact-match assertion on a model's output" in test
+    assert "records new outputs first, and new verdicts on them" in test
