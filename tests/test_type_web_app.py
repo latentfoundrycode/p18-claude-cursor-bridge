@@ -192,7 +192,7 @@ def test_r023_the_web_deployment_procedure():
              "4. **The deployment.**", "5. **The check.**", "6. **The way back**"]
     at = [t.index(s) for s in steps]
     assert at == sorted(at), at
-    # Review B, rounds 2 to 4: the order the paragraph enforces, read sentence by sentence, not heading by heading.
+    # Review B, rounds 2 to 4, and Review A, round 10: the order the paragraph enforces, read sentence by sentence, not heading by heading.
     order = ["the yes names the release", "The product stops taking writes", "a marker write that changes no user's data",
              "With writes held, the owner's live data is backed up", "The backup is then restored to a copy",
              "its contents compared with the live store's under the pause", "its migration is rehearsed on that copy",
@@ -202,7 +202,8 @@ def test_r023_the_web_deployment_procedure():
              "Only after a refused marker is it checked at its address",
              "When it passes, writes resume", "Where step 4 began a migration on the live data",
              "step 2's marker write, tried again at the start of this step, is refused",
-             "Then the backup is restored over the live data", "the restore is the owner's question",
+             "Then the backup is restored over the live data",
+             "the restored store read back against the backup as step 3 read the copy", "the restore is the owner's question",
              "Only once the restore has succeeded, or where none was needed, is the previous release deployed",
              "only once it passes the check of step 5 do writes resume"]
     at = [t.index(s) for s in order]
@@ -222,7 +223,7 @@ def test_r023_the_web_deployment_procedure():
     assert "so the backup holds every write" in t
     assert "never into the repository or the Workspace, since it holds the users' data" in t
     assert "kept away from the repository and the Workspace as the backup is, and read back, its contents compared with the live store's under the pause (the count of records in each table or collection, or a checksum of each), which proves this backup restores" in t
-    assert "Whichever way this step ends, the copy is then deleted, since it holds the users' data; the backup stays where Resources records it." in t
+    assert "Whichever way this step ends, the copy is then deleted, since it holds the users' data; the backup stays where Resources records it, for as long as the design's data-retention section says, which is the owner's choice (a design that names no period names one before the first deployment)." in t
     assert "A backup that does not restore, or a rehearsal that fails, stops the deployment: writes resume on the unchanged live product" in t
     assert "deployed by the recorded procedure, which brings the release up in the mode of step 2" in t
     assert "its migration runs on the live data only here, as part of the deployment, never apart from a release" in t
@@ -235,7 +236,7 @@ def test_r023_the_web_deployment_procedure():
     assert "is refused (where it is accepted, once the product is back in its mode or stopped, as step 2 says), and the product's records of when each write from a user or from outside was made show none later than the backup's time (the migration's own writes and the marker writes not counted)" in t
     assert "Otherwise (a write later than the backup, or a product that keeps no such records, where nothing shows that no write landed while the deployment ran or while the product was out of its mode) a user's write may have landed since the backup" in t
     assert "every earlier try" not in t
-    assert "Then the backup is restored over the live data, and the restore discards no user's write." in t
+    assert "Then the backup is restored over the live data, and the restored store read back against the backup as step 3 read the copy (the same counts or checksums): only a match is a restore that has succeeded, and it discards no user's write; a mismatch is a restore that has failed." in t
     assert "may have landed since the backup, and the restore is the owner's question, put with what each answer costs: a restore discards the writes made since the backup (named where the product's records allow), and declining leaves the failed release deployed on the migrated data, which the previous release may not run on, with writes held until the owner says to resume them, which would resume them on that failed release and that data." in t
     assert "The answer does not end the pause: after a yes, the restore and the rest of this step run as for any restore, writes held until the previous release passes its check." in t
     assert "Where step 4 began no migration, the live data is left as it is." in t
