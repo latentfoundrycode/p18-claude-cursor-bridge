@@ -599,3 +599,13 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 ## Subject: ceiling — after the critique
 
 **After the critique** (supervisor, at the brief, for the code gate's reviewers): the change log's and KP-062's migration notes gain one sentence, a round file named other than by its number (`-confirm`) is refused and its next file takes the next number (the spec-packager's note: release B's own plan critique used `DESIGN-plan-confirm.md`); the brief matches `run`, `review` and `DESIGN-` in any case, with a test. Not criticised by the two critics; reviewed at the code gate with the whole diff.
+
+## Subject: pace (the pace update: a code-review round ceiling, one mutation run per increment, a pace section in the report cycle; a scoped revision mid-build, 2026-10-24)
+
+**What is criticised:** a scoped revision of release B's plan at the owner's placement of 2026-10-22 ("a": stage B5, beside TASK-028 to TASK-031, one plan revision), on the maintainer's request of 2026-10-20 relaying the owner's three approved solutions to the projects' slowdown (the TDP's pace fell about tenfold while its subject stayed the same; review rounds per increment rose from 1.0 to 7.2; the inferred causes: a gate that only grows, no cost brake on code-review rounds, a mutation driver rerun every round). One subject holds both its design revision — three rows of the register, R-042 to R-044, R-041 reworded, and the INVENTORY Decisions rows recording the number, the definitions and the rulings — and its plan addendum: TASK-032 (builder: the ceiling held by the launcher and the guard), TASK-033 (builder: the plan check's title rule and `pace-report.py`), TASK-034 (supervisor: the loop's text and stage B3's review leads) in stage B5, TASK-030's mutation text moved to one run per increment, the stage's demonstration extended, TASK-017's, TASK-023's and TASK-025's lines amended. The critics read `run/review/DESIGN-pace-<round>.md`, built from the committed records.
+
+**Accepted** (finding, critic, round, the reason): none yet.
+
+**Rounds** (round, kind, the commit its file was built from, critic, Blocking / Should fix / Consider, what was fixed): none yet.
+
+**Resolution**: not yet due.
