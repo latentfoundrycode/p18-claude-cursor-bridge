@@ -624,3 +624,15 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 **Resolution**: not due — after the confirming read nothing Blocking or non-convergent is open; its findings were all taken.
 
 **Gate**: approved by the owner on 2026-10-24 ("I choose three"): R-041 reworded, R-042 to R-044, TASK-032 to TASK-035 in stage B5, the amendments to TASK-017, TASK-023, TASK-025, TASK-030 and TASK-031, the ceiling at three rounds (INVENTORY, Decisions).
+
+## Subject: traits (stage B4's trait increments revised before TASK-017's first edit: the Scopes, the home of every passage, two registry refinements; a scoped revision mid-build, 2026-10-24)
+
+**What is criticised:** a scoped revision of release B's plan before stage B4's TASK-017, prompted by the supervisor's reality check of the text as built (the delegation loop's step 2 rule, applied to its own text; run/supervisor/task017-reality-check.md, quoted in the critique's file): TASK-017's Scope missed files that hold or pin passages it moves (project-end.md, run-parameters.md, bridge/agents/plan-critic.md, the registry, seven test files), named reflection.md as a has-screens source (it holds none), gave no home to passages no registry point places (the UI acceptance criteria, the benchmark and contract-capture increments, the refactoring pass's optimization candidates, the manual's chapters and the Performance-Patterns entries at project end), named the deployed-layout and bounded-remote-wait checks as passages to move where no module holds them (the plan's P11 puts them under external services, its §13.1 the bounded wait under spends money), and said nothing of the units two traits share (design's performance and code-signing sentences; step 6; project end's manual) or of the `Installer verification` parameter the five-names pin holds. The revision: TASK-017's Scope and Done when rewritten passage by passage with the extension point each goes to; two §6.4 refinements of the registry (`planning.stages` widened to increments, `planning.acceptance-criteria` new), made by TASK-017 with planning.md; five INVENTORY Decisions rows (the moving rule and what stays; the refinements; the parameter kept; the two checks as external services' new text with spends money pointing at them; the plan critic's lenses moved); TASK-018 depending on TASK-017 for its pointer; TASK-019 and TASK-021 naming their delivery kinds by key with the kind's procedure at `project-end.delivery`; a HARDENING placement block. No requirement row changes. The Decisions rows are the design revision (a refinement of §6.4), the increments the plan revision; one subject holds both. The critics read `run/review/DESIGN-traits-<round>.md`, built from the committed records.
+
+**Accepted** (finding, critic, round, the reason): none yet.
+
+**Rounds** (round, kind, the commit its file was built from, critic, Blocking / Should fix / Consider, what was fixed): none yet.
+
+**Resolution**: not yet due.
+
+**Gate**: not yet held.
