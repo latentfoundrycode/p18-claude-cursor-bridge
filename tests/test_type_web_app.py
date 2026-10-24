@@ -225,6 +225,7 @@ def test_r023_the_web_deployment_procedure():
     assert "deployed by the recorded procedure, which brings the release up in the mode of step 2" in t
     assert "its migration runs on the live data only here, as part of the deployment, never apart from a release" in t
     assert "The deployed product is first seen to be still paused, since a deployment may restart it out of its mode" in t
+    assert "step 2's marker write is tried again and refused; one accepted fails this step, once the product is back in its mode or stopped as step 2 says." in t
     assert "with requests that change no user's data: it answers, and it reports the release's version where the design gives the version a place, the deployed commit read from the platform otherwise" in t
     assert "When it passes, writes resume, and the report and the User Manual name the address and the version deployed." in t
     assert "when step 4 or step 5 fails, a defect like any other, with writes held throughout" in t
