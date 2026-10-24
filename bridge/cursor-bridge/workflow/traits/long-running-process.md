@@ -6,8 +6,8 @@ A part that keeps a process running between uses (a server, a watcher, a schedul
 
 ## Add at delegation-loop.brief-constraints
 
-A run leaves nothing running: the brief says how a test starts the process and how it stops it (the procedure's own start and stop commands, or a fixture that calls them), and that every process the run starts is stopped before the run ends, its children included, a test failure no exception.
+A run leaves nothing running: a test starts an instance of its own, on a port and data of its own, never the instance the owner runs, and the brief says how a test starts that instance and how it stops it (the procedure's own start and stop commands given the test's port and data, or a fixture that calls them), and that every process the run starts is stopped before the run ends, its children included, a test failure no exception.
 
 ## Add at delegation-loop.test-checks
 
-Nothing is left running: after the change's tests and the suite, the supervisor checks that no process the part runs, and no port or socket it holds, outlives them; one that does is a correctness-class block (step 7), stopped by the procedure's stop command and recorded with the test that left it.
+Nothing the run started is left running: after the change's tests and the suite, the supervisor checks that no process started during them, and no port or socket such a process holds, outlives them; one that does is a correctness-class block (step 7), stopped by itself and its children, never by the procedure's stop command, which would stop the instance the owner runs too, and recorded with the test that left it. A process the owner started is left as it is.

@@ -204,10 +204,14 @@ def test_r021_a_run_leaves_nothing_running():
     process) and the nothing-left-running test check."""
     brief = add("long-running-process", "delegation-loop.brief-constraints")
     assert brief.startswith("A run leaves nothing running")
-    assert "the brief says how a test starts the process and how it stops it" in brief
+    # Review B, round 1: a test never touches the instance the owner runs, and the check stops only what the run started.
+    assert "a test starts an instance of its own, on a port and data of its own, never the instance the owner runs" in brief
+    assert "the brief says how a test starts that instance and how it stops it" in brief
     assert "its children included" in brief
     test = add("long-running-process", "delegation-loop.test-checks")
-    assert test.startswith("Nothing is left running") and "correctness-class block" in test
+    assert test.startswith("Nothing the run started is left running") and "correctness-class block" in test
+    assert "never by the procedure's stop command, which would stop the instance the owner runs too" in test
+    assert "A process the owner started is left as it is." in test
 
 
 def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_outputs():
@@ -230,3 +234,7 @@ def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_output
     assert "correctness-class block" in test and "an exact-match assertion on a model's output" in test
     assert "records new outputs first, and new verdicts on them" in test
     assert "a change to the code that shapes the judged result from a recorded reply has that result judged again" in test
+    # Review B, round 1: no pass on verdicts recorded before a change to the judged result.
+    assert "the evaluation does not pass on the verdicts recorded before the change" in test
+    assert "is blocked at the test step, however the old verdicts read" in test
+    assert "while nothing that shapes the judged result changes, the evaluation runs again without calling any model" in conf
