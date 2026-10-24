@@ -391,10 +391,10 @@ EXCUSED_SECTIONS = {
     ("interface/command-design.md", "What this variant is"): (563, "bfc7ccc3704ff6b69361cc8ee16eb568a809634fa869b046b0b67a7d8ad87bd3"),
     ("interface/contract-design.md", "What this variant is"): (673, "00c28cc73cb732979930405822ee1f7a35f17e70fd540b73baf0d31fe0d16589"),
     ("interface/playable-prototype.md", "What this variant is"): (993, "b4cfca71dad76f4d3abaa1ee356b1c025c1d922626887958a84c45a3b5ca48eb"),
-    ("interface/command-design.md", "Writing the command design"): (1900, "1374ccafa4416dedcfa92197b5eaef4a7860943563db1222d172b44fc2ad5e30"),
-    ("interface/command-design.md", "Approving the command design"): (1014, "227dbdc7db5d5aaa0f8ed76d5ba39c5cfcd5e693d208c673b8a51bd3840b0919"),
-    ("interface/contract-design.md", "Writing the contract design"): (2327, "5456ee1e4912cd81c9abfd2741c7bae905be4ebc576d3b688fed2c5f93b8bd17"),
-    ("interface/contract-design.md", "Approving the contract design"): (733, "16fc1c8f1202d9c3d67f2100cb49e8d00029597ed7ed0a58c9b9ad38b99bb0eb"),
+    ("interface/command-design.md", "Writing the command design"): (2308, "8a65810907eea4954f7d6997e17441a815c1db76a26277a0d0bbcb1040d6a443"),
+    ("interface/command-design.md", "Approving the command design"): (1036, "814476197c6b11d00b55d5e9462cdec2997109939fdd8775275e8400a6fd10a5"),
+    ("interface/contract-design.md", "Writing the contract design"): (4205, "03f29dedf5f4d56af0775248e3b0b6257c2a86d4d1e5a5ce316393bff0d4ac31"),
+    ("interface/contract-design.md", "Approving the contract design"): (892, "1ca4a7e12410b7242cb6ad88854563a6bc919266fc61e0c5f3166f36ba7f50f6"),
 }
 
 
