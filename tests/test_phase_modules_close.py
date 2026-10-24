@@ -382,15 +382,19 @@ def test_the_glossary_names_the_modules_as_files():
 # sha256 of each variant-file section a `new` trace entry excuses (from its heading to the next heading of its level or
 # higher, LF, the whitespace at its end stripped), as TASK-014 leaves it: an entry excuses new text anywhere in its
 # section, so CI holds each section's text here (Review A, TASK-014, should-fix 3). A change to a pin is reviewed as a
-# new trace exception. TASK-022 writes the command and contract designs' bodies under headings of their own, with
-# entries of their own, and leaves these sections as they are; its first entry fails the last assertion below until
-# the increment adds its section here, pinned, so every new excused section of a variant file reaches a reviewer
+# new trace exception. TASK-022 wrote the command and contract designs' bodies under headings of their own, with
+# entries of their own, left the declaring sections as they were and added its four sections here; an entry without
+# its section here fails the last assertion below, so every new excused section of a variant file reaches a reviewer
 EXCUSED_SECTIONS = {
     ("interface/mockups.md", "What this variant is"): (620, "6d539112c3b10ecf7e20bdc5b76fcbcd6fdb2e4786212f2af947176914ce1298"),
     ("interface/mockups.md", "The design-tooling flow"): (3200, "d878dbcca05094b316960040e468e376b8b5bf76b9c64908a3be88c9efa5416e"),
     ("interface/command-design.md", "What this variant is"): (563, "bfc7ccc3704ff6b69361cc8ee16eb568a809634fa869b046b0b67a7d8ad87bd3"),
     ("interface/contract-design.md", "What this variant is"): (673, "00c28cc73cb732979930405822ee1f7a35f17e70fd540b73baf0d31fe0d16589"),
     ("interface/playable-prototype.md", "What this variant is"): (993, "b4cfca71dad76f4d3abaa1ee356b1c025c1d922626887958a84c45a3b5ca48eb"),
+    ("interface/command-design.md", "Writing the command design"): (2308, "8a65810907eea4954f7d6997e17441a815c1db76a26277a0d0bbcb1040d6a443"),
+    ("interface/command-design.md", "Approving the command design"): (1036, "814476197c6b11d00b55d5e9462cdec2997109939fdd8775275e8400a6fd10a5"),
+    ("interface/contract-design.md", "Writing the contract design"): (4482, "fe7807a0db32c3648a8368cdfcf1394e4ab65f61aed36111079c03124f172280"),
+    ("interface/contract-design.md", "Approving the contract design"): (892, "1ca4a7e12410b7242cb6ad88854563a6bc919266fc61e0c5f3166f36ba7f50f6"),
 }
 
 
