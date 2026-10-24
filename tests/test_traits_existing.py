@@ -215,6 +215,16 @@ def test_r016_r019_the_sources_no_longer_hold_the_moved_passages(key):
     critic no longer holds the lens bullets, and no other phase module holds either."""
     for _p, mod, start in MOVED[key]:
         assert start not in flat(module(mod)), (mod, start)
+    phases = []
+    for root, _dirs, names in os.walk(os.path.join(WORKFLOW, "phases")):
+        phases += [os.path.join(root, f) for f in names if f.endswith(".md")]
+    assert len(phases) >= 10, phases
+    for path in phases:
+        t = flat(read(path))
+        for _p, _mod, start in MOVED[key]:
+            assert start not in t, (path, start)
+        for lens in LENSES.get(key, []):
+            assert lens[:80] not in t, (path, lens[:80])
     pc = flat(read(PLAN_CRITIC))
     for lens in LENSES[key]:
         assert lens[:80] not in pc, lens[:80]
@@ -285,17 +295,39 @@ def test_r010_r016_has_screens_activates_the_mockups_and_gathers_the_interface_s
 
 def test_r019_the_two_checks_exist_only_in_external_services():
     """R-019, the plan's P11: the bounded remote wait (a brief constraint and an inspect check) and the deployed layout
-    tested before any deployment (a test check) are external services' new text, held nowhere else."""
+    tested before any deployment (a test check) are external services' new text, held nowhere else; the inspect check
+    names its reviewer and retries only a call that may run twice, the brief names a zero limit for one that may not,
+    and the layout test is for an increment that deploys or prepares a deployment (Review A, TASK-017 round 1)."""
     text = trait("external-services")
-    assert "is bounded" in flat(section(text, add_heading("delegation-loop.inspect-checks"), 2))
-    assert "is bounded" in flat(section(text, add_heading("delegation-loop.brief-constraints"), 2))
-    assert "the deployed layout is tested" in flat(section(text, add_heading("delegation-loop.test-checks"), 2))
+    inspect = flat(section(text, add_heading("delegation-loop.inspect-checks"), 2))
+    assert "is bounded" in inspect and "`diff-reviewer` checks" in inspect and "where it retries, a bounded retry" in inspect
+    assert "must not run twice" in inspect and "is not retried" in inspect
+    brief = flat(section(text, add_heading("delegation-loop.brief-constraints"), 2))
+    assert "is bounded" in brief and "the limit zero for a call that must not run twice" in brief
+    layout = flat(section(text, add_heading("delegation-loop.test-checks"), 2))
+    assert "the deployed layout is tested before any deployment" in layout and "deploys the part or prepares" in layout
     others = [CORE, PLAN_CRITIC]
     for root, _dirs, files in os.walk(WORKFLOW):
         others += [os.path.join(root, f) for f in files if f.endswith(".md") and f != "external-services.md"]
     for path in others:
         t = flat(read(path))
         assert "the deployed layout is tested" not in t and "Every remote wait the increment adds is bounded" not in t, path
+        assert "Every wait on a remote service in the diff is bounded" not in t, path
+
+
+def test_r017_installable_s_new_sentences_name_their_kinds():
+    """BUILD_PLAN TASK-017: each scoping sentence names the kinds `installer` and `install-script` and what a part of
+    another kind does; the packaging stage's names the `n/a` pass-over; the install-script delivery names the project's
+    `install-check.ps1` and no dialog (the registry: an addition at project-end.delivery reaches only its kind)."""
+    text = trait("installable")
+    for title, other in (("Which delivery kinds the intake passage is for", "takes its delivery questions from its type workflow"),
+                         ("Which delivery kinds the Delivery section is for", "records its kind's delivery as its type workflow says"),
+                         ("Which delivery kinds the packaging stage is for", "takes the packaging stage its type workflow adds")):
+        body = flat(section(text, title, 3))
+        assert "`installer`" in body and "`install-script`" in body and other in body, title
+    assert "`Installer verification` answer of `n/a` passes the lifecycle check over" in flat(section(text, "Which delivery kinds the packaging stage is for", 3))
+    script = flat(section(text, add_heading("project-end.delivery for install-script"), 2))
+    assert "`install-check.ps1` as the lifecycle verification" in script and 'no "already installed" dialog' in script
 
 
 def test_r016_r019_n7_and_n9_remain_in_the_core():

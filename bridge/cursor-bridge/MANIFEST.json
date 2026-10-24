@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-24 19:15",
+  "generated": "2026-10-24 19:38",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -123,8 +123,8 @@
     "cursor-bridge/workflow/phases/run-parameters.md": "7d37e1c3ab4dac2b2069b80998b28e6dfe1f8c68a849afa7a3bf415a2a9f73ed",
     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
     "cursor-bridge/workflow/trace-exceptions.md": "aad3d99e8fc87e29cd64bc3899558c2171514dce5d4dfdb99b9047f395778fbf",
-    "cursor-bridge/workflow/traits/external-services.md": "9533e452d90464008261b59c5040b99643a1bca41c25d5c75a6bc00b4890e044",
-    "cursor-bridge/workflow/traits/has-screens.md": "7f716db54942f1922b7f14492a65e4d9a291ed689f6fc7f43ea88e34c6237f51",
+    "cursor-bridge/workflow/traits/external-services.md": "83f325922b7d816d5040e99a58f0d31e5dc05ccf5324fa3f1ce999759e068034",
+    "cursor-bridge/workflow/traits/has-screens.md": "665507e53b95f5c63feb052e0a61e6ebdfeca2edf81939ade91fb7ca8dfde82b",
     "cursor-bridge/workflow/traits/installable.md": "4f5dc268853dc885d9ee69d1445992120b9c84aaba3c704283c80f17be35c200",
     "cursor-bridge/workflow/traits/performance-budgets.md": "f168b3bfa513a58520a18864bdaa618b6cfb0176b1a36a709e37bde48abd000c",
     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",

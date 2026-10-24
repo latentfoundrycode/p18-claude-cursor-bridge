@@ -20,7 +20,7 @@ Also for a UI-bearing project, add an **"Observability & Verifiability" section*
 
 ## Add at interface.variants
 
-A part with this trait runs the interface phase's mockups variant for its screens, `~/.claude/cursor-bridge/workflow/phases/interface/mockups.md`: the variant this trait activates, an addition and never a replacement. Design quality is measured, never asked (founding rule N7), and the running render is part of the gate (N9); both rules stay in the core, and the additions below are where the loop carries them out: the approved mockup and the frozen interface rules in every brief, the design auditor at the inspect step, the observability tests at the test step.
+A part with this trait runs the interface phase's mockups variant for its screens, `~/.claude/cursor-bridge/workflow/phases/interface/mockups.md`: the variant this trait activates, an addition and never a replacement. Design quality is measured, never asked (founding rule N7), and the running render is part of the gate (N9); both rules stay in the core, and the additions below are where the loop carries them out: the approved mockup and the frozen interface rules in the brief of every UI-bearing increment, the design auditor at the inspect step, the observability tests at the test step.
 
 ## Add at planning.acceptance-criteria
 

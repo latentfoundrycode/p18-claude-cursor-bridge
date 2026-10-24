@@ -24,12 +24,12 @@ secret/cost escalation, asked once per service.
 
 ## Add at delegation-loop.inspect-checks
 
-Every wait on a remote service in the diff is bounded: a call to a service run by others carries a timeout and a bounded retry, and a wait with no bound is a blocking finding, re-delegated like any defect (step 7).
+Every wait on a remote service in the diff is bounded: `diff-reviewer` checks, as it reads the diff, that a call to a service run by others carries a timeout and, where it retries, a bounded retry, and that a call which must not run twice (a paid call, a call that changes something at the service) is not retried; a wait with no bound is a blocking finding, re-delegated like any defect (step 7).
 
 ## Add at delegation-loop.test-checks
 
-Before any deployment, the deployed layout is tested: the part runs from the files and the configuration it will be deployed with, its configuration read as the deployed part reads it, and a test that passes only in the development layout does not count; a failing one is a correctness-class block (step 7).
+For an increment that deploys the part or prepares what will be deployed, the deployed layout is tested before any deployment: the part runs from the files and the configuration it will be deployed with, its configuration read as the deployed part reads it, and a test that passes only in the development layout does not count; a failing one is a correctness-class block (step 7).
 
 ## Add at delegation-loop.brief-constraints
 
-Every remote wait the increment adds is bounded: the brief names the timeout and the retry limit of each call to a service run by others, and the builder adds none without them.
+Every remote wait the increment adds is bounded: the brief names the timeout and the retry limit of each call to a service run by others, the limit zero for a call that must not run twice, and the builder adds none without them.
