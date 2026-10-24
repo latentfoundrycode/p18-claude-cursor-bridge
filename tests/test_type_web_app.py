@@ -243,7 +243,7 @@ def test_r023_the_web_deployment_procedure():
     assert "is the previous release deployed by the same procedure, in the mode of step 2" in t
     assert "The pause lasts until step 5 passes, step 3 stops the deployment, or step 6 has brought the previous release back and its check has passed; where step 6 ends without that (the owner declines its restore, or the restore or the previous release's check fails), until the owner says, as a decision of its own, to resume writes on the release then deployed and the data it holds, both of which the supervisor names when it tells them. An answer to step 6's question does not end it." in t
     assert "until their word" not in t
-    assert "If the restore fails, or the previous release fails its check, writes stay held and the owner is told." in t
+    assert "If the restore fails, or the previous release fails its check (an accepted marker there included, which contains the product as step 2 says and starts no second way back), writes stay held and the owner is told." in t
     assert "Once step 5 has passed and writes have resumed, the backup is no longer a way back that loses nothing: restoring it later discards the writes made since, which is the owner's question." in t
 
 
