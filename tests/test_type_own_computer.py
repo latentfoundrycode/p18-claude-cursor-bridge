@@ -94,8 +94,8 @@ def test_r024_each_file_is_a_title_and_its_change_sections_only(key):
 
 def test_r024_the_type_names_its_four_sub_types_by_what_the_user_meets():
     """BUILD_PLAN TASK-020: the type names its GUI, CLI, pipeline and local-service sub-types, each by the surface its
-    open-list definition turns on (a window, a terminal, nothing, other software through a protocol); every sub-type
-    the open list gives the type is named and none other; a part met through several takes the sub-type of the surface
+    open-list definition turns on (a window, a terminal, nothing, other software through a protocol); the open list
+    gives the type exactly these four, and each is named; a part met through several takes the sub-type of the surface
     it exists for, and one that exists for two equally pauses as intake's classification says (phases/intake.md)."""
     t = flat(body("own-computer", "Add at intake.questions"))
     subs = {k: r for k, r in rows("Sub-types").items() if r["Of type"] == "own-computer"}
@@ -124,12 +124,14 @@ def test_r024_local_service_adds_the_contract_design_and_for_commands_the_comman
     both variant files exist where the text points."""
     t = flat(body("local-service", "Add at interface.variants"))
     assert ("runs the interface phase's contract design variant for the protocol other software calls it through, "
-            "`~/.claude/cursor-bridge/workflow/phases/interface/contract-design.md`: the variant this sub-workflow "
+            "`~/.claude/cursor-bridge/workflow/phases/interface/contract-design.md`: the first variant this sub-workflow "
             "activates, an addition and never a replacement") in t
-    assert ("Where the part also has administrative commands a person types, as the TDP has, it runs the command design "
+    assert ("Where the part also has administrative commands a person types, it runs the command design "
             "variant for them too, `~/.claude/cursor-bridge/workflow/phases/interface/command-design.md`") in t
     assert "Each variant is added for its own kind of interface, so a part with both runs both, never one in place of the other." in t
     assert t.index("contract-design.md") < t.index("command-design.md")
+    # Review A, round 1: procedure text installed into every project names no project.
+    assert "TDP" not in text("local-service") and "TDP" not in text("own-computer")
     for name in ("contract-design.md", "command-design.md"):
         assert os.path.isfile(os.path.join(PHASES, "interface", name)), name
     line = [l for l in read(REGISTRY).split("\n") if l.startswith("| interface.variants |")]
