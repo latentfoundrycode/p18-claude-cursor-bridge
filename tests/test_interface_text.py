@@ -118,6 +118,8 @@ def test_r026_each_operation_says_who_may_call_it_and_how_the_part_tells():
               "the Host and Origin headers and refuses a call from a web page",
               "*A program holding the part's token* means a secret the caller presents and the part checks.",
               "*Only the part's own front end* means a secret the front end holds, never an Origin header or a client id.",
+              "*Only the client that started it* means a server an MCP client starts over its standard input and "
+              "output: it opens no listening socket, so its one caller is the process holding its pipes",
               "An operation that changes something or reads the owner's private data is open to any local program only "
               "if the owner approves exactly that at the gate.",
               "An operation open to every caller says so in those words."):
@@ -146,8 +148,8 @@ def test_r026_a_refused_call_changes_nothing_reveals_nothing_and_is_tested():
               "The refusal does not echo the credential presented, and it does not tell a thing that exists but is not "
               "the caller's apart from a thing that does not exist.",
               "The increment that enforces the contract then tests the refusals as well as the shapes of the replies: a "
-              "call without the secret, a call reaching outside its bound and, where the part speaks HTTP, a call from a "
-              "web page's origin and one with a wrong Host header."):
+              "call without the secret and one with a wrong secret, a call reaching outside its bound and, where the part "
+              "speaks HTTP, a call from a web page's origin and one with a wrong Host header."):
         assert s in w, s
 
 

@@ -393,7 +393,7 @@ EXCUSED_SECTIONS = {
     ("interface/playable-prototype.md", "What this variant is"): (993, "b4cfca71dad76f4d3abaa1ee356b1c025c1d922626887958a84c45a3b5ca48eb"),
     ("interface/command-design.md", "Writing the command design"): (2308, "8a65810907eea4954f7d6997e17441a815c1db76a26277a0d0bbcb1040d6a443"),
     ("interface/command-design.md", "Approving the command design"): (1036, "814476197c6b11d00b55d5e9462cdec2997109939fdd8775275e8400a6fd10a5"),
-    ("interface/contract-design.md", "Writing the contract design"): (4205, "03f29dedf5f4d56af0775248e3b0b6257c2a86d4d1e5a5ce316393bff0d4ac31"),
+    ("interface/contract-design.md", "Writing the contract design"): (4482, "fe7807a0db32c3648a8368cdfcf1394e4ab65f61aed36111079c03124f172280"),
     ("interface/contract-design.md", "Approving the contract design"): (892, "1ca4a7e12410b7242cb6ad88854563a6bc919266fc61e0c5f3166f36ba7f50f6"),
 }
 
