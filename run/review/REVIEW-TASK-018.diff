@@ -1,0 +1,530 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 117e4f8..33b2196 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.18a",
+-  "generated": "2026-10-24 19:38",
++  "generated": "2026-10-24 21:18",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -105,7 +105,7 @@
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/workflow-check.py": "ff87680ca972eb50abbda822443420f7c650b5fee9e8b607cdf9e6fcf27c9d73",
+     "cursor-bridge/workflow/extension-points.md": "b3973253f2bdf38fe9f329f1a0fb13604a221453c1d7f7bdfbd227013c0592d0",
+-    "cursor-bridge/workflow/open-list.md": "976ded7028cb6cfdd842f6b9330acc4e49a02bd529b05c327862b297e35f7b02",
++    "cursor-bridge/workflow/open-list.md": "7225f911bae2f17664961350c45eccb1d42b08b20a33befda1f6444c07ad29cf",
+     "cursor-bridge/workflow/phases/change-cycle.md": "8b4c12bd4afc80a4adcb2dfbd4ddecb0b5d20848805addd41daf6f04eeb3b37a",
+     "cursor-bridge/workflow/phases/configuration.md": "4bcb7792438ac85fa7b3246d70c8a0e042d6f0860670e0649c4bf11a4ddf4142",
+     "cursor-bridge/workflow/phases/delegation-loop.md": "baa4e3203e2ea4ab6ee5962e07c92e2ab4bff7e6ab41b8fb0dddb4703ed73f7e",
+@@ -122,11 +122,14 @@
+     "cursor-bridge/workflow/phases/reflection.md": "101ce7f3528f8f4624432b8ae1396bc799c12c0860174fafbe19b0c9042ae121",
+     "cursor-bridge/workflow/phases/run-parameters.md": "7d37e1c3ab4dac2b2069b80998b28e6dfe1f8c68a849afa7a3bf415a2a9f73ed",
+     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
+-    "cursor-bridge/workflow/trace-exceptions.md": "aad3d99e8fc87e29cd64bc3899558c2171514dce5d4dfdb99b9047f395778fbf",
++    "cursor-bridge/workflow/trace-exceptions.md": "9a095ce83e8a2a0ebc4108fd37f3f5d1294a97310ce9395c8865cfc6f029f2ce",
++    "cursor-bridge/workflow/traits/ai-models.md": "05724b8355c2e0118ce8ee3c24a92729f342ea05a2dccfb836a250dc42a4216f",
+     "cursor-bridge/workflow/traits/external-services.md": "83f325922b7d816d5040e99a58f0d31e5dc05ccf5324fa3f1ce999759e068034",
+     "cursor-bridge/workflow/traits/has-screens.md": "665507e53b95f5c63feb052e0a61e6ebdfeca2edf81939ade91fb7ca8dfde82b",
+     "cursor-bridge/workflow/traits/installable.md": "4f5dc268853dc885d9ee69d1445992120b9c84aaba3c704283c80f17be35c200",
++    "cursor-bridge/workflow/traits/long-running-process.md": "8e02916276f8348b5b8dbe7cc8edae7ad7ec4a6224400094c8259b43d75291a7",
+     "cursor-bridge/workflow/traits/performance-budgets.md": "f168b3bfa513a58520a18864bdaa618b6cfb0176b1a36a709e37bde48abd000c",
++    "cursor-bridge/workflow/traits/spends-money.md": "adaf76012bc4d1a15c7b417c0b2cdb56df1ceb4a8dff5f9056da860e48215a39",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+     "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
+diff --git a/bridge/cursor-bridge/workflow/open-list.md b/bridge/cursor-bridge/workflow/open-list.md
+index 2264c79..1f20d6e 100644
+--- a/bridge/cursor-bridge/workflow/open-list.md
++++ b/bridge/cursor-bridge/workflow/open-list.md
+@@ -65,9 +65,9 @@ A trait is a property that adds work whatever the product type. A part may have
+ | installable | Installable | Delivered as something the user installs | yes | release B |
+ | performance-budgets | Performance budgets | Speed, size or frame-rate targets are requirements | yes | release B |
+ | external-services | External services | Depends on services run by others | yes | release B |
+-| spends-money | Spends money | Its actions cost real money (paid APIs, purchases) | no | release B |
+-| long-running-process | Long-running process | Keeps a process running between uses (a server, a watcher) | no | release B |
+-| ai-models | AI models | Its results come from models, so correctness is judged by evaluation rather than by exact tests | no | release B |
++| spends-money | Spends money | Its actions cost real money (paid APIs, purchases) | yes | release B |
++| long-running-process | Long-running process | Keeps a process running between uses (a server, a watcher) | yes | release B |
++| ai-models | AI models | Its results come from models, so correctness is judged by evaluation rather than by exact tests | yes | release B |
+ | personal-data | Personal data | Holds data about people: accounts, sign-in, privacy, deletion | no | when a project first needs it |
+ | multiplayer | Multiplayer | Several people interact live through a server | no | release E, with the Roblox sub-workflow |
+ 
+diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
+index c32099b..6d98caf 100644
+--- a/bridge/cursor-bridge/workflow/trace-exceptions.md
++++ b/bridge/cursor-bridge/workflow/trace-exceptions.md
+@@ -79,3 +79,14 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
+ - new TASK-017 bridge/cursor-bridge/workflow/traits/external-services.md Add at delegation-loop.inspect-checks
+ - new TASK-017 bridge/cursor-bridge/workflow/traits/external-services.md Add at delegation-loop.test-checks
+ - new TASK-017 bridge/cursor-bridge/workflow/traits/external-services.md Add at delegation-loop.brief-constraints
++- new TASK-018 bridge/cursor-bridge/workflow/traits/spends-money.md Add at intake.questions
++- new TASK-018 bridge/cursor-bridge/workflow/traits/spends-money.md Add at configuration.items
++- new TASK-018 bridge/cursor-bridge/workflow/traits/spends-money.md Add at delegation-loop.brief-constraints
++- new TASK-018 bridge/cursor-bridge/workflow/traits/spends-money.md Add at delegation-loop.inspect-checks
++- new TASK-018 bridge/cursor-bridge/workflow/traits/long-running-process.md Add at configuration.items
++- new TASK-018 bridge/cursor-bridge/workflow/traits/long-running-process.md Add at delegation-loop.brief-constraints
++- new TASK-018 bridge/cursor-bridge/workflow/traits/long-running-process.md Add at delegation-loop.test-checks
++- new TASK-018 bridge/cursor-bridge/workflow/traits/ai-models.md Add at intake.questions
++- new TASK-018 bridge/cursor-bridge/workflow/traits/ai-models.md Add at design.sections
++- new TASK-018 bridge/cursor-bridge/workflow/traits/ai-models.md Add at configuration.items
++- new TASK-018 bridge/cursor-bridge/workflow/traits/ai-models.md Add at delegation-loop.test-checks
+diff --git a/bridge/cursor-bridge/workflow/traits/ai-models.md b/bridge/cursor-bridge/workflow/traits/ai-models.md
+new file mode 100644
+index 0000000..efcbcbe
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/traits/ai-models.md
+@@ -0,0 +1,17 @@
++# AI models
++
++## Add at intake.questions
++
++For a part whose results come from models, ask before design, and write each answer to the intake notes: which results a model produces; for each, the **evaluation set** that stands in for exact tests (the inputs, drawn from the owner's real cases, and what a good result is for each, as the owner judges it), and the **threshold** a result must meet (a share of the set passing, a score, a rate of a named failure no higher than a figure), each threshold the owner's value, fixed in a test (rule 52).
++
++## Add at design.sections
++
++The design has an **Evaluation** section: each evaluation set, where it lives and how it grows, the judge of each result (a rule a program checks, or a model of another family than the one judged, rule 51), and each threshold with its source, a result below it blocking the change at the test step.
++
++## Add at configuration.items
++
++Each model is **pinned**, a model judge included: its exact identifier and version, never a name that moves to a newer model, recorded in `docs/INVENTORY.md` (Resources), and changed only as a change of its own whose evaluation runs before and after. **Recorded outputs** have a home: the model's replies to the evaluation set, kept with the model's identifier and the date, under the project's test fixtures, and beside them a model judge's verdicts on them, judged again whenever the outputs are recorded again or anything that shapes the judged result from them changes (the code after the model's reply included), so that, while nothing that shapes the judged result changes, the evaluation runs again without calling any model; each verdict is kept with the judged result it read, so that a change to that result shows by comparison.
++
++## Add at delegation-loop.test-checks
++
++The evaluation runs against its thresholds on the recorded outputs and their recorded verdicts with the change's tests: a result below a threshold is a correctness-class block (step 7), and an exact-match assertion on a model's output, where the evaluation set should judge it, is a finding of its own. A change that alters the prompt, the model or its settings records new outputs first, and new verdicts on them; a change to the code that shapes the judged result from a recorded reply has that result judged again; each in a run the owner has approved where a model costs money, and the evaluation reads those. Until they are recorded, the evaluation does not pass on the verdicts recorded before the change: a change whose judged result changed and whose new verdicts are not yet recorded is blocked at the test step, however the old verdicts read. A judged result has changed where it differs from the one kept beside its verdict; where a model costs money, the block waits on the run the owner approved, which the supervisor starts (a builder runs no paid action), never on a re-delegation.
+diff --git a/bridge/cursor-bridge/workflow/traits/long-running-process.md b/bridge/cursor-bridge/workflow/traits/long-running-process.md
+new file mode 100644
+index 0000000..e57a4a0
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/traits/long-running-process.md
+@@ -0,0 +1,13 @@
++# Long-running process
++
++## Add at configuration.items
++
++A part that keeps a process running between uses (a server, a watcher, a scheduler) has, before its first increment, a written **start, stop and health** procedure: the one command that starts it, the one that stops it and everything it started, and the one that reports whether it is healthy, the start and stop commands taking the port and the data of the instance they start and stop, so that a test's instance runs and stops beside the instance the owner runs; each command is recorded in `docs/INVENTORY.md` (Resources: the process, its port or socket, its data, its log) and, for a project with a command-line surface, in its command reference, in the increment that builds it. Every run of the process the loop starts (a test, a demonstration, a check) meets founding rule N1's eight conditions, a run a test starts and stops being part of that test, so that no gate depends on a process it did not start; the conditions stay in the core (`supervisor.md`, "Founding rules", N1; Restructuring Plan §8.1): this addition is how a part that runs one keeps to them, never an exception to them.
++
++## Add at delegation-loop.brief-constraints
++
++A run leaves nothing running: a test starts an instance of its own, on a port and data of its own, never the instance the owner runs, and the brief says how a test starts that instance and how it stops it (the procedure's own start and stop commands given the test's port and data, or a fixture that calls them), and that every process the run starts is stopped before the run ends, its children included, a test failure no exception.
++
++## Add at delegation-loop.test-checks
++
++Nothing the run started is left running: after the change's tests and the suite, the supervisor checks that no process the tests started (one descended from the test run, or one on a test instance's port or data), and no port or socket such a process holds, outlives them; one that does is a correctness-class block (step 7), stopped by its process ID together with its children, or by the procedure's stop command given that instance's port and data, never by a command that reaches the instance the owner runs, and recorded with the test that left it. A process the owner started, or another session's, is left as it is.
+diff --git a/bridge/cursor-bridge/workflow/traits/spends-money.md b/bridge/cursor-bridge/workflow/traits/spends-money.md
+new file mode 100644
+index 0000000..ec4ee03
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/traits/spends-money.md
+@@ -0,0 +1,17 @@
++# Spends money
++
++## Add at intake.questions
++
++For a part whose actions cost real money (a paid API, a purchase, a metered model or service), ask before design, and write each answer to the intake notes: which actions cost money, on which **platform and account** each is charged; the **worst case** of each, the most one run of it can cost when it goes wrong as well as when it goes right (every retry, every item of the largest input, a run that does not stop), estimated in that platform's own units and in money; and the **cap** the owner sets, the most the project may spend in all, per month or per run as the owner names it, with what happens at the cap (the action stops and the owner is asked; never a silent overrun). The loop's own paid actions (a contract capture, a dry or paid run of an increment, a re-recording, a benchmark against a paid service) are tracked against the cap by the supervisor; where the product itself spends in the owner's use, the design states how the product enforces the cap, and the cap is a value the owner chose, fixed in a test (rule 52). This trait adds no design section, so the intake notes carry its two duties to the design as requirements of it: how the product enforces the cap, where it spends in the owner's use, and the folder that holds the store of paid results (its addition at `configuration.items`). No paid action of the loop runs without the owner's approval first, given in words for that action, with its estimate against the worst case and the platform and account named in the same sentence; an approval covers the action it names, never the next one. A paid call is a remote call, whose wait the trait *external services* bounds (its addition at `delegation-loop.inspect-checks`), so a part that pays a remote service is classified with *external services* too, which the design gate's trait decision checks.
++
++## Add at configuration.items
++
++**The store of paid results.** Before the first paid action, configure where its results are kept: a folder the design names, which no clean, reset, cache purge or test teardown reaches, each result kept with the request that bought it, so that a retry, a rerun or a crash reads the result already paid for instead of buying it again. Its path is a Resources row of `docs/INVENTORY.md`. **The cap** is recorded where the owner can read it: a Decisions row `Spending cap: <amount> <per month or per run> on <platform and account> (<the owner's words>, <date>)`, beside the provider's own spending limit in the account's Resources row, which configuration's spending-limits item sets.
++
++## Add at delegation-loop.brief-constraints
++
++The builder runs no paid action: a brief that needs one says so, and the paid run is the supervisor's, after the owner's approval for it. Every paid call the part's code makes goes through the store of paid results: its result written there with the request that bought it, and the store read before a call is bought, so a retry never buys twice. Before any paid run, the brief's increment has run once **dry**: on a copy of the data, with a stand-in provider that answers as the real one does (its recorded replies, the trait *external services*' contract capture) and charges nothing, the run's every paid call counted and compared with the estimate. The first paid run of a contract capture, which has no recorded replies to stand in yet, and a paid action with no remote service behind it (a purchase) run instead at the smallest size that answers them, under their own approval, their paid calls counted beforehand against the estimate.
++
++## Add at delegation-loop.inspect-checks
++
++No paid action ran unapproved, and none bypassed the store: the supervisor reads the run's log and the store of paid results, and the provider's usage for the run's time where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet); a paid call with no approval naming it, or a paid call in the diff that does not both read the store first and write its result there, is a blocking finding, a paid call that ran unapproved also recorded as an issue and told to the owner in the next report's first line with its amount, platform and account.
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 5a44a79..f8f95be 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -251,6 +251,15 @@ Every lead above that this revision was to place has its increment in docs/BUILD
+ - **Lead (Review A, TASK-017):** installable's install-script delivery reads "as 'Deliver the installer' above", text standing in the `for installer` section, which the registry says reaches only installer parts; it holds because the hook names the trait file whole and the supervisor reads it whole (the Done when's "the sentences both kinds share stand once"). Check: if any reader comes to compose additions per kind, the install-script section states its steps in full.
+ - **Lead (Review A, TASK-017):** installable's packaging lens is scoped by its own parenthetical (a desktop application, a command-line tool, a local server), not by the kind keys the other scoping sentences use, so the bridge itself (kind `host-installation`, trait installable) carries it in a plan critique and must read it as not applying. Check: a scoping `###` after the lens, naming the kinds, at TASK-021's classification of the bridge or the next edit of the file.
+ 
++### TASK-018, the new trait files (2026-10-24)
++- **Checkpoint run (step 4):** tests/test_traits_new.py and tests/test_b3_least_confident.py run once against b03fd42 in a read-only worktree: 28 failed, 78 passed; the new file's one passing test there is the guard that the workflow check passes over workflow/, which holds on both sides; the eleven new pins fail and the earlier pins pass.
++- **Round 1: Review A REJECT (2/5/3), the secret sentinel CLEAR.** Both blocking items taken: the dry run needs recorded replies, which a first contract capture does not yet have, so a capture's first paid run and a paid action with no remote service run at the smallest size under their own approval, counted beforehand; and the store of paid results reached neither the builder nor the gate, so every paid call the part's code makes goes through it (a brief constraint) and a paid call that bypasses it is a blocking finding (the inspect check). The five should-fixes taken: the provider's usage read only where a Resources row records a way, else by the owner at the stage close; the approval covers the loop's paid actions, the product enforcing the cap in the owner's use as a value fixed in a test (rule 52); the process's commands recorded in the increment that builds them; a model judge pinned and its verdicts recorded; the design's Evaluation section stating the test step's block. Two considers taken: the copy check reads the plan critic and the other trait files; the N1 guard reads each of the eight conditions. The third (the workflow-check test holds on both sides) is accepted: a guard on the state, as the checkpoint run says.
++- **Lead (Review A, TASK-018, intent):** the open list defines *long-running process* as keeping a process running between uses, while N1's fourth condition says a background process stops when idle. The trait binds the runs the loop starts (a test, a demonstration, a check) to N1, as §6.8's "the conditions of 8.1" says, and leaves the product's own lifetime to its design. Check: TASK-020's local service, which the owner keeps running, states its lifetime in its type file; if the owner wants N1's idle stop for a product's service too, that is the owner's question at TASK-020's design, not this trait's.
++- **Round 2: Review A APPROVE (0/3/1),** every round-1 finding fixed at its cause; the three new should-fixes and the consider taken: the intake notes carry spends money's two duties to the design (how the product enforces the cap; the store's folder), since the trait adds no design section; the inspect check fails a paid call that does not both read the store and write to it; a model judge's verdicts are judged again when the code that shapes the judged result changes; a run a test starts and stops is part of that test, so N1's fifth condition (no gate depends on it being up) reads as no gate depending on a process the test did not start.
++- **Review B, round 1: REJECT, two findings, both taken.** The nothing-left-running check would have stopped the instance the owner runs (it named every process the part runs, and the procedure's stop command stops them all): a test now starts an instance of its own, on a port and data of its own, and the check stops only what started during the tests, by itself and its children, leaving the owner's process as it is. A model judge's re-judging could be skipped where it costs money, and the evaluation then read a stale pass: until new verdicts are recorded, a change whose judged result changed is blocked at the test step. Review A had read both sections twice (convergence did not hold here; the cross-family read caught what the Anthropic one missed).
++- **Review B, round 2: APPROVE; Review A's read of the round-1 fixes: APPROVE, two should-fix and two consider, all taken.** The start and stop commands take the port and the data of the instance they start and stop, so that the brief's test instance can run beside the owner's; the nothing-left-running check tells what the tests started by descent from the test run or by a test instance's port or data, never by start time alone (which would catch another session's process), stops it by its process ID with its children or by the stop command given that instance's port and data, and leaves the owner's and another session's processes as they are; each model judge's verdict is kept with the judged result it read, so that a changed result shows by comparison, and where a model costs money the block waits on the run the owner approved, which the supervisor starts, never on a re-delegation. Review B reads the change again.
++- **Review A's confirming read of ce44062: APPROVE, two considers, kept as leads.** (1) A test instance told by its port or data cannot be told from another session's instance on the same fixed port, and the two collide there: the brief constraint could have each run take a port and a data folder of its own (a free port chosen at start); a lead for TASK-020's local service. (2) A judged result that varies between identical runs (a timestamp, an id, an unordered collection) differs from the kept one on every change: the comparison could read a normalised form, or the design's Evaluation section name what it ignores; a lead for the first project with the trait AI models.
++
+ ### Placed by the stage B4 plan revision (2026-10-24, subject `traits`)
+ The reality check before TASK-017's first edit (run/supervisor/task017-reality-check.md) is recorded in docs/DESIGN_CRITIQUE.md under the subject; its findings are in TASK-017's Scope and Done when. Leads this revision places: FIX-004's lead above (item 2's pins cover the phase modules only, the trait and type files' entries excused by nothing yet) is **TASK-017**'s and **TASK-018**'s, whose Scopes hold tests/test_b3_least_confident.py and whose Done when name the derivation of every new trace entry; stage B3's lead for planning.md's project-end pointer (planning.md:109) is **TASK-035**'s, as the pace revision placed it (above); the open list's headroom and its step 2 rewording stay the briefs' checks as recorded under stage B2. What stays in the main workflow with no increment (INVENTORY, Decisions): the configurator paragraph's performance-floor clause, the reviewer-routing table's UI-bearing row, intake's security-context paragraph, planning's two-critic paragraph with its UI clause, project end's User Manual item with its install and command-reference chapters, run-parameters.md's template fence, the refactoring pass's performance inputs and optimization candidates, the promotion pass's Performance-Patterns entries, the change cycle's packaging re-run, reflection item 2b's clause, interface.md's sentences naming what activates each variant, step 6's title and first sentence.
+ - **Lead (Review B, subject `traits`, round 1):** run-parameters.md's template gloss `n/a (not a desktop application)` misreads a command-line tool or a local server when read alone; the parameter's own item names both. Check: reword the gloss at the next edit of that fence that pays its `reword` anyway (the fence is one trace unit under a whole-phase baseline heading). Landing, in TASK-034's Done when: TASK-034 edits the paragraph directly after the fence (run-parameters.md:70), a baseline unit under the same heading, so that increment pays the whole-phase `reword` and the gloss changes with it (the resolution round of 2026-10-24, both critics voting to leave it until then).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 99e4183..3ffc75e 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -28,6 +28,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The closing modules | change-cycle.md, reflection.md and project-end.md open with their compaction-survival lists; the change cycle runs the interface variant of every kind of interface a change touches (amending what was approved, re-presenting no untouched kind) and keeps its step on the `Change cycle:` line; the reflection points and project end keep their finished steps in run/supervisor/in-flight.md; every Issues entry gives the incident's time and a `Compaction before:` line; the promotion pass reads the inventory's `Flagged trait:` rows and proposes each trait as the maintainer could write it; reflection.md declares `reflection.items` and project-end.md `project-end.completion-conditions` and `project-end.delivery`, the change cycle none, and a test cross-checks the registry against every module; each interface variant file's declaring paragraph has a heading of its own | bridge/cursor-bridge/workflow/phases/change-cycle.md; .../reflection.md; .../project-end.md; .../interface/*.md | tests/test_phase_modules_close.py | release B (TASK-014) |
+ | The hook's module pointers | After a compaction, resume or fork the session-start hook names the current phase's module files (one Phase→module table, every template value), the files a module's `Sub-files:` and `Variants:` lines name, and the type, sub-type and trait files that touch the phase, in the order additions apply; it reads the open list and the registry only at their installed paths and through no link; a table or checker it cannot read or use gives one plain line and names no conditional or pointer-line file; nothing the checker returns is printed except as an exact str matching its pattern, what the checker prints through sys.stdout and sys.stderr is discarded (an exception's type name included, which is read inside a redirection of its own), a phase module line from the checker's file_lines that is not an exact str makes the checker unusable (the one plain line), each pointer path is taken exactly as written between `; ` separators (only the line's end is stripped), and the hook exits 0 | bridge/cursor-bridge/session-start.py | tests/test_session_start_module.py; tests/test_session_start.py | release B (TASK-015; hardened by FIX-003 before the first pointer line) |
+ | The first trait files | has screens, installable, performance budgets and external services, each a `#` title and `## Add at <point key>` sections: the phase modules' and the plan critic's conditional passages moved there unit by unit (three split at the sentence, each split's parts equal to the baseline unit in its sentence order), new text only in a `###` sub-section after the moved units, each with a `new` entry; has screens activates the mockup variant and gathers the screen inventory, the interface ruleset, the design tooling, the frozen-rule brief constraint, the design auditor and the observability criteria and tests (founding rules N7 and N9 stay in the core); installable the delivery questions, the Delivery section, the code-signing escalation, the packaging stage with the command reference and the delivery for the kinds `installer` and `install-script`, each scoped to those kinds; performance budgets the budgets at intake, their mechanisms in the design, the benchmark increment, its lens and the benchmark floor; external services the contract capture and its lens, and as new checks the bounded remote wait and the deployed layout tested before any deployment; the registry widens `planning.stages` to increments and adds `planning.acceptance-criteria`; the plan critic keeps its design lenses and flags a missing trait; design's trait gate carries the traits' plan lenses and asks a trait added there its questions; the four open-list rows are written | bridge/cursor-bridge/workflow/traits/*.md; bridge/cursor-bridge/workflow/extension-points.md; .../phases/*.md; bridge/agents/plan-critic.md | tests/test_traits_existing.py; trace-check.py (424 passages, 0 dropped, 14 excused); tests/test_b3_least_confident.py (every excused trait section pinned) | release B (TASK-017) |
++| The new trait files | spends money, long-running process and AI models, new text throughout, each a `#` title and `## Add at <point key>` sections, each section under its own `new` entry: spends money asks at intake which actions cost money, on which platform and account, their worst case and the owner's cap, every paid action approved first, a paid call being a remote call whose wait external services bounds (so a part that pays a remote service has that trait too), keeps paid results in a store nothing discards, records the cap, keeps paid actions out of builder runs, runs dry on a copy with a stand-in provider first, and checks that no paid action ran unapproved; long-running process points at founding rule N1 (which stays in the core) and adds the start, stop and health procedure, a run that leaves nothing running and the check of it; AI models adds evaluation sets and thresholds in place of exact tests, an Evaluation design section, pinned models, recorded outputs and the evaluation on them | bridge/cursor-bridge/workflow/traits/spends-money.md; .../long-running-process.md; .../ai-models.md | tests/test_traits_new.py; tests/test_b3_least_confident.py (every section pinned) | release B (TASK-018) |
+ 
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 65e4b83..d536b67 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,20 +3,20 @@ Last updated: 2026-10-24
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at the merge of TASK-017 (PR #68); next is TASK-018
+-Last accepted: TASK-017 (PR #68, at its merge): the trait files has screens, installable, performance budgets and external services, their passages moved out of the phase modules and the plan critic unit by unit, the registry's two refinements (`planning.stages` widened, `planning.acceptance-criteria` added), R-010 and R-016 to R-019 built (tests/test_traits_existing.py); before it the stage B4 plan revision (PR #67, approved by the owner on 2026-10-24: "I approve of the plan"), TASK-022 (PR #66, R-026 built), FIX-004 (PR #65) and the pace plan revision (PR #64); stage B3's close records (PR #63) and the stage's pull requests #47 to #62; main holds TASK-001 to TASK-017, TASK-022, BUG-001 to BUG-019, the refactoring passes of B2 and B3, HOTFIX-001, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Increment: none — this file states the position at the merge of TASK-018 (PR #69); next is TASK-019
++Last accepted: TASK-018 (PR #69, at its merge): the trait files spends money, long-running process and AI models, new text throughout, R-020 to R-022 built (tests/test_traits_new.py); before it TASK-017 (PR #68): the four trait files moved out of the phase modules and the plan critic, R-010 and R-016 to R-019 built; before it the stage B4 plan revision (PR #67, approved by the owner on 2026-10-24: "I approve of the plan"), TASK-022 (PR #66, R-026 built), FIX-004 (PR #65) and the pace plan revision (PR #64); stage B3's close records (PR #63) and the stage's pull requests #47 to #62; main holds TASK-001 to TASK-018, TASK-022, BUG-001 to BUG-019, the refactoring passes of B2 and B3, HOTFIX-001, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: none
+-Next: TASK-018 (the trait files spends money, long-running process and AI models; supervisor-authored; on Opus 5.5), then TASK-019 to TASK-021. Until TASK-031's own pull request merges, plan-check.py's READY is not trusted for TASK-031 or for TASK-030 and TASK-025, which depend on it: it counts TASK-031 merged from BUG-018's title (BUILD_PLAN, TASK-031's note; ISS-013), and no pull-request title that is not an increment's names a plan ID inside its closing parenthesis.
++Next: TASK-019 (the type workflow web app and its sub-type local web app, the video factory and reAngle classified; supervisor-authored; on Opus 5.5), then TASK-020 and TASK-021. Until TASK-031's own pull request merges, plan-check.py's READY is not trusted for TASK-031 or for TASK-030 and TASK-025, which depend on it: it counts TASK-031 merged from BUG-018's title (BUILD_PLAN, TASK-031's note; ISS-013), and no pull-request title that is not an increment's names a plan ID inside its closing parenthesis.
+ Deviations accepted: none
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+ Layout: Workspace=E:\p18-claude-cursor-bridge\Workspace  Documents=E:\p18-claude-cursor-bridge\Documents
+ Worktrees: none
+ In flight: none
+-Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); the closed gates' files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, status_<id>.py, task0nn_*.py, bug017_*.py to bug019_*.py) of stages B1 to B3; the stage reviews' writers and findings (write_stage_b1.py, write_stage_b3.py, SCOPE-STAGE-B3*.md, stage-b3-review-r1.md to -r4.md); the refactoring pass's refactor-B3-* and refac_b3_tests.py; maintainer-windowless.md, maintainer-pace.md (the pace update's request), design_windowless_file.py, design_pace_file.py (the pace critique's file writer), pace_r2/ and msg-pace-*.txt (its round texts and commit messages), pace_shares.py (the gate's rounds-per-increment figures); task017-reality-check.md (the map TASK-017 is built from), design_traits_file.py and design_traits_r1_file.py (the traits critique's file writers), plan_traits_*.py and msg-plan-traits-*.txt (its edit scripts and commit messages), write_review_plantraits.py and SCOPE-PLAN-TRAITS.md (PR #67's gate); task017_apply.py, task017_constants.py, task017_write_test.py, task017_pins.py, task017_b3pins.py and task017_records.py (TASK-017's moves, its test, its pins and these records), write_review_task017.py and SCOPE-TASK-017.md (its gate); the mutation drivers fix002_mutants.py, task016_mutants.py and task015_mutants.py (63 mutants; re-anchor it on session-start.py's text before reuse) with stage B2's drivers and sweeps; demo_b2.py, demo_b3.py; drafts/ (drafts/task012/ and drafts/task022/: the command- and contract-design bodies TASK-022 started from; drafts/task022-notes.md: TASK-012's security audit's three advisories); CONFIG-B3b-r3-partial.diff and the CONFIG-B3b checks; hotfix-position.md and hotfix/; runsheet-socket-key-2026-10-16.md; maintainer-b2.md
++Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); the closed gates' files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, status_<id>.py, task0nn_*.py, bug017_*.py to bug019_*.py) of stages B1 to B3; the stage reviews' writers and findings (write_stage_b1.py, write_stage_b3.py, SCOPE-STAGE-B3*.md, stage-b3-review-r1.md to -r4.md); the refactoring pass's refactor-B3-* and refac_b3_tests.py; maintainer-windowless.md, maintainer-pace.md (the pace update's request), design_windowless_file.py, design_pace_file.py (the pace critique's file writer), pace_r2/ and msg-pace-*.txt (its round texts and commit messages), pace_shares.py (the gate's rounds-per-increment figures); task017-reality-check.md (the map TASK-017 is built from), design_traits_file.py and design_traits_r1_file.py (the traits critique's file writers), plan_traits_*.py and msg-plan-traits-*.txt (its edit scripts and commit messages), write_review_plantraits.py and SCOPE-PLAN-TRAITS.md (PR #67's gate); task017_apply.py, task017_constants.py, task017_write_test.py, task017_pins.py, task017_b3pins.py and task017_records.py (TASK-017's moves, its test, its pins and these records), write_review_task017.py and SCOPE-TASK-017.md (its gate); drafts/task018/, task018_apply.py, task018_records.py, write_review_task018.py and SCOPE-TASK-018.md (TASK-018); the mutation drivers fix002_mutants.py, task016_mutants.py and task015_mutants.py (63 mutants; re-anchor it on session-start.py's text before reuse) with stage B2's drivers and sweeps; demo_b2.py, demo_b3.py; drafts/ (drafts/task012/ and drafts/task022/: the command- and contract-design bodies TASK-022 started from; drafts/task022-notes.md: TASK-012's security audit's three advisories); CONFIG-B3b-r3-partial.diff and the CONFIG-B3b checks; hotfix-position.md and hotfix/; runsheet-socket-key-2026-10-16.md; maintainer-b2.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #68, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24 (CFG-B3, FIX-001, CONFIG-B3b, FIX-002, TASK-016, TASK-010 with TASK-015, TASK-011, FIX-003, TASK-012, TASK-013, TASK-014; REFAC-B3; the stage review's four rounds, the first three's fixes BUG-017 to BUG-019, round 4 approved); the pace plan revision approved 2026-10-24 (PR #64); stage B3's least-confident items 1 and 2 settled by FIX-004 (PR #65); B4 (the first conditional workflows) in progress: TASK-022 (PR #66); the stage's plan revised before TASK-017 (subject `traits`, approved 2026-10-24, PR #67); TASK-017 (PR #68); next TASK-018. Last reflection: stage B3's close, 2026-10-24 (demonstration passed; conformance 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-011 to ISS-013 completed; Feedback FB-026 to FB-041; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #69, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24 (CFG-B3, FIX-001, CONFIG-B3b, FIX-002, TASK-016, TASK-010 with TASK-015, TASK-011, FIX-003, TASK-012, TASK-013, TASK-014; REFAC-B3; the stage review's four rounds, the first three's fixes BUG-017 to BUG-019, round 4 approved); the pace plan revision approved 2026-10-24 (PR #64); stage B3's least-confident items 1 and 2 settled by FIX-004 (PR #65); B4 (the first conditional workflows) in progress: TASK-022 (PR #66); the stage's plan revised before TASK-017 (subject `traits`, approved 2026-10-24, PR #67); TASK-017 (PR #68), TASK-018 (PR #69); next TASK-019. Last reflection: stage B3's close, 2026-10-24 (demonstration passed; conformance 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-011 to ISS-013 completed; Feedback FB-026 to FB-041; least confident in HARDENING; Project Summary patched)
+ Open issues: ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged, 2026-10-23; the records fixed by BUG-019; the plan check's rule is TASK-033's). ISS-012 fixed (Review B's pytest caches under run/review/ voided REFAC-B3's first APPROVE, 2026-10-22; the directive sends scratch files to the system temporary folder). ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; the maintainer's process-start record of 2026-10-20 shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031, approved 2026-10-20). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
+ Maintainer requests: the pace update (2026-10-20; run/supervisor/maintainer-pace.md): a code-review round ceiling, one mutation run per increment, a pace report; placed by the owner on 2026-10-22 ("a": stage B5 beside TASK-028 to TASK-031; INVENTORY, Decisions), the maintainer told; designed as R-042 to R-044 and TASK-032 to TASK-035 and approved 2026-10-24 with the ceiling at three ("I choose three"). Earlier: the windowless fix (TASK-028 to TASK-031, PR #57); Release B2 (FB-021; INVENTORY, Decisions)
+ Bridge version: 2026.10.18a
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 2659093..09402d9 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -23,9 +23,9 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-017 | Trait *installable* written: the delivery conventions — installers, install scripts, the command reference, the packaging stage, installer verification. | DESIGN §6.8 | built | tests/test_traits_existing.py (the test_r017_r018_ test and the four-trait test_r016_r019_ tests: bridge/cursor-bridge/workflow/traits/installable.md, its additions at their points, its moved units word for word and its sources without them; TASK-017); workflow-check.py passes over workflow/ |
+ | R-018 | Trait *performance budgets* written: budgets at intake, their mechanisms in the design, benchmarks, the benchmark floor, the performance lens. | DESIGN §6.8 | built | tests/test_traits_existing.py (the test_r017_r018_ test and the four-trait test_r016_r019_ tests: bridge/cursor-bridge/workflow/traits/performance-budgets.md, its additions at their points, its moved units word for word and its sources without them; TASK-017); workflow-check.py passes over workflow/ |
+ | R-019 | Trait *external services* written: contract capture before an adapter is built, replay of recorded responses, and the deployed-layout-tested-before-deployment / bounded-remote-wait checks. | DESIGN §6.8, §6.3 (P11) | built | tests/test_traits_existing.py (test_r019_the_two_checks_exist_only_in_external_services and the four-trait test_r016_r019_ tests: bridge/cursor-bridge/workflow/traits/external-services.md, its additions at their points, its moved units word for word and its sources without them; TASK-017); workflow-check.py passes over workflow/ |
+-| R-020 | Trait *spends money* written: an approval before any paid action, the estimate against the worst case, a cap, the platform and account named, the §13.1 store of paid results that is never discarded, and a dry run on a copy before any paid run. | DESIGN §6.8, §13.1 | planned | — |
+-| R-021 | Trait *long-running process* written: it points at founding rule N1/§8.1 (which stays in the core) and adds start, stop, and health; nothing left running; the brief constraint. | DESIGN §6.8, §8.1 | planned | — |
+-| R-022 | Trait *AI models* written: evaluation sets and thresholds in place of exact tests; pinned models; recorded outputs. | DESIGN §6.8 | planned | — |
++| R-020 | Trait *spends money* written: an approval before any paid action, the estimate against the worst case, a cap, the platform and account named, the §13.1 store of paid results that is never discarded, and a dry run on a copy before any paid run. | DESIGN §6.8, §13.1 | built | tests/test_traits_new.py (the test_r020_ tests and the three-trait test_r020_r022_ tests: bridge/cursor-bridge/workflow/traits/spends-money.md, new text at its points and no other, each section under its own `new` entry; TASK-018); workflow-check.py passes over workflow/ |
++| R-021 | Trait *long-running process* written: it points at founding rule N1/§8.1 (which stays in the core) and adds start, stop, and health; nothing left running; the brief constraint. | DESIGN §6.8, §8.1 | built | tests/test_traits_new.py (the test_r021_ tests and the three-trait test_r020_r022_ tests: bridge/cursor-bridge/workflow/traits/long-running-process.md, new text at its points and no other, each section under its own `new` entry; TASK-018); workflow-check.py passes over workflow/ |
++| R-022 | Trait *AI models* written: evaluation sets and thresholds in place of exact tests; pinned models; recorded outputs. | DESIGN §6.8 | built | tests/test_traits_new.py (test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_outputs and the three-trait test_r020_r022_ tests: bridge/cursor-bridge/workflow/traits/ai-models.md, new text at its points and no other, each section under its own `new` entry; TASK-018); workflow-check.py passes over workflow/ |
+ | R-023 | Type workflow *web app* and sub-type *local web app* written. | DESIGN §6.8, §6.9 | planned | — |
+ | R-024 | Type workflow *software on your own computer* and sub-type *local service* written. | DESIGN §6.8, §6.9 | planned | — |
+ | R-025 | Type workflow *host extension* and sub-type *Claude Code extension* written: the host's behaviour as verified facts with the version checked, tests inside the real host, delivery as installation into the host. | DESIGN §6.9 | planned | — |
+diff --git a/docs/ROSTER.resolved.json b/docs/ROSTER.resolved.json
+index 0031a18..1c929cd 100644
+--- a/docs/ROSTER.resolved.json
++++ b/docs/ROSTER.resolved.json
+@@ -10,6 +10,6 @@
+   },
+   "other_pool": "exhausted",
+   "probed": true,
+-  "resolved_at": "2026-10-24T17:46 UTC",
++  "resolved_at": "2026-10-24T19:27 UTC",
+   "reset_day": 16
+ }
+diff --git a/project.json b/project.json
+index 357e508..8d34e7d 100644
+--- a/project.json
++++ b/project.json
+@@ -5,7 +5,7 @@
+   "version": "2026.10.18a",
+   "state": {
+     "phase": "building",
+-    "stage": "B1 to B3 closed; the pace plan revision approved 2026-10-24; B4 in progress (TASK-022 and TASK-017 merged; TASK-018 next)",
++    "stage": "B1 to B3 closed; the pace plan revision approved 2026-10-24; B4 in progress (TASK-022, TASK-017 and TASK-018 merged; TASK-019 next)",
+     "bridge": "2026.10.18a",
+     "updated": "2026-10-24"
+   }
+diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
+index 83f0d24..07e1a57 100644
+--- a/tests/test_b3_least_confident.py
++++ b/tests/test_b3_least_confident.py
+@@ -160,6 +160,10 @@ EXCUSED_MODULE_SECTIONS = {
+     ("run-parameters.md", "Extension points"): (683, "5ef8d017187dfd16f8fa971a8e7ef3551136b497387f14e9477562f84331976c"),
+     ("run-parameters.md", "What must survive a compaction"): (821, "d67698de27c0e6d55d3d347079911111df122fb0b3cb667fcb937b4ff1f55979"),
+     ("run-parameters.md", "Writing the answers down"): (779, "ed3fe29e9fe1c96fa0348e57540a525572f2a646250b2adae046fc231b17b731"),
++    ("traits/ai-models.md", "Add at configuration.items"): (869, "ca632cfc9deaf4672832fd25d2a1960cba068bb5582925ae924b42759c881b52"),
++    ("traits/ai-models.md", "Add at delegation-loop.test-checks"): (1135, "3fc214c80f94e1b98fe1d8ab961d74f1e9fb191942dafc8f02bbb76672e76b53"),
++    ("traits/ai-models.md", "Add at design.sections"): (325, "2f905de7f6e5d8b7f7c01c9f93afaeec794d9c20482ed2177211ac032b4f73da"),
++    ("traits/ai-models.md", "Add at intake.questions"): (529, "20e891d7b9c1e96dd4f1c2951030ed089834e66ee50ab9548bac19c69092020a"),
+     ("traits/external-services.md", "Add at delegation-loop.brief-constraints"): (273, "e19a9657e8871232fd956bf6e14673e86457026f88a1fbd564dcd926b32c5a32"),
+     ("traits/external-services.md", "Add at delegation-loop.inspect-checks"): (439, "ff3dde12e5e044f461431458e96384a7f0f08a0e78a12b7daf74b63c38a7f3e1"),
+     ("traits/external-services.md", "Add at delegation-loop.test-checks"): (419, "6e3340c6127ca19cfb60997566f496159c87685169f40cb94139e3e06b3884e7"),
+@@ -174,8 +178,15 @@ EXCUSED_MODULE_SECTIONS = {
+     ("traits/installable.md", "Which delivery kinds the Delivery section is for"): (236, "db56fef951c7aba1a67b796d4d85e19d2c58bcc218d0246737d0468591a82cac"),
+     ("traits/installable.md", "Which delivery kinds the intake passage is for"): (273, "ac97680fd2fe85b751ea032c449418d2178ed307e0bbee73dade1c86f6379ea3"),
+     ("traits/installable.md", "Which delivery kinds the packaging stage is for"): (295, "51a6686b489336f334218346d1514999765a3ee2f7a6dfad70d7595d22bd1df4"),
++    ("traits/long-running-process.md", "Add at configuration.items"): (1126, "8c519174065a3fb315e7f683241cb1ab586f94d652d9830359089529b5a471b9"),
++    ("traits/long-running-process.md", "Add at delegation-loop.brief-constraints"): (479, "dc52685ab9d4112a16acbe97a1731c5215ced74f88737ca6448822bb28d6fdc2"),
++    ("traits/long-running-process.md", "Add at delegation-loop.test-checks"): (661, "812d870334a6574c22154268eec05a5dd3b0dc760bceafcf4318e748d1964c0e"),
+     ("traits/performance-budgets.md", "Add at planning.critic-lenses"): (321, "464ee6c2b87edda66ee707a2081737826b3afa823d54c036df9afa2949d43b84"),
+     ("traits/performance-budgets.md", "The mechanism and the hot path"): (488, "96fb8f084311c8ec4c9b853d3b6a71e50eb159055a22f03888f4d9a69a23b97d"),
++    ("traits/spends-money.md", "Add at configuration.items"): (713, "97aa5573d5661618d7436dc1b5f06ed9a755b9da3713bedf65c4e35228125fd3"),
++    ("traits/spends-money.md", "Add at delegation-loop.brief-constraints"): (986, "e4aba6a5946681595c0f1ff19dd3e3fc65b4e308e02506907fc20d877154648d"),
++    ("traits/spends-money.md", "Add at delegation-loop.inspect-checks"): (634, "21599c27ab2a9814894195f6019af8f42cef3a57a972c6595d042ff32e94ebc9"),
++    ("traits/spends-money.md", "Add at intake.questions"): (1854, "ffd8aaaf3d1562ceedfd8c2a4f070b2862bc90d4ca5b792bbf6a727dfcd82c80"),
+ }
+ 
+ 
+diff --git a/tests/test_traits_new.py b/tests/test_traits_new.py
+new file mode 100644
+index 0000000..7bda196
+--- /dev/null
++++ b/tests/test_traits_new.py
+@@ -0,0 +1,250 @@
++"""TASK-018: the trait files spends money, long-running process and AI models (R-020, R-021, R-022), new text
++throughout.
++
++enforces: docs/BUILD_PLAN.md TASK-018 (its Done when: each file one `#` title and `## Add at <point key>` sections and
++nothing else, each section under a `new` entry naming the file and the heading, the points each adds at and no other,
++what each names, N1/§8.1 left in the core, the pointer at external services' bounded wait, the three rows written,
++the workflow check passing); docs/INVENTORY.md, Decisions, the row on the deployed-layout and bounded-remote-wait
++checks (spends money's pointer and its classification sentence). Supervisor-written; no builder run."""
++import importlib.util
++import os
++import re
++import subprocess
++import sys
++
++import pytest
++
++from phase_modules import BRIDGE, read, section
++
++WORKFLOW = os.path.join(BRIDGE, "cursor-bridge", "workflow")
++TRAITS = os.path.join(WORKFLOW, "traits")
++PHASES = os.path.join(WORKFLOW, "phases")
++CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
++EXCEPTIONS = os.path.join(WORKFLOW, "trace-exceptions.md")
++OPEN_LIST = os.path.join(WORKFLOW, "open-list.md")
++TRACE_CHECK = os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")
++WORKFLOW_CHECK = os.path.join(BRIDGE, "cursor-bridge", "workflow-check.py")
++TRAIT_PREFIX = "bridge/cursor-bridge/workflow/traits/"
++
++# The points each file adds at, in its order (BUILD_PLAN TASK-018).
++POINTS = {
++    "spends-money": ["intake.questions", "configuration.items", "delegation-loop.brief-constraints",
++                     "delegation-loop.inspect-checks"],
++    "long-running-process": ["configuration.items", "delegation-loop.brief-constraints", "delegation-loop.test-checks"],
++    "ai-models": ["intake.questions", "design.sections", "configuration.items", "delegation-loop.test-checks"],
++}
++TITLES = {"spends-money": "Spends money", "long-running-process": "Long-running process", "ai-models": "AI models"}
++
++
++def trait(key):
++    return read(os.path.join(TRAITS, key + ".md"))
++
++
++def flat(text):
++    return re.sub(r"\s+", " ", text).strip()
++
++
++def add(key, point):
++    return flat(section(trait(key), "Add at " + point, 2))
++
++
++def trace_units(text):
++    spec = importlib.util.spec_from_file_location("trace_check_traits_new", TRACE_CHECK)
++    mod = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(mod)
++    return [u["normal"] for u in mod.parse_units(text)[0]]
++
++
++@pytest.mark.parametrize("key", sorted(POINTS))
++def test_r020_r022_each_file_is_a_title_and_add_at_sections_only(key):
++    """BUILD_PLAN TASK-018: one `#` title, then the `## Add at <point key>` sections named above, in that order, and
++    nothing else: no other heading of any level, so each file adds only and at no other point."""
++    lines = trait(key).split("\n")
++    heads = [l for l in lines if re.match(r"^ {0,3}#", l)]
++    assert heads == ["# " + TITLES[key]] + ["## Add at " + p for p in POINTS[key]], heads
++    assert lines[0] == "# " + TITLES[key], lines[0]
++    for p in POINTS[key]:
++        assert add(key, p), (key, p)
++
++
++@pytest.mark.parametrize("key", sorted(POINTS))
++def test_r020_r022_every_section_has_its_own_new_entry_and_no_other_entry_names_the_file(key):
++    """BUILD_PLAN TASK-018: each `## Add at` section is new text under a `new` entry naming the file and that heading
++    (the trace check counts a trait file as a module); no `reword` entry, and no entry on the file's title, which would
++    excuse the file whole."""
++    rel = TRAIT_PREFIX + key + ".md"
++    got = []
++    for line in read(EXCEPTIONS).split("\n"):
++        m = re.match(r"^- (new|reword) (\S+) (\S+\.md) (.+)$", line)
++        if m and m.group(3) == rel:
++            got.append((m.group(1), m.group(2), m.group(4).strip()))
++    assert got == [("new", "TASK-018", "Add at " + p) for p in POINTS[key]], got
++
++
++@pytest.mark.parametrize("key", sorted(POINTS))
++def test_r020_r022_the_text_is_new_and_copies_no_passage_of_the_main_workflow(key):
++    """BUILD_PLAN TASK-018: the files are new text throughout; no unit of one, as trace-check.py reads units, is a unit
++    of the core, of a phase module, of the plan critic or of another trait file (a copy would be a passage in two homes,
++    and an excused section switches the trace check's copy check off; Review A, round 1)."""
++    main = set(trace_units(read(CORE))) | set(trace_units(read(os.path.join(BRIDGE, "agents", "plan-critic.md"))))
++    for root, _dirs, names in os.walk(PHASES):
++        for f in names:
++            if f.endswith(".md"):
++                main |= set(trace_units(read(os.path.join(root, f))))
++    others = [f for f in os.listdir(TRAITS) if f.endswith(".md") and f != key + ".md"]
++    assert len(others) >= 6, others
++    for f in others:
++        main |= set(trace_units(read(os.path.join(TRAITS, f))))
++    assert len(main) > 300, len(main)
++    for unit in trace_units(trait(key)):
++        assert unit not in main, unit[:80]
++
++
++def test_r020_r022_the_three_rows_are_written_in_the_open_list():
++    """BUILD_PLAN TASK-018: the three rows flip to written in the same change as their files."""
++    text = read(OPEN_LIST)
++    for key in POINTS:
++        rows = [l for l in text.split("\n") if l.startswith("| %s |" % key)]
++        assert len(rows) == 1 and rows[0].rstrip().endswith("| yes | release B |"), rows
++
++
++def test_r020_r022_workflow_check_passes_over_the_workflow_folder():
++    """BUILD_PLAN TASK-018: `workflow-check.py` passes over `workflow/` with the three files written."""
++    r = subprocess.run([sys.executable, WORKFLOW_CHECK, WORKFLOW], capture_output=True, text=True, encoding="utf-8")
++    assert r.returncode == 0, r.stdout + r.stderr
++    assert "RESULT: OK" in r.stdout, r.stdout
++
++
++def test_r020_spends_money_asks_for_approval_the_worst_case_the_cap_and_the_account():
++    """R-020 (DESIGN §6.8): at intake, the approval before any paid action, the estimate against the worst case, the
++    cap, and the platform and account named."""
++    t = add("spends-money", "intake.questions")
++    assert "**platform and account**" in t and "**worst case**" in t and "the **cap** the owner sets" in t
++    assert "No paid action of the loop runs without the owner's approval first" in t
++    assert "with its estimate against the worst case and the platform and account named in the same sentence" in t
++    assert "an approval covers the action it names, never the next one" in t
++    assert "never a silent overrun" in t
++    # Review A, round 1: which paid actions the approval covers, and who enforces the cap.
++    assert "The loop's own paid actions (a contract capture, a dry or paid run of an increment, a re-recording" in t
++    assert "tracked against the cap by the supervisor" in t
++    assert "the design states how the product enforces the cap" in t and "fixed in a test (rule 52)" in t
++    # Review A, round 2: the trait adds no design section, so the intake notes carry both duties to the design.
++    assert "the intake notes carry its two duties to the design as requirements of it" in t
++    assert "the folder that holds the store of paid results" in t
++
++
++def test_r020_r019_a_paid_call_is_bounded_by_external_services_and_classified_with_it():
++    """BUILD_PLAN TASK-018; INVENTORY, Decisions (the bounded remote wait is external services' addition): one sentence
++    that a paid call is a remote call whose wait external services' addition bounds, naming that addition, and that a
++    part paying a remote service is classified with external services too, which the design gate checks; the addition
++    it names exists and holds the bounded wait, and spends money holds no bound of its own."""
++    t = add("spends-money", "intake.questions")
++    assert ("A paid call is a remote call, whose wait the trait *external services* bounds (its addition at "
++            "`delegation-loop.inspect-checks`), so a part that pays a remote service is classified with *external "
++            "services* too, which the design gate's trait decision checks.") in t
++    target = flat(section(trait("external-services"), "Add at delegation-loop.inspect-checks", 2))
++    assert target.startswith("Every wait on a remote service in the diff is bounded")
++    assert "timeout" not in flat(trait("spends-money"))
++
++
++def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first():
++    """R-020 (DESIGN §6.8, §13.1): the store of paid results that is never discarded and where the cap is recorded
++    (configuration); the approval before any paid action in a builder run and the dry run on a copy with a stand-in
++    provider before any paid run (brief); the check that no paid action ran unapproved (inspect)."""
++    conf = add("spends-money", "configuration.items")
++    assert "**The store of paid results.**" in conf
++    assert "a folder the design names, which no clean, reset, cache purge or test teardown reaches" in conf
++    assert "reads the result already paid for instead of buying it again" in conf
++    assert "**The cap** is recorded" in conf and "`Spending cap: " in conf
++    brief = add("spends-money", "delegation-loop.brief-constraints")
++    assert "The builder runs no paid action" in brief and "after the owner's approval for it" in brief
++    assert "**dry**: on a copy of the data, with a stand-in provider" in brief and "charges nothing" in brief
++    # Review A, round 1, blocking: the product's paid calls go through the store; a first capture and a purchase,
++    # which have no replies to stand in, run at the smallest size instead of dry.
++    assert "Every paid call the part's code makes goes through the store of paid results" in brief
++    assert "the store read before a call is bought, so a retry never buys twice" in brief
++    assert "The first paid run of a contract capture, which has no recorded replies to stand in yet" in brief
++    assert "a paid action with no remote service behind it (a purchase)" in brief
++    assert "at the smallest size that answers them, under their own approval" in brief
++    inspect = add("spends-money", "delegation-loop.inspect-checks")
++    assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
++    assert "does not both read the store first and write its result there" in inspect
++    assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
++
++
++def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
++    """R-021 (DESIGN §8.1): the trait points at founding rule N1 and §8.1, which stay in the core, and adds the start,
++    stop and health procedure."""
++    conf = add("long-running-process", "configuration.items")
++    assert "the conditions stay in the core (" in conf and "§8.1" in conf
++    assert "never an exception to them" in conf
++    assert "**start, stop and health**" in conf
++    for verb in ("starts it", "stops it and everything it started", "reports whether it is healthy"):
++        assert verb in conf, verb
++    # Review A, round 3: the commands take an instance's port and data, so a test's instance runs beside the owner's.
++    assert "the start and stop commands taking the port and the data of the instance they start and stop" in conf
++    # Review A, round 1: a command is recorded in the increment that builds it, and N1 binds the runs the loop starts.
++    assert "in its command reference, in the increment that builds it" in conf
++    assert "Every run of the process the loop starts (a test, a demonstration, a check) meets founding rule N1" in conf
++    assert "a run a test starts and stops being part of that test, so that no gate depends on a process it did not start" in conf
++    core = flat(read(CORE))
++    assert "- **N1 — Files are the truth; programs are one-shot.**" in core
++    n1 = ("A background process is allowed only when all eight hold", "never writes tracked files",
++          "can be rebuilt from the files", "states the commit or version it reflects", "stops when idle",
++          "no gate depends on it", "runs no migration of the owner's live data", "unreleased code against live data",
++          "spends nothing unless asked")
++    for phrase in n1:
++        assert phrase in core, phrase
++    for key in POINTS:
++        t = flat(trait(key))
++        for phrase in n1:
++            assert phrase not in t, (key, phrase)
++
++
++def test_r021_a_run_leaves_nothing_running():
++    """R-021: the brief constraint (a run leaves nothing running; the brief says how a test starts and stops the
++    process) and the nothing-left-running test check."""
++    brief = add("long-running-process", "delegation-loop.brief-constraints")
++    assert brief.startswith("A run leaves nothing running")
++    # Review B, round 1: a test never touches the instance the owner runs, and the check stops only what the run started.
++    assert "a test starts an instance of its own, on a port and data of its own, never the instance the owner runs" in brief
++    assert "the brief says how a test starts that instance and how it stops it" in brief
++    assert "its children included" in brief
++    test = add("long-running-process", "delegation-loop.test-checks")
++    assert test.startswith("Nothing the run started is left running") and "correctness-class block" in test
++    # Review A, round 3: what the tests started is told by descent or by a test instance's port or data, never by
++    # start time alone, and the stop never reaches the instance the owner runs.
++    assert "no process the tests started (one descended from the test run, or one on a test instance's port or data)" in test
++    assert "stopped by its process ID together with its children" in test
++    assert "never by a command that reaches the instance the owner runs" in test
++    assert "A process the owner started, or another session's, is left as it is." in test
++
++
++def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_outputs():
++    """R-022 (DESIGN §6.8): the evaluation sets and thresholds in place of exact tests (intake), the evaluation's design
++    (design), the pinned models and the recorded outputs' home (configuration), the evaluation against the thresholds
++    on recorded outputs (test check)."""
++    intake = add("ai-models", "intake.questions")
++    assert "the **evaluation set** that stands in for exact tests" in intake and "the **threshold**" in intake
++    assert "fixed in a test (rule 52)" in intake
++    design = add("ai-models", "design.sections")
++    assert "**Evaluation** section" in design and "rule 51" in design
++    assert "a result below it blocking the change at the test step" in design
++    conf = add("ai-models", "configuration.items")
++    assert "Each model is **pinned**, a model judge included" in conf and "never a name that moves to a newer model" in conf
++    assert "**Recorded outputs** have a home" in conf and "without calling any model" in conf
++    assert "a model judge's verdicts on them, judged again whenever the outputs are recorded again or anything" in conf
++    assert "(the code after the model's reply included)" in conf
++    test = add("ai-models", "delegation-loop.test-checks")
++    assert "The evaluation runs against its thresholds on the recorded outputs and their recorded verdicts" in test
++    assert "correctness-class block" in test and "an exact-match assertion on a model's output" in test
++    assert "records new outputs first, and new verdicts on them" in test
++    assert "a change to the code that shapes the judged result from a recorded reply has that result judged again" in test
++    # Review B, round 1: no pass on verdicts recorded before a change to the judged result.
++    assert "the evaluation does not pass on the verdicts recorded before the change" in test
++    assert "is blocked at the test step, however the old verdicts read" in test
++    assert "while nothing that shapes the judged result changes, the evaluation runs again without calling any model" in conf
++    # Review A, round 3: the judged result is kept beside its verdict, and a paid re-judging is the supervisor's run.
++    assert "each verdict is kept with the judged result it read" in conf
++    assert "where a model costs money, the block waits on the run the owner approved" in test
++    assert "never on a re-delegation" in test
