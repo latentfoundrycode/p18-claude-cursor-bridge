@@ -160,6 +160,10 @@ EXCUSED_MODULE_SECTIONS = {
     ("run-parameters.md", "Extension points"): (683, "5ef8d017187dfd16f8fa971a8e7ef3551136b497387f14e9477562f84331976c"),
     ("run-parameters.md", "What must survive a compaction"): (821, "d67698de27c0e6d55d3d347079911111df122fb0b3cb667fcb937b4ff1f55979"),
     ("run-parameters.md", "Writing the answers down"): (779, "ed3fe29e9fe1c96fa0348e57540a525572f2a646250b2adae046fc231b17b731"),
+    ("traits/ai-models.md", "Add at configuration.items"): (477, "0cd6ba8279dab69df2077767da61e236a81eac595c934390febe4e835310558d"),
+    ("traits/ai-models.md", "Add at delegation-loop.test-checks"): (492, "3d8bbb1a433f9b898b88407b64178fae579319279cb82ddb5f0dce2e090d26be"),
+    ("traits/ai-models.md", "Add at design.sections"): (321, "09508fb0992818dad099e7712b063bad82beb8e0af8ccd6214900dd3d2da2e1e"),
+    ("traits/ai-models.md", "Add at intake.questions"): (529, "20e891d7b9c1e96dd4f1c2951030ed089834e66ee50ab9548bac19c69092020a"),
     ("traits/external-services.md", "Add at delegation-loop.brief-constraints"): (273, "e19a9657e8871232fd956bf6e14673e86457026f88a1fbd564dcd926b32c5a32"),
     ("traits/external-services.md", "Add at delegation-loop.inspect-checks"): (439, "ff3dde12e5e044f461431458e96384a7f0f08a0e78a12b7daf74b63c38a7f3e1"),
     ("traits/external-services.md", "Add at delegation-loop.test-checks"): (419, "6e3340c6127ca19cfb60997566f496159c87685169f40cb94139e3e06b3884e7"),
@@ -174,8 +178,15 @@ EXCUSED_MODULE_SECTIONS = {
     ("traits/installable.md", "Which delivery kinds the Delivery section is for"): (236, "db56fef951c7aba1a67b796d4d85e19d2c58bcc218d0246737d0468591a82cac"),
     ("traits/installable.md", "Which delivery kinds the intake passage is for"): (273, "ac97680fd2fe85b751ea032c449418d2178ed307e0bbee73dade1c86f6379ea3"),
     ("traits/installable.md", "Which delivery kinds the packaging stage is for"): (295, "51a6686b489336f334218346d1514999765a3ee2f7a6dfad70d7595d22bd1df4"),
+    ("traits/long-running-process.md", "Add at configuration.items"): (709, "5393c32b8f19e08436d1c9efc7a8e9c324d748e98b9df4b71d1f1f6fb22cd095"),
+    ("traits/long-running-process.md", "Add at delegation-loop.brief-constraints"): (338, "f1b06a3b0864cc335c483d5663d9fa82c141dfc612228c7030836f6708ad9082"),
+    ("traits/long-running-process.md", "Add at delegation-loop.test-checks"): (337, "99cb41c6f4155661268050d97c2a530c778cfd1c584a4c07ecde44479da9dccc"),
     ("traits/performance-budgets.md", "Add at planning.critic-lenses"): (321, "464ee6c2b87edda66ee707a2081737826b3afa823d54c036df9afa2949d43b84"),
     ("traits/performance-budgets.md", "The mechanism and the hot path"): (488, "96fb8f084311c8ec4c9b853d3b6a71e50eb159055a22f03888f4d9a69a23b97d"),
+    ("traits/spends-money.md", "Add at configuration.items"): (804, "dcb10ab0c9a6420245a988a3d6d07a47706e0943b4169e53d045d220193261ed"),
+    ("traits/spends-money.md", "Add at delegation-loop.brief-constraints"): (488, "71bf7d8964824dd208f9fa1f8c1d91ed190fd46ae4f60792cd96c8daf1cc34f5"),
+    ("traits/spends-money.md", "Add at delegation-loop.inspect-checks"): (368, "e983e0ed86d30970b0990965c1b9f18506bef4e01219b91dae56310b2fff168c"),
+    ("traits/spends-money.md", "Add at intake.questions"): (1212, "1b40dc5ba8336417426894134934bc346fbdd759be01c71e6ee3f003af29b93f"),
 }
 
 

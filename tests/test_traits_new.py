@@ -1,0 +1,194 @@
+"""TASK-018: the trait files spends money, long-running process and AI models (R-020, R-021, R-022), new text
+throughout.
+
+enforces: docs/BUILD_PLAN.md TASK-018 (its Done when: each file one `#` title and `## Add at <point key>` sections and
+nothing else, each section under a `new` entry naming the file and the heading, the points each adds at and no other,
+what each names, N1/§8.1 left in the core, the pointer at external services' bounded wait, the three rows written,
+the workflow check passing); docs/INVENTORY.md, Decisions, the row on the deployed-layout and bounded-remote-wait
+checks (spends money's pointer and its classification sentence). Supervisor-written; no builder run."""
+import importlib.util
+import os
+import re
+import subprocess
+import sys
+
+import pytest
+
+from phase_modules import BRIDGE, read, section
+
+WORKFLOW = os.path.join(BRIDGE, "cursor-bridge", "workflow")
+TRAITS = os.path.join(WORKFLOW, "traits")
+PHASES = os.path.join(WORKFLOW, "phases")
+CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
+EXCEPTIONS = os.path.join(WORKFLOW, "trace-exceptions.md")
+OPEN_LIST = os.path.join(WORKFLOW, "open-list.md")
+TRACE_CHECK = os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")
+WORKFLOW_CHECK = os.path.join(BRIDGE, "cursor-bridge", "workflow-check.py")
+TRAIT_PREFIX = "bridge/cursor-bridge/workflow/traits/"
+
+# The points each file adds at, in its order (BUILD_PLAN TASK-018).
+POINTS = {
+    "spends-money": ["intake.questions", "configuration.items", "delegation-loop.brief-constraints",
+                     "delegation-loop.inspect-checks"],
+    "long-running-process": ["configuration.items", "delegation-loop.brief-constraints", "delegation-loop.test-checks"],
+    "ai-models": ["intake.questions", "design.sections", "configuration.items", "delegation-loop.test-checks"],
+}
+TITLES = {"spends-money": "Spends money", "long-running-process": "Long-running process", "ai-models": "AI models"}
+
+
+def trait(key):
+    return read(os.path.join(TRAITS, key + ".md"))
+
+
+def flat(text):
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def add(key, point):
+    return flat(section(trait(key), "Add at " + point, 2))
+
+
+def trace_units(text):
+    spec = importlib.util.spec_from_file_location("trace_check_traits_new", TRACE_CHECK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return [u["normal"] for u in mod.parse_units(text)[0]]
+
+
+@pytest.mark.parametrize("key", sorted(POINTS))
+def test_r020_r022_each_file_is_a_title_and_add_at_sections_only(key):
+    """BUILD_PLAN TASK-018: one `#` title, then the `## Add at <point key>` sections named above, in that order, and
+    nothing else: no other heading of any level, so each file adds only and at no other point."""
+    lines = trait(key).split("\n")
+    heads = [l for l in lines if re.match(r"^ {0,3}#", l)]
+    assert heads == ["# " + TITLES[key]] + ["## Add at " + p for p in POINTS[key]], heads
+    assert lines[0] == "# " + TITLES[key], lines[0]
+    for p in POINTS[key]:
+        assert add(key, p), (key, p)
+
+
+@pytest.mark.parametrize("key", sorted(POINTS))
+def test_r020_r022_every_section_has_its_own_new_entry_and_no_other_entry_names_the_file(key):
+    """BUILD_PLAN TASK-018: each `## Add at` section is new text under a `new` entry naming the file and that heading
+    (the trace check counts a trait file as a module); no `reword` entry, and no entry on the file's title, which would
+    excuse the file whole."""
+    rel = TRAIT_PREFIX + key + ".md"
+    got = []
+    for line in read(EXCEPTIONS).split("\n"):
+        m = re.match(r"^- (new|reword) (\S+) (\S+\.md) (.+)$", line)
+        if m and m.group(3) == rel:
+            got.append((m.group(1), m.group(2), m.group(4).strip()))
+    assert got == [("new", "TASK-018", "Add at " + p) for p in POINTS[key]], got
+
+
+@pytest.mark.parametrize("key", sorted(POINTS))
+def test_r020_r022_the_text_is_new_and_copies_no_passage_of_the_main_workflow(key):
+    """BUILD_PLAN TASK-018: the files are new text throughout; no unit of one, as trace-check.py reads units, is a unit
+    of the core or of a phase module (a copy would be a passage in two homes)."""
+    main = set(trace_units(read(CORE)))
+    for root, _dirs, names in os.walk(PHASES):
+        for f in names:
+            if f.endswith(".md"):
+                main |= set(trace_units(read(os.path.join(root, f))))
+    assert len(main) > 300, len(main)
+    for unit in trace_units(trait(key)):
+        assert unit not in main, unit[:80]
+
+
+def test_r020_r022_the_three_rows_are_written_in_the_open_list():
+    """BUILD_PLAN TASK-018: the three rows flip to written in the same change as their files."""
+    text = read(OPEN_LIST)
+    for key in POINTS:
+        rows = [l for l in text.split("\n") if l.startswith("| %s |" % key)]
+        assert len(rows) == 1 and rows[0].rstrip().endswith("| yes | release B |"), rows
+
+
+def test_r020_r022_workflow_check_passes_over_the_workflow_folder():
+    """BUILD_PLAN TASK-018: `workflow-check.py` passes over `workflow/` with the three files written."""
+    r = subprocess.run([sys.executable, WORKFLOW_CHECK, WORKFLOW], capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "RESULT: OK" in r.stdout, r.stdout
+
+
+def test_r020_spends_money_asks_for_approval_the_worst_case_the_cap_and_the_account():
+    """R-020 (DESIGN §6.8): at intake, the approval before any paid action, the estimate against the worst case, the
+    cap, and the platform and account named."""
+    t = add("spends-money", "intake.questions")
+    assert "**platform and account**" in t and "**worst case**" in t and "the **cap** the owner sets" in t
+    assert "No paid action runs without the owner's approval first" in t
+    assert "with its estimate against the worst case and the platform and account named in the same sentence" in t
+    assert "an approval covers the action it names, never the next one" in t
+    assert "never a silent overrun" in t
+
+
+def test_r020_r019_a_paid_call_is_bounded_by_external_services_and_classified_with_it():
+    """BUILD_PLAN TASK-018; INVENTORY, Decisions (the bounded remote wait is external services' addition): one sentence
+    that a paid call is a remote call whose wait external services' addition bounds, naming that addition, and that a
+    part paying a remote service is classified with external services too, which the design gate checks; the addition
+    it names exists and holds the bounded wait, and spends money holds no bound of its own."""
+    t = add("spends-money", "intake.questions")
+    assert ("A paid call is a remote call, whose wait the trait *external services* bounds (its addition at "
+            "`delegation-loop.inspect-checks`), so a part that pays a remote service is classified with *external "
+            "services* too, which the design gate's trait decision checks.") in t
+    target = flat(section(trait("external-services"), "Add at delegation-loop.inspect-checks", 2))
+    assert target.startswith("Every wait on a remote service in the diff is bounded")
+    assert "timeout" not in flat(trait("spends-money"))
+
+
+def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first():
+    """R-020 (DESIGN §6.8, §13.1): the store of paid results that is never discarded and where the cap is recorded
+    (configuration); the approval before any paid action in a builder run and the dry run on a copy with a stand-in
+    provider before any paid run (brief); the check that no paid action ran unapproved (inspect)."""
+    conf = add("spends-money", "configuration.items")
+    assert "**The store of paid results.**" in conf and "that nothing in the loop discards" in conf
+    assert "reads the result already paid for instead of buying it again" in conf
+    assert "**The cap** is recorded" in conf and "`Spending cap: " in conf
+    brief = add("spends-money", "delegation-loop.brief-constraints")
+    assert "The builder runs no paid action" in brief and "after the owner's approval for it" in brief
+    assert "**dry**: on a copy of the data, with a stand-in provider" in brief and "charges nothing" in brief
+    inspect = add("spends-money", "delegation-loop.inspect-checks")
+    assert inspect.startswith("No paid action ran unapproved") and "is a blocking finding" in inspect
+
+
+def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
+    """R-021 (DESIGN §8.1): the trait points at founding rule N1 and §8.1, which stay in the core, and adds the start,
+    stop and health procedure."""
+    conf = add("long-running-process", "configuration.items")
+    assert "founding rule N1's eight conditions, which stay in the core" in conf and "§8.1" in conf
+    assert "never an exception to them" in conf
+    assert "**start, stop and health**" in conf
+    for verb in ("starts it", "stops it and everything it started", "reports whether it is healthy"):
+        assert verb in conf, verb
+    core = flat(read(CORE))
+    assert "- **N1 — Files are the truth; programs are one-shot.**" in core
+    assert "A background process is allowed only when all eight hold" in core
+    for key in POINTS:
+        assert "A background process is allowed only when all eight hold" not in flat(trait(key)), key
+
+
+def test_r021_a_run_leaves_nothing_running():
+    """R-021: the brief constraint (a run leaves nothing running; the brief says how a test starts and stops the
+    process) and the nothing-left-running test check."""
+    brief = add("long-running-process", "delegation-loop.brief-constraints")
+    assert brief.startswith("A run leaves nothing running")
+    assert "the brief says how a test starts the process and how it stops it" in brief
+    assert "its children included" in brief
+    test = add("long-running-process", "delegation-loop.test-checks")
+    assert test.startswith("Nothing is left running") and "correctness-class block" in test
+
+
+def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_outputs():
+    """R-022 (DESIGN §6.8): the evaluation sets and thresholds in place of exact tests (intake), the evaluation's design
+    (design), the pinned models and the recorded outputs' home (configuration), the evaluation against the thresholds
+    on recorded outputs (test check)."""
+    intake = add("ai-models", "intake.questions")
+    assert "the **evaluation set** that stands in for exact tests" in intake and "the **threshold**" in intake
+    assert "fixed in a test (rule 52)" in intake
+    design = add("ai-models", "design.sections")
+    assert "**Evaluation** section" in design and "rule 51" in design
+    conf = add("ai-models", "configuration.items")
+    assert "Each model is **pinned**" in conf and "never a name that moves to a newer model" in conf
+    assert "**Recorded outputs** have a home" in conf and "without calling the model" in conf
+    test = add("ai-models", "delegation-loop.test-checks")
+    assert "The evaluation runs against its thresholds on the recorded outputs" in test
+    assert "correctness-class block" in test and "an exact-match assertion on a model's output" in test
