@@ -92,7 +92,7 @@ def test_r023_each_file_is_a_title_and_its_change_sections_only(key):
 
 
 @pytest.mark.parametrize("key", sorted(FILES))
-def test_r023_the_type_sets_web_deployment_and_the_sub_type_overrides_it_with_installer(key):
+def test_r023_the_type_sets_web_deployment_and_the_sub_type_overrides_it_with_install_script(key):
     """BUILD_PLAN TASK-019: web app sets `intake.delivery-kind` to `web-deployment`; local web app overrides it with
     `install-script`, one key, its section's first non-blank line (extension-points.md: the value is the section's first
     non-blank line), with nothing after it."""
@@ -200,6 +200,8 @@ def test_r023_the_web_deployment_procedure():
     # Review A, round 1: the order of the way back.
     assert "where a migration ran, the backup is restored first, since the previous release may not run on migrated data, then the previous release is deployed by the same procedure" in t
     assert "A check that fails is a defect like any other" in t
+    # Review A, round 2: what the product is while a restore waits for the owner's yes.
+    assert "while it waits the product is taken offline, unless the owner, asked in the same question, chooses to leave it taking writes" in t
     assert "The report and the User Manual name the address and the version deployed." in t
     assert t.index("rehearsed on a copy") < t.index("Immediately before the deployment") < t.index("checked at its address")
 
