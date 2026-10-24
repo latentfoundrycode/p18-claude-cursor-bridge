@@ -26,7 +26,7 @@ A product type answers one question: **how does the product reach its user?** Th
 | mobile-app | Mobile app | Installed on a phone or tablet from an app store | Mobile App Development | has-screens, installable | no | when the first project of this type arrives |
 | web-app | Web app | Used in a browser; keeps data for its users (accounts, saved state, runs, orders). Without a sub-type it runs on a server the owner operates and is delivered by deployment | Web App Development | has-screens, personal-data | yes | release B |
 | website | Website | Used in a browser; presents content; keeps no data for its users | Website Development | has-screens | no | when the first project of this type arrives |
-| own-computer | Software on your own computer | Installed and run on the user's own computer, and met through something other than a browser page | Own-Computer Software Development | installable | no | release B |
+| own-computer | Software on your own computer | Installed and run on the user's own computer, and met through something other than a browser page | Own-Computer Software Development | installable | yes | release B |
 | backend-service | Backend service | Runs on a server, has no screen, serves other software over a network | Backend Service Development | long-running-process | no | when the first project of this type arrives |
 | library | Library | Code that other programs include; delivered as a package | Library Development | — | no | when the first project of this type arrives |
 | video-game | Video game | Built around a real-time play loop | Game Development | has-screens, performance-budgets | no | release E |
@@ -46,7 +46,7 @@ A sub-type says more precisely what a part of its product type is, where that ch
 | gui | GUI | own-computer | Met through a window | GUI Software | has-screens, installable | no | when the first project of this type arrives |
 | cli | CLI | own-computer | Met through a terminal | CLI Software | installable | no | when the first project of this type arrives |
 | pipeline | Pipeline | own-computer | Met through nothing: it runs jobs unattended and its output is files or records | Pipeline Software | installable | no | when the first project of this type arrives |
-| local-service | Local service | own-computer | Other software on the same computer calls it through a protocol, such as an MCP server; its interface is a contract | Local Service Software | installable, long-running-process | no | release B |
+| local-service | Local service | own-computer | Other software on the same computer calls it through a protocol, such as an MCP server; its interface is a contract | Local Service Software | installable, long-running-process | yes | release B |
 | roblox | Roblox | video-game | A game built for and published on Roblox | Roblox Game | has-screens, performance-budgets, multiplayer | no | release E |
 | claude-code-extension | Claude Code extension | host-extension | Runs inside Claude Code, through its commands, agents, hooks and settings (the bridge itself) | Claude Code Extension | installable | no | release B |
 | browser-extension | Browser extension | host-extension | Runs inside a web browser, through the browser's extension interfaces | Browser Extension | installable | no | when the first project of this type arrives |

@@ -248,10 +248,10 @@ def test_r001_run_parameters_parse():
     assert _parameter_faults(good.replace("Stage pause: run", "Stage pause: later")) == ["Stage pause: 'later'"]
 
 
-# The values the owner chose (RUN_PARAMETERS.md; INVENTORY Decisions, 2026-10-11 and 2026-10-12, owner), fixed in a test
+# The values the owner chose (RUN_PARAMETERS.md; INVENTORY Decisions, 2026-10-11, 2026-10-12 and 2026-10-25, owner), fixed in a test
 # (rule 52). Installer verification is not among them: n/a is the product type's, not an answer of the owner's.
 OWNER_RUN_PARAMETERS = {"Stage pause": "run", "Merge authority": "supervisor", "Refactoring pass": "on",
-                        "Parallel increments": "off"}
+                        "Parallel increments": "on"}
 
 
 def test_r001_run_parameters_owner_values():
