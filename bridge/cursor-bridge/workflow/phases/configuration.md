@@ -45,15 +45,6 @@ After it writes `.githooks/pre-commit`, set the git-native lint gate live once f
 blocks any plain `git commit`; your pre-delegation checkpoint commits bypass it with
 `--no-verify` (below).
 
-For a UI-bearing project, also work the **design-tooling** steps in
-`Cursor-Project-Configuration.md` §5b: the configurator writes `.impeccable/config.json`,
-the frozen `.cursor/rules/vercel-interface.mdc`, and the second `afterFileEdit` detect hook.
-**You** run the Vercel fetch-and-freeze here (validate the fetch or fall back to the bundled
-`~/.claude/cursor-bridge/vercel-interface.snapshot.md`, and hand the configurator the
-frozen body), pin the Impeccable CLI version, and record both source date and pinned
-version in `docs/INVENTORY.md` (Resources). None of this escalates — it is all local, file-based,
-Apache-2.0/MIT, no secrets.
-
 Work the **security-tooling** steps in `Cursor-Project-Configuration.md` §5c the same way:
 the configurator writes `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, the frozen
 `.cursor/rules/secure-coding.mdc` (from the bundled
@@ -71,19 +62,6 @@ classes the token-free OSS packs miss. Local-only mode inherits the OSS coverage
 partly closed by the bundled heuristic bridge rules) and Windows-local Semgrep fragility — fine
 for a throwaway, but steer a real project to the CI gate (see `Cursor-Project-Configuration.md`
 §5c). Record which mode is in force in `docs/INVENTORY.md` (Resources).
-
-For a UI-bearing project, also work the **observability** steps in
-`Cursor-Project-Configuration.md` §5d (per `~/.claude/cursor-bridge/Observability-Conventions.md`):
-the configurator wires the observability e2e tests into the CI `gate` job, sets test-mode fixed
-clock/seed/locale, gitignores the screenshot/log artifacts, and confirms logs redact secrets.
-**You** write the observability tests (they are reviewer-independent, like any test you author);
-the instrumentation + reachability they exercise is product code Cursor builds from the brief. A
-fired runtime invariant, a `console.error`, or an unreachable inventory state is a
-correctness-class block, re-delegated like any REJECT — never a user question. The one
-escalation is the **driver dependency** (Playwright for web, CI-primary; a per-platform driver
-for mobile/desktop) — a new dependency, admitted and recorded under the one dependency rule
-(rule 56), put to the user only for the consequence they bear. Record the tier,
-driver + version, invariant set, and state→reachability map in `docs/INVENTORY.md` (Resources).
 
 The fail-closed `beforeShellExecution` **shell-guard** is **opt-in and off by default**. It
 blocks the *builder's* destructive/irreversible/exfil shell commands before they run (and does

@@ -56,19 +56,7 @@ whatever was already there.
 
 ### 2. Package the brief
 
-Delegate to **spec-packager** to write `handoff/TASK-<nnn>.md`. The brief must be
-self-contained — Cursor gets no conversation history, only this file. For a UI-bearing
-increment, the brief must name the exact approved mockup file(s) and the relevant
-`docs/design/DESIGN.md` sections, and list the frozen `vercel-interface.mdc` as an
-applicable rule. Every brief carries the Workspace boundary and the standing invitation to
-note tooling friction in `docs/BUILDER_NOTES.md` (spec-packager's constraints template).
-spec-packager's **reality check** runs first: the schema, configuration, data, and
-interfaces the increment assumes must exist in the codebase *as built*; "approved in the
-plan" is not "fits the data" (KP-019). A mismatch comes back to you as a scope question,
-not as a brief. Once the brief is written, `python ~/.claude/cursor-bridge/plan-check.py`
-compares it with its increment: a Scope path outside the increment's Scope or a requirement
-the increment satisfies that the brief does not name is a `BRIEF` failure, fixed in the brief
-before the checkpoint commit (release A4: a brief once silently dropped planned work).
+Delegate to **spec-packager** to write `handoff/TASK-<nnn>.md`. The brief must be self-contained — Cursor gets no conversation history, only this file. Every brief carries the Workspace boundary and the standing invitation to note tooling friction in `docs/BUILDER_NOTES.md` (spec-packager's constraints template). spec-packager's **reality check** runs first: the schema, configuration, data, and interfaces the increment assumes must exist in the codebase *as built*; "approved in the plan" is not "fits the data" (KP-019). A mismatch comes back to you as a scope question, not as a brief. Once the brief is written, `python ~/.claude/cursor-bridge/plan-check.py` compares it with its increment: a Scope path outside the increment's Scope or a requirement the increment satisfies that the brief does not name is a `BRIEF` failure, fixed in the brief before the checkpoint commit (release A4: a brief once silently dropped planned work).
 
 ### 3. Delegate to Cursor
 
@@ -300,12 +288,6 @@ brief asked for is still a deviation — flag it rather than silently accepting 
 File-level drift is already settled by the scope check before it reads; `diff-reviewer`'s
 scope job is **region-level** — an in-scope file edited beyond what the brief asked.
 
-For a **UI-bearing** diff, also delegate to **design-auditor** after `diff-reviewer` — it
-reviews design conformance (mockup fidelity, visual system, the frozen interface rules)
-that `diff-reviewer` deliberately leaves alone. A **blocking** design finding re-delegates
-like any correctness `REJECT` (a corrected brief, step 7) — it does **not** escalate.
-**Advisory** findings go to `docs/CHANGES.md`, not a re-delegation.
-
 For a diff with **logic, auth, input-handling, or data-access** surface (almost all, not just
 UI), also delegate to **security-auditor** after `diff-reviewer` — it reviews the
 exploitable-vulnerability and authz/authn/data-integrity classes the deterministic floor
@@ -369,26 +351,6 @@ This stops a poisoned package at the moment of admission rather than catching it
 ### 6. Benchmarks and observability
 
 The tests already ran in step 4, before the first reviewer, the ones you wrote first.
-
-Where budgets exist and their benchmarks are built, the **benchmark floor** runs with the
-tests: `scripts/bench.ps1` then
-`python ~/.claude/cursor-bridge/bench-check.py bench/budgets.json bench/baseline.json bench/results/latest.json`.
-`OVER BUDGET`, `REGRESSION`, or `NOT MEASURED` is a correctness-class block: re-delegate
-with the numbers in the brief, never route it to the user, and never fix it by loosening a
-budget or moving the baseline (`Merge-Verification-Policy.md` §Anti-gaming). Write the
-corrected brief from a **named cause**: profile the failing benchmark, match the hot spot
-against `~/.claude/cursor-bridge/Performance-Patterns.md`, and put the entry's fix and
-measure in the brief — never "make it faster". A hot spot that matches no entry goes through
-`root-cause-first` like any other defect.
-
-For a UI-bearing increment, the tests you write include the **observability tests** (Tier A):
-drive the app to each affected inventory state *through the real render path* and assert no
-runtime invariant fired, no `console.error`, and the required states exist (see
-`~/.claude/cursor-bridge/Observability-Conventions.md`). These run under `test-runner`/CI like
-any test — no daemon. A fired invariant / `console.error` / unreachable state is a
-**correctness-class block** (re-delegate, step 7), never a user question. If Tier B is on, the
-tests capture per-state screenshots; hand those to **design-auditor** as evidence for its
-existing mockup-fidelity judgement (they do not add a new pass).
 
 ### 7. Decide (accept the increment)
 

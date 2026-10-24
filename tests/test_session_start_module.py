@@ -179,8 +179,25 @@ def test_r005_a_file_two_parts_share_is_named_once_in_the_first_parts_place(tmp_
 
 
 def test_r005_a_named_workflow_that_is_not_written_is_not_named(tmp_path, home):
-    out = pointers(project(tmp_path, "Phase: intake", "Workflows: Host Extension Development; traits: Installable"), home)
+    """A type and a trait release B leaves unwritten (TASK-017: with Installable written, the case names Mobile App
+    Development and personal data, so no type file a later increment writes, such as TASK-021's host extension,
+    which sets at `intake.delivery-kind`, can be named here)."""
+    out = pointers(project(tmp_path, "Phase: intake", "Workflows: Mobile App Development; traits: Personal data"), home)
     assert named(out) == [P + "intake.md"], out
+
+
+def test_r005_the_installed_installable_trait_is_named_for_a_phase_it_adds_at(tmp_path, home):
+    """TASK-017: the real traits/installable.md, copied into the home as bridge-install.py lays it out, is named for
+    intake, where it adds at `intake.questions`, and for building, where its `project-end.delivery` additions are
+    project end's, and not for the interface phase, where it adds nothing."""
+    line = "Workflows: Mobile App Development; traits: Installable"
+    out = pointers(project(tmp_path, "Phase: intake", line), home)
+    assert named(out) == [P + "intake.md", W + "traits/installable.md"], out
+    out = pointers(project(tmp_path, "Phase: building", line), home)
+    assert W + "traits/installable.md" in named(out), out
+    out = pointers(project(tmp_path, "Phase: mockups", line), home)
+    assert P + "interface.md" in named(out), out
+    assert W + "traits/installable.md" not in named(out), out
 
 
 def test_r005_a_split_modules_sub_files_and_a_phases_variants_follow_their_module(tmp_path, home):

@@ -105,20 +105,6 @@ Attack it along these lines:
   If it is more than a few, the plan is back-loading risk.
 - **Missing increments.** What has to happen that no increment covers — error handling,
   configuration, teardown, migration, packaging?
-- **Packaging stage (installable software: desktop application, command-line tool, local
-  server).** Is the last stage "Packaging & installer", and does it carry
-  `Delivery-Conventions.md` §2 / §3 / §4 as checkable acceptance criteria — one-command
-  build or install, committed installer or install script, per-user install registered in
-  Apps & features (a CLI on PATH from an isolated environment built from the lock file),
-  upgrade in place keeping data, Upgrade / Uninstall / Cancel when already installed,
-  uninstall keeping data, the lifecycle verification passing, the manual's install chapter?
-  A plan for installable software without it is **Blocking**: the owner cannot install the
-  result.
-- **Command reference (any command-line surface).** Does the increment that first adds a
-  command also add the reference generator (`scripts/dump-cli.py` → `docs/cli-reference.json`)
-  and the CI currency check, and does every later command-changing increment carry
-  "reference regenerated" as a criterion? Without it the supervisor has nothing to look
-  commands up in and will instruct the owner from memory — **Blocking**.
 - **Change-cycle addendum (a finished project being changed).** Does each new stage state
   which existing behaviour it may alter and that everything else is unchanged? Are the
   tests that pin existing behaviour kept, not rewritten? Is the version bumped in the
@@ -126,33 +112,14 @@ Attack it along these lines:
   deliverable carries the new version? An addendum that quietly changes existing behaviour
   without saying so is **Blocking**.
 - **Already built, already settled (any project with `docs/INVENTORY.md`).** Read the inventory first. An increment that builds what Features already lists, a step that asks the owner for a resource Resources already lists, or a design change that reverses a Decision without quoting its recorded reason and the circumstance that changed is **Blocking**.
-- **External-service integrations.** For every third-party API, SDK, or provider the
-  software talks to: is the first increment on it a **contract capture** (an attended live
-  call recorded to fixtures, secrets scrubbed) that later increments replay, with "passes
-  against recorded real responses" as the acceptance criterion? An adapter increment whose
-  only evidence is a mock the builder writes is **Blocking**: it tests the builder's
-  assumption about the service, not the service (KP-020).
-- **Benchmark increments (where budgets exist).** Is there a benchmark increment per
-  budget, in the stage where the budgeted operation first exists, so a baseline is
-  committed before any optimization? A budget with no benchmark in the plan is **Blocking**:
-  it can never be checked.
+- **A trait missing.** A part whose `Delivery kind:` row is `installer` or `install-script` whose plan's critique file carries no packaging lens, a design or intake note naming a service run by others (a third-party API, SDK or provider) whose plan's critique file carries no external-service lens, a design that shows screens whose plan's critique file carries no design-criteria lens, or a design naming a budget whose plan's critique file carries no benchmark-increments lens, is a finding that a trait is missing (**Blocking**: the trait's additions never reach the build).
 - **Project end is the last stage close.** Does the plan name its last stage so that its
   close is unambiguous? A plan whose end is "when everything is done" leaves the supervisor
   unable to recognise project end.
-- **Design criteria (UI increments).** Does each UI-bearing increment cite an approved
-  mockup screen and the relevant `docs/design/DESIGN.md` sections, and are its design
-  acceptance criteria actually checkable (a specific observable outcome — "matches mockup
-  screen X", "passes `impeccable detect` with no primary findings") rather than "looks
-  good"?
 - **Security criteria (logic/auth/data increments).** Does each increment with logic, auth,
   input-handling, or data-access surface carry checkable security acceptance criteria ("no
   new Semgrep high findings", "passes OSV/Socket", "authz enforced at the boundary per ASVS
   §x") rather than "is secure"?
-- **Observability criteria (UI increments).** Does each increment that adds/changes a
-  screen-state carry checkable observability criteria — the state is driver-reachable through
-  the real render path, its observability test passes (no fired invariant, no `console.error`),
-  the required empty/sparse/dense/error states exist — rather than "renders fine"? Is each
-  state's reachability mechanism named in `docs/DESIGN.md`'s Observability section?
 - **Unnecessary code (advisory).** Does any increment plan to build what an existing helper,
   the standard library, a native platform feature, or an already-installed dependency
   already provides? Is any increment speculative — building for a requirement nobody stated

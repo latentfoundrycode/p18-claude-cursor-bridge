@@ -7,7 +7,7 @@ After a compaction or a resume at project end, read these before your next actio
 - this module and `reflection.md`, each whole: project end runs after the reflection points' items 1 to 5 at the last stage's close, in the same turn;
 - the last entries of `run/supervisor/in-flight.md`: the project-end items finished so far ("Keeping the position");
 - `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Workflows:` lines name each part's conditional workflows, whose additions at `project-end.completion-conditions` and `project-end.delivery` this module runs, and the deferred increments the status file lists are the ones the report lists; the inventory's `Delivery kind:` rows give each part's delivery kind, and its `Flagged trait:` rows the traits the promotion pass puts forward;
-- `docs/REQUIREMENTS.md`, `docs/CHANGES.md` and `docs/RUN_PARAMETERS.md`: the completion check reads the register, whose deferred and dropped requirements the "Project complete" line lists by ID and name, the User Manual is written from the change log, and the installer's last verification follows the `Installer verification` parameter;
+- `docs/REQUIREMENTS.md`, `docs/CHANGES.md` and `docs/RUN_PARAMETERS.md`: the completion check reads the register, whose deferred and dropped requirements the "Project complete" line lists by ID and name, the User Manual is written from the change log, and the installer's last verification, the trait *installable*'s addition at `project-end.delivery`, follows the `Installer verification` parameter;
 - the Issues and Feedback documents under `Documents/`, whole: the promotion pass reads both and writes its proposals as the Feedback document's last section.
 
 ### Where this module begins
@@ -44,11 +44,6 @@ whose last stage has closed without this having run is in the wrong state: run i
   (Upgrade / Uninstall / Cancel), and where the user's data lives and that uninstalling
   keeps it. For anything with a command-line surface the next chapter is the **command
   reference rendered from `docs/cli-reference.json`** — never written from memory.
-- **Deliver the installer** (installable software): run the lifecycle verification one
-  final time on the release build (per the `Installer verification` parameter), exercise the
-  "already installed" dialog once interactively, then attach the deliverable as a GitHub
-  Release asset where a remote exists, or name its path in the report and the manual where
-  there is none.
 - **Run the promotion pass.** Read the Issues document and the Feedback document whole, and
   draft — as a final section of the Feedback document titled **"Proposed bridge changes"** —
   concrete proposed edits: which file in the governance tree, what wording, and which issue or
@@ -75,4 +70,4 @@ Keep the position as the reflection points keep theirs (`reflection.md`, "Keepin
 This module offers the points below, each by its key in the extension-point registry (`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and whether it applies per part or per project. A conditional workflow's additions at a point are made where the point's line places them, in the order the core states in "Main and conditional workflows".
 
 - `project-end.completion-conditions` — completion conditions a conditional workflow adds for the part, each checked with "Prove the product is complete" above, before anything else at project end: a condition not met means, as a failure of `completion-check.py` does, that the project has not ended; a condition the plan must build toward is also added at intake (`intake.requirement-sources`), as the registry says.
-- `project-end.delivery` — the delivery procedure for the part's delivery kind, which an addition names (`## Add at project-end.delivery for <kind>`) and which runs for each part whose `Delivery kind:` row in `docs/INVENTORY.md` names that kind, beside "Deliver the installer" above and before the promotion pass; the report and the User Manual name what was delivered and where it is.
+- `project-end.delivery` — the delivery procedure for the part's delivery kind, which an addition names (`## Add at project-end.delivery for <kind>`) and which runs for each part whose `Delivery kind:` row in `docs/INVENTORY.md` names that kind, after the User Manual item above and before the promotion pass; the report and the User Manual name what was delivered and where it is.
