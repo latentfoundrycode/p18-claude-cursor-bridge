@@ -21,35 +21,59 @@ def flat(text):
     return re.sub(r"\s+", " ", text)
 
 
-def headings(text):
-    """(level, title) of every heading outside fenced blocks, in order."""
+def trace_headings(lines):
+    """(index, level, title) of each heading as trace-check.py reads one: up to three spaces before the hashes
+    (its HEADING_RE), the title stripped, and no line inside a fenced block (its FENCE_OPEN_RE, closed by a line that
+    starts with a run of the same character at least as long, whatever follows the run, as trace-check.py closes
+    one). The one reading of a heading in the phase-module tests: trace-check.py excuses a passage under every heading
+    its reading finds, so a test that read headings another way could miss one it excuses (HARDENING, Stage B3, the
+    least-confident item 1; FIX-004)."""
     out, fence = [], None
-    for line in text.split("\n"):
-        m = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
-        if m:
-            if fence is None:
-                fence = m.group(1)[0]
-            elif m.group(1)[0] == fence:
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if fence:
+            c = re.match(r"^(`{3,}|~{3,})", stripped)
+            if c and c.group(1)[0] == fence[0] and len(c.group(1)) >= fence[1]:
                 fence = None
             continue
-        if fence is None:
-            h = re.match(r"^(#{1,6}) (.*)$", line)
-            if h:
-                out.append((len(h.group(1)), h.group(2).strip()))
+        f = re.match(r"^(`{3,}|~{3,})", stripped) if line.lstrip().startswith(("```", "~~~")) else None
+        if f:
+            fence = (f.group(1)[0], len(f.group(1)))
+            continue
+        h = re.match(r"^ {0,3}(#{1,6}) (.*)$", line)
+        if h:
+            out.append((i, len(h.group(1)), h.group(2).strip()))
     return out
 
 
-def section(text, title, level):
-    """The body of the heading `title` at `level`, to the next heading of that level or higher."""
-    lines = text.split("\n")
-    start = lines.index("#" * level + " " + title) + 1
+def headings(text):
+    """(level, title) of every heading as trace-check.py reads one (trace_headings), in order."""
+    return [(level, title) for _i, level, title in trace_headings(text.split("\n"))]
+
+
+def section_span(lines, title, level):
+    """(start, end) line indexes of the one section titled `title`, its heading line at `start`, to the next heading
+    of `level` or higher as trace_headings reads them (a heading in a fenced block not counting). The file has exactly
+    one heading of that title at any level, and it is at `level`: trace-check.py excuses a passage under every heading
+    of an entry's title, so a second one would hide text a test of the first never reads (FIX-004)."""
+    found = trace_headings(lines)
+    same = [(i, lv) for i, lv, t in found if t == title]
+    if not (len(same) == 1 and same[0][1] == level):  # an explicit raise: `python -O` strips an assert
+        raise AssertionError((title, level, [(lines[i], lv) for i, lv in same]))
+    start = same[0][0]
     end = len(lines)
-    for i in range(start, len(lines)):
-        h = re.match(r"^(#{1,6}) ", lines[i])
-        if h and len(h.group(1)) <= level:
+    for i, lv, _t in found:
+        if i > start and lv <= level:
             end = i
             break
-    return "\n".join(lines[start:end])
+    return start, end
+
+
+def section(text, title, level):
+    """The body of the one heading `title` at `level` (section_span), without its heading line."""
+    lines = text.split("\n")
+    start, end = section_span(lines, title, level)
+    return "\n".join(lines[start + 1:end])
 
 
 def registry_points(module_key):
