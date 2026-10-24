@@ -187,6 +187,9 @@ EXCUSED_MODULE_SECTIONS = {
     ("traits/spends-money.md", "Add at delegation-loop.brief-constraints"): (986, "e4aba6a5946681595c0f1ff19dd3e3fc65b4e308e02506907fc20d877154648d"),
     ("traits/spends-money.md", "Add at delegation-loop.inspect-checks"): (634, "21599c27ab2a9814894195f6019af8f42cef3a57a972c6595d042ff32e94ebc9"),
     ("traits/spends-money.md", "Add at intake.questions"): (1854, "ffd8aaaf3d1562ceedfd8c2a4f070b2862bc90d4ca5b792bbf6a727dfcd82c80"),
+    ("types/web-app.md", "Add at project-end.delivery for web-deployment"): (1114, "ff9c23da3088ee31442be038a92f7f6d4e117c693683ad5a66c7ecaeaf4b4e50"),
+    ("types/web-app.md", "Set at intake.delivery-kind"): (46, "2f7f51bb4c7b463f115afedb11af271b6040aba9852194f8fc6f3b522241f7f5"),
+    ("types/web-app/local-web-app.md", "Set at intake.delivery-kind"): (41, "8386b5618bcabbc4f062187cce16c2ebcf07f71fc937d7387284c98c44e8c7a9"),
 }
 
 
