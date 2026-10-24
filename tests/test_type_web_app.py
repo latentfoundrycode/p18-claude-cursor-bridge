@@ -175,14 +175,17 @@ def test_r023_the_sub_workflow_inherits_and_leaves_the_types_delivery_behind():
 
 def test_r023_the_web_deployment_procedure():
     """BUILD_PLAN TASK-019: the delivery procedure for `web-deployment`, numbered steps each run only after the one
-    before it has succeeded (Review B, rounds 1 and 2): the owner's yes first (an action outside the repository a revert
-    does not undo, the merge policy's irreversibility), the procedure recorded with its platform and account; the pause
-    before the backup, in a mode in which the product still answers, seen to hold by a marker write that changes no
-    user's data; the backup taken under the pause, outside the repository and the Workspace, proved by a restore, the
-    migration rehearsed on that copy, a failure resuming writes on the unchanged product; the migration on the live
-    data only inside the deployment (N1's principle); the check in the paused mode; the way back with writes held, the
-    previous release deployed only after the restore succeeded, a failure keeping writes held; the address and version
-    named. Dropping data is the owner's yes (supervisor.md's escalation)."""
+    before it has succeeded (Review B, rounds 1 and 2; Review A, round 5): the owner's yes first (an action outside the
+    repository a revert does not undo, the merge policy's irreversibility), the procedure recorded with its platform
+    and account; the pause before the backup, in a mode in which the product still answers, seen to hold by a marker
+    write that changes no user's data; the backup taken under the pause, outside the repository and the Workspace,
+    proved by a restore to a copy read back against the live store, the migration rehearsed on that copy, the copy
+    deleted, a failure resuming writes on the unchanged product; the migration on the live data only inside the
+    deployment (N1's principle); the pause seen to hold again after the deployment, then the check; the way back with
+    writes held, a restore only where a migration began and only once the pause is seen to have held since the backup,
+    a write that may have landed since making the restore the owner's question, the previous release deployed only
+    after the restore succeeded, a failure keeping writes held; the address and version named. Dropping data is the
+    owner's yes (supervisor.md's escalation)."""
     t = flat(body("web-app", "Add at project-end.delivery for web-deployment"))
     assert t.startswith("- **Deploy the release** (a hosted web application): steps 1 to 5 in this order, each only after the one before it has succeeded, and step 6 when step 4 or step 5 fails, its own actions too each only after the one before it has succeeded:")
     steps = ["1. **The owner's yes**, first", "2. **The pause.**", "3. **The backup, proved.**",
@@ -192,10 +195,13 @@ def test_r023_the_web_deployment_procedure():
     # Review B, round 2: the order the paragraph enforces, read sentence by sentence, not heading by heading.
     order = ["the yes names the release", "The product stops taking writes", "a marker write that changes no user's data",
              "With writes held, the owner's live data is backed up", "The backup is then restored to a copy",
-             "its migration is rehearsed on that copy", "The release's commit on `main` is deployed",
-             "The deployed product, still in its mode of step 2, is checked", "When it passes, writes resume",
-             "the live store's last write is first compared with the backup's time", "makes the restore the owner's question",
-             "the backup of step 3 is restored over the live data", "Only once the restore has succeeded is the previous release deployed",
+             "its contents compared with the live store's under the pause", "its migration is rehearsed on that copy",
+             "The copy is then deleted", "The release's commit on `main` is deployed",
+             "step 2's marker write is tried again and refused", "It is then checked at its address",
+             "When it passes, writes resume", "Where step 4 began a migration on the live data",
+             "step 2's marker write, tried again at the start of this step, is refused",
+             "Then the backup is restored over the live data", "the restore is the owner's question",
+             "Only once the restore has succeeded, or where none was needed, is the previous release deployed",
              "only once it passes the check of step 5 do writes resume"]
     at = [t.index(s) for s in order]
     assert at == sorted(at), list(zip(order, at))
@@ -208,17 +214,25 @@ def test_r023_the_web_deployment_procedure():
     assert "a marker write that changes no user's data (one the product discards, or one removed afterwards) is tried and refused" in t
     assert "A product with neither mode cannot be checked while it takes no writes, so its design gives it one, a change like any other, before its first deployment" in t
     assert "offline" not in t and "where it can hold them" not in t and "leave it taking writes" not in t
+    assert "the live store's last write" not in t
     assert "so the backup holds every write" in t
     assert "never into the repository or the Workspace, since it holds the users' data" in t
-    assert "kept away from the repository and the Workspace as the backup is, and read back, which proves this backup restores" in t
+    assert "kept away from the repository and the Workspace as the backup is, and read back, its contents compared with the live store's under the pause (the count of records in each table or collection, or a checksum of each), which proves this backup restores" in t
+    assert "The copy is then deleted, since it holds the users' data; the backup stays where Resources records it." in t
     assert "A backup that does not restore, or a rehearsal that fails, stops the deployment: writes resume on the unchanged live product" in t
+    assert "deployed by the recorded procedure, which brings the release up in the mode of step 2" in t
     assert "its migration runs on the live data only here, as part of the deployment, never apart from a release" in t
+    assert "The deployed product is first seen to be still paused, since a deployment may restart it out of its mode" in t
     assert "with requests that change no user's data: it answers, and it reports the release's version where the design gives the version a place, the deployed commit read from the platform otherwise" in t
     assert "When it passes, writes resume, and the report and the User Manual name the address and the version deployed." in t
     assert "when step 4 or step 5 fails, a defect like any other, with writes held throughout" in t
-    assert "a write found since the backup, which the pause should have made impossible, makes the restore the owner's question" in t
-    assert "and the pause of step 2 means the restore discards no user's write" in t
-    assert "The pause lasts until step 5 passes, step 3 stops the deployment, or step 6 has brought the previous release back and its check has passed." in t
+    assert "but only once the pause is seen to have held since the backup" in t
+    assert "is refused, as at every earlier try, and where the product records when each write from a user or from outside was made, none is later than the backup's time, the migration's own writes not counted" in t
+    assert "Then the backup is restored over the live data, and the restore discards no user's write." in t
+    assert "A marker write accepted at this try or an earlier one, or such a write later than the backup, means a user's write may have landed since the backup, and the restore is the owner's question." in t
+    assert "Where step 4 began no migration, the live data is left as it is." in t
+    assert "is the previous release deployed by the same procedure, in the mode of step 2" in t
+    assert "The pause lasts until step 5 passes, step 3 stops the deployment, or step 6 has brought the previous release back and its check has passed; where step 6 puts a question to the owner or tells them of a failure, until their word." in t
     assert "If the restore fails, or the previous release fails its check, writes stay held and the owner is told." in t
     assert "Once step 5 has passed and writes have resumed, the backup is no longer a way back that loses nothing: restoring it later discards the writes made since, which is the owner's question." in t
 
