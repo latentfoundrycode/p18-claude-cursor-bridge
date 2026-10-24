@@ -81,12 +81,14 @@ def test_item1_the_round4_probe_is_seen():
 def test_item1_fences_open_and_close_as_trace_check_reads_them():
     """Item 1: a fence opened by an indented run (four spaces, which the old reading did not take for a fence) hides
     the headings inside it, and a fence closes only on a run of its character at least as long, whatever follows the
-    run, as trace-check.py's parse_units reads a fence; the helpers and trace-check.py agree on each case."""
+    run, as trace-check.py's parse_units reads a fence, and a fence never closed hides the rest of the file; the
+    helpers and trace-check.py agree on each case."""
     cases = {
         "## A\n    ```\n### B\n    ```\n### C\n": [(2, "A"), (3, "C")],
         "## A\n````\n### B\n```\n### C\n````text\n### D\n": [(2, "A"), (3, "D")],
         "## A\n~~~\n### B\n```\n~~~\n### C\n": [(2, "A"), (3, "C")],
         "## A\n    ### B\n   ### C\n": [(2, "A"), (3, "C")],
+        "## A\n```\n### B\n## C\n": [(2, "A")],
     }
     tc = trace_check()
     for text, expected in cases.items():

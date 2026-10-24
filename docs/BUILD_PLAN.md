@@ -207,7 +207,7 @@ Parent: none
 Depends on: TASK-011, TASK-013, TASK-005, TASK-006
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/traits/spends-money.md; .../long-running-process.md; .../ai-models.md; bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_traits_new.py
+Scope: bridge/cursor-bridge/workflow/traits/spends-money.md; .../long-running-process.md; .../ai-models.md; bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_traits_new.py; tests/test_b3_least_confident.py
 Satisfies: R-020, R-021, R-022
 Done when: *spends money* carries approval-before-paid-action, the worst-case estimate, a cap, platform+account named, the §13.1 store of paid results that is never discarded, and a dry run on a copy before any paid run; *long-running process* **points at** founding rule N1/§8.1 (which stays in the core, not moved) and adds the start/stop/health procedure, the nothing-left-running check, and the brief constraint at the configuration and delegation-loop points; *AI models* carries evaluation sets and thresholds, pinned models, recorded outputs; the three rows flip to written; `workflow-check.py` passes; `test_traits_new.py` (names R-020–R-022) asserts each adds-only, names its content, and that N1/§8.1 remains in the core.
 

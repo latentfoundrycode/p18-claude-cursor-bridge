@@ -58,7 +58,8 @@ def section_span(lines, title, level):
     of an entry's title, so a second one would hide text a test of the first never reads (FIX-004)."""
     found = trace_headings(lines)
     same = [(i, lv) for i, lv, t in found if t == title]
-    assert len(same) == 1 and same[0][1] == level, (title, level, [(lines[i], lv) for i, lv in same])
+    if not (len(same) == 1 and same[0][1] == level):  # an explicit raise: `python -O` strips an assert
+        raise AssertionError((title, level, [(lines[i], lv) for i, lv in same]))
     start = same[0][0]
     end = len(lines)
     for i, lv, _t in found:
