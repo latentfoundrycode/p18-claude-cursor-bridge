@@ -128,6 +128,9 @@ def test_r020_spends_money_asks_for_approval_the_worst_case_the_cap_and_the_acco
     assert "The loop's own paid actions (a contract capture, a dry or paid run of an increment, a re-recording" in t
     assert "tracked against the cap by the supervisor" in t
     assert "the design states how the product enforces the cap" in t and "fixed in a test (rule 52)" in t
+    # Review A, round 2: the trait adds no design section, so the intake notes carry both duties to the design.
+    assert "the intake notes carry its two duties to the design as requirements of it" in t
+    assert "the folder that holds the store of paid results" in t
 
 
 def test_r020_r019_a_paid_call_is_bounded_by_external_services_and_classified_with_it():
@@ -165,7 +168,7 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert "at the smallest size that answers them, under their own approval" in brief
     inspect = add("spends-money", "delegation-loop.inspect-checks")
     assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
-    assert "neither writes its result to the store nor reads the store first" in inspect
+    assert "does not both read the store first and write its result there" in inspect
     assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
 
 
@@ -173,7 +176,7 @@ def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
     """R-021 (DESIGN §8.1): the trait points at founding rule N1 and §8.1, which stay in the core, and adds the start,
     stop and health procedure."""
     conf = add("long-running-process", "configuration.items")
-    assert "founding rule N1's eight conditions, which stay in the core" in conf and "§8.1" in conf
+    assert "the conditions stay in the core (" in conf and "§8.1" in conf
     assert "never an exception to them" in conf
     assert "**start, stop and health**" in conf
     for verb in ("starts it", "stops it and everything it started", "reports whether it is healthy"):
@@ -181,6 +184,7 @@ def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
     # Review A, round 1: a command is recorded in the increment that builds it, and N1 binds the runs the loop starts.
     assert "in its command reference, in the increment that builds it" in conf
     assert "Every run of the process the loop starts (a test, a demonstration, a check) meets founding rule N1" in conf
+    assert "a run a test starts and stops being part of that test, so that no gate depends on a process it did not start" in conf
     core = flat(read(CORE))
     assert "- **N1 — Files are the truth; programs are one-shot.**" in core
     n1 = ("A background process is allowed only when all eight hold", "never writes tracked files",
@@ -219,8 +223,10 @@ def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_output
     conf = add("ai-models", "configuration.items")
     assert "Each model is **pinned**, a model judge included" in conf and "never a name that moves to a newer model" in conf
     assert "**Recorded outputs** have a home" in conf and "without calling any model" in conf
-    assert "a model judge's verdicts on them, judged again only when the outputs are recorded again" in conf
+    assert "a model judge's verdicts on them, judged again whenever the outputs are recorded again or anything" in conf
+    assert "(the code after the model's reply included)" in conf
     test = add("ai-models", "delegation-loop.test-checks")
     assert "The evaluation runs against its thresholds on the recorded outputs and their recorded verdicts" in test
     assert "correctness-class block" in test and "an exact-match assertion on a model's output" in test
     assert "records new outputs first, and new verdicts on them" in test
+    assert "a change to the code that shapes the judged result from a recorded reply has that result judged again" in test
