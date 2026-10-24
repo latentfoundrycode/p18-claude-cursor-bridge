@@ -181,6 +181,8 @@ def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
     assert "**start, stop and health**" in conf
     for verb in ("starts it", "stops it and everything it started", "reports whether it is healthy"):
         assert verb in conf, verb
+    # Review A, round 3: the commands take an instance's port and data, so a test's instance runs beside the owner's.
+    assert "the start and stop commands taking the port and the data of the instance they start and stop" in conf
     # Review A, round 1: a command is recorded in the increment that builds it, and N1 binds the runs the loop starts.
     assert "in its command reference, in the increment that builds it" in conf
     assert "Every run of the process the loop starts (a test, a demonstration, a check) meets founding rule N1" in conf
@@ -210,8 +212,12 @@ def test_r021_a_run_leaves_nothing_running():
     assert "its children included" in brief
     test = add("long-running-process", "delegation-loop.test-checks")
     assert test.startswith("Nothing the run started is left running") and "correctness-class block" in test
-    assert "never by the procedure's stop command, which would stop the instance the owner runs too" in test
-    assert "A process the owner started is left as it is." in test
+    # Review A, round 3: what the tests started is told by descent or by a test instance's port or data, never by
+    # start time alone, and the stop never reaches the instance the owner runs.
+    assert "no process the tests started (one descended from the test run, or one on a test instance's port or data)" in test
+    assert "stopped by its process ID together with its children" in test
+    assert "never by a command that reaches the instance the owner runs" in test
+    assert "A process the owner started, or another session's, is left as it is." in test
 
 
 def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_outputs():
@@ -238,3 +244,7 @@ def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_output
     assert "the evaluation does not pass on the verdicts recorded before the change" in test
     assert "is blocked at the test step, however the old verdicts read" in test
     assert "while nothing that shapes the judged result changes, the evaluation runs again without calling any model" in conf
+    # Review A, round 3: the judged result is kept beside its verdict, and a paid re-judging is the supervisor's run.
+    assert "each verdict is kept with the judged result it read" in conf
+    assert "where a model costs money, the block waits on the run the owner approved" in test
+    assert "never on a re-delegation" in test
