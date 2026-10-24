@@ -183,7 +183,7 @@ def test_r023_the_web_deployment_procedure():
     only inside the deployment (N1's principle); the check at the address that changes no user's data; the way back in
     its order; the address and version named."""
     t = flat(body("web-app", "Add at project-end.delivery for web-deployment"))
-    assert t.startswith("- **Deploy the release** (a hosted web application), in this order, each step only after the one before it has succeeded:")
+    assert t.startswith("- **Deploy the release** (a hosted web application): steps 1 to 5 in this order, each only after the one before it has succeeded, and step 6 when step 4 or step 5 fails:")
     steps = ["1. **The owner's yes**, first", "2. **The rehearsal**", "3. **The backup and the pause.**",
              "4. **The deployment.**", "5. **The check.**", "6. **The way back**"]
     at = [t.index(s) for s in steps]
@@ -191,7 +191,7 @@ def test_r023_the_web_deployment_procedure():
     assert t.count("**The deployment.**") == 1 and t.count("is deployed by") == 2, t
     assert t.index("The release's commit on `main` is deployed") > t.index("3. **The backup and the pause.**")
     assert "since a deployment acts outside the repository and a revert does not undo it" in t
-    assert "the yes names the release, the pause in writes step 3 makes, and the way back in step 6" in t
+    assert "the yes names the release, the pause in writes step 3 makes (and the writes from outside it refuses, which a sender that does not retry loses), and the way back in step 6" in t
     assert "recorded in `docs/INVENTORY.md` (Resources: the host, its platform and account, the command that deploys) before the first deployment" in t
     assert "the owner through a run sheet where it needs a key the session does not hold" in t
     assert "its migration runs on a copy restored from a backup of the live data" in t and "which also proves the backup restores" in t
@@ -201,7 +201,9 @@ def test_r023_the_web_deployment_procedure():
     assert "Immediately before the deployment the owner's live data is backed up" in t
     assert "never into the repository or the Workspace, since it holds the users' data" in t
     # Review B, round 1: writes are held with no exception, so the live migration loses no user's write.
-    assert "from that backup until step 5 passes, the product takes no writes (a maintenance or read-only mode, or offline where it has neither), so that no user's write is lost whichever way the deployment goes" in t
+    assert "from that backup until step 5 passes, the product takes no writes, neither its users' nor any from outside (a provider's notices, its scheduled jobs), in a maintenance or read-only mode, or offline where it has neither, so that no user's write is lost whichever way the deployment goes" in t
+    # Review A, round 4: the pause is seen to hold; a write found since the backup, a failed way back, a later restore.
+    assert "a write is tried and seen refused before step 4 begins" in t
     assert "where it can hold them" not in t and "leave it taking writes" not in t
     assert "its migration runs on the live data only here, as part of the deployment, never apart from a release" in t
     assert "checked at its address with requests that change no user's data: it answers" in t
@@ -209,7 +211,9 @@ def test_r023_the_web_deployment_procedure():
     assert "When it passes, writes resume, and the report and the User Manual name the address and the version deployed." in t
     assert "when step 4 or step 5 fails, a defect like any other" in t
     assert "where a migration ran, the backup is restored first, since the previous release may not run on migrated data; then the previous release is deployed by the same procedure and checked as in step 5" in t
-    assert "The pause of step 3 means the restore discards no user's write." in t
+    assert "The pause of step 3 means the restore discards no user's write; a write found since the backup makes the restore the owner's question first." in t
+    assert "If the previous release fails its check too, writes stay held and the owner is told." in t
+    assert "Once step 5 has passed and writes have resumed, the backup is no longer a way back that loses nothing: restoring it later discards the writes made since, which is the owner's question." in t
 
 
 def test_r023_workflow_check_passes_over_the_workflow_folder():
