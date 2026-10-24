@@ -174,36 +174,42 @@ def test_r023_the_sub_workflow_inherits_and_leaves_the_types_delivery_behind():
 
 
 def test_r023_the_web_deployment_procedure():
-    """BUILD_PLAN TASK-019: the delivery procedure for `web-deployment`: the owner's yes before a deployment (an action
-    outside the repository a revert does not undo, the merge policy's irreversibility), the procedure recorded with its
-    platform and account, a migration rehearsed on a restored copy, the live data backed up outside the repository and
-    the Workspace with writes held, migrated only as part of a release, a check at the deployed address that changes no
-    user's data, the way back in its order, and the address and version named."""
+    """BUILD_PLAN TASK-019: the delivery procedure for `web-deployment`, as numbered steps each run only after the one
+    before it has succeeded (Review B, round 1): the owner's yes first (an action outside the repository a revert does
+    not undo, the merge policy's irreversibility), the procedure recorded with its platform and account; a migration
+    rehearsed on a restored copy, a failed rehearsal stopping everything live; the live data backed up outside the
+    repository and the Workspace and writes held with no exception until the check passes (no user's write lost on the
+    way forward or back; dropping data is the owner's yes, supervisor.md's escalation); the migration on the live data
+    only inside the deployment (N1's principle); the check at the address that changes no user's data; the way back in
+    its order; the address and version named."""
     t = flat(body("web-app", "Add at project-end.delivery for web-deployment"))
-    assert t.startswith("- **Deploy the release** (a hosted web application): the owner says yes first")
+    assert t.startswith("- **Deploy the release** (a hosted web application), in this order, each step only after the one before it has succeeded:")
+    steps = ["1. **The owner's yes**, first", "2. **The rehearsal**", "3. **The backup and the pause.**",
+             "4. **The deployment.**", "5. **The check.**", "6. **The way back**"]
+    at = [t.index(s) for s in steps]
+    assert at == sorted(at), at
+    assert t.count("**The deployment.**") == 1 and t.count("is deployed by") == 2, t
+    assert t.index("The release's commit on `main` is deployed") > t.index("3. **The backup and the pause.**")
     assert "since a deployment acts outside the repository and a revert does not undo it" in t
-    # Review A, round 1 (blocking): a restore over the owner's live data that discards users' writes is the owner's own yes.
-    assert "the yes covers the deployment and the way back below, except a restore that would discard users' writes, which is asked of its own" in t
-    assert "a restore that would discard writes made since the backup (the product could not hold them) waits for the owner's yes, given with what it discards stated" in t
-    assert "deployed to the server the owner operates by the deployment procedure" in t
+    assert "the yes names the release, the pause in writes step 3 makes, and the way back in step 6" in t
     assert "recorded in `docs/INVENTORY.md` (Resources: the host, its platform and account, the command that deploys) before the first deployment" in t
     assert "the owner through a run sheet where it needs a key the session does not hold" in t
-    # Review A, round 1: the migration rehearsed first; the backup's home; writes held so going back loses nothing.
-    assert "its migration is first rehearsed on a copy restored from a backup of the live data" in t and "which also proves the backup restores" in t
-    assert "kept away from the repository and the Workspace as the backup below is" in t
+    assert "its migration runs on a copy restored from a backup of the live data" in t and "which also proves the backup restores" in t
+    assert "kept away from the repository and the Workspace as the backup in step 3 is" in t
+    # Review B, round 1: a failed rehearsal stops before anything live is touched.
+    assert "A rehearsal that fails stops the deployment before anything live is touched" in t
     assert "Immediately before the deployment the owner's live data is backed up" in t
     assert "never into the repository or the Workspace, since it holds the users' data" in t
-    assert "the product takes no writes where it can hold them (a maintenance or read-only mode), so that going back loses nothing" in t
-    assert "the migration runs on the live data only as part of the deployment, never apart from a release" in t
+    # Review B, round 1: writes are held with no exception, so the live migration loses no user's write.
+    assert "from that backup until step 5 passes, the product takes no writes (a maintenance or read-only mode, or offline where it has neither), so that no user's write is lost whichever way the deployment goes" in t
+    assert "where it can hold them" not in t and "leave it taking writes" not in t
+    assert "its migration runs on the live data only here, as part of the deployment, never apart from a release" in t
     assert "checked at its address with requests that change no user's data: it answers" in t
     assert "it reports the release's version where the design gives the version a place, the deployed commit read from the platform otherwise" in t
-    # Review A, round 1: the order of the way back.
-    assert "where a migration ran, the backup is restored first, since the previous release may not run on migrated data, then the previous release is deployed by the same procedure" in t
-    assert "A check that fails is a defect like any other" in t
-    # Review A, round 2: what the product is while a restore waits for the owner's yes.
-    assert "while it waits the product is taken offline, unless the owner, asked in the same question, chooses to leave it taking writes" in t
-    assert "The report and the User Manual name the address and the version deployed." in t
-    assert t.index("rehearsed on a copy") < t.index("Immediately before the deployment") < t.index("checked at its address")
+    assert "When it passes, writes resume, and the report and the User Manual name the address and the version deployed." in t
+    assert "when step 4 or step 5 fails, a defect like any other" in t
+    assert "where a migration ran, the backup is restored first, since the previous release may not run on migrated data; then the previous release is deployed by the same procedure and checked as in step 5" in t
+    assert "The pause of step 3 means the restore discards no user's write." in t
 
 
 def test_r023_workflow_check_passes_over_the_workflow_folder():
