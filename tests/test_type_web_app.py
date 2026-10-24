@@ -183,7 +183,7 @@ def test_r023_the_web_deployment_procedure():
     deleted, a failure resuming writes on the unchanged product; the migration on the live data only inside the
     deployment (N1's principle); the pause seen to hold again after the deployment, then the check; the way back with
     writes held, a restore only where a migration began and only once the pause is seen to have held since the backup,
-    a write that may have landed since making the restore the owner's question, the previous release deployed only
+    a write that may have landed since making the restore the owner's question, put with what each answer costs, the previous release deployed only
     after the restore succeeded, a failure keeping writes held; the address and version named. Dropping data is the
     owner's yes (supervisor.md's escalation)."""
     t = flat(body("web-app", "Add at project-end.delivery for web-deployment"))
@@ -226,10 +226,10 @@ def test_r023_the_web_deployment_procedure():
     assert "with requests that change no user's data: it answers, and it reports the release's version where the design gives the version a place, the deployed commit read from the platform otherwise" in t
     assert "When it passes, writes resume, and the report and the User Manual name the address and the version deployed." in t
     assert "when step 4 or step 5 fails, a defect like any other, with writes held throughout" in t
-    assert "but only once the pause is seen to have held since the backup" in t
-    assert "is refused, as at every earlier try, and where the product records when each write from a user or from outside was made, none is later than the backup's time, the migration's own writes not counted" in t
+    assert "but only once the pause is seen to hold and no write from a user or from outside can have landed since the backup" in t
+    assert "is refused; and where the product records when each write from a user or from outside was made, none is later than the backup's time (the migration's own writes and the marker writes not counted), or, where it keeps no such records, the marker write was refused at every earlier try as well" in t
     assert "Then the backup is restored over the live data, and the restore discards no user's write." in t
-    assert "A marker write accepted at this try or an earlier one, or such a write later than the backup, means a user's write may have landed since the backup, and the restore is the owner's question." in t
+    assert "Otherwise a user's write may have landed since the backup, and the restore is the owner's question, put with what each answer costs: a restore discards the writes made since the backup (named where the product's records allow), and declining leaves the migrated data in place, which the previous release may not run on, with writes held." in t
     assert "Where step 4 began no migration, the live data is left as it is." in t
     assert "is the previous release deployed by the same procedure, in the mode of step 2" in t
     assert "The pause lasts until step 5 passes, step 3 stops the deployment, or step 6 has brought the previous release back and its check has passed; where step 6 puts a question to the owner or tells them of a failure, until their word." in t
