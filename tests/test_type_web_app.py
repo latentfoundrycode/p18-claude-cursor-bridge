@@ -1,7 +1,8 @@
 """TASK-019: the type workflow web app and its sub-workflow local web app (R-023), new text throughout.
 
 enforces: docs/BUILD_PLAN.md TASK-019 (its Done when: the type sets `intake.delivery-kind` to `web-deployment` and adds
-the delivery procedure for that kind; local web app overrides the kind to `installer`, one key, installable's procedure
+the delivery procedure for that kind; local web app overrides the kind with one key, `install-script` (a local server
+ships the install-script way, Delivery-Conventions.md §1; INVENTORY, Decisions, TASK-019), installable's procedure
 for that kind applying; the default traits has-screens and personal-data, replaced for the sub-type by installable and
 long-running process; every section new text under a `new` entry; both rows written; `workflow-check.py` passing and
 classifying reAngle and the video factory without pausing); bridge/cursor-bridge/workflow/open-list.md, "Default
@@ -37,7 +38,7 @@ FILES = {
                 ["Set at intake.delivery-kind", "Add at project-end.delivery for web-deployment"]),
     "local-web-app": ("web-app/local-web-app.md", "Local web app", ["Set at intake.delivery-kind"]),
 }
-KINDS = {"web-app": "web-deployment", "local-web-app": "installer"}
+KINDS = {"web-app": "web-deployment", "local-web-app": "install-script"}
 
 
 def text(key):
@@ -93,7 +94,7 @@ def test_r023_each_file_is_a_title_and_its_change_sections_only(key):
 @pytest.mark.parametrize("key", sorted(FILES))
 def test_r023_the_type_sets_web_deployment_and_the_sub_type_overrides_it_with_installer(key):
     """BUILD_PLAN TASK-019: web app sets `intake.delivery-kind` to `web-deployment`; local web app overrides it with
-    `installer`, one key, its section's first non-blank line (extension-points.md: the value is the section's first
+    `install-script`, one key, its section's first non-blank line (extension-points.md: the value is the section's first
     non-blank line), with nothing after it."""
     lines = [l.strip() for l in body(key, "Set at intake.delivery-kind").split("\n") if l.strip()]
     assert lines == [KINDS[key]], lines
@@ -132,7 +133,8 @@ def test_r023_the_text_is_new_and_copies_no_passage_of_the_main_workflow(key):
 
 def test_r023_both_rows_are_written_and_the_sub_type_is_of_web_app():
     """BUILD_PLAN TASK-019: both rows flip to written in the same change as their files; local web app is a sub-type of
-    web app, delivered by an installer, with a local server to start and stop (the open list's definition, §6.3)."""
+    web app, delivered by an installer instead of a deployment, with a local server to start and stop (the open
+    list's definition, §6.3, whose plain-word installer the install script is: Delivery-Conventions.md §1)."""
     web = row("Product types", "web-app")
     local = row("Sub-types", "local-web-app")
     assert web["Written"] == "yes" and local["Written"] == "yes", (web, local)
@@ -156,14 +158,15 @@ def test_r023_the_default_traits_and_the_sub_types_replacement():
 
 def test_r023_the_sub_workflow_inherits_and_leaves_the_types_delivery_behind():
     """BUILD_PLAN TASK-019: the sub-workflow changes only what differs, at the same point its type set (an override is
-    inheritance, the core's "Main and conditional workflows"); its kind `installer` takes installable's procedure for
-    that kind (TASK-017), and the type's procedure names `web-deployment`, so it never reaches a local web app
+    inheritance, the core's "Main and conditional workflows"); its kind `install-script` takes installable's procedure
+    for that kind (TASK-017), and the type's procedure names `web-deployment`, so it never reaches a local web app
     (extension-points.md: a sub-workflow that sets another kind leaves its type workflow's procedure behind)."""
     assert "project-end.delivery" not in text("local-web-app")
     delivery = [l for l in text("web-app").split("\n") if l.startswith("## Add at project-end.delivery")]
     assert delivery == ["## Add at project-end.delivery for web-deployment"], delivery
     installable = read(os.path.join(TRAITS, "installable.md"))
-    assert "\n## Add at project-end.delivery for installer\n" in installable.replace("\r\n", "\n")
+    assert "\n## Add at project-end.delivery for install-script\n" in installable.replace("\r\n", "\n")
+    assert "Deliver the install script** (a command-line tool or a local server)" in flat(installable)
     core = flat(read(CORE))
     assert "**A sub-workflow inherits its type workflow** and changes only what differs, at the same extension points." in core
     assert "It may override its type workflow's replacement or setting: that is inheritance, not a collision." in core
@@ -173,20 +176,32 @@ def test_r023_the_sub_workflow_inherits_and_leaves_the_types_delivery_behind():
 def test_r023_the_web_deployment_procedure():
     """BUILD_PLAN TASK-019: the delivery procedure for `web-deployment`: the owner's yes before a deployment (an action
     outside the repository a revert does not undo, the merge policy's irreversibility), the procedure recorded with its
-    platform and account, live data backed up and migrated only as part of a release (founding rule N1), a check at the
-    deployed address that changes no user's data, the previous release deployed again on a failed check, and the
-    address and version named."""
+    platform and account, a migration rehearsed on a restored copy, the live data backed up outside the repository and
+    the Workspace with writes held, migrated only as part of a release, a check at the deployed address that changes no
+    user's data, the way back in its order, and the address and version named."""
     t = flat(body("web-app", "Add at project-end.delivery for web-deployment"))
     assert t.startswith("- **Deploy the release** (a hosted web application): the owner says yes first")
     assert "since a deployment acts outside the repository and a revert does not undo it" in t
+    # Review A, round 1 (blocking): a restore over the owner's live data that discards users' writes is the owner's own yes.
+    assert "the yes covers the deployment and the way back below, except a restore that would discard users' writes, which is asked of its own" in t
+    assert "a restore that would discard writes made since the backup (the product could not hold them) waits for the owner's yes, given with what it discards stated" in t
     assert "deployed to the server the owner operates by the deployment procedure" in t
     assert "recorded in `docs/INVENTORY.md` (Resources: the host, its platform and account, the command that deploys) before the first deployment" in t
     assert "the owner through a run sheet where it needs a key the session does not hold" in t
-    assert "the owner's live data is backed up before the deployment and migrated as part of it, never apart from a release (founding rule N1)" in t
-    assert "checked at its address with requests that change no user's data: it answers, and it reports the release's version" in t
-    assert "A check that fails is a defect like any other, and the previous release is deployed again by the same procedure" in t
-    assert "the backup restored where a migration ran" in t
+    # Review A, round 1: the migration rehearsed first; the backup's home; writes held so going back loses nothing.
+    assert "its migration is first rehearsed on a copy restored from a backup of the live data" in t and "which also proves the backup restores" in t
+    assert "kept away from the repository and the Workspace as the backup below is" in t
+    assert "Immediately before the deployment the owner's live data is backed up" in t
+    assert "never into the repository or the Workspace, since it holds the users' data" in t
+    assert "the product takes no writes where it can hold them (a maintenance or read-only mode), so that going back loses nothing" in t
+    assert "the migration runs on the live data only as part of the deployment, never apart from a release" in t
+    assert "checked at its address with requests that change no user's data: it answers" in t
+    assert "it reports the release's version where the design gives the version a place, the deployed commit read from the platform otherwise" in t
+    # Review A, round 1: the order of the way back.
+    assert "where a migration ran, the backup is restored first, since the previous release may not run on migrated data, then the previous release is deployed by the same procedure" in t
+    assert "A check that fails is a defect like any other" in t
     assert "The report and the User Manual name the address and the version deployed." in t
+    assert t.index("rehearsed on a copy") < t.index("Immediately before the deployment") < t.index("checked at its address")
 
 
 def test_r023_workflow_check_passes_over_the_workflow_folder():
