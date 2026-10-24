@@ -192,12 +192,14 @@ def test_r023_the_web_deployment_procedure():
              "4. **The deployment.**", "5. **The check.**", "6. **The way back**"]
     at = [t.index(s) for s in steps]
     assert at == sorted(at), at
-    # Review B, rounds 2 and 3: the order the paragraph enforces, read sentence by sentence, not heading by heading.
+    # Review B, rounds 2 to 4: the order the paragraph enforces, read sentence by sentence, not heading by heading.
     order = ["the yes names the release", "The product stops taking writes", "a marker write that changes no user's data",
              "With writes held, the owner's live data is backed up", "The backup is then restored to a copy",
              "its contents compared with the live store's under the pause", "its migration is rehearsed on that copy",
-             "The copy is then deleted", "The release's commit on `main` is deployed",
-             "step 2's marker write is tried again and refused", "It is then checked at its address",
+             "A backup that does not restore, or a rehearsal that fails, stops the deployment",
+             "the copy is then deleted", "The release's commit on `main` is deployed",
+             "step 2's marker write is tried again and refused", "the check below is not run, writes stay held, and step 6 runs",
+             "Only after a refused marker is it checked at its address",
              "When it passes, writes resume", "Where step 4 began a migration on the live data",
              "step 2's marker write, tried again at the start of this step, is refused",
              "Then the backup is restored over the live data", "the restore is the owner's question",
@@ -220,12 +222,12 @@ def test_r023_the_web_deployment_procedure():
     assert "so the backup holds every write" in t
     assert "never into the repository or the Workspace, since it holds the users' data" in t
     assert "kept away from the repository and the Workspace as the backup is, and read back, its contents compared with the live store's under the pause (the count of records in each table or collection, or a checksum of each), which proves this backup restores" in t
-    assert "The copy is then deleted, since it holds the users' data; the backup stays where Resources records it." in t
+    assert "Whichever way this step ends, the copy is then deleted, since it holds the users' data; the backup stays where Resources records it." in t
     assert "A backup that does not restore, or a rehearsal that fails, stops the deployment: writes resume on the unchanged live product" in t
     assert "deployed by the recorded procedure, which brings the release up in the mode of step 2" in t
     assert "its migration runs on the live data only here, as part of the deployment, never apart from a release" in t
     assert "The deployed product is first seen to be still paused, since a deployment may restart it out of its mode" in t
-    assert "step 2's marker write is tried again and refused; one accepted fails this step, once the product is back in its mode or stopped as step 2 says." in t
+    assert "step 2's marker write is tried again and refused; one accepted fails this step at once, once the product is back in its mode or stopped as step 2 says: the check below is not run, writes stay held, and step 6 runs." in t
     assert "with requests that change no user's data: it answers, and it reports the release's version where the design gives the version a place, the deployed commit read from the platform otherwise" in t
     assert "When it passes, writes resume, and the report and the User Manual name the address and the version deployed." in t
     assert "when step 4 or step 5 fails, a defect like any other, with writes held throughout" in t
