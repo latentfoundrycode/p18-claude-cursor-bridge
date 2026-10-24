@@ -90,3 +90,6 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-018 bridge/cursor-bridge/workflow/traits/ai-models.md Add at design.sections
 - new TASK-018 bridge/cursor-bridge/workflow/traits/ai-models.md Add at configuration.items
 - new TASK-018 bridge/cursor-bridge/workflow/traits/ai-models.md Add at delegation-loop.test-checks
+- new TASK-019 bridge/cursor-bridge/workflow/types/web-app.md Set at intake.delivery-kind
+- new TASK-019 bridge/cursor-bridge/workflow/types/web-app.md Add at project-end.delivery for web-deployment
+- new TASK-019 bridge/cursor-bridge/workflow/types/web-app/local-web-app.md Set at intake.delivery-kind

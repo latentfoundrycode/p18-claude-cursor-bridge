@@ -24,7 +24,7 @@ A product type answers one question: **how does the product reach its user?** Th
 | Key | Name | Definition | Workflow name | Default traits | Written | Planned |
 |---|---|---|---|---|---|---|
 | mobile-app | Mobile app | Installed on a phone or tablet from an app store | Mobile App Development | has-screens, installable | no | when the first project of this type arrives |
-| web-app | Web app | Used in a browser; keeps data for its users (accounts, saved state, runs, orders). Without a sub-type it runs on a server the owner operates and is delivered by deployment | Web App Development | has-screens, personal-data | no | release B |
+| web-app | Web app | Used in a browser; keeps data for its users (accounts, saved state, runs, orders). Without a sub-type it runs on a server the owner operates and is delivered by deployment | Web App Development | has-screens, personal-data | yes | release B |
 | website | Website | Used in a browser; presents content; keeps no data for its users | Website Development | has-screens | no | when the first project of this type arrives |
 | own-computer | Software on your own computer | Installed and run on the user's own computer, and met through something other than a browser page | Own-Computer Software Development | installable | no | release B |
 | backend-service | Backend service | Runs on a server, has no screen, serves other software over a network | Backend Service Development | long-running-process | no | when the first project of this type arrives |
@@ -42,7 +42,7 @@ A sub-type says more precisely what a part of its product type is, where that ch
 |---|---|---|---|---|---|---|---|
 | android | Android | mobile-app | A mobile app for Android | Android App | has-screens, installable | no | when the first project of this type arrives |
 | ios | iOS | mobile-app | A mobile app for iOS; it can only be built on a Mac | iOS App | has-screens, installable | no | when the owner builds on a Mac |
-| local-web-app | Local web app | web-app | Installed and run on the user's own computer and opened in their browser at a local address; it is delivered by an installer instead of a deployment and has a local server to start and stop | Local Web App | has-screens, installable, long-running-process | no | release B |
+| local-web-app | Local web app | web-app | Installed and run on the user's own computer and opened in their browser at a local address; it is delivered by an installer instead of a deployment and has a local server to start and stop | Local Web App | has-screens, installable, long-running-process | yes | release B |
 | gui | GUI | own-computer | Met through a window | GUI Software | has-screens, installable | no | when the first project of this type arrives |
 | cli | CLI | own-computer | Met through a terminal | CLI Software | installable | no | when the first project of this type arrives |
 | pipeline | Pipeline | own-computer | Met through nothing: it runs jobs unattended and its output is files or records | Pipeline Software | installable | no | when the first project of this type arrives |
