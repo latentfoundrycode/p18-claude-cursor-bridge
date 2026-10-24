@@ -26,7 +26,7 @@ STRUCTURE = {
     "intake": [(2, "Phase 1 — Intake"), (3, "What must survive a compaction"), (3, "The procedure"),
                (3, "The intake notes"), (3, "Classifying each part"), (3, "The gate"), (2, "Extension points")],
     "design": [(2, "Phase 2 — Design"), (3, "What must survive a compaction"), (3, "The procedure"),
-               (3, "The delivery kind"), (3, "Traits at the design gate"), (3, "The gate"), (2, "Extension points")],
+               (4, "A part without screens"), (3, "The delivery kind"), (3, "Traits at the design gate"), (3, "The gate"), (2, "Extension points")],
 }
 
 SURVIVAL = {

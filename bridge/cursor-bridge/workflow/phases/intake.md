@@ -56,31 +56,6 @@ from the merge policy's two-profile template and resolve it (`python
 exists from the first phase: the design critique needs it (release A3, plan 8.6). Phase 5 only
 re-resolves it.
 
-For **installable software** — a desktop application, a command-line tool, a local server
-— the platform context includes the **delivery**: the project ends with one file the owner
-double-clicks on Windows 11 x64 that installs it, upgrades it in place, and uninstalls it
-cleanly, per `~/.claude/cursor-bridge/Delivery-Conventions.md` §1 (which kind ships what).
-Confirm the kind and the target (Windows 11 x64 unless the user says otherwise), whether it
-must be per-machine (a service, a driver, a machine-wide file association) or can be
-per-user (the default, no administrator prompt), where its data should live, and — for
-anything with a command-line surface — that a generated **command reference** will exist
-(§4). This is not optional and not a late addition: it is a stage of the build plan.
-
-**Performance and cost budgets** (`~/.claude/cursor-bridge/Performance-Conventions.md` §1).
-Turn the stated performance, scale, and cost expectations into numbered budgets — one
-operation, one condition, one number, one measurement: "a search over 10,000 documents
-answers within 2 s at p95", "startup under 1 s", "syncing 1,000 files costs at most $0.50".
-Propose the numbers from the platform and the expected data; the owner sets them (a
-decision brief: what each number means for the user and what meeting it costs). "No
-budgets" is a legitimate answer for software with no operation the owner cares about the
-speed or cost of — it must be an answer, not a default. The budgets are recorded as prose
-in `docs/DESIGN.md` and as `bench/budgets.json` at configuration.
-
-For every **UI-bearing** feature, capture a **screen-and-state inventory** — the screens
-it needs and, for each, the states that must exist: empty, sparse, dense, and error. This
-is what makes the mockup (Phase 3) complete rather than a happy-path shell, and it is what
-each screen's mockup is later mapped back onto.
-
 Alongside it, capture a light **security-context** for the feature set: the **trust
 boundaries** (where untrusted input crosses into the system), the **authentication and
 authorization model**, the **data sensitivity / PII** handled, and the **external inputs

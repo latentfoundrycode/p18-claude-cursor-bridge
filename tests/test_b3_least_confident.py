@@ -23,6 +23,9 @@ from phase_modules import BRIDGE, PHASES, read, module, headings, section, secti
 TRACE_CHECK = os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")
 EXCEPTIONS = os.path.join(BRIDGE, "cursor-bridge", "workflow", "trace-exceptions.md")
 PREFIX = "bridge/cursor-bridge/workflow/phases/"
+WORKFLOW_PREFIX = "bridge/cursor-bridge/workflow/"
+WORKFLOW = os.path.join(BRIDGE, "cursor-bridge", "workflow")
+CONDITIONAL = ("traits/", "types/")
 
 
 def trace_check():
@@ -42,16 +45,26 @@ def phase_files():
 
 
 def excused_module_sections():
-    """(file under phases/, title) of every `new` or `reword` entry on a phase module, the interface variant files
-    apart, each once, the entry's heading stripped as trace-check.py's parse_exceptions strips it."""
+    """(file, title) of every `new` or `reword` entry on a phase module, the interface variant files apart, the file
+    given under phases/, and of every entry on a conditional workflow, which trace-check.py reads as a module too (its
+    is_module_path), the file given under workflow/ (`traits/<key>.md`, `types/...`; FIX-004's lead, taken by
+    TASK-017); each once, the entry's heading stripped as trace-check.py's parse_exceptions strips it."""
     out = []
     for line in read(EXCEPTIONS).split("\n"):
         m = re.match(r"^- (?:new|reword) \S+ (\S+\.md) (.+)$", line)
+        key = None
         if m and m.group(1).startswith(PREFIX) and not m.group(1).startswith(PREFIX + "interface/"):
             key = (m.group(1)[len(PREFIX):], m.group(2).strip())
-            if key not in out:
-                out.append(key)
+        elif m and m.group(1).startswith(tuple(WORKFLOW_PREFIX + c for c in CONDITIONAL)):
+            key = (m.group(1)[len(WORKFLOW_PREFIX):], m.group(2).strip())
+        if key and key not in out:
+            out.append(key)
     return out
+
+
+def excused_file(rel):
+    """A pinned file's text: a conditional workflow read under workflow/, a phase module under phases/."""
+    return read(os.path.join(WORKFLOW, rel)) if rel.startswith(CONDITIONAL) else module(rel)
 
 
 @pytest.mark.parametrize("rel", phase_files())
@@ -97,7 +110,7 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
 
 
 # Each section an entry of trace-exceptions.md excuses in a phase module, the interface variant files apart (pinned in
-# test_phase_modules_close.py), as FIX-004 found it: from its heading line to the next heading of its level or higher
+# test_phase_modules_close.py), and since TASK-017 in a conditional workflow (keyed `traits/<key>.md`), as FIX-004 found it: from its heading line to the next heading of its level or higher
 # as trace-check.py reads them, LF, the whitespace at its end stripped; (length, sha256). trace-check.py excuses new
 # text anywhere in such a section, so CI holds each section's text here. An increment that edits an excused section
 # re-takes its pin in the same diff as its `reword` entry, and a reviewer reads the change to a pin as a new trace
@@ -108,15 +121,17 @@ EXCUSED_MODULE_SECTIONS = {
     ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
     ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
     ("configuration.md", "What must survive a compaction"): (963, "338b5c4e338a41c95c7b9b2e1a110ed4e1473a8ad4ed04298359f8b21fd0984a"),
+    ("delegation-loop.md", "2. Package the brief"): (964, "5394e345e8d43f10f2f9d98db2d5b092b96d0deea6e2dd75a4d3bb47b45e7e2e"),
     ("delegation-loop.md", "Extension points"): (1696, "71ab68db2d7893030aa65e8136e44bba2d06a321490d2127803a47a4e9ad680d"),
     ("delegation-loop.md", "The procedure"): (288, "c455b10f89b3cfc21f9e0d9d62f36ac7bb68484c47bbb1b0109cab2295e0a51f"),
     ("delegation-loop.md", "What must survive a compaction"): (2592, "dcf59727f5776ead8bb2daf4adda3c57af89d350468e2283185c72eb7b156791"),
     ("delegation-loop/refactoring-pass.md", "Keeping the pass's position"): (474, "16c05ddcf26b7cfb893f990cc227172f04ef2417dcce816df779b25abd84024b"),
     ("delegation-loop/refactoring-pass.md", "Where this sub-file belongs"): (451, "d5cc03c8c0b31688c8182cc8c13bd6ef7288eb85dcc32c95a7157929cfcb696c"),
+    ("design.md", "A part without screens"): (268, "2a16dc74e42feea8823e7d580109fbed8dd2783aae9e58b8ea9fc36058211446"),
     ("design.md", "Extension points"): (761, "0084dfd13bf170a046f673a2312ed9580521c8be2a0a428b167b06aca65ffeb1"),
     ("design.md", "The delivery kind"): (494, "6b32868830fa9a36639468c4485c247450ad5d9337993b315eaed2480bf51dd5"),
     ("design.md", "The gate"): (3276, "811efda0ecdbcc72898697ee0027efe24d7e9a09c5263ab4919bb976cd5c8768"),
-    ("design.md", "Traits at the design gate"): (2799, "643369f3976415a46f53a8bb6409fd2fb26a599e4001d582fa2db89e8bce294b"),
+    ("design.md", "Traits at the design gate"): (3403, "653036f6b84c11afd94a9900be1477d23e9b839bc1c9e2eb933a0d03860a617b"),
     ("design.md", "What must survive a compaction"): (1824, "d9abbafd86416f3858cb865ca649ecfda5b4f47c167fd0691387079cc0234ea1"),
     ("intake.md", "Classifying each part"): (3492, "9b052cc643dd9fbb953f62dc8e62fa4a5750d37318b9b9d6da196e389632181e"),
     ("intake.md", "Extension points"): (1254, "4a0f40bda97f5ba7ea20d260c0262f88783a2018a5fb15d709625fe991c1bada"),
@@ -128,14 +143,14 @@ EXCUSED_MODULE_SECTIONS = {
     ("interface.md", "The variants"): (1458, "926ec90a63bd7a60e8334e4c9046d870f1bddd016dd90f3169bd6104baf0fd8a"),
     ("interface.md", "What must survive a compaction"): (1489, "5b372267c3bf6f318492b4eae6f277d3619d0fd42039ceddc7f903c9c3f170b7"),
     ("interface.md", "Which variants a part runs"): (1922, "82a465d2e23ba652f9704bedd8abeb28d031fadb17385366063f4766a1593068"),
-    ("planning.md", "Extension points"): (782, "973cdaf724babb527ef7753deb5feebc5572eccce46c73adc1da707c1918f691"),
+    ("planning.md", "Extension points"): (1220, "7c60fc3db2dd655458f81bae44119268990eb368b946e71acfb98eacd3750dfe"),
     ("planning.md", "Step 0 — Prior-project lessons (ask before drafting)"): (2264, "48550c1f28154614dad3e93db34babdca1eb5906c75c3288198be40d0f4af65a"),
     ("planning.md", "What must survive a compaction"): (1824, "8b60325b75200bd99b0800fd6f99b9e9fe9a44da4f9963bb75615d8942b33020"),
-    ("planning.md", "What the interface phase hands to the plan"): (534, "ea6c029f7594746a920c03954f423d7cfc25135b4ce11f96577f7e36348a46d2"),
-    ("project-end.md", "Extension points"): (1219, "ac30355587f1874a2f32174c2cbc507db8563bb625ee9542f0aaa20960a12f9b"),
+    ("planning.md", "What the interface phase hands to the plan"): (584, "26b22c10b97b6677af0480dc61aaf573b23e49c0589319405a1d9ac5dbdf67fb"),
+    ("project-end.md", "Extension points"): (1215, "b43b5ed92b4810f1da52e175f743c08db42a712311f25476bfa586af47ee56c6"),
     ("project-end.md", "Flagged traits in the promotion pass"): (1352, "882dd588f2b4e00b538bb37dc9ff64d590ada558b6bbc6094eb2fab17153eee5"),
     ("project-end.md", "Keeping the position"): (310, "e817d5b0593b8c3a9162d3463969c7034ee539ed8ca874e240bb2a82d56a29be"),
-    ("project-end.md", "What must survive a compaction"): (1342, "c64ef2906fd54af4bc2dd2d85548e36c8eb299ab703f482af4f61034648b158b"),
+    ("project-end.md", "What must survive a compaction"): (1405, "8cf8d80f0852e598b6084dbd884f9a159de9eecce64ad1718553549e5f76277f"),
     ("project-end.md", "Where this module begins"): (321, "bbeaa6dac861483bec0e2e320a116a0d483739f69bb50facc302542288aaf75e"),
     ("reflection.md", "Extension points"): (738, "bd09934998929fba6d2139393c37232ec3e9c13622b402ce9ac264fb7b7b8228"),
     ("reflection.md", "Keeping the position"): (536, "197743ebea82a65f13ab634c7a4d70966457f1d3bc711817bed81386dcf22277"),
@@ -145,12 +160,28 @@ EXCUSED_MODULE_SECTIONS = {
     ("run-parameters.md", "Extension points"): (683, "5ef8d017187dfd16f8fa971a8e7ef3551136b497387f14e9477562f84331976c"),
     ("run-parameters.md", "What must survive a compaction"): (821, "d67698de27c0e6d55d3d347079911111df122fb0b3cb667fcb937b4ff1f55979"),
     ("run-parameters.md", "Writing the answers down"): (779, "ed3fe29e9fe1c96fa0348e57540a525572f2a646250b2adae046fc231b17b731"),
+    ("traits/external-services.md", "Add at delegation-loop.brief-constraints"): (222, "aebd1f2804736ea72e182c119e34e503391ea180ee7b119329f57beac89b07b6"),
+    ("traits/external-services.md", "Add at delegation-loop.inspect-checks"): (256, "3d9b8d30de5deb015376d3a3fcb26e799a7989e072e3ba4dc0c01fb7394df215"),
+    ("traits/external-services.md", "Add at delegation-loop.test-checks"): (346, "7f81a6a34bea4c8482f0fe50141822fea695ec99488927ae03dc1f4e1c0cecdf"),
+    ("traits/external-services.md", "Add at planning.critic-lenses"): (533, "c850ed185641c6f69f3925e376c34d91be2c08df3de3b63d526e250b1d52113b"),
+    ("traits/has-screens.md", "Add at interface.variants"): (595, "987c0734050379c161e41578b5f797eb9f29d2c4ae3075c0710f808a8d68cfa8"),
+    ("traits/has-screens.md", "Add at planning.critic-lenses"): (843, "e33f771242637cec0ff3b0e641c304dbd93619ab35e5c5f510aef3a8243805fd"),
+    ("traits/has-screens.md", "The Observability & Verifiability section"): (947, "11fa2639607592b1459f987f5001d0995649c703b0d1883b36952ee46d567b7a"),
+    ("traits/has-screens.md", "The approved mockup and the frozen rule"): (243, "7053139bfab3ea1b0a7cbf4b5438523980a566c20ef1722fbd2ffeaa343f32de"),
+    ("traits/installable.md", "Add at planning.critic-lenses"): (1170, "da8c4ceb8668b134252b51479f875f286f892a49cb695566978a9f90a88a2cc0"),
+    ("traits/installable.md", "Add at project-end.delivery for install-script"): (274, "d362a1f64616d675f5352593568531e22e5fc3c918ed83a33a3962c02a1f3b8a"),
+    ("traits/installable.md", "Code signing"): (308, "ed449346ff68fd449d3f7a1af719ba4547e34d1d74efdfde46f305a81e10ffb8"),
+    ("traits/installable.md", "Which delivery kinds the Delivery section is for"): (236, "db56fef951c7aba1a67b796d4d85e19d2c58bcc218d0246737d0468591a82cac"),
+    ("traits/installable.md", "Which delivery kinds the intake passage is for"): (273, "ac97680fd2fe85b751ea032c449418d2178ed307e0bbee73dade1c86f6379ea3"),
+    ("traits/installable.md", "Which delivery kinds the packaging stage is for"): (295, "51a6686b489336f334218346d1514999765a3ee2f7a6dfad70d7595d22bd1df4"),
+    ("traits/performance-budgets.md", "Add at planning.critic-lenses"): (321, "464ee6c2b87edda66ee707a2081737826b3afa823d54c036df9afa2949d43b84"),
+    ("traits/performance-budgets.md", "The mechanism and the hot path"): (488, "96fb8f084311c8ec4c9b853d3b6a71e50eb159055a22f03888f4d9a69a23b97d"),
 }
 
 
 def test_item2_the_pins_are_derived_from_the_entries():
     """Item 2: the pinned sections are exactly the sections the entries excuse in the phase modules (the interface
-    variant files apart), so a new entry fails here until its section is pinned, and an entry withdrawn takes its pin
+    variant files apart) and in the conditional workflows (TASK-017), so a new entry fails here until its section is pinned, and an entry withdrawn takes its pin
     with it; the thirteen sections stage B3's review counted are among them, with every other excused module section."""
     assert sorted(excused_module_sections()) == sorted(EXCUSED_MODULE_SECTIONS)
 
@@ -159,7 +190,7 @@ def test_item2_the_pins_are_derived_from_the_entries():
 def test_item2_each_excused_module_section_has_one_heading_and_is_pinned(rel, title):
     """Item 2: the module has one heading of the excused title, as trace-check.py reads headings (a second would be
     excused unpinned), and the section under it, to where trace-check.py's reading ends it, is the pinned text."""
-    lines = module(rel).split("\n")
+    lines = excused_file(rel).split("\n")
     same = [(i, level) for i, level, t in trace_headings(lines) if t == title]
     assert len(same) == 1, (rel, title, same)
     start, end = section_span(lines, title, same[0][1])

@@ -61,10 +61,10 @@ A trait is a property that adds work whatever the product type. A part may have 
 
 | Key | Name | Definition | Written | Planned |
 |---|---|---|---|---|
-| has-screens | Has screens | Shows a visual interface to a person | no | release B |
-| installable | Installable | Delivered as something the user installs | no | release B |
-| performance-budgets | Performance budgets | Speed, size or frame-rate targets are requirements | no | release B |
-| external-services | External services | Depends on services run by others | no | release B |
+| has-screens | Has screens | Shows a visual interface to a person | yes | release B |
+| installable | Installable | Delivered as something the user installs | yes | release B |
+| performance-budgets | Performance budgets | Speed, size or frame-rate targets are requirements | yes | release B |
+| external-services | External services | Depends on services run by others | yes | release B |
 | spends-money | Spends money | Its actions cost real money (paid APIs, purchases) | no | release B |
 | long-running-process | Long-running process | Keeps a process running between uses (a server, a watcher) | no | release B |
 | ai-models | AI models | Its results come from models, so correctness is judged by evaluation rather than by exact tests | no | release B |
@@ -83,7 +83,7 @@ At intake, the supervisor classifies each part against the definitions above (§
 The procedure (§6.10):
 
 1. The owner describes the product type, sub-type or trait and what should differ, in plain words, in the maintainer's session; a project paused for a new product type brings its supervisor's reasons.
-2. The maintainer writes the conditional workflow: which extension points it uses, and what it adds, replaces or sets at each (trait additions only add). Its entry joins this list with every column of its table filled, including, for a product type or sub-type its definition, default traits and workflow or sub-workflow name (and a sub-type's Of type); for a trait its definition.
+2. The maintainer writes the conditional workflow: which extension points it uses and what it adds or sets at each, or which replaceable module it replaces (trait additions only add). Its entry joins this list with every column of its table filled, including, for a product type or sub-type its definition, default traits and workflow or sub-workflow name (and a sub-type's Of type); for a trait its definition.
 3. The workflow check passes, and the entry's Written flag is set to `yes` in the same change.
 4. The release's changelog names the conditional workflow, and calibration applies it to running projects of that product type by phase, reopening no gate.
 

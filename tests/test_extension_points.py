@@ -44,7 +44,10 @@ S64 = [
     ("Design", "diagram catalogue", "design.diagram-catalogue"),
     ("Design", "Mandatory diagram kinds", "design.mandatory-diagrams"),
     ("Interface phase", "variants", "interface.variants"),
-    ("Planning", "Mandatory stages", "planning.stages"),
+    # TASK-017 widens §6.4's mandatory stages to increments (a benchmark increment, a contract capture) and adds the
+    # acceptance criteria an increment carries beside its functional ones (§6.8: the traits gather both).
+    ("Planning", "Mandatory stages and increments", "planning.stages"),
+    ("Planning", "Acceptance criteria", "planning.acceptance-criteria"),
     ("Planning", "plan critic's lenses", "planning.critic-lenses"),
     ("Run parameters", "Additional run parameters", "run-parameters.parameters"),
     ("Configuration", "Additional configuration items, tools and checks", "configuration.items"),
@@ -112,14 +115,17 @@ def test_r006_every_s6_4_point_is_present_with_its_declaring_module():
     _, rows = points()
     by_key = {r["Key"]: r for r in rows}
     assert len(by_key) == len(rows), "keys are unique"
-    assert [r["Key"] for r in rows] == [k for _, _, k in S64], "the §6.4 points and the two refinements, in §6.4's order"
+    assert [r["Key"] for r in rows] == [k for _, _, k in S64], "the §6.4 points and the three refinements (two at intake, one at planning), in §6.4's order"
     for phase, phrase, key in S64:
         r = by_key[key]
         assert r["Phase"] == phase, key
         assert phrase.lower() in r["Point"].lower(), key
         assert r["Declared by"] == key.split(".")[0], key
     assert {"Definition of done", "Delivery"} <= {r["Phase"] for r in rows}
-    assert "Two points are added to §6.4's list, both at intake, because §6.5 names their kinds as values a type workflow or sub-workflow sets and the core settles both at intake, before design and planning act on them" in TEXT
+    assert "Three points are added to §6.4's list, and one is widened." in TEXT
+    assert "Two of the added points are at intake, because §6.5 names their kinds as values a type workflow or sub-workflow sets and the core settles both at intake, before design and planning act on them" in TEXT
+    assert "The third, `planning.acceptance-criteria`, holds the acceptance criteria an increment carries beside its functional ones" in TEXT
+    assert "The widened one is `planning.stages`: §6.4's mandatory stages, and mandatory increments too" in TEXT
     assert "`project-end.delivery` holds the procedure for the kind set there" in TEXT
 
 

@@ -134,13 +134,20 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # artifact of each interface variant the change runs"; and, for Review B's should-fix, its step 7, project end now run
 # by project-end.md, scaled; and, for Review B's round 3, rule 34, which stated the same procedure, excused by the
 # earlier Standing rules entry and so labelled TASK-015)
-TRACED = "TRACED: 424 passages of baseline 0a186da; 155 in supervisor.md, 258 under workflow/, 0 dropped, 11 excused"
+# (TASK-017: three passages move from traced to excused, each split at the sentence between two homes: design's
+# performance-mechanism and code-signing paragraph and its Observability & Verifiability paragraph, under the
+# standing TASK-012 entry on "Phase 2 \u2014 Design", and step 2's brief paragraph, under TASK-017's own entry on
+# "2. Package the brief"; every other passage the trait files take moves whole and is traced in its new home)
+TRACED = "TRACED: 424 passages of baseline 0a186da; 155 in supervisor.md, 255 under workflow/, 0 dropped, 14 excused"
 NOTES = [
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
+    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - For every **performance or cost budget** the design names th",
+    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - Also for a UI-bearing project, add an **\"Observability & Ver",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: The design-tooling flow - Save the mockup files under `docs/mockups/` (one file per sc",
+    "NOTE (reword TASK-017) bridge/commands/supervisor.md: 2. Package the brief - Delegate to **spec-packager** to write `handoff/TASK-<nnn>.m",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 3. **UI mockups** (Phase 3) **only if the change touches the",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 7. **Project end again.** The close of the addendum's last s",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - The gates of a change cycle are the same approvals the origi",
@@ -152,10 +159,10 @@ NOTES = [
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the eleven passages of the five `reword` entries the carve (TASK-010), TASK-012, TASK-014
-    and TASK-015 declare (three in the core's "Main and conditional workflows", three standing rules, one each in the
-    design gate and the design-tooling flow, three in the change cycle), so an increment that excuses anything more
-    changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+    excused ones exactly the fourteen passages of the six `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+    TASK-015 and TASK-017 declare (three in the core's "Main and conditional workflows", three standing rules, three
+    under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits), one in the design-tooling
+    flow, three in the change cycle, one in step 2), so an increment that excuses anything more changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
     have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)

@@ -205,8 +205,8 @@ def test_fix002_a_broken_line_in_a_shaped_file_is_the_one_finding(tmp_path, shap
 
 def test_fix002_the_bridge_status_line_fails_for_the_stated_reasons_only():
     """Item 3: the bridge's own status file, run through workflow-check.py --status, gives exactly the two (f) findings
-    and the FLAG the plan expects. TASK-017 (Installable written: the FLAG goes) and TASK-021 (the type and sub-type
-    written: RESULT OK) take this test into their Scope and change the pin."""
+    the plan expects, the FLAG having gone with Installable written (TASK-017). TASK-021 (the type and sub-type
+    written: RESULT OK) takes this test into its Scope and changes the pin."""
     p = subprocess.run([sys.executable, str(WORKFLOW_CHECK), "--status", "docs/PROJECT_STATUS.md"], cwd=str(REPO),
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert p.stderr == "", p.stderr
@@ -214,6 +214,5 @@ def test_fix002_the_bridge_status_line_fails_for_the_stated_reasons_only():
     assert p.stdout.splitlines() == [
         "FAIL (f) docs/PROJECT_STATUS.md: Host Extension Development - product type is not written",
         "FAIL (f) docs/PROJECT_STATUS.md: Claude Code Extension - sub-type is not written",
-        "FLAG (trait) docs/PROJECT_STATUS.md: Installable - trait not yet written; flagged, work continues (non-fatal)",
         "RESULT: 2 problem(s)",
     ]

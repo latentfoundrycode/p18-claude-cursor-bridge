@@ -30,24 +30,6 @@ regime the project is in and when it switches); key interfaces and contracts; er
 handling and failure modes;
 security and secret-handling approach; testing strategy; open questions.
 
-For **installable software** it also has a **Delivery** section
-(`~/.claude/cursor-bridge/Delivery-Conventions.md` §6): the kind (§1), the toolchain for
-this stack (§2.1 for a desktop app; the install-script contract of §3 for a CLI or local
-server), per-user or per-machine with the reason, the data location, the single version
-source, whether a server runs as a service, the command-reference generator for any CLI
-(§4), and the installer behaviour (already installed → Upgrade / Uninstall / Cancel;
-upgrade in place keeps data; uninstall keeps data unless opted out).
-
-For every **performance or cost budget** the design names the **mechanism** that meets it
-and the **hot path** it runs on — the index or data structure, caching, batching,
-streaming, concurrency, where the work happens, what is precomputed
-(`Performance-Conventions.md` §2). These are the choices that are cheap now and expensive
-after the build, so they are decided here, and `plan-critic`'s performance lens checks
-them against the stated data sizes. **Code signing is the one escalation here**: a certificate costs money
-and identity verification, so present it once as a user-level consequence — unsigned
-(SmartScreen warns on first run, the manual explains the two clicks) or signed (the owner
-buys a certificate) — and record the answer.
-
 When the design settles a technology choice or a subsystem kind that an earlier project
 plausibly shared (the same framework, the same platform packager, a media pipeline, a
 payments or auth layer), say so in the design presentation in one line — "an Issues file
@@ -187,24 +169,6 @@ When no roster profile is usable at intake (Cursor not signed in, both pools exh
 design waits and the report says so, as rule 38's failure path does; `plan-critic` alone is
 never the gate's critique.
 
-For a UI-bearing project, record in `docs/INVENTORY.md` (Decisions) whether the stack is
-**React/Next** (Vercel's React-specific interface items apply in full) or otherwise (the
-framework-agnostic subset applies), and the **styling approach**. A resumed session needs
-to know which interface ruleset is in force.
-
-Also for a UI-bearing project, add an **"Observability & Verifiability" section** to
-`docs/DESIGN.md`, instantiating `~/.claude/cursor-bridge/Observability-Conventions.md` (read it
-by that absolute path). It records, per Phase-1 inventory state, its **reachability mechanism**
-(deep-link URL on web; a shared scriptable action path on mobile/desktop; a test-mode-only,
-prod-compiled-out hook only as a last resort — so your observability driver can reach every
-state *through the real render path*); the **runtime invariant list** (baseline: no
-undefined/NaN/`[object Object]`/untranslated-key rendered, `console.error` fails the run, plus
-project-specific); and the log/test-mode/redaction conventions. **Choose the tier** and record
-it: Tier A (deterministic assertions + reachability — the default) always; Tier B (screenshots
-as `design-auditor` evidence) at your discretion for higher-stakes UI. A non-UI project (CLI/
-library, no screen-and-state inventory) opts out — note that it did. The driver dependency is
-the one escalation (see Phase 5).
-
 **Development data stays apart from live data (rule 55).** The design names where the
 product's live data lives and how a development build is kept from it: another path or store
 chosen by a build-time marker, and a build that refuses the installed product's data outright.
@@ -217,6 +181,10 @@ never recorded as a person's. A per-item approval step inside the product is dec
 of another model family than the one that produced the item, with a person as an optional
 override; the design says which judge and which family.
 
+#### A part without screens
+
+A part without the trait *has screens* writes no Observability & Verifiability section, and `docs/DESIGN.md` notes that it did not. The observability driver dependency is the one escalation of that trait's configuration addition (Phase 5).
+
 ### The delivery kind
 
 When you create `docs/INVENTORY.md`, record each part's delivery kind as a Decisions row that begins `Delivery kind:`, naming each part and its kind's key from the extension-point registry: the kind a type workflow or sub-workflow sets at `intake.delivery-kind`, or else the kind confirmed with the owner at intake (the intake notes). The delivery procedure at project end applies to a part by this recorded kind, and the kind changes only with the part's classification.
@@ -224,6 +192,8 @@ When you create `docs/INVENTORY.md`, record each part's delivery kind as a Decis
 ### Traits at the design gate
 
 The traits proposed at intake, the default traits of each part's product type and sub-type among them, are settled at this gate (intake's "Classifying each part"). Before presenting the design, weigh each part's traits again against the open list's definitions (`~/.claude/cursor-bridge/workflow/open-list.md`) in the light of the design: a trait the design now shows is added (the product needs accounts: *personal data*), and a proposed or default trait the design shows does not apply is dropped, each with its reason. At the gate each part's traits are a decision of their own, asked in the question form beside the separate decisions the gate below lists: each trait with its definition in one line and, in plain words, the work it adds. Once the owner has settled them, rewrite the part's `Workflows:` line if they changed, and run `python ~/.claude/cursor-bridge/workflow-check.py --status docs/PROJECT_STATUS.md` again.
+
+A plan critique's file carries, beside `plan-critic`'s own sections, the lenses each part's conditional workflows add at `planning.critic-lenses`, each once for the project: the point applies per project, and the traits are settled at this gate, before the plan. A trait added at this gate has its additions at `intake.questions` asked, the answers written to the intake notes, its additions at `design.sections` and `design.mandatory-diagrams` written (the Select step run again for a mandatory kind), and the design and the register revised from the new answers, before the design is presented again.
 
 **A new or unwritten trait is flagged, and the work continues.** A property that adds work and fits no trait's definition is a new trait; a trait whose open-list row reads `no` under Written (the check's `FLAG (trait)`) is defined but not yet written. Traits only add, so the main workflow and the part's product type still cover everything essential: write the extra handling into `docs/DESIGN.md`, a section of its own for each such trait saying what it adds and in which phases, and flag it at the gate as a decision of its own, saying plainly that until the bridge writes the trait's additions the design's section is the only handling it has: the work continues with the handling in the design, or the owner may still choose to pause the project. On a pause the trait goes to the bridge's maintainer as an unwritten product type does at intake: `Awaiting user on: paused at the design gate — <the trait> needs additions the bridge has not written`, the run sheet with your reasons, the release, the calibration, and the owner's word to resume. On resuming, a new trait, now in the open list, is added to each part's `Workflows:` line that has it; for a new trait and for an unwritten one already on the line alike, the check is run again, and the trait's additions, now written, take the place of the design's section. A new trait is not named on the `Workflows:` line until then, since the line names only the open list's entries; its handling lives in the design. Record each flagged trait in `docs/INVENTORY.md` → Decisions as a row that begins `Flagged trait:`, naming the trait, the parts that have it and the design section that handles it, so that the promotion pass at project end puts it forward, from which the maintainer may write it as trait additions; once the trait's additions are written and apply, the row is removed.
 

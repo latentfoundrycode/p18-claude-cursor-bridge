@@ -94,8 +94,8 @@ SURVIVAL = {
         "`Delivery kind:` "
         "rows give each part's delivery kind, and its `Flagged trait:` rows the traits the promotion pass puts forward;",
         "`docs/REQUIREMENTS.md`, `docs/CHANGES.md` and `docs/RUN_PARAMETERS.md`: the completion check reads the register, "
-        "whose deferred and dropped requirements the \"Project complete\" line lists by ID and name, the User Manual is written from the change log, and the installer's last verification follows the `Installer "
-        "verification` parameter;",
+        "whose deferred and dropped requirements the \"Project complete\" line lists by ID and name, the User Manual is written from the change log, and the installer's last verification, the trait "
+        "*installable*'s addition at `project-end.delivery`, follows the `Installer verification` parameter;",
         "the Issues and Feedback documents under `Documents/`, whole: the promotion pass reads both and writes its "
         "proposals as the Feedback document's last section.",
     ],
@@ -181,7 +181,7 @@ POINTS = {
                                          "added at intake (`intake.requirement-sources`), as the registry says.",
     "project-end.delivery": "the delivery procedure for the part's delivery kind, which an addition names (`## Add at "
                             "project-end.delivery for <kind>`) and which runs for each part whose `Delivery kind:` row in "
-                            "`docs/INVENTORY.md` names that kind, beside \"Deliver the installer\" above and before the "
+                            "`docs/INVENTORY.md` names that kind, after the User Manual item above and before the "
                             "promotion pass; the report and the User Manual name what was delivered and where it is.",
 }
 
@@ -343,20 +343,28 @@ def test_r004_the_positions_the_survival_lists_name_are_kept():
 def test_no_trace_entry_excuses_a_whole_phase_file():
     """HARDENING Stage B3 (the trace exceptions, from S1): a `new` entry on a file's top heading excuses every passage in
     the file, so a passage added under it, or a copy of one, passes unseen; each variant file's declaring paragraph is
-    under a heading of its own, and no entry names the top heading of a file under workflow/phases/. A `reword` entry
+    under a heading of its own, and no entry names the top heading of a file under workflow/phases/, nor of a
+    conditional workflow under workflow/traits/ or workflow/types/, which trace-check.py reads as modules too
+    (TASK-017). A `reword` entry
     excuses the current text under its heading as a `new` one does (trace-check.py, build_excuse_index), so both kinds
     are read, and an entry's heading is stripped as trace-check.py's parse_exceptions strips it (stage B3's review,
     round 1; BUG-017's Review A)."""
     entries = [l for l in read(EXCEPTIONS).split("\n") if l.startswith(("- new ", "- reword "))]
     prefix = "bridge/cursor-bridge/workflow/phases/"
-    seen = 0
+    conditional = ("bridge/cursor-bridge/workflow/traits/", "bridge/cursor-bridge/workflow/types/")
+    seen = conditional_seen = 0
     for e in entries:
         m = re.match(r"^- (?:new|reword) \S+ (\S+\.md) (.+)$", e)
         if m and m.group(1).startswith(prefix):
             seen += 1
             text = module(m.group(1)[len(prefix):])
             assert headings(text)[0][1] != m.group(2).strip(), e
+        elif m and m.group(1).startswith(conditional):
+            conditional_seen += 1
+            text = read(os.path.join(BRIDGE, os.pardir, m.group(1)))
+            assert headings(text)[0][1] != m.group(2).strip(), e
     assert seen > 30, seen
+    assert conditional_seen > 10, conditional_seen
     for f in ("mockups", "command-design", "contract-design", "playable-prototype"):
         assert "- new TASK-014 %sinterface/%s.md What this variant is" % (prefix, f) in entries, f
 

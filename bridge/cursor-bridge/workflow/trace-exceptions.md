@@ -60,3 +60,22 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-014 bridge/cursor-bridge/workflow/phases/project-end.md Flagged traits in the promotion pass
 - new TASK-014 bridge/cursor-bridge/workflow/phases/project-end.md Keeping the position
 - new TASK-014 bridge/cursor-bridge/workflow/phases/project-end.md Extension points
+- reword TASK-017 bridge/commands/supervisor.md 2. Package the brief
+- new TASK-017 bridge/cursor-bridge/workflow/phases/delegation-loop.md 2. Package the brief
+- new TASK-017 bridge/cursor-bridge/workflow/phases/design.md A part without screens
+- new TASK-017 bridge/cursor-bridge/workflow/traits/has-screens.md The Observability & Verifiability section
+- new TASK-017 bridge/cursor-bridge/workflow/traits/has-screens.md Add at interface.variants
+- new TASK-017 bridge/cursor-bridge/workflow/traits/has-screens.md Add at planning.critic-lenses
+- new TASK-017 bridge/cursor-bridge/workflow/traits/has-screens.md The approved mockup and the frozen rule
+- new TASK-017 bridge/cursor-bridge/workflow/traits/installable.md Which delivery kinds the intake passage is for
+- new TASK-017 bridge/cursor-bridge/workflow/traits/installable.md Code signing
+- new TASK-017 bridge/cursor-bridge/workflow/traits/installable.md Which delivery kinds the Delivery section is for
+- new TASK-017 bridge/cursor-bridge/workflow/traits/installable.md Which delivery kinds the packaging stage is for
+- new TASK-017 bridge/cursor-bridge/workflow/traits/installable.md Add at planning.critic-lenses
+- new TASK-017 bridge/cursor-bridge/workflow/traits/installable.md Add at project-end.delivery for install-script
+- new TASK-017 bridge/cursor-bridge/workflow/traits/performance-budgets.md The mechanism and the hot path
+- new TASK-017 bridge/cursor-bridge/workflow/traits/performance-budgets.md Add at planning.critic-lenses
+- new TASK-017 bridge/cursor-bridge/workflow/traits/external-services.md Add at planning.critic-lenses
+- new TASK-017 bridge/cursor-bridge/workflow/traits/external-services.md Add at delegation-loop.inspect-checks
+- new TASK-017 bridge/cursor-bridge/workflow/traits/external-services.md Add at delegation-loop.test-checks
+- new TASK-017 bridge/cursor-bridge/workflow/traits/external-services.md Add at delegation-loop.brief-constraints

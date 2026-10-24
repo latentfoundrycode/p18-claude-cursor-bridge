@@ -172,8 +172,8 @@ def test_r010_the_mockups_are_an_addition_the_trait_has_screens_activates():
 def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_conditions():
     """R-010 and TASK-012's Done when: interface/mockups.md holds today's Phase 3 mockup procedure, verbatim (its
     passages, its design-tooling flow, its gate and the mockup's authority); the build-phase conditions of screens (the
-    frozen-rule brief constraint, the design-auditor review step, the observability tests) stay in the delegation-loop
-    module, where the trait *has screens* gathers them (TASK-017)."""
+    frozen-rule brief constraint, the design-auditor review step, the observability tests) are the trait *has screens*'
+    additions at the delegation loop's points, moved there out of the delegation-loop module (TASK-017)."""
     m = module("interface/mockups.md")
     assert headings(m) == [(2, "Mockups"), (3, "What this variant is"), (3, "The procedure"),
                            (3, "The design-tooling flow")], headings(m)
@@ -189,10 +189,12 @@ def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_con
     ):
         assert passage in fm, passage
     loop = flat(module("delegation-loop"))
+    screens = flat(module("../traits/has-screens.md"))
     for build in ("list the frozen `vercel-interface.mdc` as an applicable rule",
                   "For a **UI-bearing** diff, also delegate to **design-auditor** after `diff-reviewer`",
                   "the tests you write include the **observability tests** (Tier A)"):
-        assert build in loop, build
+        assert build in screens, build
+        assert build not in loop, build
         assert build not in fm, build
     assert "Build an HTML/CSS mockup" not in module("interface")
 
