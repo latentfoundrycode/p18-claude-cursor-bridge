@@ -14,7 +14,7 @@ import re
 
 import pytest
 
-from phase_modules import read, module, flat, headings, section
+from phase_modules import read, module, flat, headings, section, trace_headings
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
@@ -392,29 +392,6 @@ EXCUSED_SECTIONS = {
     ("interface/contract-design.md", "What this variant is"): (673, "00c28cc73cb732979930405822ee1f7a35f17e70fd540b73baf0d31fe0d16589"),
     ("interface/playable-prototype.md", "What this variant is"): (993, "b4cfca71dad76f4d3abaa1ee356b1c025c1d922626887958a84c45a3b5ca48eb"),
 }
-
-
-def trace_headings(lines):
-    """(index, level, title) of each heading as trace-check.py reads one: up to three spaces before the hashes
-    (its HEADING_RE), the title stripped, and no line inside a fenced block (its FENCE_OPEN_RE, closed by a line that
-    starts with a run of the same character at least as long, whatever follows the run, as trace-check.py closes
-    one)."""
-    out, fence = [], None
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if fence:
-            c = re.match(r"^(`{3,}|~{3,})", stripped)
-            if c and c.group(1)[0] == fence[0] and len(c.group(1)) >= fence[1]:
-                fence = None
-            continue
-        f = re.match(r"^(`{3,}|~{3,})", stripped) if line.lstrip().startswith(("```", "~~~")) else None
-        if f:
-            fence = (f.group(1)[0], len(f.group(1)))
-            continue
-        h = re.match(r"^ {0,3}(#{1,6}) (.*)$", line)
-        if h:
-            out.append((i, len(h.group(1)), h.group(2).strip()))
-    return out
 
 
 @pytest.mark.parametrize("rel,title", sorted(EXCUSED_SECTIONS))
