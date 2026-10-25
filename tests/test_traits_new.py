@@ -148,8 +148,10 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert ("runs against the dry run's stand-in provider, which measures the operation's paid calls for a cost "
             "budget and the part's own time, never the service's") in brief
     assert ("a speed budget that includes the service's time is measured either on a stand-in that replays each "
-            "reply's wait as the contract capture recorded it or in a run against the paid service itself, the "
-            "design's budget saying which") in brief
+            "reply's wait as an approved paid run of the operation measured it or in a paid run against the service "
+            "itself, the design's budget saying which") in brief
+    assert ("a budget measured in a paid run is kept out of the floor's budgets file and checked at that run, which "
+            "each increment that changes the operation has.") in brief
     assert ("A benchmark run against the paid service itself is a paid action of its own, approved as one, never "
             "part of the benchmark floor or of CI.") in brief
     # Review A, round 1, blocking: the product's paid calls go through the store; a first capture and a purchase,

@@ -112,7 +112,7 @@ def test_r025_host_behaviour_is_tested_inside_the_real_host_kept_apart_from_the_
             "A host behaviour no test can reach inside the host is named in the increment's report as untested there, "
             "never counted as tested.",
             "Where driving the host uses the owner's account, that use is put to the owner once, before any test relies "
-            "on it, and what it reaches is recorded in `docs/INVENTORY.md` (Decisions)",
+            "on it, and what it reaches is recorded in `docs/INVENTORY.md` (Decisions), a use beyond it asked again",
             "where it draws paid usage, the part is classified with *spends money* too, and each run that draws it is "
             "a paid action of that trait's, approved for itself and run by the supervisor, never by the builder or in "
             "CI."]:
@@ -175,7 +175,7 @@ def test_r025_the_sub_workflow_names_claude_codes_extension_points_and_its_versi
     # BUG-021 and stage B4's review, round 2: a probe that checks a fact runs as the tests do, kept apart.
     probe = flat(body("host-extension", "Add at design.sections"))
     assert ("A probe that checks such a fact runs as the tests do, in a host kept apart from the owner's own, and its "
-            "use of the owner's account or paid usage is put to the owner as the test step's addition says.") in probe
+            "use of the owner's account or paid usage is put to the owner first, as the test step's addition says.") in probe
 
 
 @pytest.mark.parametrize("key", sorted(FILES))

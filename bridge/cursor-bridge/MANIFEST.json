@@ -1,6 +1,6 @@
 {
   "version": "2026.10.18a",
-  "generated": "2026-10-25 06:02",
+  "generated": "2026-10-25 06:21",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -129,8 +129,8 @@
     "cursor-bridge/workflow/traits/installable.md": "4f5dc268853dc885d9ee69d1445992120b9c84aaba3c704283c80f17be35c200",
     "cursor-bridge/workflow/traits/long-running-process.md": "8e02916276f8348b5b8dbe7cc8edae7ad7ec4a6224400094c8259b43d75291a7",
     "cursor-bridge/workflow/traits/performance-budgets.md": "f168b3bfa513a58520a18864bdaa618b6cfb0176b1a36a709e37bde48abd000c",
-    "cursor-bridge/workflow/traits/spends-money.md": "7948a67a1d5612409dc4ac2bdbbc33401db15538f64f51ad01e6c81a0f87b68f",
-    "cursor-bridge/workflow/types/host-extension.md": "25e1453df087651e78f40ed8b70230fb3a7b894df0512af846bd9b8c36defb46",
+    "cursor-bridge/workflow/traits/spends-money.md": "bc8d0f7b125f586ff323084fc9f801f31631e0565943d64052cb852c8b900dfe",
+    "cursor-bridge/workflow/types/host-extension.md": "93c7e6f512591bd33a679aa90e1c07832ca28cc919c6dddba181184e230192a5",
     "cursor-bridge/workflow/types/host-extension/claude-code-extension.md": "2632c680d24231d491b509f71c4f9cd0aefdfb8127f81d0ee44abdbca45de336",
     "cursor-bridge/workflow/types/own-computer.md": "ab6f291d4daa1b6c544b067341bef3be8a0d7abf5c9c19da9e2f2e205d8b655f",
     "cursor-bridge/workflow/types/own-computer/local-service.md": "146b1179b8558743b6e922f2918386c10fe0efcc575c95c02c10299781a55005",
