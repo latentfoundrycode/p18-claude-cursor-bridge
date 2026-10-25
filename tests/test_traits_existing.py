@@ -325,6 +325,9 @@ def test_r016_r019_the_plan_critic_keeps_its_design_lenses_and_catches_a_missing
     pc = flat(read(PLAN_CRITIC))
     assert "**Performance lens (where budgets exist).**" in pc
     assert "is a finding that a trait is missing" in pc
+    bullet = [l for l in read(PLAN_CRITIC).replace("\r\n", "\n").split("\n") if l.startswith("- **A trait missing.**")]
+    assert len(bullet) == 1 and bullet[0].endswith(
+        "is a finding that a trait is missing (**Blocking**: the trait's additions never reach the build)."), bullet
     for trigger, lens in (("`installer` or `install-script`", "no packaging lens"),
                           ("a service run by others (a third-party API, SDK or provider)", "no external-service lens"),
                           ("a design that shows screens", "no design-criteria lens"),
@@ -342,11 +345,21 @@ def test_r017_the_command_reference_reaches_every_approved_command_design():
             "reference's generator (`scripts/dump-cli.py` or the stack's equivalent, which writes "
             "`docs/cli-reference.json` from the real command tree, `Delivery-Conventions.md` §4) and its currency "
             "check") in plan
-    assert "whatever the part's traits (rule 32)" in plan
+    assert "every later increment that adds or changes a command carries \"reference regenerated\" as a criterion, " \
+           "whatever the part's traits (rule 32)" in plan
+    assert "for an `installer` or `install-script` part, the delivery kinds the trait *installable*'s packaging " \
+           "stage is for, this is the generator that stage names, not a second one." in plan
     pc = flat(read(PLAN_CRITIC))
-    lens = pc[pc.index("**Command reference (an approved command design).**"):]
-    lens = lens[:lens.index("**Blocking**") + len("**Blocking**")]
-    assert "whatever the part's traits" in lens and "(rule 32)" in lens, lens
+    # The lens is its own bullet, one line of the file; its grade is the one it ends with (stage B4's review,
+    # round 2, the tests part: a cut to the next **Blocking** in the file read on into the next lens).
+    lens = [l for l in read(PLAN_CRITIC).replace("\r\n", "\n").split("\n")
+            if l.startswith("- **Command reference (an approved command design).**")]
+    assert len(lens) == 1, lens
+    lens = lens[0]
+    assert lens.endswith("Without it the supervisor has nothing to look commands up in (rule 32) — **Blocking**."), lens
+    assert ("does the increment that first builds one of its commands carry the command reference's generator and "
+            "its currency check, and does every later increment that adds or changes one of its commands carry "
+            "\"reference regenerated\" as a criterion, whatever the part's traits") in lens, lens
     assert ("the lenses the parts' conditional workflows add at `planning.critic-lenses`; apply each as one of your "
             "own, at the grade it states") in pc
 

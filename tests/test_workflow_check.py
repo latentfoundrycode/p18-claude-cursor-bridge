@@ -3560,7 +3560,8 @@ def test_r013_every_unwritten_type_and_sub_type_pauses_against_the_real_open_lis
         if head in written:
             assert code == 0 and out == ["RESULT: OK"] and err == "", (head, out, err)
             continue
-        found = [l for l in out if l.startswith("FAIL (f)")]
-        assert code == 1 and len(found) == 1 and "is not written" in found[0] and err == "", (head, out, err)
-        assert found[0].endswith(": %s - %s is not written" % (head.split(" → ")[-1],
+        # The whole output: the one FAIL (f) line, then the RESULT line (stage B4's review, round 2; BUG-003's class).
+        assert code == 1 and len(out) == 2 and out[1] == "RESULT: 1 problem(s)" and err == "", (head, out, err)
+        found = out[:1]
+        assert found[0].startswith("FAIL (f)") and found[0].endswith(": %s - %s is not written" % (head.split(" → ")[-1],
                                                                "sub-type" if " → " in head else "product type")), (head, found)

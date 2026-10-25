@@ -99,7 +99,8 @@ def test_r020_spends_money_asks_for_approval_the_worst_case_the_cap_and_the_acco
     assert "No paid action of the loop runs without the owner's approval first" in t
     assert "with its estimate against the worst case and the platform and account named in the same sentence" in t
     assert "an approval covers the action it names, never the next one" in t
-    assert ("settles the service's key and account only: where a part has both traits, the contract "
+    assert ("and the escalation the trait *external services* asks once per service (its addition at "
+            "`planning.stages`) settles the service's key and account only: where a part has both traits, the contract "
             "capture's live call that escalation names is, when it costs money, a paid action of the loop "
             "like any other, approved for itself as this trait asks, and so is every later capture or "
             "re-recording of that service.") in t, "BUG-021: one escalation never approves a paid call"
@@ -138,7 +139,19 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert "**The cap** is recorded" in conf and "`Spending cap: " in conf
     brief = add("spends-money", "delegation-loop.brief-constraints")
     assert "The builder runs no paid action" in brief and "after the owner's approval for it" in brief
-    assert "**dry**: on a copy of the data, with a stand-in provider" in brief and "charges nothing" in brief
+    assert "charges nothing" in brief
+    # Stage B4's review, round 2: the dry run's data is the development data, a copy of live data only with the
+    # owner's yes; a benchmark on the stand-in measures calls and the part's own time, never the service's.
+    assert ("**dry**: on the development data the inventory's `Development data:` decision names (rule 55; a copy "
+            "of live data only with the owner's yes for that run, kept away from the repository and the Workspace, "
+            "since it holds the users' data, and deleted whichever way the run ends), with a stand-in provider") in brief
+    assert ("runs against the dry run's stand-in provider, which measures the operation's paid calls for a cost "
+            "budget and the part's own time, never the service's") in brief
+    assert ("a speed budget that includes the service's time is measured either on a stand-in that replays each "
+            "reply's wait as the contract capture recorded it or in a run against the paid service itself, the "
+            "design's budget saying which") in brief
+    assert ("A benchmark run against the paid service itself is a paid action of its own, approved as one, never "
+            "part of the benchmark floor or of CI.") in brief
     # Review A, round 1, blocking: the product's paid calls go through the store; a first capture and a purchase,
     # which have no replies to stand in, run at the smallest size instead of dry.
     assert "Every paid call the part's code makes goes through the store of paid results" in brief
@@ -228,3 +241,13 @@ def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_output
     assert "each verdict is kept with the judged result it read" in conf
     assert "where a model costs money, the block waits on the run the owner approved" in test
     assert "never on a re-delegation" in test
+    # BUG-021 and stage B4's review, round 2: a case kept out of the repository lives in a development-only place,
+    # apart from the live data, and the test step runs the whole set, a case not run there blocking.
+    assert ("is asked before the first is recorded whether they may be committed; a case that cannot be scrubbed, "
+            "or that the owner keeps out, is kept with its outputs, and the verdicts and judged results recorded "
+            "beside them, outside the repository, in a development-only place the Evaluation section names by its "
+            "role, never by a path of a computer (rule 54), apart from the live data and never read by the product "
+            "(rule 55), and a run without it (CI) reports that case as not run, never as passed.") in conf
+    assert ("The evaluation at this step runs the whole set, the cases kept outside the repository read from their "
+            "place: a case not run here is a correctness-class block too") in test
+    assert "the not-run report of a run without those cases (CI) is that run's alone." in test

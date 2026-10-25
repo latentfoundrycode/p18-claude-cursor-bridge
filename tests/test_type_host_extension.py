@@ -111,8 +111,11 @@ def test_r025_host_behaviour_is_tested_inside_the_real_host_kept_apart_from_the_
             "The behaviour is driven there and its result read from what the host did.",
             "A host behaviour no test can reach inside the host is named in the increment's report as untested there, "
             "never counted as tested.",
-            "Where driving the host uses the owner's account or paid usage, that use is put to the owner before any test "
-            "relies on it, as a paid action is."]:
+            "Where driving the host uses the owner's account, that use is put to the owner once, before any test relies "
+            "on it, and what it reaches is recorded in `docs/INVENTORY.md` (Decisions)",
+            "where it draws paid usage, the part is classified with *spends money* too, and each run that draws it is "
+            "a paid action of that trait's, approved for itself and run by the supervisor, never by the builder or in "
+            "CI."]:
         assert phrase in t, phrase
 
 
@@ -166,8 +169,13 @@ def test_r025_the_sub_workflow_names_claude_codes_extension_points_and_its_versi
             "The version each fact in the design's host section was checked on is the one `claude --version` prints.",
             "when a hook runs and what its output does (the Stop hook's), and which commands a permission rule matches "
             "(a rule for git that does not match git given a folder with -C)",
-            "each such fact is checked in Claude Code itself before the design relies on it."]:
+            "each such fact is checked in Claude Code itself before the design relies on it.",
+            "Such a check runs, as the type's probes do, in a Claude Code kept apart from the owner's own."]:
         assert phrase in t, phrase
+    # BUG-021 and stage B4's review, round 2: a probe that checks a fact runs as the tests do, kept apart.
+    probe = flat(body("host-extension", "Add at design.sections"))
+    assert ("A probe that checks such a fact runs as the tests do, in a host kept apart from the owner's own, and its "
+            "use of the owner's account or paid usage is put to the owner as the test step's addition says.") in probe
 
 
 @pytest.mark.parametrize("key", sorted(FILES))
