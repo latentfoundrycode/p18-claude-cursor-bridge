@@ -17,8 +17,10 @@ Installing:
      folder's own manifest and no file may be unlisted; and when the folder is a checkout of
      the bridge's repository it must be `main` as merged (on main, equal to origin/main,
      nothing uncommitted), because the install check cannot tell a merged release from a
-     stamped branch. --anyway installs a checkout's state as it is (the maintainer's
-     rehearsals, with --target);
+     stamped branch. A hotfix of an installed release is merged on its `release/<name>`
+     branch, so a checkout on a `release/*` branch equal to origin/<that branch>, nothing
+     uncommitted, is accepted alike (FB-016; 2026.10.25a); any other branch is refused.
+     --anyway installs a checkout's state as it is (the maintainer's rehearsals, with --target);
   1. KEEPS THE PREVIOUS RELEASE: when the target holds a bridge of another version, the
      files its manifest lists are saved to <target>/cursor-bridge-previous/<that version>/
      first (one previous release is kept; an older saved one is removed; a kept copy of
@@ -147,8 +149,9 @@ def git(folder, *args):
 
 
 def not_the_merged_state(release):
-    """Why `release`, when it is a checkout of the bridge's repository, is not main as merged;
-    None when it is, or when the folder is no checkout (a release copied somewhere)."""
+    """Why `release`, when it is a checkout of the bridge's repository, is not main (or a
+    release/* branch) as merged; None when it is, or when the folder is no checkout (a release
+    copied somewhere)."""
     inside = git(release, "rev-parse", "--is-inside-work-tree")
     if inside is None:
         if has_git_dir(release):
@@ -159,16 +162,26 @@ def not_the_merged_state(release):
     branch = git(release, "rev-parse", "--abbrev-ref", "HEAD")
     if branch is None:
         return "git could not read its branch, so main as merged cannot be confirmed"
-    if branch != "main":
-        return "it is on '%s', not on main" % branch
-    home = git(release, "rev-parse", "--verify", "--quiet", "origin/main")
+    if branch != "main" and not branch.startswith("release/"):
+        return "it is on '%s', not on main or a release/* branch" % branch
+    home = git(release, "rev-parse", "--verify", "--quiet", "origin/" + branch)     # a hotfix merged on its release branch (FB-016)
     if home is None:
-        return "its origin/main cannot be read (no origin remote, or never fetched), so main as merged cannot be confirmed"
+        return "its origin/%s cannot be read (no origin remote, or never fetched), so %s as merged cannot be confirmed" % (branch, branch)
     if home != git(release, "rev-parse", "HEAD"):
-        return "its main differs from origin/main (not pulled, or holding commits that were never merged)"
-    changed = git(release, "status", "--porcelain", "--", ".")
+        return "its %s differs from origin/%s (not pulled, or holding commits that were never merged)" % (branch, branch)
+    if branch != "main":
+        # A release/* branch is not protected like main, so a push alone would pass the check above: its
+        # head must be a pull request's merge, made by GitHub (committer noreply@github.com, a subject
+        # ending "(#<number>)"), as the review of 2026.10.25a asked.
+        made = git(release, "log", "-1", "--format=%ce%x09%s", "HEAD")
+        if made is None:
+            return "git could not read its head commit, so %s as merged cannot be confirmed" % branch
+        email, _, subject = made.partition("\t")
+        if email.strip().lower() != "noreply@github.com" or not re.search(r"\(#\d+\)\s*$", subject):
+            return "its head on %s is not a pull request's merge on GitHub (committer %s, subject %r): a release branch installs only as merged through a pull request" % (branch, email.strip() or "unknown", subject[:80])
+    changed =git(release, "status", "--porcelain", "--", ".")
     if changed is None:
-        return "git could not read its status, so main as merged cannot be confirmed"
+        return "git could not read its status, so %s as merged cannot be confirmed" % branch
     lines = [l for l in changed.splitlines() if "__pycache__" not in l and not l.rstrip().endswith(".pyc")]   # Python's cache is no change (S3)
     if lines:
         return "it holds %d change(s) that are not committed" % len(lines)
@@ -577,7 +590,7 @@ def install(target, dry, anyway=False):
         return 2
     why = None if anyway else not_the_merged_state(RELEASE)
     if why:
-        print("bridge-install: %s is a checkout of the bridge's repository, and %s. A release is installed from main as merged; "
+        print("bridge-install: %s is a checkout of the bridge's repository, and %s. A release is installed from main (or a release/* branch) as merged; "
               "nothing was changed. Tell the maintainer. (--anyway installs this state as it is; it is for the maintainer's rehearsals.)" % (RELEASE, why))
         return 2
     inputs = read_inputs(target, RELEASE)

@@ -25,7 +25,7 @@ jobs:
       - name: osv
         run: osv-scanner@v2.3.1 --lockfile package-lock.json
       - name: socket
-        run: npx socket@1.2.3 ci
+        run: npx socket@1.2.3 ci --no-banner
       - run: npx impeccable@3.3.0 detect --json docs/mockups
       - run: pytest -q
 """
@@ -72,6 +72,7 @@ def make_workspace(root, conformant=True):
     (root / ".cursor" / "rules" / "workspace-boundary.mdc").write_text("rule\n", encoding="utf-8")
     (root / ".cursor" / "rules" / "secure-coding.mdc").write_text("rule\n", encoding="utf-8")
     (root / ".cursor" / "hooks.json").write_text('{"hooks": ["boundary-check.py", "windowless-check.py"]}', encoding="utf-8")
+    (root / ".gitignore").write_text("docs/BOUNDARY_VIOLATIONS.md\n", encoding="utf-8")   # the hook's log of absolute paths (2026.10.25a, FB-031)
     (root / "package.json").write_text("{}", encoding="utf-8")
     (root / "package-lock.json").write_text("{}", encoding="utf-8")
     (root / ".github" / "workflows" / "ci.yml").write_text(GATE, encoding="utf-8")
@@ -129,8 +130,8 @@ def test_each_missing_floor_is_named_and_secret_values_never_printed(tmp_path):
 
 def test_guarded_scanner_step_and_public_rulesets_are_not_a_floor(tmp_path):
     make_workspace(tmp_path)
-    gate = GATE.replace("      - name: socket\n        run: npx socket@1.2.3 ci\n",
-                        "      - name: socket\n        if: ${{ env.SOCKET_TOKEN != '' }}\n        run: npx socket@1.2.3 ci\n")
+    gate = GATE.replace("      - name: socket\n        run: npx socket@1.2.3 ci --no-banner\n",
+                        "      - name: socket\n        if: ${{ env.SOCKET_TOKEN != '' }}\n        run: npx socket@1.2.3 ci --no-banner\n")
     gate = gate.replace("pipx run semgrep==1.176.1 ci", "pipx run semgrep==1.176.1 --config p/default --config p/owasp-top-ten")
     (tmp_path / ".github" / "workflows" / "ci.yml").write_text(gate, encoding="utf-8")
     rc, out = run(tmp_path)
@@ -271,7 +272,7 @@ def test_second_pass_residue(tmp_path):
     gate = GATE.replace("      - name: osv\n        run: osv-scanner@v2.3.1 --lockfile package-lock.json\n",
                         "      - name: get osv\n        run: curl -L https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64 -o osv-scanner\n"
                         "      - name: osv\n        run: ./osv-scanner --lockfile package-lock.json\n")
-    gate = gate.replace("npx socket@1.2.3 ci", 'if [ -n "${SOCKET_CLI_API_TOKEN}" ]; then npx socket@1.2.3 ci; else echo skipping; fi')
+    gate = gate.replace("npx socket@1.2.3 ci --no-banner", 'if [ -n "${SOCKET_CLI_API_TOKEN}" ]; then npx socket@1.2.3 ci --no-banner; else echo skipping; fi')
     (tmp_path / ".github" / "workflows" / "ci.yml").write_text(gate, encoding="utf-8")
     rc, out = run(tmp_path)
     assert verdict(out, "OSV-Scanner in the gate")[0] == "OK" and verdict(out, "OSV-Scanner version pinned")[0] is None

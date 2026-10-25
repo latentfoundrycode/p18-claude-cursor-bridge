@@ -95,8 +95,10 @@ Installing:
      folder's own manifest and no file may be unlisted; and when the folder is a checkout of
      the bridge's repository it must be `main` as merged (on main, equal to origin/main,
      nothing uncommitted), because the install check cannot tell a merged release from a
-     stamped branch. --anyway installs a checkout's state as it is (the maintainer's
-     rehearsals, with --target);
+     stamped branch. A hotfix of an installed release is merged on its `release/<name>`
+     branch, so a checkout on a `release/*` branch equal to origin/<that branch>, nothing
+     uncommitted, is accepted alike (FB-016; 2026.10.25a); any other branch is refused.
+     --anyway installs a checkout's state as it is (the maintainer's rehearsals, with --target);
   1. KEEPS THE PREVIOUS RELEASE: when the target holds a bridge of another version, the
      files its manifest lists are saved to <target>/cursor-bridge-previous/<that version>/
      first (one previous release is kept; an older saved one is removed; a kept copy of
@@ -186,6 +188,18 @@ named when the ceiling is chosen. A slow but healthy task is never ended before 
 An owner's cap below twice the default is ignored with a note: the line says "above twice".
 Refuses a design critique round above the ceiling (exit 125, `design ceiling:`).
 
+Since 2026.10.25a: a `--kind review` run whose `--model` is of the family of the branch's last
+builder run is refused (exit 125; roster-check.py's REBUILD: the new profile's builder
+rebuilds the change first). A builder or review run lists the files beside the Workspace
+(its parent folder, the Workspace and `Worktrees/` excluded) before and after, and reports
+each new, changed or removed one as `bridge-run: BOUNDARY ...` on stderr and in the run log:
+the boundary hook does not run in a headless builder run (ISS-010), so this is the one
+detection of a write outside the Workspace. A `gh pr checks <n> --watch` waits up to two
+minutes for the pushed head (the local HEAD) to be the pull request's head on GitHub with a
+check registered, and says how long it waited, so a watch neither ends at once with "no
+checks reported" nor takes the previous commit's run (KP-051). `-p no:cacheprovider` is
+accepted after `python -m pytest` as after `pytest`.
+
 `--key-file <path>` (release A2): a file of `NAME=value` lines, outside the Workspace, whose
 values reach the child's environment only; names are printed, values never (the owner's
 rule of 2026-10-05: no secret through the environment the owner sets).
@@ -261,17 +275,27 @@ What it checks, with the file it reads (the 0b review corrected several of these
     silently when its condition is false); Semgrep runs the bridge rules or the Pro engine
     (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner
     without a pinned version is a NOTE (rule 14); every `uses:` is pinned by a 40-character
-    commit; the runner is Linux (a note otherwise);
+    commit; the runner is Linux (a note otherwise); `socket ci` without `--no-banner` is
+    MISSING (its banner prints part of the key, ISS-005), and so is a step that installs the
+    Socket CLI while its `env:` holds the Socket key (the install scripts see it, FB-007);
   - on GitHub, read-only through `gh` unless --offline: the default branch has a required
     status check (N6), and the repository's visibility (a public repository is a NOTE);
   - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
     .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen
-    secure-coding rule (.cursor/rules/secure-coding.mdc);
+    secure-coding rule (.cursor/rules/secure-coding.mdc); a configured boundary-check hook is
+    a NOTE (configured, not engaging) unless this computer's probe record
+    ~/.cursor-bridge/boundary-probe.json says it fired ({"fired": true, "when": ..., "launch":
+    ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program
+    writes the record yet), and it is MISSING while docs/BOUNDARY_VIOLATIONS.md, its log of
+    absolute paths, is not gitignored (FB-031);
   - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for
     a root requirements.txt (direct pins alone are not a lock; KP-018);
   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,
     ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and
-    docs/diagrams/INDEX.md (missing = a diagram retrofit item);
+    docs/diagrams/INDEX.md (missing = a diagram retrofit item); a tracked (or, outside a git
+    repository, any) docs/PROJECT_STATUS.md holding an absolute path (a drive letter
+    followed by a colon and a backslash or a slash, or a macOS home under root Users, or a
+    Linux home under root home) is MISSING (rule 54: no computer path enters a commit; FB-026);
   - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or not right after
     Phase: is MISSING (R-015);
   - with --screens (or a docs/mockups folder): the design detector in the gate;
@@ -292,6 +316,9 @@ What it checks, with the file it reads (the 0b review corrected several of these
     NOTE; values are never read or printed (KP-032); the advice is a key file outside the
     Workspace, never the Windows user environment; key-like variable NAMES in the session's
     own environment are a NOTE (the launcher withholds them from builder and reviewer runs);
+    an inventory row that says a secret arrives through an environment variable is MISSING,
+    a row whose only mention is negated ("never an environment variable the owner sets",
+    "not through an environment variable", "no longer ...") is not one;
   - the private memory notes Claude Code keeps for this project (names only; calibration
     step 2b reviews them, rule 41);
   - the recorded bridge version against the installed one (calibration due).
@@ -332,7 +359,7 @@ evaluate-reports: the report cycle's program (restructuring plan, section 12; re
 
 - `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
 - `--ledger`; default: null; required: false
-- `--project-root`; default: null; required: false; one project root instead of the three (tests)
+- `--project-root`; default: null; required: false; one project root instead of the project list (tests, a hand collect)
 - `--project-name`; default: null; required: false
 - `--home`; default: null; required: false; the folder holding .claude/projects (tests)
 - `--out`; default: null; required: false
@@ -349,7 +376,7 @@ evaluate-reports: the report cycle's program (restructuring plan, section 12; re
 
 - `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
 - `--ledger`; default: null; required: false
-- `--project-root`; default: null; required: false; one project root instead of the three (tests)
+- `--project-root`; default: null; required: false; one project root instead of the project list (tests, a hand collect)
 - `--project-name`; default: null; required: false
 - `--home`; default: null; required: false; the folder holding .claude/projects (tests)
 - `--reason`; default: null; required: false
@@ -361,7 +388,7 @@ evaluate-reports: the report cycle's program (restructuring plan, section 12; re
 
 - `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
 - `--ledger`; default: null; required: false
-- `--project-root`; default: null; required: false; one project root instead of the three (tests)
+- `--project-root`; default: null; required: false; one project root instead of the project list (tests, a hand collect)
 - `--project-name`; default: null; required: false
 - `--home`; default: null; required: false; the folder holding .claude/projects (tests)
 - `--date`; default: null; required: false
@@ -373,7 +400,7 @@ evaluate-reports: the report cycle's program (restructuring plan, section 12; re
 
 - `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
 - `--ledger`; default: null; required: false
-- `--project-root`; default: null; required: false; one project root instead of the three (tests)
+- `--project-root`; default: null; required: false; one project root instead of the project list (tests, a hand collect)
 - `--project-name`; default: null; required: false
 - `--home`; default: null; required: false; the folder holding .claude/projects (tests)
 - `--out`; default: null; required: false
@@ -403,15 +430,22 @@ Path: `bridge/cursor-bridge/invisible-check.py`
 ```
 invisible-check: characters a reader cannot see in the files a diff changed (release A4, 13.1).
 
-  python invisible-check.py [<base-ref>] [--all]
+  python invisible-check.py [<base-ref>] [--all] [--non-ascii]
 
 Run from the Workspace root. Reads the text files changed against <base-ref> (default HEAD:
 the checkpoint) plus the untracked ones, or every tracked text file with --all, and lists
 each line holding a zero-width character (U+200B..U+200D, U+2060, U+FEFF after the first
 character), a bidirectional control (U+202A..U+202E, U+2066..U+2069: the "Trojan Source"
-reordering), a soft hyphen (U+00AD) or a word joiner. Such a character hides a token from a
+reordering), a soft hyphen (U+00AD), a word joiner, or a space that is not U+0020 (the
+no-break spaces U+00A0, U+202F, the fixed-width spaces U+2000..U+200A, U+2007 among them,
+and U+3000; 2026-10-25 C8, FB-010). Such a character hides a token from a
 reviewer's eye and from a grep, and reorders what a reviewer reads. Exit 0 = none, 1 = at
 least one, 2 = cannot verify. ASCII output; the character is named by its code point.
+
+  --non-ascii  also lists EVERY non-ASCII character of those files, one line each (path,
+               line, column, U+XXXX and its Unicode name), so the author confirms each was
+               meant: a backslash-u escape typed through a tool arrives as the character
+               itself (KP-052, FB-029). The listing does not change the exit code.
 ```
 
 ## lock-check.py
@@ -455,7 +489,9 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
 
   1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;
   2. its `Phase:` is building or changing;
-  3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner);
+  3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner), and
+     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2026.10.25a, FB-027:
+     a pause written in the untracked working file touches no tracked file);
   (and, in every phase: a turn whose last message holds a shell block and names no terminal
   is sent back once, because a run sheet without its terminal cannot be followed, rule 27);
   4. nothing is pending that will wake the session. Since release A2 the hook's own lists
@@ -466,8 +502,13 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
      ceiling is running, because a hung agent never completes and nothing else would wake the session
      (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the
      session is idle). A background command of any other kind (a dev server, a worker, a
-     probe) is NOT a wake source: a server never finishes (KP-031). When the hook hands no
-     lists, the transcript is read as before, within GRACE_HOURS;
+     probe) is NOT a wake source: a server never finishes (KP-031). A task is classed by its
+     tool (2026.10.25a, TDP FB-006): an Agent task is timer-bound as above, a shell command
+     counts by its pattern, and a monitor (an artifact live-update monitor, a Monitor tool
+     task) is neither a wake source nor an agent: it never demands a wake-timer and never
+     counts; any other task with no command (a workflow, a teammate, an MCP task) is read as
+     an agent, as before. When the hook hands no lists, the
+     transcript is read as before, within GRACE_HOURS;
   5. this is not already a continuation forced by this hook (`stop_hook_active`), so it
      nudges at most once per stop sequence and can never trap the session.
 
@@ -585,6 +626,21 @@ for the likely cases, not a boundary.
 ASCII-only on purpose (cp1252 consoles).
 ```
 
+## records-check.py
+
+Path: `bridge/cursor-bridge/records-check.py`
+
+```
+Every TASK/BUG/FIX id merged since a commit has its docs/CHANGES.md line.
+```
+
+### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--since`; default: null; required: true; the stage's first checkpoint commit
+- `--ref`; default: "origin/main"; required: false
+- `--changes`; default: "docs/CHANGES.md"; required: false
+
 ## refactor-check.py
 
 Path: `bridge/cursor-bridge/refactor-check.py`
@@ -637,12 +693,21 @@ would make the supervisor's next git command run the reviewer's program with the
 identity), or a changed ignored file (`.env`, a record a project keeps gitignored, a brief).
 
 What each step does:
-  snapshot  refuses a dirty tree (commit first); records HEAD, the branch, every ref, the
-            stash list, a hash of `.git/config`, of every file in the ACTIVE hooks folder
-            (`core.hooksPath`, read from the config file, or `.git/hooks`) and in
-            `.git/hooks`, and every ignored file with its size and mtime (cache folders
-            such as `.venv`, `node_modules` and `__pycache__` are skipped); writes
-            <git common dir>/bridge/review-<nnn>.json and prints that file's hash.
+  snapshot  refuses a dirty tree (commit first); lists the review's input files (the files
+            directly under run/review/ whose name contains <nnn>, the launcher's
+            REVIEW-<nnn>.err excepted) with their sizes and refuses when one is empty, since
+            both reviewers would read an empty input (KP-067: `git show <rev>:<path>
+            --output=<file>` creates the file empty; none found is a NOTE); records HEAD,
+            the branch, every ref, the stash list, a hash of `.git/config`, of every file in
+            the ACTIVE hooks folder (`core.hooksPath`, read from the config file, or
+            `.git/hooks`) and in `.git/hooks`, and every ignored file with its size and
+            mtime (cache folders such as `.venv`, `node_modules` and `__pycache__` are
+            skipped); writes
+            <git common dir>/bridge/review-<nnn>.json and a copy of its sha256 outside the
+            checkout the reviewer runs in (~/.cursor-bridge/review-hashes/<key>-<nnn>.sha256,
+            FB-037), and prints that file's hash. `verify` and `premerge` compare the copy
+            themselves: a mismatch is GATE-INTEGRITY, a missing copy CANNOT VERIFY (take the
+            snapshot again).
   verify    reads the configuration and the hooks folders FIRST, as files, without running
             git: a change is GATE-INTEGRITY and nothing else runs. Every git command the
             guard runs is given `-c core.hooksPath=<an empty folder> -c core.fsmonitor=false`,
@@ -653,16 +718,22 @@ What each step does:
             whose first line it prints), lists what it removed, and compares the ignored
             files: a change under docs/, handoff/, run/review/ or to `.env*` is
             GATE-INTEGRITY, any other is LEFT BEHIND. A moved remote-tracking ref (a fetch)
-            is a note. It prints the snapshot file's hash again: compare it with the one
-            `snapshot` printed, since the reviewer could rewrite the snapshot.
+            is a note. Before all of this it compares the snapshot file's hash with the copy
+            `snapshot` wrote: a difference is GATE-INTEGRITY (the snapshot was rewritten after
+            it was taken; nothing is restored from it), a missing copy CANNOT VERIFY (take the
+            snapshot again; a snapshot taken by an older release has none). It prints the snapshot file's hash again: compare it with the
+            one `snapshot` printed, since the reviewer could rewrite the snapshot.
   premerge  needs the verified mark `verify` wrote for this snapshot (release A1b, second and
             third passes: Review B launched after the snapshot through the launcher and ended
             with exit 0, the last `verify` OK; `snapshot` and `verify` remove an older mark), so a
-            merge that skipped the cross-family review has no way through; refuses a dirty
+            merge that skipped the cross-family review has no way through; compares the
+            snapshot's hash with its copy as `verify` does; refuses a dirty
             tree; the head about to merge must descend from the reviewed head and differ from
             it only under run/review/ (the review files removed with `git rm`); with <pr>, the
             pull request's head on GitHub must equal the local HEAD (push first; a branch
-            updated from main needs the reviews again). It writes the record the permission
+            updated from main needs the reviews again). GitHub can lag a push: a head that
+            differs is read again every 15 seconds for up to 90 before it is flagged, and the
+            wait is printed either way (2026-10-18 C2). It writes the record the permission
             guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command
             with `--match-head-commit`.
 
@@ -704,10 +775,19 @@ Pool is inferred from the id per Cursor's docs: Grok (any effort/host prefix) an
 the "Cursor Models" pool (native); every third-party model is "Other Models".
 A profile is skipped when other_pool is "exhausted" and any of its models is in the other
 pool. Unless --no-probe, the builder and Review B of a candidate profile are each sent a
-one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply, or
-timeout marks the profile unusable (this catches hard failures only, never a nearly-empty
-quota). The chosen profile's three families must be distinct. The result is written to
-docs/ROSTER.resolved.json for the delegate and Review B commands to read.
+one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
+usage-limit message or timeout marks the profile unusable (this catches hard failures only,
+never a nearly-empty quota); any other reply counts as answered, off-script. The chosen
+profile's three families must be distinct. The result is written to
+docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
+changes (the time of every check goes to the state file as last_resolved), so a check
+before a snapshot leaves the tree clean.
+The family rule governs Review B only (2026.10.25a): Review B is never of the family of the
+last builder run of the branch under review (none for a branch with no builder run). When
+the chosen profile's Review B is of that family - the change in flight was built under
+another profile, before a switch - the profile still resolves, with a REBUILD line and a
+"rebuild" entry in the resolved file: its builder rebuilds the change first (step 3b), and
+bridge-run.py refuses that Review B until the branch's last builder run is of another family.
 --record-failure <model> --stderr-file <path> [--stdout-file <path>]
   Classify a failed cursor-agent call. <model> must be a model id of this roster (a wrong
   argument exits 2 and changes nothing). USAGE-LIMIT (a usage/quota/limit message) or a
@@ -718,7 +798,9 @@ docs/ROSTER.resolved.json for the delegate and Review B commands to read.
   the same step once", twice per window, then exit 5 = "stop and tell the owner" (no
   switch helps a dead line). A first other failure is exit 4 too. The counts expire after
   8 hours, longer than any run limit, and --record-success <model> clears them. An
-  automatic "unavailable" mark expires after 6 hours.
+  automatic "unavailable" mark expires after 6 hours; --clear-unavailable <model> removes
+  one at once (a wrong mark, e.g. a service outage). The service's `[unavailable]` line is a
+  connection error, never the model's failure.
 The changing state (pool, marks, counts) is kept in <git common dir>/bridge/roster-state.json,
 never in the tracked roster, so a reset of the working tree cannot erase a switch; a roster
 from an older release seeds the state file once.
@@ -779,14 +861,21 @@ Usage:
 
     --base   commit to diff against. Default: the commit that FIRST added the brief (the
              checkpoint commits the brief; a brief fixed and committed later never moves the
-             base past the builder's commits); HEAD when the brief is not committed.
+             base past the builder's commits); HEAD when the brief is not committed. For a
+             re-delegation, give the commit that committed THAT round's brief, so the
+             supervisor's commits between rounds are not measured (FB-014). A --base without a
+             value, or one that names no commit, cannot be verified (exit 2).
 
 Output lines: BASE (with how it was chosen), SCOPE, NOT READ AS A PATH (a Scope bullet that
 names no path, reported and ignored), CHANGED, BOOKKEEPING (the files a builder must write),
 RECORDS (the supervisor's record files changed only by commits that touched records alone
 since the checkpoint: not drift; a commit that mixes code with a record is the builder's),
-IN SCOPE, SCOPE DRIFT, VERDICT. The Scope is the brief's top-level bullets up to the first
-line that is neither a bullet nor blank (a bold note, prose): sub-bullets are not paths.
+SUPERVISOR TESTS (test files changed only by the supervisor's commits: a commit of records and
+test files alone whose subject starts with `supervisor:`, rule N4; such a commit's records are
+the supervisor's too. The subject is a convention the supervisor writes, not proof: every
+commit carries the owner's identity), IN SCOPE, SCOPE DRIFT, VERDICT. The Scope is the
+brief's top-level bullets up to the first line that is neither a bullet nor blank (a bold
+note, prose): sub-bullets are not paths.
 
 Exit codes:
     0  every changed file is inside the declared Scope
@@ -911,6 +1000,26 @@ is unaffected — which is why blocking destructive git here is safe.
 The deny-list below is the auditable policy. Keep it tight: an over-broad guard that
 stalls normal builds is the fastest way to get a safety control switched off.
 ```
+
+## stage-diff.py
+
+Path: `bridge/cursor-bridge/stage-diff.py`
+
+```
+Write a stage's whole change and its parts from its squash commits.
+```
+
+### Positionals
+
+- `commits`; default: null; required: false
+
+### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--from-file`; default: null; required: false
+- `--out`; default: null; required: true
+- `--name`; default: ""; required: false
+- `--ref`; default: "origin/main"; required: false
 
 ## sync-check.py
 

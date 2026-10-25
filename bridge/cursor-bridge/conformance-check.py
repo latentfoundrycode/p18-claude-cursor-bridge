@@ -17,17 +17,27 @@ What it checks, with the file it reads (the 0b review corrected several of these
     silently when its condition is false); Semgrep runs the bridge rules or the Pro engine
     (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner
     without a pinned version is a NOTE (rule 14); every `uses:` is pinned by a 40-character
-    commit; the runner is Linux (a note otherwise);
+    commit; the runner is Linux (a note otherwise); `socket ci` without `--no-banner` is
+    MISSING (its banner prints part of the key, ISS-005), and so is a step that installs the
+    Socket CLI while its `env:` holds the Socket key (the install scripts see it, FB-007);
   - on GitHub, read-only through `gh` unless --offline: the default branch has a required
     status check (N6), and the repository's visibility (a public repository is a NOTE);
   - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
     .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen
-    secure-coding rule (.cursor/rules/secure-coding.mdc);
+    secure-coding rule (.cursor/rules/secure-coding.mdc); a configured boundary-check hook is
+    a NOTE (configured, not engaging) unless this computer's probe record
+    ~/.cursor-bridge/boundary-probe.json says it fired ({"fired": true, "when": ..., "launch":
+    ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program
+    writes the record yet), and it is MISSING while docs/BOUNDARY_VIOLATIONS.md, its log of
+    absolute paths, is not gitignored (FB-031);
   - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for
     a root requirements.txt (direct pins alone are not a lock; KP-018);
   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,
     ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and
-    docs/diagrams/INDEX.md (missing = a diagram retrofit item);
+    docs/diagrams/INDEX.md (missing = a diagram retrofit item); a tracked (or, outside a git
+    repository, any) docs/PROJECT_STATUS.md holding an absolute path (a drive letter
+    followed by a colon and a backslash or a slash, or a macOS home under root Users, or a
+    Linux home under root home) is MISSING (rule 54: no computer path enters a commit; FB-026);
   - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or not right after
     Phase: is MISSING (R-015);
   - with --screens (or a docs/mockups folder): the design detector in the gate;
@@ -48,6 +58,9 @@ What it checks, with the file it reads (the 0b review corrected several of these
     NOTE; values are never read or printed (KP-032); the advice is a key file outside the
     Workspace, never the Windows user environment; key-like variable NAMES in the session's
     own environment are a NOTE (the launcher withholds them from builder and reviewer runs);
+    an inventory row that says a secret arrives through an environment variable is MISSING,
+    a row whose only mention is negated ("never an environment variable the owner sets",
+    "not through an environment variable", "no longer ...") is not one;
   - the private memory notes Claude Code keeps for this project (names only; calibration
     step 2b reviews them, rule 41);
   - the recorded bridge version against the installed one (calibration due).
@@ -71,6 +84,13 @@ ENV_SECRET = re.compile(r"((^|_)TOKENS?(_|$)|(^|_)SECRETS?(_|$)|PASSWORD|PASSWD|
 LOCATION_NAME = re.compile(r"_(PATH|DIR|FILE|FOLDER|URL)$")  # where a store is, not a secret
 SCANNERS = (("Semgrep", r"\bsemgrep\b"), ("OSV-Scanner", r"osv-scanner"), ("Socket", r"\bsocket(security)?\b"))   # `npm install -g @socketsecurity/cli@<version>` carries the pin (2026.10.11c)
 GH_TIMEOUT = 25
+BOUNDARY_PROBE = os.path.join("~", ".cursor-bridge", "boundary-probe.json")   # per computer; no program writes it yet (ISS-010)
+BOUNDARY_LOG = "docs/BOUNDARY_VIOLATIONS.md"
+SOCKET_CI = re.compile(r"(?:(?<![\w/.@-])socket|@socketsecurity/cli)(?:@\S+)?\s+(?:-\S+(?:\s+[^-\s]\S*)?\s+)*ci(?![\w-])", re.I)   # `socket ci`, `npx socket@1.2.3 ci`, `npx @socketsecurity/cli@1.7.0 ci`, `socket --config x ci`
+SOCKET_INSTALL = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+(?:install|i|add)\b[^\n]*(?:@socketsecurity/cli|(?<![\w/.@-])socket(?:@\S+)?(?=\s|$))|\bnpx\s+(?:-y\s+|--yes\s+)?(?:@socketsecurity/cli|socket)(?:@|\s|$)|\bpip[x3]?\s+install\b[^\n]*\bsocketsecurity\b", re.I | re.M)
+SOCKET_KEY = re.compile(r"^[A-Z0-9_]*SOCKET[A-Z0-9_]*(?:TOKEN|KEY|SECRET)[A-Z0-9_]*\s*:|^[A-Z0-9_]*SOCKET[A-Z0-9_]*\s*:.*\bsecrets\.|\bsecrets\.[A-Za-z0-9_]*SOCKET", re.I | re.M)   # an env: entry holding the Socket key (SOCKET_SECURITY_API_KEY, SOCKET_CLI_API_TOKEN, ...)
+ABSOLUTE_PATH = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]|/Users/|/home/")   # a drive letter path, or a macOS or Linux home
+NEGATED_ENV = re.compile(r"\b(?:never|not|no longer|nor|no)\b(?:(?!\bbut\b|\binstead\b)[^|.;,]){0,40}?\benv(?:ironment)?[ _-]?var\w*", re.I)   # "never an environment variable the owner sets"
 
 
 def read(path):
@@ -149,6 +169,14 @@ def gh(args, cwd):
 def git_ignored(ws, rel):
     try:
         p = subprocess.run(["git", "-c", "core.fsmonitor=false", "check-ignore", "-q", rel], cwd=ws, capture_output=True, timeout=GH_TIMEOUT, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return p.returncode == 0
+
+
+def git_tracked(ws, rel):
+    try:
+        p = subprocess.run(["git", "-c", "core.fsmonitor=false", "ls-files", "--error-unmatch", rel], cwd=ws, capture_output=True, timeout=GH_TIMEOUT, creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired):
         return False
     return p.returncode == 0
@@ -387,6 +415,14 @@ def main():
                 add("OK", "Semgrep bridge rules or Pro engine")
             else:
                 add("MISSING", "Semgrep bridge rules or Pro engine", "Semgrep runs public rulesets only; the floor is `.semgrep/bridge-rules.yml` or `semgrep ci` (Cursor-Project-Configuration.md 5c, KP-001)")
+        # the Socket CLI's banner prints five characters of the key's secret part (ISS-005); its
+        # install scripts run with the key when the install shares the step that holds it (FB-007)
+        bannered = [body for body, _, cmds in steps if any(SOCKET_CI.search(l) and "--no-banner" not in l for l in re.sub(r"\\\n\s*", " ", cmds).splitlines())]
+        if bannered:
+            add("MISSING", "Socket runs without its banner", "%d step(s) run `socket ci` without `--no-banner`: the banner prints part of the key into the CI log, and GitHub masks whole secrets only (ISS-005)" % len(bannered))
+        keyed_install = [body for body, _, cmds in steps if SOCKET_INSTALL.search(cmds) and re.search(r"^env:", body, re.M) and SOCKET_KEY.search(body.split("\nenv:", 1)[-1])]
+        if keyed_install:
+            add("MISSING", "Socket CLI installed without the key", "%d step(s) install the Socket CLI in the step whose `env:` holds the Socket key: the package's and its dependencies' install scripts run with it; install it in a step of its own, without the key and with `--ignore-scripts` (FB-007)" % len(keyed_install))
         unpinned = sorted(set(m.group(1) for m in re.finditer(r"uses:\s*([^\s#]+@[^\s#]+)", wf_text) if not re.search(r"@[0-9a-f]{40}$", m.group(1))))
         if unpinned:
             add("MISSING", "CI actions pinned by commit", "pinned by tag only: " + ", ".join(unpinned[:6]) + (" ..." if len(unpinned) > 6 else ""))
@@ -433,7 +469,26 @@ def main():
     ):
         add("OK" if os.path.isfile(os.path.join(ws, rel)) else "MISSING", floor, "" if os.path.isfile(os.path.join(ws, rel)) else detail)
     hooks = read(os.path.join(ws, ".cursor", "hooks.json")) or ""
-    add("OK" if "boundary-check" in hooks else "MISSING", "Boundary-check hook", "" if "boundary-check" in hooks else ".cursor/hooks.json does not run boundary-check (rule 22)")
+    if "boundary-check" not in hooks:
+        add("MISSING", "Boundary-check hook", ".cursor/hooks.json does not run boundary-check (rule 22)")
+    else:
+        # ISS-010: the project's afterFileEdit hook never ran in a headless builder run launched
+        # the bridge's way; it counts only once this computer's probe record says it fired
+        try:
+            probe = json.loads(read(os.path.expanduser(BOUNDARY_PROBE)) or "null")
+        except ValueError:
+            probe = None
+        if isinstance(probe, dict) and probe.get("fired") is True:
+            add("OK", "Boundary-check hook (seen firing %s, %s)" % (str(probe.get("when") or "at an unrecorded time")[:40], str(probe.get("launch") or "launch not recorded")[:60]))
+        else:
+            add("NOTE", "Boundary-check hook", "configured, not engaging: the hook has not been seen firing in a headless builder run on this computer (no record that it fired in ~/.cursor-bridge/boundary-probe.json; ISS-010); the launcher's own before-and-after listing (BOUNDARY on stderr) is what detects a builder's write outside the Workspace")
+        if os.path.isdir(os.path.join(ws, ".git")):
+            log_ignored = git_ignored(ws, BOUNDARY_LOG)
+        else:
+            gi_lines = [l.strip() for l in (read(os.path.join(ws, ".gitignore")) or "").splitlines()]
+            log_ignored = any(l.lstrip("/") in (BOUNDARY_LOG, "docs/", "docs/*", "BOUNDARY_VIOLATIONS.md", "**/BOUNDARY_VIOLATIONS.md") for l in gi_lines)
+        if not log_ignored:
+            add("MISSING", "Boundary log ignored", "%s is not in .gitignore: the hook's log holds this computer's absolute paths, which a commit would publish (FB-031, rule 54)" % BOUNDARY_LOG)
     windowless = "windowless-check" in hooks or os.path.isfile(os.path.join(ws, ".cursor", "hooks", "windowless-check.py"))
     add("OK" if windowless else "MISSING", "Windowless check", "" if windowless else "no windowless-check in the hooks; rule 24 puts it in the pre-commit gate")
 
@@ -499,6 +554,11 @@ def main():
             add("MISSING", "Workflows line", "malformed: " + detail)
         else:
             add("MISSING", "Workflows line", "not checked: " + "; ".join(rows))
+    status_text = read(os.path.join(ws, "docs", "PROJECT_STATUS.md"))
+    if status_text is not None and (not os.path.isdir(os.path.join(ws, ".git")) or git_tracked(ws, "docs/PROJECT_STATUS.md")):
+        abs_lines = [str(i) for i, l in enumerate(status_text.splitlines(), 1) if ABSOLUTE_PATH.search(l)]
+        if abs_lines:
+            add("MISSING", "No computer path in the status file", "docs/PROJECT_STATUS.md holds an absolute path on line(s) %s: it is committed with every pull request, so this computer's drive and folder names reach the repository (rule 54, FB-026); name the folders relative to the project root (`Workspace/`, `Documents/`)" % ", ".join(abs_lines[:8]))
     if os.path.isfile(os.path.join(ws, "project.json")):
         try:
             pj = json.loads(read(os.path.join(ws, "project.json")) or "")
@@ -719,8 +779,10 @@ def main():
     # --- no secret through an environment variable the owner sets (the inventory says how each arrives)
     by_env = []
     for line in inv.splitlines():
-        if not line.lstrip().startswith("|") or not re.search(r"env(ironment)? var", line, re.I) or re.search(r"test-only", line, re.I):
+        if not line.lstrip().startswith("|") or re.search(r"test-only", line, re.I):
             continue
+        if not re.search(r"env(ironment)? var", NEGATED_ENV.sub(" ", line), re.I):
+            continue                                       # no mention, or a negated one only: "never an environment variable the owner sets" (TDP FB-006)
         for name in re.findall(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b", line.split("|")[1] if line.count("|") > 2 else line):
             if ENV_SECRET.search(name) and not LOCATION_NAME.search(name) and name not in by_env:
                 by_env.append(name)
