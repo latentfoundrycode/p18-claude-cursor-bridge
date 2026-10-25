@@ -63,7 +63,8 @@ def test_r025_the_type_sets_host_installation():
     not (the core's "Main and conditional workflows"), and no trait file sets the kind."""
     lines = [l.strip() for l in body("host-extension", "Set at intake.delivery-kind").split("\n") if l.strip()]
     assert lines == ["host-installation"], lines
-    assert "`host-installation` (an extension installed into its host)" in flat(read(REGISTRY))
+    assert "`host-installation` (an extension installed into its host)" in flat(
+        section(read(REGISTRY), "Extension points", 2))
     spec = importlib.util.spec_from_file_location("workflow_check_type_host_extension", WORKFLOW_CHECK)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -156,7 +157,7 @@ def test_r025_the_procedure_reaches_host_installation_parts_only():
                            "## Add at project-end.delivery for install-script"], installable
     assert "project-end.delivery" not in text("claude-code-extension")
     assert ("Each addition at `project-end.delivery` names the delivery kind it is for and applies only to a part of that "
-            "kind") in flat(read(REGISTRY))
+            "kind") in flat(section(read(REGISTRY), "Extension points", 2))
 
 
 def test_r025_the_sub_workflow_names_claude_codes_extension_points_and_its_version():

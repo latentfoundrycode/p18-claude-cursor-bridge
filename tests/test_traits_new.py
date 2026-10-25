@@ -139,6 +139,14 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert "a folder the design names, which no clean, reset, cache purge or test teardown reaches" in conf
     assert "reads the result already paid for instead of buying it again" in conf
     assert "**The cap** is recorded" in conf and "`Spending cap: " in conf
+    # Stage B4's review, round 5: a capture, the dry run and a benchmark buy or count afresh (the passage cut back
+    # to a plain rule at BUG-025's confirming read).
+    assert ("A contract capture or a re-recording the owner approved buys its replies afresh: it reads only the "
+            "replies it has bought itself, each written there with the run that bought it in place of the one "
+            "recorded before, so that a resumed run never takes an older reply for a new one. The dry run and a "
+            "benchmark keep their results in a store of their own instead, empty when the run starts and deleted "
+            "when it ends, outside this folder, so that no stand-in's reply reaches it and a benchmark counts every "
+            "paid call a run from cold makes. Every other run reads this store before it buys.") in conf
     brief = add("spends-money", "delegation-loop.brief-constraints")
     assert "The builder runs no paid action" in brief and "after the owner's approval for it" in brief
     assert "charges nothing" in brief
@@ -166,21 +174,27 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     # Review A, round 1, blocking: the product's paid calls go through the store; a first capture and a purchase,
     # which have no replies to stand in, run at the smallest size instead of dry.
     assert "Every paid call the part's code makes goes through the store of paid results" in brief
-    assert "the store read before a call is bought, so a retry never buys twice" in brief
+    assert ("Every paid call the part's code makes goes through the store of paid results as its configuration "
+            "says: its result written there with the request that bought it, and the store read before a call is "
+            "bought, so a retry never buys twice, a capture, a re-recording, the dry run and a benchmark keeping "
+            "the rule that configuration gives them.") in brief
     assert "The first paid run of a contract capture, which has no recorded replies to stand in yet" in brief
     assert "a paid action with no remote service behind it (a purchase)" in brief
     assert "at the smallest size that answers them, under their own approval" in brief
     inspect = add("spends-money", "delegation-loop.inspect-checks")
     assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
-    assert "does not both read the store first and write its result there" in inspect
-    assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
-    # The clause held whole with its grade (BUG-023's confirming read: a separate "is a blocking finding" was
-    # already in the section from the other clauses).
-    assert ("or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
+    assert ("does not both read the store first and write its result there (a capture or re-recording reading "
+            "only the replies its own run bought, in an approved run of it only, as the store's configuration "
+            "says), a capture or re-recording that reads a reply its own run did not buy, a run other than those "
+            "the configuration names that skips the store, a stand-in's reply written to the store of paid "
+            "results, a dry run's or benchmark's own store left after its run, "
+            # The list held in one piece with its grade (BUG-023's confirming read; BUG-025's second).
+            "or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
             "time names (the benchmark results read against the budgets file and the design's record, in the "
             "owner's words, of the speed budgets that leave that time out, any other speed budget of an operation "
             "that calls a paid service "
             "read as including it), is a blocking finding") in inspect
+    assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
 
 
 def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
@@ -198,8 +212,10 @@ def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
     assert "in its command reference, in the increment that builds it" in conf
     assert "Every run of the process the loop starts (a test, a demonstration, a check) meets founding rule N1" in conf
     assert "a run a test starts and stops being part of that test, so that no gate depends on a process it did not start" in conf
-    core = flat(read(CORE))
-    assert "- **N1 — Files are the truth; programs are one-shot.**" in core
+    rules = section(read(CORE), "Founding rules", 2).replace("\r\n", "\n").split("\n")
+    core = [l for l in rules if l.startswith("- **N1 — Files are the truth; programs are one-shot.**")]
+    assert len(core) == 1, core
+    core = flat(core[0])  # N1's own bullet (stage B4's review, round 5's fix)
     n1 = ("A background process is allowed only when all eight hold", "never writes tracked files",
           "can be rebuilt from the files", "states the commit or version it reflects", "stops when idle",
           "no gate depends on it", "runs no migration of the owner's live data", "unreleased code against live data",

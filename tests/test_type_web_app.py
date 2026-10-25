@@ -115,11 +115,13 @@ def test_r023_the_sub_workflow_inherits_and_leaves_the_types_delivery_behind():
     assert delivery == ["## Add at project-end.delivery for web-deployment"], delivery
     installable = read(os.path.join(TRAITS, "installable.md"))
     assert "\n## Add at project-end.delivery for install-script\n" in installable.replace("\r\n", "\n")
-    assert "Deliver the install script** (a command-line tool or a local server)" in flat(installable)
-    core = flat(read(CORE))
+    assert "Deliver the install script** (a command-line tool or a local server)" in flat(
+        section(installable, "Add at project-end.delivery for install-script", 2))
+    core = flat(section(read(CORE), "Main and conditional workflows", 2))
     assert "**A sub-workflow inherits its type workflow** and changes only what differs, at the same extension points." in core
     assert "It may override its type workflow's replacement or setting: that is inheritance, not a collision." in core
-    assert "so a sub-workflow that sets another kind leaves its type workflow's procedure behind" in flat(read(REGISTRY))
+    assert "so a sub-workflow that sets another kind leaves its type workflow's procedure behind" in flat(
+        section(read(REGISTRY), "Extension points", 2))
 
 
 def test_r023_the_web_deployment_procedure():

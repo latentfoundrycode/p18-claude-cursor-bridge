@@ -311,9 +311,14 @@ def test_r017_installable_s_new_sentences_name_their_kinds():
 
 def test_r016_r019_n7_and_n9_remain_in_the_core():
     """BUILD_PLAN TASK-017: the founding rules the traits point at stay in the core."""
-    core = flat(read(CORE))
-    assert "N7 Design quality is measured, never asked." in core
-    assert "N9 For software with screens the running render is measured." in core
+    brief = flat(section(read(CORE), "The core, in brief", 2))
+    assert "N7 Design quality is measured, never asked." in brief
+    assert "N9 For software with screens the running render is measured." in brief
+    # The rules themselves, not only the digest's line (stage B4's review, round 5's fix).
+    rules = section(read(CORE), "Founding rules", 2).replace("\r\n", "\n").split("\n")
+    assert [l for l in rules if l.startswith("- **N7 — Design quality is a measurable gate.**")], "N7"
+    assert [l for l in rules if l.startswith("- **N9 — For software with screens, the running render is a gate "
+                                             "input.**")], "N9"
 
 
 def test_r016_r019_the_plan_critic_keeps_its_design_lenses_and_catches_a_missing_trait():
@@ -321,20 +326,20 @@ def test_r016_r019_the_plan_critic_keeps_its_design_lenses_and_catches_a_missing
     lens stays, since the design critique runs before the traits are settled; one bullet catches each trigger with no
     lens of its own in the plan's critique file. R-018's performance lens is the plan-side benchmark lens, which the
     trait carries (that Decisions row)."""
-    pc = flat(read(PLAN_CRITIC))
-    assert "**Performance lens (where budgets exist).**" in pc
-    assert "is a finding that a trait is missing" in pc
-    # Read from the plan-review section, where the critic applies it to a plan (stage B4's review, round 3).
+    # Each lens read from the section where the critic applies it (stage B4's review, rounds 3 and 5).
+    design_review = flat(section(read(PLAN_CRITIC), "When reviewing a design document", 2))
+    assert "**Performance lens (where budgets exist).**" in design_review
     plan_review = section(read(PLAN_CRITIC), "When reviewing a build plan", 2).replace("\r\n", "\n")
     bullet = [l for l in plan_review.split("\n") if l.startswith("- **A trait missing.**")]
     assert len(bullet) == 1 and bullet[0].endswith(
         "is a finding that a trait is missing (**Blocking**: the trait's additions never reach the build)."), bullet
+    b = flat(bullet[0])  # the pairs are the bullet's own, not the file's (stage B4's review, round 5)
     for trigger, lens in (("`installer` or `install-script`", "no packaging lens"),
                           ("a service run by others (a third-party API, SDK or provider)", "no external-service lens"),
                           ("a design that shows screens", "no design-criteria lens"),
                           ("a design naming a budget", "no benchmark-increments lens")):
-        start = pc.index(trigger)
-        assert pc[start:pc.index(" lens", start) + 5].endswith(lens), (trigger, lens)
+        start = b.index(trigger)
+        assert b[start:b.index(" lens", start) + 5].endswith(lens), (trigger, lens)
 
 
 def test_r017_the_command_reference_reaches_every_approved_command_design():
