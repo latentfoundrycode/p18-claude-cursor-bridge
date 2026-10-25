@@ -151,8 +151,8 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
             "which measures the operation's paid calls for a cost budget and the part's own time, never the "
             "service's") in brief
     # Stage B4's review, round 3: the part's own time never stands under a service-time budget's name.
-    assert ("the part's own time there is reported under a benchmark name of its own, never under the benchmark and "
-            "metric a budget that includes the service's time names.") in brief
+    assert ("The part's own time on the stand-in is always reported under a benchmark name of its own, never under "
+            "the benchmark and metric a budget that includes the service's time names.") in brief
     assert ("a speed budget that includes the service's time is one the floor cannot check on the stand-in, so the "
             "design that names one says how it is measured, any paid run the measuring needs approved as a paid action of its "
             "own and run by the supervisor, and until the design says so the floor reports the budget `NOT MEASURED`, "
@@ -171,8 +171,11 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
     assert "does not both read the store first and write its result there" in inspect
     assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
+    # The clause held whole with its grade (BUG-023's confirming read: a separate "is a blocking finding" was
+    # already in the section from the other clauses).
     assert ("or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
-            "time names") in inspect and "is a blocking finding" in inspect
+            "time names (the benchmark results read against the budgets file and the design's statement of which "
+            "budgets include that time), is a blocking finding") in inspect
 
 
 def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():

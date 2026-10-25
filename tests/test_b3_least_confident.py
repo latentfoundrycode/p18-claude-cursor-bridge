@@ -184,7 +184,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("traits/performance-budgets.md", "Add at planning.critic-lenses"): (321, "464ee6c2b87edda66ee707a2081737826b3afa823d54c036df9afa2949d43b84"),
     ("traits/performance-budgets.md", "The mechanism and the hot path"): (488, "96fb8f084311c8ec4c9b853d3b6a71e50eb159055a22f03888f4d9a69a23b97d"),
     ("traits/spends-money.md", "Add at configuration.items"): (713, "97aa5573d5661618d7436dc1b5f06ed9a755b9da3713bedf65c4e35228125fd3"),
-    ("traits/spends-money.md", "Add at delegation-loop.brief-constraints"): (2123, "83ece2fb1e1af47fba4258509064ba827b6139bae929fe635b5bbf8dac5be948"),
+    ("traits/spends-money.md", "Add at delegation-loop.brief-constraints"): (2140, "3a3ba2c3b076fd0b768be7acca977d88ade43207e553c1764fb2a0b7b40f411c"),
     ("traits/spends-money.md", "Add at delegation-loop.inspect-checks"): (860, "e65d59c44f5d0ae06ce1cf115ca11de129608d4b5db4d4b0b8a3ff84c25892a1"),
     ("traits/spends-money.md", "Add at intake.questions"): (2377, "1a38c4f3be6a16f238f35acf5e9f23fce1c441de9e685db84644e65e7ec5c5d6"),
     ("types/host-extension.md", "Add at delegation-loop.test-checks"): (1011, "a842e08d33314a8b6f2fb56aaf755f9752b653f7720241b370606c7c8a5749cb"),
