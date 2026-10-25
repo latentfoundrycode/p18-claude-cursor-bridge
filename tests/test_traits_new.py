@@ -151,12 +151,12 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
             "which measures the operation's paid calls for a cost budget and the part's own time, never the "
             "service's") in brief
     # Stage B4's review, round 3: the part's own time never stands under a service-time budget's name.
-    assert ("the part's own time on the stand-in is reported under a benchmark name of its own, never under the "
-            "name of a budget that includes the service's time.") in brief
+    assert ("the part's own time there is reported under a benchmark name of its own, never under the benchmark and "
+            "metric a budget that includes the service's time names.") in brief
     assert ("a speed budget that includes the service's time is one the floor cannot check on the stand-in, so the "
             "design that names one says how it is measured, any paid run the measuring needs approved as a paid action of its "
-            "own and run by the supervisor, and until the design says so no benchmark of it runs on the stand-in, so "
-            "the floor reports the budget `NOT MEASURED`, a block, never a pass;") in brief
+            "own and run by the supervisor, and until the design says so the floor reports the budget `NOT MEASURED`, "
+            "a block, never a pass, since no benchmark of it runs on the stand-in") in brief
     assert "budgets file" not in brief and "baseline" not in brief, "stage B4's review, round 2: no baseline exception"
     assert ("A benchmark run against the paid service itself is a paid action of its own, approved as one, never "
             "part of the benchmark floor or of CI.") in brief
@@ -171,8 +171,8 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
     assert "does not both read the store first and write its result there" in inspect
     assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
-    assert ("or a stand-in result reported under the name of a budget that includes a paid service's time, is a "
-            "blocking finding") in inspect
+    assert ("or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
+            "time names") in inspect and "is a blocking finding" in inspect
 
 
 def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
