@@ -350,11 +350,11 @@ def test_r017_the_command_reference_reaches_every_approved_command_design():
            "committed\" as a criterion (`Delivery-Conventions.md` §4), whatever the part's traits (rule 32)" in plan
     assert "for an `installer` or `install-script` part, the delivery kinds the trait *installable*'s packaging " \
            "stage is for, this is the generator that stage names, not a second one." in plan
-    pc = flat(read(PLAN_CRITIC))
+    plan_review = section(read(PLAN_CRITIC), "When reviewing a build plan", 2)
     # The lens is its own bullet, one line of the file; its grade is the one it ends with (stage B4's review,
     # round 2, the tests part: a cut to the next **Blocking** in the file read on into the next lens).
     # Read from the plan-review section, where the critic applies it to a plan (stage B4's review, round 3).
-    lens = [l for l in section(read(PLAN_CRITIC), "When reviewing a build plan", 2).replace("\r\n", "\n").split("\n")
+    lens = [l for l in plan_review.replace("\r\n", "\n").split("\n")
             if l.startswith("- **Command reference (an approved command design).**")]
     assert len(lens) == 1, lens
     lens = lens[0]
@@ -362,8 +362,9 @@ def test_r017_the_command_reference_reaches_every_approved_command_design():
     assert ("does the increment that first builds one of its commands carry the command reference's generator and "
             "its currency check, and does every later increment that adds or changes one of its commands carry "
             "\"the reference regenerated and committed\" as a criterion, whatever the part's traits") in lens, lens
+    # The sentence on a round's added lenses is read from the same section (stage B4's review, round 4).
     assert ("the lenses the parts' conditional workflows add at `planning.critic-lenses`; apply each as one of your "
-            "own, at the grade it states") in pc
+            "own, at the grade it states") in flat(plan_review)
 
 
 def test_r035_a_plan_critique_carries_the_traits_lenses_and_a_trait_added_at_the_gate_is_asked_and_written():
