@@ -160,7 +160,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("run-parameters.md", "Extension points"): (683, "5ef8d017187dfd16f8fa971a8e7ef3551136b497387f14e9477562f84331976c"),
     ("run-parameters.md", "What must survive a compaction"): (821, "d67698de27c0e6d55d3d347079911111df122fb0b3cb667fcb937b4ff1f55979"),
     ("run-parameters.md", "Writing the answers down"): (779, "ed3fe29e9fe1c96fa0348e57540a525572f2a646250b2adae046fc231b17b731"),
-    ("traits/ai-models.md", "Add at configuration.items"): (1282, "0a238fe02c348dec8556d3c68bf79416f242720eb93d08dcdc6c38663e4bdbe2"),
+    ("traits/ai-models.md", "Add at configuration.items"): (1466, "86d5bd17d836b7eac0a9ff0483fdd07fd9c5212436dd691238d730ad185f1352"),
     ("traits/ai-models.md", "Add at delegation-loop.test-checks"): (1135, "3fc214c80f94e1b98fe1d8ab961d74f1e9fb191942dafc8f02bbb76672e76b53"),
     ("traits/ai-models.md", "Add at design.sections"): (325, "2f905de7f6e5d8b7f7c01c9f93afaeec794d9c20482ed2177211ac032b4f73da"),
     ("traits/ai-models.md", "Add at intake.questions"): (529, "20e891d7b9c1e96dd4f1c2951030ed089834e66ee50ab9548bac19c69092020a"),

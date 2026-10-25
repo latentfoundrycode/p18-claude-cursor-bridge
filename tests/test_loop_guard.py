@@ -363,5 +363,6 @@ def test_bug021_the_clock_change_edges_of_cron_next(lg):
     start = utc("2026-11-02T10:00:30")
     assert lg.cron_next("0 10 10 11 *", start, tz=timezone.utc) == utc("2026-11-10T10:00:00")  # the last minute searched
     assert lg.cron_next("1 10 10 11 *", start, tz=timezone.utc) is None                          # one minute past it
+    assert lg.cron_next("30 2 30 2 *", NOW) is None, "the precondition: no time is found for 30 February"
     pending, unscheduled = lg.pending_from_hook({"background_tasks": [], "session_crons": [{"id": "c9", "schedule": "30 2 30 2 *"}]}, NOW, ".")
     assert pending == ["scheduled wake-up c9"] and not unscheduled, (pending, unscheduled)
