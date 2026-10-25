@@ -11,6 +11,7 @@ per entry, cells split on `|`, columns found by their header names.
 import os
 import re
 
+from phase_modules import section
 from test_open_list import table as open_list_table
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -122,11 +123,11 @@ def test_r006_every_s6_4_point_is_present_with_its_declaring_module():
         assert phrase.lower() in r["Point"].lower(), key
         assert r["Declared by"] == key.split(".")[0], key
     assert {"Definition of done", "Delivery"} <= {r["Phase"] for r in rows}
-    assert "Three points are added to §6.4's list, and one is widened." in TEXT
-    assert "Two of the added points are at intake, because §6.5 names their kinds as values a type workflow or sub-workflow sets and the core settles both at intake, before design and planning act on them" in TEXT
-    assert "The third, `planning.acceptance-criteria`, holds the acceptance criteria an increment carries beside its functional ones" in TEXT
-    assert "The widened one is `planning.stages`: §6.4's mandatory stages, and mandatory increments too" in TEXT
-    assert "`project-end.delivery` holds the procedure for the kind set there" in TEXT
+    assert "Three points are added to §6.4's list, and one is widened." in section(TEXT, "Extension points", 2)
+    assert "Two of the added points are at intake, because §6.5 names their kinds as values a type workflow or sub-workflow sets and the core settles both at intake, before design and planning act on them" in section(TEXT, "Extension points", 2)
+    assert "The third, `planning.acceptance-criteria`, holds the acceptance criteria an increment carries beside its functional ones" in section(TEXT, "Extension points", 2)
+    assert "The widened one is `planning.stages`: §6.4's mandatory stages, and mandatory increments too" in section(TEXT, "Extension points", 2)
+    assert "`project-end.delivery` holds the procedure for the kind set there" in section(TEXT, "Extension points", 2)
 
 
 def test_r006_every_point_is_well_formed_and_names_a_listed_module():

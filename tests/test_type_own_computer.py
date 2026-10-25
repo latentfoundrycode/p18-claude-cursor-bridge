@@ -87,7 +87,8 @@ def test_r024_local_service_adds_the_contract_design_and_for_commands_the_comman
     assert "TDP" not in text("local-service") and "TDP" not in text("own-computer")
     for name in ("contract-design.md", "command-design.md"):
         assert os.path.isfile(os.path.join(PHASES, "interface", name)), name
-    line = [l for l in read(REGISTRY).split("\n") if l.startswith("| interface.variants |")]
+    line = [l for l in section(read(REGISTRY), "Extension points", 2).split("\n")
+            if l.startswith("| interface.variants |")]
     assert len(line) == 1 and line[0].rstrip().endswith("| interface | add | part |"), line
     assert "Every variant is an addition, never a replacement of another" in flat(
         section(read(os.path.join(PHASES, "interface.md")), "The variants", 3))

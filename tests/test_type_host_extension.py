@@ -37,7 +37,7 @@ def body(key, heading):
 
 
 def registry_row(point):
-    got = [l for l in read(REGISTRY).split("\n") if l.startswith("| %s |" % point)]
+    got = [l for l in section(read(REGISTRY), "Extension points", 2).split("\n") if l.startswith("| %s |" % point)]
     assert len(got) == 1, (point, got)
     return [c.strip() for c in got[0].strip().strip("|").split("|")]
 
