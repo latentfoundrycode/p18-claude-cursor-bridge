@@ -1,14 +1,24 @@
 # Bridge token-free Semgrep rules — the OSS-engine SAST supplement.
 #
-# The community packs (p/default, p/secrets, p/owasp-top-ten) do NOT catch string-concatenation
-# SQL injection — that lives in Semgrep Pro's taint engine (S10 finding, 2026-09-09). This file
-# closes that specific class WITHOUT a token, so the local/token-free floor is not blind to the
-# top web-vuln class. cursor-configurator writes it into each project at .semgrep/bridge-rules.yml
-# and adds `--config .semgrep/bridge-rules.yml` to the gate command alongside the packs.
+# What the community packs (p/default, p/secrets, p/owasp-top-ten) still miss: a value
+# concatenated into an SQL string at a JavaScript/TypeScript driver call (`db.query("..." + x)`;
+# S10 finding, 2026-09-09, rechecked with Semgrep 1.176.1 on 2026-10-13). The Python case
+# `cur.execute("..." + x)` is flagged by the packs as of that check (sqlalchemy-execute-raw-query,
+# formatted-sql-query); the Python rule below stays as a token-free floor for it, and adds
+# `executemany`. cursor-configurator writes this file into each project at
+# .semgrep/bridge-rules.yml and adds `--config .semgrep/bridge-rules.yml` to the gate command
+# alongside the packs.
 #
-# HEURISTIC, NOT TAINT: these are shape-matchers. They catch a literal SQL string concatenated
-# with a value at a common DB sink, but input laundered through a helper variable or across
-# functions before the sink still slips past — that needs the Pro engine (see §5c "CI / Pro").
+# HEURISTIC, NOT TAINT: these are shape-matchers. What they catch: a string literal and any other
+# expression joined by `+` (`"..." + x`; also `x + "..."` at the SQL-only names query, execute and
+# prepare, since `axios.get(base + "/items")` and `Promise.all(...)` would match the generic ones),
+# anywhere inside the argument list of a sink call named below (JS: query, execute, prepare, run, get, all, exec;
+# Python: execute and executemany, also `"..." % x` and an f-string with a placeholder at
+# execute). A concatenation of two literals only, as the whole first argument, is not flagged.
+# What they do NOT catch: a query string built into a variable or by a helper before the sink
+# call, a template literal, `.format()`, `.join()`, a sink of another name, or input that crosses
+# functions; that needs the Pro engine (see §5c "CI / Pro"). Two literals joined inside another
+# call in the argument (`db.all(fmt("a" + "b"))`) are flagged; join them into one literal.
 # VALIDATE PER PROJECT before relying on it: confirm the rule flags a planted concat-SQLi probe
 # AND produces zero false positives on the app's real (parameterised) queries; extend/adjust the
 # sink list to the project's DB library if needed.
@@ -29,14 +39,18 @@ rules:
     patterns:
       - pattern-either:
           - pattern: $DB.query(<... "..." + $X ...>, ...)
+          - pattern: $DB.query(<... $X + "..." ...>, ...)
           - pattern: $DB.execute(<... "..." + $X ...>, ...)
+          - pattern: $DB.execute(<... $X + "..." ...>, ...)
           - pattern: $DB.prepare(<... "..." + $X ...>, ...)
+          - pattern: $DB.prepare(<... $X + "..." ...>, ...)
           - pattern: $DB.run(<... "..." + $X ...>, ...)
           - pattern: $DB.get(<... "..." + $X ...>, ...)
           - pattern: $DB.all(<... "..." + $X ...>, ...)
           - pattern: $DB.exec(<... "..." + $X ...>, ...)
-      # Do not flag pure literal-to-literal concatenation (no untrusted value in play).
-      - pattern-not: $DB.$M(<... "..." + "..." ...>, ...)
+      # Do not flag a concatenation of two literals only, as the whole first argument (no value
+      # in play). Not a deep match: `"SELECT " + "* FROM t WHERE id=" + x` holds one and is flagged.
+      - pattern-not: $DB.$M("..." + "...", ...)
 
   - id: bridge-sql-string-concat-py
     languages: [python]
@@ -53,7 +67,11 @@ rules:
     patterns:
       - pattern-either:
           - pattern: $CUR.execute(<... "..." + $X ...>, ...)
+          - pattern: $CUR.execute(<... $X + "..." ...>, ...)
           - pattern: $CUR.executemany(<... "..." + $X ...>, ...)
+          - pattern: $CUR.executemany(<... $X + "..." ...>, ...)
           - pattern: $CUR.execute(<... "..." % $X ...>, ...)
           - pattern: $CUR.execute(f"...{$X}...", ...)
-      - pattern-not: $CUR.execute(<... "..." + "..." ...>, ...)
+      # As the JavaScript rule: two literals only, as the whole first argument, at either sink.
+      - pattern-not: $CUR.execute("..." + "...", ...)
+      - pattern-not: $CUR.executemany("..." + "...", ...)

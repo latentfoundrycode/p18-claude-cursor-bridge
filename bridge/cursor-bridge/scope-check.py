@@ -17,14 +17,21 @@ Usage:
 
     --base   commit to diff against. Default: the commit that FIRST added the brief (the
              checkpoint commits the brief; a brief fixed and committed later never moves the
-             base past the builder's commits); HEAD when the brief is not committed.
+             base past the builder's commits); HEAD when the brief is not committed. For a
+             re-delegation, give the commit that committed THAT round's brief, so the
+             supervisor's commits between rounds are not measured (FB-014). A --base without a
+             value, or one that names no commit, cannot be verified (exit 2).
 
 Output lines: BASE (with how it was chosen), SCOPE, NOT READ AS A PATH (a Scope bullet that
 names no path, reported and ignored), CHANGED, BOOKKEEPING (the files a builder must write),
 RECORDS (the supervisor's record files changed only by commits that touched records alone
 since the checkpoint: not drift; a commit that mixes code with a record is the builder's),
-IN SCOPE, SCOPE DRIFT, VERDICT. The Scope is the brief's top-level bullets up to the first
-line that is neither a bullet nor blank (a bold note, prose): sub-bullets are not paths.
+SUPERVISOR TESTS (test files changed only by the supervisor's commits: a commit of records and
+test files alone whose subject starts with `supervisor:`, rule N4; such a commit's records are
+the supervisor's too. The subject is a convention the supervisor writes, not proof: every
+commit carries the owner's identity), IN SCOPE, SCOPE DRIFT, VERDICT. The Scope is the
+brief's top-level bullets up to the first line that is neither a bullet nor blank (a bold
+note, prose): sub-bullets are not paths.
 
 Exit codes:
     0  every changed file is inside the declared Scope
@@ -41,6 +48,7 @@ anything under run/, its report file handoff/<brief>-rN-report.md) are never dri
 """
 
 import fnmatch
+import os
 import re
 import subprocess
 import sys
@@ -137,7 +145,17 @@ def parse_scope(brief_path):
 
 
 RECORDS = ("docs/BUILD_PLAN", "docs/INVENTORY.md", "docs/CHANGES.md", "docs/REQUIREMENTS.md", "docs/PROJECT_STATUS.md",
-           "docs/RUN_PARAMETERS.md", "docs/DESIGN.md", "docs/diagrams/", "handoff/")
+           "docs/RUN_PARAMETERS.md", "docs/DESIGN.md", "docs/diagrams/", "handoff/",
+           "docs/DESIGN_CRITIQUE.md", "docs/HARDENING.md", "project.json")           # FB-009: the supervisor writes these too
+TEST_DIRS = ("tests", "test", "__tests__", "spec")
+TEST_NAME_RX = re.compile(r"^(test_.+\.py|.+_test\.(py|go)|.+\.(test|spec)\.[A-Za-z]+|conftest\.py)$")
+SUPERVISOR_SUBJECT = "supervisor:"
+
+
+def is_test(path):
+    """A test file: under a tests folder, or named as one (test_x.py, x_test.py, x.test.ts, x.spec.js)."""
+    parts = path.split("/")
+    return any(p in TEST_DIRS for p in parts[:-1]) or bool(TEST_NAME_RX.match(parts[-1]))
 
 
 def checkpoint_of(brief):
@@ -157,10 +175,12 @@ def is_record(path):
 
 
 def supervisors_own(path, base, uncommitted):
-    """A records file changed, since the checkpoint, only by commits that touched records and
-    bookkeeping alone (the supervisor's record keeping) and not in the working tree. A commit that
-    mixes code with a record is the builder's, and its record edit is drift. Authorship cannot tell
-    the two apart: every commit on the computer carries the owner's git identity (second pass, N1)."""
+    """A records or test file changed, since the checkpoint, only by the supervisor's commits and
+    not in the working tree: a commit that touched records and bookkeeping alone (the record
+    keeping), or one of records, bookkeeping and test files alone whose subject starts with
+    `supervisor:` (its tests, rule N4; 2026-10-25 C6). A commit that mixes code with a record is
+    the builder's, and its record edit is drift. Authorship cannot tell the two apart: every commit
+    on the computer carries the owner's git identity (second pass, N1)."""
     if path in uncommitted:
         return False
     shas = _run_git(["log", "--format=%H", base + "..HEAD", "--", path]).split()
@@ -168,9 +188,53 @@ def supervisors_own(path, base, uncommitted):
         return False
     for sha in shas:
         files = [_norm(f) for f in _run_git(["show", "--name-only", "--format=", sha]).splitlines() if f.strip()]
-        if not files or not all(is_record(f) or bookkeeping(f) for f in files):
+        if files and all(is_record(f) or bookkeeping(f) for f in files):
+            continue
+        subject = _run_git(["show", "-s", "--format=%s", sha]).strip()
+        if not files or not subject.lower().startswith(SUPERVISOR_SUBJECT) or not all(is_record(f) or bookkeeping(f) or is_test(f) for f in files):
             return False
+        if any(is_test(f) for f in files) and during_a_builder_run(sha):
+            return False                               # a builder commits in the parallel variant: a test commit made while one ran is not the supervisor's
     return True
+
+
+def builder_windows():
+    """[(start, end)] in epoch seconds of every builder run in the launcher's log (run/launcher/runs.jsonl,
+    read from the current folder, the Workspace), each end with two minutes of slack; None when the log
+    cannot be read, so the `supervisor:` test exemption fails closed (the review of 2026.10.25a)."""
+    import datetime
+    import json
+    try:
+        with open(os.path.join("run", "launcher", "runs.jsonl"), encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    out = []
+    branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"]).strip()
+    for line in lines:
+        try:
+            e = json.loads(line)
+            if not isinstance(e, dict) or e.get("kind") != "builder":
+                continue
+            if e.get("branch") and branch and e.get("branch") != branch:
+                continue                               # another branch's builder (the parallel variant) did not commit here
+            start = datetime.datetime.strptime(str(e.get("id", ""))[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+        except (ValueError, TypeError):
+            continue
+        seconds = e.get("seconds") if isinstance(e.get("seconds"), (int, float)) else e.get("limit") or 7200
+        out.append((start, start + float(seconds) + 120))
+    return out
+
+
+def during_a_builder_run(sha):
+    windows = builder_windows()
+    if windows is None:
+        return True
+    try:
+        when = int(_run_git(["show", "-s", "--format=%ct", sha]).strip())
+    except ValueError:
+        return True
+    return any(a <= when <= b for a, b in windows)
 
 
 def changed_files(base):
@@ -202,13 +266,27 @@ def main(argv):
     if len(argv) < 2:
         print(__doc__)
         sys.exit(2)
-    brief = argv[1]
     base = None
     if "--base" in argv:
         i = argv.index("--base")
-        if i + 1 < len(argv):
-            base = argv[i + 1]
+        if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+            print("CANNOT VERIFY: --base needs a commit (for a re-delegation, the commit that committed the round's brief)")
+            sys.exit(2)
+        base = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+    if len(argv) < 2:
+        print(__doc__)
+        sys.exit(2)
+    brief = argv[1]
     note = ""
+    if base is not None:
+        try:
+            subprocess.run(["git", "rev-parse", "-q", "--verify", base + "^{commit}"], capture_output=True, text=True, check=True,
+                           creationflags=NO_WINDOW)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print("CANNOT VERIFY: --base %s names no commit" % base)
+            sys.exit(2)
+        note = " (given with --base: measured from that commit, not from the brief's first commit)"
     if base is None:
         base, later = checkpoint_of(_norm(brief))
         note = " (the checkpoint: the commit that first added the brief%s)" % ("; the brief was changed in %d later commit(s), the base stays" % later if later else "") if base else ""
@@ -222,8 +300,10 @@ def main(argv):
 
     books = [p for p in changed if bookkeeping(p)]
     changed = [p for p in changed if not bookkeeping(p)]
-    records = [p for p in changed if is_record(p) and not in_scope(p, entries) and base != "HEAD" and supervisors_own(p, base, uncommitted)]
-    changed = [p for p in changed if p not in records]
+    own = [p for p in changed if (is_record(p) or is_test(p)) and not in_scope(p, entries) and base != "HEAD" and supervisors_own(p, base, uncommitted)]
+    records = [p for p in own if is_record(p)]
+    tests = [p for p in own if not is_record(p)]
+    changed = [p for p in changed if p not in own]
     inside = [p for p in changed if in_scope(p, entries)]
     drift = [p for p in changed if not in_scope(p, entries)]
 
@@ -236,7 +316,9 @@ def main(argv):
     if books:
         print("BOOKKEEPING (%d), never drift: %s" % (len(books), ", ".join(books)))
     if records:
-        print("RECORDS (%d), changed only by records-only commits since the checkpoint, not drift: %s" % (len(records), ", ".join(records)))
+        print("RECORDS (%d), changed only by records-only commits or the supervisor's since the checkpoint, not drift: %s" % (len(records), ", ".join(records)))
+    if tests:
+        print("SUPERVISOR TESTS (%d), changed only by `supervisor:` commits of records and tests since the checkpoint, not drift: %s" % (len(tests), ", ".join(tests)))
     print("IN SCOPE (%d): %s" % (len(inside), ", ".join(inside) if inside else "(none)"))
     if drift:
         print("SCOPE DRIFT (%d) - outside the brief's Scope:" % len(drift))

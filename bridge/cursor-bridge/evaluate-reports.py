@@ -19,7 +19,15 @@ owner's typed messages and question-form answers from the session records since 
 (`~/.claude/projects/<key>/*.jsonl`, every folder the project was opened in; only records the app
 marks as the owner's own typing, `origin.kind == human`; a compaction summary, app-inserted text,
 a notification and a message from another session are left out; a record is counted once by its
-uuid; a message with a screenshot keeps its text).
+uuid; a message with a screenshot keeps its text; times are UTC, as the records hold them). The
+projects are reAngle, the TDP, the video factory and, since 2026.10.25a, the bridge's own project
+`Bridge` (E:\\p18-claude-cursor-bridge), whose notes and session records are read from its
+Workspace's folder key only (`E--p18-claude-cursor-bridge-Workspace`): the root's key is the
+maintainer's own and never a report source. Also read: the one `Open issues:` line of each
+project's status file (Workspace/docs/PROJECT_STATUS.md), for the incidents it names as still to
+write (2026.10.25a, C8 of 2026-10-18): a part of the line that says "to write" and names no ISS
+entry the Issues document holds is shown as TO WRITE, so an incident not yet written is not missed
+for a week; nothing else of the status file is read.
 
 Entries (12.2), in the documents' own shapes: an Issues entry is each `## ` section (`## ISS-nnn`,
 `## Issue n`, or a plain heading); a Feedback entry is any section whose heading carries `FB-nnn`
@@ -27,7 +35,9 @@ Entries (12.2), in the documents' own shapes: an Issues entry is each `## ` sect
 a stage heading (reAngle's form), and the body a `## ` section holds before its first `### ` (the
 TDP's form). An entry's ID is the project's own (`ISS-nnn`, `FB-nnn`, `ISSUE-n`, `FEEDBACK-n`);
 an entry without one is identified by a fingerprint of its first body lines (so a renamed heading
-does not make it new), with the heading kept as its label. `collect` prints, per document, how
+does not make it new), with the heading kept as its label. A recurrence heading under an ID the
+document already holds (`### FB-001 (recurred 2026-10-18)`) is part of that entry, read as its
+update, never a second entry under the same key (2026.10.25a). `collect` prints, per document, how
 many entries it found and how many lines lie outside any entry, so a silent loss is visible. The
 ledger (`Reports/ledger.json`) keeps, per project and ID, the date evaluated, the fingerprint of
 the entry's text and the outcome: fixed in release X, pitfall KP-nnn, planned in section Y,
@@ -35,8 +45,11 @@ declined with the reason, or project-specific.
 
 `collect` writes `Reports/Evaluations/<date>/unprocessed.md`: every entry absent from the ledger
 (unprocessed) or whose text no longer matches its fingerprint (updated, with the earlier outcome
-shown beside it); a run with nothing new prints one line and writes no evaluation file (the
-ledger keeps the run's date). `record` writes a
+shown beside it); an entry whose verdict was recorded with `--force` before the project wrote it
+(no fingerprint) is shown on its first appearance as WRITTEN with the forced verdict beside it,
+and its fingerprint is taken then, so a later change surfaces as UPDATED (2026.10.25a: four
+entries written after a forced verdict were never shown); a run with nothing new prints one line
+and writes no evaluation file (the ledger keeps the run's date). `record` writes a
 verdict. `seed` enters the first evaluation's tables (`Reports/Evaluations/2026-10-04/<Project>.md`,
 one file per project, matched to that project only) as outcomes, so that the first scheduled run
 raises nothing already handled.
@@ -57,7 +70,13 @@ PROJECTS = {
     "reAngle": r"E:\ck04k02s01-reangle-prototype",
     "TDP": r"E:\p19-technical-documentation-provider",
     "Video Factory": r"E:\pk02k02s02-short-form-video-factory",
+    "Bridge": r"E:\p18-claude-cursor-bridge",                   # the bridge's own project (2026.10.25a, C1)
 }
+# A project whose root's own folder key is the maintainer's session (the bridge's root): only its
+# Workspace's key is a report source, for the notes and the session records alike.
+WORKSPACE_KEY_ONLY = ("Bridge",)
+STATUS_TO_WRITE_RX = re.compile(r"\bto (?:be )?write\b|\bto be written\b|\bnot yet written\b", re.I)
+ISS_ID_RX = re.compile(r"\bISS-\d{3,}[a-z]?\b", re.I)
 ISSUES_SUFFIX = "Issues During Development and Their Solutions.md"
 FEEDBACK_SUFFIX = "Claude-Cursor Bridge Feedback.md"
 ISSUE_HEAD_RX = re.compile(r"^##\s+(?:(ISS-\d{3,}[a-z]?)|Issue\s+(\d+))\b", re.I)
@@ -102,6 +121,17 @@ def body_id(prefix, body, heading):
 def project_key(root):
     """Claude Code's folder name for a project path: the path with every separator and colon as a dash."""
     return re.sub(r"[:\\/]", "-", root)
+
+
+def project_keys(project, root):
+    """The folder keys under ~/.claude/projects that are this project's: the root's and the
+    Workspace's; the Workspace's only for the bridge's own project, whose root key is the
+    maintainer's (2026.10.25a; by name, or by the bridge's root under any name)."""
+    keys = [project_key(root), project_key(os.path.join(root, "Workspace"))]
+    bridge = os.path.normcase(os.path.abspath(PROJECTS["Bridge"]))
+    if project in WORKSPACE_KEY_ONLY or os.path.normcase(os.path.abspath(root)) == bridge:
+        keys = keys[1:]
+    return keys
 
 
 def project_of_file(name, projects):
@@ -155,6 +185,21 @@ def issues_entries(text):
         label = heading[3:].strip()
         eid = (m.group(1).upper() if m and m.group(1) else ("ISSUE-%s" % m.group(2) if m else body_id("issues", body, label)))
         out.append((eid, label, body, 1 + body.count("\n")))
+    return merge_recurrences(out)
+
+
+def merge_recurrences(entries):
+    """One entry per ID: a later section under an ID already found (`### FB-001 (recurred
+    2026-10-18)`) is appended to the first, heading and body, so it reads as that entry's update
+    and never as a second entry under the same key (2026.10.25a, C1)."""
+    out, at = [], {}
+    for eid, label, body, lines in entries:
+        if eid in at:
+            first = out[at[eid]]
+            out[at[eid]] = (eid, first[1], first[2] + "\n" + label + "\n" + body, first[3] + lines)
+            continue
+        at[eid] = len(out)
+        out.append((eid, label, body, lines))
     return out
 
 
@@ -204,7 +249,7 @@ def feedback_entries(text):
         out.append((body_id("feedback", body, label), label, body, 1 + body.count("\n")))
         for k in range(start, start + 1 + body.count("\n")):
             taken.add(k)
-    return out
+    return merge_recurrences(out)
 
 
 def stage_of(lines, index):
@@ -221,10 +266,53 @@ def outside(text, entries):
     return max(0, total - inside)
 
 
-def notes_entries(project_root, home=None):
+def status_segments(value):
+    """The parts of an `Open issues:` value: split at `;` and at a sentence's end, outside brackets and quotes."""
+    parts, depth, quote, cur = [], 0, False, ""
+    for i, ch in enumerate(value):
+        if ch == '"':
+            quote = not quote
+        elif not quote and ch in "([":
+            depth += 1
+        elif not quote and ch in ")]":
+            depth = max(0, depth - 1)
+        if depth == 0 and not quote and (ch == ";" or (ch == "." and value[i + 1:i + 2] in (" ", ""))):
+            parts.append(cur.strip())
+            cur = ""
+            continue
+        cur += ch
+    parts.append(cur.strip())
+    return [p for p in parts if p]
+
+
+def status_entries(project_root, written):
+    """[(id, label, body, lines)] of the incidents the status file's `Open issues:` line names as
+    still to write (2026.10.25a, C8 of 2026-10-18), less those the Issues document already holds
+    (`written`, a set of IDs). Only that one line of the status file is read."""
+    path = os.path.join(project_root, "Workspace", "docs", "PROJECT_STATUS.md")
+    try:
+        text = read(path)
+    except OSError:
+        return []
+    m = re.search(r"^\s*(?:[-*]\s+)?[*_`]*Open issues[*_`]*\s*:[*_`]*\s*(.*)$", text, re.M | re.I)
+    if not m:
+        return []
+    out = []
+    for seg in status_segments(m.group(1)):
+        if not STATUS_TO_WRITE_RX.search(seg):
+            continue
+        ids = [x.upper() for x in ISS_ID_RX.findall(seg)]
+        if ids and all(x in written for x in ids):
+            continue                                   # written since: the Issues entry is the source now
+        eid = "status:%s" % ids[0] if ids else body_id("status", seg, seg)
+        out.append((eid, "Open issues: " + seg[:120], seg + "\n", 1))
+    return out
+
+
+def notes_entries(project_root, home=None, project=None):
     """[(id, label, body, lines)] of the supervisor's private notes, keyed by file name."""
     out = []
-    for key in (project_key(project_root), project_key(os.path.join(project_root, "Workspace"))):
+    for key in project_keys(project, project_root):
         folder = os.path.join(home or HOME, ".claude", "projects", key, "memory")
         if not os.path.isdir(folder):
             continue
@@ -250,7 +338,13 @@ def collect_entries(projects=None, home=None, report=None):
                 rows.append((source, eid, label, body))
             if report is not None:
                 report.append("%s %s: %d entries, %d line(s) outside any entry" % (project, source, len(entries), outside(text, entries)))
-        for eid, label, body, _ in notes_entries(root, home):
+        written = set(eid for source, eid, _, _ in rows if source == "issues")
+        to_write = status_entries(root, written)
+        for eid, label, body, _ in to_write:
+            rows.append(("status", eid, label, body))
+        if report is not None and to_write:
+            report.append("%s status: %d incident(s) named on the Open issues: line as still to write" % (project, len(to_write)))
+        for eid, label, body, _ in notes_entries(root, home, project):
             rows.append(("note", eid, label, body))
         found[project] = rows
     return found
@@ -291,9 +385,20 @@ def unprocessed(entries, ledger):
             fp = fingerprint(body)
             if rec is None:
                 out.append((project, source, eid, label, body, None))
+            elif not rec.get("fingerprint") and source != "status":
+                out.append((project, source, eid, label, body, rec))   # forced before it was written: shown once, as WRITTEN
             elif rec.get("fingerprint") and rec.get("fingerprint") != fp:
                 out.append((project, source, eid, label, body, rec))
     return out
+
+
+def row_tag(source, earlier):
+    """NEW, TO WRITE (a status-line incident), WRITTEN (its verdict forced before the entry existed) or UPDATED."""
+    if earlier is None:
+        return "TO WRITE (named on the status file's Open issues: line; not yet written as an ISS entry)" if source == "status" else "NEW"
+    if not earlier.get("fingerprint"):
+        return "WRITTEN (forced verdict: %s %s)" % (earlier.get("outcome"), earlier.get("reason") or "")
+    return "UPDATED (earlier: %s %s)" % (earlier.get("outcome"), earlier.get("reason") or "")
 
 
 def redact(text):
@@ -313,7 +418,10 @@ def cmd_collect(a):
     entries = collect_entries(projects_from(a), a.home, report)
     for line in report:
         print("evaluate-reports: " + line)
-    rows = unprocessed(entries, ledger)
+    rows = [r + (row_tag(r[1], r[5]),) for r in unprocessed(entries, ledger)]
+    for project, source, eid, label, body, earlier, tag in rows:
+        if tag.startswith("WRITTEN"):                                       # its fingerprint is taken now: a later change is an update
+            earlier.update({"fingerprint": fingerprint(body), "written": today()})
     ledger.setdefault("_meta", {})["last_collect"] = today()                  # never drops last_extract (third pass, finding 1)
     save_ledger(ledger_path, ledger)
     if not rows:
@@ -326,14 +434,15 @@ def cmd_collect(a):
     with open(path, "w", encoding="utf-8") as f:
         f.write("# Unprocessed and updated entries, %s\n\n" % today())
         f.write("%d entries. Each needs one verdict: fixed <release> | pitfall KP-nnn | planned <section> | declined <reason> | project-specific. Record with `evaluate-reports.py record <project> <id> <outcome> --reason <text>`.\n\n" % len(rows))
-        for project, source, eid, label, body, earlier in rows:
-            tag = "UPDATED (earlier: %s %s)" % (earlier.get("outcome"), earlier.get("reason") or "") if earlier else "NEW"
+        for project, source, eid, label, body, earlier, tag in rows:
             shown = redact(body.strip())
             if len(shown) > 6000:
                 shown = shown[:6000] + "\n\n[cut at 6,000 characters; the document holds the rest]"
             f.write("## %s / %s / %s - %s\n\n%s\n\n%s\n\n" % (project, source, eid, tag, label, shown))
-    print("evaluate-reports: %d entries to evaluate (%d new, %d updated) -> %s" % (
-        len(rows), sum(1 for r in rows if r[5] is None), sum(1 for r in rows if r[5] is not None), path))
+    counts = dict((k, sum(1 for r in rows if r[6].startswith(k))) for k in ("NEW", "UPDATED", "WRITTEN", "TO WRITE"))
+    more = "".join(", %d %s" % (counts[k], w) for k, w in (("WRITTEN", "written after a forced verdict"), ("TO WRITE", "to write")) if counts[k])
+    print("evaluate-reports: %d entries to evaluate (%d new, %d updated%s) -> %s" % (
+        len(rows), counts["NEW"], counts["UPDATED"], more, path))
     return 0
 
 
@@ -437,9 +546,9 @@ def cmd_seed(a):
 
 
 # ---------------------------------------------------------------- the owner's messages
-def session_files(project_root, home=None):
+def session_files(project_root, home=None, project=None):
     out = []
-    for key in (project_key(project_root), project_key(os.path.join(project_root, "Workspace"))):
+    for key in project_keys(project, project_root):
         out += glob.glob(os.path.join(home or HOME, ".claude", "projects", key, "*.jsonl"))
     return sorted(set(out))
 
@@ -526,14 +635,14 @@ def cmd_extract(a):
     total = 0
     for project, proot in (projects_from(a) or PROJECTS).items():
         rows, seen = [], set()
-        for path in session_files(proot, a.home):
+        for path in session_files(proot, a.home, project):
             rows += owner_messages(path, since, seen)
         rows.sort()
         if not rows:
             continue
         total += len(rows)
         with open(os.path.join(out_dir, "owner-messages-%s.md" % project.replace(" ", "-")), "w", encoding="utf-8") as f:
-            f.write("# The owner's messages and answers, %s, since %s\n\nFilters: only records the app marks as the owner's own typing and the question-form answers; compaction summaries, app-inserted text, notifications and other sessions' messages left out; each record once; every session folder the project was opened in; key values and key-shaped tokens withheld.\n\n" % (project, since))
+            f.write("# The owner's messages and answers, %s, since %s\n\nTimes are UTC (the session records' own timestamps).\n\nFilters: only records the app marks as the owner's own typing and the question-form answers; compaction summaries, app-inserted text, notifications and other sessions' messages left out; each record once; every session folder the project was opened in; key values and key-shaped tokens withheld.\n\n" % (project, since))
             for ts, kind, text in rows:
                 f.write("- %s [%s] %s\n" % (ts[:16].replace("T", " "), kind, redact(text).replace("\n", " / ")[:1200]))
     ledger = load_ledger(ledger_path)
@@ -549,7 +658,7 @@ def main():
     for name in ("collect", "record", "seed", "extract"):
         p = sub.add_parser(name)
         p.add_argument("--ledger")
-        p.add_argument("--project-root", help="one project root instead of the three (tests)")
+        p.add_argument("--project-root", help="one project root instead of the project list (tests, a hand collect)")
         p.add_argument("--project-name")
         p.add_argument("--home", help="the folder holding .claude/projects (tests)")
         if name in ("collect", "extract"):
