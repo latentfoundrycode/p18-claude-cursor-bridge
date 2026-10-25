@@ -9,7 +9,6 @@ benchmark lens while the design-side lens stays in plan-critic.md).
 
 The pre-move text is held as constants below, taken from the modules and the plan critic as they stood at the
 increment's checkpoint, never read from git history. Supervisor-written; no builder run."""
-import importlib.util
 import os
 import re
 import subprocess
@@ -17,24 +16,9 @@ import sys
 
 import pytest
 
-from phase_modules import BRIDGE, read, module, headings, section
-
-WORKFLOW = os.path.join(BRIDGE, "cursor-bridge", "workflow")
-TRAITS = os.path.join(WORKFLOW, "traits")
-CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
-PLAN_CRITIC = os.path.join(BRIDGE, "agents", "plan-critic.md")
-EXCEPTIONS = os.path.join(WORKFLOW, "trace-exceptions.md")
-OPEN_LIST = os.path.join(WORKFLOW, "open-list.md")
-TRACE_CHECK = os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")
-WORKFLOW_CHECK = os.path.join(BRIDGE, "cursor-bridge", "workflow-check.py")
-TRAIT_PREFIX = "bridge/cursor-bridge/workflow/traits/"
-
-
-def trace_check():
-    spec = importlib.util.spec_from_file_location("trace_check_traits_existing", TRACE_CHECK)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+from phase_modules import read, module, headings, section
+from workflow_files import (CORE, EXCEPTIONS, OPEN_LIST, PLAN_CRITIC, TRAIT_PREFIX, TRAITS, WORKFLOW, WORKFLOW_CHECK,
+                            flat, trace_check)
 
 
 def trait(key):
@@ -44,10 +28,6 @@ def trait(key):
 def units(text):
     """The units trace-check.py reads (a paragraph, a list item, a table, a fence), each (normal form, chain)."""
     return [(u["normal"], [t for _l, t in u["chain"]]) for u in trace_check().parse_units(text)[0]]
-
-
-def flat(text):
-    return re.sub(r"\s+", " ", text).strip()
 
 
 def entries(kind=None):

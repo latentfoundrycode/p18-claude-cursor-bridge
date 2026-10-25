@@ -10,26 +10,12 @@ type's and a sub-type's default traits). Supervisor-written; no builder run."""
 import importlib.util
 import os
 import re
-import subprocess
-import sys
 
 import pytest
 
-from phase_modules import BRIDGE, read, section
-
-REPO = os.path.dirname(BRIDGE)
-
-WORKFLOW = os.path.join(BRIDGE, "cursor-bridge", "workflow")
-TYPES = os.path.join(WORKFLOW, "types")
-TRAITS = os.path.join(WORKFLOW, "traits")
-PHASES = os.path.join(WORKFLOW, "phases")
-CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
-EXCEPTIONS = os.path.join(WORKFLOW, "trace-exceptions.md")
-OPEN_LIST = os.path.join(WORKFLOW, "open-list.md")
-REGISTRY = os.path.join(WORKFLOW, "extension-points.md")
-TRACE_CHECK = os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")
-WORKFLOW_CHECK = os.path.join(BRIDGE, "cursor-bridge", "workflow-check.py")
-FIXTURES = os.path.join(REPO, "tests", "fixtures", "workflows")
+from phase_modules import read, section
+from workflow_files import (CORE, PHASES, REGISTRY, TRAITS, TYPES, WORKFLOW, FIXTURES, BRIDGE, REPO, WORKFLOW_CHECK,
+                            file_entries, flat, row, run_check, trace_units)
 
 DELIVERY = "Add at project-end.delivery for host-installation"
 # Each file's path under workflow/types/, its title and its change headings, in its order (BUILD_PLAN TASK-021).
@@ -46,41 +32,14 @@ def text(key):
     return read(os.path.join(TYPES, FILES[key][0]))
 
 
-def flat(t):
-    return re.sub(r"\s+", " ", t).strip()
-
-
 def body(key, heading):
     return section(text(key), heading, 2)
-
-
-def trace_units(t):
-    spec = importlib.util.spec_from_file_location("trace_check_type_host_extension", TRACE_CHECK)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return [u["normal"] for u in mod.parse_units(t)[0]]
-
-
-def row(table_heading, key):
-    """The open list's row `key` in the table under `table_heading`, as a dict of its columns."""
-    lines = [l for l in section(read(OPEN_LIST), table_heading, 2).split("\n") if l.startswith("|")]
-    header = [c.strip() for c in lines[0].strip("|").split("|")]
-    for l in lines[2:]:
-        cells = [c.strip() for c in l.strip("|").split("|")]
-        if cells[0] == key:
-            return dict(zip(header, cells))
-    raise AssertionError(key)
 
 
 def registry_row(point):
     got = [l for l in read(REGISTRY).split("\n") if l.startswith("| %s |" % point)]
     assert len(got) == 1, (point, got)
     return [c.strip() for c in got[0].strip().strip("|").split("|")]
-
-
-def run_check(*args):
-    return subprocess.run([sys.executable, WORKFLOW_CHECK] + list(args), capture_output=True, text=True,
-                          encoding="utf-8")
 
 
 @pytest.mark.parametrize("key", sorted(FILES))
@@ -216,11 +175,7 @@ def test_r025_every_section_has_its_own_new_entry_and_no_other_entry_names_the_f
     """BUILD_PLAN TASK-021: every section of the two files is new text under a `new` entry naming the file and that
     heading (the trace check counts the type files as modules); no `reword` entry, and none on the title."""
     rel = "bridge/cursor-bridge/workflow/types/" + FILES[key][0]
-    got = []
-    for line in read(EXCEPTIONS).split("\n"):
-        m = re.match(r"^- (new|reword) (\S+) (\S+\.md) (.+)$", line)
-        if m and m.group(3) == rel:
-            got.append((m.group(1), m.group(2), m.group(4).strip()))
+    got = file_entries(rel)
     assert got == [("new", "TASK-021", h) for h in FILES[key][2]], got
 
 
