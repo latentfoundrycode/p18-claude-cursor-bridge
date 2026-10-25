@@ -285,6 +285,23 @@ def test_r019_the_two_checks_exist_only_in_external_services():
     assert "is bounded" in brief and "the limit zero for a call that must not run twice" in brief
     layout = flat(section(text, add_heading("delegation-loop.test-checks"), 2))
     assert "the deployed layout is tested before any deployment" in layout and "deploys the part or prepares" in layout
+    # each section held whole, its grades included (stage B4's review, round 7).
+    assert inspect == (
+        "Every wait on a remote service in the diff is bounded: `diff-reviewer` checks, as it reads the diff, "
+        "that a call to a service run by others carries a timeout and, where it retries, a bounded retry, and "
+        "that a call which must not run twice (a paid call, a call that changes something at the service) is "
+        "not retried; a wait with no bound is a blocking finding, re-delegated like any defect (step 7)."), inspect
+    # the brief's section.
+    assert brief == (
+        "Every remote wait the increment adds is bounded: the brief names the timeout and the retry limit of "
+        "each call to a service run by others, the limit zero for a call that must not run twice, and the "
+        "builder adds none without them."), brief
+    # the test step's section.
+    assert layout == (
+        "For an increment that deploys the part or prepares what will be deployed, the deployed layout is "
+        "tested before any deployment: the part runs from the files and the configuration it will be deployed "
+        "with, its configuration read as the deployed part reads it, and a test that passes only in the "
+        "development layout does not count; a failing one is a correctness-class block (step 7)."), layout
     others = [CORE, PLAN_CRITIC]
     for root, _dirs, files in os.walk(WORKFLOW):
         others += [os.path.join(root, f) for f in files if f.endswith(".md") and f != "external-services.md"]
@@ -334,6 +351,14 @@ def test_r016_r019_the_plan_critic_keeps_its_design_lenses_and_catches_a_missing
     assert len(bullet) == 1 and bullet[0].endswith(
         "is a finding that a trait is missing (**Blocking**: the trait's additions never reach the build)."), bullet
     b = flat(bullet[0])  # the pairs are the bullet's own, not the file's (stage B4's review, round 5)
+    # the bullet held whole, each trigger's words between it and its lens included (stage B4's review, round 7).
+    assert b == (
+        "- **A trait missing.** A part whose `Delivery kind:` row is `installer` or `install-script` whose "
+        "plan's critique file carries no packaging lens, a design or intake note naming a service run by "
+        "others (a third-party API, SDK or provider) whose plan's critique file carries no external-service "
+        "lens, a design that shows screens whose plan's critique file carries no design-criteria lens, or a "
+        "design naming a budget whose plan's critique file carries no benchmark-increments lens, is a finding "
+        "that a trait is missing (**Blocking**: the trait's additions never reach the build)."), b
     for trigger, lens in (("A part whose `Delivery kind:` row is `installer` or `install-script`", "no packaging lens"),
                           ("a service run by others (a third-party API, SDK or provider)", "no external-service lens"),
                           ("a design that shows screens", "no design-criteria lens"),
@@ -370,8 +395,8 @@ def test_r017_the_command_reference_reaches_every_approved_command_design():
             "its currency check, and does every later increment that adds or changes one of its commands carry "
             "\"the reference regenerated and committed\" as a criterion, whatever the part's traits") in lens, lens
     # The sentence on a round's added lenses is read from the same section (stage B4's review, round 4).
-    assert ("the lenses the parts' conditional workflows add at `planning.critic-lenses`; apply each as one of your "
-            "own, at the grade it states") in flat(plan_review)
+    assert ("The round's file may carry, beside the lenses below, the lenses the parts' conditional workflows add "
+            "at `planning.critic-lenses`; apply each as one of your own, at the grade it states.") in flat(plan_review)
 
 
 def test_r035_a_plan_critique_carries_the_traits_lenses_and_a_trait_added_at_the_gate_is_asked_and_written():

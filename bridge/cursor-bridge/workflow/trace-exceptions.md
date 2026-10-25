@@ -83,6 +83,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-018 bridge/cursor-bridge/workflow/traits/spends-money.md Add at configuration.items
 - new TASK-018 bridge/cursor-bridge/workflow/traits/spends-money.md Add at delegation-loop.brief-constraints
 - new TASK-018 bridge/cursor-bridge/workflow/traits/spends-money.md Add at delegation-loop.inspect-checks
+- new BUG-027 bridge/cursor-bridge/workflow/traits/spends-money.md Add at delegation-loop.test-checks
 - new TASK-018 bridge/cursor-bridge/workflow/traits/long-running-process.md Add at configuration.items
 - new TASK-018 bridge/cursor-bridge/workflow/traits/long-running-process.md Add at delegation-loop.brief-constraints
 - new TASK-018 bridge/cursor-bridge/workflow/traits/long-running-process.md Add at delegation-loop.test-checks
