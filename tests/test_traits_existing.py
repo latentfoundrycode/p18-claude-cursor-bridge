@@ -339,7 +339,9 @@ def test_r017_the_command_reference_reaches_every_approved_command_design():
     *installable*; the plan critic holds a Blocking lens for it and applies the lenses a round's file adds."""
     plan = flat(section(module("planning"), "What the interface phase hands to the plan", 3))
     assert ("The increment that first builds a command of the approved command design also carries the command "
-            "reference's generator (`docs/cli-reference.json`) and its currency check") in plan
+            "reference's generator (`scripts/dump-cli.py` or the stack's equivalent, which writes "
+            "`docs/cli-reference.json` from the real command tree, `Delivery-Conventions.md` §4) and its currency "
+            "check") in plan
     assert "whatever the part's traits (rule 32)" in plan
     pc = flat(read(PLAN_CRITIC))
     lens = pc[pc.index("**Command reference (an approved command design).**"):]
