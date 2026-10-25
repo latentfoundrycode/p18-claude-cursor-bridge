@@ -106,10 +106,10 @@ def test_r020_spends_money_asks_for_approval_the_worst_case_the_cap_and_the_acco
             "re-recording of that service.") in t, "BUG-021: one escalation never approves a paid call"
     assert "never a silent overrun" in t
     # Review A, round 1: which paid actions the approval covers, and who enforces the cap.
-    assert "The loop's own paid actions (a contract capture, a dry or paid run of an increment, a re-recording" in t
+    assert "The loop's own paid actions (a contract capture, a paid run of an increment, a re-recording" in t
     assert "tracked against the cap by the supervisor" in t
     assert "the design states how the product enforces the cap" in t and "fixed in a test (rule 52)" in t
-    # Review A, round 2: the trait adds no design section, so the intake notes carry both duties to the design.
+    # Review A, round 2, and BUG-022: the trait adds no design section, so the intake notes carry its three duties.
     assert "the intake notes carry its three duties to the design as requirements of it" in t
     assert ("and how a speed budget that includes a paid service's time is measured (its addition at "
             "`delegation-loop.brief-constraints`).") in t
@@ -132,8 +132,8 @@ def test_r020_r019_a_paid_call_is_bounded_by_external_services_and_classified_wi
 
 def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first():
     """R-020 (DESIGN §6.8, §13.1): the store of paid results that is never discarded and where the cap is recorded
-    (configuration); the approval before any paid action in a builder run and the dry run on a copy with a stand-in
-    provider before any paid run (brief); the check that no paid action ran unapproved (inspect)."""
+    (configuration); the approval before any paid action in a builder run and the dry run on the development data
+    with a stand-in provider before any paid run (brief); the check that no paid action ran unapproved (inspect)."""
     conf = add("spends-money", "configuration.items")
     assert "**The store of paid results.**" in conf
     assert "a folder the design names, which no clean, reset, cache purge or test teardown reaches" in conf
@@ -147,12 +147,16 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert ("**dry**: on the development data the inventory's `Development data:` decision names (rule 55; a copy "
             "of live data only with the owner's yes for that run, kept away from the repository and the Workspace, "
             "since it holds the users' data, and deleted whichever way the run ends), with a stand-in provider") in brief
-    assert ("runs against the dry run's stand-in provider, which measures the operation's paid calls for a cost "
-            "budget and the part's own time, never the service's") in brief
+    assert ("A benchmark of an operation that calls a paid service runs against the dry run's stand-in provider, "
+            "which measures the operation's paid calls for a cost budget and the part's own time, never the "
+            "service's") in brief
+    # Stage B4's review, round 3: the part's own time never stands under a service-time budget's name.
+    assert ("The part's own time on the stand-in is always reported under a benchmark name of its own, never under "
+            "the benchmark and metric a budget that includes the service's time names.") in brief
     assert ("a speed budget that includes the service's time is one the floor cannot check on the stand-in, so the "
             "design that names one says how it is measured, any paid run the measuring needs approved as a paid action of its "
-            "own and run by the supervisor, and until the design says so no benchmark of it runs on the stand-in, so "
-            "the floor reports the budget `NOT MEASURED`, a block, never a pass.") in brief
+            "own and run by the supervisor, and until the design says so the floor reports the budget `NOT MEASURED`, "
+            "a block, never a pass, since no benchmark of it runs on the stand-in") in brief
     assert "budgets file" not in brief and "baseline" not in brief, "stage B4's review, round 2: no baseline exception"
     assert ("A benchmark run against the paid service itself is a paid action of its own, approved as one, never "
             "part of the benchmark floor or of CI.") in brief
@@ -167,6 +171,11 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
     assert "does not both read the store first and write its result there" in inspect
     assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
+    # The clause held whole with its grade (BUG-023's confirming read: a separate "is a blocking finding" was
+    # already in the section from the other clauses).
+    assert ("or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
+            "time names (the benchmark results read against the budgets file and the design's statement of which "
+            "budgets include that time), is a blocking finding") in inspect
 
 
 def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
@@ -247,9 +256,14 @@ def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_output
     assert "never on a re-delegation" in test
     # BUG-021 and stage B4's review, round 2: a case kept out of the repository lives in a development-only place,
     # apart from the live data, and the test step runs the whole set, a case not run there blocking.
+    # Stage B4's review, round 3: the scrubbing clause, the security half of the sentence, is held too.
+    assert ("The evaluation set's inputs and the recorded outputs are scrubbed as a contract capture's fixtures are "
+            "(no key, no secret, nothing about a person the owner has not agreed to commit), and the owner, who "
+            "chooses the cases, ") in conf
     assert ("is asked before the first is recorded whether they may be committed; a case that cannot be scrubbed, "
             "or that the owner keeps out, is kept with its outputs, and the verdicts and judged results recorded "
-            "beside them, outside the repository, in a development-only place the Evaluation section names by its "
+            "beside them, outside the repository and the Workspace, since it may hold something about a person, "
+            "in a development-only place the Evaluation section names by its "
             "role, never by a path of a computer (rule 54), apart from the live data and never read by the product "
             "(rule 55), and a run without it (CI) reports that case as not run, never as passed.") in conf
     assert ("The evaluation at this step runs the whole set, the cases kept outside the repository read from their "
