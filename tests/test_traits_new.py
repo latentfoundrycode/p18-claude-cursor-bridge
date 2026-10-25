@@ -110,7 +110,9 @@ def test_r020_spends_money_asks_for_approval_the_worst_case_the_cap_and_the_acco
     assert "tracked against the cap by the supervisor" in t
     assert "the design states how the product enforces the cap" in t and "fixed in a test (rule 52)" in t
     # Review A, round 2: the trait adds no design section, so the intake notes carry both duties to the design.
-    assert "the intake notes carry its two duties to the design as requirements of it" in t
+    assert "the intake notes carry its three duties to the design as requirements of it" in t
+    assert ("and how a speed budget that includes a paid service's time is measured (its addition at "
+            "`delegation-loop.brief-constraints`).") in t
     assert "the folder that holds the store of paid results" in t
 
 
@@ -149,8 +151,8 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
             "budget and the part's own time, never the service's") in brief
     assert ("a speed budget that includes the service's time is one the floor cannot check on the stand-in, so the "
             "design that names one says how it is measured, any paid run the measuring needs approved as a paid action of its "
-            "own and run by the supervisor, and until the design says so the budget is one with no benchmark, which "
-            "the trait *performance budgets*' lens blocks at the plan.") in brief
+            "own and run by the supervisor, and until the design says so no benchmark of it runs on the stand-in, so "
+            "the floor reports the budget `NOT MEASURED`, a block, never a pass.") in brief
     assert "budgets file" not in brief and "baseline" not in brief, "stage B4's review, round 2: no baseline exception"
     assert ("A benchmark run against the paid service itself is a paid action of its own, approved as one, never "
             "part of the benchmark floor or of CI.") in brief
