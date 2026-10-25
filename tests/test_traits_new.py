@@ -136,17 +136,32 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     with a stand-in provider before any paid run (brief); the check that no paid action ran unapproved (inspect)."""
     conf = add("spends-money", "configuration.items")
     assert "**The store of paid results.**" in conf
-    assert "a folder the design names, which no clean, reset, cache purge or test teardown reaches" in conf
+    # Stage B4's review, round 6: the store outside the repository and the Workspace, its requests without keys.
     assert "reads the result already paid for instead of buying it again" in conf
     assert "**The cap** is recorded" in conf and "`Spending cap: " in conf
     # Stage B4's review, round 5: a capture, the dry run and a benchmark buy or count afresh (the passage cut back
     # to a plain rule at BUG-025's confirming read).
-    assert ("A contract capture or a re-recording the owner approved buys its replies afresh: it reads only the "
-            "replies it has bought itself, each written there with the run that bought it in place of the one "
-            "recorded before, so that a resumed run never takes an older reply for a new one. The dry run and a "
-            "benchmark keep their results in a store of their own instead, empty when the run starts and deleted "
-            "when it ends, outside this folder, so that no stand-in's reply reaches it and a benchmark counts every "
-            "paid call a run from cold makes. Every other run reads this store before it buys.") in conf
+    # The section held whole, one `==` (stage B4's review, round 6, and Review A on BUG-026: the cap's sentence and
+    # the store's opening were held by the pin alone). Round 6: the store outside the repository and the
+    # Workspace, its requests without secrets; a live smoke buys afresh; a test run on a stand-in keeps a store of
+    # its own; each repetition starts empty.
+    assert conf == (
+        "**The store of paid results.** Before the first paid action, configure where its results are kept: a "
+        "folder the design names, outside the repository and the Workspace, which no clean, reset, cache purge or "
+        "test teardown reaches, each result kept with the request that bought it, both with every key, token and "
+        "other secret left out as a contract capture's are scrubbed, so that a retry, a rerun or a crash reads the "
+        "result already paid for instead of buying it again. A contract capture, a re-recording or a live smoke "
+        "the owner approved buys its replies afresh: it reads only the replies it has bought itself, each written "
+        "there with the run that bought it in place of the one recorded before, so that a resumed run never takes "
+        "an older reply for a new one. The dry run, a benchmark and a test run on a stand-in provider keep their "
+        "results in a store of their own instead, outside the repository, the Workspace and this folder, empty "
+        "when each run, and each repetition of a benchmark, starts, deleted whichever way it ends, and never "
+        "reading this store, so that no stand-in's reply reaches it and a benchmark counts every paid call a run "
+        "from cold makes. Every other run reads this store before it buys. The store is a Resources row of "
+        "`docs/INVENTORY.md`, named by its role and never by a path of this computer (rule 54). **The cap** is "
+        "recorded where the owner can read it: a Decisions row `Spending cap: <amount> <per month or per run> on "
+        "<platform and account> (<the owner's words>, <date>)`, beside the provider's own spending limit in the "
+        "account's Resources row, which configuration's spending-limits item sets."), conf
     brief = add("spends-money", "delegation-loop.brief-constraints")
     assert "The builder runs no paid action" in brief and "after the owner's approval for it" in brief
     assert "charges nothing" in brief
@@ -176,25 +191,31 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert "Every paid call the part's code makes goes through the store of paid results" in brief
     assert ("Every paid call the part's code makes goes through the store of paid results as its configuration "
             "says: its result written there with the request that bought it, and the store read before a call is "
-            "bought, so a retry never buys twice, a capture, a re-recording, the dry run and a benchmark keeping "
-            "the rule that configuration gives them.") in brief
+            "bought, so a retry never buys twice, a capture, a re-recording, a live smoke, the dry run, a benchmark "
+            "and a test run keeping the rule that configuration gives them, and no result or request kept with a "
+            "secret in it.") in brief
     assert "The first paid run of a contract capture, which has no recorded replies to stand in yet" in brief
     assert "a paid action with no remote service behind it (a purchase)" in brief
     assert "at the smallest size that answers them, under their own approval" in brief
     inspect = add("spends-money", "delegation-loop.inspect-checks")
-    assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
-    assert ("does not both read the store first and write its result there (a capture or re-recording reading "
-            "only the replies its own run bought, in an approved run of it only, as the store's configuration "
-            "says), a capture or re-recording that reads a reply its own run did not buy, a run other than those "
-            "the configuration names that skips the store, a stand-in's reply written to the store of paid "
-            "results, a dry run's or benchmark's own store left after its run, "
-            # The list held in one piece with its grade (BUG-023's confirming read; BUG-025's second).
-            "or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
-            "time names (the benchmark results read against the budgets file and the design's record, in the "
-            "owner's words, of the speed budgets that leave that time out, any other speed budget of an operation "
-            "that calls a paid service "
-            "read as including it), is a blocking finding") in inspect
-    assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
+    # The section held whole, one `==` (stage B4's review, round 6: the list had been held from its second item,
+    # its first, a paid call with no approval naming it, and its closing duty held by the pin alone).
+    assert inspect == (
+        "No paid action ran unapproved, and none bypassed the store: the supervisor reads the run's log and the "
+        "store of paid results, and the provider's usage for the run's time where a Resources row records a way to "
+        "read it (otherwise the owner reads it at the stage close, by a run sheet); a paid call with no approval "
+        "naming it, a paid call in the diff that does not both read the store first and write its result there (a "
+        "capture, re-recording or live smoke reading only the replies its own run bought, in an approved run of it "
+        "only, as the store's configuration says), a capture, re-recording or live smoke that reads a reply its own "
+        "run did not buy, a run other than those the configuration names that skips the store, a stand-in's reply "
+        "written to the store of paid results, a dry run, benchmark or test run on a stand-in provider that "
+        "reads it, a store of paid results or a run's own store inside the repository or the Workspace, a result "
+        "or request kept with a secret in it, such a run's own store left after it, or a stand-in result reported under the benchmark "
+        "and metric a budget that includes a paid service's time names (the benchmark results read against the "
+        "budgets file and the design's record, in the owner's words, of the speed budgets that leave that time out, "
+        "any other speed budget of an operation that calls a paid service read as including it), is a blocking "
+        "finding, a paid call that ran unapproved also recorded as an issue and told to the owner in the next "
+        "report's first line with its amount, platform and account."), inspect
 
 
 def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():

@@ -334,7 +334,7 @@ def test_r016_r019_the_plan_critic_keeps_its_design_lenses_and_catches_a_missing
     assert len(bullet) == 1 and bullet[0].endswith(
         "is a finding that a trait is missing (**Blocking**: the trait's additions never reach the build)."), bullet
     b = flat(bullet[0])  # the pairs are the bullet's own, not the file's (stage B4's review, round 5)
-    for trigger, lens in (("`installer` or `install-script`", "no packaging lens"),
+    for trigger, lens in (("A part whose `Delivery kind:` row is `installer` or `install-script`", "no packaging lens"),
                           ("a service run by others (a third-party API, SDK or provider)", "no external-service lens"),
                           ("a design that shows screens", "no design-criteria lens"),
                           ("a design naming a budget", "no benchmark-increments lens")):
@@ -364,6 +364,8 @@ def test_r017_the_command_reference_reaches_every_approved_command_design():
     assert len(lens) == 1, lens
     lens = lens[0]
     assert lens.endswith("Without it the supervisor has nothing to look commands up in (rule 32) — **Blocking**."), lens
+    assert lens.startswith("- **Command reference (an approved command design).** Where the interface phase "
+                           "approved a command design (`docs/design/COMMANDS.md`)"), lens  # round 6
     assert ("does the increment that first builds one of its commands carry the command reference's generator and "
             "its currency check, and does every later increment that adds or changes one of its commands carry "
             "\"the reference regenerated and committed\" as a criterion, whatever the part's traits") in lens, lens
