@@ -200,18 +200,21 @@ def cron_field(field, value):
     return False
 
 
-def cron_next(expr, now):
-    """The next fire time (local wall clock, as a unix time) of a 5-field cron expression, within
-    eight days; None when the expression does not parse. Claude Code's session crons are local time."""
+def cron_next(expr, now, tz=None):
+    """The next fire time of a 5-field cron expression within eight days, as a unix time; None when
+    the expression does not parse. Walks instants one minute apart, each read as the wall time of
+    tz, and returns the matching instant. tz is the zone (None for the computer's local zone, the
+    zone Claude Code's session crons are written in)."""
     fields = (expr or "").split()
     if len(fields) != 5:
         return None
-    t = datetime.fromtimestamp(now).replace(second=0, microsecond=0) + timedelta(minutes=1)
+    instant = int(now // 60) * 60 + 60
     for _ in range(8 * 24 * 60):
+        t = datetime.fromtimestamp(instant, tz)
         if cron_field(fields[0], t.minute) and cron_field(fields[1], t.hour) and cron_field(fields[2], t.day) \
                 and cron_field(fields[3], t.month) and cron_field(fields[4], t.weekday() + 1 if t.weekday() < 6 else 0):
-            return t.timestamp()
-        t += timedelta(minutes=1)
+            return instant
+        instant += 60
     return None
 
 
