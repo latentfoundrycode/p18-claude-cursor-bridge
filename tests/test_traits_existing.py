@@ -311,9 +311,14 @@ def test_r017_installable_s_new_sentences_name_their_kinds():
 
 def test_r016_r019_n7_and_n9_remain_in_the_core():
     """BUILD_PLAN TASK-017: the founding rules the traits point at stay in the core."""
-    core = flat(read(CORE))
-    assert "N7 Design quality is measured, never asked." in core
-    assert "N9 For software with screens the running render is measured." in core
+    brief = flat(section(read(CORE), "The core, in brief", 2))
+    assert "N7 Design quality is measured, never asked." in brief
+    assert "N9 For software with screens the running render is measured." in brief
+    # The rules themselves, not only the digest's line (stage B4's review, round 5's fix).
+    rules = section(read(CORE), "Founding rules", 2).replace("\r\n", "\n").split("\n")
+    assert [l for l in rules if l.startswith("- **N7 — Design quality is a measurable gate.**")], "N7"
+    assert [l for l in rules if l.startswith("- **N9 — For software with screens, the running render is a gate "
+                                             "input.**")], "N9"
 
 
 def test_r016_r019_the_plan_critic_keeps_its_design_lenses_and_catches_a_missing_trait():

@@ -189,11 +189,13 @@ def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_con
     ):
         assert passage in fm, passage
     loop = flat(module("delegation-loop"))
-    screens = flat(module("../traits/has-screens.md"))
-    for build in ("list the frozen `vercel-interface.mdc` as an applicable rule",
-                  "For a **UI-bearing** diff, also delegate to **design-auditor** after `diff-reviewer`",
-                  "the tests you write include the **observability tests** (Tier A)"):
-        assert build in screens, build
+    # Each read from the delegation-loop point it is added at (stage B4's review, round 5's fix).
+    for point, build in (("brief-constraints", "list the frozen `vercel-interface.mdc` as an applicable rule"),
+                         ("inspect-checks", "For a **UI-bearing** diff, also delegate to **design-auditor** after "
+                                           "`diff-reviewer`"),
+                         ("test-checks", "the tests you write include the **observability tests** (Tier A)")):
+        screens = flat(section(module("../traits/has-screens.md"), "Add at delegation-loop." + point, 2))
+        assert build in screens, (point, build)
         assert build not in loop, build
         assert build not in fm, build
     assert "Build an HTML/CSS mockup" not in module("interface")
