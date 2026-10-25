@@ -109,6 +109,8 @@ def test_r025_the_type_sets_host_installation():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert "host-installation" in mod.DELIVERY_KINDS
+    trait_files = [os.path.join(here, f) for here, _dirs, names in os.walk(TRAITS) for f in names]
+    assert len(trait_files) >= 7, trait_files
     for here, _dirs, names in os.walk(TRAITS):
         for f in names:
             assert "## Set at" not in read(os.path.join(here, f)), f
@@ -140,7 +142,7 @@ def test_r025_the_hosts_behaviour_is_recorded_as_verified_facts_with_the_version
 def test_r025_host_behaviour_is_tested_inside_the_real_host_kept_apart_from_the_owners():
     """BUILD_PLAN TASK-021: tests inside the real host, at the version the design records, with the part installed
     into a host kept apart from the owner's own and never into the host the owner works in; the result read from what
-    the host did; a behaviour no test can reach there named as untested, never counted as tested."""
+    the host did; a behaviour no test can reach there named as untested, never counted as tested; the owner's account or paid usage, where driving the host needs it, put to the owner first."""
     t = flat(body("host-extension", "Add at delegation-loop.test-checks"))
     for phrase in [
             "each behaviour of the part that depends on the host is tested inside the real host, at the version the "
@@ -149,7 +151,9 @@ def test_r025_host_behaviour_is_tested_inside_the_real_host_kept_apart_from_the_
             "instance, as the host allows), never into the host the owner works in.",
             "The behaviour is driven there and its result read from what the host did.",
             "A host behaviour no test can reach inside the host is named in the increment's report as untested there, "
-            "never counted as tested."]:
+            "never counted as tested.",
+            "Where driving the host uses the owner's account or paid usage, that use is put to the owner before any test "
+            "relies on it, as a paid action is."]:
         assert phrase in t, phrase
 
 
@@ -157,15 +161,16 @@ def test_r025_the_host_installation_procedure():
     """BUILD_PLAN TASK-021: the kind's procedure at `project-end.delivery for host-installation`: an install program
     the owner runs from a run sheet (it acts outside the repository, rule 27), copying the release, merging into the
     host's settings without changing the owner's entries, keeping what it replaces, ending by checking that the host
-    loads the installed version; a take-back proved once on a host kept apart before the first install; the User
+    loads the installed version, a clash with the owner's entries put to the owner; a take-back proved once on a host kept apart before the first install; the User
     Manual's first chapter (project-end.md's install chapter for installable software)."""
     t = flat(body("host-extension", DELIVERY))
     for phrase in [
             "the owner's host receives the release through an install program the project ships, which the owner runs "
             "from a run sheet, since it acts outside the repository.",
             "The program copies the release's files into the host's extension folder, merges the part's entries into the "
-            "host's settings without changing the owner's own entries, keeps what it replaces so that the previous "
-            "release can be put back, and ends by checking that the host loads the installed version",
+            "host's settings without changing the owner's own entries (where an entry of the part's and one of the "
+            "owner's name the same thing, it stops and puts the clash to the owner), keeps what it replaces so that "
+            "the previous release can be put back, and ends by checking that the host loads the installed version",
             "The take-back puts the previous release's files and entries back the same way, and is proved once, on a "
             "host kept apart from the owner's own, before the first release is installed.",
             "The User Manual's first chapter says how to install, update and take back the release, and that the "
@@ -187,6 +192,8 @@ def test_r025_the_procedure_reaches_host_installation_parts_only():
     assert installable == ["## Add at project-end.delivery for installer",
                            "## Add at project-end.delivery for install-script"], installable
     assert "project-end.delivery" not in text("claude-code-extension")
+    assert ("Each addition at `project-end.delivery` names the delivery kind it is for and applies only to a part of that "
+            "kind") in flat(read(REGISTRY))
 
 
 def test_r025_the_sub_workflow_names_claude_codes_extension_points_and_its_version():
@@ -195,7 +202,7 @@ def test_r025_the_sub_workflow_names_claude_codes_extension_points_and_its_versi
     Code itself; the sub-workflow inherits the type's kind and procedure and sets nothing of its own."""
     t = flat(body("claude-code-extension", "Add at design.sections"))
     for phrase in [
-            "The host is Claude Code, and its extension points are its commands, agents, skills, hooks, settings and "
+            "The host is Claude Code, and its extension points include its commands, agents, skills, hooks, settings and "
             "permission rules.",
             "The version each fact in the design's host section was checked on is the one `claude --version` prints.",
             "when a hook runs and what its output does (the Stop hook's), and which commands a permission rule matches "
