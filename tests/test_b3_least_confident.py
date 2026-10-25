@@ -187,6 +187,8 @@ EXCUSED_MODULE_SECTIONS = {
     ("traits/spends-money.md", "Add at delegation-loop.brief-constraints"): (986, "e4aba6a5946681595c0f1ff19dd3e3fc65b4e308e02506907fc20d877154648d"),
     ("traits/spends-money.md", "Add at delegation-loop.inspect-checks"): (634, "21599c27ab2a9814894195f6019af8f42cef3a57a972c6595d042ff32e94ebc9"),
     ("traits/spends-money.md", "Add at intake.questions"): (1854, "ffd8aaaf3d1562ceedfd8c2a4f070b2862bc90d4ca5b792bbf6a727dfcd82c80"),
+    ("types/own-computer.md", "Add at intake.questions"): (728, "caf1748cd3bdb56fe9109723467158c5a2dc4f319dd0fab07fb9b20180feb0b0"),
+    ("types/own-computer/local-service.md", "Add at interface.variants"): (611, "7ddcb47b124539696c5a26a884ee52b3107282dbbc6e8be76ddc092002d50015"),
     ("types/web-app.md", "Add at project-end.delivery for web-deployment"): (6724, "689aa1ef2457273aeb2403eb876e29f788199d0760c7d8a228dd1490a159287d"),
     ("types/web-app.md", "Set at intake.delivery-kind"): (46, "2f7f51bb4c7b463f115afedb11af271b6040aba9852194f8fc6f3b522241f7f5"),
     ("types/web-app/local-web-app.md", "Set at intake.delivery-kind"): (46, "a1a429fb4f8905db0310a69eb9ed62f22f457d76e0e20044530163c83d2b32ee"),
