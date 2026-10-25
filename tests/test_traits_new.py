@@ -101,7 +101,8 @@ def test_r020_spends_money_asks_for_approval_the_worst_case_the_cap_and_the_acco
     assert "an approval covers the action it names, never the next one" in t
     assert ("settles the service's key and account only: where a part has both traits, the contract "
             "capture's live call that escalation names is, when it costs money, a paid action of the loop "
-            "like any other, approved for itself") in t, "BUG-021: one escalation never approves a paid call"
+            "like any other, approved for itself as this trait asks, and so is every later capture or "
+            "re-recording of that service.") in t, "BUG-021: one escalation never approves a paid call"
     assert "never a silent overrun" in t
     # Review A, round 1: which paid actions the approval covers, and who enforces the cap.
     assert "The loop's own paid actions (a contract capture, a dry or paid run of an increment, a re-recording" in t
