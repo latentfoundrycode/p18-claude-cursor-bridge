@@ -238,11 +238,15 @@ def test_r005_a_pointer_path_outside_the_pattern_is_ignored_even_in_lower_case(t
 
 def test_r005_a_conditional_file_that_is_a_link_is_not_named(tmp_path, home):
     """handoff/TASK-015.md Requirement 5: a candidate that is a link is not named (a file link needs a privilege
-    Windows accounts often lack; the test runs where the link can be made, on Linux CI at least)."""
+    Windows accounts often lack; the test runs where the link can be made, on Linux CI at least). Since TASK-021 the
+    installed host-extension.md is copied into the home, so it is removed before the link takes its place: a link
+    over an existing file would fail and skip the test for the wrong reason (Review A, TASK-021)."""
     real = tmp_path / "outside.md"
     real.write_text("# Outside\n\n## Add at intake.questions\n\nq\n", encoding="utf-8")
     link = home / ".claude" / "cursor-bridge" / "workflow" / "types" / "host-extension.md"
-    link.parent.mkdir(parents=True, exist_ok=True)
+    assert link.is_file() and not link.is_symlink(), link
+    link.unlink()
+    assert not os.path.lexists(str(link))
     try:
         os.symlink(str(real), str(link))
     except (OSError, NotImplementedError):

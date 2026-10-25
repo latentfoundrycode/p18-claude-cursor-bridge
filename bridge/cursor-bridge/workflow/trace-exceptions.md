@@ -95,3 +95,8 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-019 bridge/cursor-bridge/workflow/types/web-app/local-web-app.md Set at intake.delivery-kind
 - new TASK-020 bridge/cursor-bridge/workflow/types/own-computer.md Add at intake.questions
 - new TASK-020 bridge/cursor-bridge/workflow/types/own-computer/local-service.md Add at interface.variants
+- new TASK-021 bridge/cursor-bridge/workflow/types/host-extension.md Set at intake.delivery-kind
+- new TASK-021 bridge/cursor-bridge/workflow/types/host-extension.md Add at design.sections
+- new TASK-021 bridge/cursor-bridge/workflow/types/host-extension.md Add at delegation-loop.test-checks
+- new TASK-021 bridge/cursor-bridge/workflow/types/host-extension.md Add at project-end.delivery for host-installation
+- new TASK-021 bridge/cursor-bridge/workflow/types/host-extension/claude-code-extension.md Add at design.sections

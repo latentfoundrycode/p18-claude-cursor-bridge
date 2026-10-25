@@ -30,7 +30,7 @@ A product type answers one question: **how does the product reach its user?** Th
 | backend-service | Backend service | Runs on a server, has no screen, serves other software over a network | Backend Service Development | long-running-process | no | when the first project of this type arrives |
 | library | Library | Code that other programs include; delivered as a package | Library Development | — | no | when the first project of this type arrives |
 | video-game | Video game | Built around a real-time play loop | Game Development | has-screens, performance-budgets | no | release E |
-| host-extension | Host extension | Runs inside another application, through that application's extension points | Host Extension Development | installable | no | release B |
+| host-extension | Host extension | Runs inside another application, through that application's extension points | Host Extension Development | installable | yes | release B |
 
 To tell a website from a web app at intake, one question decides: **does it keep data for its users** (accounts, saved progress, runs, orders)? If yes, it is a web app. To tell a web app from software on your own computer: **does its user meet it in a browser?** If yes, it is a web app, wherever it runs.
 
@@ -48,7 +48,7 @@ A sub-type says more precisely what a part of its product type is, where that ch
 | pipeline | Pipeline | own-computer | Met through nothing: it runs jobs unattended and its output is files or records | Pipeline Software | installable | no | when the first project of this type arrives |
 | local-service | Local service | own-computer | Other software on the same computer calls it through a protocol, such as an MCP server; its interface is a contract | Local Service Software | installable, long-running-process | yes | release B |
 | roblox | Roblox | video-game | A game built for and published on Roblox | Roblox Game | has-screens, performance-budgets, multiplayer | no | release E |
-| claude-code-extension | Claude Code extension | host-extension | Runs inside Claude Code, through its commands, agents, hooks and settings (the bridge itself) | Claude Code Extension | installable | no | release B |
+| claude-code-extension | Claude Code extension | host-extension | Runs inside Claude Code, through its commands, agents, hooks and settings (the bridge itself) | Claude Code Extension | installable | yes | release B |
 | browser-extension | Browser extension | host-extension | Runs inside a web browser, through the browser's extension interfaces | Browser Extension | installable | no | when the first project of this type arrives |
 
 **A sub-type must earn its place.** It must change a phase, a gate, a check or the tooling. A difference that changes none of these (a puzzle game against a shooter) is a design choice and belongs in the project's design document. A Roblox game earns its sub-type: a different editor, language, testing and publishing.
