@@ -4,7 +4,9 @@
     python tools/compaction-baseline.py [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--projects <folder>:<name> ...]
 
 Reads every transcript (`*.jsonl`) under the named Claude Code project folders in
-`~/.claude/projects/`. A compaction is the record `type == "system", subtype == "compact_boundary"`;
+`~/.claude/projects/`, each with its `-Workspace` twin (the folder the app made on 2026-10-12 for
+the sessions opened in the project's Workspace; item C9 of 2026-10-18), counted with the project's
+other folder. A compaction is the record `type == "system", subtype == "compact_boundary"`;
 a resumed or forked session copies earlier records, so markers are counted once by their `uuid`
 (review R24). Prints, per project and day, the number of compactions, and the sessions seen; then
 the totals before and after the digest hook (release 0b, installed 2026-10-04). Read-only; the
@@ -25,6 +27,11 @@ DEFAULT = [
     ("E--pk02k02s02-short-form-video-factory", "SFVF"),
     ("G--Project-Workspaces-Software-Cursor-short-form-video-factory", "SFVF"),
 ]
+
+
+def folders_of(folder):
+    """A project's transcript folders: the one named and its `-Workspace` twin (2026-10-12 on)."""
+    return [folder] if folder.endswith("-Workspace") else [folder, folder + "-Workspace"]
 
 
 DAY_RX = re.compile(r'"timestamp":\s*"(\d{4}-\d{2}-\d{2})')
@@ -69,12 +76,15 @@ def main():
     days_seen = collections.defaultdict(set)
     active_days = collections.defaultdict(set)
     for folder, name in pairs:
-        full = os.path.join(root, folder)
-        if not os.path.isdir(full):
-            print("note: no folder %s" % full)
+        fulls = [os.path.join(root, f) for f in folders_of(folder) if os.path.isdir(os.path.join(root, f))]
+        if not fulls:
+            print("note: no folder %s" % os.path.join(root, folder))
             continue
-        active = set()
-        for uuid, (ts, sid, trig, pre) in markers(full, active).items():
+        active, found = set(), {}
+        for full in fulls:                                         # a marker copied into both folders counts once
+            for uuid, rec in markers(full, active).items():
+                found.setdefault(uuid, rec)
+        for uuid, (ts, sid, trig, pre) in found.items():
             day = ts[:10]
             if (a.since and day < a.since) or (a.until and day > a.until):
                 continue
