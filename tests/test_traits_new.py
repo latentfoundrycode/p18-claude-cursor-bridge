@@ -150,10 +150,16 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert ("a speed budget that includes the service's time stays in the floor's budgets file like every budget and "
             "is measured on a stand-in that replays each reply's wait as an approved paid run of the operation "
             "measured it, the waits kept with the recorded replies under the test fixtures") in brief
-    assert ("That paid run is taken again at each increment that changes the operation: its waits are a fixture "
-            "change of their own commit, with the baseline re-taken beside them from the floor's run on the code "
-            "before the increment, the one baseline update outside an optimization commit") in brief
-    assert "until it is taken, that budget counts as `NOT MEASURED` for the increment" in brief
+    assert ("That paid run is taken again at each increment that changes the operation, by the supervisor after the "
+            "owner's approval and before the builder's branch: its waits, and the baseline re-taken beside them from "
+            "the floor's run on the code before the increment, are a commit of the supervisor's that holds nothing "
+            "else") in brief
+    assert "which the reviewers check as an optimization commit's are checked (`Performance-Conventions.md` §5)" in brief
+    assert ("it is the one baseline update outside an optimization commit, and a builder never edits the waits or "
+            "the baseline") in brief
+    assert ("Until it is taken, that budget counts as `NOT MEASURED` for the increment, and the block waits on the "
+            "run the owner approved, which the supervisor starts, never on a re-delegation") in brief
+    assert "where the owner declines the run, the budget stays not measured, and what becomes of it is the owner's decision" in brief
     assert ("A benchmark run against the paid service itself is a paid action of its own, approved as one, never "
             "part of the benchmark floor or of CI.") in brief
     # Review A, round 1, blocking: the product's paid calls go through the store; a first capture and a purchase,
