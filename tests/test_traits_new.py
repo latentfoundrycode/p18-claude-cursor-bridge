@@ -147,19 +147,11 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
             "since it holds the users' data, and deleted whichever way the run ends), with a stand-in provider") in brief
     assert ("runs against the dry run's stand-in provider, which measures the operation's paid calls for a cost "
             "budget and the part's own time, never the service's") in brief
-    assert ("a speed budget that includes the service's time stays in the floor's budgets file like every budget and "
-            "is measured on a stand-in that replays each reply's wait as an approved paid run of the operation "
-            "measured it, the waits kept with the recorded replies under the test fixtures") in brief
-    assert ("That paid run is taken again at each increment that changes the operation, by the supervisor after the "
-            "owner's approval and before the builder's branch: its waits, and the baseline re-taken beside them from "
-            "the floor's run on the code before the increment, are a commit of the supervisor's that holds nothing "
-            "else") in brief
-    assert "which the reviewers check as an optimization commit's are checked (`Performance-Conventions.md` §5)" in brief
-    assert ("it is the one baseline update outside an optimization commit, and a builder never edits the waits or "
-            "the baseline") in brief
-    assert ("Until it is taken, that budget counts as `NOT MEASURED` for the increment, and the block waits on the "
-            "run the owner approved, which the supervisor starts, never on a re-delegation") in brief
-    assert "where the owner declines the run, the budget stays not measured, and what becomes of it is the owner's decision" in brief
+    assert ("a speed budget that includes the service's time is one the floor cannot check on the stand-in, so the "
+            "design that names one says how it is measured, any paid run the measuring needs approved as a paid action of its "
+            "own and run by the supervisor, and until the design says so the budget is one with no benchmark, which "
+            "the trait *performance budgets*' lens blocks at the plan.") in brief
+    assert "budgets file" not in brief and "baseline" not in brief, "stage B4's review, round 2: no baseline exception"
     assert ("A benchmark run against the paid service itself is a paid action of its own, approved as one, never "
             "part of the benchmark floor or of CI.") in brief
     # Review A, round 1, blocking: the product's paid calls go through the store; a first capture and a purchase,
