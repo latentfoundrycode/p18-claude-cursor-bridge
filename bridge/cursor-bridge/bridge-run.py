@@ -42,6 +42,18 @@ named when the ceiling is chosen. A slow but healthy task is never ended before 
 An owner's cap below twice the default is ignored with a note: the line says "above twice".
 Refuses a design critique round above the ceiling (exit 125, `design ceiling:`).
 
+Since 2026.10.25a: a `--kind review` run whose `--model` is of the family of the branch's last
+builder run is refused (exit 125; roster-check.py's REBUILD: the new profile's builder
+rebuilds the change first). A builder or review run lists the files beside the Workspace
+(its parent folder, the Workspace and `Worktrees/` excluded) before and after, and reports
+each new, changed or removed one as `bridge-run: BOUNDARY ...` on stderr and in the run log:
+the boundary hook does not run in a headless builder run (ISS-010), so this is the one
+detection of a write outside the Workspace. A `gh pr checks <n> --watch` waits up to two
+minutes for the pushed head (the local HEAD) to be the pull request's head on GitHub with a
+check registered, and says how long it waited, so a watch neither ends at once with "no
+checks reported" nor takes the previous commit's run (KP-051). `-p no:cacheprovider` is
+accepted after `python -m pytest` as after `pytest`.
+
 `--key-file <path>` (release A2): a file of `NAME=value` lines, outside the Workspace, whose
 values reach the child's environment only; names are printed, values never (the owner's
 rule of 2026-10-05: no secret through the environment the owner sets).
@@ -162,8 +174,8 @@ def test_suite(argv, folder=None):
         attached = next((e for e in escapes if e in ("-p", "-c", "-r") and a.startswith(e) and len(a) > len(e)), None)
         if name in escapes or attached:
             value = a[len(attached):] if attached else (argv[i + 1] if i + 1 < len(argv) else "")
-            if head in ("pytest", "uv") and (name == "-p" or attached == "-p") and value.startswith("no:") and "pytest" in argv and i > argv.index("pytest"):
-                continue                                   # `-p no:cacheprovider` disables a plugin (after the word pytest, never uv's own -p)
+            if head in ("pytest", "uv", "python", "python3", "py") and (name == "-p" or attached == "-p") and value.startswith("no:") and "pytest" in argv and i > argv.index("pytest"):
+                continue                                   # `-p no:cacheprovider` disables a plugin (after the word pytest, never uv's or python's own -p; 2026.10.25a: python -m pytest and the project's .venv python too)
             return False
     if head == "npx" and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0])) \
             and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0] + ".cmd")):
@@ -434,6 +446,18 @@ def branch_of(folder):
         return None
 
 
+def workspace_of(argv, folder):
+    """The folder a cursor-agent run works in: its `--workspace <path>` (a worktree builder, relative to
+    the launch folder), else the launch folder; the run is logged under that folder's branch (2026.10.25a)."""
+    if head_of(argv) == "cursor-agent":
+        for i, a in enumerate(argv):
+            if a == "--workspace" and i + 1 < len(argv):
+                return os.path.join(folder, argv[i + 1])
+            if a.startswith("--workspace="):
+                return os.path.join(folder, a.split("=", 1)[1])
+    return folder
+
+
 def model_of(argv):
     """The --model value of a launched command (the roster check compares the reviewer's family with it; release A4)."""
     for i, a in enumerate(argv):
@@ -442,6 +466,128 @@ def model_of(argv):
         if a.startswith("--model="):
             return a.split("=", 1)[1]
     return None
+
+
+def roster_program():
+    """roster-check.py beside this file, loaded as a module (its family and built-by rules are the one copy)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("roster_check", os.path.join(HERE, "roster-check.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+NOTES = []                                               # printed after the launch line, which stays the first
+
+
+def review_family_refusal(argv, folder):
+    """A Review B of the family that built the change in flight is refused (release A4's rule, held by the
+    launcher since 2026.10.25a): after a profile switch the new profile's builder rebuilds the change first."""
+    model = model_of(argv)
+    if head_of(argv) != "cursor-agent" or not model:
+        return None
+    try:
+        roster = roster_program()
+        built = roster.built_by(os.path.join(folder, LOG), branch_of(workspace_of(argv, folder)))
+        if not built:
+            return None
+        built_fam, review_fam = roster.family_of(built), roster.family_of(model)
+    except Exception as e:                               # the check never stops a run on its own failure, but says so
+        NOTES.append("the review-family check could not run (%s); check the family by hand" % e)
+        return None
+    if built_fam and built_fam == review_fam:
+        return ("Review B %s is of the %s family, which built this change (%s, the branch's last builder run): rebuild it "
+                "with the builder in docs/ROSTER.resolved.json first (step 3b; roster-check prints REBUILD)" % (model, review_fam, built))
+    return None
+
+
+WATCH_WAIT = 120                                         # seconds the watch waits for the pushed head's first check
+WATCH_STEP = 10
+
+
+def gh_pr_state(pr_args, folder):
+    """(head sha on GitHub, number of checks on it) of the pull request, or (None, None)."""
+    try:
+        p = subprocess.run(["gh", "pr", "view"] + pr_args + ["--json", "headRefOid,statusCheckRollup"], cwd=folder, capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)
+        if p.returncode != 0:
+            return None, None
+        o = json.loads(p.stdout or "{}")
+        return o.get("headRefOid"), len(o.get("statusCheckRollup") or [])
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None, None
+
+
+def local_head(folder):
+    try:
+        p = subprocess.run(["git", "-C", folder, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=30, creationflags=NO_WINDOW)
+        return p.stdout.strip() if p.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def wait_for_first_check(argv, folder):
+    """Before `gh pr checks <n> --watch`: wait up to WATCH_WAIT seconds until the pull request's head on
+    GitHub is the local head and has a check (2026.10.25a, FB-002: a watch started seconds after the push
+    exited at once with "no checks reported"; KP-051: a watch begun before the new run took the old one).
+    Returns the line to print."""
+    if "--watch" not in argv:
+        return None
+    rest = argv[3:]
+    pr_args = [a for a in rest[:1] if not a.startswith("-")]
+    want = local_head(folder)
+    waited = 0
+    while True:
+        head, checks = gh_pr_state(pr_args, folder)
+        if head and want and head == want and checks:
+            return "waited %ds for the pushed head %s's first check (%d check(s) registered)" % (waited, want[:12], checks)
+        if waited >= WATCH_WAIT:
+            return ("waited %ds and the pushed head %s has no check registered on GitHub (its head there: %s); the watch starts anyway "
+                    "- if it ends at once with \"no checks reported\", run `gh pr checks <n>` once and start the watch again" % (
+                        waited, (want or "?")[:12], (head or "unknown")[:12]))
+        time.sleep(WATCH_STEP)
+        waited += WATCH_STEP
+
+
+BOUNDARY_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+BOUNDARY_MAX = 20000
+
+
+def boundary_listing(folder):
+    """{path relative to the Workspace's parent: (size, mtime_ns)} for every file beside the Workspace
+    (the project root's other folders and files), the Workspace itself and the worktrees excluded;
+    None when the parent is a drive root or the listing is too large to be a project root."""
+    work = os.path.abspath(folder)
+    parent = os.path.dirname(work)
+    if not parent or os.path.dirname(parent) == parent:
+        return None
+    found = {}
+    same = lambda a, b: os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))   # noqa: E731  (Windows: any case)
+    junction = getattr(os.path, "isjunction", lambda p: False)
+    for top, dirs, files in os.walk(parent):
+        if same(top, parent):
+            dirs[:] = [d for d in dirs if not same(os.path.join(parent, d), work) and d.lower() != "worktrees"]
+        dirs[:] = [d for d in dirs if d not in BOUNDARY_SKIP and not junction(os.path.join(top, d))]
+        for name in files:
+            full = os.path.join(top, name)
+            try:
+                st = os.stat(full)
+            except OSError:
+                continue
+            found[os.path.relpath(full, parent).replace("\\", "/")] = (st.st_size, st.st_mtime_ns)
+            if len(found) > BOUNDARY_MAX:
+                return None
+    return found
+
+
+def boundary_changes(before, after):
+    """[(new|changed|removed, path)] between two listings."""
+    out = []
+    for path in sorted(set(before) | set(after)):
+        b, a = before.get(path), after.get(path)
+        if b != a:
+            out.append(("new" if b is None else "removed" if a is None else "changed", path))
+    return out
 
 
 def resolve(argv):
@@ -545,6 +691,11 @@ def main():
     if kind not in KINDS:
         sys.stderr.write("bridge-run: refused - unknown kind %r (builder, review, watch, test)\n" % kind)
         return 125
+    if kind == "review":
+        reason = review_family_refusal(cmd, folder)
+        if reason:
+            sys.stderr.write("bridge-run: refused - %s\n" % reason)
+            return 125
     raw = flags[flags.index("--limit") + 1] if flags.index("--limit") + 1 < len(flags) else ""
     if raw != "auto":
         try:
@@ -559,6 +710,8 @@ def main():
         run_id = run_id.split("Z")[0] + "Z-%d" % n
         n += 1
     sys.stderr.write("bridge-run: started %s\n" % run_id)         # the FIRST line: review-guard and pr-activity-check read it
+    for note in NOTES:
+        sys.stderr.write("bridge-run: note - %s\n" % note)
     sys.stderr.flush()
     cap, cap_note = cap_for(kind, folder)
     if cap_note:
@@ -586,7 +739,33 @@ def main():
             return 125
         env.update(keys)
         sys.stderr.write("bridge-run: key file read (%d name(s): %s)\n" % (len(keys), ", ".join(sorted(keys)) or "none"))
-    entry = {"id": run_id, "kind": kind, "head": head, "model": model_of(cmd), "branch": branch_of(folder), "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
+    entry = {"id": run_id, "kind": kind, "head": head, "model": model_of(cmd), "branch": branch_of(workspace_of(argv[argv.index("--") + 1:], folder)), "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
+    if kind == "watch" and head.startswith("gh pr checks"):
+        line = wait_for_first_check(argv[argv.index("--") + 1:], folder)
+        if line:
+            sys.stderr.write("bridge-run: %s\n" % line)
+            sys.stderr.flush()
+    # A builder's or reviewer's write outside the Workspace (2026.10.25a, ISS-010: the boundary hook does not run in a
+    # headless builder run): the files beside the Workspace are listed before and after, and every new,
+    # changed or removed one is reported as BOUNDARY on stderr and in the run log.
+    boundary_before = boundary_listing(folder) if kind in ("builder", "review") else None
+    if kind in ("builder", "review") and boundary_before is None:
+        sys.stderr.write("bridge-run: note - no boundary listing (the Workspace's parent is a drive root or holds over %d files)\n" % BOUNDARY_MAX)
+
+    def report_boundary():
+        if boundary_before is None:
+            return
+        after = boundary_listing(folder)
+        if after is None:
+            return
+        changes = boundary_changes(boundary_before, after)
+        for what, path in changes[:20]:
+            sys.stderr.write("bridge-run: BOUNDARY %s outside the Workspace: %s\n" % (what, path))
+        if len(changes) > 20:
+            sys.stderr.write("bridge-run: BOUNDARY ... and %d more\n" % (len(changes) - 20))
+        if changes:
+            entry["boundary"] = ["%s %s" % c for c in changes[:200]]
+        sys.stderr.flush()
 
     killer = None
     if sys.platform == "win32":
@@ -621,8 +800,10 @@ def main():
     try:
         rc = proc.wait(timeout=limit)
     except subprocess.TimeoutExpired:
-        sys.stderr.write("bridge-run: LIMIT %ds reached after %ds; terminating the whole process tree\nbridge-run: exit 124\n"
+        sys.stderr.write("bridge-run: LIMIT %ds reached after %ds; terminating the whole process tree\n"
                          % (int(limit), int(time.time() - started)))
+        report_boundary()                   # before the exit line, which stays the last (the job ends this process)
+        sys.stderr.write("bridge-run: exit 124\n")
         sys.stderr.flush()
         entry.update(seconds=int(time.time() - started), exit=124)
         write_log(folder, entry)            # before the job ends this process too
@@ -637,6 +818,7 @@ def main():
         rc = 124
     remove_pid_file(pid_file)
     if rc != 124:
+        report_boundary()
         sys.stderr.write("bridge-run: exit %d\n" % rc)
         sys.stderr.flush()
     if entry["exit"] is None:

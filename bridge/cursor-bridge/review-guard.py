@@ -15,12 +15,21 @@ would make the supervisor's next git command run the reviewer's program with the
 identity), or a changed ignored file (`.env`, a record a project keeps gitignored, a brief).
 
 What each step does:
-  snapshot  refuses a dirty tree (commit first); records HEAD, the branch, every ref, the
-            stash list, a hash of `.git/config`, of every file in the ACTIVE hooks folder
-            (`core.hooksPath`, read from the config file, or `.git/hooks`) and in
-            `.git/hooks`, and every ignored file with its size and mtime (cache folders
-            such as `.venv`, `node_modules` and `__pycache__` are skipped); writes
-            <git common dir>/bridge/review-<nnn>.json and prints that file's hash.
+  snapshot  refuses a dirty tree (commit first); lists the review's input files (the files
+            directly under run/review/ whose name contains <nnn>, the launcher's
+            REVIEW-<nnn>.err excepted) with their sizes and refuses when one is empty, since
+            both reviewers would read an empty input (KP-067: `git show <rev>:<path>
+            --output=<file>` creates the file empty; none found is a NOTE); records HEAD,
+            the branch, every ref, the stash list, a hash of `.git/config`, of every file in
+            the ACTIVE hooks folder (`core.hooksPath`, read from the config file, or
+            `.git/hooks`) and in `.git/hooks`, and every ignored file with its size and
+            mtime (cache folders such as `.venv`, `node_modules` and `__pycache__` are
+            skipped); writes
+            <git common dir>/bridge/review-<nnn>.json and a copy of its sha256 outside the
+            checkout the reviewer runs in (~/.cursor-bridge/review-hashes/<key>-<nnn>.sha256,
+            FB-037), and prints that file's hash. `verify` and `premerge` compare the copy
+            themselves: a mismatch is GATE-INTEGRITY, a missing copy CANNOT VERIFY (take the
+            snapshot again).
   verify    reads the configuration and the hooks folders FIRST, as files, without running
             git: a change is GATE-INTEGRITY and nothing else runs. Every git command the
             guard runs is given `-c core.hooksPath=<an empty folder> -c core.fsmonitor=false`,
@@ -31,16 +40,22 @@ What each step does:
             whose first line it prints), lists what it removed, and compares the ignored
             files: a change under docs/, handoff/, run/review/ or to `.env*` is
             GATE-INTEGRITY, any other is LEFT BEHIND. A moved remote-tracking ref (a fetch)
-            is a note. It prints the snapshot file's hash again: compare it with the one
-            `snapshot` printed, since the reviewer could rewrite the snapshot.
+            is a note. Before all of this it compares the snapshot file's hash with the copy
+            `snapshot` wrote: a difference is GATE-INTEGRITY (the snapshot was rewritten after
+            it was taken; nothing is restored from it), a missing copy CANNOT VERIFY (take the
+            snapshot again; a snapshot taken by an older release has none). It prints the snapshot file's hash again: compare it with the
+            one `snapshot` printed, since the reviewer could rewrite the snapshot.
   premerge  needs the verified mark `verify` wrote for this snapshot (release A1b, second and
             third passes: Review B launched after the snapshot through the launcher and ended
             with exit 0, the last `verify` OK; `snapshot` and `verify` remove an older mark), so a
-            merge that skipped the cross-family review has no way through; refuses a dirty
+            merge that skipped the cross-family review has no way through; compares the
+            snapshot's hash with its copy as `verify` does; refuses a dirty
             tree; the head about to merge must descend from the reviewed head and differ from
             it only under run/review/ (the review files removed with `git rm`); with <pr>, the
             pull request's head on GitHub must equal the local HEAD (push first; a branch
-            updated from main needs the reviews again). It writes the record the permission
+            updated from main needs the reviews again). GitHub can lag a push: a head that
+            differs is read again every 15 seconds for up to 90 before it is flagged, and the
+            wait is printed either way (2026-10-18 C2). It writes the record the permission
             guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command
             with `--match-head-commit`.
 
@@ -67,6 +82,7 @@ CACHE_DIRS = {".venv", "venv", "env", "node_modules", "__pycache__", ".pytest_ca
               ".tox", ".nox", "dist", "build", ".cache", "target", ".next", ".turbo", "coverage", "site-packages", ".ipynb_checkpoints"}
 PROTECTED_PREFIXES = ("docs/", "handoff/", "run/review/")
 MAX_IGNORED_FILES = 50000
+PR_HEAD_WAIT, PR_HEAD_STEP = 90, 15                # premerge: how long, and how often, GitHub's head is read again
 _NO_HOOKS = {}
 
 
@@ -240,6 +256,47 @@ def snapshot_path(common, nnn):
     return os.path.join(common, "bridge", "review-%s.json" % nnn)
 
 
+def hash_copy_path(common, nnn):
+    """~/.cursor-bridge/review-hashes/<the repository's key>-<nnn>.sha256: outside the checkout the
+    reviewer runs in (the snapshot itself lies in its .git/, within the reviewer's reach). The
+    bridge's own test suite points BRIDGE_REVIEW_HASHES at a temporary folder."""
+    key = hashlib.sha256(os.path.normcase(os.path.abspath(common)).encode("utf-8")).hexdigest()[:16]
+    folder = os.environ.get("BRIDGE_REVIEW_HASHES") or os.path.join(os.path.expanduser("~"), ".cursor-bridge", "review-hashes")
+    return os.path.join(folder, "%s-%s.sha256" % (key, nnn))
+
+
+def snapshot_rewritten(common, nnn):
+    """'rewritten' when the snapshot file's hash differs from the copy `snapshot` wrote outside the
+    checkout (FB-037), 'missing' when there is no copy (fail closed: a snapshot taken before this
+    release or a deleted copy is taken again), None when it matches."""
+    try:
+        with open(hash_copy_path(common, nnn), encoding="utf-8") as f:
+            recorded = f.read().strip()
+    except OSError:
+        print("review-guard: CANNOT VERIFY - no copy of the snapshot hash (%s): take the snapshot again and run Review B on it (a snapshot taken before 2026.10.25a has none)" % hash_copy_path(common, nnn))
+        return "missing"
+    if sha256_file(snapshot_path(common, nnn)) != recorded:
+        print("  GATE-INTEGRITY  the snapshot was rewritten after it was taken: %s no longer matches the hash in %s" % (snapshot_path(common, nnn), hash_copy_path(common, nnn)))
+        return "rewritten"
+    return None
+
+
+def review_inputs(root, nnn):
+    """[(name, size)] of the files directly under run/review/ whose name contains <nnn>, the
+    launcher's own REVIEW-<nnn>.err excepted: what the two reviewers are told to read."""
+    folder = os.path.join(root, "run", "review")
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return []
+    out = []
+    for name in names:
+        p = os.path.join(folder, name)
+        if str(nnn) in name and name != "REVIEW-%s.err" % nnn and os.path.isfile(p):
+            out.append((name, os.path.getsize(p)))
+    return out
+
+
 def mark_path(common, nnn):
     return os.path.join(common, "bridge", "verified-%s.json" % nnn)
 
@@ -282,6 +339,17 @@ def cmd_snapshot(nnn, cwd):
     if run_git(["status", "--porcelain"], root, common).strip():
         print("review-guard: CANNOT SNAPSHOT - the tree is not clean; commit everything of yours first (rule 2)")
         return 2
+    # The review's input files, with their sizes (2026-10-25 C4, FB-003): an empty one is
+    # refused before anything is written, since both reviewers would read nothing (KP-067).
+    inputs = review_inputs(root, nnn)
+    for name, size in inputs:
+        print("review-guard: review input run/review/%s  %d bytes" % (name, size))
+    if not inputs:
+        print("  NOTE no review input file under run/review/ names %s" % nnn)
+    empty = [name for name, size in inputs if size == 0]
+    if empty:
+        print("review-guard: CANNOT SNAPSHOT - run/review/%s is empty: both reviewers would read an empty input (KP-067: `git show <rev>:<path> --output=<file>` creates the file empty); write it again, commit, then snapshot" % ", run/review/".join(empty))
+        return 2
     head = run_git(["rev-parse", "HEAD"], root, common).strip()
     try:
         branch = run_git(["symbolic-ref", "-q", "HEAD"], root, common).strip()
@@ -298,6 +366,9 @@ def cmd_snapshot(nnn, cwd):
     path = snapshot_path(common, nnn)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(snap, f, indent=1, sort_keys=True)
+    os.makedirs(os.path.dirname(hash_copy_path(common, nnn)), exist_ok=True)
+    with open(hash_copy_path(common, nnn), "w", encoding="utf-8") as f:
+        f.write(sha256_file(path) + "\n")                   # the copy verify and premerge compare with (FB-037)
     print("review-guard: snapshot %s taken at %s on %s (%d refs, %d stashes, %d ignored entries, hooks at %s)" % (
         head[:12], snap["taken"], branch or "detached HEAD", len(snap["refs"]), len(snap["stashes"]), len(snap["ignored"]),
         snap["git"]["hooks_path"] or os.path.join(common, "hooks")))
@@ -329,6 +400,13 @@ def cmd_verify(nnn, cwd):
     if snap is None:
         return 2
     remove_mark(common, nnn)                           # a failed verify leaves no mark behind
+    # 0. the snapshot itself: a rewritten one would restore what the reviewer chose
+    state = snapshot_rewritten(common, nnn)
+    if state == "missing":
+        return 2
+    if state:
+        print("review-guard: GATE-INTEGRITY - the snapshot was rewritten after it was taken; the checkout was NOT restored from it and no git command was run")
+        return 1
     flags, notes = [], []
     # 1. the repository's configuration and hooks, read as files, before any git command runs
     now = config_state(common, root)
@@ -462,10 +540,28 @@ def cmd_verify(nnn, cwd):
     return 0
 
 
+def pr_head(pr, root):
+    """(the pull request's head sha on GitHub, None) or (None, the reason gh failed)."""
+    try:
+        g = subprocess.run(["gh", "pr", "view", str(pr), "--json", "headRefOid", "--jq", ".headRefOid"], cwd=root, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, " (%s)" % e
+    if g.returncode != 0:
+        return None, ": %s" % (g.stderr.strip() or g.stdout.strip())[:200]
+    return g.stdout.strip(), None
+
+
 def cmd_premerge(nnn, cwd, pr=None):
     snap, root, common, snap_hash = load_snapshot(nnn, cwd)
     if snap is None:
         return 2
+    state = snapshot_rewritten(common, nnn)
+    if state == "missing":
+        return 2
+    if state:
+        print("review-guard: GATE-INTEGRITY - do not merge; the snapshot was rewritten after it was taken")
+        return 1
     try:
         with open(mark_path(common, nnn), encoding="utf-8") as f:
             mark = json.load(f)
@@ -502,18 +598,20 @@ def cmd_premerge(nnn, cwd, pr=None):
         print("review-guard: GATE-INTEGRITY - do not merge; re-run the reviews on the new head")
         return 1
     if pr:
-        try:
-            g = subprocess.run(["gh", "pr", "view", str(pr), "--json", "headRefOid", "--jq", ".headRefOid"], cwd=root, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired) as e:
-            print("review-guard: CANNOT CHECK - gh pr view failed (%s)" % e)
+        remote_head, err = pr_head(pr, root)
+        waited = 0
+        while err is None and remote_head != head and waited < PR_HEAD_WAIT:
+            time.sleep(PR_HEAD_STEP)                       # GitHub can lag a push (2026-10-18 C2)
+            waited += PR_HEAD_STEP
+            remote_head, err = pr_head(pr, root)
+        if err is not None:
+            print("review-guard: CANNOT CHECK - gh pr view failed%s" % err)
             return 2
-        if g.returncode != 0:
-            print("review-guard: CANNOT CHECK - gh pr view failed: %s" % (g.stderr.strip() or g.stdout.strip())[:200])
-            return 2
-        remote_head = g.stdout.strip()
+        if waited:
+            print("review-guard: the pull request's head on GitHub differed from the local head; waited %d seconds, read every %d, %s" % (
+                waited, PR_HEAD_STEP, "now it matches" if remote_head == head else "it still differs"))
         if remote_head != head:
-            print("  GATE-INTEGRITY  the pull request's head on GitHub (%s) is not the local head (%s): push first; if the branch was updated from main on GitHub, the reviews run again on that head" % (remote_head[:12], head[:12]))
+            print("  GATE-INTEGRITY  the pull request's head on GitHub (%s) is not the local head (%s), after waiting %d seconds: push first; if the branch was updated from main on GitHub, the reviews run again on that head" % (remote_head[:12], head[:12], waited))
             print("review-guard: NOT READY - do not merge yet")
             return 1
     print("review-guard: OK - %s descends from the reviewed %s and differs only under run/review/ (%d file(s))%s" % (

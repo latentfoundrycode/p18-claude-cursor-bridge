@@ -22,10 +22,19 @@ Pool is inferred from the id per Cursor's docs: Grok (any effort/host prefix) an
 the "Cursor Models" pool (native); every third-party model is "Other Models".
 A profile is skipped when other_pool is "exhausted" and any of its models is in the other
 pool. Unless --no-probe, the builder and Review B of a candidate profile are each sent a
-one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply, or
-timeout marks the profile unusable (this catches hard failures only, never a nearly-empty
-quota). The chosen profile's three families must be distinct. The result is written to
-docs/ROSTER.resolved.json for the delegate and Review B commands to read.
+one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
+usage-limit message or timeout marks the profile unusable (this catches hard failures only,
+never a nearly-empty quota); any other reply counts as answered, off-script. The chosen
+profile's three families must be distinct. The result is written to
+docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
+changes (the time of every check goes to the state file as last_resolved), so a check
+before a snapshot leaves the tree clean.
+The family rule governs Review B only (2026.10.25a): Review B is never of the family of the
+last builder run of the branch under review (none for a branch with no builder run). When
+the chosen profile's Review B is of that family - the change in flight was built under
+another profile, before a switch - the profile still resolves, with a REBUILD line and a
+"rebuild" entry in the resolved file: its builder rebuilds the change first (step 3b), and
+bridge-run.py refuses that Review B until the branch's last builder run is of another family.
 --record-failure <model> --stderr-file <path> [--stdout-file <path>]
   Classify a failed cursor-agent call. <model> must be a model id of this roster (a wrong
   argument exits 2 and changes nothing). USAGE-LIMIT (a usage/quota/limit message) or a
@@ -36,7 +45,9 @@ docs/ROSTER.resolved.json for the delegate and Review B commands to read.
   the same step once", twice per window, then exit 5 = "stop and tell the owner" (no
   switch helps a dead line). A first other failure is exit 4 too. The counts expire after
   8 hours, longer than any run limit, and --record-success <model> clears them. An
-  automatic "unavailable" mark expires after 6 hours.
+  automatic "unavailable" mark expires after 6 hours; --clear-unavailable <model> removes
+  one at once (a wrong mark, e.g. a service outage). The service's `[unavailable]` line is a
+  connection error, never the model's failure.
 The changing state (pool, marks, counts) is kept in <git common dir>/bridge/roster-state.json,
 never in the tracked roster, so a reset of the working tree cannot erase a switch; a roster
 from an older release seeds the state file once.
@@ -71,7 +82,7 @@ CONNECTION_RETRIES = 2        # connection failures / time-outs retried this oft
 # working tree would erase it (release 0a review, F1). It lives in the repository's own
 # .git/bridge/roster-state.json, which no reset, clean or checkout touches.
 STATE_KEYS = ("other_pool", "exhausted_at", "exhausted_reason", "auto_exhausted_at", "auto_exhausted_reason",
-              "unavailable", "failures", "connection_failures", "last_reset")
+              "unavailable", "failures", "connection_failures", "last_reset", "last_resolved")
 NL = chr(10)
 PROBE_PROMPT = "Reply with exactly the single word OK and nothing else."
 PROBE_TIMEOUT = 150
@@ -105,15 +116,17 @@ def current_branch():
         return ""
 
 
-def built_by(run_log):
+def built_by(run_log, branch=None):
     """The model of the last builder run of the branch under review in the launcher's run log
-    (release A4; the log records the branch); the last builder run of any branch when none names it."""
+    (release A4; the log records the branch). None for a branch with no builder run: a design
+    review is of a text nothing built, and another branch's builder did not build this change
+    (2026.10.25a: the fallback to any branch's last run refused the only usable profile)."""
     try:
         with open(run_log, encoding="utf-8") as f:
             lines = f.read().splitlines()
     except OSError:
         return None
-    branch = current_branch()
+    branch = branch or current_branch()
     entries = []
     for line in lines:
         try:
@@ -125,7 +138,7 @@ def built_by(run_log):
     for e in reversed(entries):
         if branch and e.get("branch") == branch:
             return str(e["model"])
-    return str(entries[-1]["model"]) if entries else None
+    return None
 
 
 def family_of(model_id, override=None):
@@ -160,7 +173,10 @@ def cursor_agent_cmd():
 
 
 def probe(model_id):
-    """Return (ok, detail). ok only when the model replied 'OK' (case-insensitive) within the timeout."""
+    """Return (ok, detail). ok when the model replied 'OK' (case-insensitive) within the timeout, or
+    replied something else that is not a usage-limit message: answered off-script, so the model is
+    there (2026.10.25a: a sentence instead of the word printed FAIL, which sends the owner to buy
+    usage). A refusal (non-zero exit), an empty reply, a time-out or a usage-limit message is not ok."""
     launcher = cursor_agent_cmd()
     if launcher is None:
         return False, "cursor-agent not found (PATH or %LOCALAPPDATA%/cursor-agent)"
@@ -179,7 +195,11 @@ def probe(model_id):
     out = (p.stdout or "").strip()
     if p.returncode == 0 and out.strip().strip(".").upper() == "OK":
         return True, "answered"
-    err = (p.stderr or "").strip().replace("\n", " ")[:200]
+    if (p.returncode == 0 and out and classify_failure(out + " " + (p.stderr or ""))[0] == "OTHER"
+            and not re.search(r"(?i)\b(error|exception|failed|failure|traceback|unavailable|not available|denied|unauthori[sz]ed|forbidden"
+                              r"|invalid|not found|unknown model|cannot use|not supported)\b", out)):
+        return True, "answered off-script: %r" % out.replace(NL, " ")[:80]
+    err =(p.stderr or "").strip().replace("\n", " ")[:200]
     return False, "exit %d; stdout=%r; stderr=%r" % (p.returncode, out[:80], err)
 
 
@@ -301,6 +321,7 @@ CONNECTION_PATTERNS = [
     r"\benotfound\b", r"network (error|unreachable|is unreachable)", r"reconnect", r"socket hang up",
     r"\b(502|503|504)\b", r"gateway time-?out", r"service unavailable", r"\brate limit",
     r"\b429\b", r"too many requests",
+    r"\[unavailable\]",                  # the service's own outage line, `[unavailable] Error ...` (2026.10.25a)
     r"bridge-run: limit \d+s reached",   # the launcher's limit was hit: the run hung, the model did not fail
 ]
 
@@ -461,6 +482,21 @@ def main():
         print(("ok    failure count cleared for %s" if changed else "ok    no failure count for %s") % model)
         return 0
 
+    if "--clear-unavailable" in argv:
+        i = argv.index("--clear-unavailable") + 1
+        model = argv[i] if i < len(argv) else ""
+        marks = roster.get("unavailable") or {}
+        if model not in marks:
+            print("ok    no unavailable mark for %r (marked: %s)" % (model, ", ".join(sorted(marks)) or "none"))
+            return 0 if model in roster_models(roster) else 2
+        del marks[model]
+        if not marks:
+            roster.pop("unavailable", None)
+        (roster.get("failures") or {}).pop(model, None)
+        save_state(path, roster)
+        print("CLEARED  the unavailable mark of %s (a wrong mark, e.g. a service outage) - re-resolve" % model)
+        return 0
+
     maybe_auto_reset(path, roster)
     dropped = expire_unavailable(roster)
     if dropped:
@@ -503,8 +539,14 @@ def main():
         fams = {"builder": b_fam, "review_a": ra_fam, "review_b": r_fam}
         if len(set(fams.values())) < 3:
             print("    skip: family collision %s" % fams); continue
+        # The family rule governs Review B only (2026.10.25a, ISS-008 / FB-013): when this profile's
+        # Review B is of the family that built the change in flight, this profile's builder rebuilds
+        # the change first (step 3b) and Review B is compared with that builder, never with the old
+        # one. The launcher refuses Review B until the branch's last builder run is of another family.
+        rebuild = None
         if built_fam and r_fam == built_fam:
-            print("    skip: review_b %s is of the %s family, which built this change (%s); the reviewer of a change is never of the family that built it (release A4)" % (r_id, r_fam, built_model)); continue
+            rebuild = {"built_by": built_model, "rebuild_with": b_id}
+            print("    REBUILD  review_b %s is of the %s family, which built the change in flight (%s): this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (r_id, r_fam, built_model, b_id))
         if do_probe:
             usable = True
             for role, mid in (("builder", b_id), ("review_b", r_id)):
@@ -517,6 +559,8 @@ def main():
         chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": r_id, "families": fams,
                   "other_pool": other_pool, "probed": do_probe,
                   "resolved_at": stamp(now_utc()), "reset_day": roster.get("reset_day")}
+        if rebuild:
+            chosen["rebuild"] = rebuild
         break
 
     if chosen is None:
@@ -531,10 +575,26 @@ def main():
             print("FAIL  delegate command uses --model %s but the resolved builder is %s" % (m.group(1), chosen["builder"])); ok = False
         else:
             print("ok    delegate command sets --model %s" % chosen["builder"])
-    with open(out_path, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(chosen, f, indent=2); f.write("\n")
-    print("RESOLVED profile '%s': builder=%s  review_a=%s  review_b=%s  -> %s" % (
-        chosen["profile"], chosen["builder"], chosen["review_a"], chosen["review_b"], out_path))
+    # The tracked file is rewritten only when what it resolves changes, so a check before every
+    # snapshot leaves the tree clean (2026.10.25a, FB-008); the time of each check goes to the
+    # roster's untracked state.
+    try:
+        with open(out_path, encoding="utf-8-sig") as f:
+            before = json.load(f)
+    except (OSError, ValueError):
+        before = None
+    same = isinstance(before, dict) and {k: v for k, v in before.items() if k != "resolved_at"} == {k: v for k, v in chosen.items() if k != "resolved_at"}
+    roster["last_resolved"] = chosen["resolved_at"]
+    save_state(path, roster)
+    if not same:
+        with open(out_path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(chosen, f, indent=2); f.write("\n")
+    print("RESOLVED profile '%s': builder=%s  review_a=%s  review_b=%s  -> %s%s" % (
+        chosen["profile"], chosen["builder"], chosen["review_a"], chosen["review_b"], out_path,
+        "" if not same else " (unchanged since %s, not rewritten)" % before.get("resolved_at")))
+    if chosen.get("rebuild"):
+        print("REBUILD  the change in flight was built by %s; rebuild it with %s (the brief re-delegated) before Review B %s; the launcher refuses Review B until then" % (
+            chosen["rebuild"]["built_by"], chosen["builder"], chosen["review_b"]))
     if chosen["profile"] != profiles[0].get("name", "?"):
         print("NOTE  the preferred profile '%s' is not in use - report this to the owner in the first line" % profiles[0].get("name", "?"))
     return 0 if ok else 1

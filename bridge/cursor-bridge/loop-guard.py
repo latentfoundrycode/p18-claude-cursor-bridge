@@ -8,7 +8,9 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
 
   1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;
   2. its `Phase:` is building or changing;
-  3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner);
+  3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner), and
+     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2026.10.25a, FB-027:
+     a pause written in the untracked working file touches no tracked file);
   (and, in every phase: a turn whose last message holds a shell block and names no terminal
   is sent back once, because a run sheet without its terminal cannot be followed, rule 27);
   4. nothing is pending that will wake the session. Since release A2 the hook's own lists
@@ -19,8 +21,13 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
      ceiling is running, because a hung agent never completes and nothing else would wake the session
      (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the
      session is idle). A background command of any other kind (a dev server, a worker, a
-     probe) is NOT a wake source: a server never finishes (KP-031). When the hook hands no
-     lists, the transcript is read as before, within GRACE_HOURS;
+     probe) is NOT a wake source: a server never finishes (KP-031). A task is classed by its
+     tool (2026.10.25a, TDP FB-006): an Agent task is timer-bound as above, a shell command
+     counts by its pattern, and a monitor (an artifact live-update monitor, a Monitor tool
+     task) is neither a wake source nor an agent: it never demands a wake-timer and never
+     counts; any other task with no command (a workflow, a teammate, an MCP task) is read as
+     an agent, as before. When the hook hands no lists, the
+     transcript is read as before, within GRACE_HOURS;
   5. this is not already a continuation forced by this hook (`stop_hook_active`), so it
      nudges at most once per stop sequence and can never trap the session.
 
@@ -226,6 +233,31 @@ def workspace_of(cwd):
     return None
 
 
+def names_a_wait(value):
+    """Does a field's value name a wait (anything but nothing, none, n/a, a dash or empty)?"""
+    a = (value or "").strip().strip("<>").strip().lower()
+    return a not in NOTHING and not a.startswith(("nothing", "none", "n/a"))
+
+
+def paused_in_flight(cwd):
+    """The `Paused:` line of run/supervisor/in-flight.md beside the status file, when it names a
+    wait (2026.10.25a, FB-027): the untracked working file records a pause, so no tracked file is
+    edited for it. None otherwise, or when the file is missing or unreadable."""
+    ws = workspace_of(cwd)
+    if not ws:
+        return None
+    try:
+        with open(os.path.join(ws, "run", "supervisor", "in-flight.md"), encoding="utf-8-sig", errors="replace") as f:
+            value = field(f.read(), "Paused")
+    except OSError:
+        return None
+    if value is None or not names_a_wait(value):
+        return None
+    if re.match(r"(?i)\s*(no|not|false|off|resumed|ended|cleared)\b", value):
+        return None                                # "Paused: no", "Paused: resumed 10-26": not a wait (the review of 2026.10.25a)
+    return value
+
+
 def record_input(data, cwd):
     """The hook's last input, for the record (run/supervisor/loop-guard-input.json beside the project's
     status file; never the transcript): what the guard decided from can then be read (release A3)."""
@@ -242,21 +274,44 @@ def record_input(data, cwd):
         pass
 
 
-def wakes(tur, content, uses):
-    """Does this background task's completion count as a wake source?
+AGENT_TOOLS = ("Agent", "Task")
+OTHER_TOOLS = ("Monitor",)  # a tool whose task streams events and is no wake source, whatever its input
+AGENT_TYPES = ("subagent", "background_subagent", "agent", "agent sdk tool", "local_agent")
+SHELL_TYPES = ("shell", "command", "local_bash", "bash", "powershell")
 
-    Agents and non-Bash tasks finish by nature. A background Bash command counts only if
-    its text matches WAKE_PATTERNS; a command the transcript cannot be mapped back to is
-    counted (fail open)."""
-    if not tur.get("backgroundTaskId"):
-        return True                                # an async agent or a tracked task: finishes
+
+def task_class(t):
+    """'agent', 'shell' or 'other' for a task of the hook's list, by its tool (2026.10.25a, TDP
+    FB-006: an artifact live-update monitor, type `monitor` with no command, was read as an agent
+    and a wake-timer demanded for it). Claude Code names the type (`subagent`, `shell`, `monitor`,
+    `MCP task`, `workflow`, ...) and gives a command for a shell task only. Only a monitor is
+    'other'; any other task with no command finishes and notifies, so it stays an agent."""
+    kind, cmd = str(t.get("type") or "").lower(), str(t.get("command") or "")
+    if kind in AGENT_TYPES or t.get("agent_type"):
+        return "agent"
+    if kind in SHELL_TYPES or (cmd and "monitor" not in kind):
+        return "shell"                             # a command: whatever else the hook calls its type
+    if "monitor" in kind:
+        return "other"                             # streams events, never finishes on its own
+    return "agent"                                 # a workflow, a teammate, an MCP task: finishes and notifies, as before
+
+
+def wakes(tur, content, uses):
+    """Does this background task's completion count as a wake source? Classed by its tool
+    (2026.10.25a): an Agent task finishes by nature; a shell command counts only if its text
+    matches WAKE_PATTERNS; any other tool's task (a Monitor) never counts. A task the transcript
+    cannot be mapped back to a tool is counted (fail open)."""
     if not isinstance(content, list):
         return True
     for x in content:
         if isinstance(x, dict) and x.get("type") == "tool_result" and x.get("tool_use_id") in uses:
             name, inp = uses[x["tool_use_id"]]
+            if name in AGENT_TOOLS:
+                return True                        # an async agent: finishes
+            if name in OTHER_TOOLS:
+                return False                       # a monitor: neither a wake source nor an agent
             if not isinstance(inp, dict) or "command" not in inp:
-                return True                        # not a shell tool: finishes by nature
+                return True                        # another tool's task (a workflow, an MCP tool): finishes, as in the hook's list
             cmd = str(inp.get("command") or "")    # Bash, PowerShell, any shell tool alike
             return any(pat.search(cmd) for pat in WAKE_PATTERNS)
     return True
@@ -372,9 +427,11 @@ def pending_from_hook(data, now, cwd):
             continue
         start = parse_ts(t.get("started_at") if t.get("started_at") is not None else t.get("startedAt")) or now
         age = now - start
-        kind, cmd = str(t.get("type") or "").lower(), str(t.get("command") or "")
-        is_agent = kind in ("background_subagent", "subagent", "agent", "agent sdk tool") or (not cmd and kind != "command")
-        if not is_agent:                                   # a command: whatever the hook calls its type
+        cmd = str(t.get("command") or "")
+        cls = task_class(t)
+        if cls == "other":
+            continue                                       # a monitor: never a wake source, never an agent
+        if cls == "shell":
             if WAITER_RX.search(cmd):
                 WAITERS.append(str(t.get("id")))           # a polling loop a subagent left behind never ends and never counts
                 continue
@@ -385,7 +442,7 @@ def pending_from_hook(data, now, cwd):
                 continue                                   # a server never finishes, so it never wakes you
             if age <= command_ceiling(cmd, cwd) + GRACE_SECONDS:
                 pending.append("background command %s" % t.get("id"))
-        else:                                              # background_subagent, Agent SDK tool
+        else:                                              # subagent, background_subagent, Agent SDK tool
             ceiling = agent_ceiling(cwd)
             if age > ceiling:
                 continue                                   # past its ceiling: stop it and re-run its task in the foreground
@@ -497,9 +554,9 @@ def main():
         sys.exit(2)
     if not phase.lower().startswith(ACTIVE_PHASES):
         allow()
-    awaiting = (field(status, "Awaiting user on") or "").strip().strip("<>").strip()
-    a = awaiting.lower()
-    if a not in NOTHING and not a.startswith(("nothing", "none", "n/a")):
+    if names_a_wait(field(status, "Awaiting user on")):
+        allow()
+    if paused_in_flight(cwd):                              # a pause in the untracked working file (FB-027)
         allow()
     listed, unscheduled = pending_from_hook(data, time.time(), cwd)
     tp = data.get("transcript_path")

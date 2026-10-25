@@ -3,12 +3,16 @@ import importlib.util
 import os
 import subprocess
 import sys
+import tempfile
 
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CURSOR_BRIDGE = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge")
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+# Set before any test module is imported, so the environments some modules copy at import carry it too:
+# review-guard.py's snapshot-hash copies (2026.10.25a) never reach the owner's ~/.cursor-bridge.
+os.environ["BRIDGE_REVIEW_HASHES"] = tempfile.mkdtemp(prefix="bridge-review-hashes-")
 
 
 def windowless_kwargs(kwargs):
