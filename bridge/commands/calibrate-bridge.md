@@ -49,7 +49,7 @@ Run it from the project root or from `Workspace/` (it resolves either). It compa
 Read, whole, in this order — even if you believe you already know them, and even if
 the version has not changed (the owner is asking for certainty, not a version check):
 
-1. `~/.claude/commands/supervisor.md`
+1. `~/.claude/commands/supervisor.md`, the core: it is longer than one Read call returns, so read it in parts, each call starting where the last one ended, until its last line; then the current phase's modules under `~/.claude/cursor-bridge/workflow/phases/`, each whole, with the sub-files and variant files their `Sub-files:` and `Variants:` lines name, as the session-start hook's table below gives them for the status file's `Phase:` value; then the conditional workflows the project's `Workflows:` line names that touch the phase: the type's file, the sub-type's file, the trait files in the open list's order
 2. `~/.claude/cursor-bridge/Merge-Verification-Policy.md`
 3. `~/.claude/cursor-bridge/Cursor-Project-Configuration.md`
 4. `~/.claude/cursor-bridge/Known-Pitfalls.md`
@@ -58,6 +58,19 @@ the version has not changed (the owner is asking for certainty, not a version ch
 7. `~/.claude/cursor-bridge/Performance-Conventions.md` and `Performance-Patterns.md` (projects with performance or cost budgets)
 8. `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` and `Glossary.md` (every project: the diagram catalogue, its rules, and the bridge's vocabulary)
 9. Every `SKILL.md` under `~/.claude/skills/`
+
+The session-start hook's table (`PHASE_MODULES` in `session-start.py`), which also names these modules after every compaction and resume:
+
+| `Phase:` | Modules |
+|---|---|
+| `intake` | `intake.md` |
+| `design` | `design.md` |
+| `mockups`, `interface` | `interface.md` and its variant files |
+| `planning` | `planning.md`, `run-parameters.md` |
+| `configuration`, `configuring`, `configure` | `configuration.md` |
+| `building` | `delegation-loop.md` and its sub-file, `reflection.md`, `project-end.md` (read at the close of the plan's last stage) |
+| `done` | `change-cycle.md` |
+| `changing` | `change-cycle.md`, `delegation-loop.md` and its sub-file, `reflection.md`, `project-end.md` |
 
 Subagent definitions under `~/.claude/agents/` are loaded fresh each time a subagent is
 spawned, so they need no re-read here — but note that any subagent spawned **before** the
@@ -146,6 +159,15 @@ Rules while applying **Now** items:
 - Nothing here escalates. If an item genuinely cannot be applied without a decision only the
   owner can take (the layout rename of a pre-layout project), it becomes the single
   decision line of the report, with a run sheet, and the loop continues without it.
+
+## 4b. Conditional workflows — by phase, reopening no gate
+
+A release that adds or changes a conditional workflow (a product type's, a sub-type's or a trait's file under `~/.claude/cursor-bridge/workflow/`) names it in its changelog, and calibration applies it to every running project whose `Workflows:` line names that type, sub-type or trait, by phase, as step 4 sorts any item, reopening no gate:
+
+- **The `Workflows:` line.** A running project whose status file has none gets it now, a record-keeping addition as `project.json` was at release A2: one line per part, right after `Phase:`, in the open list's grammar, written from the classification the project recorded (the inventory's Decisions row of each part's product type, sub-type and traits, as the owner decided it); then `python ~/.claude/cursor-bridge/workflow-check.py --status docs/PROJECT_STATUS.md` must pass. The line is confirmed with the owner: the report's first line quotes it and asks whether it is right, and the loop continues meanwhile on the line as written; a correction is written and checked the same way. A project that recorded no classification is classified against the open list as intake does, and its line is put to the owner the same way.
+- **The `Phase:` value is kept.** Calibration never renames a project's phase: the session-start hook's table (step 2) maps the value the status file holds to its modules.
+- **When the text takes effect.** A conditional workflow's text takes effect from the project's next design phase or change cycle, where its intake questions, design sections, mandatory diagrams and plan additions are asked and written into the design and the plan; until then the project runs on the design and the plan the owner approved. Its additions at the points of a phase already passed are never applied backwards, and nothing it adds re-presents an approved design or plan or reopens a gate; what the changelog marks for the current phase or a later one is applied as step 4 says, **Now** or **Later**.
+- The report names each conditional workflow applied, the parts it reaches and when it takes effect, one line each.
 
 ## 5. Record and report
 
