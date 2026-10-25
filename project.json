@@ -5,7 +5,7 @@
   "version": "2026.10.18a",
   "state": {
     "phase": "building",
-    "stage": "B1 to B3 closed; the pace plan revision approved 2026-10-24; B4 in progress (TASK-022 and TASK-017 to TASK-020 merged; TASK-021 next)",
+    "stage": "B1 to B3 closed; the pace plan revision approved 2026-10-24; B4's increments merged (TASK-017 to TASK-022); the stage's close next",
     "bridge": "2026.10.18a",
     "updated": "2026-10-25"
   }
