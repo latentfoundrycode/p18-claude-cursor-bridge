@@ -311,3 +311,29 @@ def test_the_hook_input_is_read_in_its_live_forms(lg, tmp_path, monkeypatch):
     assert e.value.code == 0
     recorded = json.loads((root / "run" / "supervisor" / "loop-guard-input.json").read_text(encoding="utf-8"))
     assert recorded["background_tasks"][0]["id"] == "b1" and "transcript_path" not in recorded, "the guard records what it decided from"
+
+
+def test_bug020_a_one_shot_in_the_repeated_hour_is_found(lg):
+    """BUG-020 (docs/debug/BUG-020.md, ISS-014): `cron_next` walks instants, not wall-clock minutes, so a
+    one-shot schedule in the hour the clock repeats when summer time ends is found at its second
+    occurrence, the first occurrence still before the fold is found as itself, a time after the fold
+    is right, and after clocks go forward a wall time past the gap is right. The zone is named through
+    `tz` (the computer's local zone when it is None), so the case runs at any hour on any computer
+    that has the zone data. Europe/Berlin: 2026-10-25 01:00 UTC clocks go from 03:00 back to 02:00;
+    2027-03-28 01:00 UTC from 02:00 forward to 03:00."""
+    zoneinfo = pytest.importorskip("zoneinfo")
+    try:
+        berlin = zoneinfo.ZoneInfo("Europe/Berlin")
+    except zoneinfo.ZoneInfoNotFoundError:
+        pytest.skip("no zone data on this computer")
+
+    def utc(text):
+        return datetime.fromisoformat(text).replace(tzinfo=timezone.utc).timestamp()
+
+    autumn = utc("2026-10-25T00:35:00")  # 02:35 local summer time, before the fold
+    assert lg.cron_next("9 2 25 10 *", autumn, tz=berlin) == utc("2026-10-25T01:09:00")   # 02:09 the second time
+    assert lg.cron_next("49 2 25 10 *", autumn, tz=berlin) == utc("2026-10-25T00:49:00")  # 02:49 the first time
+    assert lg.cron_next("9 3 25 10 *", autumn, tz=berlin) == utc("2026-10-25T02:09:00")   # 03:09 standard time
+    spring = utc("2027-03-28T00:30:00")  # 01:30 local standard time, before the gap
+    assert lg.cron_next("30 3 28 3 *", spring, tz=berlin) == utc("2027-03-28T01:30:00")   # 03:30 summer time
+    assert lg.cron_next("45 1 28 3 *", spring, tz=berlin) == utc("2027-03-28T00:45:00")   # 01:45 before the gap
