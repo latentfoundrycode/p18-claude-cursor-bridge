@@ -157,6 +157,9 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
             "design that names one says how it is measured, any paid run the measuring needs approved as a paid action of its "
             "own and run by the supervisor, and until the design says so the floor reports the budget `NOT MEASURED`, "
             "a block, never a pass, since no benchmark of it runs on the stand-in") in brief
+    # Stage B4's review, round 4: a design that says nothing leaves the budget including the service's time.
+    assert ("A speed budget of an operation that calls a paid service includes the service's time unless the "
+            "design records, in the owner's words, that it leaves that time out.") in brief
     assert "budgets file" not in brief and "baseline" not in brief, "stage B4's review, round 2: no baseline exception"
     assert ("A benchmark run against the paid service itself is a paid action of its own, approved as one, never "
             "part of the benchmark floor or of CI.") in brief
@@ -174,8 +177,9 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     # The clause held whole with its grade (BUG-023's confirming read: a separate "is a blocking finding" was
     # already in the section from the other clauses).
     assert ("or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
-            "time names (the benchmark results read against the budgets file and the design's statement of which "
-            "budgets include that time), is a blocking finding") in inspect
+            "time names (the benchmark results read against the budgets file and the design's record of the speed "
+            "budgets that leave that time out, any other speed budget of an operation that calls a paid service "
+            "read as including it), is a blocking finding") in inspect
 
 
 def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
@@ -266,6 +270,6 @@ def test_r022_ai_models_judge_by_evaluation_on_pinned_models_and_recorded_output
             "in a development-only place the Evaluation section names by its "
             "role, never by a path of a computer (rule 54), apart from the live data and never read by the product "
             "(rule 55), and a run without it (CI) reports that case as not run, never as passed.") in conf
-    assert ("The evaluation at this step runs the whole set, the cases kept outside the repository read from their "
-            "place: a case not run here is a correctness-class block too") in test
+    assert ("The evaluation at this step runs the whole set, the cases kept outside the repository and the "
+            "Workspace read from their place: a case not run here is a correctness-class block too") in test
     assert "the not-run report of a run without those cases (CI) is that run's alone." in test
