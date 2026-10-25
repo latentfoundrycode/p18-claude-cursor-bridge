@@ -177,8 +177,9 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     # The clause held whole with its grade (BUG-023's confirming read: a separate "is a blocking finding" was
     # already in the section from the other clauses).
     assert ("or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
-            "time names (the benchmark results read against the budgets file and the design's record of the speed "
-            "budgets that leave that time out, any other speed budget of an operation that calls a paid service "
+            "time names (the benchmark results read against the budgets file and the design's record, in the "
+            "owner's words, of the speed budgets that leave that time out, any other speed budget of an operation "
+            "that calls a paid service "
             "read as including it), is a blocking finding") in inspect
 
 
