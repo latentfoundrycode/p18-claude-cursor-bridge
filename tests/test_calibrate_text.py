@@ -38,16 +38,18 @@ def test_r027_the_core_is_read_in_parts_with_the_phase_modules_and_the_condition
     assert got == [(
         "1. `~/.claude/commands/supervisor.md`, the core: it is longer than one Read call returns, so read it "
         "in parts, each call starting where the last one ended, until its last line; then the current phase's "
-        "modules under `~/.claude/cursor-bridge/workflow/phases/`, each whole, with the sub-files and variant "
-        "files their `Sub-files:` and `Variants:` lines name, as the session-start hook's table below gives "
-        "them for the status file's `Phase:` value; then the conditional workflows the project's `Workflows:` "
-        "line names that touch the phase: the type's file, the sub-type's file, the trait files in the open "
-        "list's order")], "R-027: the re-read list's first item"
+        "modules under `~/.claude/cursor-bridge/workflow/phases/`, each whole (`project-end.md` only at the "
+        "close of the plan's last stage, as the table notes), with the sub-files and variant files their "
+        "`Sub-files:` and `Variants:` lines name, as the session-start hook's table below gives them for the "
+        "status file's `Phase:` value; then the conditional workflows the project's `Workflows:` line names "
+        "that touch the phase: the type's file, the sub-type's file, the trait files in the open list's order")], "R-027: the re-read list's first item"
 
 
 def test_r027_the_re_read_table_is_the_hooks_table():
     """R-027 (TASK-023): the table step 2 gives is the session-start hook's PHASE_MODULES, every `Phase:` value with
-    exactly its modules in the hook's order, so calibration and the hook name the same files for a phase."""
+    exactly its modules in the hook's order, so calibration and the hook name the same files for a phase; a module's
+    "and its sub-file" or "and its variant files" stands exactly where the module has a `Sub-files:` or `Variants:`
+    line (Review A, round 1)."""
     body = section(text(), REREAD, 2)
     rows = [l for l in body.split("\n") if l.startswith("| `")]
     got = {}
@@ -57,6 +59,12 @@ def test_r027_the_re_read_table_is_the_hooks_table():
         for phase in re.findall(r"`([a-z-]+)`", phases_cell):
             assert phase not in got, phase
             got[phase] = modules
+        for m in modules:
+            lines = read(os.path.join(BRIDGE, "cursor-bridge", "workflow", "phases", m + ".md")).split("\n")
+            for mark, words in (("Sub-files:", "and its sub-file"), ("Variants:", "and its variant files")):
+                has_line = any(l.startswith(mark) for l in lines)
+                says = ("`%s.md` %s" % (m, words)) in modules_cell
+                assert has_line == says, "R-027: the table's %r for %s matches its %s line" % (words, m, mark)
     assert got == hook_table(), "R-027: the table is the hook's"
     assert "(`PHASE_MODULES` in `session-start.py`)" in body, "R-027: the table names its source"
 
@@ -75,20 +83,27 @@ def test_r027_a_conditional_workflow_is_applied_by_phase_reopening_no_gate():
         "line per part, right after `Phase:`, in the open list's grammar, written from the classification the "
         "project recorded (the inventory's Decisions row of each part's product type, sub-type and traits, as "
         "the owner decided it); then `python ~/.claude/cursor-bridge/workflow-check.py --status "
-        "docs/PROJECT_STATUS.md` must pass. The line is confirmed with the owner: the report's first line "
-        "quotes it and asks whether it is right, and the loop continues meanwhile on the line as written; a "
-        "correction is written and checked the same way. A project that recorded no classification is "
-        "classified against the open list as intake does, and its line is put to the owner the same way. - "
-        "**The `Phase:` value is kept.** Calibration never renames a project's phase: the session-start "
-        "hook's table (step 2) maps the value the status file holds to its modules. - **When the text takes "
-        "effect.** A conditional workflow's text takes effect from the project's next design phase or change "
-        "cycle, where its intake questions, design sections, mandatory diagrams and plan additions are asked "
-        "and written into the design and the plan; until then the project runs on the design and the plan the "
-        "owner approved. Its additions at the points of a phase already passed are never applied backwards, "
-        "and nothing it adds re-presents an approved design or plan or reopens a gate; what the changelog "
-        "marks for the current phase or a later one is applied as step 4 says, **Now** or **Later**. - The "
-        "report names each conditional workflow applied, the parts it reaches and when it takes effect, one "
-        "line each."), "R-027: the conditional workflows' step"
+        "docs/PROJECT_STATUS.md` must pass. Once it passes, the conditional workflows the new line names that "
+        "touch the current phase are read whole, as step 2's item 1 reads them, before step 4 applies "
+        "anything: step 2 read none, since the line was missing. The line is confirmed with the owner: the "
+        "report's first line quotes it, every part's line together, and asks whether they are right, after "
+        "the roster's note where the profile is not the preferred one and beside step 4's decision line where "
+        "there is one; the loop continues meanwhile on the line as written, and a correction is written and "
+        "checked the same way. A project that recorded no classification is classified against the open list "
+        "as intake does, and its line is put to the owner the same way. A project past intake is never paused "
+        "for its classification: where the check fails, or the classification falls to a type or sub-type the "
+        "open list has not written, its line reads `not yet classified`, which the check accepts, the finding "
+        "or the unwritten workflow (a request to the maintainer) is the report's single decision line, and "
+        "the project runs on the main workflow alone until the line is written. - **The `Phase:` value is "
+        "kept.** Calibration never renames a project's phase: the session-start hook's table (step 2) maps "
+        "the value the status file holds to its modules. - **When the text takes effect.** A conditional "
+        "workflow's text takes effect from the project's next design phase or change cycle, where its intake "
+        "questions, design sections, mandatory diagrams and plan additions are asked and written into the "
+        "design and the plan; until then the project runs on the design and the plan the owner approved. Its "
+        "additions at the points of a phase already passed are never applied backwards, and nothing it adds "
+        "re-presents an approved design or plan or reopens a gate; what the changelog marks for the current "
+        "phase or a later one is applied as step 4 says, **Now** or **Later**. - The report names each "
+        "conditional workflow applied, the parts it reaches and when it takes effect, one line each."), "R-027: the conditional workflows' step"
 
 
 def test_r027_the_step_stands_between_the_delta_and_the_record():
