@@ -107,7 +107,7 @@ The round's file may carry, beside the lenses below, the lenses the parts' condi
   If it is more than a few, the plan is back-loading risk.
 - **Missing increments.** What has to happen that no increment covers — error handling,
   configuration, teardown, migration, packaging?
-- **Command reference (an approved command design).** Where the interface phase approved a command design (`docs/design/COMMANDS.md`), does the increment that first builds one of its commands carry the command reference's generator and its currency check, whatever the part's traits (planning.md, "What the interface phase hands to the plan")? Without it the supervisor has nothing to look commands up in (rule 32) — **Blocking**.
+- **Command reference (an approved command design).** Where the interface phase approved a command design (`docs/design/COMMANDS.md`), does the increment that first builds one of its commands carry the command reference's generator and its currency check, and does every later increment that adds or changes one of its commands carry "reference regenerated" as a criterion, whatever the part's traits (planning.md, "What the interface phase hands to the plan")? Without it the supervisor has nothing to look commands up in (rule 32) — **Blocking**.
 - **Change-cycle addendum (a finished project being changed).** Does each new stage state
   which existing behaviour it may alter and that everything else is unchanged? Are the
   tests that pin existing behaviour kept, not rewritten? Is the version bumped in the
