@@ -329,7 +329,26 @@ def test_r016_r019_the_plan_critic_keeps_its_design_lenses_and_catches_a_missing
                           ("a service run by others (a third-party API, SDK or provider)", "no external-service lens"),
                           ("a design that shows screens", "no design-criteria lens"),
                           ("a design naming a budget", "no benchmark-increments lens")):
-        assert trigger in pc and lens in pc, trigger
+        start = pc.index(trigger)
+        assert pc[start:pc.index(" lens", start) + 5].endswith(lens), (trigger, lens)
+
+
+def test_r017_the_command_reference_reaches_every_approved_command_design():
+    """Rule 32; stage B4's review, round 1 (BUG-021): the command reference's generator is planned for every part
+    whose command design the interface phase approved, whatever its traits, not only through the trait
+    *installable*; the plan critic holds a Blocking lens for it and applies the lenses a round's file adds."""
+    plan = flat(section(module("planning"), "What the interface phase hands to the plan", 3))
+    assert ("The increment that first builds a command of the approved command design also carries the command "
+            "reference's generator (`scripts/dump-cli.py` or the stack's equivalent, which writes "
+            "`docs/cli-reference.json` from the real command tree, `Delivery-Conventions.md` §4) and its currency "
+            "check") in plan
+    assert "whatever the part's traits (rule 32)" in plan
+    pc = flat(read(PLAN_CRITIC))
+    lens = pc[pc.index("**Command reference (an approved command design).**"):]
+    lens = lens[:lens.index("**Blocking**") + len("**Blocking**")]
+    assert "whatever the part's traits" in lens and "(rule 32)" in lens, lens
+    assert ("the lenses the parts' conditional workflows add at `planning.critic-lenses`; apply each as one of your "
+            "own, at the grade it states") in pc
 
 
 def test_r035_a_plan_critique_carries_the_traits_lenses_and_a_trait_added_at_the_gate_is_asked_and_written():

@@ -337,3 +337,32 @@ def test_bug020_a_one_shot_in_the_repeated_hour_is_found(lg):
     spring = utc("2027-03-28T00:30:00")  # 01:30 local standard time, before the gap
     assert lg.cron_next("30 3 28 3 *", spring, tz=berlin) == utc("2027-03-28T01:30:00")   # 03:30 summer time
     assert lg.cron_next("45 1 28 3 *", spring, tz=berlin) == utc("2027-03-28T00:45:00")   # 01:45 before the gap
+
+
+def test_bug021_the_clock_change_edges_of_cron_next(lg):
+    """Stage B4's review, round 1 (Review A's briefs and programs parts, converging; docs/HARDENING.md, Stage B4):
+    from inside the repeated hour, a one-shot later in it is found at its second occurrence, not an hour early
+    (docs/debug/BUG-020.md, Evidence); a one-shot in the hour clocks skip is found at no time and a daily schedule
+    in it fires the next day, the model of Claude Code's own scheduler the walk assumes (recorded with its check);
+    a cron with no time found still counts as a pending wake-up; and the eight-day bound is exact."""
+    zoneinfo = pytest.importorskip("zoneinfo")
+    try:
+        berlin = zoneinfo.ZoneInfo("Europe/Berlin")
+    except zoneinfo.ZoneInfoNotFoundError:
+        pytest.skip("no zone data on this computer")
+
+    def utc(text):
+        return datetime.fromisoformat(text).replace(tzinfo=timezone.utc).timestamp()
+
+    inside = utc("2026-10-25T01:20:00")  # 02:20 local standard time, the second time
+    assert lg.cron_next("50 2 25 10 *", inside, tz=berlin) == utc("2026-10-25T01:50:00")  # not 00:50, an hour early
+    assert lg.cron_next("10 2 25 10 *", inside, tz=berlin) is None                       # both 02:10s have passed
+    spring = utc("2027-03-28T00:30:00")  # 01:30 local standard time, before the gap
+    assert lg.cron_next("30 2 28 3 *", spring, tz=berlin) is None                         # 02:30 does not exist that day
+    assert lg.cron_next("30 2 * * *", spring, tz=berlin) == utc("2027-03-29T00:30:00")    # the next day's 02:30
+    start = utc("2026-11-02T10:00:30")
+    assert lg.cron_next("0 10 10 11 *", start, tz=timezone.utc) == utc("2026-11-10T10:00:00")  # the last minute searched
+    assert lg.cron_next("1 10 10 11 *", start, tz=timezone.utc) is None                          # one minute past it
+    assert lg.cron_next("30 2 30 2 *", NOW) is None, "the precondition: no time is found for 30 February"
+    pending, unscheduled = lg.pending_from_hook({"background_tasks": [], "session_crons": [{"id": "c9", "schedule": "30 2 30 2 *"}]}, NOW, ".")
+    assert pending == ["scheduled wake-up c9"] and not unscheduled, (pending, unscheduled)

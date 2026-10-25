@@ -3536,3 +3536,31 @@ def test_r014_a_status_line_is_read_as_written(tmp_path, case):
     rc, lines, err = run("--open-list", STATUS_LIST, "--status", str(status))
     assert lines == whole_output([line.format(s=s) for line in expected]), (separates, lines)
     assert rc == 1 and err == "", err
+
+
+def test_r013_every_unwritten_type_and_sub_type_pauses_against_the_real_open_list(tmp_path):
+    """R-013, stage B4's demonstration (a mock new project of an unwritten product type pauses at intake), against
+    the bridge's own open list rather than the fixture list: a status file at `Phase: intake` naming each product
+    type whose Written is not yes, and each such sub-type of a written type, fails with FAIL (f) naming it, exit 1,
+    while each written type passes (stage B4's review, round 1, the tests part; BUG-021)."""
+    from workflow_files import rows
+    types = rows("Product types")
+    lines = [types[k]["Workflow name"] for k in types if types[k]["Written"] != "yes"]
+    subs = rows("Sub-types")
+    lines += [types[s["Of type"]]["Workflow name"] + " \u2192 " + s["Sub-workflow name"] for s in subs.values()
+              if s["Written"] != "yes" and types[s["Of type"]]["Written"] == "yes"]
+    assert "Library Development" in lines and len(lines) >= 6, lines
+    written = [types[k]["Workflow name"] for k in types if types[k]["Written"] == "yes"]
+    assert len(written) >= 3, written
+    for i, head in enumerate(written + lines):
+        status = tmp_path / ("status-%d.md" % i)
+        status.write_text("# Project Status\nPhase: intake\nWorkflows: %s; traits: none\nAwaiting user on: none\n" % head,
+                          encoding="utf-8")
+        code, out, err = run("--status", str(status))
+        if head in written:
+            assert code == 0 and out == ["RESULT: OK"] and err == "", (head, out, err)
+            continue
+        found = [l for l in out if l.startswith("FAIL (f)")]
+        assert code == 1 and len(found) == 1 and "is not written" in found[0] and err == "", (head, out, err)
+        assert found[0].endswith(": %s - %s is not written" % (head.split(" → ")[-1],
+                                                               "sub-type" if " → " in head else "product type")), (head, found)
