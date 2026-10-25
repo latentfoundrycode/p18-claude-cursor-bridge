@@ -66,7 +66,7 @@ def test_r024_the_type_names_its_four_sub_types_by_what_the_user_meets():
     assert ("A part met through several, such as a local service with administrative commands, takes the sub-type of "
             "the surface it exists for, and the interface phase runs a variant for each of its other kinds of interface") in t
     assert "a part that exists for two equally fits two sub-types equally, which pauses the project as the classification at intake says" in t
-    intake = flat(read(os.path.join(PHASES, "intake.md")))
+    intake = flat(section(read(os.path.join(PHASES, "intake.md")), "Classifying each part", 3))
     assert "fits two sub-types of its type equally" in intake and "the project stops before design" in intake
 
 
@@ -89,7 +89,8 @@ def test_r024_local_service_adds_the_contract_design_and_for_commands_the_comman
         assert os.path.isfile(os.path.join(PHASES, "interface", name)), name
     line = [l for l in read(REGISTRY).split("\n") if l.startswith("| interface.variants |")]
     assert len(line) == 1 and line[0].rstrip().endswith("| interface | add | part |"), line
-    assert "Every variant is an addition, never a replacement of another" in flat(read(os.path.join(PHASES, "interface.md")))
+    assert "Every variant is an addition, never a replacement of another" in flat(
+        section(read(os.path.join(PHASES, "interface.md")), "The variants", 3))
 
 
 @pytest.mark.parametrize("key", sorted(FILES))

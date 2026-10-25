@@ -139,6 +139,11 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert "a folder the design names, which no clean, reset, cache purge or test teardown reaches" in conf
     assert "reads the result already paid for instead of buying it again" in conf
     assert "**The cap** is recorded" in conf and "`Spending cap: " in conf
+    # Stage B4's review, round 5: a capture, the dry run and a benchmark buy or count afresh.
+    assert ("Three runs do not read it: a contract capture or a re-recording the owner approved, which buys its "
+            "reply on purpose and writes it there in place of the old one; the dry run, whose stand-in replies are "
+            "never written there; and a benchmark, which runs with an empty store of its own, so that it counts "
+            "every paid call a run from cold makes.") in conf
     brief = add("spends-money", "delegation-loop.brief-constraints")
     assert "The builder runs no paid action" in brief and "after the owner's approval for it" in brief
     assert "charges nothing" in brief
@@ -166,13 +171,15 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     # Review A, round 1, blocking: the product's paid calls go through the store; a first capture and a purchase,
     # which have no replies to stand in, run at the smallest size instead of dry.
     assert "Every paid call the part's code makes goes through the store of paid results" in brief
-    assert "the store read before a call is bought, so a retry never buys twice" in brief
+    assert ("the store read before a call is bought, so a retry never buys twice, outside the three runs the "
+            "store's configuration names (a capture or re-recording, the dry run, a benchmark).") in brief
     assert "The first paid run of a contract capture, which has no recorded replies to stand in yet" in brief
     assert "a paid action with no remote service behind it (a purchase)" in brief
     assert "at the smallest size that answers them, under their own approval" in brief
     inspect = add("spends-money", "delegation-loop.inspect-checks")
     assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
-    assert "does not both read the store first and write its result there" in inspect
+    assert ("does not both read the store first and write its result there (a capture or re-recording writing "
+            "without reading, as the store's configuration says), a stand-in's reply written to the store,") in inspect
     assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
     # The clause held whole with its grade (BUG-023's confirming read: a separate "is a blocking finding" was
     # already in the section from the other clauses).
