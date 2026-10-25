@@ -6,7 +6,6 @@ nothing else, each section under a `new` entry naming the file and the heading, 
 what each names, N1/§8.1 left in the core, the pointer at external services' bounded wait, the three rows written,
 the workflow check passing); docs/INVENTORY.md, Decisions, the row on the deployed-layout and bounded-remote-wait
 checks (spends money's pointer and its classification sentence). Supervisor-written; no builder run."""
-import importlib.util
 import os
 import re
 import subprocess
@@ -15,16 +14,8 @@ import sys
 import pytest
 
 from phase_modules import BRIDGE, read, section
-
-WORKFLOW = os.path.join(BRIDGE, "cursor-bridge", "workflow")
-TRAITS = os.path.join(WORKFLOW, "traits")
-PHASES = os.path.join(WORKFLOW, "phases")
-CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
-EXCEPTIONS = os.path.join(WORKFLOW, "trace-exceptions.md")
-OPEN_LIST = os.path.join(WORKFLOW, "open-list.md")
-TRACE_CHECK = os.path.join(BRIDGE, "cursor-bridge", "trace-check.py")
-WORKFLOW_CHECK = os.path.join(BRIDGE, "cursor-bridge", "workflow-check.py")
-TRAIT_PREFIX = "bridge/cursor-bridge/workflow/traits/"
+from workflow_files import (CORE, OPEN_LIST, PHASES, TRAIT_PREFIX, TRAITS, WORKFLOW, WORKFLOW_CHECK, file_entries, flat,
+                            trace_units)
 
 # The points each file adds at, in its order (BUILD_PLAN TASK-018).
 POINTS = {
@@ -40,19 +31,8 @@ def trait(key):
     return read(os.path.join(TRAITS, key + ".md"))
 
 
-def flat(text):
-    return re.sub(r"\s+", " ", text).strip()
-
-
 def add(key, point):
     return flat(section(trait(key), "Add at " + point, 2))
-
-
-def trace_units(text):
-    spec = importlib.util.spec_from_file_location("trace_check_traits_new", TRACE_CHECK)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return [u["normal"] for u in mod.parse_units(text)[0]]
 
 
 @pytest.mark.parametrize("key", sorted(POINTS))
@@ -73,11 +53,7 @@ def test_r020_r022_every_section_has_its_own_new_entry_and_no_other_entry_names_
     (the trace check counts a trait file as a module); no `reword` entry, and no entry on the file's title, which would
     excuse the file whole."""
     rel = TRAIT_PREFIX + key + ".md"
-    got = []
-    for line in read(EXCEPTIONS).split("\n"):
-        m = re.match(r"^- (new|reword) (\S+) (\S+\.md) (.+)$", line)
-        if m and m.group(3) == rel:
-            got.append((m.group(1), m.group(2), m.group(4).strip()))
+    got = file_entries(rel)
     assert got == [("new", "TASK-018", "Add at " + p) for p in POINTS[key]], got
 
 
