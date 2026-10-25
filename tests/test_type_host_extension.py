@@ -101,7 +101,8 @@ def test_r025_the_hosts_behaviour_is_recorded_as_verified_facts_with_the_version
 def test_r025_host_behaviour_is_tested_inside_the_real_host_kept_apart_from_the_owners():
     """BUILD_PLAN TASK-021: tests inside the real host, at the version the design records, with the part installed
     into a host kept apart from the owner's own and never into the host the owner works in; the result read from what
-    the host did; a behaviour no test can reach there named as untested, never counted as tested; the owner's account or paid usage, where driving the host needs it, put to the owner first."""
+    the host did; a behaviour no test can reach there named as untested, never counted as tested; the owner's account, where driving the host needs it, put to the owner once and recorded,
+    a use beyond it asked again, and paid usage a spends-money paid action each run, the supervisor's."""
     t = flat(body("host-extension", "Add at delegation-loop.test-checks"))
     for phrase in [
             "each behaviour of the part that depends on the host is tested inside the real host, at the version the "
