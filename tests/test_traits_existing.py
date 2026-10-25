@@ -329,7 +329,8 @@ def test_r016_r019_the_plan_critic_keeps_its_design_lenses_and_catches_a_missing
                           ("a service run by others (a third-party API, SDK or provider)", "no external-service lens"),
                           ("a design that shows screens", "no design-criteria lens"),
                           ("a design naming a budget", "no benchmark-increments lens")):
-        assert trigger in pc and lens in pc, trigger
+        start = pc.index(trigger)
+        assert pc[start:pc.index(" lens", start) + 5].endswith(lens), (trigger, lens)
 
 
 def test_r035_a_plan_critique_carries_the_traits_lenses_and_a_trait_added_at_the_gate_is_asked_and_written():

@@ -81,6 +81,8 @@ Attack it along these lines:
 
 ## When reviewing a build plan
 
+The round's file may carry, beside the lenses below, the lenses the parts' conditional workflows add at `planning.critic-lenses`; apply each as one of your own, at the grade it states.
+
 - **Prior-project lessons.** If the plan's "Prior-project lessons" section lists extracted
   issues, does every one of them land on a named increment's acceptance criteria, an
   ordering choice, a brief constraint, or a Phase-5 configuration item? An extracted issue
@@ -105,6 +107,7 @@ Attack it along these lines:
   If it is more than a few, the plan is back-loading risk.
 - **Missing increments.** What has to happen that no increment covers — error handling,
   configuration, teardown, migration, packaging?
+- **Command reference (an approved command design).** Where the interface phase approved a command design (`docs/design/COMMANDS.md`), does the increment that first builds one of its commands carry the command reference's generator and its currency check, whatever the part's traits (planning.md, "What the interface phase hands to the plan")? Without it the supervisor has nothing to look commands up in (rule 32) — **Blocking**.
 - **Change-cycle addendum (a finished project being changed).** Does each new stage state
   which existing behaviour it may alter and that everything else is unchanged? Are the
   tests that pin existing behaviour kept, not rewritten? Is the version bumped in the
