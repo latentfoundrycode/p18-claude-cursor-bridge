@@ -145,7 +145,7 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
             "replies it has bought itself, each written there with the run that bought it in place of the one "
             "recorded before, so that a resumed run never takes an older reply for a new one. The dry run and a "
             "benchmark keep their results in a store of their own instead, empty when the run starts and deleted "
-            "when it ends, never this folder, so that no stand-in's reply reaches it and a benchmark counts every "
+            "when it ends, outside this folder, so that no stand-in's reply reaches it and a benchmark counts every "
             "paid call a run from cold makes. Every other run reads this store before it buys.") in conf
     brief = add("spends-money", "delegation-loop.brief-constraints")
     assert "The builder runs no paid action" in brief and "after the owner's approval for it" in brief
@@ -185,16 +185,16 @@ def test_r020_spends_money_keeps_paid_results_records_the_cap_and_runs_dry_first
     assert inspect.startswith("No paid action ran unapproved, and none bypassed the store") and "is a blocking finding" in inspect
     assert ("does not both read the store first and write its result there (a capture or re-recording reading "
             "only the replies its own run bought, in an approved run of it only, as the store's configuration "
-            "says), a run other than those the configuration names that skips the store, a stand-in's reply "
-            "written to the store of paid results, a dry run's or benchmark's own store left after its run,") in inspect
-    assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
-    # The clause held whole with its grade (BUG-023's confirming read: a separate "is a blocking finding" was
-    # already in the section from the other clauses).
-    assert ("or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
+            "says), a capture or re-recording that reads a reply its own run did not buy, a run other than those "
+            "the configuration names that skips the store, a stand-in's reply written to the store of paid "
+            "results, a dry run's or benchmark's own store left after its run, "
+            # The list held in one piece with its grade (BUG-023's confirming read; BUG-025's second).
+            "or a stand-in result reported under the benchmark and metric a budget that includes a paid service's "
             "time names (the benchmark results read against the budgets file and the design's record, in the "
             "owner's words, of the speed budgets that leave that time out, any other speed budget of an operation "
             "that calls a paid service "
             "read as including it), is a blocking finding") in inspect
+    assert "where a Resources row records a way to read it (otherwise the owner reads it at the stage close, by a run sheet)" in inspect
 
 
 def test_r021_long_running_process_points_at_n1_which_stays_in_the_core():
