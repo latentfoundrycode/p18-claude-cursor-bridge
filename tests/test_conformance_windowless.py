@@ -630,3 +630,110 @@ def test_r039_other_runner_unclosed_quote(tmp_path):
         "  NOTE     Windowless test suite  - mocha: release B ships no default for this runner "
         "(INVENTORY, Deferred); use detached: false (KP-059)"
     ]
+
+
+# --- the supervisor's tests for round 5 (TASK-028 round 4's reviews; handoff/TASK-028-r5.md)
+
+def _floor_rows_in_process(program, monkeypatch, capsys, root):
+    """Run the Workspace's conformance-check.main() in this process on a fixture; return (rc, rows, out)."""
+    mod = program("conformance-check")
+    (Path(root) / "docs").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(sys, "argv", ["conformance-check.py", str(root), "--offline"])
+    rc = mod.main()
+    out = capsys.readouterr().out
+    for line in out.splitlines():
+        if not line.startswith("conformance-check: "):
+            assert FIXTURE_NAME not in line, line
+    return mod, rc, row_for(out), out
+
+
+def test_r039_nul_in_testpaths_dropped(tmp_path):
+    """R-039 (the supervisor's, TASK-028 round 4's reviews, both): 9(c), no input makes the check print a
+    traceback: a testpaths entry holding a NUL counts as a link and is dropped, so tests/ decides."""
+    root = fixture_root(tmp_path)
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    (root / "pytest.ini").write_bytes(b"[pytest]\ntestpaths = a\x00b\n")
+    rc, out, err = run_check(tmp_path)
+    assert rc < 2 and "Traceback" not in err
+    assert row_for(out + err) == [MISSING_ROW]
+
+
+def test_r039_unlistable_tests_folder_is_no_suite(program, monkeypatch, capsys, tmp_path):
+    """R-039 (the supervisor's, Review A round 4): 9(c) and 9(b2): a tests/ that cannot be listed shows
+    no test_*.py, never a traceback; with no configuration the neither-seen row stands."""
+    root = fixture_root(tmp_path)
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    real_listdir = os.listdir
+    tests_dir = os.path.normcase(os.path.abspath(str(root / "tests")))
+
+    def listdir(path="."):
+        if os.path.normcase(os.path.abspath(str(path))) == tests_dir:
+            raise PermissionError(13, "Access is denied", str(path))
+        return real_listdir(path)
+
+    monkeypatch.setattr(os, "listdir", listdir)
+    mod, rc, rows, out = _floor_rows_in_process(program, monkeypatch, capsys, root)
+    assert rc < 2
+    assert rows == [NEITHER_NOTE]
+
+
+def test_r039_ok_row_path_is_escaped(tmp_path):
+    """R-039 (the supervisor's, Review A round 4): requirement 9, the floor prints no control
+    character: the OK row's path is rendered by escape_field, so U+202E reaches no output line."""
+    root = fixture_root(tmp_path)
+    folder = "t" + chr(0x202E) + "x"
+    try:
+        (root / folder).mkdir()
+    except OSError:
+        pytest.skip("this file system refuses U+202E in a folder name")
+    (root / folder / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    (root / "docs").mkdir(exist_ok=True)
+    (root / "pyproject.toml").write_text('[tool.pytest.ini_options]\ntestpaths = ["t\\u202ex"]\n', encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")      # a UTF-8 console, where no encoding error escapes it by chance
+    p = subprocess.run([sys.executable, PROG, str(root), "--offline"], capture_output=True, timeout=120, env=env)
+    out = p.stdout.decode("utf-8", "replace") + p.stderr.decode("utf-8", "replace")
+    assert p.returncode < 2 and "Traceback" not in out
+    assert chr(0x202E) not in out
+    assert row_for(out) == ["  OK       Windowless test suite (t\\u202ex/conftest.py)"]
+
+
+def test_r039_floor_backstop_turns_an_error_into_one_note(program, monkeypatch, capsys, tmp_path):
+    """R-039 (the supervisor, closing the input-robustness tail of rounds 2 to 4): 9(c), no input makes the
+    check print a traceback: an unexpected exception anywhere in the floor gives exactly one NOTE naming the
+    exception's class and nothing of its message, and the check's other floors still run."""
+    root = fixture_root(tmp_path)
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    mod = program("conformance-check")
+
+    def boom(ws):
+        raise RuntimeError("secret_zz91 " + str(ws))
+
+    monkeypatch.setattr(mod, "_pytest_test_roots", boom)
+    monkeypatch.setattr(sys, "argv", ["conformance-check.py", str(root), "--offline"])
+    (root / "docs").mkdir(exist_ok=True)
+    rc = mod.main()
+    out = capsys.readouterr().out
+    assert rc < 2
+    assert "secret_zz91" not in out
+    assert row_for(out) == ["  NOTE     Windowless test suite  - the floor could not be judged (RuntimeError)"]
+    assert re.search(r"^\s+(OK|MISSING|NOTE)\s+Lockfile|^\s+(OK|MISSING|NOTE)\s+Records|^conformance-check: \d+ OK", out, re.M)
+
+
+@pytest.mark.parametrize("entry", ["a\\..\\b", "a/..\\b", "ABS"])
+def test_r039_dotdot_entry_spellings_dropped(tmp_path, entry):
+    """R-039 (the supervisor's, Review A round 4, H1): round 4's 9(b) rule splits on `/` and `\\` and
+    applies to an absolute entry too: each spelling of `a/../b` is dropped, so tests/ decides."""
+    root = fixture_root(tmp_path)
+    (root / "a").mkdir()
+    (root / "b").mkdir()
+    (root / "b" / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    value = (str(root) + "/a/../b") if entry == "ABS" else entry
+    (root / "pytest.ini").write_text("[pytest]\ntestpaths = %s\n" % value, encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc == 1 and "Traceback" not in err
+    assert row_for(out + err) == [MISSING_ROW]

@@ -536,7 +536,7 @@ def test_r039_limit_auto_driver_empty_log(tmp_path):
     assert "bridge-run: limit 7200s for driver (the default for driver)" in p.stderr.splitlines()
 
 
-@pytest.mark.parametrize("kind_flags", [["--kind", "test"], []])
+@pytest.mark.parametrize("kind_flags", [["--kind", "test"], ["--kind", "builder"], []])
 @pytest.mark.parametrize("uv_argv", [["uv", "run", "--frozen"], ["uv", "run"], ["uv", "run", "--project", "x"]])
 def test_r039_uv_run_without_pytest_still_refused(tmp_path, kind_flags, uv_argv):
     """R-039 (the supervisor's, TASK-028 round 3's inspection): requirement 2, every other kind keeps
