@@ -411,7 +411,8 @@ def read_in_child(path, timeout=5):
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX special files")
 def test_r040_special_file_records_posix(tmp_path):
     """R-040 (Requirement 5; handoff/TASK-029-r3.md, the record's read): a FIFO at the record's path is
-    not waited on, and a link to /dev/zero is not read without end: both read as no record at once."""
+    not waited on, a link to /dev/zero is not read without end, and a link to a regular, valid record
+    is not followed: each reads as no record at once."""
     fifo = str(tmp_path / "fifo.holder")
     os.mkfifo(fifo)
     zero = str(tmp_path / "zero.holder")
