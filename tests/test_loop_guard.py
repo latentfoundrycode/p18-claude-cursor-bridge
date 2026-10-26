@@ -112,7 +112,7 @@ def task(kind, command, age, status="running", tid="t1"):
 
 @pytest.mark.parametrize("name,tasks,crons,allowed", [
     ("a running builder read from the hook's list", [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x", 600)], None, True),
-    ("a builder past its limit plus grace no longer counts", [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x", 7200 + 601)], None, False),
+    ("a builder past its limit plus grace no longer counts", [task("command", "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x", 7200 + 14400 + 120 + 60 + 601)], None, False),
     ("a server never counts", [task("command", "npm run dev", 60)], None, False),
     ("a completed task never counts", [task("command", "cursor-agent -p --force x", 60, status="completed")], None, False),
     ("a background agent under its ceiling with its timer running (KP-043)", [task("background_subagent", "Agent", 600), task("command", 'python ~/.claude/cursor-bridge/wake-timer.py 3000 "Agent"', 600, tid="t2")], [], True),
@@ -337,6 +337,36 @@ def test_bug020_a_one_shot_in_the_repeated_hour_is_found(lg):
     spring = utc("2027-03-28T00:30:00")  # 01:30 local standard time, before the gap
     assert lg.cron_next("30 3 28 3 *", spring, tz=berlin) == utc("2027-03-28T01:30:00")   # 03:30 summer time
     assert lg.cron_next("45 1 28 3 *", spring, tz=berlin) == utc("2027-03-28T00:45:00")   # 01:45 before the gap
+
+
+def test_r040_driver_auto_ceiling_is_not_the_test_fallback(lg, tmp_path):
+    """R-040: --limit auto --kind driver uses the driver's ceiling, not the test fallback."""
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    cmd = "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python x.py"
+    assert lg.command_ceiling(cmd, str(root)) == 14400
+
+
+def test_r040_heavy_launch_count_includes_slot_wait(lg, tmp_path):
+    """R-040: a launched heavy bridge-run command counts through slot wait, grace, report and launcher grace."""
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    driver = "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python x.py"
+    builder = "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x"
+    testcmd = "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- pytest -q"
+    review = "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p x"
+    wake = "python scratch/pgtest.py . # wake"
+    assert lg.command_ceiling(driver, str(root)) + lg.heavy_launch_extra(driver) + lg.GRACE_SECONDS == 29580
+    assert lg.command_ceiling(builder, str(root)) + lg.heavy_launch_extra(builder) + lg.GRACE_SECONDS == 22380
+    assert lg.command_ceiling(testcmd, str(root)) + lg.heavy_launch_extra(testcmd) + lg.GRACE_SECONDS == 18780
+    assert lg.heavy_launch_extra(review) == 0
+    assert lg.heavy_launch_extra(wake) == 0
+    tasks = [task("command", driver, 29579)]
+    pending, _ = lg.pending_from_hook({"background_tasks": tasks, "session_crons": []}, NOW, str(root))
+    assert pending
+    tasks[0]["started_at"] = ts(-29581)
+    pending, _ = lg.pending_from_hook({"background_tasks": tasks, "session_crons": []}, NOW, str(root))
+    assert not pending
 
 
 def test_bug021_the_clock_change_edges_of_cron_next(lg):

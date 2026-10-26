@@ -212,8 +212,17 @@ rule of 2026-10-05: no secret through the environment the owner sets).
 - The first line on stderr is `bridge-run: started <UTC time>Z`, which is what
   pr-activity-check.py's --since needs; the last is `bridge-run: exit <code>`, which
   review-guard.py reads to tell a review that reached a verdict from one that failed.
-- The exit code is the command's own; 124 = the limit was hit; 125 = refused or could not
-  start.
+- Heavy runs (`builder`, `test`, `driver`) take one machine-wide slot on
+  `~/.cursor-bridge/heavy.lock` before the command starts and hold it until the launcher
+  ends; a second heavy run waits, prints who holds the slot once a minute, and exits 123 if
+  the wait bound passes without the slot. `review` and `watch` take no slot. The first line
+  after `started` for a heavy run that took the slot is `bridge-run: slot taken <UTC time>Z`;
+  a wait prints `bridge-run: waiting for the slot held by ...` and a failed wait prints
+  `bridge-run: slot not free - ...` then `bridge-run: exit 123`.
+- The exit code is the command's own; 123 = the slot was not free in time; 124 = the limit was
+  hit; 125 = refused or could not start.
+- `BRIDGE_RUN_SLOT_SCALE` (test-only): when set to a number with 0 < value <= 1, scales the
+  slot wait reporting interval, grace and wait bounds for tests.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
   owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`
   withholds it for any other accepted command too.
@@ -501,14 +510,16 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
   1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;
   2. its `Phase:` is building or changing;
   3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner), and
-     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2026.10.25a, FB-027:
+     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2HEAVY_SLOT_WAIT + SLOT_GRACE + SLOT_REPORT26.10.25a, FB-027:
      a pause written in the untracked working file touches no tracked file);
   (and, in every phase: a turn whose last message holds a shell block and names no terminal
   is sent back once, because a run sheet without its terminal cannot be followed, rule 27);
   4. nothing is pending that will wake the session. Since release A2 the hook's own lists
      decide: a background command *of a kind that finishes* (a builder run, a CI watch, a
      command run through bridge-run.py, or one marked `# wake`) counts until its limit plus a
-     grace; a background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
+     grace; a heavy bridge-run launch (`builder`, `test` or `driver`) also counts through the
+     longest slot wait (14,400 s), the slot grace (120 s) and the waiter's minute (60 s); a
+     background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
      the run parameters) AND only while a wake-timer command that ends no later than that
      ceiling is running, because a hung agent never completes and nothing else would wake the session
      (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the

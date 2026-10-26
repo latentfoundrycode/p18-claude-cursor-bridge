@@ -1,6 +1,6 @@
 {
   "version": "2026.10.25a",
-  "generated": "2026-10-26 05:45",
+  "generated": "2026-10-26 07:34",
   "files": {
     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -31,7 +31,7 @@
     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
     "cursor-bridge/bridge-install.py": "c679380382e8bd34a6116c4d0abc8e254326059a8c35929f49b8fd6484a52b6d",
-    "cursor-bridge/bridge-run.py": "656cbec35bc070b8b131a3fadcb58ada1ff09909a7bdf87d2b7b4e58bb12b9fd",
+    "cursor-bridge/bridge-run.py": "5155dce2cb3fecd25846ea406623e4048c7289e38f5d8654b5a8db0022d4cfa2",
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
     "cursor-bridge/bridge_env.py": "7fe536ff12e72406a84efa59d2e74788d174092f524ae0438d38169aa99b7d53",
     "cursor-bridge/completion-check.py": "f584af6a6592c7f748beec212ad2b1752356607529fd60c1acb6507190626134",
@@ -83,7 +83,7 @@
     "cursor-bridge/inventory-check.py": "112505dd6c882d3f59bdd8fafb007fc82259fa9b5769ea91f678f9d4a3bf4c0f",
     "cursor-bridge/invisible-check.py": "aa6f6b129546ae10c0e22b70a6bc4ed78982ac184d3b4a117a9ff04050d881e5",
     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
-    "cursor-bridge/loop-guard.py": "08c4a26191310697c58e1ca1912401c41c869225b27104d5a9bc1e114008a751",
+    "cursor-bridge/loop-guard.py": "db99e2a13cc17b1b2e3e9f2b07a4b89c01a818e3ba0442ac63ab8cba5232261e",
     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
     "cursor-bridge/permission-guard.py": "2600097012c2f28b7d0db0d22e9f7a874a8a9a5f96c584804e7bf68c1c88f60d",
     "cursor-bridge/plan-check.py": "f40ec62685576cbe34f54edb8ceaf40868d2a84c13ef74ff03a627f717bb2a86",

@@ -66,8 +66,17 @@ rule of 2026-10-05: no secret through the environment the owner sets).
 - The first line on stderr is `bridge-run: started <UTC time>Z`, which is what
   pr-activity-check.py's --since needs; the last is `bridge-run: exit <code>`, which
   review-guard.py reads to tell a review that reached a verdict from one that failed.
-- The exit code is the command's own; 124 = the limit was hit; 125 = refused or could not
-  start.
+- Heavy runs (`builder`, `test`, `driver`) take one machine-wide slot on
+  `~/.cursor-bridge/heavy.lock` before the command starts and hold it until the launcher
+  ends; a second heavy run waits, prints who holds the slot once a minute, and exits 123 if
+  the wait bound passes without the slot. `review` and `watch` take no slot. The first line
+  after `started` for a heavy run that took the slot is `bridge-run: slot taken <UTC time>Z`;
+  a wait prints `bridge-run: waiting for the slot held by ...` and a failed wait prints
+  `bridge-run: slot not free - ...` then `bridge-run: exit 123`.
+- The exit code is the command's own; 123 = the slot was not free in time; 124 = the limit was
+  hit; 125 = refused or could not start.
+- `BRIDGE_RUN_SLOT_SCALE` (test-only): when set to a number with 0 < value <= 1, scales the
+  slot wait reporting interval, grace and wait bounds for tests.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
   owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`
   withholds it for any other accepted command too.
@@ -76,6 +85,7 @@ ASCII-only on purpose (cp1252 consoles).
 """
 import datetime
 import json
+import math
 import os
 import re
 import signal
@@ -98,6 +108,11 @@ DRIVER_KEYFILE_REFUSE = ("bridge-run: refused - driver kind: --key-file is not a
 LOG = os.path.join("run", "launcher", "runs.jsonl")
 LEARN_FACTOR = 1.5
 CAP_FACTOR = 2
+HEAVY_KINDS = frozenset(("builder", "driver", "test"))
+SLOT_GRACE = 120
+SLOT_REPORT = 60
+SLOT_BUILDER_CAP = CAP_FACTOR * KINDS["builder"]
+RUN_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(?:-\d+)?$")
 DESIGN_DEFAULT_ROUNDS = 5
 DESIGN_RESOLUTION_DEFAULT = 1
 DESIGN_RESOLUTION_LIFTED = 2
@@ -500,6 +515,9 @@ def mark_healthy(run_id, folder, kind=None):
         sys.stderr.write("bridge-run: refused - %s fits %d runs (%s); give the whole id, and --kind when two kinds share it\n" % (
             run_id, len(hit), ", ".join("%s %s" % (r.get("id"), r.get("kind")) for r in hit[:6])))
         return 1
+    if hit[0].get("exit") == 123:
+        sys.stderr.write("bridge-run: refused - a run that ended waiting for the slot cannot be marked healthy\n")
+        return 1
     if hit[0].get("kind") == "driver" and hit[0].get("exit") not in (0, 1):
         sys.stderr.write("bridge-run: refused - a driver run is healthy at exit 0 or 1 only\n")
         return 1
@@ -566,6 +584,271 @@ def remove_pid_file(path):
             os.remove(path)
         except OSError:
             pass
+
+
+def heavy_state_paths(env=None):
+    """`(~/.cursor-bridge/heavy.lock, ~/.cursor-bridge/heavy.lock.holder)` from the launcher's environment."""
+    home = bridge_env.real_home(env or os.environ)
+    folder = os.path.join(home, ".cursor-bridge")
+    return os.path.join(folder, "heavy.lock"), os.path.join(folder, "heavy.lock.holder")
+
+
+def parse_slot_scale():
+    """Test-only scale for slot waits; raises ValueError when set but invalid."""
+    raw = os.environ.get("BRIDGE_RUN_SLOT_SCALE", "")
+    if not raw:
+        return 1.0
+    value = float(raw)
+    if not math.isfinite(value) or value <= 0 or value > 1:
+        raise ValueError("must be a number with 0 < value <= 1 (got %r)" % raw)
+    return value
+
+
+def _plain_record_text(value):
+    if not isinstance(value, str) or not value:
+        return False
+    for ch in value:
+        if ord(ch) < 32 or ord(ch) == 127:
+            return False
+    return True
+
+
+def process_alive(pid):
+    if sys.platform == "win32":
+        p = subprocess.run(["tasklist", "/FI", "PID eq %d" % pid, "/NH"], capture_output=True, text=True, creationflags=NO_WINDOW)
+        return str(pid) in p.stdout
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    try:
+        with open("/proc/%d/stat" % pid, encoding="utf-8", errors="replace") as f:
+            state = f.read().rsplit(")", 1)[-1].split()[0]
+        return state != "Z"
+    except (OSError, IndexError):
+        return True
+
+
+def process_creation_epoch(pid):
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        k.OpenProcess.restype = wintypes.HANDLE
+        k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        k.GetProcessTimes.restype = wintypes.BOOL
+        k.GetProcessTimes.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        k.CloseHandle.restype = wintypes.BOOL
+        k.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = k.OpenProcess(0x1000, False, int(pid))
+        if not handle:
+            return None
+
+        class FILETIME(ctypes.Structure):
+            _fields_ = [("dwLowDateTime", wintypes.DWORD), ("dwHighDateTime", wintypes.DWORD)]
+
+        created = FILETIME()
+        if not k.GetProcessTimes(handle, ctypes.byref(created), ctypes.byref(FILETIME()),
+                                 ctypes.byref(FILETIME()), ctypes.byref(FILETIME())):
+            k.CloseHandle(handle)
+            return None
+        k.CloseHandle(handle)
+        filetime = (int(created.dwHighDateTime) << 32) + int(created.dwLowDateTime)
+        return filetime / 10000000.0 - 11644473600.0
+    try:
+        with open("/proc/%d/stat" % pid, encoding="utf-8", errors="replace") as f:
+            stat = f.read()
+        rest = stat.rsplit(")", 1)[-1].split()
+        starttime = int(rest[19])
+        boot = None
+        with open("/proc/stat", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.startswith("btime "):
+                    boot = int(line.split()[1])
+                    break
+        if boot is None:
+            return None
+        hz = os.sysconf("SC_CLK_TCK")
+        return boot + starttime / hz
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def read_holder_record(holder_path):
+    """A live holder record, or None when missing, stale or untrusted."""
+    try:
+        with open(holder_path, encoding="utf-8") as f:
+            raw = f.read()
+    except OSError:
+        return None
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    kind = data.get("kind")
+    run_id = data.get("run_id")
+    start = data.get("start")
+    if kind not in KINDS or not _plain_record_text(kind):
+        return None
+    if not isinstance(run_id, str) or not RUN_ID_RE.match(run_id) or not _plain_record_text(run_id):
+        return None
+    if not isinstance(start, str) or not RUN_ID_RE.match(start) or not _plain_record_text(start):
+        return None
+    try:
+        pid = int(data.get("pid"))
+        limit = int(data.get("limit"))
+        created = float(data.get("created"))
+    except (TypeError, ValueError):
+        return None
+    if pid <= 0 or limit <= 0 or not math.isfinite(created):
+        return None
+    actual = process_creation_epoch(pid)
+    if not process_alive(pid) or actual is None or abs(actual - created) > 0.01:
+        return None
+    return {"kind": kind, "run_id": run_id, "pid": pid, "created": created, "start": start, "limit": limit}
+
+
+def run_id_epoch(run_id):
+    """Seconds since epoch for a run id timestamp (ignores a -2 suffix)."""
+    base = run_id.split("Z")[0] + "Z"
+    try:
+        return datetime.datetime.strptime(base, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc).timestamp()
+    except ValueError:
+        return None
+
+
+def holder_end_time(record, grace):
+    """UTC end time string for a live holder record plus grace."""
+    start_epoch = run_id_epoch(record["start"])
+    if start_epoch is None:
+        return None
+    end = datetime.datetime.fromtimestamp(start_epoch + int(record["limit"]) + int(grace), tz=datetime.timezone.utc)
+    return end.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+
+
+def publish_holder_record(holder_path, record):
+    folder = os.path.dirname(holder_path)
+    os.makedirs(folder, exist_ok=True)
+    tmp = os.path.join(folder, ".heavy.holder.%d.tmp" % os.getpid())
+    for _ in range(5):
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(record, f)
+            os.replace(tmp, holder_path)
+            return True
+        except (OSError, PermissionError):
+            time.sleep(0.02)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+    sys.stderr.write("bridge-run: note - could not publish the slot holder record\n")
+    return False
+
+
+def _try_lock_byte(fd):
+    if sys.platform == "win32":
+        import msvcrt
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+    import fcntl
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except BlockingIOError:
+        return False
+
+
+def _unlock_byte(fd):
+    if sys.platform == "win32":
+        import msvcrt
+        try:
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+    else:
+        import fcntl
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+
+
+def _waiting_line(record, grace):
+    if record is None:
+        return "bridge-run: waiting for the slot held by unknown\n"
+    end = holder_end_time(record, grace)
+    if end is None:
+        return "bridge-run: waiting for the slot held by unknown\n"
+    return ("bridge-run: waiting for the slot held by %s %s since %s, ends by %s\n"
+            % (record["kind"], record["run_id"], record["start"], end))
+
+
+def _slot_not_free_line(record, grace):
+    if record is None:
+        return "bridge-run: slot not free - held by unknown\n"
+    end = holder_end_time(record, grace)
+    if end is None:
+        return "bridge-run: slot not free - held by unknown\n"
+    return ("bridge-run: slot not free - held by %s %s since %s, ends by %s\n"
+            % (record["kind"], record["run_id"], record["start"], end))
+
+
+def acquire_heavy_slot(kind, run_id, limit, scale):
+    """Take the machine-wide heavy slot; return (lock_fd, waited_seconds) or None after printing exit 123."""
+    lock_path, holder_path = heavy_state_paths()
+    state_dir = os.path.dirname(lock_path)
+    grace = SLOT_GRACE * scale
+    report = max(0.001, SLOT_REPORT * scale)
+    wait_start = time.time()
+    provisional = wait_start + (SLOT_BUILDER_CAP + SLOT_GRACE) * scale
+    own_floor = wait_start + KINDS[kind] * scale
+    bound = None
+    last_report = 0.0
+    last_live = None
+    try:
+        os.makedirs(state_dir, exist_ok=True)
+        lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT)
+    except OSError as exc:
+        sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/heavy.lock (%s)\n" % exc.__class__.__name__)
+        return "refused"
+    while True:
+        if _try_lock_byte(lock_fd):
+            waited = int(time.time() - wait_start)
+            taken = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+            sys.stderr.write("bridge-run: slot taken %s\n" % taken)
+            sys.stderr.flush()
+            created = process_creation_epoch(os.getpid())
+            publish_holder_record(holder_path, {
+                "kind": kind, "run_id": run_id, "pid": os.getpid(),
+                "created": created if created is not None else time.time(),
+                "start": taken, "limit": int(limit),
+            })
+            return lock_fd, waited
+        now = time.time()
+        live = read_holder_record(holder_path)
+        if live is not None:
+            last_live = live
+            start_epoch = run_id_epoch(live["start"])
+            if start_epoch is not None and bound is None:
+                end_epoch = start_epoch + live["limit"] + grace
+                bound = min(provisional, max(own_floor, end_epoch))
+        if bound is not None and now > bound:
+            sys.stderr.write(_slot_not_free_line(last_live, grace))
+            sys.stderr.write("bridge-run: exit 123\n")
+            sys.stderr.flush()
+            os.close(lock_fd)
+            return None
+        if last_report == 0.0 or now - last_report >= report - 0.001:
+            sys.stderr.write(_waiting_line(live, grace))
+            sys.stderr.flush()
+            last_report = now
+        time.sleep(1)
 
 
 def branch_of(folder):
@@ -833,6 +1116,11 @@ def main():
     if kind not in KINDS:
         sys.stderr.write("bridge-run: refused - unknown kind %r (builder, driver, review, watch, test)\n" % kind)
         return 125
+    try:
+        slot_scale = parse_slot_scale()
+    except ValueError as e:
+        sys.stderr.write("bridge-run: refused - BRIDGE_RUN_SLOT_SCALE %s\n" % e)
+        return 125
     if kind == "review":
         reason = review_family_refusal(cmd, folder)
         if reason:
@@ -912,6 +1200,22 @@ def main():
             entry["boundary"] = ["%s %s" % c for c in changes[:200]]
         sys.stderr.flush()
 
+    if kind == "driver" and len(cmd) >= 2 and not verify_driver_program_abs(cmd[1], folder):
+        sys.stderr.write(DRIVER_REFUSE)
+        return 125
+
+    slot_fd = None
+    if kind in HEAVY_KINDS:
+        slot_attempt = time.time()
+        slot_result = acquire_heavy_slot(kind, run_id, int(limit), slot_scale)
+        if slot_result == "refused":
+            return 125
+        if slot_result is None:
+            entry.update(waited=int(time.time() - slot_attempt), seconds=0, exit=123)
+            write_log(folder, entry)
+            return 123
+        slot_fd, entry["waited"] = slot_result[0], slot_result[1]
+
     killer = None
     if sys.platform == "win32":
         try:
@@ -921,9 +1225,6 @@ def main():
         except OSError as e:
             sys.stderr.write("bridge-run: no job object (%s); the limit will end the first process only\n" % e)
             job = None
-        if kind == "driver" and len(cmd) >= 2 and not verify_driver_program_abs(cmd[1], folder):
-            sys.stderr.write(DRIVER_REFUSE)
-            return 125
         try:
             # A process created without a console (NO_WINDOW) does not inherit the standard
             # handles by itself; they are passed explicitly so the caller's redirects hold.
@@ -931,21 +1232,30 @@ def main():
                                     creationflags=NO_WINDOW | 0x00000200)  # CREATE_NEW_PROCESS_GROUP
         except OSError as e:
             sys.stderr.write("bridge-run: cannot start %s (%s)\n" % (cmd[0], e))
+            if slot_fd is not None:
+                _unlock_byte(slot_fd)
+                try:
+                    os.close(slot_fd)
+                except OSError:
+                    pass
             return 125
         if killer is None:
             killer = proc.kill
     else:
-        if kind == "driver" and len(cmd) >= 2 and not verify_driver_program_abs(cmd[1], folder):
-            sys.stderr.write(DRIVER_REFUSE)
-            return 125
         try:
             proc = subprocess.Popen(cmd, env=env, preexec_fn=os.setsid, creationflags=NO_WINDOW)
         except OSError as e:
             sys.stderr.write("bridge-run: cannot start %s (%s)\n" % (cmd[0], e))
+            if slot_fd is not None:
+                _unlock_byte(slot_fd)
+                try:
+                    os.close(slot_fd)
+                except OSError:
+                    pass
             return 125
         killer = lambda: os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # noqa: E731
 
-    started = time.time()
+    started = time.time()                                    # after the slot: the limit counts from here
     entry.update(pid=os.getpid(), child_pid=proc.pid)
     pid_file = write_pid_file(folder, run_id, os.getpid(), proc.pid)   # read by bridge-stop.py while the run lives (2026.10.11c)
     try:
@@ -968,13 +1278,19 @@ def main():
             proc.kill()
         rc = 124
     remove_pid_file(pid_file)
+    if slot_fd is not None:
+        _unlock_byte(slot_fd)
+        try:
+            os.close(slot_fd)
+        except OSError:
+            pass
     if rc != 124:
         report_boundary()
         sys.stderr.write("bridge-run: exit %d\n" % rc)
         sys.stderr.flush()
     if entry["exit"] is None:
         healthy = True if (kind == "test" and rc == 0) or (kind == "driver" and rc in (0, 1)) else None
-        entry.update(seconds=int(time.time() - started), exit=rc, healthy=healthy)
+        entry.update(seconds=int(time.time() - started)+entry.get("waited",0), exit=rc, healthy=healthy)
         write_log(folder, entry)
     # The job handle is deliberately not closed here: it closes when this process exits,
     # after the exit code is set, and "kill on close" then ends any orphan the command left.
