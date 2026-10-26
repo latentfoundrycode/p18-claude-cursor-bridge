@@ -270,7 +270,7 @@ Parent: none
 Depends on: TASK-023, TASK-006, TASK-008
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_calibrate_program.py; docs/cli-reference.json; docs/CLI_REFERENCE.md
+Scope: bridge/cursor-bridge/conformance-check.py; bridge/cursor-bridge/MANIFEST.json; tests/test_calibrate_program.py; tests/test_workflows_line_check.py; tests/test_b2_least_confident.py; docs/cli-reference.json; docs/CLI_REFERENCE.md
 Satisfies: R-027, R-033
 Done when: `conformance-check.py` runs `workflow-check` at calibration over a running project's status file and reports an unclassified line or one naming an unwritten workflow; `test_calibrate_program.py` (names R-027, R-033) covers a classified and an unclassified project.
 

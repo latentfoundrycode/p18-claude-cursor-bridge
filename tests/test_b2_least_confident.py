@@ -145,11 +145,16 @@ def notes(out):
 
 
 def plain_notes(tmp_path):
-    """conformance-check.py's NOTE lines on make_workspace's own minimal status file, in this environment (some
-    NOTEs depend on it: the session's environment, --offline): any other NOTE on a shaped file is about the file."""
+    """conformance-check.py's NOTE lines on a classified minimal status file (same shape as the shaped fixtures),
+    in this environment (some NOTEs depend on it: the session's environment, --offline): any other NOTE on a shaped
+    file is about the file."""
     root = tmp_path / "plain"
     root.mkdir()
     make_workspace(root)
+    (root / "docs" / "PROJECT_STATUS.md").write_text(
+        "# Project Status\nBridge version: %s\nPhase: building\nWorkflows: Host Extension Development %s Claude Code Extension; traits: Installable\n"
+        % (VERSION, ARROW),
+        encoding="utf-8", newline="\n")
     rc, out, err = conformance(root)
     assert rc == 0 and out.splitlines()[-1] == "RESULT: CONFORMANT", out
     return notes(out)

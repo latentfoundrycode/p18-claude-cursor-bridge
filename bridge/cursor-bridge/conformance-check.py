@@ -38,8 +38,10 @@ What it checks, with the file it reads (the 0b review corrected several of these
     repository, any) docs/PROJECT_STATUS.md holding an absolute path (a drive letter
     followed by a colon and a backslash or a slash, or a macOS home under root Users, or a
     Linux home under root home) is MISSING (rule 54: no computer path enters a commit; FB-026);
-  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or not right after
-    Phase: is MISSING (R-015);
+  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or misplaced is MISSING
+    (R-015); a line naming an unwritten product type or sub-type is MISSING; an unwritten trait
+    is a NOTE `Unwritten trait`; `not yet classified` past intake is a NOTE `Workflows
+    classification` (calibration step 4b; R-027, R-033);
   - with --screens (or a docs/mockups folder): the design detector in the gate;
   - release A1b: a spending limit recorded for every key, account or provider that can charge
     (the inventory's Resources rows); the inventory's `Development data:` decision; every
@@ -369,6 +371,90 @@ def judge_workflows_line(path, text):
         return "not-checked", [ascii_text("%s: %s" % (shown, type(err).__name__))]
 
 
+def calibration_workflows_grades(path, text):
+    """Calibration grades when judge_workflows_line returned valid (R-027, R-033).
+
+    Returns (workflows_verdict, workflows_detail, notes). workflows_verdict is OK, MISSING, or
+    not-checked. workflows_detail is the MISSING detail, empty for OK, or a list of ASCII reasons
+    for not-checked. notes is a list of (floor, detail) NOTE rows in status-file order, empty for
+    not-checked. Loads workflow-check.py beside this file's real path.
+    """
+
+    def ascii_text(value):
+        return ("" if value is None else str(value)).encode("ascii", "backslashreplace").decode("ascii")
+
+    def field(mod, value):
+        return ascii_text(mod.escape_field(value))
+
+    checker = os.path.join(os.path.dirname(os.path.realpath(__file__)), "workflow-check.py")
+    shown = checker.replace("\\", "/")
+    previous_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec = importlib.util.spec_from_file_location("workflow_check", checker)
+        if spec is None or spec.loader is None:
+            raise ImportError("no loader")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except (Exception, SystemExit) as err:
+        return "not-checked", [ascii_text("%s: cannot be loaded (%s)" % (shown, type(err).__name__))], []
+    finally:
+        sys.dont_write_bytecode = previous_bytecode
+    try:
+        open_text, open_shown, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
+        reg_text, reg_shown, reg_err = mod.read_utf8(mod.DEFAULT_REGISTRY)
+        causes = []
+        if open_err:
+            causes.append("%s: %s" % (open_shown, open_err))
+        if reg_err:
+            causes.append("%s: %s" % (reg_shown, reg_err))
+        if causes:
+            return "not-checked", [field(mod, cause) for cause in causes], []
+        tables, errors = mod.load_tables(open_text, mod.DEFAULT_OPEN, reg_text, mod.DEFAULT_REGISTRY)
+        if errors:
+            return "not-checked", [field(mod, "%s: %s" % (item_path, reason)) for item_path, reason in errors], []
+        phase = ""
+        for line in mod.file_lines(text):
+            if line.startswith("Phase: "):
+                parts = line[len("Phase: "):].split()
+                phase = parts[0] if parts else ""
+                break
+        shown_path = mod.slash(path)
+        findings = mod.check_status(path, text, tables)
+        f_items = [item for item in findings if item[0] == "f"]
+        notes = []
+        workflow_lines = [line for line in mod.file_lines(text) if line.startswith("Workflows: ")]
+        multi = len(workflow_lines) > 1
+        for line in workflow_lines:
+            rest = line[len("Workflows: "):]
+            part, body, bad = mod.prefix_of(rest, multi)
+            if bad is not None:
+                continue
+            if body == "not yet classified":
+                if phase != "intake":
+                    notes.append((
+                        "Workflows classification",
+                        "unclassified past intake (Phase: %s); calibration step 4b classifies it, the project running on the main workflow alone meanwhile" % field(mod, phase),
+                    ))
+                continue
+            if body.count(mod.TRAITS_MARK) != 1:
+                continue
+            head, traits = body.split(mod.TRAITS_MARK, 1)
+            part_findings = []
+            mod.check_head(head, shown_path, tables, part_findings)
+            mod.check_traits(traits, shown_path, tables, part_findings)
+            for code, _path, name, reason in part_findings:
+                if code == "FLAG":
+                    notes.append(("Unwritten trait", "%s - %s" % (field(mod, name), field(mod, reason))))
+        if f_items:
+            detail = "names an unwritten workflow: " + "; ".join(
+                "%s - %s" % (field(mod, item[2]), field(mod, item[3])) for item in f_items)
+            return "MISSING", detail, notes
+        return "OK", "", notes
+    except (Exception, SystemExit) as err:
+        return "not-checked", [ascii_text("%s: %s" % (shown, type(err).__name__))], []
+
+
 def main():
     argv = sys.argv[1:]
     quiet = "--quiet" in argv
@@ -546,7 +632,15 @@ def main():
         status_text = read(status_path)
         outcome, rows = judge_workflows_line(status_path, "" if status_text is None else status_text)
         if outcome == "valid":
-            add("OK", "Workflows line")
+            wv, wdetail, wnotes = calibration_workflows_grades(status_path, "" if status_text is None else status_text)
+            if wv == "MISSING":
+                add("MISSING", "Workflows line", wdetail)
+            elif wv == "OK":
+                add("OK", "Workflows line")
+            else:
+                add("MISSING", "Workflows line", "not checked: " + "; ".join(wdetail))
+            for floor, detail in wnotes:
+                add("NOTE", floor, detail)
         elif outcome == "missing":
             add("MISSING", "Workflows line", "missing: docs/PROJECT_STATUS.md has no Workflows line")
         elif outcome == "malformed":

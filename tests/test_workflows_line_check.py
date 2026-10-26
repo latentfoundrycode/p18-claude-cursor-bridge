@@ -507,13 +507,31 @@ def test_r015_checker_is_found_beside_the_real_file_not_the_link(tmp_path, progr
 
 # --- conformance-check.py ------------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("case", sorted(VALID))
-def test_r015_conformance_valid_line_is_ok(tmp_path, case):
+def test_r015_conformance_not_yet_classified_is_ok(tmp_path):
     """Run on a copy whose open list marks every entry unwritten, as the inventory twin is."""
     folder = _unwritten_copy(tmp_path)
-    rc, out, err = conformance(workspace(tmp_path, VALID[case]), program=folder / "conformance-check.py")
+    rc, out, err = conformance(workspace(tmp_path, VALID["not-yet-classified"]), program=folder / "conformance-check.py")
     assert verdict(out, "Workflows line") == ("OK", "Workflows line"), out
     assert rc == 0 and out.splitlines()[-1] == "RESULT: CONFORMANT", out
+
+
+def test_r015_conformance_bridge_line_unwritten_is_missing_and_trait_note(tmp_path):
+    """TASK-024: unwritten type and sub-type are MISSING; unwritten trait is a NOTE (R-027, R-033)."""
+    folder = _unwritten_copy(tmp_path)
+    rc, out, err = conformance(workspace(tmp_path, VALID["bridge-line"]), program=folder / "conformance-check.py")
+    v, text = verdict(out, "Workflows line")
+    assert v == "MISSING" and text == (
+        "Workflows line  - names an unwritten workflow: Host Extension Development - product type is not written; "
+        "Claude Code Extension - sub-type is not written"), out
+    trait_rows = [line for line in out.splitlines() if "Unwritten trait" in line]
+    assert trait_rows == [
+        "  NOTE     Unwritten trait  - Installable - trait not yet written; flagged, work continues (non-fatal)",
+    ], out
+    lines = out.splitlines()
+    missing_ix = next(i for i, line in enumerate(lines) if line.strip().startswith("MISSING") and "Workflows line" in line)
+    trait_ix = next(i for i, line in enumerate(lines) if "Unwritten trait" in line)
+    assert missing_ix < trait_ix, out
+    assert rc == 1
 
 
 @pytest.mark.parametrize("case", sorted(MISSING))
