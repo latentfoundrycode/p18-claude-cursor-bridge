@@ -83,7 +83,12 @@ def test_bug029_a_doubled_suffix_never_runs_as_the_agent(tmp_path, kind):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     marker = tmp_path / "ran.txt"
-    _stub(bin_dir, "cursor-agent.exe.cmd", marker)
+    stub = _stub(bin_dir, "cursor-agent.exe.cmd", marker)
+    # precondition: the stand-in runs when started directly, so its marker's absence below means it never ran
+    direct = ["cmd.exe", "/d", "/c", str(stub)] if sys.platform == "win32" else [str(stub)]
+    subprocess.run(direct, capture_output=True, timeout=30)
+    assert marker.read_text(encoding="ascii").strip() == "ran"
+    marker.unlink()
     root = tmp_path / "launch"
     (root / "run").mkdir(parents=True)
     env = dict(os.environ)

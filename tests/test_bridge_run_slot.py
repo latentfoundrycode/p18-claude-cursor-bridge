@@ -716,7 +716,7 @@ def test_r040_two_heavy_runs_serialize_commands(tmp_path):
         br = load_br()
         holder_path = br.heavy_state_paths(env)[1]
         rid1 = head1[0].split("started ", 1)[1]
-        # precondition: p1's record is published and live before p2 starts (it follows the slot-taken line)
+        # precondition: p1's record is published and live before p2 starts (since BUG-029 it precedes the slot-taken line; the wait stays as a guard)
         assert wait_until(lambda: (br.read_holder_record(holder_path) or {}).get("run_id") == rid1)
         p2 = popen_bridge(b, env, "--limit", "30", "--", sys.executable, "-c",
                           "import time; open('s2','w').write(repr(time.time()))")
@@ -754,7 +754,7 @@ def test_r040_holder_that_waited_publishes_slot_taken_start(tmp_path):
         kill_tree(holder)
         taken = read_until(l1, "bridge-run: slot taken ")[-1].split("slot taken ", 1)[1]
         assert taken != started
-        # the record is published after the slot-taken line: start the third launcher once it names l1
+        # start the third launcher once the record names l1 (published before the slot-taken line since BUG-029)
         rec = lock_path_of(env) + ".holder"
 
         def names_l1():
