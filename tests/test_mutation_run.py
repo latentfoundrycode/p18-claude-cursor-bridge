@@ -1,4 +1,5 @@
 """R-041: mutation-run.py applies mutants in a scratch copy and caches kills (TASK-031)."""
+import ctypes
 import hashlib
 import json
 import os
@@ -76,6 +77,53 @@ def run_mr(ws, mutants_file, scratch=None, timeout=60, extra=(), home_env=None):
                           timeout=timeout + 30, **test_conftest.windowless_kwargs({}))
 
 
+def git_porcelain(ws):
+    kw = test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 30})
+    p = subprocess.run(GIT + ["status", "--porcelain"], cwd=str(ws), **kw)
+    assert p.returncode == 0
+    return p.stdout
+
+
+def git_porcelain_excluding_cache(ws):
+    lines = [ln for ln in git_porcelain(ws).splitlines() if "mutation-cache/" not in ln]
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def pid_dead(pid):
+    if sys.platform == "win32":
+        SYNCHRONIZE = 0x00100000
+        WAIT_OBJECT_0 = 0
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+        if not handle:
+            return True
+        rc = kernel32.WaitForSingleObject(handle, 0)
+        kernel32.CloseHandle(handle)
+        return rc == WAIT_OBJECT_0
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return True
+    return False
+
+
+def kill_proc_tree(proc):
+    if proc.poll() is not None:
+        return
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+            capture_output=True,
+            **test_conftest.windowless_kwargs({"stdin": subprocess.DEVNULL}),
+        )
+    else:
+        import signal
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except OSError:
+            proc.kill()
+
+
 def tree_bytes(ws):
     out = {}
     for root, dirs, files in os.walk(ws):
@@ -133,21 +181,23 @@ def test_r041_done_c_mutated_file_reruns(tmp_path):
     """R-041, TASK-031 Done when (c): a change to a mutated file reruns only that file's mutants."""
     ws = workspace(tmp_path)
     init_pkg(ws)
-    body = {
-        "mutants": [
-            basic_mutant()["mutants"][0],
-            {**basic_mutant()["mutants"][0], "id": "m2", "file": "tests/test_calc.py",
-             "pairs": [{"old": "assert add(1, 1) == 2", "new": "assert add(1, 1) == 99"}],
-             "tests": ["tests/test_calc.py"], "expect_fail": ["tests/test_calc.py::test_add"]},
-        ]
-    }
+    write(ws, "lib/__init__.py", "")
+    write(ws, "lib/util.py", "def double(x):\n    return 2 * x\n")
+    write(ws, "tests/test_util.py", "from lib.util import double\n\ndef test_double():\n    assert double(2) == 4\n")
+    git(ws, "add", "-A")
+    body = {"mutants": [
+        {"id": "calc", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+         "tests": ["tests/test_calc.py"], "expect_fail": ["tests/test_calc.py::test_add"]},
+        {"id": "util", "file": "lib/util.py", "pairs": [{"old": "return 2 * x", "new": "return 3 * x"}],
+         "tests": ["tests/test_util.py"], "expect_fail": ["tests/test_util.py::test_double"]},
+    ]}
     mp = mutants_path(ws, "t3", body)
     git(ws, "add", "run/supervisor/t3-mutants.json")
     run_mr(ws, mp)
-    write(ws, "demo/calc.py", "def add(a, b):\n    return a + b\n# touch\n")
+    write(ws, "demo/calc.py", "def add(a, b):\n    return a + b  # touched\n")
     git(ws, "add", "demo/calc.py")
     p = run_mr(ws, mp)
-    assert "m1:" in p.stdout and "m2: killed (cached" in p.stdout
+    assert "calc:" in p.stdout and "util: killed (cached" in p.stdout
 
 
 def test_r041_malformed_exits_2(tmp_path):
@@ -159,16 +209,35 @@ def test_r041_malformed_exits_2(tmp_path):
     assert p.returncode == 2
 
 
-def test_r041_default_scratch_under_temp_home(tmp_path, home_of_the_tests):
-    """R-041: the default scratch folder lies under the tests' temporary home."""
+def test_r041_default_scratch_stale_removed(tmp_path, home_of_the_tests):
+    """R-041, TASK-031 Requirement 2: the default scratch folder removes a left-behind mutation-run-<id>/ and uses the tests' temporary home."""
     ws = workspace(tmp_path)
     init_pkg(ws)
+    stale = home_of_the_tests / ".cursor-bridge" / "scratch" / "proj" / "mutation-run-sc" / "stale.txt"
+    stale.parent.mkdir(parents=True, exist_ok=True)
+    stale.write_text("left behind\n", encoding="utf-8")
+    bridge = os.path.normpath(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge"))
+    real_cb_before = None
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("bridge_env", os.path.join(bridge, "bridge_env.py"))
+        be = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(be)
+        rh = be.real_home(os.environ)
+        real_root = os.path.join(rh, ".cursor-bridge")
+        if os.path.isdir(real_root):
+            real_cb_before = set(os.listdir(real_root))
+    except Exception:
+        pass
     mp = mutants_path(ws, "sc", basic_mutant())
     git(ws, "add", "run/supervisor/sc-mutants.json")
     p = run_mr(ws, mp, home_env=home_of_the_tests)
     assert p.returncode == 0
-    scratch = home_of_the_tests / ".cursor-bridge" / "scratch" / tmp_path.name
-    assert not list(scratch.rglob("mutation-run-sc")) if scratch.exists() else True
+    assert not (home_of_the_tests / ".cursor-bridge" / "scratch" / "proj" / "mutation-run-sc").exists()
+    if real_cb_before is not None:
+        real_root = os.path.join(be.real_home(os.environ), ".cursor-bridge")
+        if os.path.isdir(real_root):
+            assert set(os.listdir(real_root)) == real_cb_before
 
 
 def test_r041_all_with_checkpoint_exits_2(tmp_path):
@@ -381,19 +450,31 @@ def test_r041_crash_is_error_exit_3(tmp_path):
 
 
 def test_r041_timeout_error_continues(tmp_path):
-    """R-041, TASK-031 Done when (d): infinite loop is error timed out under short timeout, exit 3."""
+    """R-041, TASK-031 Done when (d): infinite loop is error timed out under short timeout, exit 3, then the next mutant runs and the hang process ends."""
     ws = workspace(tmp_path)
     init_pkg(ws)
-    write(ws, "tests/test_hang.py", "def test_hang():\n    while True:\n        pass\n")
-    git(ws, "add", "tests/test_hang.py")
-    body = {"mutants": [{
-        "id": "hang", "file": "tests/test_hang.py", "pairs": [{"old": "pass", "new": "pass"}],
-        "tests": ["tests/test_hang.py"], "expect_fail": ["tests/test_hang.py::test_hang"],
-    }]}
+    pid_file = tmp_path / "hang.pid"
+    write(ws, "tests/test_hang.py", textwrap.dedent("""
+import os
+def test_hang():
+    open(%r, "w").write(str(os.getpid()))
+    while True:
+        pass
+""" % str(pid_file).replace("\\", "/")))
+    write(ws, "tests/test_ok.py", "from demo.calc import add\n\ndef test_add():\n    assert add(1, 1) == 2\n")
+    git(ws, "add", "tests/test_hang.py", "tests/test_ok.py")
+    body = {"mutants": [
+        {"id": "hang", "file": "tests/test_hang.py", "pairs": [{"old": "pass", "new": "pass"}],
+         "tests": ["tests/test_hang.py"], "expect_fail": ["tests/test_hang.py::test_hang"]},
+        {"id": "ok", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+         "tests": ["tests/test_ok.py"], "expect_fail": ["tests/test_ok.py::test_add"]},
+    ]}
     mp = mutants_path(ws, "hang", body)
     git(ws, "add", "run/supervisor/hang-mutants.json")
     p = run_mr(ws, mp, timeout=3)
-    assert p.returncode == 3 and "timed out" in p.stdout
+    assert p.returncode == 3 and "timed out" in p.stdout and "ok: killed" in p.stdout
+    if pid_file.is_file():
+        assert pid_dead(int(pid_file.read_text(encoding="utf-8").strip()))
 
 
 def test_r041_unexpected_fail_is_error(tmp_path):
@@ -451,9 +532,11 @@ def test_r041_tree_unchanged_after_run(tmp_path):
     mp = mutants_path(ws, "bt", basic_mutant())
     git(ws, "add", "run/supervisor/bt-mutants.json")
     before = tree_bytes(ws)
+    porcelain_before = git_porcelain_excluding_cache(ws)
     run_mr(ws, mp)
     after = tree_bytes(ws)
     assert before == after
+    assert git_porcelain_excluding_cache(ws) == porcelain_before
 
 
 def test_r041_cache_torn_line_ignored(tmp_path):
@@ -602,13 +685,11 @@ def test_r041_relaunch_after_partial_cache(tmp_path):
     assert "m1: killed (cached" in p.stdout and "m2:" in p.stdout and "run=1" in p.stdout
 
 
-def test_r041_editable_install_overridden(tmp_path):
-    """R-041, TASK-031 Done when (d): editable install of the fixture package is overridden by the copy."""
-    ws = workspace(tmp_path)
-    init_pkg(ws)
-    vroot = tmp_path / "venv"
+def _venv_with_pth(tmp_path, ws, pth_target, tag="v"):
+    vroot = tmp_path / ("%s-%s" % (tag, abs(hash(str(pth_target))) % 1000000))
     subprocess.run([sys.executable, "-m", "venv", "--without-pip", "--system-site-packages", str(vroot)],
-                   check=True, **test_conftest.windowless_kwargs({"capture_output": True}))
+                   check=True, timeout=60,
+                   **test_conftest.windowless_kwargs({"capture_output": True}))
     if sys.platform == "win32":
         vpy = vroot / "Scripts" / "python.exe"
         site = vroot / "Lib" / "site-packages"
@@ -616,15 +697,307 @@ def test_r041_editable_install_overridden(tmp_path):
         vpy = vroot / "bin" / "python"
         site = vroot / "lib" / ("python%d.%d" % sys.version_info[:2]) / "site-packages"
     site.mkdir(parents=True, exist_ok=True)
-    (site / "demo.pth").write_text(str(ws) + "\n", encoding="utf-8")
-    mp = mutants_path(ws, "edi", basic_mutant())
-    git(ws, "add", "run/supervisor/edi-mutants.json")
+    (site / "demo.pth").write_text(str(pth_target) + "\n", encoding="utf-8")
+    return vpy
+
+
+def test_r041_editable_install_flat_kills_mutant(tmp_path):
+    """R-041, TASK-031 Done when (d): editable install of the flat fixture package is overridden by the copy and the mutant on package code is killed."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "tests/test_one.py", "from demo.calc import add\n\ndef test_add():\n    assert add(1, 1) == 2\n")
+    git(ws, "add", "tests/test_one.py")
+    vpy = _venv_with_pth(tmp_path, ws, ws)
+    body = {"mutants": [{
+        "id": "m1", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+        "tests": ["tests/test_one.py"], "expect_fail": ["tests/test_one.py::test_add"],
+    }]}
+    mp = mutants_path(ws, "edif", body)
+    git(ws, "add", "run/supervisor/edif-mutants.json")
     env = dict(os.environ)
     env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
     cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env,
+    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
                        **test_conftest.windowless_kwargs({}))
-    assert p.returncode == 0, p.stderr + p.stdout
+    assert p.returncode == 0 and "killed" in p.stdout, p.stderr + p.stdout
+
+
+def test_r041_editable_install_src_kills_mutant(tmp_path):
+    """R-041, TASK-031 Done when (d): editable install of a src-layout fixture package is overridden by the copy and the mutant on package code is killed."""
+    ws = workspace(tmp_path)
+    write(ws, "src/demo/__init__.py", "")
+    write(ws, "src/demo/calc.py", "def add(a, b):\n    return a + b\n")
+    write(ws, "tests/test_one.py", "from demo.calc import add\n\ndef test_add():\n    assert add(1, 1) == 2\n")
+    write(ws, "pytest.ini", "[pytest]\npythonpath = src\n")
+    git(ws, "init", "-q", "-b", "main")
+    git(ws, "add", "-A")
+    git(ws, "commit", "-q", "-m", "init")
+    vpy = _venv_with_pth(tmp_path, ws, ws)
+    body = {"mutants": [{
+        "id": "m1", "file": "src/demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+        "tests": ["tests/test_one.py"], "expect_fail": ["tests/test_one.py::test_add"],
+    }]}
+    mp = mutants_path(ws, "edis", body)
+    git(ws, "add", "run/supervisor/edis-mutants.json")
+    env = dict(os.environ)
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
+                       **test_conftest.windowless_kwargs({}))
+    assert p.returncode == 0 and "killed" in p.stdout, p.stderr + p.stdout
+
+
+def test_r041_editable_src_only_refused(tmp_path):
+    """R-041, TASK-031 Requirement 5: a src-layout fixture that relies on the editable install alone is refused with exit 2."""
+    ws = workspace(tmp_path)
+    write(ws, "src/demo/__init__.py", "")
+    write(ws, "src/demo/calc.py", "def add(a, b):\n    return a + b\n")
+    write(ws, "tests/test_calc.py", "from demo.calc import add\n\ndef test_add():\n    assert add(1, 1) == 2\n")
+    git(ws, "init", "-q", "-b", "main")
+    git(ws, "add", "-A")
+    git(ws, "commit", "-q", "-m", "init")
+    vpy = _venv_with_pth(tmp_path, ws, ws, tag="edir")
+    body = {"mutants": [{
+        "id": "m1", "file": "src/demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+        "tests": ["tests/test_calc.py"], "expect_fail": ["tests/test_calc.py::test_add"],
+    }]}
+    mp = mutants_path(ws, "edir", body)
+    git(ws, "add", "run/supervisor/edir-mutants.json")
+    env = dict(os.environ)
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
+                       **test_conftest.windowless_kwargs({}))
+    assert p.returncode == 2, p.stderr + p.stdout
+    sha = git(ws, "rev-parse", "HEAD")
+    mp2 = mutants_path(ws, "edir2", {"mutants": [], "new_tests": ["tests/test_calc.py::test_add"]})
+    git(ws, "add", "run/supervisor/edir2-mutants.json")
+    cmd2 = [str(vpy), MUTATION_RUN, str(mp2), "--mutant-timeout", "60", "--checkpoint", sha]
+    p2 = subprocess.run(cmd2, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
+                        **test_conftest.windowless_kwargs({}))
+    assert p2.returncode == 2, p2.stderr + p2.stdout
+    assert not (ws / "run/supervisor/mutation-cache/edir.jsonl").exists()
+    assert not (ws / "run/supervisor/mutation-cache/edir2.jsonl").exists()
+
+
+def test_r041_namespace_package_resolution_refused(tmp_path):
+    """R-041, TASK-031 Requirement 5 (i): a namespace package whose search path lies outside the copy is refused."""
+    ws = workspace(tmp_path)
+    write(ws, "ns/pkg/mod.py", "VALUE = 1\n")
+    write(ws, "tests/test_ns.py", "from ns.pkg import mod\n\ndef test_ns():\n    assert mod.VALUE == 1\n")
+    git(ws, "init", "-q", "-b", "main")
+    git(ws, "add", "-A")
+    git(ws, "commit", "-q", "-m", "init")
+    body = {"mutants": [{
+        "id": "m1", "file": "ns/pkg/mod.py", "pairs": [{"old": "VALUE = 1", "new": "VALUE = 2"}],
+        "tests": ["tests/test_ns.py"], "expect_fail": ["tests/test_ns.py::test_ns"],
+    }]}
+    mp = mutants_path(ws, "nsp", body)
+    git(ws, "add", "run/supervisor/nsp-mutants.json")
+    outside = tmp_path / "outside_ns"
+    outside.mkdir()
+    (outside / "ns").mkdir()
+    (outside / "ns" / "pkg").mkdir(parents=True)
+    (outside / "ns" / "pkg" / "mod.py").write_text("VALUE = 9\n", encoding="utf-8")
+    write(ws, "tests/conftest.py", "import sys\nsys.path.insert(0, %r)\n" % str(outside))
+    git(ws, "add", "tests/conftest.py")
+    p = run_mr(ws, mp)
+    assert p.returncode == 2, p.stdout + p.stderr
+
+
+def test_r041_killed_run_keeps_partial_cache(tmp_path, home_of_the_tests):
+    """R-041, TASK-031 Done when (d): a run stopped after N mutants keeps N cache lines, leaves the tree unchanged, and a relaunch runs only the rest."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    marker = tmp_path / "continue.marker"
+    write(ws, "tests/test_gate.py", textwrap.dedent("""
+import time
+from pathlib import Path
+def test_gate():
+    p = Path(%r)
+    while not p.is_file():
+        time.sleep(0.05)
+    assert False
+""" % str(marker).replace("\\", "/")))
+    write(ws, "tests/test_m1.py", "from demo.calc import add\n\ndef test_add():\n    assert add(1, 1) == 2\n")
+    write(ws, "tests/test_m3.py", "from demo.calc import add\n\ndef test_sub():\n    assert add(2, 3) == 5\n")
+    git(ws, "add", "tests/test_gate.py", "tests/test_m1.py", "tests/test_m3.py")
+    body = {"mutants": [
+        {"id": "m1", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+         "tests": ["tests/test_m1.py"], "expect_fail": ["tests/test_m1.py::test_add"]},
+        {"id": "m2", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+         "tests": ["tests/test_gate.py"], "expect_fail": ["tests/test_gate.py::test_gate"]},
+        {"id": "m3", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+         "tests": ["tests/test_m3.py"], "expect_fail": ["tests/test_m3.py::test_sub"]},
+    ]}
+    mp = mutants_path(ws, "kill", body)
+    git(ws, "add", "run/supervisor/kill-mutants.json")
+    scratch = home_of_the_tests / "scr-kill"
+    env = dict(os.environ)
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+    cmd = [sys.executable, MUTATION_RUN, str(mp), "--scratch", str(scratch), "--mutant-timeout", "120"]
+    before = tree_bytes(ws)
+    porcelain_before = git_porcelain_excluding_cache(ws)
+    proc = subprocess.Popen(cmd, cwd=str(ws), env=env,
+                            **test_conftest.windowless_kwargs({"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True}))
+    cache = ws / "run/supervisor/mutation-cache/kill.jsonl"
+    try:
+        for _ in range(600):
+            if cache.is_file() and len([l for l in cache.read_text(encoding="utf-8").splitlines() if l.strip()]) >= 1:
+                break
+            time.sleep(0.05)
+        kill_proc_tree(proc)
+        proc.wait(timeout=30)
+    finally:
+        if proc.poll() is None:
+            kill_proc_tree(proc)
+            proc.wait(timeout=10)
+    assert tree_bytes(ws) == before
+    assert git_porcelain_excluding_cache(ws) == porcelain_before
+    lines = [l for l in cache.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(lines) == 1
+    marker.write_text("go\n", encoding="utf-8")
+    p2 = run_mr(ws, mp, scratch=scratch, home_env=home_of_the_tests, timeout=120)
+    assert "m1: killed (cached" in p2.stdout
+    assert "m2:" in p2.stdout and "m3:" in p2.stdout
+    assert "cached=1" in p2.stdout and "run=2" in p2.stdout
+
+
+def test_r041_checkpoint_reads_root_env_exit_4(tmp_path):
+    """R-041, TASK-031 Done when (d): --checkpoint with a new test that reads the root .env passes on old code with exit 4."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, ".env", "SECRET=fixture-value\n")
+    sha = git(ws, "rev-parse", "HEAD")
+    write(ws, "tests/test_env_ck.py", textwrap.dedent("""
+def test_reads_env():
+    assert open(".env", encoding="utf-8").read().strip().endswith("fixture-value")
+"""))
+    git(ws, "add", "tests/test_env_ck.py")
+    mp = mutants_path(ws, "cken", {"mutants": [], "new_tests": ["tests/test_env_ck.py::test_reads_env"]})
+    git(ws, "add", "run/supervisor/cken-mutants.json")
+    p = run_mr(ws, mp, extra=["--checkpoint", sha])
+    assert p.returncode == 4 and "passing on old code" in p.stdout
+
+
+def test_r041_refuse_untracked_test_file(tmp_path):
+    """R-041, TASK-031 Requirement 1: an untracked test file in mutants exits 2 with nothing cached."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "tests/extra.py", "def test_x():\n    pass\n")
+    body = basic_mutant()
+    body["mutants"][0]["tests"] = ["tests/extra.py"]
+    body["mutants"][0]["expect_fail"] = ["tests/extra.py::test_x"]
+    mp = mutants_path(ws, "utt", body)
+    p = run_mr(ws, mp)
+    assert p.returncode == 2
+    assert not (ws / "run/supervisor/mutation-cache/utt.jsonl").exists()
+
+
+def test_r041_refuse_untracked_path_is_link(tmp_path):
+    """R-041, TASK-031 Requirement 1: an untracked path that is itself a link exits 2."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    target = tmp_path / "target.txt"
+    target.write_text("x\n", encoding="utf-8")
+    link = ws / "link.txt"
+    try:
+        os.symlink(str(target), str(link))
+    except (OSError, NotImplementedError) as e:
+        if sys.platform != "win32":
+            pytest.skip("this account cannot create a symbolic link here (%s)" % e)
+        j = subprocess.run(["cmd", "/c", "mklink", "/J", str(ws / "linkdir"), str(target.parent)],
+                           **test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 30}))
+        if j.returncode != 0:
+            pytest.skip("neither a symbolic link nor a junction could be made here (%s)" % j.stderr)
+        untracked = ["linkdir"]
+    else:
+        untracked = ["link.txt"]
+    body = basic_mutant()
+    body["untracked"] = untracked
+    mp = mutants_path(ws, "utl", body)
+    git(ws, "add", "run/supervisor/utl-mutants.json")
+    p = run_mr(ws, mp)
+    assert p.returncode == 2
+    assert not (ws / "run/supervisor/mutation-cache/utl.jsonl").exists()
+
+
+def test_r041_refuse_unknown_field(tmp_path):
+    """R-041, TASK-031 Requirement 1: an unknown top-level field exits 2."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    body = basic_mutant()
+    body["extra"] = 1
+    mp = mutants_path(ws, "unk", body)
+    assert run_mr(ws, mp).returncode == 2
+
+
+def test_r041_refuse_duplicate_id(tmp_path):
+    """R-041, TASK-031 Requirement 1: a duplicate mutant id exits 2."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    m = basic_mutant()["mutants"][0]
+    body = {"mutants": [m, dict(m)]}
+    mp = mutants_path(ws, "dup", body)
+    assert run_mr(ws, mp).returncode == 2
+
+
+def test_r041_refuse_bad_expect(tmp_path):
+    """R-041, TASK-031 Requirement 1: an expect that does not start with survive exits 2."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    body = basic_mutant()
+    body["mutants"][0]["expect"] = "kill me"
+    mp = mutants_path(ws, "bex", body)
+    assert run_mr(ws, mp).returncode == 2
+
+
+def test_r041_refuse_empty_expect_fail(tmp_path):
+    """R-041, TASK-031 Requirement 1: an empty expect_fail exits 2."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    body = basic_mutant()
+    body["mutants"][0]["expect_fail"] = []
+    mp = mutants_path(ws, "eef", body)
+    assert run_mr(ws, mp).returncode == 2
+
+
+def test_r041_refuse_new_tests_not_tracked(tmp_path):
+    """R-041, TASK-031 Requirement 1: a new_tests entry that is not tracked exits 2."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    sha = git(ws, "rev-parse", "HEAD")
+    write(ws, "tests/new.py", "def test_n():\n    pass\n")
+    mp = mutants_path(ws, "nnt", {"mutants": [], "new_tests": ["tests/new.py::test_n"]})
+    p = run_mr(ws, mp, extra=["--checkpoint", sha])
+    assert p.returncode == 2
+
+
+def test_r041_scratch_contains_workspace_refused(tmp_path):
+    """R-041, TASK-031 Requirement 2: a scratch folder that contains the Workspace exits 2."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    mp = mutants_path(ws, "scw", basic_mutant())
+    git(ws, "add", "run/supervisor/scw-mutants.json")
+    scratch = ws.parent
+    assert run_mr(ws, mp, scratch=scratch).returncode == 2
+
+
+def test_r041_scratch_through_link_refused(tmp_path):
+    """R-041, TASK-031 Requirement 2: a scratch path reached through a link exits 2."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    real_scratch = tmp_path / "real_scratch"
+    real_scratch.mkdir()
+    link_scratch = tmp_path / "link_scratch"
+    try:
+        os.symlink(str(real_scratch), str(link_scratch))
+    except (OSError, NotImplementedError) as e:
+        pytest.skip("this account cannot create a symbolic link here (%s)" % e)
+    mp = mutants_path(ws, "scl", basic_mutant())
+    git(ws, "add", "run/supervisor/scl-mutants.json")
+    assert run_mr(ws, mp, scratch=link_scratch).returncode == 2
 
 
 def test_r041_scratch_inside_workspace_refused(tmp_path):

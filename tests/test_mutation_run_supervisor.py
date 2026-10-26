@@ -205,3 +205,25 @@ def test_task031_req8_the_checkpoint_check_collects_the_listed_new_tests(tmp_pat
     mf = _mutants(ws, "ckleak", {"mutants": [], "new_tests": ["checks/test_leak.py::test_new"]})
     p = _run(ws, mf, "--checkpoint", sha)
     assert p.returncode == 2, p.stdout + p.stderr
+
+
+def test_task031_req8_a_module_the_increment_adds_does_not_refuse_the_checkpoint_run(tmp_path):
+    """R-041, TASK-031 Requirement 8 and 5 (i) (handoff/TASK-031-r3.md, item 1): in --checkpoint mode the mutants'
+    files are checked only for resolving outside the copy; a mutated module the increment adds is absent at the
+    checkpoint, so it resolves nowhere there, and the run goes on: its new test fails to collect on the old code
+    and is listed `not run`, exit 0, never the refusal's 2."""
+    ws = _fixture(tmp_path, CALC)
+    sha = _git(ws, "rev-parse", "HEAD")
+    _write(ws, "demo/newmod.py", "def triple(x):\n    return 3 * x\n")
+    _write(ws, "tests/test_newmod.py", "from demo.newmod import triple\n\ndef test_triple():\n"
+           "    assert triple(2) == 6\n")
+    _git(ws, "add", "demo/newmod.py", "tests/test_newmod.py")
+    mf = _mutants(ws, "cknew", {"mutants": [{
+        "id": "m", "file": "demo/newmod.py", "pairs": [{"old": "return 3 * x", "new": "return 2 * x"}],
+        "tests": ["tests/test_newmod.py"], "expect_fail": ["tests/test_newmod.py::test_triple"]}],
+        "new_tests": ["tests/test_newmod.py"]})
+    p = _run(ws, mf, "--checkpoint", sha)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert "not run" in p.stdout
+    normal = _run(ws, mf)                                          # the same file in normal mode: killed
+    assert normal.returncode == 0, normal.stdout + normal.stderr

@@ -44,6 +44,11 @@ class InternalError(Exception):
     pass
 
 
+class ResolutionTimeout(Exception):
+    def __init__(self, seconds):
+        self.seconds = seconds
+
+
 def git(*args, cwd=None, env=None, binary=False, ok=(0,)):
     try:
         p = subprocess.run(
@@ -88,7 +93,10 @@ def normalize_rel(p):
 
 
 def mutants_file_ok(workspace, path):
-    rel = os.path.relpath(os.path.abspath(path), workspace).replace("\\", "/")
+    try:
+        rel = os.path.relpath(os.path.abspath(path), workspace).replace("\\", "/")
+    except ValueError:
+        raise Refuse("mutation-run: mutants file must be run/supervisor/<id>-mutants.json")
     if not rel.startswith("run/supervisor/") or not rel.endswith("-mutants.json"):
         raise Refuse("mutation-run: mutants file must be run/supervisor/<id>-mutants.json")
     base = os.path.basename(rel)
@@ -98,16 +106,61 @@ def mutants_file_ok(workspace, path):
     return run_id
 
 
-def link_on_path(path):
-    cur = path
+def link_on_path(path, stop=None):
+    cur = os.path.abspath(path)
+    stop_abs = os.path.abspath(stop) if stop else None
     while True:
         if bridge_env.is_link(cur):
             return True
+        if stop_abs is not None and os.path.normcase(cur) == os.path.normcase(stop_abs):
+            break
         parent = os.path.dirname(cur)
         if parent == cur:
             break
         cur = parent
     return False
+
+
+def refuse_links_under(workspace, rel):
+    full = os.path.join(workspace, rel.replace("/", os.sep))
+    if os.path.isfile(full):
+        if bridge_env.is_link(full):
+            raise Refuse("mutation-run: %s is a link" % rel)
+        return
+    if not os.path.isdir(full):
+        return
+    for dirpath, dirnames, filenames in os.walk(full, followlinks=False):
+        for name in dirnames + filenames:
+            p = os.path.join(dirpath, name)
+            if bridge_env.is_link(p):
+                r = os.path.relpath(p, workspace).replace("\\", "/")
+                raise Refuse("mutation-run: %s is a link" % r)
+
+
+def validate_tracked_copy(workspace, tracked_list):
+    for rel in tracked_list:
+        full = os.path.join(workspace, rel)
+        if not os.path.lexists(full):
+            continue
+        parts = rel.replace("\\", "/").split("/")
+        cur = workspace
+        for part in parts:
+            cur = os.path.join(cur, part)
+            if os.path.lexists(cur) and bridge_env.is_link(cur):
+                raise Refuse("mutation-run: %s is a link" % rel)
+    env_src = os.path.join(workspace, ".env")
+    if os.path.lexists(env_src) and bridge_env.is_link(env_src):
+        raise Refuse("mutation-run: .env is a link")
+
+
+def assert_worktree_top(workspace):
+    top = git_try("rev-parse", "--show-toplevel", cwd=workspace)
+    if top is None:
+        raise Refuse("mutation-run: not inside a git work tree")
+    top_n = os.path.normcase(os.path.realpath(top.strip()))
+    ws_n = os.path.normcase(os.path.realpath(os.path.abspath(workspace)))
+    if top_n != ws_n:
+        raise Refuse("mutation-run: cwd is not the top of the git work tree")
 
 
 def refuse_cache_links(workspace):
@@ -228,8 +281,12 @@ def validate_untracked(untracked, workspace):
         full = os.path.normpath(os.path.join(workspace, u))
         if not full.startswith(ws + os.sep) and full != ws:
             raise Refuse("mutation-run: untracked %r lies outside the Workspace" % u)
-        if link_on_path(full):
+        if link_on_path(full, stop=ws):
             raise Refuse("mutation-run: untracked %r is reached through a link" % u)
+        if os.path.isdir(full):
+            refuse_links_under(workspace, u)
+        elif bridge_env.is_link(full):
+            raise Refuse("mutation-run: untracked %r is a link" % u)
 
 
 def default_scratch(workspace, env):
@@ -353,6 +410,24 @@ def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
             shutil.copy2(src, dst)
 
 
+def dotted_module_paths(rel):
+    rel = normalize_rel(rel)
+    out = []
+    for prefix in ("", "src/"):
+        if prefix and not rel.startswith(prefix):
+            continue
+        rest = rel[len(prefix):] if prefix else rel
+        if not rest.endswith(".py"):
+            continue
+        modpath = rest[:-3]
+        if not modpath:
+            continue
+        parts = modpath.split("/")
+        if all(p.isidentifier() for p in parts):
+            out.append(".".join(parts))
+    return out
+
+
 def conftest_paths(test_file):
     parts = test_file.replace("\\", "/").split("/")
     paths = ["conftest.py"]
@@ -369,12 +444,15 @@ def key_file_set(mutant, workspace, tracked_set):
             if t == mutant["file"] or t.startswith(mdir + "/"):
                 rels.add(t)
     else:
-        rels.add(mutant["file"])
+        rels.update(tracked_set)
     for tf in mutant["tests"]:
         tdir = os.path.dirname(tf)
-        for t in tracked_set:
-            if t == tf or (tdir and t.startswith(tdir + "/")):
-                rels.add(t)
+        if tdir:
+            for t in tracked_set:
+                if t == tf or t.startswith(tdir + "/"):
+                    rels.add(t)
+        else:
+            rels.update(tracked_set)
         for cf in conftest_paths(tf):
             if cf in tracked_set:
                 rels.add(cf)
@@ -392,7 +470,9 @@ def key_bytes(workspace, rels):
             continue
         with open(path, "rb") as f:
             data = f.read()
-        parts.append(rel.encode("utf-8"))
+        rb = rel.encode("utf-8")
+        parts.append(struct.pack(">Q", len(rb)))
+        parts.append(rb)
         parts.append(struct.pack(">Q", len(data)))
         parts.append(data)
     return b"".join(parts)
@@ -413,7 +493,9 @@ def compute_key(workspace, mutant, tracked_set):
     rels = key_file_set(mutant, workspace, tracked_set)
     h = hashlib.sha256()
     h.update(key_bytes(workspace, rels))
-    h.update(mutant_key_part(mutant))
+    mp = mutant_key_part(mutant)
+    h.update(struct.pack(">Q", len(mp)))
+    h.update(mp)
     return h.hexdigest()
 
 
@@ -449,10 +531,11 @@ def append_cache(cache_path, mid, key, outcome):
         os.fsync(f.fileno())
 
 
-def normalize_newlines(text, content):
-    if b"\r\n" in content or (isinstance(content, str) and "\r\n" in content):
-        return text.replace("\n", "\r\n")
-    return text.replace("\r\n", "\n")
+def normalize_pair_text(s, crlf):
+    s = s.replace("\r\n", "\n")
+    if crlf:
+        return s.replace("\n", "\r\n")
+    return s
 
 
 def apply_mutant(copy_root, mutant):
@@ -465,15 +548,17 @@ def apply_mutant(copy_root, mutant):
         text = original.decode("utf-8")
     except UnicodeDecodeError:
         return False
+    crlf = b"\r\n" in original
+    norm_orig = text.replace("\r\n", "\n")
     for pair in mutant["pairs"]:
-        old = normalize_newlines(pair["old"], original)
-        new = normalize_newlines(pair["new"], original)
-        count = text.count(old)
-        if count != 1:
+        if norm_orig.count(pair["old"].replace("\r\n", "\n")) != 1:
             return False
+    for pair in mutant["pairs"]:
+        old = normalize_pair_text(pair["old"], crlf)
+        new = normalize_pair_text(pair["new"], crlf)
         text = text.replace(old, new, 1)
-    nl = "\r\n" if b"\r\n" in original else "\n"
-    out = text.replace("\r\n", "\n").replace("\n", nl) if nl == "\r\n" else text
+    nl = "\r\n" if crlf else "\n"
+    out = text.replace("\r\n", "\n").replace("\n", nl) if crlf else text
     with open(path, "wb") as f:
         f.write(out.encode("utf-8"))
     return True
@@ -545,10 +630,14 @@ def _dotted(rel):
         if prefix and not rel.startswith(prefix):
             continue
         rest = rel[len(prefix):] if prefix else rel
-        if rest.endswith(".py") and "/" in rest:
-            mod = rest[:-3].replace("/", ".")
-            if mod.replace(".", "").replace("_", "").isalnum() or "_" in mod:
-                yield mod
+        if not rest.endswith(".py"):
+            continue
+        modpath = rest[:-3]
+        if not modpath:
+            continue
+        parts = modpath.split("/")
+        if all(p.isidentifier() for p in parts):
+            yield ".".join(parts)
 
 loaded_ws = []
 resolved = {}
@@ -556,32 +645,62 @@ resolved = {}
 def pytest_configure(config):
     import importlib
     import importlib.util
+    croot = os.path.abspath(ROOT)
     for mf in MUTATED:
         for modname in _dotted(mf):
             try:
-                spec = importlib.util.find_spec(modname.split(".")[0])
-                if spec is None or spec.origin is None:
+                spec = importlib.util.find_spec(modname)
+                if spec is None:
+                    resolved[modname] = None
                     continue
-                origin = os.path.abspath(spec.origin)
-                resolved[modname] = origin
+                if spec.origin is not None:
+                    origin = os.path.abspath(spec.origin)
+                    resolved[modname] = origin
+                elif spec.submodule_search_locations:
+                    for loc in spec.submodule_search_locations:
+                        aloc = os.path.abspath(loc)
+                        if not aloc.startswith(croot + os.sep) and aloc != croot:
+                            resolved[modname] = aloc
+                            break
             except Exception:
                 pass
+
+def _norm(p):
+    return os.path.normcase(os.path.abspath(p))
 
 def pytest_sessionfinish(session, exitstatus):
     import sys as _sys
     wroot = os.path.abspath(WORKSPACE)
     croot = os.path.abspath(ROOT)
+    nw = _norm(wroot)
+    nc = _norm(croot)
+    norm_path = []
+    for p in _sys.path:
+        if not p:
+            continue
+        try:
+            norm_path.append(_norm(p))
+        except (OSError, TypeError):
+            continue
+    wi = ci = None
+    for i, ap in enumerate(norm_path):
+        if ap == nw or ap.startswith(nw + os.sep):
+            wi = i if wi is None else wi
+        if ap == nc or ap.startswith(nc + os.sep):
+            ci = i if ci is None else ci
+    if wi is not None and (ci is None or wi < ci):
+        loaded_ws.append("sys.path")
     for name, mod in list(_sys.modules.items()):
         f = getattr(mod, "__file__", None)
         if not f:
             continue
-        af = os.path.abspath(f)
-        if not af.startswith(wroot + os.sep) and af != wroot:
+        af = _norm(f)
+        if not af.startswith(nw + os.sep) and af != nw:
             continue
-        if af.startswith(croot + os.sep) or af == croot:
+        if af.startswith(nc + os.sep) or af == nc:
             continue
         for t in TRACKED:
-            wp = os.path.abspath(os.path.join(wroot, t.replace("/", os.sep)))
+            wp = _norm(os.path.join(wroot, t.replace("/", os.sep)))
             if af == wp:
                 loaded_ws.append(t)
                 break
@@ -597,32 +716,39 @@ def pytest_sessionfinish(session, exitstatus):
     return out_json
 
 
-def run_resolution_check(copy_root, mutants, workspace_tracked, workspace, env, timeout_sec, work_sub):
+def run_resolution_check(copy_root, mutants, test_files, workspace_tracked, workspace, env, timeout_sec):
     mutated_files = [{"file": m["file"]} for m in mutants]
     out_json = write_resolution_plugin(copy_root, mutated_files, workspace_tracked, workspace)
     if os.path.isfile(out_json):
         os.remove(out_json)
-    test_files = []
-    for m in mutants:
-        test_files.extend(m["tests"])
     test_files = sorted(set(test_files))
     if not test_files:
-        test_files = ["tests"]
+        return
     run_env = dict(env)
     run_env["PYTHONPATH"] = copy_root
     argv = [sys.executable, "-m", "pytest", "--collect-only", "-q",
             "-p", PLUGIN_MOD, "-p", "no:cacheprovider"] + test_files
     rc, out, err, timed = run_process(argv, run_env, copy_root, timeout_sec)
     if timed:
-        raise Refuse("mutation-run: resolution check timed out after %d s" % timeout_sec)
-    if rc not in (0, 1, 2, 3, 4, 5):
-        raise Refuse("mutation-run: resolution check failed to run")
+        raise ResolutionTimeout(timeout_sec)
+    if rc not in (0, 2):
+        raise Refuse("mutation-run: resolution check failed (pytest exit %d)" % rc)
     if not os.path.isfile(out_json):
         raise Refuse("mutation-run: resolution check produced no report")
     with open(out_json, encoding="utf-8") as f:
         report = json.load(f)
+    croot_abs = os.path.abspath(copy_root) + os.sep
+    for m in mutants:
+        for modname in dotted_module_paths(m["file"]):
+            origin = report.get("resolved", {}).get(modname)
+            if not origin:
+                raise Refuse("mutation-run: module %s does not resolve inside the copy" % modname)
+            if not os.path.abspath(origin).startswith(croot_abs):
+                raise Refuse("mutation-run: module %s resolves outside the copy at %s" % (modname, origin))
     for mod, origin in report.get("resolved", {}).items():
-        if not origin.startswith(os.path.abspath(copy_root) + os.sep):
+        if origin is None:
+            continue
+        if not os.path.abspath(origin).startswith(croot_abs):
             raise Refuse("mutation-run: module %s resolves outside the copy at %s" % (mod, origin))
     for t in report.get("loaded_ws", []):
         raise Refuse("mutation-run: module from Workspace path %s was loaded" % t)
@@ -699,6 +825,7 @@ def main(argv=None):
     workspace = os.getcwd()
     if git_try("rev-parse", "--is-inside-work-tree", cwd=workspace) is None:
         raise Refuse("mutation-run: not inside a git work tree")
+    assert_worktree_top(workspace)
     refuse_cache_links(workspace)
     run_id = mutants_file_ok(workspace, args.mutants_file)
     mutants, new_tests, untracked = load_mutants(args.mutants_file, args.checkpoint)
@@ -725,9 +852,18 @@ def main(argv=None):
               "error": 0, "expected survive": 0}
     try:
         if args.checkpoint:
+            validate_tracked_copy(workspace, tracked_list)
             archive_checkpoint(workspace, args.checkpoint, copy_root, new_tests, untracked)
-            chk_mutants = mutants if mutants else [{"file": "pyproject.toml", "tests": ["tests"]}]
-            run_resolution_check(copy_root, chk_mutants, tracked_set, workspace, env, timeout_sec, work_sub)
+            chk_test_files = []
+            for item in new_tests or []:
+                if "::" in item:
+                    fpart = normalize_rel(item.split("::", 1)[0])
+                else:
+                    fpart = normalize_rel(item)
+                if fpart not in chk_test_files:
+                    chk_test_files.append(fpart)
+            run_resolution_check(
+                copy_root, mutants, chk_test_files, tracked_set, workspace, env, timeout_sec)
             items = checkpoint_new_test_items(new_tests)
             run_env = dict(env)
             run_env["PYTHONPATH"] = copy_root
@@ -755,8 +891,12 @@ def main(argv=None):
                 else:
                     print("%s: failing" % label)
             return 4 if any_pass else 0
+        validate_tracked_copy(workspace, tracked_list)
         copy_tracked(workspace, copy_root, tracked_list, untracked)
-        run_resolution_check(copy_root, mutants, tracked_set, workspace, env, timeout_sec, work_sub)
+        res_tests = []
+        for m in mutants:
+            res_tests.extend(m["tests"])
+        run_resolution_check(copy_root, mutants, res_tests, tracked_set, workspace, env, timeout_sec)
         originals = {}
         for m in mutants:
             key = compute_key(workspace, m, tracked_set)
@@ -797,7 +937,6 @@ def main(argv=None):
                     append_cache(cache_path, m["id"], key, "killed")
                 elif outcome == "survived":
                     results.append((m["id"], "expected survive (%s)" % m["survive"], True))
-                    counts["survived"] += 1
                     append_cache(cache_path, m["id"], key, "survived")
                 else:
                     results.append((m["id"], outcome + ((" (%s)" % reason) if reason else ""), True))
@@ -834,6 +973,9 @@ def main(argv=None):
 def run_main():
     try:
         return main()
+    except ResolutionTimeout as e:
+        print("mutation-run: resolution check timed out after %d s" % e.seconds, file=sys.stderr)
+        return 3
     except Refuse as e:
         msg = str(e)
         if not msg.startswith("mutation-run:"):
