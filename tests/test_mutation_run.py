@@ -1008,3 +1008,206 @@ def test_r041_scratch_inside_workspace_refused(tmp_path):
     git(ws, "add", "run/supervisor/si-mutants.json")
     scratch = ws / "scratch"
     assert run_mr(ws, mp, scratch=scratch).returncode == 2
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="console windows exist only on Windows")
+def test_r041_pytest_process_windowless(tmp_path, home_of_the_tests):
+    """R-041, TASK-031 Requirement 4 (M06): the pytest process mutation-run starts has no console window."""
+    from test_tests_windowless import window_and_console
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    hook = textwrap.dedent("""
+def pytest_sessionstart(session):
+    import ctypes, os
+    k = ctypes.windll.kernel32
+    a = (ctypes.c_uint * 64)()
+    n = k.GetConsoleProcessList(a, 64)
+    parts = [str(k.GetConsoleWindow()), str(os.getpid())]
+    parts.extend(str(a[i]) for i in range(n))
+    open("_win_probe.txt", "w").write(" ".join(parts))
+""")
+    write(ws, "tests/conftest.py", hook)
+    git(ws, "add", "tests/conftest.py")
+    mp = mutants_path(ws, "win2", basic_mutant())
+    git(ws, "add", "run/supervisor/win2-mutants.json")
+    scratch = home_of_the_tests / "scr-win2"
+    env = dict(os.environ)
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+    cmd = [sys.executable, MUTATION_RUN, str(mp), "--scratch", str(scratch), "--mutant-timeout", "60"]
+    # the program starts windowless (the suite's default): it gets a console of its own with no window, so a
+    # pytest child it starts without the flag inherits that console, and the program's pid is then on it
+    proc = subprocess.Popen(
+        cmd, cwd=str(ws), env=env,
+        **test_conftest.windowless_kwargs({"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True}),
+    )
+    line = None
+    while proc.poll() is None:
+        hits = list(scratch.rglob("_win_probe.txt"))
+        if hits:
+            line = hits[0].read_text(encoding="utf-8").strip()
+            break
+        time.sleep(0.05)
+    out, err = proc.communicate(timeout=90)
+    assert proc.returncode == 0, err or out
+    assert line, "probe file missing"
+    window, _pytest_pid, on_console = window_and_console(line)
+    assert window == 0
+    assert proc.pid not in on_console
+
+
+def test_r041_crlf_multiline_mutant_killed(tmp_path):
+    """R-041, TASK-031 Requirement 3 (M07): a CRLF mutant whose old and new span two lines is killed."""
+    ws = workspace(tmp_path)
+    init_pkg(ws, crlf=True)
+    body = {"mutants": [{
+        "id": "ml", "file": "demo/calc.py",
+        "pairs": [{"old": "def add(a, b):\n    return a + b", "new": "def add(a, b):\n    return a - b"}],
+        "tests": ["tests/test_calc.py"],
+        "expect_fail": ["tests/test_calc.py::test_add", "tests/test_calc.py::test_sub"],
+    }]}
+    mp = mutants_path(ws, "ml", body)
+    git(ws, "add", "run/supervisor/ml-mutants.json")
+    p = run_mr(ws, mp)
+    assert p.returncode == 0 and "ml: killed" in p.stdout
+
+
+def test_r041_parent_conftest_change_reruns(tmp_path):
+    """R-041, TASK-031 Done when (c) (M11): a tracked tests/conftest.py above tests/unit/ is in the cache key."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "tests/unit/test_u.py", "from demo.calc import add\n\ndef test_u():\n    assert add(1, 1) == 2\n")
+    git(ws, "add", "tests/unit/test_u.py")
+    body = {"mutants": [{
+        "id": "u1", "file": "demo/calc.py",
+        "pairs": [{"old": "return a + b", "new": "return a - b"}],
+        "tests": ["tests/unit/test_u.py"],
+        "expect_fail": ["tests/unit/test_u.py::test_u"],
+    }]}
+    mp = mutants_path(ws, "ucf", body)
+    git(ws, "add", "run/supervisor/ucf-mutants.json")
+    assert run_mr(ws, mp).returncode == 0
+    cache = ws / "run/supervisor/mutation-cache/ucf.jsonl"
+    n1 = len([l for l in cache.read_text(encoding="utf-8").splitlines() if l.strip()])
+    write(ws, "tests/conftest.py", "# changed\n")
+    git(ws, "add", "tests/conftest.py")
+    p2 = run_mr(ws, mp)
+    assert "run=1" in p2.stdout
+    n2 = len([l for l in cache.read_text(encoding="utf-8").splitlines() if l.strip()])
+    assert n2 == n1 + 1
+
+
+def test_r041_refuse_tracked_data_link(tmp_path):
+    """R-041, TASK-031 Requirement 2 (M13): a tracked folder replaced by a link outside the Workspace is refused."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "data/x.txt", "payload\n")
+    git(ws, "add", "data/x.txt")
+    outside = tmp_path / "outside_data"
+    outside.mkdir()
+    (outside / "x.txt").write_text("payload\n", encoding="utf-8")
+    data_dir = ws / "data"
+    shutil.rmtree(data_dir)
+    try:
+        os.symlink(str(outside), str(data_dir), target_is_directory=True)
+    except (OSError, NotImplementedError) as e:
+        if sys.platform != "win32":
+            pytest.skip("this account cannot create a symbolic link here (%s)" % e)
+        j = subprocess.run(["cmd", "/c", "mklink", "/J", str(data_dir), str(outside)],
+                           **test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 30}))
+        if j.returncode != 0:
+            pytest.skip("neither a symbolic link nor a junction could be made here (%s)" % j.stderr)
+    mp = mutants_path(ws, "tdl", basic_mutant())
+    git(ws, "add", "run/supervisor/tdl-mutants.json")
+    p = run_mr(ws, mp)
+    assert p.returncode == 2
+    assert "link" in p.stderr.lower()
+    assert "data" in p.stderr
+    assert not (ws / "run/supervisor/mutation-cache/tdl.jsonl").exists()
+
+
+def test_r041_refuse_dotdot_names_path_form(tmp_path):
+    """R-041, TASK-031 Requirement 1 (M21): .. in a mutant file path is refused as not relative, not as untracked."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    body = basic_mutant()
+    body["mutants"][0]["file"] = "demo/../demo/calc.py"
+    mp = mutants_path(ws, "ddm", body)
+    p = run_mr(ws, mp)
+    assert p.returncode == 2
+    assert "git index" not in p.stderr
+    assert ".." in p.stderr or "not relative" in p.stderr
+
+
+def test_r041_duplicate_old_not_applied(tmp_path):
+    """R-041, TASK-031 Requirement 3 (M22): old text found more than once yields not applied."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "demo/dup.py", "x = 1\nx = 1\n")
+    write(ws, "tests/test_dup.py", "import demo.dup\n\ndef test_dup():\n    assert demo.dup.x == 1\n")
+    git(ws, "add", "demo/dup.py", "tests/test_dup.py")
+    body = {"mutants": [{
+        "id": "dup", "file": "demo/dup.py",
+        "pairs": [{"old": "x = 1", "new": "x = 2"}],
+        "tests": ["tests/test_dup.py"],
+        "expect_fail": ["tests/test_dup.py::test_dup"],
+    }]}
+    mp = mutants_path(ws, "dup", body)
+    git(ws, "add", "run/supervisor/dup-mutants.json")
+    p = run_mr(ws, mp)
+    assert p.returncode == 1 and "dup: not applied" in p.stdout
+
+
+def test_r041_root_env_copied_when_extra_test_runs(tmp_path):
+    """R-041, TASK-031 Requirement 2 (M23): the root .env is copied so an extra listed test does not error the run."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, ".env", "SECRET=fixture-value\n")
+    write(ws, "tests/test_calc.py", "from demo.calc import add\n\ndef test_add():\n    assert add(1, 1) == 2\n")
+    write(ws, "tests/test_env.py", textwrap.dedent("""
+def test_env():
+    assert open(".env", encoding="utf-8").read().strip().endswith("fixture-value")
+"""))
+    git(ws, "add", "tests/test_calc.py", "tests/test_env.py")
+    body = {"mutants": [{
+        "id": "env2", "file": "demo/calc.py",
+        "pairs": [{"old": "return a + b", "new": "return a - b"}],
+        "tests": ["tests/test_calc.py", "tests/test_env.py"],
+        "expect_fail": ["tests/test_calc.py::test_add"],
+    }]}
+    mp = mutants_path(ws, "env2", body)
+    git(ws, "add", "run/supervisor/env2-mutants.json")
+    p = run_mr(ws, mp)
+    assert p.returncode == 0 and "env2: killed" in p.stdout
+
+
+def test_r041_pytest_setup_error_is_run_error(tmp_path):
+    """R-041, TASK-031 Requirement 4 (M25): a pytest ERROR in setup makes the mutant outcome error, not killed."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "tests/test_setup_err.py", textwrap.dedent("""
+import pytest
+
+@pytest.fixture
+def broken():
+    raise RuntimeError("setup failed")
+
+def test_broken(broken):
+    pass
+
+def test_calc():
+    from demo.calc import add
+    assert add(1, 1) == 2
+"""))
+    git(ws, "add", "tests/test_setup_err.py")
+    body = {"mutants": [{
+        "id": "se", "file": "demo/calc.py",
+        "pairs": [{"old": "return a + b", "new": "return a - b"}],
+        "tests": ["tests/test_setup_err.py"],
+        "expect_fail": ["tests/test_setup_err.py::test_calc"],
+    }]}
+    mp = mutants_path(ws, "se", body)
+    git(ws, "add", "run/supervisor/se-mutants.json")
+    p = run_mr(ws, mp)
+    assert p.returncode == 3
+    assert "se: error" in p.stdout

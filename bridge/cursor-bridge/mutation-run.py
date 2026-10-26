@@ -716,7 +716,8 @@ def pytest_sessionfinish(session, exitstatus):
     return out_json
 
 
-def run_resolution_check(copy_root, mutants, test_files, workspace_tracked, workspace, env, timeout_sec):
+def run_resolution_check(copy_root, mutants, test_files, workspace_tracked, workspace, env, timeout_sec,
+                         checkpoint=False):
     mutated_files = [{"file": m["file"]} for m in mutants]
     out_json = write_resolution_plugin(copy_root, mutated_files, workspace_tracked, workspace)
     if os.path.isfile(out_json):
@@ -742,7 +743,9 @@ def run_resolution_check(copy_root, mutants, test_files, workspace_tracked, work
         for modname in dotted_module_paths(m["file"]):
             origin = report.get("resolved", {}).get(modname)
             if not origin:
-                raise Refuse("mutation-run: module %s does not resolve inside the copy" % modname)
+                if not checkpoint:
+                    raise Refuse("mutation-run: module %s does not resolve inside the copy" % modname)
+                continue
             if not os.path.abspath(origin).startswith(croot_abs):
                 raise Refuse("mutation-run: module %s resolves outside the copy at %s" % (modname, origin))
     for mod, origin in report.get("resolved", {}).items():
@@ -863,7 +866,8 @@ def main(argv=None):
                 if fpart not in chk_test_files:
                     chk_test_files.append(fpart)
             run_resolution_check(
-                copy_root, mutants, chk_test_files, tracked_set, workspace, env, timeout_sec)
+                copy_root, mutants, chk_test_files, tracked_set, workspace, env, timeout_sec,
+                checkpoint=True)
             items = checkpoint_new_test_items(new_tests)
             run_env = dict(env)
             run_env["PYTHONPATH"] = copy_root

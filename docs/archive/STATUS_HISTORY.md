@@ -19,3 +19,5 @@ Last accepted, the part moved out at TASK-028 (2026-10-26): before it TASK-024 (
 Last accepted, the part moved out at TASK-029 (2026-10-26): before it BUG-028 (PR #87): the review-guard test fixture records the guard's own sleeps only, so Linux CI no longer fails at random on the lagging-head test (ISS-016)
 
 Last accepted, the part moved out at BUG-029 (2026-10-26): before it TASK-028 (PR #88): windowless launches enforced by the launcher (the driver kind for mutation runs, every launch with CREATE_NO_WINDOW) and the suite's frozen default shipped as windowless-default.snapshot.md, with the conformance floor `Windowless test suite`
+
+Last accepted, the part moved out at TASK-031 (2026-10-26): before it TASK-029 (PR #89): one heavy job at a time, the launcher's machine-wide slot on ~/.cursor-bridge/heavy.lock (builder, driver and test runs wait for it, naming the holder, their wait bounded; review and watch runs take none; the loop guard counts a heavy launch longer by the wait)
