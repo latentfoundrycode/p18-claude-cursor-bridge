@@ -1,18 +1,17 @@
 """Shared fixtures: load a bridge program as a module by its file name; every program a test starts is windowless."""
 import importlib.util
 import os
-import subprocess
-import sys
 import tempfile
 
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CURSOR_BRIDGE = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge")
+
+import subprocess
+import sys
+
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-# Set before any test module is imported, so the environments some modules copy at import carry it too:
-# review-guard.py's snapshot-hash copies (2026.10.25a) never reach the owner's ~/.cursor-bridge.
-os.environ["BRIDGE_REVIEW_HASHES"] = tempfile.mkdtemp(prefix="bridge-review-hashes-")
 
 
 def windowless_kwargs(kwargs):
@@ -40,6 +39,10 @@ if sys.platform == "win32" and not getattr(subprocess.Popen.__init__, "windowles
 
     _windowless_init.windowless_default = True
     subprocess.Popen.__init__ = _windowless_init
+
+# Set before any test module is imported, so the environments some modules copy at import carry it too:
+# review-guard.py's snapshot-hash copies (2026.10.25a) never reach the owner's ~/.cursor-bridge.
+os.environ["BRIDGE_REVIEW_HASHES"] = tempfile.mkdtemp(prefix="bridge-review-hashes-")
 
 
 def load_program(name):

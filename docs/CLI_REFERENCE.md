@@ -172,11 +172,15 @@ when it is installed in the project (`node_modules/.bin/`), and `--key-file` is 
 `cursor-agent` (a key must never reach the builder); anything else is refused with exit 125,
 so the launcher's allow rule cannot become a way to run arbitrary commands unseen. A
 benchmark or a runner the launcher does not know runs directly in the background, marked
-`# wake`. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers through it.
+`# wake`. `--kind driver` accepts only `python <program> [args]` where the program is a `.py`
+file under `run/supervisor/` of the launch folder (no link on the path) or
+`~/.claude/cursor-bridge/mutation-run.py`; interpreter options before the program (`-c`,
+`-m`, `py -3`) are refused. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers
+through it (driver commands are never exempt).
 
 Ceilings (release A2, plan 10.3): every run is logged to `run/launcher/runs.jsonl` under the
 folder the launcher is started in (kind, limit, seconds, exit; never the prompt). `--limit
-auto` takes the kind's default (builder 7200, review 3600, watch 3600, test 1800) or, once a
+auto` takes the kind's default (builder 7200, driver 7200, review 3600, watch 3600, test 1800) or, once a
 HEALTHY run of that kind is on record, one and a half times the longest healthy run, never
 below the default and never above twice it unless `docs/RUN_PARAMETERS.md` carries the
 owner's words on a line `Ceiling above twice: <kind> <seconds> (<their words>, <date>)`. The
@@ -281,8 +285,10 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - on GitHub, read-only through `gh` unless --offline: the default branch has a required
     status check (N6), and the repository's visibility (a public repository is a NOTE);
   - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
-    .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen
-    secure-coding rule (.cursor/rules/secure-coding.mdc); a configured boundary-check hook is
+    .cursor/hooks.json), the windowless check in the hooks (rule 24), the windowless pytest
+    default in the test roots' conftest.py (FIX-001 snapshot in windowless-default.snapshot.md;
+    R-039), and the frozen secure-coding rule (.cursor/rules/secure-coding.mdc); a configured
+    boundary-check hook is
     a NOTE (configured, not engaging) unless this computer's probe record
     ~/.cursor-bridge/boundary-probe.json says it fired ({"fired": true, "when": ..., "launch":
     ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program

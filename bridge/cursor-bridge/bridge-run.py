@@ -26,11 +26,15 @@ when it is installed in the project (`node_modules/.bin/`), and `--key-file` is 
 `cursor-agent` (a key must never reach the builder); anything else is refused with exit 125,
 so the launcher's allow rule cannot become a way to run arbitrary commands unseen. A
 benchmark or a runner the launcher does not know runs directly in the background, marked
-`# wake`. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers through it.
+`# wake`. `--kind driver` accepts only `python <program> [args]` where the program is a `.py`
+file under `run/supervisor/` of the launch folder (no link on the path) or
+`~/.claude/cursor-bridge/mutation-run.py`; interpreter options before the program (`-c`,
+`-m`, `py -3`) are refused. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers
+through it (driver commands are never exempt).
 
 Ceilings (release A2, plan 10.3): every run is logged to `run/launcher/runs.jsonl` under the
 folder the launcher is started in (kind, limit, seconds, exit; never the prompt). `--limit
-auto` takes the kind's default (builder 7200, review 3600, watch 3600, test 1800) or, once a
+auto` takes the kind's default (builder 7200, driver 7200, review 3600, watch 3600, test 1800) or, once a
 HEALTHY run of that kind is on record, one and a half times the longest healthy run, never
 below the default and never above twice it unless `docs/RUN_PARAMETERS.md` carries the
 owner's words on a line `Ceiling above twice: <kind> <seconds> (<their words>, <date>)`. The
@@ -85,7 +89,9 @@ import bridge_env  # noqa: E402
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 AGENT_NAMES = ("cursor-agent", "cursor-agent.cmd", "cursor-agent.exe")
-KINDS = {"builder": 7200, "review": 3600, "watch": 3600, "test": 1800}
+KINDS = {"builder": 7200, "driver": 7200, "review": 3600, "watch": 3600, "test": 1800}
+DRIVER_REFUSE = ("bridge-run: refused - driver kind: only python <program> under run/supervisor/ "
+                 "or ~/.claude/cursor-bridge/mutation-run.py\n")
 LOG = os.path.join("run", "launcher", "runs.jsonl")
 LEARN_FACTOR = 1.5
 CAP_FACTOR = 2
@@ -103,7 +109,7 @@ DESIGN_TRIM_BEFORE_SEP = re.compile(r"[. ]+(?=[/\\])")
 
 
 def usage():
-    sys.stderr.write("usage: bridge-run.py --limit <seconds|auto> [--kind builder|review|watch|test] [--strip] [--key-file <path>] -- <command> [args...]\n"
+    sys.stderr.write("usage: bridge-run.py --limit <seconds|auto> [--kind builder|driver|review|watch|test] [--strip] [--key-file <path>] -- <command> [args...]\n"
                      "       bridge-run.py --healthy <run id>\n")
     return 2
 
@@ -148,6 +154,68 @@ def own_venv_python(path, folder=None):
     return norm.startswith(base.replace("\\", "/").lower() + "/") and bool(re.search(r"/\.venv/(scripts/python(3)?\.exe|bin/python3?)$", norm))
 
 
+def python_interpreter_ok(argv, folder=None):
+    """Bare python, python3 or py, or the project's own .venv interpreter (shared by test and driver kinds)."""
+    if not argv:
+        return False
+    head = head_of(argv)
+    if "/" in argv[0] or "\\" in argv[0]:
+        return head in ("python", "python3") and own_venv_python(argv[0], folder)
+    return head in ("python", "python3", "py")
+
+
+def _normcase_path(path):
+    return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
+
+def _mutation_run_path():
+    return os.path.normpath(os.path.join(os.path.expanduser("~"), ".claude", "cursor-bridge", "mutation-run.py"))
+
+
+def _program_abs(token, folder):
+    if token.startswith("~/") or token.startswith("~\\"):
+        return os.path.normpath(os.path.join(os.path.expanduser("~"), token[2:].replace("\\", "/")))
+    if os.path.isabs(token):
+        return os.path.normpath(token)
+    return os.path.normpath(os.path.join(os.path.abspath(folder), token))
+
+
+def _supervisor_program_ok(program_token, folder):
+    base = os.path.abspath(folder)
+    prog = _program_abs(program_token, folder)
+    supervisor = os.path.normpath(os.path.join(base, "run", "supervisor"))
+    sup = _normcase_path(supervisor)
+    p = _normcase_path(prog)
+    if not p.endswith(".py"):
+        return False
+    if not (p == sup or p.startswith(sup + os.sep)):
+        return False
+    rel = os.path.relpath(prog, base)
+    if rel.startswith(".."):
+        return False
+    current = base
+    for part in rel.split(os.sep):
+        current = os.path.join(current, part)
+        if bridge_env.is_link(current):
+            return False
+    return True
+
+
+def _mutation_program_ok(program_token, folder):
+    prog = _program_abs(program_token, folder)
+    return _normcase_path(prog) == _normcase_path(_mutation_run_path())
+
+
+def driver_accepted(argv, folder=None):
+    """python <program> [args]: program under run/supervisor/ or the installed mutation-run.py."""
+    if len(argv) < 2 or not python_interpreter_ok(argv, folder) or argv[1].startswith("-"):
+        return False
+    program = argv[1]
+    if not program.endswith(".py"):
+        return False
+    return _supervisor_program_ok(program, folder) or _mutation_program_ok(program, folder)
+
+
 def named_suite(argv):
     """A test suite the launcher knows by name (release A2)."""
     head, rest = head_of(argv), argv[1:3]
@@ -166,7 +234,7 @@ def test_suite(argv, folder=None):
     head, rest = head_of(argv), argv[1:3]
     if not named_suite(argv):
         return False
-    if ("/" in argv[0] or "\\" in argv[0]) and not (head in ("python", "python3") and own_venv_python(argv[0], folder)):
+    if ("/" in argv[0] or "\\" in argv[0]) and not python_interpreter_ok(argv, folder):
         return False                                       # the runner by its bare name; a path only for the project's own .venv python
     escapes = ESCAPE_OPTIONS.get(head, ())
     for i, a in enumerate(argv[1:], 1):
@@ -351,8 +419,9 @@ def learned_limit(kind, folder):
     never below the default and never above twice it without the owner's words."""
     default = KINDS[kind]
     cap, _ = cap_for(kind, folder)
+    exits = (0, 1) if kind == "driver" else (0, 124)   # 124: ended at its limit, its kept work merged (test kind)
     healthy = [r for r in read_log(folder) if r.get("kind") == kind and r.get("healthy") is True
-               and isinstance(r.get("seconds"), (int, float)) and r.get("exit") in (0, 124)]   # 124: ended at its limit, its kept work merged
+               and isinstance(r.get("seconds"), (int, float)) and r.get("exit") in exits]
     if not healthy:
         return default, "the default for %s" % kind
     longest = max(healthy, key=lambda r: r["seconds"])
@@ -371,6 +440,9 @@ def mark_healthy(run_id, folder, kind=None):
     if len(hit) > 1:
         sys.stderr.write("bridge-run: refused - %s fits %d runs (%s); give the whole id, and --kind when two kinds share it\n" % (
             run_id, len(hit), ", ".join("%s %s" % (r.get("id"), r.get("kind")) for r in hit[:6])))
+        return 1
+    if hit[0].get("kind") == "driver" and hit[0].get("exit") not in (0, 1):
+        sys.stderr.write("bridge-run: refused - a driver run is healthy at exit 0 or 1 only\n")
         return 1
     for r in hit:
         r["healthy"] = True
@@ -675,7 +747,12 @@ def main():
     cmd = argv[argv.index("--") + 1:]
     if not cmd:
         return usage()
-    if not accepted(cmd, folder):
+    kind_in_flags = flags[flags.index("--kind") + 1] if "--kind" in flags and flags.index("--kind") + 1 < len(flags) else None
+    if kind_in_flags == "driver":
+        if not driver_accepted(cmd, folder):
+            sys.stderr.write(DRIVER_REFUSE)
+            return 125
+    elif not accepted(cmd, folder):
         sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
         return 125
     if "--key-file" in flags and head_of(cmd) == "cursor-agent":
@@ -689,7 +766,7 @@ def main():
     if kind is None and os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1":
         kind = "test"                                        # the tests' own helpers
     if kind not in KINDS:
-        sys.stderr.write("bridge-run: refused - unknown kind %r (builder, review, watch, test)\n" % kind)
+        sys.stderr.write("bridge-run: refused - unknown kind %r (builder, driver, review, watch, test)\n" % kind)
         return 125
     if kind == "review":
         reason = review_family_refusal(cmd, folder)
@@ -725,6 +802,9 @@ def main():
             sys.stderr.write("bridge-run: refused - a limit of %ds is above twice the default for %s (%ds); the owner's words in docs/RUN_PARAMETERS.md (`Ceiling above twice: %s <seconds> (<their words>, <date>)`) lift the cap\n" % (int(limit), kind, cap, kind))
             return 125
     strip = "--strip" in flags
+    if kind == "driver" and len(cmd) >= 2 and (cmd[1].startswith("~/") or cmd[1].startswith("~\\")):
+        cmd = list(cmd)
+        cmd[1] = _program_abs(cmd[1], folder)
     cmd, is_agent = resolve(cmd)
     try:
         env = bridge_env.stripped_env() if (is_agent or strip) else dict(os.environ)
@@ -822,7 +902,8 @@ def main():
         sys.stderr.write("bridge-run: exit %d\n" % rc)
         sys.stderr.flush()
     if entry["exit"] is None:
-        entry.update(seconds=int(time.time() - started), exit=rc, healthy=(True if kind == "test" and rc == 0 else None))   # a passing test run is its own gate
+        healthy = True if (kind == "test" and rc == 0) or (kind == "driver" and rc in (0, 1)) else None
+        entry.update(seconds=int(time.time() - started), exit=rc, healthy=healthy)
         write_log(folder, entry)
     # The job handle is deliberately not closed here: it closes when this process exits,
     # after the exit code is set, and "kill on close" then ends any orphan the command left.

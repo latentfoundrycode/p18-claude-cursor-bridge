@@ -23,8 +23,10 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - on GitHub, read-only through `gh` unless --offline: the default branch has a required
     status check (N6), and the repository's visibility (a public repository is a NOTE);
   - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
-    .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen
-    secure-coding rule (.cursor/rules/secure-coding.mdc); a configured boundary-check hook is
+    .cursor/hooks.json), the windowless check in the hooks (rule 24), the windowless pytest
+    default in the test roots' conftest.py (FIX-001 snapshot in windowless-default.snapshot.md;
+    R-039), and the frozen secure-coding rule (.cursor/rules/secure-coding.mdc); a configured
+    boundary-check hook is
     a NOTE (configured, not engaging) unless this computer's probe record
     ~/.cursor-bridge/boundary-probe.json says it fired ({"fired": true, "when": ..., "launch":
     ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program
@@ -69,6 +71,7 @@ What it checks, with the file it reads (the 0b review corrected several of these
 Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
 ASCII-only on purpose (cp1252 consoles). Never writes.
 """
+import configparser
 import datetime
 import glob
 import importlib.util
@@ -77,6 +80,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -95,12 +99,102 @@ ABSOLUTE_PATH = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]|/Users/|/home/")   #
 NEGATED_ENV = re.compile(r"\b(?:never|not|no longer|nor|no)\b(?:(?!\bbut\b|\binstead\b)[^|.;,]){0,40}?\benv(?:ironment)?[ _-]?var\w*", re.I)   # "never an environment variable the owner sets"
 
 
+WINDOWLESS_TOKENS = ("windowless_kwargs", "Popen.__init__", "CREATE_NO_WINDOW")
+WINDOWLESS_MISSING = ("copy windowless-default.snapshot.md into conftest.py (see "
+                      "Cursor-Project-Configuration.md, windowless-default); need "
+                      "windowless_kwargs, Popen.__init__ and CREATE_NO_WINDOW")
+NODE_RUNNERS = (("vitest", "vitest"), ("jest", "jest"), ("playwright", "playwright"), ("node --test", "node --test"))
+
+
 def read(path):
     try:
         with open(path, encoding="utf-8-sig", errors="replace") as f:
             return f.read()
     except OSError:
         return None
+
+
+def _conftest_windowless_ok(path):
+    text = read(path)
+    return text is not None and all(t in text for t in WINDOWLESS_TOKENS)
+
+
+def _pytest_testpaths(ws):
+    ini = os.path.join(ws, "pytest.ini")
+    if os.path.isfile(ini):
+        cp = configparser.ConfigParser()
+        cp.read(ini, encoding="utf-8")
+        if cp.has_option("pytest", "testpaths"):
+            raw = cp.get("pytest", "testpaths")
+            return [p.strip() for p in re.split(r"[\s,]+", raw.strip()) if p.strip()]
+        return ["tests"]
+    cfg = os.path.join(ws, "setup.cfg")
+    if os.path.isfile(cfg):
+        cp = configparser.ConfigParser()
+        cp.read(cfg, encoding="utf-8")
+        if cp.has_section("tool:pytest") and cp.has_option("tool:pytest", "testpaths"):
+            raw = cp.get("tool:pytest", "testpaths")
+            return [p.strip() for p in re.split(r"[\s,]+", raw.strip()) if p.strip()]
+    toml_path = os.path.join(ws, "pyproject.toml")
+    if os.path.isfile(toml_path):
+        try:
+            with open(toml_path, "rb") as f:
+                data = tomllib.load(f)
+            opts = data.get("tool", {}).get("pytest", {}).get("ini_options", {})
+            if "testpaths" in opts:
+                tp = opts["testpaths"]
+                if isinstance(tp, str):
+                    return [p.strip() for p in re.split(r"[\s,]+", tp.strip()) if p.strip()]
+                if isinstance(tp, list):
+                    return [str(p).strip() for p in tp if str(p).strip()]
+        except (OSError, ValueError, tomllib.TOMLDecodeError):
+            pass
+    return ["tests"]
+
+
+def _pytest_suite_seen(ws):
+    if os.path.isfile(os.path.join(ws, "pytest.ini")):
+        return True
+    toml_path = os.path.join(ws, "pyproject.toml")
+    if os.path.isfile(toml_path):
+        try:
+            with open(toml_path, "rb") as f:
+                data = tomllib.load(f)
+            if "ini_options" in data.get("tool", {}).get("pytest", {}):
+                return True
+        except (OSError, ValueError, tomllib.TOMLDecodeError):
+            pass
+    cfg = os.path.join(ws, "setup.cfg")
+    if os.path.isfile(cfg):
+        cp = configparser.ConfigParser()
+        cp.read(cfg, encoding="utf-8")
+        if cp.has_section("tool:pytest"):
+            return True
+    tests = os.path.join(ws, "tests")
+    if os.path.isdir(tests):
+        for name in os.listdir(tests):
+            if name.startswith("test_") and name.endswith(".py"):
+                return True
+    return False
+
+
+def _node_test_runner(ws):
+    pkg_path = os.path.join(ws, "package.json")
+    if not os.path.isfile(pkg_path):
+        return None
+    try:
+        scripts = json.loads(read(pkg_path) or "{}").get("scripts") or {}
+    except ValueError:
+        return None
+    script = scripts.get("test") or ""
+    for needle, label in NODE_RUNNERS:
+        if needle in script:
+            return label
+    return None
+
+
+def _rel_forward(path, ws):
+    return os.path.relpath(path, ws).replace("\\", "/")
 
 
 def resolve_workspace(path):
@@ -577,6 +671,44 @@ def main():
             add("MISSING", "Boundary log ignored", "%s is not in .gitignore: the hook's log holds this computer's absolute paths, which a commit would publish (FB-031, rule 54)" % BOUNDARY_LOG)
     windowless = "windowless-check" in hooks or os.path.isfile(os.path.join(ws, ".cursor", "hooks", "windowless-check.py"))
     add("OK" if windowless else "MISSING", "Windowless check", "" if windowless else "no windowless-check in the hooks; rule 24 puts it in the pre-commit gate")
+
+    pytest_seen = _pytest_suite_seen(ws)
+    node_runner = _node_test_runner(ws)
+    if pytest_seen:
+        root_conftest = os.path.join(ws, "conftest.py")
+        ok_path = None
+        if os.path.isfile(root_conftest) and _conftest_windowless_ok(root_conftest):
+            ok_path = root_conftest
+        else:
+            roots = _pytest_testpaths(ws)
+            all_ok = True
+            for rel in roots:
+                cpath = os.path.join(ws, rel, "conftest.py")
+                if not os.path.isfile(cpath) or not _conftest_windowless_ok(cpath):
+                    all_ok = False
+                    break
+            if all_ok and roots:
+                ok_path = os.path.join(ws, roots[0], "conftest.py")
+        if ok_path:
+            add("OK", "Windowless test suite (%s)" % _rel_forward(ok_path, ws))
+        else:
+            add("MISSING", "Windowless test suite", WINDOWLESS_MISSING)
+    if node_runner:
+        add("NOTE", "Windowless test suite",
+            "%s: release B ships no default for this runner (INVENTORY, Deferred); use detached: false (KP-059)" % node_runner)
+    if not pytest_seen and not node_runner:
+        pkg_path = os.path.join(ws, "package.json")
+        detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
+        if os.path.isfile(pkg_path):
+            try:
+                scripts = json.loads(read(pkg_path) or "{}").get("scripts") or {}
+                script = scripts.get("test") or ""
+                if script:
+                    first = script.split()[0] if script.split() else script
+                    detail = "%s: release B ships no default for this runner (INVENTORY, Deferred); use detached: false (KP-059)" % first
+            except ValueError:
+                pass
+        add("NOTE", "Windowless test suite", detail)
 
     # --- lockfiles
     if os.path.isfile(os.path.join(ws, "package.json")):
