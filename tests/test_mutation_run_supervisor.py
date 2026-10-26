@@ -481,9 +481,8 @@ PIPE_TARGET = """import subprocess
 import sys
 import time
 
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 subprocess.run([sys.executable, sys.argv[1], sys.argv[2]], stdin=subprocess.DEVNULL, stdout=sys.stdout.fileno(),
-               stderr=sys.stderr.fileno(), creationflags=NO_WINDOW, timeout=60)
+               stderr=sys.stderr.fileno(), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=60)
 while True:
     time.sleep(0.2)
 """
@@ -491,10 +490,9 @@ while True:
 PIPE_MIDDLE = """import subprocess
 import sys
 
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 kw = {} if sys.platform == "win32" else {"start_new_session": True}
 holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"], stdin=subprocess.DEVNULL,
-                          stdout=sys.stdout.fileno(), stderr=sys.stderr.fileno(), creationflags=NO_WINDOW, **kw)
+                          stdout=sys.stdout.fileno(), stderr=sys.stderr.fileno(), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), **kw)
 with open(sys.argv[1], "w") as f:
     f.write(str(holder.pid))
 """

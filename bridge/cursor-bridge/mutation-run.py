@@ -447,12 +447,11 @@ def run_process(argv, env, cwd, timeout_sec):
         try:
             out, err = proc.communicate(timeout=30)
         except subprocess.TimeoutExpired:
-            if proc.stdout:
-                proc.stdout.close()
-            if proc.stderr:
-                proc.stderr.close()
-            proc.wait(timeout=30)
             out, err = b"", b""
+            try:
+                proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                pass
         return None, out, err, True
     return proc.returncode, out, err, False
 

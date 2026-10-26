@@ -1285,3 +1285,91 @@ def teardown_module():
     assert elapsed < 5 + 60, "run exceeded bound plus 60 s"
     assert p.returncode == 3
     assert "pipe: error (timed out)" in p.stdout
+
+
+def test_r041_pipe_holder_outside_tree_cwd_in_copy_times_out(tmp_path, home_of_the_tests):
+    """R-041, TASK-031 S7: a pipe holder outside the killed tree with cwd in the copy times out with exit 3 and no internal error."""
+    import signal
+
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, ".env", "SECRET=copy\n")
+    git(ws, "add", ".env")
+    pid_file = tmp_path / "holder.pid"
+    write(ws, "tests/pipe_hold_middle.py", textwrap.dedent("""
+import os
+import subprocess
+import sys
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+root = os.getcwd()
+kw = {} if sys.platform == "win32" else {"start_new_session": True}
+holder = subprocess.Popen(
+    [sys.executable, "-c", "import os, time; os.chdir(%r); time.sleep(3600)" % root],
+    stdin=subprocess.DEVNULL,
+    stdout=sys.stdout,
+    stderr=sys.stderr,
+    cwd=root,
+    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    **kw,
+)
+open(sys.argv[1], "w").write(str(holder.pid))
+"""))
+    write(ws, "tests/test_pipe_hold_copy.py", textwrap.dedent("""
+import subprocess
+import sys
+import time
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def test_hold_pipes():
+    subprocess.run(
+        [sys.executable, "tests/pipe_hold_middle.py", PIDFILE_JSON],
+        stdin=subprocess.DEVNULL,
+        stdout=sys.stdout.fileno(),
+        stderr=sys.stderr.fileno(),
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        timeout=60,
+    )
+    while True:
+        time.sleep(0.2)
+""").replace("PIDFILE_JSON", json.dumps(str(pid_file))))
+    git(ws, "add", "tests/pipe_hold_middle.py", "tests/test_pipe_hold_copy.py")
+    body = {"mutants": [{
+        "id": "phc", "file": "tests/test_pipe_hold_copy.py",
+        "pairs": [{"old": "time.sleep(0.2)", "new": "time.sleep(0.2)"}],
+        "tests": ["tests/test_pipe_hold_copy.py"],
+        "expect_fail": ["tests/test_pipe_hold_copy.py::test_hold_pipes"],
+    }]}
+    mp = mutants_path(ws, "phc", body)
+    git(ws, "add", "run/supervisor/phc-mutants.json")
+    work_sub = home_of_the_tests / ".cursor-bridge" / "scratch" / "proj" / "mutation-run-phc"
+    try:
+        t0 = time.time()
+        p = run_mr(ws, mp, timeout=5, home_env=home_of_the_tests)
+        elapsed = time.time() - t0
+        assert elapsed < 5 + 90, "run exceeded bound plus 90 s"
+        assert p.returncode == 3
+        assert "phc: error (timed out)" in p.stdout
+        assert "internal error" not in p.stderr
+        assert pid_file.is_file()
+        if sys.platform == "win32":
+            assert work_sub.is_dir(), "holder cwd should keep mutation-run-phc on disk until the holder ends"
+            assert (work_sub / "tree").is_dir(), "the copy root stays while the holder's cwd is inside it"
+    finally:
+        if pid_file.is_file():
+            try:
+                hp = int(pid_file.read_text(encoding="utf-8").strip())
+                if sys.platform == "win32":
+                    subprocess.run(
+                        ["taskkill", "/F", "/PID", str(hp)],
+                        capture_output=True,
+                        **test_conftest.windowless_kwargs({"stdin": subprocess.DEVNULL, "timeout": 30}),
+                    )
+                else:
+                    os.kill(hp, signal.SIGKILL)
+            except (OSError, ValueError):
+                pass
+        if work_sub.is_dir():
+            shutil.rmtree(work_sub, ignore_errors=True)
