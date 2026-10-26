@@ -1348,6 +1348,16 @@ def main():
             return 123
         slot_fd, entry["waited"] = slot_result[0], slot_result[1]
 
+    if kind == "driver" and len(cmd) >= 2 and not verify_driver_program_abs(cmd[1], folder):
+        if slot_fd is not None:
+            _unlock_byte(slot_fd)
+            try:
+                os.close(slot_fd)
+            except OSError:
+                pass
+        sys.stderr.write(DRIVER_REFUSE)
+        return 125
+
     killer = None
     if sys.platform == "win32":
         try:
