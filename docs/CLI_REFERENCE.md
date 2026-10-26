@@ -214,15 +214,18 @@ rule of 2026-10-05: no secret through the environment the owner sets).
   review-guard.py reads to tell a review that reached a verdict from one that failed.
 - Heavy runs (`builder`, `test`, `driver`) take one machine-wide slot on
   `~/.cursor-bridge/heavy.lock` before the command starts and hold it until the launcher
-  ends; a second heavy run waits, prints who holds the slot once a minute, and exits 123 if
-  the wait bound passes without the slot. `review` and `watch` take no slot. The first line
-  after `started` for a heavy run that took the slot is `bridge-run: slot taken <UTC time>Z`;
-  a wait prints `bridge-run: waiting for the slot held by ...` and a failed wait prints
-  `bridge-run: slot not free - ...` then `bridge-run: exit 123`.
+  process ends; a second heavy run waits, prints who holds the slot once a minute, and exits
+  123 if the wait bound passes without the slot. `review` and `watch` take no slot. After
+  `bridge-run: started <run id>`, the launch's own notes, the limit line and the other launch
+  lines, and before the command starts: waiting lines, then `bridge-run: slot taken <UTC time>Z`,
+  or `bridge-run: slot not free - ...` and `bridge-run: exit 123`. A run that waited logs
+  `waited` (whole seconds in the slot queue); a run that ended waiting logs `"slot": "not free"`.
 - The exit code is the command's own; 123 = the slot was not free in time; 124 = the limit was
   hit; 125 = refused or could not start.
-- `BRIDGE_RUN_SLOT_SCALE` (test-only): when set to a number with 0 < value <= 1, scales the
-  slot wait reporting interval, grace and wait bounds for tests.
+- `BRIDGE_RUN_SLOT_SCALE` (test-only, honoured only beside `BRIDGE_RUN_ALLOW_ANY=1`): when set
+  to a number with 0 < value <= 1, scales the slot wait reporting interval, grace and wait
+  bounds for tests; without `BRIDGE_RUN_ALLOW_ANY=1` a set value is ignored and one note line
+  says so.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
   owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`
   withholds it for any other accepted command too.
@@ -510,7 +513,7 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
   1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;
   2. its `Phase:` is building or changing;
   3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner), and
-     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2HEAVY_SLOT_WAIT + SLOT_GRACE + SLOT_REPORT26.10.25a, FB-027:
+     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2026.10.25a, FB-027:
      a pause written in the untracked working file touches no tracked file);
   (and, in every phase: a turn whose last message holds a shell block and names no terminal
   is sent back once, because a run sheet without its terminal cannot be followed, rule 27);

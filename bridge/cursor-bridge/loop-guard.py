@@ -9,7 +9,7 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
   1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;
   2. its `Phase:` is building or changing;
   3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner), and
-     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2HEAVY_SLOT_WAIT + SLOT_GRACE + SLOT_REPORT26.10.25a, FB-027:
+     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2026.10.25a, FB-027:
      a pause written in the untracked working file touches no tracked file);
   (and, in every phase: a turn whose last message holds a shell block and names no terminal
   is sent back once, because a run sheet without its terminal cannot be followed, rule 27);
@@ -349,14 +349,19 @@ def owner_ceiling(cwd, kind):
     return None
 
 
+def launch_kind(cmd):
+    """Kind resolved the same way as command_ceiling (without reading --limit N)."""
+    k = re.search(r"--kind\s+(builder|driver|review|watch|test)", cmd) or re.search(r"#\s*wake\s+(builder|review|watch|test)\b", cmd, re.I)
+    return k.group(1).lower() if k else ("builder" if "cursor-agent" in cmd else "watch" if "gh pr checks" in cmd else "test")
+
+
 def command_ceiling(cmd, cwd=None):
     """The limit a launched command runs under: `--limit N` in the command; with `--limit auto`
     twice its kind's default, or the owner's raised ceiling (the most the launcher learns)."""
     m = re.search(r"--limit\s+(\d+)", cmd)
     if m:
         return int(m.group(1))
-    k = re.search(r"--kind\s+(builder|driver|review|watch|test)", cmd) or re.search(r"#\s*wake\s+(builder|review|watch|test)\b", cmd, re.I)   # a project's own wrapper names its kind (2026.10.11c)
-    kind = k.group(1).lower() if k else ("builder" if "cursor-agent" in cmd else "watch" if "gh pr checks" in cmd else "test")
+    kind = launch_kind(cmd)
     key = {"builder": "cursor-agent", "driver": "driver", "review": "review", "watch": "gh pr checks", "test": "# wake"}[kind]
     ceiling = KIND_CEILING[key]
     if "--limit auto" in cmd:
@@ -368,11 +373,9 @@ def heavy_launch_extra(cmd):
     """Extra seconds a heavy bridge-run launch may spend waiting for the machine-wide slot (R-040)."""
     if not re.search(r"bridge-run\.py", cmd):
         return 0
-    k = re.search(r"--kind\s+(builder|driver|review|watch|test)", cmd)
-    kind = k.group(1).lower() if k else ("builder" if "cursor-agent" in cmd else "test")
-    if kind not in HEAVY_LAUNCH_KINDS:
+    if launch_kind(cmd) not in HEAVY_LAUNCH_KINDS:
         return 0
-    return 0
+    return HEAVY_SLOT_WAIT + SLOT_GRACE + SLOT_REPORT
 
 
 def local_clock(unix):

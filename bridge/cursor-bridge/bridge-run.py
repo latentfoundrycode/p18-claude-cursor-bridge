@@ -68,15 +68,18 @@ rule of 2026-10-05: no secret through the environment the owner sets).
   review-guard.py reads to tell a review that reached a verdict from one that failed.
 - Heavy runs (`builder`, `test`, `driver`) take one machine-wide slot on
   `~/.cursor-bridge/heavy.lock` before the command starts and hold it until the launcher
-  ends; a second heavy run waits, prints who holds the slot once a minute, and exits 123 if
-  the wait bound passes without the slot. `review` and `watch` take no slot. The first line
-  after `started` for a heavy run that took the slot is `bridge-run: slot taken <UTC time>Z`;
-  a wait prints `bridge-run: waiting for the slot held by ...` and a failed wait prints
-  `bridge-run: slot not free - ...` then `bridge-run: exit 123`.
+  process ends; a second heavy run waits, prints who holds the slot once a minute, and exits
+  123 if the wait bound passes without the slot. `review` and `watch` take no slot. After
+  `bridge-run: started <run id>`, the launch's own notes, the limit line and the other launch
+  lines, and before the command starts: waiting lines, then `bridge-run: slot taken <UTC time>Z`,
+  or `bridge-run: slot not free - ...` and `bridge-run: exit 123`. A run that waited logs
+  `waited` (whole seconds in the slot queue); a run that ended waiting logs `"slot": "not free"`.
 - The exit code is the command's own; 123 = the slot was not free in time; 124 = the limit was
   hit; 125 = refused or could not start.
-- `BRIDGE_RUN_SLOT_SCALE` (test-only): when set to a number with 0 < value <= 1, scales the
-  slot wait reporting interval, grace and wait bounds for tests.
+- `BRIDGE_RUN_SLOT_SCALE` (test-only, honoured only beside `BRIDGE_RUN_ALLOW_ANY=1`): when set
+  to a number with 0 < value <= 1, scales the slot wait reporting interval, grace and wait
+  bounds for tests; without `BRIDGE_RUN_ALLOW_ANY=1` a set value is ignored and one note line
+  says so.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
   owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`
   withholds it for any other accepted command too.
@@ -112,7 +115,13 @@ HEAVY_KINDS = frozenset(("builder", "driver", "test"))
 SLOT_GRACE = 120
 SLOT_REPORT = 60
 SLOT_BUILDER_CAP = CAP_FACTOR * KINDS["builder"]
-RUN_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(?:-\d+)?$")
+SLOT_CLOCK_SKEW = 300
+SLOT_LIMIT_MAX = 604800
+PID_MAX = 4294967295 if sys.platform == "win32" else 4194304
+RUN_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(?:-\d+)?$", re.ASCII)
+SLOT_START_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", re.ASCII)
+SLOT_START_MIN = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+WATCH_ONLY_REFUSE = ("bridge-run: refused - a watch run is only a gh pr checks command\n")
 DESIGN_DEFAULT_ROUNDS = 5
 DESIGN_RESOLUTION_DEFAULT = 1
 DESIGN_RESOLUTION_LIFTED = 2
@@ -515,7 +524,7 @@ def mark_healthy(run_id, folder, kind=None):
         sys.stderr.write("bridge-run: refused - %s fits %d runs (%s); give the whole id, and --kind when two kinds share it\n" % (
             run_id, len(hit), ", ".join("%s %s" % (r.get("id"), r.get("kind")) for r in hit[:6])))
         return 1
-    if hit[0].get("exit") == 123:
+    if hit[0].get("slot") == "not free":
         sys.stderr.write("bridge-run: refused - a run that ended waiting for the slot cannot be marked healthy\n")
         return 1
     if hit[0].get("kind") == "driver" and hit[0].get("exit") not in (0, 1):
@@ -615,11 +624,34 @@ def _plain_record_text(value):
 
 def process_alive(pid):
     if sys.platform == "win32":
-        p = subprocess.run(["tasklist", "/FI", "PID eq %d" % pid, "/NH"], capture_output=True, text=True, creationflags=NO_WINDOW)
-        return str(pid) in p.stdout
+        import ctypes
+        from ctypes import wintypes
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        k.OpenProcess.restype = wintypes.HANDLE
+        k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        k.GetExitCodeProcess.restype = wintypes.BOOL
+        k.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        k.WaitForSingleObject.restype = wintypes.DWORD
+        k.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        k.CloseHandle.restype = wintypes.BOOL
+        k.CloseHandle.argtypes = [wintypes.HANDLE]
+        access = 0x1000 | 0x00100000
+        handle = k.OpenProcess(access, False, int(pid))
+        if not handle:
+            return False
+        try:
+            code = wintypes.DWORD()
+            if k.GetExitCodeProcess(handle, ctypes.byref(code)):
+                if int(code.value) == 259:
+                    return True
+            if k.WaitForSingleObject(handle, 0) == 258:
+                return True
+            return False
+        finally:
+            k.CloseHandle(handle)
     try:
         os.kill(pid, 0)
-    except OSError:
+    except (OSError, OverflowError, ValueError):
         return False
     try:
         with open("/proc/%d/stat" % pid, encoding="utf-8", errors="replace") as f:
@@ -674,6 +706,24 @@ def process_creation_epoch(pid):
         return None
 
 
+def _slot_start_epoch(start):
+    if not isinstance(start, str) or not SLOT_START_RE.match(start) or not _plain_record_text(start):
+        return None
+    try:
+        dt = datetime.datetime.strptime(start, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return None
+    if dt < SLOT_START_MIN:
+        return None
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if dt > now + datetime.timedelta(seconds=SLOT_CLOCK_SKEW):
+        return None
+    try:
+        return dt.timestamp()
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def read_holder_record(holder_path):
     """A live holder record, or None when missing, stale or untrusted."""
     try:
@@ -688,50 +738,72 @@ def read_holder_record(holder_path):
     if not isinstance(data, dict):
         return None
     kind = data.get("kind")
-    run_id = data.get("run_id")
-    start = data.get("start")
-    if kind not in KINDS or not _plain_record_text(kind):
+    if not isinstance(kind, str) or kind not in KINDS or not _plain_record_text(kind):
         return None
+    run_id = data.get("run_id")
     if not isinstance(run_id, str) or not RUN_ID_RE.match(run_id) or not _plain_record_text(run_id):
         return None
-    if not isinstance(start, str) or not RUN_ID_RE.match(start) or not _plain_record_text(start):
+    start = data.get("start")
+    if _slot_start_epoch(start) is None:
+        return None
+    pid = data.get("pid")
+    if type(pid) is not int or pid < 1 or pid > PID_MAX:
+        return None
+    limit = data.get("limit")
+    if type(limit) is not int or limit < 1 or limit > SLOT_LIMIT_MAX:
+        return None
+    created = data.get("created")
+    if type(created) not in (int, float) or isinstance(created, bool):
         return None
     try:
-        pid = int(data.get("pid"))
-        limit = int(data.get("limit"))
-        created = float(data.get("created"))
+        created_f = float(created)
     except (TypeError, ValueError):
         return None
-    if pid <= 0 or limit <= 0 or not math.isfinite(created):
+    if not math.isfinite(created_f):
         return None
-    actual = process_creation_epoch(pid)
-    if not process_alive(pid) or actual is None or abs(actual - created) > 0.01:
+    try:
+        actual = process_creation_epoch(pid)
+    except (OverflowError, OSError, ValueError):
         return None
-    return {"kind": kind, "run_id": run_id, "pid": pid, "created": created, "start": start, "limit": limit}
+    if not process_alive(pid) or actual is None or abs(actual - created_f) > 0.01:
+        return None
+    return {"kind": kind, "run_id": run_id, "pid": pid, "created": created_f, "start": start, "limit": limit}
 
 
 def run_id_epoch(run_id):
     """Seconds since epoch for a run id timestamp (ignores a -2 suffix)."""
-    base = run_id.split("Z")[0] + "Z"
+    if not isinstance(run_id, str):
+        return None
+    m = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)", run_id)
+    if not m:
+        return None
     try:
-        return datetime.datetime.strptime(base, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc).timestamp()
-    except ValueError:
+        return datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc).timestamp()
+    except (ValueError, OverflowError, OSError):
         return None
 
 
 def holder_end_time(record, grace):
     """UTC end time string for a live holder record plus grace."""
-    start_epoch = run_id_epoch(record["start"])
-    if start_epoch is None:
+    try:
+        start_epoch = _slot_start_epoch(record["start"])
+        if start_epoch is None:
+            return None
+        end = datetime.datetime.fromtimestamp(start_epoch + int(record["limit"]) + int(grace), tz=datetime.timezone.utc)
+        return end.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+    except (OverflowError, OSError, ValueError):
         return None
-    end = datetime.datetime.fromtimestamp(start_epoch + int(record["limit"]) + int(grace), tz=datetime.timezone.utc)
-    return end.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 
 
 def publish_holder_record(holder_path, record):
     folder = os.path.dirname(holder_path)
     os.makedirs(folder, exist_ok=True)
-    tmp = os.path.join(folder, ".heavy.holder.%d.tmp" % os.getpid())
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=folder, prefix=".heavy.holder.", suffix=".tmp")
+    try:
+        os.close(fd)
+    except OSError:
+        pass
     for _ in range(5):
         try:
             with open(tmp, "w", encoding="utf-8") as f:
@@ -750,12 +822,15 @@ def publish_holder_record(holder_path, record):
 
 def _try_lock_byte(fd):
     if sys.platform == "win32":
+        import errno
         import msvcrt
         try:
             msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
             return True
-        except OSError:
-            return False
+        except OSError as exc:
+            if exc.errno in (errno.EACCES, errno.EDEADLOCK):
+                return False
+            raise
     import fcntl
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -799,55 +874,89 @@ def _slot_not_free_line(record, grace):
             % (record["kind"], record["run_id"], record["start"], end))
 
 
+def _open_heavy_lock(lock_path, state_dir):
+    if sys.platform == "win32":
+        os.makedirs(state_dir, exist_ok=True)
+        return os.open(lock_path, os.O_RDWR | os.O_CREAT)
+    os.makedirs(state_dir, mode=0o700, exist_ok=True)
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        os.chmod(lock_path, 0o600)
+    except OSError:
+        pass
+    return fd
+
+
 def acquire_heavy_slot(kind, run_id, limit, scale):
     """Take the machine-wide heavy slot; return (lock_fd, waited_seconds) or None after printing exit 123."""
     lock_path, holder_path = heavy_state_paths()
     state_dir = os.path.dirname(lock_path)
     grace = SLOT_GRACE * scale
     report = max(0.001, SLOT_REPORT * scale)
-    wait_start = time.time()
-    provisional = wait_start + (SLOT_BUILDER_CAP + SLOT_GRACE) * scale
-    own_floor = wait_start + KINDS[kind] * scale
-    bound = None
+    wait_mono = time.monotonic()
+    wait_wall = time.time()
+    provisional_wall = wait_wall + (SLOT_BUILDER_CAP + SLOT_GRACE) * scale
+    own_floor_wall = wait_wall + KINDS[kind] * scale
+    deadline_mono = wait_mono + (SLOT_BUILDER_CAP + SLOT_GRACE) * scale
+    bound_wall = None
     last_report = 0.0
     last_live = None
     try:
-        os.makedirs(state_dir, exist_ok=True)
-        lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT)
+        lock_fd = _open_heavy_lock(lock_path, state_dir)
     except OSError as exc:
         sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/heavy.lock (%s)\n" % exc.__class__.__name__)
         return "refused"
+    pub_limit = max(1, int(limit))
     while True:
-        if _try_lock_byte(lock_fd):
-            waited = int(time.time() - wait_start)
+        try:
+            got_lock = _try_lock_byte(lock_fd)
+        except OSError as exc:
+            sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/heavy.lock (%s)\n" % exc.__class__.__name__)
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
+            return "refused"
+        if got_lock:
+            waited = int(time.monotonic() - wait_mono)
             taken = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
             sys.stderr.write("bridge-run: slot taken %s\n" % taken)
             sys.stderr.flush()
             created = process_creation_epoch(os.getpid())
-            publish_holder_record(holder_path, {
-                "kind": kind, "run_id": run_id, "pid": os.getpid(),
-                "created": created if created is not None else time.time(),
-                "start": taken, "limit": int(limit),
-            })
+            if created is None:
+                sys.stderr.write("bridge-run: note - could not read this process creation time for the slot holder record\n")
+            else:
+                publish_holder_record(holder_path, {
+                    "kind": kind, "run_id": run_id, "pid": os.getpid(),
+                    "created": created, "start": taken, "limit": pub_limit,
+                })
             return lock_fd, waited
-        now = time.time()
+        now_mono = time.monotonic()
         live = read_holder_record(holder_path)
         if live is not None:
             last_live = live
-            start_epoch = run_id_epoch(live["start"])
-            if start_epoch is not None and bound is None:
-                end_epoch = start_epoch + live["limit"] + grace
-                bound = min(provisional, max(own_floor, end_epoch))
-        if bound is not None and now > bound:
+            if bound_wall is None:
+                start_epoch = _slot_start_epoch(live["start"])
+                if start_epoch is not None:
+                    try:
+                        end_epoch = start_epoch + live["limit"] + grace
+                        bound_wall = min(provisional_wall, max(own_floor_wall, end_epoch))
+                        deadline_mono = wait_mono + (bound_wall - wait_wall)
+                    except (OverflowError, OSError, ValueError):
+                        pass
+        if now_mono > deadline_mono:
             sys.stderr.write(_slot_not_free_line(last_live, grace))
             sys.stderr.write("bridge-run: exit 123\n")
             sys.stderr.flush()
-            os.close(lock_fd)
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
             return None
-        if last_report == 0.0 or now - last_report >= report - 0.001:
-            sys.stderr.write(_waiting_line(live, grace))
+        if last_report == 0.0 or now_mono - last_report >= report - 0.001:
+            sys.stderr.write(_waiting_line(last_live, grace))
             sys.stderr.flush()
-            last_report = now
+            last_report = now_mono
         time.sleep(1)
 
 
@@ -1116,11 +1225,14 @@ def main():
     if kind not in KINDS:
         sys.stderr.write("bridge-run: refused - unknown kind %r (builder, driver, review, watch, test)\n" % kind)
         return 125
-    try:
-        slot_scale = parse_slot_scale()
-    except ValueError as e:
-        sys.stderr.write("bridge-run: refused - BRIDGE_RUN_SLOT_SCALE %s\n" % e)
-        return 125
+    slot_scale = 1.0
+    scale_raw = os.environ.get("BRIDGE_RUN_SLOT_SCALE", "")
+    if os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1":
+        try:
+            slot_scale = parse_slot_scale()
+        except ValueError as e:
+            sys.stderr.write("bridge-run: refused - BRIDGE_RUN_SLOT_SCALE %s\n" % e)
+            return 125
     if kind == "review":
         reason = review_family_refusal(cmd, folder)
         if reason:
@@ -1142,6 +1254,8 @@ def main():
     sys.stderr.write("bridge-run: started %s\n" % run_id)         # the FIRST line: review-guard and pr-activity-check read it
     for note in NOTES:
         sys.stderr.write("bridge-run: note - %s\n" % note)
+    if scale_raw and os.environ.get("BRIDGE_RUN_ALLOW_ANY") != "1":
+        sys.stderr.write("bridge-run: note - BRIDGE_RUN_SLOT_SCALE is ignored without BRIDGE_RUN_ALLOW_ANY=1\n")
     sys.stderr.flush()
     cap, cap_note = cap_for(kind, folder)
     if cap_note:
@@ -1154,6 +1268,9 @@ def main():
         if limit > cap:
             sys.stderr.write("bridge-run: refused - a limit of %ds is above twice the default for %s (%ds); the owner's words in docs/RUN_PARAMETERS.md (`Ceiling above twice: %s <seconds> (<their words>, <date>)`) lift the cap\n" % (int(limit), kind, cap, kind))
             return 125
+    if kind == "watch" and kind_of(cmd) != "watch":
+        sys.stderr.write(WATCH_ONLY_REFUSE)
+        return 125
     strip = "--strip" in flags
     if kind == "driver" and driver_prog is not None:
         cmd = list(cmd)
@@ -1206,12 +1323,12 @@ def main():
 
     slot_fd = None
     if kind in HEAVY_KINDS:
-        slot_attempt = time.time()
-        slot_result = acquire_heavy_slot(kind, run_id, int(limit), slot_scale)
+        slot_attempt = time.monotonic()
+        slot_result = acquire_heavy_slot(kind, run_id, limit, slot_scale)
         if slot_result == "refused":
             return 125
         if slot_result is None:
-            entry.update(waited=int(time.time() - slot_attempt), seconds=0, exit=123)
+            entry.update(waited=int(time.monotonic() - slot_attempt), seconds=0, exit=123, slot="not free", healthy=None)
             write_log(folder, entry)
             return 123
         slot_fd, entry["waited"] = slot_result[0], slot_result[1]
@@ -1278,19 +1395,13 @@ def main():
             proc.kill()
         rc = 124
     remove_pid_file(pid_file)
-    if slot_fd is not None:
-        _unlock_byte(slot_fd)
-        try:
-            os.close(slot_fd)
-        except OSError:
-            pass
     if rc != 124:
         report_boundary()
         sys.stderr.write("bridge-run: exit %d\n" % rc)
         sys.stderr.flush()
     if entry["exit"] is None:
         healthy = True if (kind == "test" and rc == 0) or (kind == "driver" and rc in (0, 1)) else None
-        entry.update(seconds=int(time.time() - started)+entry.get("waited",0), exit=rc, healthy=healthy)
+        entry.update(seconds=int(time.time() - started), exit=rc, healthy=healthy)
         write_log(folder, entry)
     # The job handle is deliberately not closed here: it closes when this process exits,
     # after the exit code is set, and "kill on close" then ends any orphan the command left.
