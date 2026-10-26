@@ -747,6 +747,16 @@ def test_r040_holder_that_waited_publishes_slot_taken_start(tmp_path):
         kill_tree(holder)
         taken = read_until(l1, "bridge-run: slot taken ")[-1].split("slot taken ", 1)[1]
         assert taken != started
+        # the record is published after the slot-taken line: start the third launcher once it names l1
+        rec = lock_path_of(env) + ".holder"
+
+        def names_l1():
+            try:
+                return json.loads(open(rec, encoding="utf-8").read()).get("run_id") == started
+            except (OSError, ValueError):
+                return False
+
+        assert wait_until(names_l1), "l1 never published its record"
         l3 = popen_bridge(r3, env, "--limit", "30", "--", sys.executable, "-c", "pass")
         line = read_until(l3, "bridge-run: waiting")[-1]
         assert "held by test %s since %s, ends by " % (started, taken) in line
