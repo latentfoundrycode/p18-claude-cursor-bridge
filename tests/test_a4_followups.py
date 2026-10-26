@@ -67,14 +67,14 @@ def test_bridge_stop_ends_a_launcher_run_and_its_tree(tmp_path):
         stop = subprocess.run([sys.executable, os.path.join(CB, "bridge-stop.py"), "--pid", str(child_pid)], capture_output=True, text=True, env=env_now)
         assert "is not running" in stop.stdout, "the child is gone with its tree: " + stop.stdout
     finally:
+        if child_pid is not None and sys.platform != "win32":
+            try:
+                os.kill(child_pid, 9)              # off Windows no Job ends the child with the launcher; first, since it holds the pipes
+            except OSError:
+                pass
         if p.poll() is None:
             p.kill()
         p.communicate(timeout=10)                  # waits for the launcher and closes its pipes
-        if child_pid is not None and sys.platform != "win32":
-            try:
-                os.kill(child_pid, 9)              # off Windows no Job ends the child with the launcher
-            except OSError:
-                pass
 
 
 def test_the_credential_helper_is_reset_in_the_bridges_git_config_file(program, tmp_path):
