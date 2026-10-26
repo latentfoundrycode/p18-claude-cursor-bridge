@@ -44,6 +44,7 @@ def test_bridge_stop_ends_a_launcher_run_and_its_tree(tmp_path):
     env = dict(env_now, BRIDGE_RUN_ALLOW_ANY="1")
     p = subprocess.Popen([sys.executable, launcher, "--limit", "120", "--kind", "test", "--", sys.executable, "-c", "import time; time.sleep(100)"],
                          cwd=str(tmp_path), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    child_pid = None
     try:
         pid_dir = tmp_path / "run" / "launcher" / "pids"
         for _ in range(40):
@@ -55,6 +56,8 @@ def test_bridge_stop_ends_a_launcher_run_and_its_tree(tmp_path):
         run_id = files[0].name
         launcher_pid, child_pid = (int(x) for x in files[0].read_text(encoding="utf-8").split())
         assert launcher_pid == p.pid
+        lock = os.path.join(os.environ["USERPROFILE"], ".cursor-bridge", "heavy.lock")
+        assert os.path.exists(lock), "the launcher's slot is under the tests' temporary home, so this test never touches the owner's"
         q = subprocess.run([sys.executable, os.path.join(CB, "bridge-stop.py"), run_id[:10]], cwd=str(tmp_path), capture_output=True, text=True, env=env_now)
         assert q.returncode == 0 and "ended" in q.stdout, q.stdout + q.stderr
         try:
@@ -66,7 +69,12 @@ def test_bridge_stop_ends_a_launcher_run_and_its_tree(tmp_path):
     finally:
         if p.poll() is None:
             p.kill()
-            p.wait(timeout=10)
+        p.communicate(timeout=10)                  # waits for the launcher and closes its pipes
+        if child_pid is not None and sys.platform != "win32":
+            try:
+                os.kill(child_pid, 9)              # off Windows no Job ends the child with the launcher
+            except OSError:
+                pass
 
 
 def test_the_credential_helper_is_reset_in_the_bridges_git_config_file(program, tmp_path):
