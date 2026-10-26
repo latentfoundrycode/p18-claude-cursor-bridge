@@ -285,15 +285,18 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - on GitHub, read-only through `gh` unless --offline: the default branch has a required
     status check (N6), and the repository's visibility (a public repository is a NOTE);
   - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
-    .cursor/hooks.json), the windowless check in the hooks (rule 24), the windowless pytest
-    default in the test roots' conftest.py (FIX-001 snapshot in windowless-default.snapshot.md;
-    R-039), and the frozen secure-coding rule (.cursor/rules/secure-coding.mdc); a configured
-    boundary-check hook is
+    .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen
+    secure-coding rule (.cursor/rules/secure-coding.mdc); a configured boundary-check hook is
     a NOTE (configured, not engaging) unless this computer's probe record
     ~/.cursor-bridge/boundary-probe.json says it fired ({"fired": true, "when": ..., "launch":
     ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program
     writes the record yet), and it is MISSING while docs/BOUNDARY_VIOLATIONS.md, its log of
     absolute paths, is not gitignored (FB-031);
+  - the windowless pytest default (R-039, FIX-001 snapshot in windowless-default.snapshot.md):
+    pytest.ini, then pyproject.toml's [tool.pytest.ini_options], then setup.cfg's [tool:pytest],
+    else tests/test_*.py; test roots from testpaths inside the Workspace or tests/; each root's
+    conftest.py (or the rootdir's conftest.py) must hold windowless_kwargs, Popen.__init__ and
+    CREATE_NO_WINDOW
   - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for
     a root requirements.txt (direct pins alone are not a lock; KP-018);
   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,

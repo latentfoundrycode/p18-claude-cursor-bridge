@@ -1,8 +1,10 @@
 """R-039: bridge-run.py --kind driver accepts only supervisor and mutation-run programs windowlessly."""
+import io
 import json
 import os
 import subprocess
 import sys
+from contextlib import redirect_stderr
 
 import pytest
 
@@ -122,9 +124,11 @@ def test_r039_accept_mutation_run_tilde(br, tmp_path, home_of_the_tests):
 
 
 @pytest.mark.parametrize("interpreter", ["python", "python3", "py"])
-def test_r039_interpreter_bare_name_accepted(br, interpreter):
+def test_r039_interpreter_bare_name_accepted(br, tmp_path, interpreter):
     """R-039: bare interpreter names pass driver_accepted."""
-    assert br.driver_accepted([interpreter, "run/supervisor/x.py"], os.getcwd())
+    folder = launch_folder(tmp_path)
+    (folder / "run" / "supervisor" / "x.py").write_text("pass\n", encoding="utf-8")
+    assert br.driver_accepted([interpreter, "run/supervisor/x.py"], str(folder))
 
 
 def test_r039_interpreter_venv_accepted(br, tmp_path):
@@ -136,6 +140,7 @@ def test_r039_interpreter_venv_accepted(br, tmp_path):
         vpy = folder / ".venv" / "bin" / "python"
     vpy.parent.mkdir(parents=True)
     vpy.write_text("", encoding="utf-8")
+    (folder / "run" / "supervisor" / "x.py").write_text("pass\n", encoding="utf-8")
     assert br.driver_accepted([str(vpy), "run/supervisor/x.py"], str(folder))
 
 
@@ -176,6 +181,7 @@ def test_r039_refuse_link_at_supervisor(br, tmp_path, allow_any):
     p = run_driver(folder, "run/supervisor/task.py", allow_any=allow_any)
     assert p.returncode == 125
     refuse_line(p.stderr)
+    assert runs_of(folder) == []
 
 
 @pytest.mark.parametrize("allow_any", [False, True])
@@ -190,6 +196,183 @@ def test_r039_refuse_link_in_subfolder(br, tmp_path, allow_any):
     p = run_driver(folder, "run/supervisor/nested/task.py", allow_any=allow_any)
     assert p.returncode == 125
     refuse_line(p.stderr)
+    assert runs_of(folder) == []
+
+
+@pytest.mark.parametrize("allow_any", [False, True])
+def test_r039_refuse_dotdot_inside_supervisor(br, tmp_path, allow_any):
+    """R-039: run/supervisor/sub/../task.py is refused even when task.py exists."""
+    folder = launch_folder(tmp_path)
+    _write_exit_script(folder / "run" / "supervisor" / "task.py", 0)
+    p = run_driver(folder, "run/supervisor/sub/../task.py", allow_any=allow_any)
+    assert p.returncode == 125
+    refuse_line(p.stderr)
+    assert runs_of(folder) == []
+
+
+@pytest.mark.parametrize("allow_any", [False, True])
+def test_r039_refuse_dotdot_through_supervisor_link(br, tmp_path, allow_any):
+    """R-039: run/supervisor/j/../x.py through a link escape is refused."""
+    folder = launch_folder(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    marker = outside / "marker.txt"
+    (outside / "x.py").write_text("open(%r,'w').write('hit')\n" % str(marker).replace("\\", "\\\\"), encoding="utf-8")
+    _link_folder(folder / "run" / "supervisor" / "j", outside)
+    p = run_driver(folder, "run/supervisor/j/../x.py", allow_any=allow_any)
+    assert p.returncode == 125
+    refuse_line(p.stderr)
+    assert runs_of(folder) == []
+    assert not marker.is_file()
+
+
+@pytest.mark.parametrize("allow_any", [False, True])
+def test_r039_refuse_mutation_path_dotdot(br, tmp_path, allow_any, home_of_the_tests):
+    """R-039: ~/.claude/x/../cursor-bridge/mutation-run.py is refused."""
+    folder = launch_folder(tmp_path)
+    mut_dir = home_of_the_tests / ".claude" / "cursor-bridge"
+    mut_dir.mkdir(parents=True)
+    _write_exit_script(mut_dir / "mutation-run.py", 0)
+    p = run_driver(folder, "~/.claude/x/../cursor-bridge/mutation-run.py", allow_any=allow_any,
+                   home=home_of_the_tests)
+    assert p.returncode == 125
+    refuse_line(p.stderr)
+    assert runs_of(folder) == []
+
+
+@pytest.mark.parametrize("allow_any", [False, True])
+def test_r039_refuse_directory_named_py(br, tmp_path, allow_any):
+    """R-039: a directory named d.py is refused."""
+    folder = launch_folder(tmp_path)
+    dpy = folder / "run" / "supervisor" / "d.py"
+    dpy.mkdir()
+    marker = folder / "marker.txt"
+    (dpy / "__main__.py").write_text("open(%r,'w').write('hit')\n" % str(marker).replace("\\", "\\\\"), encoding="utf-8")
+    p = run_driver(folder, "run/supervisor/d.py", allow_any=allow_any)
+    assert p.returncode == 125
+    refuse_line(p.stderr)
+    assert runs_of(folder) == []
+    assert not marker.is_file()
+
+
+@pytest.mark.parametrize("allow_any", [False, True])
+def test_r039_refuse_alternate_data_stream(br, tmp_path, allow_any):
+    """R-039: run/supervisor/x.txt:hidden.py is refused."""
+    folder = launch_folder(tmp_path)
+    base = folder / "run" / "supervisor" / "x.txt"
+    base.write_text("data\n", encoding="utf-8")
+    p = run_driver(folder, "run/supervisor/x.txt:hidden.py", allow_any=allow_any)
+    assert p.returncode == 125
+    refuse_line(p.stderr)
+    assert runs_of(folder) == []
+
+
+@pytest.mark.parametrize("allow_any", [False, True])
+def test_r039_refuse_key_file_with_driver(br, tmp_path, allow_any):
+    """R-039: --key-file with driver kind is refused."""
+    folder = launch_folder(tmp_path)
+    prog = folder / "run" / "supervisor" / "task.py"
+    marker = tmp_path / "marker.txt"
+    prog.write_text("open(%r,'w').write('hit')\n" % str(marker).replace("\\", "\\\\"), encoding="utf-8")
+    key = tmp_path / "keys.env"
+    key.write_text("PYTHONPATH=/tmp\n", encoding="utf-8")
+    env = env_for(tmp_path)
+    if allow_any:
+        env["BRIDGE_RUN_ALLOW_ANY"] = "1"
+    cmd = [sys.executable, PROG, "--limit", "30", "--kind", "driver", "--key-file", str(key), "--",
+           "python", "run/supervisor/task.py"]
+    p = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(folder), timeout=60)
+    assert p.returncode == 125
+    lines = [l for l in p.stderr.splitlines() if l.startswith("bridge-run: refused - driver kind:")]
+    assert len(lines) == 1 and "--key-file" in lines[0]
+    assert runs_of(folder) == []
+    assert not marker.is_file()
+
+
+def test_r039_started_argv_absolute_supervisor(tmp_path):
+    """R-039: driver starts the absolute normalised program path."""
+    folder = launch_folder(tmp_path)
+    prog = folder / "run" / "supervisor" / "task.py"
+    prog.write_text("import sys\nprint(sys.argv[0])\n", encoding="utf-8")
+    p = run_driver(folder, "run/supervisor/task.py")
+    assert p.returncode == 0, p.stderr
+    expected = os.path.normcase(os.path.normpath(str(prog)))
+    assert os.path.normcase(p.stdout.strip()) == expected
+
+
+def test_r039_started_argv_absolute_mutation(tmp_path, home_of_the_tests):
+    """R-039: tilde mutation-run.py starts as absolute under home."""
+    folder = launch_folder(tmp_path)
+    mut_dir = home_of_the_tests / ".claude" / "cursor-bridge"
+    mut_dir.mkdir(parents=True)
+    prog = mut_dir / "mutation-run.py"
+    prog.write_text("import sys\nprint(sys.argv[0])\n", encoding="utf-8")
+    p = run_driver(folder, "~/.claude/cursor-bridge/mutation-run.py", home=home_of_the_tests)
+    assert p.returncode == 0, p.stderr
+    expected = os.path.normcase(os.path.normpath(str(prog)))
+    assert os.path.normcase(p.stdout.strip()) == expected
+
+
+def test_r039_recheck_refuses_tampered_program(br, tmp_path, monkeypatch):
+    """R-039: re-check before start refuses a program swapped after the first check."""
+    folder = launch_folder(tmp_path)
+    prog = folder / "run" / "supervisor" / "task.py"
+    _write_exit_script(prog, 0)
+    pop_calls = []
+    job_calls = []
+
+    def branch_swap(where):
+        # a step main() takes between the first check and the start: the checked file becomes a folder
+        if prog.is_file():
+            prog.unlink()
+            prog.mkdir()
+        return None
+
+    class FakeJob:
+        # stands in for the Windows job object, so the test process is never assigned to one
+        def __init__(self):
+            job_calls.append("job")
+
+        def assign_self(self):
+            job_calls.append("assign")
+
+        def terminate(self):
+            job_calls.append("terminate")
+
+    def fake_popen(*a, **k):
+        pop_calls.append(True)
+        raise OSError("should not start")
+
+    monkeypatch.setattr(br, "branch_of", branch_swap)
+    monkeypatch.setattr(br, "Job", FakeJob)
+    monkeypatch.setattr(br.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(sys, "argv", ["bridge-run.py", "--limit", "30", "--kind", "driver", "--", "python", str(prog)])
+    monkeypatch.chdir(folder)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "localappdata"))
+    buf = io.StringIO()
+    with redirect_stderr(buf):
+        rc = br.main()
+    assert prog.is_dir()                       # the swap ran, after the first check had accepted the file
+    assert rc == 125
+    refuse_line(buf.getvalue())
+    assert runs_of(folder) == []
+    assert pop_calls == []
+    assert "cannot start" not in buf.getvalue()
+
+
+def test_r039_log_head_interpreter_only_with_args(tmp_path):
+    """R-039: driver log head is the interpreter name only."""
+    folder = launch_folder(tmp_path)
+    prog = folder / "run" / "supervisor" / "task.py"
+    _write_exit_script(prog, 0)
+    (folder / "tests").mkdir(exist_ok=True)
+    (folder / "tests" / "x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    env = env_for(tmp_path)
+    cmd = [sys.executable, PROG, "--limit", "120", "--kind", "driver", "--", "python",
+           str(prog), "tests/x", "-m", "pytest"]
+    p = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(folder), timeout=120)
+    assert p.returncode == 0, p.stderr
+    assert runs_of(folder)[-1]["head"] == "python"
 
 
 @pytest.mark.parametrize("argv", [
@@ -208,6 +391,7 @@ def test_r039_refuse_interpreter_options(br, tmp_path, argv, allow_any):
     p = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(folder), timeout=60)
     assert p.returncode == 125
     refuse_line(p.stderr)
+    assert runs_of(folder) == []
 
 
 @pytest.mark.parametrize("allow_any", [False, True])
@@ -219,6 +403,7 @@ def test_r039_refuse_txt_program(br, tmp_path, allow_any):
     p = run_driver(folder, "run/supervisor/task.txt", allow_any=allow_any)
     assert p.returncode == 125
     refuse_line(p.stderr)
+    assert runs_of(folder) == []
 
 
 @pytest.mark.parametrize("allow_any", [False, True])
@@ -230,6 +415,7 @@ def test_r039_refuse_foreign_python(br, tmp_path, allow_any):
     p = run_driver(folder, "run/supervisor/task.py", interpreter="C:/anywhere/python.exe", allow_any=allow_any)
     assert p.returncode == 125
     refuse_line(p.stderr)
+    assert runs_of(folder) == []
 
 
 def test_r039_driver_form_under_test_kind_refused(tmp_path):
@@ -240,7 +426,9 @@ def test_r039_driver_form_under_test_kind_refused(tmp_path):
     env = env_for(tmp_path)
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--kind", "test", "--", "python", str(prog)],
                        capture_output=True, text=True, env=env, cwd=str(folder), timeout=60)
-    assert p.returncode == 125 and "refused" in p.stderr
+    assert p.returncode == 125
+    assert any(l.startswith("bridge-run: refused - the launcher runs only cursor-agent") for l in p.stderr.splitlines())
+    assert not any(l.startswith("bridge-run: refused - driver kind:") for l in p.stderr.splitlines())
 
 
 def test_r039_driver_ceiling_defaults(br, tmp_path):
@@ -301,8 +489,34 @@ def test_r039_healthy_refused_for_driver_exit_3(tmp_path):
     before = log.read_text(encoding="utf-8")
     p = subprocess.run([sys.executable, PROG, "--healthy", "2026-01-01", "--kind", "driver"],
                        capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=60)
-    assert p.returncode == 1 and p.stderr.startswith("bridge-run: refused - ")
+    assert p.returncode == 1
+    assert "bridge-run: refused - a driver run is healthy at exit 0 or 1 only" in p.stderr
     assert log.read_text(encoding="utf-8") == before
+
+
+def test_r039_healthy_accepts_driver_exit_0_and_1(tmp_path):
+    """R-039: --healthy marks driver runs at exit 0 and 1."""
+    folder = launch_folder(tmp_path)
+    log = folder / "run" / "launcher" / "runs.jsonl"
+    for code in (1, 0):
+        line = {"id": "2026-01-01T00:00:0%dZ" % code, "kind": "driver", "seconds": 1, "exit": code, "healthy": None}
+        log.write_text(json.dumps(line) + "\n", encoding="utf-8")
+        p = subprocess.run([sys.executable, PROG, "--healthy", "2026-01-01T00:00:0%d" % code, "--kind", "driver"],
+                           capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=60)
+        assert p.returncode == 0, p.stderr
+        row = json.loads(log.read_text(encoding="utf-8").strip())
+        assert row["healthy"] is True
+
+
+def test_r039_limit_auto_driver_empty_log(tmp_path):
+    """R-039: --limit auto on empty log prints driver default line."""
+    folder = launch_folder(tmp_path)
+    prog = folder / "run" / "supervisor" / "task.py"
+    _write_exit_script(prog, 0)
+    p = subprocess.run([sys.executable, PROG, "--limit", "auto", "--kind", "driver", "--", "python", str(prog)],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=120)
+    assert p.returncode == 0, p.stderr
+    assert "bridge-run: limit 7200s for driver (the default for driver)" in p.stderr
 
 
 def test_r039_log_head_is_interpreter_only(tmp_path):

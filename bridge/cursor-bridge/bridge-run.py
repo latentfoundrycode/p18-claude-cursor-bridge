@@ -92,6 +92,9 @@ AGENT_NAMES = ("cursor-agent", "cursor-agent.cmd", "cursor-agent.exe")
 KINDS = {"builder": 7200, "driver": 7200, "review": 3600, "watch": 3600, "test": 1800}
 DRIVER_REFUSE = ("bridge-run: refused - driver kind: only python <program> under run/supervisor/ "
                  "or ~/.claude/cursor-bridge/mutation-run.py\n")
+DRIVER_KEYFILE_REFUSE = ("bridge-run: refused - driver kind: --key-file is not allowed; a key file never "
+                         "goes to a driver run (its NAME=value pairs reach the interpreter environment "
+                         "before the program runs)\n")
 LOG = os.path.join("run", "launcher", "runs.jsonl")
 LEARN_FACTOR = 1.5
 CAP_FACTOR = 2
@@ -180,16 +183,21 @@ def _program_abs(token, folder):
     return os.path.normpath(os.path.join(os.path.abspath(folder), token))
 
 
-def _supervisor_program_ok(program_token, folder):
-    base = os.path.abspath(folder)
-    prog = _program_abs(program_token, folder)
-    supervisor = os.path.normpath(os.path.join(base, "run", "supervisor"))
-    sup = _normcase_path(supervisor)
-    p = _normcase_path(prog)
-    if not p.endswith(".py"):
-        return False
-    if not (p == sup or p.startswith(sup + os.sep)):
-        return False
+def _token_has_dotdot(token):
+    return ".." in [p for p in re.split(r"[/\\]", token) if p]
+
+
+def _colon_in_path_after_drive(abs_path):
+    norm = os.path.normpath(abs_path)
+    if sys.platform == "win32":
+        _, tail = os.path.splitdrive(norm)
+        parts = [p for p in tail.split(os.sep) if p]
+    else:
+        parts = [p for p in norm.split(os.sep) if p]
+    return any(":" in p for p in parts)
+
+
+def _link_walk_ok(prog, base):
     rel = os.path.relpath(prog, base)
     if rel.startswith(".."):
         return False
@@ -201,19 +209,57 @@ def _supervisor_program_ok(program_token, folder):
     return True
 
 
+def _supervisor_file_ok(prog, folder):
+    base = os.path.abspath(folder)
+    supervisor = os.path.normpath(os.path.join(base, "run", "supervisor"))
+    sup = _normcase_path(supervisor)
+    p = _normcase_path(prog)
+    if not (p == sup or p.startswith(sup + os.sep)):
+        return False
+    if not os.path.isfile(prog):
+        return False
+    return _link_walk_ok(prog, base)
+
+
 def _mutation_program_ok(program_token, folder):
     prog = _program_abs(program_token, folder)
     return _normcase_path(prog) == _normcase_path(_mutation_run_path())
 
 
-def driver_accepted(argv, folder=None):
-    """python <program> [args]: program under run/supervisor/ or the installed mutation-run.py."""
+def resolve_driver_program(argv, folder=None):
+    """Accepted driver program as an absolute, normalised path, or None."""
     if len(argv) < 2 or not python_interpreter_ok(argv, folder) or argv[1].startswith("-"):
-        return False
+        return None
     program = argv[1]
     if not program.endswith(".py"):
+        return None
+    if _token_has_dotdot(program):
+        return None
+    prog = _program_abs(program, folder)
+    if _colon_in_path_after_drive(prog):
+        return None
+    if _supervisor_file_ok(prog, folder):
+        return os.path.normpath(prog)
+    if _mutation_program_ok(program, folder):
+        return os.path.normpath(prog)
+    return None
+
+
+def driver_accepted(argv, folder=None):
+    """python <program> [args]: program under run/supervisor/ or the installed mutation-run.py."""
+    return resolve_driver_program(argv, folder) is not None
+
+
+def verify_driver_program_abs(abs_prog, folder):
+    """Re-check (c)-(e) on the absolute program path already placed in the command to start."""
+    if not abs_prog.endswith(".py"):
         return False
-    return _supervisor_program_ok(program, folder) or _mutation_program_ok(program, folder)
+    prog = os.path.normpath(abs_prog)
+    if _colon_in_path_after_drive(prog):
+        return False
+    if _supervisor_file_ok(prog, folder):
+        return True
+    return _normcase_path(prog) == _normcase_path(_mutation_run_path())
 
 
 def named_suite(argv):
@@ -747,10 +793,15 @@ def main():
     cmd = argv[argv.index("--") + 1:]
     if not cmd:
         return usage()
-    kind_in_flags = flags[flags.index("--kind") + 1] if "--kind" in flags and flags.index("--kind") + 1 < len(flags) else None
-    if kind_in_flags == "driver":
-        if not driver_accepted(cmd, folder):
+    kind = flags[flags.index("--kind") + 1] if "--kind" in flags and flags.index("--kind") + 1 < len(flags) else None
+    driver_prog = None
+    if kind == "driver":
+        driver_prog = resolve_driver_program(cmd, folder)
+        if driver_prog is None:
             sys.stderr.write(DRIVER_REFUSE)
+            return 125
+        if "--key-file" in flags:
+            sys.stderr.write(DRIVER_KEYFILE_REFUSE)
             return 125
     elif not accepted(cmd, folder):
         sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
@@ -762,7 +813,8 @@ def main():
     if reason:
         sys.stderr.write("bridge-run: refused - %s\n" % reason)
         return 125
-    kind = flags[flags.index("--kind") + 1] if "--kind" in flags and flags.index("--kind") + 1 < len(flags) else kind_of(cmd)
+    if kind is None:
+        kind = kind_of(cmd)
     if kind is None and os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1":
         kind = "test"                                        # the tests' own helpers
     if kind not in KINDS:
@@ -779,7 +831,7 @@ def main():
             float(raw)
         except ValueError:
             return usage()
-    head = head_text(cmd)
+    head = head_of(cmd) if kind == "driver" else head_text(cmd)
     run_id = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
     taken = [r.get("id") for r in read_log(folder)]
     n = 2
@@ -802,9 +854,9 @@ def main():
             sys.stderr.write("bridge-run: refused - a limit of %ds is above twice the default for %s (%ds); the owner's words in docs/RUN_PARAMETERS.md (`Ceiling above twice: %s <seconds> (<their words>, <date>)`) lift the cap\n" % (int(limit), kind, cap, kind))
             return 125
     strip = "--strip" in flags
-    if kind == "driver" and len(cmd) >= 2 and (cmd[1].startswith("~/") or cmd[1].startswith("~\\")):
+    if kind == "driver" and driver_prog is not None:
         cmd = list(cmd)
-        cmd[1] = _program_abs(cmd[1], folder)
+        cmd[1] = driver_prog
     cmd, is_agent = resolve(cmd)
     try:
         env = bridge_env.stripped_env() if (is_agent or strip) else dict(os.environ)
@@ -856,6 +908,9 @@ def main():
         except OSError as e:
             sys.stderr.write("bridge-run: no job object (%s); the limit will end the first process only\n" % e)
             job = None
+        if kind == "driver" and len(cmd) >= 2 and not verify_driver_program_abs(cmd[1], folder):
+            sys.stderr.write(DRIVER_REFUSE)
+            return 125
         try:
             # A process created without a console (NO_WINDOW) does not inherit the standard
             # handles by itself; they are passed explicitly so the caller's redirects hold.
@@ -867,6 +922,9 @@ def main():
         if killer is None:
             killer = proc.kill
     else:
+        if kind == "driver" and len(cmd) >= 2 and not verify_driver_program_abs(cmd[1], folder):
+            sys.stderr.write(DRIVER_REFUSE)
+            return 125
         try:
             proc = subprocess.Popen(cmd, env=env, preexec_fn=os.setsid, creationflags=NO_WINDOW)
         except OSError as e:

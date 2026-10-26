@@ -23,15 +23,18 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - on GitHub, read-only through `gh` unless --offline: the default branch has a required
     status check (N6), and the repository's visibility (a public repository is a NOTE);
   - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
-    .cursor/hooks.json), the windowless check in the hooks (rule 24), the windowless pytest
-    default in the test roots' conftest.py (FIX-001 snapshot in windowless-default.snapshot.md;
-    R-039), and the frozen secure-coding rule (.cursor/rules/secure-coding.mdc); a configured
-    boundary-check hook is
+    .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen
+    secure-coding rule (.cursor/rules/secure-coding.mdc); a configured boundary-check hook is
     a NOTE (configured, not engaging) unless this computer's probe record
     ~/.cursor-bridge/boundary-probe.json says it fired ({"fired": true, "when": ..., "launch":
     ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program
     writes the record yet), and it is MISSING while docs/BOUNDARY_VIOLATIONS.md, its log of
     absolute paths, is not gitignored (FB-031);
+  - the windowless pytest default (R-039, FIX-001 snapshot in windowless-default.snapshot.md):
+    pytest.ini, then pyproject.toml's [tool.pytest.ini_options], then setup.cfg's [tool:pytest],
+    else tests/test_*.py; test roots from testpaths inside the Workspace or tests/; each root's
+    conftest.py (or the rootdir's conftest.py) must hold windowless_kwargs, Popen.__init__ and
+    CREATE_NO_WINDOW
   - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for
     a root requirements.txt (direct pins alone are not a lock; KP-018);
   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,
@@ -119,37 +122,91 @@ def _conftest_windowless_ok(path):
     return text is not None and all(t in text for t in WINDOWLESS_TOKENS)
 
 
-def _pytest_testpaths(ws):
+def _testpaths_list(raw):
+    if isinstance(raw, str):
+        return [p.strip() for p in re.split(r"[\s,]+", raw.strip()) if p.strip()]
+    if isinstance(raw, list) and all(isinstance(x, str) for x in raw):
+        return [p.strip() for p in raw if p.strip()]
+    return None
+
+
+def _read_ini_testpaths(text, section, option):
+    try:
+        cp = configparser.RawConfigParser()
+        cp.read_string(text)
+        if cp.has_option(section, option):
+            return _testpaths_list(cp.get(section, option))
+    except configparser.Error:
+        return "parse_error"
+    return None
+
+
+def _read_pyproject_pytest(text):
+    try:
+        data = tomllib.loads(text)
+    except (ValueError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return "parse_error", None
+    tool = data.get("tool")
+    if not isinstance(tool, dict):
+        return None, None
+    pytest = tool.get("pytest")
+    if not isinstance(pytest, dict):
+        return None, None
+    if "ini_options" not in pytest:
+        return None, None
+    opts = pytest.get("ini_options")
+    if not isinstance(opts, dict):
+        return None, None
+    tp = opts.get("testpaths")
+    if tp is None:
+        return "table", None
+    listed = _testpaths_list(tp)
+    return "table", listed if listed is not None else None
+
+
+def _pytest_active_testpaths(ws):
+    """(parse_notes, testpaths): notes in file-order; paths before inside-workspace filtering."""
+    notes = []
     ini = os.path.join(ws, "pytest.ini")
     if os.path.isfile(ini):
-        cp = configparser.ConfigParser()
-        cp.read(ini, encoding="utf-8")
-        if cp.has_option("pytest", "testpaths"):
-            raw = cp.get("pytest", "testpaths")
-            return [p.strip() for p in re.split(r"[\s,]+", raw.strip()) if p.strip()]
-        return ["tests"]
-    cfg = os.path.join(ws, "setup.cfg")
-    if os.path.isfile(cfg):
-        cp = configparser.ConfigParser()
-        cp.read(cfg, encoding="utf-8")
-        if cp.has_section("tool:pytest") and cp.has_option("tool:pytest", "testpaths"):
-            raw = cp.get("tool:pytest", "testpaths")
-            return [p.strip() for p in re.split(r"[\s,]+", raw.strip()) if p.strip()]
+        text = read(ini)
+        if text is None:
+            notes.append("pytest.ini could not be parsed; judged as if it held no pytest settings")
+            return notes, ["tests"]
+        tp = _read_ini_testpaths(text, "pytest", "testpaths")
+        if tp == "parse_error":
+            notes.append("pytest.ini could not be parsed; judged as if it held no pytest settings")
+            return notes, ["tests"]
+        return notes, tp if tp is not None else ["tests"]
     toml_path = os.path.join(ws, "pyproject.toml")
     if os.path.isfile(toml_path):
-        try:
-            with open(toml_path, "rb") as f:
-                data = tomllib.load(f)
-            opts = data.get("tool", {}).get("pytest", {}).get("ini_options", {})
-            if "testpaths" in opts:
-                tp = opts["testpaths"]
-                if isinstance(tp, str):
-                    return [p.strip() for p in re.split(r"[\s,]+", tp.strip()) if p.strip()]
-                if isinstance(tp, list):
-                    return [str(p).strip() for p in tp if str(p).strip()]
-        except (OSError, ValueError, tomllib.TOMLDecodeError):
-            pass
-    return ["tests"]
+        text = read(toml_path)
+        if text is None:
+            notes.append("pyproject.toml could not be parsed; judged as if it held no pytest settings")
+        else:
+            kind, tp = _read_pyproject_pytest(text)
+            if kind == "parse_error":
+                notes.append("pyproject.toml could not be parsed; judged as if it held no pytest settings")
+            elif kind == "table":
+                return notes, tp if tp is not None else ["tests"]
+    cfg = os.path.join(ws, "setup.cfg")
+    if os.path.isfile(cfg):
+        text = read(cfg)
+        if text is None:
+            notes.append("setup.cfg could not be parsed; judged as if it held no pytest settings")
+        else:
+            tp = _read_ini_testpaths(text, "tool:pytest", "testpaths")
+            if tp == "parse_error":
+                notes.append("setup.cfg could not be parsed; judged as if it held no pytest settings")
+            else:
+                try:
+                    cp = configparser.RawConfigParser()
+                    cp.read_string(text)
+                    if cp.has_section("tool:pytest"):
+                        return notes, tp if tp is not None else ["tests"]
+                except configparser.Error:
+                    notes.append("setup.cfg could not be parsed; judged as if it held no pytest settings")
+    return notes, ["tests"]
 
 
 def _pytest_suite_seen(ws):
@@ -157,19 +214,22 @@ def _pytest_suite_seen(ws):
         return True
     toml_path = os.path.join(ws, "pyproject.toml")
     if os.path.isfile(toml_path):
-        try:
-            with open(toml_path, "rb") as f:
-                data = tomllib.load(f)
-            if "ini_options" in data.get("tool", {}).get("pytest", {}):
+        text = read(toml_path)
+        if text is not None:
+            kind, _ = _read_pyproject_pytest(text)
+            if kind == "table":
                 return True
-        except (OSError, ValueError, tomllib.TOMLDecodeError):
-            pass
     cfg = os.path.join(ws, "setup.cfg")
     if os.path.isfile(cfg):
-        cp = configparser.ConfigParser()
-        cp.read(cfg, encoding="utf-8")
-        if cp.has_section("tool:pytest"):
-            return True
+        text = read(cfg)
+        if text is not None:
+            try:
+                cp = configparser.RawConfigParser()
+                cp.read_string(text)
+                if cp.has_section("tool:pytest"):
+                    return True
+            except configparser.Error:
+                pass
     tests = os.path.join(ws, "tests")
     if os.path.isdir(tests):
         for name in os.listdir(tests):
@@ -178,15 +238,53 @@ def _pytest_suite_seen(ws):
     return False
 
 
-def _node_test_runner(ws):
+def _path_inside_workspace(entry, ws):
+    ws_abs = os.path.abspath(ws)
+    target = os.path.normpath(entry if os.path.isabs(entry) else os.path.join(ws_abs, entry))
+    if os.path.splitdrive(target)[0].lower() != os.path.splitdrive(ws_abs)[0].lower():
+        return False
+    try:
+        return os.path.normcase(os.path.commonpath([target, ws_abs])) == os.path.normcase(ws_abs)
+    except ValueError:
+        return False
+
+
+def _pytest_test_roots(ws):
+    notes, raw = _pytest_active_testpaths(ws)
+    kept = [p for p in raw if _path_inside_workspace(p, ws)]
+    return notes, kept if kept else ["tests"]
+
+
+def _package_json_scripts(ws):
     pkg_path = os.path.join(ws, "package.json")
     if not os.path.isfile(pkg_path):
         return None
     try:
-        scripts = json.loads(read(pkg_path) or "{}").get("scripts") or {}
+        data = json.loads(read(pkg_path) or "{}")
     except ValueError:
         return None
-    script = scripts.get("test") or ""
+    if not isinstance(data, dict):
+        return None
+    scripts = data.get("scripts")
+    if not isinstance(scripts, dict):
+        return None
+    script = scripts.get("test")
+    if not isinstance(script, str):
+        return None
+    return script
+
+
+def _script_runner_word(script):
+    words = script.split()
+    while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+        words.pop(0)
+    return words[0] if words else None
+
+
+def _node_test_runner(ws):
+    script = _package_json_scripts(ws)
+    if not script:
+        return None
     for needle, label in NODE_RUNNERS:
         if needle in script:
             return label
@@ -194,7 +292,10 @@ def _node_test_runner(ws):
 
 
 def _rel_forward(path, ws):
-    return os.path.relpath(path, ws).replace("\\", "/")
+    rel = os.path.relpath(path, ws).replace("\\", "/")
+    if ".." in rel.split("/"):
+        raise ValueError("path escapes workspace")
+    return rel
 
 
 def resolve_workspace(path):
@@ -674,13 +775,15 @@ def main():
 
     pytest_seen = _pytest_suite_seen(ws)
     node_runner = _node_test_runner(ws)
+    parse_notes, roots = _pytest_test_roots(ws)
+    for note in parse_notes:
+        add("NOTE", "Windowless test suite", note)
     if pytest_seen:
         root_conftest = os.path.join(ws, "conftest.py")
         ok_path = None
         if os.path.isfile(root_conftest) and _conftest_windowless_ok(root_conftest):
             ok_path = root_conftest
         else:
-            roots = _pytest_testpaths(ws)
             all_ok = True
             for rel in roots:
                 cpath = os.path.join(ws, rel, "conftest.py")
@@ -697,17 +800,18 @@ def main():
         add("NOTE", "Windowless test suite",
             "%s: release B ships no default for this runner (INVENTORY, Deferred); use detached: false (KP-059)" % node_runner)
     if not pytest_seen and not node_runner:
-        pkg_path = os.path.join(ws, "package.json")
-        detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
-        if os.path.isfile(pkg_path):
-            try:
-                scripts = json.loads(read(pkg_path) or "{}").get("scripts") or {}
-                script = scripts.get("test") or ""
-                if script:
-                    first = script.split()[0] if script.split() else script
-                    detail = "%s: release B ships no default for this runner (INVENTORY, Deferred); use detached: false (KP-059)" % first
-            except ValueError:
-                pass
+        script = _package_json_scripts(ws)
+        if script:
+            word = _script_runner_word(script)
+            if word == "echo":
+                detail = ("no test runner is configured (the package.json test script starts with echo)")
+            elif word:
+                detail = ("%s: release B ships no default for this runner (INVENTORY, Deferred); "
+                          "use detached: false (KP-059)" % word)
+            else:
+                detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
+        else:
+            detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
         add("NOTE", "Windowless test suite", detail)
 
     # --- lockfiles
