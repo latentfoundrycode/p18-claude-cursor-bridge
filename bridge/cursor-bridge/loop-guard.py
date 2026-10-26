@@ -16,7 +16,9 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
   4. nothing is pending that will wake the session. Since release A2 the hook's own lists
      decide: a background command *of a kind that finishes* (a builder run, a CI watch, a
      command run through bridge-run.py, or one marked `# wake`) counts until its limit plus a
-     grace; a background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
+     grace; a heavy bridge-run launch (`builder`, `test` or `driver`) also counts through the
+     longest slot wait (14,400 s), the slot grace (120 s) and the waiter's minute (60 s); a
+     background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
      the run parameters) AND only while a wake-timer command that ends no later than that
      ceiling is running, because a hung agent never completes and nothing else would wake the session
      (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the
@@ -44,8 +46,12 @@ from datetime import datetime
 
 GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source (transcript fallback)
 AGENT_CEILING = 3600       # a background agent older than this no longer counts (release A2; `Agent ceiling:` in RUN_PARAMETERS overrides)
-KIND_CEILING = {"cursor-agent": 7200, "review": 3600, "gh pr checks": 3600, "# wake": 1800}
+KIND_CEILING = {"cursor-agent": 7200, "driver": 7200, "review": 3600, "gh pr checks": 3600, "# wake": 1800}
 GRACE_SECONDS = 600        # the launcher ends a run at its limit; the notification follows within this
+HEAVY_SLOT_WAIT = 14400    # longest heavy wait: twice the builder default (R-040)
+SLOT_GRACE = 120
+SLOT_REPORT = 60
+HEAVY_LAUNCH_KINDS = frozenset(("builder", "driver", "test"))
 # A background command counts as a wake source only if it is of a kind that finishes: the
 # builder, the CI watch, or a command the supervisor marked with "# wake". Everything else
 # (servers, workers, probes) runs until killed and can never wake the session.
@@ -343,19 +349,33 @@ def owner_ceiling(cwd, kind):
     return None
 
 
+def launch_kind(cmd):
+    """Kind resolved the same way as command_ceiling (without reading --limit N)."""
+    k = re.search(r"--kind\s+(builder|driver|review|watch|test)", cmd) or re.search(r"#\s*wake\s+(builder|review|watch|test)\b", cmd, re.I)
+    return k.group(1).lower() if k else ("builder" if "cursor-agent" in cmd else "watch" if "gh pr checks" in cmd else "test")
+
+
 def command_ceiling(cmd, cwd=None):
     """The limit a launched command runs under: `--limit N` in the command; with `--limit auto`
     twice its kind's default, or the owner's raised ceiling (the most the launcher learns)."""
     m = re.search(r"--limit\s+(\d+)", cmd)
     if m:
         return int(m.group(1))
-    k = re.search(r"--kind\s+(builder|review|watch|test)", cmd) or re.search(r"#\s*wake\s+(builder|review|watch|test)\b", cmd, re.I)   # a project's own wrapper names its kind (2026.10.11c)
-    kind = k.group(1).lower() if k else ("builder" if "cursor-agent" in cmd else "watch" if "gh pr checks" in cmd else "test")
-    key = {"builder": "cursor-agent", "review": "review", "watch": "gh pr checks", "test": "# wake"}[kind]
+    kind = launch_kind(cmd)
+    key = {"builder": "cursor-agent", "driver": "driver", "review": "review", "watch": "gh pr checks", "test": "# wake"}[kind]
     ceiling = KIND_CEILING[key]
     if "--limit auto" in cmd:
         return max(2 * ceiling, owner_ceiling(cwd, kind) or 0)
     return ceiling
+
+
+def heavy_launch_extra(cmd):
+    """Extra seconds a heavy bridge-run launch may spend waiting for the machine-wide slot (R-040)."""
+    if not re.search(r"bridge-run\.py", cmd):
+        return 0
+    if launch_kind(cmd) not in HEAVY_LAUNCH_KINDS:
+        return 0
+    return HEAVY_SLOT_WAIT + SLOT_GRACE + SLOT_REPORT
 
 
 def local_clock(unix):
@@ -440,7 +460,7 @@ def pending_from_hook(data, now, cwd):
                 continue
             if not any(pat.search(cmd) for pat in WAKE_PATTERNS):
                 continue                                   # a server never finishes, so it never wakes you
-            if age <= command_ceiling(cmd, cwd) + GRACE_SECONDS:
+            if age <= command_ceiling(cmd, cwd) + heavy_launch_extra(cmd) + GRACE_SECONDS:
                 pending.append("background command %s" % t.get("id"))
         else:                                              # subagent, background_subagent, Agent SDK tool
             ceiling = agent_ceiling(cwd)

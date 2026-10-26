@@ -212,8 +212,20 @@ rule of 2026-10-05: no secret through the environment the owner sets).
 - The first line on stderr is `bridge-run: started <UTC time>Z`, which is what
   pr-activity-check.py's --since needs; the last is `bridge-run: exit <code>`, which
   review-guard.py reads to tell a review that reached a verdict from one that failed.
-- The exit code is the command's own; 124 = the limit was hit; 125 = refused or could not
-  start.
+- Heavy runs (`builder`, `test`, `driver`) take one machine-wide slot on
+  `~/.cursor-bridge/heavy.lock` before the command starts and hold it until the launcher
+  process ends; a second heavy run waits, prints who holds the slot once a minute, and exits
+  123 if the wait bound passes without the slot. `review` and `watch` take no slot. After
+  `bridge-run: started <run id>`, the launch's own notes, the limit line and the other launch
+  lines, and before the command starts: waiting lines, then `bridge-run: slot taken <UTC time>Z`,
+  or `bridge-run: slot not free - ...` and `bridge-run: exit 123`. A run that waited logs
+  `waited` (whole seconds in the slot queue); a run that ended waiting logs `"slot": "not free"`.
+- The exit code is the command's own; 123 = the slot was not free in time; 124 = the limit was
+  hit; 125 = refused or could not start.
+- `BRIDGE_RUN_SLOT_SCALE` (test-only, honoured only beside `BRIDGE_RUN_ALLOW_ANY=1`): when set
+  to a number with 0 < value <= 1, scales the slot wait reporting interval, grace and wait
+  bounds for tests; without `BRIDGE_RUN_ALLOW_ANY=1` a set value is ignored and one note line
+  says so.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
   owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`
   withholds it for any other accepted command too.
@@ -508,7 +520,9 @@ the model (documented; code.claude.com hooks reference) - only when ALL hold:
   4. nothing is pending that will wake the session. Since release A2 the hook's own lists
      decide: a background command *of a kind that finishes* (a builder run, a CI watch, a
      command run through bridge-run.py, or one marked `# wake`) counts until its limit plus a
-     grace; a background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
+     grace; a heavy bridge-run launch (`builder`, `test` or `driver`) also counts through the
+     longest slot wait (14,400 s), the slot grace (120 s) and the waiter's minute (60 s); a
+     background agent counts only under its ceiling (an hour, or `Agent ceiling:` in
      the run parameters) AND only while a wake-timer command that ends no later than that
      ceiling is running, because a hung agent never completes and nothing else would wake the session
      (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the
