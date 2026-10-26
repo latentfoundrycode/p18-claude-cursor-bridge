@@ -1,0 +1,717 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index de5c01a..482f2e9 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.25a",
+-  "generated": "2026-10-26 12:50",
++  "generated": "2026-10-26 13:59",
+   "files": {
+     "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
+     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
+@@ -31,7 +31,7 @@
+     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
+     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
+     "cursor-bridge/bridge-install.py": "c679380382e8bd34a6116c4d0abc8e254326059a8c35929f49b8fd6484a52b6d",
+-    "cursor-bridge/bridge-run.py": "87975cdaf5b4faee5533eb2bf5fe690e74a904a5b157f4febc54c7707e8ce318",
++    "cursor-bridge/bridge-run.py": "705ca5f4805452547326f6b51f03cea1087f59a3e8eb18027e8212dc21088b47",
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+     "cursor-bridge/bridge_env.py": "7fe536ff12e72406a84efa59d2e74788d174092f524ae0438d38169aa99b7d53",
+     "cursor-bridge/completion-check.py": "f584af6a6592c7f748beec212ad2b1752356607529fd60c1acb6507190626134",
+diff --git a/bridge/cursor-bridge/bridge-run.py b/bridge/cursor-bridge/bridge-run.py
+index c07cf68..0dc7995 100644
+--- a/bridge/cursor-bridge/bridge-run.py
++++ b/bridge/cursor-bridge/bridge-run.py
+@@ -143,7 +143,23 @@ def usage():
+ 
+ 
+ def head_of(argv):
+-    return os.path.basename(argv[0]).lower().replace(".exe", "").replace(".cmd", "") if argv else ""
++    if not argv:
++        return ""
++    base = os.path.basename(argv[0]).lower()
++    if base.endswith(".exe"):
++        return base[:-4]
++    if base.endswith(".cmd"):
++        return base[:-4]
++    return base
++
++
++def is_agent_argv(argv):
++    """True when argv[0] is a bare cursor-agent name (AGENT_NAMES), not a path or doubled suffix."""
++    if not argv:
++        return False
++    if os.path.dirname(argv[0]):
++        return False
++    return argv[0].lower() in AGENT_NAMES
+ 
+ 
+ ESCAPE_OPTIONS = {                                     # options that run another program or delete a folder, per runner
+@@ -338,7 +354,7 @@ def test_suite(argv, folder=None):
+ def kind_of(argv):
+     """The kind a command is, when its name says so."""
+     head = head_of(argv)
+-    if head == "cursor-agent":
++    if is_agent_argv(argv):
+         return "builder"
+     if head == "gh" and argv[1:3] == ["pr", "checks"]:
+         return "watch"
+@@ -475,7 +491,7 @@ def design_refuse_name(name, token, lifts, params_path):
+ 
+ def design_ceiling(argv, folder):
+     """Refuse cursor-agent launches naming a design round above the ceiling; None when allowed."""
+-    if head_of(argv) != "cursor-agent":
++    if not is_agent_argv(argv):
+         return None
+     text = DESIGN_TRIM_BEFORE_SEP.sub("", " ".join(argv))
+     norm = DESIGN_PATH_NORM.sub("/", text)
+@@ -568,8 +584,8 @@ def head_text(argv):
+     never a prompt (`cursor-agent`, `gh pr checks`, `pytest`, `npm test`)."""
+     head = head_of(argv)
+     subs = [a for a in argv[1:3] if a in ("pr", "checks", "test", "run", "pytest", "unittest", "vitest", "jest", "playwright", "--test", "-m") or a.startswith("test")]
+-    if head == "cursor-agent":
+-        return head
++    if is_agent_argv(argv):
++        return "cursor-agent"
+     return " ".join([head] + subs)[:40]
+ 
+ 
+@@ -932,8 +948,6 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
+         if got_lock:
+             waited = int(time.monotonic() - wait_mono)
+             taken = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+-            sys.stderr.write("bridge-run: slot taken %s\n" % taken)
+-            sys.stderr.flush()
+             created = process_creation_epoch(os.getpid())
+             if created is None:
+                 sys.stderr.write("bridge-run: note - could not read this process creation time for the slot holder record\n")
+@@ -942,6 +956,8 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
+                     "kind": kind, "run_id": run_id, "pid": os.getpid(),
+                     "created": created, "start": taken, "limit": pub_limit,
+                 })
++            sys.stderr.write("bridge-run: slot taken %s\n" % taken)
++            sys.stderr.flush()
+             return lock_fd, waited
+         now_mono = time.monotonic()
+         live = read_holder_record(holder_path)
+@@ -984,7 +1000,7 @@ def branch_of(folder):
+ def workspace_of(argv, folder):
+     """The folder a cursor-agent run works in: its `--workspace <path>` (a worktree builder, relative to
+     the launch folder), else the launch folder; the run is logged under that folder's branch (2026.10.25a)."""
+-    if head_of(argv) == "cursor-agent":
++    if is_agent_argv(argv):
+         for i, a in enumerate(argv):
+             if a == "--workspace" and i + 1 < len(argv):
+                 return os.path.join(folder, argv[i + 1])
+@@ -1019,7 +1035,7 @@ def review_family_refusal(argv, folder):
+     """A Review B of the family that built the change in flight is refused (release A4's rule, held by the
+     launcher since 2026.10.25a): after a profile switch the new profile's builder rebuilds the change first."""
+     model = model_of(argv)
+-    if head_of(argv) != "cursor-agent" or not model:
++    if not is_agent_argv(argv) or not model:
+         return None
+     try:
+         roster = roster_program()
+@@ -1127,7 +1143,7 @@ def boundary_changes(before, after):
+ 
+ def resolve(argv):
+     """Return (argv to start, is_agent)."""
+-    if os.path.basename(argv[0]).lower() in AGENT_NAMES:
++    if is_agent_argv(argv):
+         launcher = bridge_env.cursor_agent_launcher()
+         if launcher is None:
+             sys.stderr.write("bridge-run: cursor-agent not found (PATH or %LOCALAPPDATA%/cursor-agent)\n")
+@@ -1223,7 +1239,7 @@ def main():
+     elif not accepted(cmd, folder):
+         sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
+         return 125
+-    if "--key-file" in flags and head_of(cmd) == "cursor-agent":
++    if "--key-file" in flags and is_agent_argv(cmd):
+         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
+         return 125
+     reason = design_ceiling(cmd, folder)
+@@ -1280,7 +1296,7 @@ def main():
+         if limit > cap:
+             sys.stderr.write("bridge-run: refused - a limit of %ds is above twice the default for %s (%ds); the owner's words in docs/RUN_PARAMETERS.md (`Ceiling above twice: %s <seconds> (<their words>, <date>)`) lift the cap\n" % (int(limit), kind, cap, kind))
+             return 125
+-    if kind == "review" and kind_of(cmd) is not None and head_of(cmd) != "cursor-agent":
++    if kind == "review" and kind_of(cmd) is not None and not is_agent_argv(cmd):
+         sys.stderr.write(REVIEW_ONLY_REFUSE)
+         return 125
+     if kind == "watch" and kind_of(cmd) != "watch":
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index e934963..16e985e 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1066,3 +1066,12 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ - **The installed mutation-run program is matched by path only.** `verify_driver_program_abs` accepts `~/.claude/cursor-bridge/mutation-run.py` by path equality, with no regular-file, link-count or link-walk test, so the second check cannot see a swap there (TASK-028's). Check: the same tests on that arm (the security audit, round 4).
+ - **A refusal after the wait leaves this run's holder record.** The record published when the slot was taken still names the run after the launcher exits, as on the Popen-failure arms; its pid is dead, so waiters read it as no record. Check: remove the record on those arms (the security audit and Review A, round 4).
+ - **The builder's round-4 report repeats its first runs' figures as the re-runs'.** The "after mutations restored" summaries are byte-identical to the first runs, durations included, and its nine errors are not explained; the supervisor's own run settles the suite (2430 passed, 38 skipped). For the stage close's Feedback, beside rounds 2's untrue mutation table (Review A, round 4).
++
++### BUG-029 (the brief's reality check; recorded, not taken)
++- **A path-qualified `gh` is accepted by its basename.** `kind_of` reads `<any folder>/gh pr checks ...` as the watch and the launcher starts that file, not the `gh` on PATH; the watch carries no secret and the identity is withheld, so the file runs as any program of the owner's account would. Check: the same exact-name rule for `gh` as BUG-029 gives the agent (the brief packager, BUG-029).
++
++### BUG-029 (its reviews; recorded, not taken)
++- **Under BRIDGE_RUN_ALLOW_ANY=1 a cursor-agent given by a path runs as itself.** It is no longer swapped for the real agent, so it gets kind `test`, the full environment (the GitHub identity included), and none of the agent's checks: the key-file refusal, the design ceiling, the review-family check. The variable is test-only and already lets `cmd /c <agent> --key-file` through. Check: base the key-file refusal on `head_of(cmd) == "cursor-agent" or is_agent_argv(cmd)` (the security audit and Review A, BUG-029).
++- **The real agent is found with shutil.which.** `bridge_env.cursor_agent_launcher` tries `cursor-agent.cmd` first, and on Windows its search looks in the launch folder before PATH, so a `cursor-agent.cmd` written into the Workspace or an earlier PATH entry becomes the agent of the next launch, still with the stripped environment and the slot (older than BUG-029). Check: resolve the agent from PATH entries outside the launch folder, or pin it to the `%LOCALAPPDATA%/cursor-agent` install (the security audit, BUG-029).
++- **is_agent_argv's directory test is redundant.** No AGENT_NAMES entry holds a separator or a colon, so the whole-token comparison already refuses every path, and a mutant removing the `os.path.dirname` lines survives. Check: keep it as a guard for a future name, or remove it (Review A, BUG-029).
++- **The builder's BUG-029 report repeats its first runs' figures as the re-runs'**, as its TASK-029 round-4 report did (Review A, BUG-029; for the stage close's Feedback).
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 83893ec..9096901 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,10 +3,10 @@ Last updated: 2026-10-26
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at the merge of TASK-029 (PR #89); next is BUG-029
+-Last accepted: TASK-029 (PR #89, at its merge): one heavy job at a time, the launcher's machine-wide slot on ~/.cursor-bridge/heavy.lock (builder, driver and test runs wait for it, naming the holder, their wait bounded; review and watch runs take none; the loop guard counts a heavy launch longer by the wait); before it TASK-028 (PR #88): windowless launches enforced by the launcher (the driver kind for mutation runs, every launch with CREATE_NO_WINDOW) and the suite's frozen default shipped as windowless-default.snapshot.md, with the conformance floor `Windowless test suite`; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-024, TASK-028, TASK-029, BUG-001 to BUG-028, the refactoring passes of B2 to B4, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Increment: none — this file states the position at the merge of BUG-029 (PR #90); next is TASK-031
++Last accepted: BUG-029 (PR #90, at its merge): the launcher knows cursor-agent by one exact name (a doubled suffix such as cursor-agent.exe.cmd, or a cursor-agent given by a path, is refused as an unknown command) and publishes a holder's record before its slot-taken line; before it TASK-029 (PR #89): one heavy job at a time, the launcher's machine-wide slot on ~/.cursor-bridge/heavy.lock (builder, driver and test runs wait for it, naming the holder, their wait bounded; review and watch runs take none; the loop guard counts a heavy launch longer by the wait); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-024, TASK-028, TASK-029, BUG-001 to BUG-029, the refactoring passes of B2 to B4, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: none
+-Next: BUG-029 (a security finding of TASK-029's round 3, older than it: the launcher's head_of strips `.exe` and `.cmd` anywhere in a name, so a file named cursor-agent.exe.cmd passes as the agent and runs as itself (without the slot when labelled `--kind review`); one exact basename test, a cursor-agent given by path refused; docs/HARDENING.md, TASK-029 round 3), then TASK-031, on Opus 5.5; at stage B5's plan revision point the supervisor plans the four text items of D4 (T14, T23, FB-036, FB-040), which the owner integrated on 2026-10-26, stopping first for the owner to switch the session to Fable 5.1 (INVENTORY, Decisions). The three-round review ceiling applies by hand until TASK-030 and TASK-032 to TASK-035 build it (INVENTORY, Decisions). TASK-028 and TASK-029 have merged; builders run concurrently once a plan revision marks increments `Parallel: yes`. Until TASK-031's own pull request merges, plan-check.py's READY is not trusted for TASK-031 or for TASK-030 and TASK-025, which depend on it (BUILD_PLAN, TASK-031's note; ISS-013); no pull-request title that is not an increment's names a plan ID inside its closing parenthesis.
++Next: TASK-031 (mutation reruns that skip what is unchanged, mutation-run.py; a builder increment), on Opus 5.5; at stage B5's plan revision point the supervisor plans the four text items of D4 (T14, T23, FB-036, FB-040), which the owner integrated on 2026-10-26, stopping first for the owner to switch the session to Fable 5.1 (INVENTORY, Decisions). The three-round review ceiling applies by hand until TASK-030 and TASK-032 to TASK-035 build it (INVENTORY, Decisions). TASK-028 and TASK-029 have merged; builders run concurrently once a plan revision marks increments `Parallel: yes`. Until TASK-031's own pull request merges, plan-check.py's READY is not trusted for TASK-031 or for TASK-030 and TASK-025, which depend on it (BUILD_PLAN, TASK-031's note; ISS-013); no pull-request title that is not an increment's names a plan ID inside its closing parenthesis.
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer` (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -15,8 +15,8 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); each closed gate's own files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*.py, bug0nn_*.py, stage_b4_scope_r*.py, stage-b4-review-r*.md, and the bug, fix, refactoring and stage-review files of stages B1 to B3); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py, demo_b3.py, demo_b4.py (run with python -X utf8); drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #89, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24; B4 (the first conditional workflows) — closed 2026-10-25: TASK-022 (PR #66), the plan revision (PR #67), TASK-017 to TASK-021 (PRs #68 to #72), BUG-020 (PR #73), REFAC-B4 (PR #74), the stage review's seven rounds fixed by BUG-021 to BUG-027 (PRs #75 to #81), closed at round 7 under the owner's cap; B5 (calibration and acceptance) in progress: HOTFIX-002 (PR #84), TASK-023 (PR #85), TASK-024 (PR #86), BUG-028 (PR #87, ISS-016), TASK-028 (PR #88), TASK-029 (PR #89). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B4's close, 2026-10-25 (demonstration passed; the installed conformance check, run by the supervisor signed in to gh, 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-014 completed, ISS-015 recorded; Feedback FB-042 to FB-050; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #90, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24; B4 (the first conditional workflows) — closed 2026-10-25: TASK-022 (PR #66), the plan revision (PR #67), TASK-017 to TASK-021 (PRs #68 to #72), BUG-020 (PR #73), REFAC-B4 (PR #74), the stage review's seven rounds fixed by BUG-021 to BUG-027 (PRs #75 to #81), closed at round 7 under the owner's cap; B5 (calibration and acceptance) in progress: HOTFIX-002 (PR #84), TASK-023 (PR #85), TASK-024 (PR #86), BUG-028 (PR #87, ISS-016), TASK-028 (PR #88), TASK-029 (PR #89), BUG-029 (PR #90). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B4's close, 2026-10-25 (demonstration passed; the installed conformance check, run by the supervisor signed in to gh, 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-014 completed, ISS-015 recorded; Feedback FB-042 to FB-050; least confident in HARDENING; Project Summary patched)
+ Open issues: ISS-016 fixed by BUG-028 (a review-guard test recorded CPython's POSIX subprocess wait as the guard's sleep, failing PR #86's Linux job once, 2026-10-26). ISS-015 mitigated (stage B4's review ran seven rounds under the owner's decided three-round ceiling, which no program held yet, 2026-10-25; the ceiling applied by hand until TASK-030 and TASK-032 to TASK-035 hold it). ISS-014 fixed (the loop guard's cron_next missed a one-shot wake-up in the hour clocks repeat, 2026-10-25; BUG-020, PR #73). ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged; the plan check's rule is TASK-033's). ISS-012 fixed. ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; TASK-029's thirty-minute wait: a launcher run started from the Bash tool waited 34 min 49 s in the slot and reached slot taken, no outside kill (recorded 2026-10-26); the maintainer's record shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002) but the proposal, due at that point. Earlier: docs/archive/STATUS_HISTORY.md.
+ Bridge version: 2026.10.25a
+diff --git a/docs/archive/STATUS_HISTORY.md b/docs/archive/STATUS_HISTORY.md
+index 114de98..58e99c3 100644
+--- a/docs/archive/STATUS_HISTORY.md
++++ b/docs/archive/STATUS_HISTORY.md
+@@ -17,3 +17,5 @@ Maintainer requests, the part moved out at BUG-028 (2026-10-26): Earlier: the pa
+ Last accepted, the part moved out at TASK-028 (2026-10-26): before it TASK-024 (PR #86): calibration aware of conditional workflows, the program half of R-027 and the calibration half of R-033 (the conformance check reports a line naming an unwritten workflow, an unwritten trait, and an unclassified project past intake); before it TASK-023 (PR #85), the text half; before it HOTFIX-002 (PR #84): hotfix 2026.10.25a (release/2026.10.11's c0822c0, PR #83) carried onto main and the project calibrated to it
+ 
+ Last accepted, the part moved out at TASK-029 (2026-10-26): before it BUG-028 (PR #87): the review-guard test fixture records the guard's own sleeps only, so Linux CI no longer fails at random on the lagging-head test (ISS-016)
++
++Last accepted, the part moved out at BUG-029 (2026-10-26): before it TASK-028 (PR #88): windowless launches enforced by the launcher (the driver kind for mutation runs, every launch with CREATE_NO_WINDOW) and the suite's frozen default shipped as windowless-default.snapshot.md, with the conformance floor `Windowless test suite`
+diff --git a/handoff/BUG-029-report.md b/handoff/BUG-029-report.md
+new file mode 100644
+index 0000000..46ebc6e
+--- /dev/null
++++ b/handoff/BUG-029-report.md
+@@ -0,0 +1,139 @@
++# BUG-029 report
++
++## Files changed
++
++- `bridge/cursor-bridge/bridge-run.py`
++- `handoff/BUG-029-report.md`
++
++## Summary
++
++BUG-029 is fixed in `bridge-run.py` by adding `is_agent_argv` so only bare `AGENT_NAMES` tokens count as the agent, teaching `head_of` to strip a single trailing `.exe` or `.cmd`, reordering `acquire_heavy_slot` so the holder record is published before the `slot taken` line, and routing every agent check through `is_agent_argv` including `resolve`.
++
++Cause 1: acceptance and `resolve` now share `is_agent_argv`, so a command is only treated as the agent when `argv[0]` is an exact bare name that `resolve` replaces with the real launcher. Cause 2: `publish_holder_record` runs before stderr prints `bridge-run: slot taken`, so waiters that react to that line see the current holder.
++
++## `is_agent_argv` call sites
++
++- `kind_of`
++- `design_ceiling`
++- `head_text`
++- `workspace_of`
++- `review_family_refusal`
++- `resolve`
++- `main` (key-file refusal and review-only refusal)
++
++## Verification
++
++### 1. Before change: `python -m pytest tests/test_bug029_agent_name.py -q -p no:cacheprovider`
++
++```text
++=========================== short test summary info ===========================
++FAILED tests/test_bug029_agent_name.py::test_bug029_head_of_strips_one_trailing_suffix
++FAILED tests/test_bug029_agent_name.py::test_bug029_only_the_exact_agent_names_are_the_agent
++FAILED tests/test_bug029_agent_name.py::test_bug029_resolve_swaps_in_the_agent_for_an_exact_name_only
++FAILED tests/test_bug029_agent_name.py::test_bug029_a_doubled_suffix_never_runs_as_the_agent[review]
++FAILED tests/test_bug029_agent_name.py::test_bug029_a_doubled_suffix_never_runs_as_the_agent[None]
++FAILED tests/test_bug029_agent_name.py::test_bug029_record_published_before_the_slot_taken_line
++6 failed in 0.70s
++```
++
++### 2. After change: `python -m pytest tests/test_bug029_agent_name.py -q -p no:cacheprovider`
++
++```text
++6 passed in 0.33s
++```
++
++### 3. `python -m pytest tests/test_bridge_run.py tests/test_bridge_run_slot.py tests/test_bridge_run_driver.py -q`
++
++```text
++132 passed, 3 skipped in 133.69s (0:02:13)
++```
++
++### 4. `python -m pytest tests -q`
++
++```text
++39 failed, 2388 passed, 38 skipped, 9 errors in 539.87s (0:08:59)
++```
++
++Install-stamp failures (MANIFEST.json not regenerated (expected)):
++
++- `tests/test_core_carve.py::test_r003_the_modules_install_from_the_manifest`
++- `tests/test_install_check.py::test_install_into_a_fresh_target_passes_the_check`
++- `tests/test_install_check.py::test_the_check_reports_a_missing_or_damaged_agent_home`
++- `tests/test_install_check.py::test_install_over_owner_settings_keeps_them_and_backs_up`
++- `tests/test_install_check.py::test_shim_is_installed_where_the_cli_lives_with_a_backup`
++- `tests/test_install_check.py::test_check_reports_missing_bridge_entry_and_ignores_owner_keys`
++- `tests/test_install_check.py::test_check_reports_a_hook_that_runs_a_bridge_program_which_is_not_installed`
++- `tests/test_install_check.py::test_dry_run_writes_nothing`
++- `tests/test_install_check.py::test_programs_survive_a_character_the_console_lacks`
++- `tests/test_install_check.py::test_the_source_tree_is_checked_against_its_manifest_only`
++- `tests/test_install_check.py::test_a_checkout_is_installed_only_as_main_as_merged`
++- `tests/test_install_check_a4.py::test_a_checkout_without_a_readable_origin_main_is_refused`
++- `tests/test_install_check_a4.py::test_pythons_cache_folder_is_not_an_uncommitted_change`
++- `tests/test_install_check_a4.py::test_a_release_that_could_not_be_taken_back_is_not_installed`
++- `tests/test_rollback.py::test_rollback_restores_the_previous_shim`
++- `tests/test_rollback.py::test_a_file_changed_on_this_computer_is_named_when_kept_and_the_way_back_refuses_it`
++- `tests/test_rollback.py::test_installing_an_older_release_over_a_newer_one_takes_the_newer_entries_out`
++- `tests/test_rollback.py::test_a_program_an_owner_hook_runs_is_not_removed`
++- `tests/test_rollback.py::test_settings_of_an_unexpected_shape_are_refused_before_anything_changes`
++- `tests/test_rollback.py::test_a_file_that_cannot_be_written_ends_in_a_sentence_and_the_run_can_be_repeated`
++- `tests/test_rollback.py::test_an_interrupted_replacement_never_leaves_a_hook_without_its_program[write_settings-older over newer]`
++- `tests/test_rollback.py::test_an_interrupted_replacement_never_leaves_a_hook_without_its_program[write_settings-newer over older]`
++- `tests/test_rollback.py::test_an_interrupted_replacement_never_leaves_a_hook_without_its_program[remove_files-older over newer]`
++- `tests/test_rollback.py::test_an_interrupted_replacement_never_leaves_a_hook_without_its_program[remove_files-newer over older]`
++- `tests/test_rollback.py::test_an_interrupted_replacement_never_leaves_a_hook_without_its_program[copy_tree-older over newer]`
++- `tests/test_rollback.py::test_an_interrupted_replacement_never_leaves_a_hook_without_its_program[copy_tree-newer over older]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[1-older over newer]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[1-newer over older]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[40-older over newer]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[40-newer over older]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[98-older over newer]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[98-newer over older]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[99-older over newer]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[99-newer over older]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[140-older over newer]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[140-newer over older]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[196-older over newer]`
++- `tests/test_rollback.py::test_an_install_killed_at_the_nth_copied_file_can_be_repeated[196-newer over older]`
++- `tests/test_rollback.py::test_a_rollback_killed_part_way_is_finished_with_the_release_folders_installer`
++
++The nine errors in the full run are the same manifest/install-stamp class (no separate defect reported).
++
++### 5. Mutation check (code restored after each; `git diff` empty of mutation residue)
++
++1. `head_of` strips `.exe` and `.cmd` everywhere again. Caught by `test_bug029_head_of_strips_one_trailing_suffix`. Summary: `1 failed, 21 passed in 14.68s`.
++2. `is_agent_argv` uses basename only (no path refusal). Caught by `test_bug029_only_the_exact_agent_names_are_the_agent` and `test_bug029_resolve_swaps_in_the_agent_for_an_exact_name_only`. Summary: `2 failed, 20 passed in 14.78s`.
++3. Holder record published after the `slot taken` line again. Caught by `test_bug029_record_published_before_the_slot_taken_line`. Summary: `1 failed, 21 passed in 28.37s`.
++4. `resolve` uses `head_of(argv) == "cursor-agent"` instead of `is_agent_argv`. Caught by `test_bug029_resolve_swaps_in_the_agent_for_an_exact_name_only`. Summary: `1 failed, 21 passed in 14.43s`.
++
++Post-restore re-runs: `6 passed in 0.33s` (BUG-029 file); `132 passed, 3 skipped in 133.69s` (launcher suites).
++
++### 6. `python tools/dump-cli.py --check`
++
++(no output; exit 0)
++
++### 7. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge/bridge-run.py`
++
++```text
++windowless-check: 1 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++### 8. `git diff -- bridge/cursor-bridge/bridge-run.py`
++
++Diff adds `is_agent_argv`, fixes `head_of` to one trailing suffix, switches listed call sites to `is_agent_argv`, and moves `slot taken` after `publish_holder_record`. Lines 1–88 unchanged.
++
++### 9. `git status --porcelain`
++
++```text
++ M bridge/cursor-bridge/bridge-run.py
++?? handoff/BUG-029-report.md
++```
++
++### 10. Leftover processes: `tasklist //FI "IMAGENAME eq python.exe"`
++
++One `python.exe` (PID 29704, ~24 MB) was listed at check time; it was not tied to a specific test subprocess from this run.
++
++## Assumed, not verified
++
++- `os.path.dirname(argv[0])` is empty on every platform for the three bare agent names the tests use · the brief names directory separators and drive prefixes but does not define every edge token · a POSIX-only argv such as a lone drive-relative name was not exercised here.
++- After `publish_holder_record`'s `os.replace`, another process reading the holder file on the `slot taken` line sees the new record · the reproduction test reads the file in the same process at stderr write time · cross-process visibility on all OS file systems was not measured separately.
++- The nine errors in the full pytest run are manifest/install-stamp only · only failed test ids were classified from the summary list · error tracebacks were not re-opened one by one.
+diff --git a/handoff/BUG-029.md b/handoff/BUG-029.md
+new file mode 100644
+index 0000000..ffe0341
+--- /dev/null
++++ b/handoff/BUG-029.md
+@@ -0,0 +1,208 @@
++# BUG-029: the launcher knows cursor-agent by one exact name, and a holder's record is published before its `slot taken` line
++
++## Objective
++
++Fix the following confirmed defect — repair the named cause, nothing else. There are two causes. Both live in `bridge/cursor-bridge/bridge-run.py`, and both are fixed in this one brief because they edit the same file.
++
++**Cause 1, in one sentence.** `head_of` strips `.exe` and `.cmd` wherever they stand in a name, so `kind_of` and `accepted` treat a file named `cursor-agent.exe.cmd` as the agent, while `resolve` swaps in the real agent only for an exact basename in `AGENT_NAMES`; such a file is therefore allowed and runs as itself through `cmd.exe`, without the stripped environment (`is_agent` False), and, when labelled `--kind review`, without the slot. A cursor-agent given by a path (`C:/x/cursor-agent`, `./cursor-agent`) is accepted by its basename, and `resolve` silently swaps the real agent in for it.
++
++**Cause 2, in one sentence.** `acquire_heavy_slot` writes `bridge-run: slot taken <time>Z` first, and only then reads this process's creation time and publishes the holder record, so a waiter that polls in between reads the previous holder's record, or none, and says `held by unknown`; at scale 1 its next waiting line comes a minute later.
++
++**Evidence (from the code and docs on this branch, `fix/BUG-029`, cut from `origin/main` after TASK-029 merged as PR #89).**
++- `bridge-run.py:145-146`: `return os.path.basename(argv[0]).lower().replace(".exe", "").replace(".cmd", "") if argv else ""`.
++- `bridge-run.py:1130`, in `resolve`: `if os.path.basename(argv[0]).lower() in AGENT_NAMES:`, where `AGENT_NAMES = ("cursor-agent", "cursor-agent.cmd", "cursor-agent.exe")` (:104).
++- `bridge-run.py:932-945`, in `acquire_heavy_slot`: the line `sys.stderr.write("bridge-run: slot taken %s\n" % taken)` (:935) and its `flush` (:936) come before `created = process_creation_epoch(os.getpid())` (:937) and `publish_holder_record(...)` (:941-944).
++- `docs/HARDENING.md`, "### TASK-029 (round 3's reviews ...)", the entry "Taken next, as BUG-029: `head_of` strips `.exe` and `.cmd` anywhere in a name" (the security audit, round 3, advisory 1). It predates TASK-029.
++- `docs/HARDENING.md`, "### TASK-029 (round 4's reviews ...)", the entry "`slot taken` is printed before the record is published" ("taken with BUG-029, which edits the same file").
++
++**The reproduction tests.** They are the supervisor's, in `tests/test_bug029_agent_name.py`, which is in the working tree and committed with this brief. All six fail today, and all six must pass after your fix:
++- `test_bug029_head_of_strips_one_trailing_suffix`
++- `test_bug029_resolve_swaps_in_the_agent_for_an_exact_name_only`
++- `test_bug029_only_the_exact_agent_names_are_the_agent`
++- `test_bug029_a_doubled_suffix_never_runs_as_the_agent[review]`
++- `test_bug029_a_doubled_suffix_never_runs_as_the_agent[None]`
++- `test_bug029_record_published_before_the_slot_taken_line`
++
++Repairs, no new requirement: R-040 ("a builder run, a test suite and a mutation run each hold one machine-wide slot in the launcher ... a second heavy run waits for it, saying what it waits for"), whose waiting line must name the holder; and the launcher's allow list as its module docstring states it ("only the commands the loop runs through it, each by name: `cursor-agent …` ...; anything else is refused with exit 125").
++
++## Scope
++
++One brief carries one increment's scope; work that needs a second scope is a second brief, never a second section here.
++
++Files you may create or modify:
++- bridge/cursor-bridge/bridge-run.py
++- docs/BUILDER_NOTES.md
++- handoff/BUG-029-report.md
++
++Do not modify anything else.
++
++## Out of scope
++
++- .env and anything under secrets/
++- CI configuration (`.github/`, `.githooks/`)
++- docs/ and handoff/, except the files the Scope section names.
++- Every test file. You edit none, and you may not add, rename, skip or mark any test. This covers in particular `tests/test_bug029_agent_name.py` (the reproduction tests), `tests/test_bridge_run.py`, `tests/test_bridge_run_slot.py`, `tests/test_bridge_run_driver.py`, `tests/test_loop_guard.py` and `tests/conftest.py`.
++- `bridge/cursor-bridge/MANIFEST.json`. The supervisor regenerates it after your run. Do not run `tools/make-manifest.py`. Do not run `python tools/dump-cli.py` without `--check`, because without it the script writes files.
++- `bridge/cursor-bridge/loop-guard.py`, `bridge_env.py`, `bridge-stop.py`, `VERSION` and every other file under `bridge/`.
++- The module docstring of `bridge-run.py`, lines 1-88, ending with the closing `"""` at line 88. It is frozen: leave it byte-for-byte unchanged. I read it against this fix and no sentence becomes false. "each by name: `cursor-agent …`" already says the agent is known by its name, "anything else is refused with exit 125" covers the newly refused names, and the slot paragraph (lines 69-76) states no order between the `slot taken` line and the record. So the command reference stays current.
++- The interpreter and runner rules for every name other than the agent's: `python_interpreter_ok` (:185-192), `own_venv_python` (:177-182), `test_suite`'s path rule (:321-322), `named_suite`, `ESCAPE_OPTIONS`, and the `gh pr checks` watch. A path-qualified `gh` is accepted today by its basename, and it stays as it is (see Context).
++- Every other item in `docs/HARDENING.md` under the four "TASK-029 (round N's reviews ...)" headings: the `--kind review` builder, the double close, the record's validation guard, the Windows record link, the record left after a refusal, the interpreter checked by name, and the rest. Do none of them.
++- Any message text, constant (`AGENT_NAMES` included), exit code, default or duration.
++
++## Context
++
++**What your report is checked against.** In TASK-029 a builder's report claimed mutant kills that the supervisor's driver then disproved, and it repeated its first runs' figures as its re-runs' figures. The supervisor and both reviewers re-run every command in your report and check every claim against their own run. Report only what you ran, and quote pytest's own output for it.
++
++**Development data.** The inventory's decision, copied verbatim: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". The tests run the Workspace's `bridge/cursor-bridge/bridge-run.py` by file path. The autouse fixture `home_of_the_tests` in `tests/conftest.py` gives every test a fresh temporary `HOME` and `USERPROFILE`, so the slot's lock and record are the tests' own `<home>/.cursor-bridge/heavy.lock` and `heavy.lock.holder`. You must never read, create or lock the owner's real `~/.cursor-bridge/` files, and never touch the real `~/.claude`. Any launcher run you make outside pytest does three things: it sets `HOME` and `USERPROFILE` to a temporary folder you created for it, it uses a temporary launch folder rather than the Workspace, and it never names the real agent. The real agent's exact names (`cursor-agent`, `cursor-agent.cmd`, `cursor-agent.exe`) make `resolve` start the installed Cursor CLI, so never start the real cursor-agent in any by-hand check.
++
++**Security context.** ASVS level 2 (`docs/INVENTORY.md`, Decisions). `.cursor/rules/secure-coding.mdc` and `.cursor/rules/workspace-boundary.mdc` are in force for you. The trust boundary is the command handed to the launcher, `argv[0]` in particular, together with the files that name reaches. On Windows, `resolve` looks the name up with `shutil.which`, which searches the launch folder before `PATH`, and it runs a `.cmd` or `.bat` it finds through `cmd.exe`. Any program of the owner's account can place a file with any name there. The launcher's allow list is what keeps such a file from running unseen. The cursor-agent arm matters most, because an agent run gets the stripped environment (`bridge_env.stripped_env()`, KP-032) and a builder run gets the slot. A name the launcher accepts as the agent must therefore be one that `resolve` replaces with the real agent, and nothing else.
++
++**The code as it stands (bridge/cursor-bridge/bridge-run.py on branch fix/BUG-029; I checked each line number against the file).**
++- `AGENT_NAMES = ("cursor-agent", "cursor-agent.cmd", "cursor-agent.exe")` :104.
++- `def head_of(argv):` :145-146 (quoted under Evidence).
++- `def kind_of(argv):` :338-347 begins `head = head_of(argv)` / `if head == "cursor-agent": return "builder"`.
++- `def accepted(argv, folder=None):` :350-356: `if kind_of(argv) is not None and (kind_of(argv) != "test" or test_suite(argv, folder)): return True`, otherwise `return os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1"`.
++- `def resolve(argv):` :1128-1142, docstring `"""Return (argv to start, is_agent)."""`. For a name in `AGENT_NAMES` it calls `bridge_env.cursor_agent_launcher()` and returns `launcher + argv[1:], True`. Otherwise, on Windows, it uses `shutil.which(argv[0]) or argv[0]` and wraps a `.cmd`/`.bat` in `["cmd.exe", "/d", "/c", found]`.
++- The other places that ask whether a command is the agent all compare `head_of(...)` with `"cursor-agent"`:
++  - `design_ceiling` :478
++  - `head_text` :571
++  - `workspace_of` :987
++  - `review_family_refusal` :1022
++  - the key-file refusal in `main` :1226
++  - the review-only refusal in `main` :1283
++- The other callers of `head_of` use it for runner names:
++  - `python_interpreter_ok` :189
++  - `named_suite` :305
++  - `test_suite` :318
++  - the driver's log head in `main` :1259
++- `main` :1201. For every kind but `driver`, it refuses at :1223-1225 when `not accepted(cmd, folder)`, writing `bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, ...` and returning 125. This is the refusal the reproduction test expects, and it comes before the kind is read. So a doubled-suffix name labelled `--kind review` meets it too.
++- `acquire_heavy_slot(kind, run_id, limit, scale)` :902-972. The `if got_lock:` arm is :932-945. `taken` (:934) is both the `slot taken` line's time and the record's `"start"`. `tests/test_bridge_run_slot.py:729-731` matches a waiter's `since` against that line's time, so the two must stay the same value.
++
++**Path-qualified runners other than the agent: not affected.** I checked this.
++- `head_of` still returns the basename with one suffix removed, so `C:/py/python.exe` reads as `python` (pinned by `test_bug029_head_of_strips_one_trailing_suffix`).
++- A path-qualified python is accepted only as the project's own `.venv` interpreter. `python_interpreter_ok` :190-191 calls `own_venv_python` :177-182, and `test_suite` :321-322 enforces the rule for every suite. This fix leaves both unchanged. `tests/test_bridge_run.py:106` pins the `.venv` python as accepted.
++- `C:/py/python.exe -m pytest` is refused today, not accepted, and it stays refused. The same code refuses it, and `tests/test_bridge_run.py:108` pins `C:/anywhere/python.exe -m pytest` as refused. `tests/test_bridge_run.py:99` pins `./tools/pytest` and `C:/x/pytest.exe` as refused.
++- A path-qualified `gh ... pr checks` is accepted today by its basename. It is out of scope here, and it stays as it is.
++
++**A side effect of the one-suffix `head_of`, intended.** A doubled-suffix runner name such as `pytest.exe.cmd` read as `pytest` today, so it was accepted and ran through `cmd.exe`. After the fix it reads as `pytest.exe`, which is no known command, so it is refused like any unknown command. No existing test uses such a name.
++
++**loop-guard.py: out of scope, and why it may stay as it is.** `loop-guard.py` has its own reading of a command's kind. `WAKE_PATTERNS` (:58-63) holds `\bcursor-agent\b` and `bridge-run\.py`. `launch_kind` (:352-355) falls back to `"builder"` whenever the text `cursor-agent` appears and no `--kind` is given. So it calls `cursor-agent.exe.cmd` and `C:/x/cursor-agent` a builder, and `heavy_launch_extra` (:372-378) then adds the heavy slot wait to how long that background launch counts as a wake source. This only decides whether the session may end. It starts nothing and lets nothing run. After this fix the launcher refuses such a command at once with exit 125, so the background task ends and its notification wakes the session. The wider count never comes into play. Leave `loop-guard.py` untouched.
++
++**The docstrings of the reproduction tests are the requirements they enforce.** Quoted verbatim:
++- `test_bug029_head_of_strips_one_trailing_suffix`: "BUG-029 (handoff/BUG-029.md, the exact name): head_of strips one trailing .exe or .cmd only, so the other runners' names read as before and a doubled suffix is not the agent." It asserts `C:/py/python.exe` -> `python`, `npx.cmd` -> `npx`, `gh.exe` -> `gh`, the three agent names -> `cursor-agent`, and `cursor-agent.exe.cmd` and `cursor-agent.cmd.exe` -> not `cursor-agent`.
++- `test_bug029_only_the_exact_agent_names_are_the_agent`: "BUG-029 (handoff/BUG-029.md, the exact name; a cursor-agent given by path refused): the agent is one of cursor-agent, cursor-agent.cmd and cursor-agent.exe, bare; a doubled suffix or a path is not accepted as it." It asserts that `cursor-agent`, `cursor-agent.cmd`, `cursor-agent.exe` and `Cursor-Agent.CMD` are `kind_of` `builder` and `accepted`. It asserts that `cursor-agent.exe.cmd`, `cursor-agent.cmd.cmd` and `cursor-agent.exe.exe` are `kind_of` `None` and not `accepted`. It asserts that `<tmp>/cursor-agent`, `<tmp>/cursor-agent.cmd`, `./cursor-agent`, `C:/tools/cursor-agent.exe` and `sub\cursor-agent` are not `accepted`. All of this runs with `BRIDGE_RUN_ALLOW_ANY` unset.
++- `test_bug029_a_doubled_suffix_never_runs_as_the_agent[review]` and `[None]`: "BUG-029 (handoff/BUG-029.md; docs/HARDENING.md, TASK-029 round 3, the security audit's advisory 1): a file named cursor-agent.exe.cmd on PATH, launched as `--kind review` or with no kind, is refused (125, the launcher's refusal of an unknown command) and never runs; today it passes as the agent and runs as itself." It asserts exit 125, the text `bridge-run: refused - the launcher runs only cursor-agent` on stderr, and no marker file.
++- `test_bug029_resolve_swaps_in_the_agent_for_an_exact_name_only`: "BUG-029 (handoff/BUG-029.md, the exact name in resolve): resolve puts the stripped agent launcher in place only for a bare exact agent name; a doubled suffix or a path keeps its own argv[0] and is not the agent." With `bridge_env.cursor_agent_launcher` replaced by a stand-in, `resolve` must return the stand-in and `is_agent` true for `cursor-agent`, `Cursor-Agent.CMD` and `cursor-agent.exe`, and `is_agent` false, the stand-in absent, for `cursor-agent.exe.cmd`, a path ending in `cursor-agent` and `./cursor-agent`.
++- `test_bug029_record_published_before_the_slot_taken_line`: "BUG-029 (handoff/BUG-029.md, the record before the line; docs/HARDENING.md, TASK-029 round 4): when a launcher takes the slot, its holder record already names it when its `slot taken` line is written, so a waiter started on that line reads it." It calls `acquire_heavy_slot("test", "2026-10-26T12:00:00Z", 60, 1.0)` in-process on a free slot and reads the record at the moment the line is written.
++
++**The tests that pass today and must keep passing.** Every test in `tests/test_bridge_run.py` must keep passing. Lines 89-113 cover the suites by name and the path rules, and lines 300-307 cover `resolve` swapping the real launcher in for a bare `cursor-agent`. Every test in `tests/test_bridge_run_slot.py` and `tests/test_bridge_run_driver.py`, and the rest of the suite, must keep passing too. No existing test launches a cursor-agent given by a path.
++
++## Diagrams
++
++None. A fix brief implements no diagram element.
++
++## Requirements
++
++1. **One exact test of the agent's name.** A command is the agent when its `argv[0]`, the whole token compared ignoring case, equals one of `AGENT_NAMES`. A name with any directory part (either separator, or a drive prefix) never is the agent, and neither is a doubled suffix.
++   - One implementation of this test answers the question everywhere the file asks whether a command is the agent:
++     - `kind_of`'s `builder` arm, and through it `accepted`;
++     - `resolve`'s swap;
++     - every comparison listed in Context: `design_ceiling` :478, `head_text` :571, `workspace_of` :987, `review_family_refusal` :1022, and the refusals at :1226 and :1283.
++   - No second copy of the rule may remain.
++   - For the three exact names, in any case, everything behaves as today:
++     - `kind_of` returns `builder`;
++     - `accepted` returns `True`;
++     - `resolve` returns the real launcher and `True`;
++     - the log's `head` is `cursor-agent`.
++2. **`head_of` strips one trailing `.exe` or `.cmd` only.** It still lowercases the basename. `python.exe` reads `python`, `npx.cmd` reads `npx`, `gh.exe` reads `gh`, and `C:/py/python.exe` reads `python`, all as today. `cursor-agent.exe.cmd` reads `cursor-agent.exe`, and `cursor-agent.cmd.exe` reads `cursor-agent.cmd`.
++3. **A doubled-suffix name or a path-qualified cursor-agent is refused as an unknown command.** With `BRIDGE_RUN_ALLOW_ANY` unset, `accepted()` returns `False` for both, whatever `--kind` says. `main` then refuses them through its existing branch :1223-1225: exit 125, with the existing text that begins `bridge-run: refused - the launcher runs only cursor-agent`. The command never starts. Add no new refusal text.
++4. **The record before the line.** In `acquire_heavy_slot`'s `got_lock` arm, do these three steps first:
++   - read this process's creation time;
++   - when that time cannot be read, write the existing note `bridge-run: note - could not read this process creation time for the slot holder record`;
++   - publish the holder record.
++   Only after them, write and flush the `bridge-run: slot taken <taken>` line. The line's text, the record's fields, `taken` (one value for both the line and the record's `start`), `waited`, the return value and every other path of the function stay unchanged.
++5. **Nothing else changes.** The following stay exactly as they are:
++   - the module docstring (lines 1-88);
++   - `AGENT_NAMES`;
++   - every message and exit code;
++   - the interpreter and runner rules for other names (Out of scope);
++   - the `BRIDGE_RUN_ALLOW_ANY=1` exemption.
++   Add no dependency and no launch.
++
++## Acceptance criteria
++
++- [ ] `python -m pytest tests/test_bug029_agent_name.py -q -p no:cacheprovider` reports 6 passed. The report quotes that summary line, and also the failures the same command printed before your change.
++- [ ] `python -m pytest tests/test_bridge_run.py tests/test_bridge_run_slot.py tests/test_bridge_run_driver.py -q` passes. The report quotes its summary line.
++- [ ] `python -m pytest tests -q` passes, except the install-stamp tests. Those tests compare the files under `bridge/` with `bridge/cursor-bridge/MANIFEST.json`, so they fail on `bridge-run.py`'s new hash until the supervisor regenerates the manifest. Report each such failure by its test id as "MANIFEST.json not regenerated (expected)", not as a defect. Any other failure is a defect.
++- [ ] The named causes are addressed at their mechanisms:
++  - The agent is recognised by one exact-name test, and `resolve` uses that same test. A name the launcher accepts as the agent is therefore always one that `resolve` replaces with the real agent.
++  - `head_of` no longer strips a suffix that is not trailing.
++  - The holder record is on disk before the `slot taken` line reaches stderr.
++- [ ] `git diff -- bridge/cursor-bridge/bridge-run.py` holds Requirements 1-4 and nothing else, and lines 1-88 are byte-for-byte unchanged.
++- [ ] `python tools/dump-cli.py --check` passes (the command reference stays current).
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge/bridge-run.py` prints `0 FAIL`.
++- [ ] `git status --porcelain` shows no changed or new file other than `bridge/cursor-bridge/bridge-run.py`, `docs/BUILDER_NOTES.md` and `handoff/BUG-029-report.md`. `tests/test_bug029_agent_name.py` is committed with this brief, so it no longer shows as untracked.
++
++## Constraints
++
++- Do not fix by suppressing the symptom. That rules out a retry, a broad `try/except`, a widened tolerance, an added `sleep`, a special case for the one name the test uses, and a null-check that hides a wrong value.
++- Do not edit the reproduction tests or any other test. If a test cannot pass without editing it, or it contradicts this brief, stop, leave the tree as it is, and report the test, its failure and why.
++- Do not leave any `DEBUG-BUG-` line or stray print.
++- **If you believe the real cause is different from the one named, stop, do not change code, and report why in your summary.** The supervisor will re-diagnose.
++- Do not add dependencies. The program text is ASCII only, as the program says.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it, and everything you produce goes inside it. The only exceptions are temporary folders: pytest's `tmp_path` and `home_of_the_tests`, and, for a by-hand launcher run, a temporary home, launch folder and stub folder that you create and remove.
++- If the brief, the rules or the tooling got in your way, append one dated line describing it to `docs/BUILDER_NOTES.md`. That covers an instruction that contradicted another, a check that fired wrongly, or a step that cost time for no reason. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall, such as a cause you found or a platform quirk that cost you a round: one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item. One paragraph is one line, and line breaks come only between blocks.
++- This fix talks to no external service. Never start the real cursor-agent. The tests use a `.cmd` or shell stub named `cursor-agent.exe.cmd`, which is not an agent name.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms). Capturing output does not prevent the window. This fix adds no launch and no `windowless: visible-ok` exemption.
++- Never start a server, a watcher or a daemon that outlives a test. Start no process other than the tests and a by-hand launcher run that you wait for to its end.
++- Do not refactor code outside Requirements 1-4, even if it looks wrong. Report it instead.
++- Never run the product, a migration, a seed or a test against the owner's live data. Never run the launcher with the Workspace (or any real project) as its working folder. Never read, create or lock the real `~/.cursor-bridge/heavy.lock` or `heavy.lock.holder`, and never touch the real `~/.claude`. Any launcher run you make outside pytest sets `HOME` and `USERPROFILE` to a temporary folder.
++- No value in this fix is marked as the owner's. The figures used (exit 125, the refusal text, `AGENT_NAMES`) are the existing code's.
++- Follow the file's existing conventions: the `bridge-run: ` line prefix, refusal texts as they stand, lower-cased name comparison.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff`, `git show` and `git log` only.
++- No number is parsed in this fix.
++- An increment that starts a process meets every point of this checklist:
++  - the process is windowless;
++  - it is stopped in a `finally` or a fixture's teardown, and its whole tree with it;
++  - nothing it started outlives the test or the command;
++  - its output pipes are closed or drained.
++  The tests already meet it, and your code adds no process.
++- Prefer reuse over new code (`AGENT_NAMES`, the existing refusal branch, the existing note and `publish_holder_record`), and write the minimum that meets the acceptance criteria. This never overrides a security requirement stated above.
++- **Mutation check, by hand, in your own run.** Once the fix passes, apply each mutant below to `bridge-run.py` in place, one at a time. For each one:
++  - run `python -m pytest tests/test_bug029_agent_name.py tests/test_bridge_run.py -q -p no:cacheprovider`;
++  - restore the fixed code exactly;
++  - confirm with `git diff` that it is restored.
++  Write no mutation script, and leave nothing of it in the diff. The supervisor's driver runs after your run. For each mutant, report what you changed, which test cases caught it (or that none did), and pytest's summary line.
++  1. `head_of` back to stripping `.exe` and `.cmd` everywhere in the name. Expected: `test_bug029_head_of_strips_one_trailing_suffix` fails.
++  2. The path refusal removed: the agent test compares the basename instead of the whole `argv[0]`. Expected: `test_bug029_only_the_exact_agent_names_are_the_agent` fails on the path cases.
++  3. The record published after the `slot taken` line again, as today. Expected: `test_bug029_record_published_before_the_slot_taken_line` fails.
++  4. `resolve` testing a stripped name (`head_of(argv) == "cursor-agent"`) instead of the exact-name test. Expected: `test_bug029_resolve_swaps_in_the_agent_for_an_exact_name_only` fails.
++- **Verification commands.** Run each one from the Workspace folder (the folder you were started in), in this order:
++  1. Before your change, run this once: `python -m pytest tests/test_bug029_agent_name.py -q -p no:cacheprovider`. Expected: 6 failed.
++  2. After your change, run the same command. Expected: 6 passed.
++  3. The launcher's own files: `python -m pytest tests/test_bridge_run.py tests/test_bridge_run_slot.py tests/test_bridge_run_driver.py -q`
++  4. The full suite: `python -m pytest tests -q`. It takes about ten minutes. Let it finish; do not stop it early. The install-stamp failures are explained under Acceptance criteria.
++  5. The mutation check above. Once the code is restored, run commands 2 and 3 again.
++  6. The command reference: `python tools/dump-cli.py --check`. Run only this form.
++  7. The windowless check: `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge/bridge-run.py`
++  8. The diff: `git diff -- bridge/cursor-bridge/bridge-run.py`. Read it whole, and confirm it holds Requirements 1-4 and nothing else.
++  9. The tree: `git status --porcelain`
++  10. After the runs, on Windows: `tasklist /FI "IMAGENAME eq python.exe"`. Say whether any process the tests started is still running.
++
++## Done
++
++Your report is the file `handoff/BUG-029-report.md`. Write it as you go: what you did, what you changed, what you ran and what it printed, and what you could not do. That way nothing of it is lost if your run ends early. Never paste a computer path or a user name into it. Write `<temporary folder>`, `<home>` or `<Workspace>` instead.
++
++State only what you ran. For every run you report, quote pytest's own output as it printed it, at least the summary line. Do not round, summarise or reconstruct a figure. The supervisor and both reviewers re-run every command and check every claim, and a claim they cannot reproduce rejects the round.
++
++When you finish, the report holds:
++- a list of every file you changed, and only those (`git status` tells you);
++- a one-paragraph summary of what you did;
++- one sentence on how the change addresses each named cause: why an accepted agent name is now always one that `resolve` swaps, and why the record is on disk before the line;
++- the list of every place that now uses the one agent-name test, by function name;
++- the quoted output of each verification command, the install-stamp failures listed by test id, and the leftover-process check;
++- the mutation list: each mutant, what caught it or that nothing did, and pytest's summary line, plus confirmation that the code was restored;
++- a section headed exactly `Assumed, not verified`. List every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: that no caller outside `bridge-run.py` reads `head_of`'s value for a doubled-suffix name; that `publish_holder_record`'s `os.replace` is visible to another process's open before the line is written; that a POSIX run of the reproduction tests behaves as the Windows one. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_bridge_run_slot.py b/tests/test_bridge_run_slot.py
+index da329b4..33bc561 100644
+--- a/tests/test_bridge_run_slot.py
++++ b/tests/test_bridge_run_slot.py
+@@ -716,7 +716,7 @@ def test_r040_two_heavy_runs_serialize_commands(tmp_path):
+         br = load_br()
+         holder_path = br.heavy_state_paths(env)[1]
+         rid1 = head1[0].split("started ", 1)[1]
+-        # precondition: p1's record is published and live before p2 starts (it follows the slot-taken line)
++        # precondition: p1's record is published and live before p2 starts (since BUG-029 it precedes the slot-taken line; the wait stays as a guard)
+         assert wait_until(lambda: (br.read_holder_record(holder_path) or {}).get("run_id") == rid1)
+         p2 = popen_bridge(b, env, "--limit", "30", "--", sys.executable, "-c",
+                           "import time; open('s2','w').write(repr(time.time()))")
+@@ -754,7 +754,7 @@ def test_r040_holder_that_waited_publishes_slot_taken_start(tmp_path):
+         kill_tree(holder)
+         taken = read_until(l1, "bridge-run: slot taken ")[-1].split("slot taken ", 1)[1]
+         assert taken != started
+-        # the record is published after the slot-taken line: start the third launcher once it names l1
++        # start the third launcher once the record names l1 (published before the slot-taken line since BUG-029)
+         rec = lock_path_of(env) + ".holder"
+ 
+         def names_l1():
+diff --git a/tests/test_bug029_agent_name.py b/tests/test_bug029_agent_name.py
+new file mode 100644
+index 0000000..42f6140
+--- /dev/null
++++ b/tests/test_bug029_agent_name.py
+@@ -0,0 +1,132 @@
++"""BUG-029: the launcher knows cursor-agent by one exact name, and a holder's record is published before its
++slot-taken line (handoff/BUG-029.md; docs/HARDENING.md, TASK-029 rounds 3 and 4). The supervisor's tests."""
++import importlib.util
++import json
++import os
++import subprocess
++import sys
++
++import pytest
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "bridge-run.py")
++
++
++def load_br():
++    spec = importlib.util.spec_from_file_location("bridge_run_bug029", PROG)
++    mod = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(mod)
++    return mod
++
++
++@pytest.fixture
++def br(monkeypatch):
++    monkeypatch.delenv("BRIDGE_RUN_ALLOW_ANY", raising=False)
++    return load_br()
++
++
++def test_bug029_head_of_strips_one_trailing_suffix(br):
++    """BUG-029 (handoff/BUG-029.md, the exact name): head_of strips one trailing .exe or .cmd only, so the
++    other runners' names read as before and a doubled suffix is not the agent."""
++    assert br.head_of(["C:/py/python.exe", "-m", "pytest"]) == "python"
++    assert br.head_of(["npx.cmd", "vitest"]) == "npx"
++    assert br.head_of(["gh.exe", "pr", "checks", "1"]) == "gh"
++    assert br.head_of(["cursor-agent"]) == "cursor-agent"
++    assert br.head_of(["cursor-agent.cmd"]) == "cursor-agent"
++    assert br.head_of(["cursor-agent.exe"]) == "cursor-agent"
++    assert br.head_of(["cursor-agent.exe.cmd"]) != "cursor-agent"
++    assert br.head_of(["cursor-agent.cmd.exe"]) != "cursor-agent"
++
++
++def test_bug029_only_the_exact_agent_names_are_the_agent(br, tmp_path):
++    """BUG-029 (handoff/BUG-029.md, the exact name; a cursor-agent given by path refused): the agent is one of
++    cursor-agent, cursor-agent.cmd and cursor-agent.exe, bare; a doubled suffix or a path is not accepted as it."""
++    for name in ("cursor-agent", "cursor-agent.cmd", "cursor-agent.exe", "Cursor-Agent.CMD"):
++        assert br.kind_of([name, "-p"]) == "builder", name   # precondition: the real names stay the agent
++        assert br.accepted([name, "-p"]), name
++    for name in ("cursor-agent.exe.cmd", "cursor-agent.cmd.cmd", "cursor-agent.exe.exe"):
++        assert br.kind_of([name, "-p"]) is None, name
++        assert not br.accepted([name, "-p"]), name
++    for path in (str(tmp_path / "cursor-agent"), str(tmp_path / "cursor-agent.cmd"), "./cursor-agent",
++                 "C:/tools/cursor-agent.exe", "sub\\cursor-agent"):
++        assert not br.accepted([path, "-p"]), path
++
++
++def test_bug029_resolve_swaps_in_the_agent_for_an_exact_name_only(br, monkeypatch, tmp_path):
++    """BUG-029 (handoff/BUG-029.md, the exact name in resolve): resolve puts the stripped agent launcher in place
++    only for a bare exact agent name; a doubled suffix or a path keeps its own argv[0] and is not the agent."""
++    monkeypatch.setattr(br.bridge_env, "cursor_agent_launcher", lambda: ["cmd.exe", "/d", "/c", "X:/cursor-agent.cmd"])
++    for name in ("cursor-agent", "Cursor-Agent.CMD", "cursor-agent.exe"):
++        argv, is_agent = br.resolve([name, "-p"])
++        assert is_agent and argv[:4] == ["cmd.exe", "/d", "/c", "X:/cursor-agent.cmd"], name   # precondition
++    for name in ("cursor-agent.exe.cmd", str(tmp_path / "cursor-agent"), "./cursor-agent"):
++        argv, is_agent = br.resolve([name, "-p"])
++        assert not is_agent, name
++        assert "X:/cursor-agent.cmd" not in argv, name
++
++
++def _stub(folder, name, marker):
++    stub = folder / name
++    if sys.platform == "win32":
++        stub.write_text('@echo off\r\necho ran> "%s"\r\n' % marker, encoding="ascii")
++    else:
++        stub.write_text('#!/bin/sh\necho ran > "%s"\n' % marker, encoding="ascii")
++        stub.chmod(0o755)
++    return stub
++
++
++@pytest.mark.parametrize("kind", ["review", None])
++def test_bug029_a_doubled_suffix_never_runs_as_the_agent(tmp_path, kind):
++    """BUG-029 (handoff/BUG-029.md; docs/HARDENING.md, TASK-029 round 3, the security audit's advisory 1): a
++    file named cursor-agent.exe.cmd on PATH, launched as `--kind review` or with no kind, is refused (125, the
++    launcher's refusal of an unknown command) and never runs; today it passes as the agent and runs as itself."""
++    bin_dir = tmp_path / "bin"
++    bin_dir.mkdir()
++    marker = tmp_path / "ran.txt"
++    stub = _stub(bin_dir, "cursor-agent.exe.cmd", marker)
++    # precondition: the stand-in runs when started directly, so its marker's absence below means it never ran
++    direct = ["cmd.exe", "/d", "/c", str(stub)] if sys.platform == "win32" else [str(stub)]
++    subprocess.run(direct, capture_output=True, timeout=30)
++    assert marker.read_text(encoding="ascii").strip() == "ran"
++    marker.unlink()
++    root = tmp_path / "launch"
++    (root / "run").mkdir(parents=True)
++    env = dict(os.environ)
++    env.pop("BRIDGE_RUN_ALLOW_ANY", None)
++    env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
++    flags = ["--limit", "30"] + (["--kind", kind] if kind else [])
++    p = subprocess.run([sys.executable, PROG] + flags + ["--", "cursor-agent.exe.cmd", "-p", "--force", "--model",
++                                                         "grok-4.7-medium", "x"],
++                       cwd=str(root), env=env, capture_output=True, text=True, timeout=60)
++    assert p.returncode == 125, p.stderr
++    assert "bridge-run: refused - the launcher runs only cursor-agent" in p.stderr
++    assert not marker.exists()
++
++
++def test_bug029_record_published_before_the_slot_taken_line(br, monkeypatch):
++    """BUG-029 (handoff/BUG-029.md, the record before the line; docs/HARDENING.md, TASK-029 round 4): when a
++    launcher takes the slot, its holder record already names it when its `slot taken` line is written, so a
++    waiter started on that line reads it."""
++    _, holder_path = br.heavy_state_paths()
++    seen = {}
++
++    class Err(object):
++        def write(self, text):
++            if text.startswith("bridge-run: slot taken "):
++                try:
++                    with open(holder_path, encoding="utf-8") as f:
++                        seen["run_id"] = json.loads(f.read()).get("run_id")
++                except (OSError, ValueError):
++                    seen["run_id"] = None
++
++        def flush(self):
++            pass
++
++    monkeypatch.setattr(sys, "stderr", Err())
++    result = br.acquire_heavy_slot("test", "2026-10-26T12:00:00Z", 60, 1.0)
++    monkeypatch.undo()
++    assert isinstance(result, tuple), result               # precondition: the free slot was taken
++    br._unlock_byte(result[0])
++    os.close(result[0])
++    assert "run_id" in seen, "no slot-taken line was written"
++    assert seen["run_id"] == "2026-10-26T12:00:00Z"
