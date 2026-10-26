@@ -137,6 +137,12 @@ def tree_bytes(ws):
     return out
 
 
+def cache_last_outcome(ws, run_id):
+    cache = ws / "run/supervisor/mutation-cache" / ("%s.jsonl" % run_id)
+    lines = [json.loads(ln) for ln in cache.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    return lines[-1]["outcome"] if lines else None
+
+
 def basic_mutant(kill=True):
     new = "assert add(1, 1) == 99" if kill else "assert add(1, 1) == 2"
     return {
@@ -290,6 +296,7 @@ def test_r041_done_c_test_file_change_reruns(tmp_path):
     git(ws, "add", "tests/test_calc.py")
     p = run_mr(ws, mp)
     assert "run=1" in p.stdout and "cached" in p.stdout
+    assert cache_last_outcome(ws, "tf") == "killed"
 
 
 def test_r041_done_c_conftest_change_reruns(tmp_path):
@@ -301,6 +308,7 @@ def test_r041_done_c_conftest_change_reruns(tmp_path):
     git(ws, "add", "tests/conftest.py")
     p = run_mr(ws, mp)
     assert "run=1" in p.stdout
+    assert cache_last_outcome(ws, "cf") == "killed"
 
 
 def test_r041_done_c_sibling_change_reruns(tmp_path):
@@ -322,6 +330,7 @@ def test_r041_done_c_sibling_change_reruns(tmp_path):
     git(ws, "add", "demo/other.py")
     p = run_mr(ws, mp)
     assert "run=1" in p.stdout
+    assert cache_last_outcome(ws, "sib") == "killed"
 
 
 def test_r041_done_c_pytest_ini_reruns(tmp_path):
@@ -335,6 +344,7 @@ def test_r041_done_c_pytest_ini_reruns(tmp_path):
     git(ws, "add", "pytest.ini")
     p = run_mr(ws, mp)
     assert "run=1" in p.stdout
+    assert cache_last_outcome(ws, "ini") == "killed"
 
 
 def test_r041_done_c_expect_fail_change_reruns(tmp_path):
@@ -361,6 +371,7 @@ def test_r041_done_c_survive_flag_change_reruns(tmp_path):
     mutants_path(ws, "sv", data)
     p = run_mr(ws, mp)
     assert "run=1" in p.stdout
+    assert cache_last_outcome(ws, "sv") == "killed"
 
 
 def test_r041_survived_reruns_every_time(tmp_path):
@@ -511,6 +522,7 @@ def test_r041_all_reruns(tmp_path):
     mp = _seed(ws, "all")
     p = run_mr(ws, mp, extra=["--all"])
     assert "run=1" in p.stdout
+    assert cache_last_outcome(ws, "all") == "killed"
 
 
 def test_r041_not_applied_exit_1(tmp_path):
@@ -1052,6 +1064,7 @@ def test_r041_parent_conftest_change_reruns(tmp_path):
     git(ws, "add", "tests/conftest.py")
     p2 = run_mr(ws, mp)
     assert "run=1" in p2.stdout
+    assert cache_last_outcome(ws, "ucf") == "killed"
     n2 = len([l for l in cache.read_text(encoding="utf-8").splitlines() if l.strip()])
     assert n2 == n1 + 1
 
@@ -1170,3 +1183,105 @@ def test_calc():
     p = run_mr(ws, mp)
     assert p.returncode == 3
     assert "se: error" in p.stdout
+
+
+def test_r041_extract_archive_tar_well_formed(tmp_path):
+    """R-041, TASK-031-r4 B5: a well-formed git-archive-style tar extracts under the copy root."""
+    import io
+    import tarfile
+    mod = load_program("mutation-run")
+    dest = tmp_path / "tree"
+    dest.mkdir()
+    bio = io.BytesIO()
+    with tarfile.open(fileobj=bio, mode="w") as tf:
+        data = b"payload\n"
+        ti = tarfile.TarInfo("demo/calc.py")
+        ti.size = len(data)
+        tf.addfile(ti, io.BytesIO(data))
+    mod.extract_archive_tar(bio.getvalue(), str(dest))
+    assert (dest / "demo" / "calc.py").read_bytes() == b"payload\n"
+
+
+@pytest.mark.parametrize("member_name", [
+    "/etc/passwd",
+    "demo/../../escape.txt",
+    "bad\\name.txt",
+    "bad:name.txt",
+])
+def test_r041_extract_archive_tar_refuses_bad_member(tmp_path, member_name):
+    """R-041, TASK-031-r4 B5: unsafe archive member names are refused with exit 2."""
+    import io
+    import tarfile
+    mod = load_program("mutation-run")
+    dest = tmp_path / "tree"
+    dest.mkdir()
+    bio = io.BytesIO()
+    with tarfile.open(fileobj=bio, mode="w") as tf:
+        ti = tarfile.TarInfo(member_name)
+        ti.size = 0
+        tf.addfile(ti, io.BytesIO(b""))
+    with pytest.raises(mod.Refuse):
+        mod.extract_archive_tar(bio.getvalue(), str(dest))
+
+
+def test_r041_extract_archive_tar_refuses_non_file(tmp_path):
+    """R-041, TASK-031-r4 B5: archive members that are neither files nor directories are refused."""
+    import io
+    import tarfile
+    mod = load_program("mutation-run")
+    dest = tmp_path / "tree"
+    dest.mkdir()
+    bio = io.BytesIO()
+    with tarfile.open(fileobj=bio, mode="w") as tf:
+        ti = tarfile.TarInfo("weird")
+        ti.type = tarfile.LNKTYPE
+        ti.size = 0
+        tf.addfile(ti)
+    with pytest.raises(mod.Refuse):
+        mod.extract_archive_tar(bio.getvalue(), str(dest))
+
+
+def test_r041_grandchild_holding_pipes_times_out(tmp_path):
+    """R-041, TASK-031-r4: a grandchild that inherits pytest's pipes cannot hold the run past the mutant bound."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "tests/test_pipe_hold.py", textwrap.dedent("""
+import subprocess
+import sys
+import time
+
+_holder = None
+
+
+def test_hold_pipes():
+    global _holder
+    _holder = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(3600)"],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
+    while True:
+        time.sleep(0.2)
+
+
+def teardown_module():
+    global _holder
+    if _holder is not None and _holder.poll() is None:
+        _holder.kill()
+        _holder.wait(timeout=10)
+"""))
+    git(ws, "add", "tests/test_pipe_hold.py")
+    body = {"mutants": [{
+        "id": "pipe", "file": "tests/test_pipe_hold.py",
+        "pairs": [{"old": "time.sleep(0.2)", "new": "time.sleep(0.2)"}],
+        "tests": ["tests/test_pipe_hold.py"],
+        "expect_fail": ["tests/test_pipe_hold.py::test_hold_pipes"],
+    }]}
+    mp = mutants_path(ws, "pipe", body)
+    git(ws, "add", "run/supervisor/pipe-mutants.json")
+    t0 = time.time()
+    p = run_mr(ws, mp, timeout=5)
+    elapsed = time.time() - t0
+    assert elapsed < 5 + 60, "run exceeded bound plus 60 s"
+    assert p.returncode == 3
+    assert "pipe: error (timed out)" in p.stdout
