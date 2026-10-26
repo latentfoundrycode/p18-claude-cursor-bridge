@@ -30,6 +30,11 @@ What it checks, with the file it reads (the 0b review corrected several of these
     ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program
     writes the record yet), and it is MISSING while docs/BOUNDARY_VIOLATIONS.md, its log of
     absolute paths, is not gitignored (FB-031);
+  - the windowless pytest default (R-039, FIX-001 snapshot in windowless-default.snapshot.md):
+    pytest.ini, then pyproject.toml's [tool.pytest.ini_options], then setup.cfg's [tool:pytest],
+    else tests/test_*.py; test roots from testpaths inside the Workspace or tests/, dropping any
+    root reached through a link; each root's conftest.py (or the rootdir's conftest.py) must hold
+    windowless_kwargs, Popen.__init__ and CREATE_NO_WINDOW
   - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for
     a root requirements.txt (direct pins alone are not a lock; KP-018);
   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,
@@ -69,16 +74,46 @@ What it checks, with the file it reads (the 0b review corrected several of these
 Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
 ASCII-only on purpose (cp1252 consoles). Never writes.
 """
+import configparser
 import datetime
 import glob
 import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
+import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+
+def _load_bridge_env():
+    path = os.path.join(HERE, "bridge_env.py")
+    if os.path.isfile(path):
+        spec = importlib.util.spec_from_file_location("bridge_env", path)
+        if spec is None or spec.loader is None:
+            raise ImportError("bridge_env.py has no loader")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    import types
+    mod = types.ModuleType("bridge_env")
+
+    def is_link(link_path):
+        try:
+            st = os.lstat(link_path)
+        except OSError:
+            return False
+        return os.path.islink(link_path) or bool(getattr(st, "st_reparse_tag", 0))
+
+    mod.is_link = is_link
+    return mod
+
+
+bridge_env = _load_bridge_env()
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 SECRET_NAME = re.compile(r"(TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|API_?KEY)", re.I)
 LOCAL_SERVICE = re.compile(r"^(POSTGRES|PG|MYSQL|MARIADB|MONGO|REDIS|MINIO|RABBITMQ|CLICKHOUSE|ELASTIC|OPENSEARCH|NEO4J|DB|DATABASE|LOCAL|DEV|TEST)[A-Z0-9_]*(PASSWORD|PASSWD|PASS|SECRET)$", re.I)
@@ -95,12 +130,302 @@ ABSOLUTE_PATH = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]|/Users/|/home/")   #
 NEGATED_ENV = re.compile(r"\b(?:never|not|no longer|nor|no)\b(?:(?!\bbut\b|\binstead\b)[^|.;,]){0,40}?\benv(?:ironment)?[ _-]?var\w*", re.I)   # "never an environment variable the owner sets"
 
 
+WINDOWLESS_TOKENS = ("windowless_kwargs", "Popen.__init__", "CREATE_NO_WINDOW")
+WINDOWLESS_MISSING = ("copy windowless-default.snapshot.md into conftest.py (see "
+                      "Cursor-Project-Configuration.md, windowless-default); need "
+                      "windowless_kwargs, Popen.__init__ and CREATE_NO_WINDOW")
+NODE_RUNNERS = (("vitest", "vitest"), ("jest", "jest"), ("playwright", "playwright"), ("node --test", "node --test"))
+
+
 def read(path):
     try:
         with open(path, encoding="utf-8-sig", errors="replace") as f:
             return f.read()
     except OSError:
         return None
+
+
+def _conftest_windowless_ok(path):
+    text = read(path)
+    return text is not None and all(t in text for t in WINDOWLESS_TOKENS)
+
+
+def _testpaths_list(raw):
+    if isinstance(raw, str):
+        return [p.strip() for p in re.split(r"[\s,]+", raw.strip()) if p.strip()]
+    if isinstance(raw, list) and all(isinstance(x, str) for x in raw):
+        return [p.strip() for p in raw if p.strip()]
+    return None
+
+
+def _read_ini_testpaths(text, section, option):
+    try:
+        cp = configparser.RawConfigParser()
+        cp.read_string(text)
+        if cp.has_option(section, option):
+            return _testpaths_list(cp.get(section, option))
+    except configparser.Error:
+        return "parse_error"
+    return None
+
+
+def _read_pyproject_pytest(text):
+    try:
+        data = tomllib.loads(text)
+    except (ValueError, UnicodeDecodeError, tomllib.TOMLDecodeError, RecursionError):
+        return "parse_error", None
+    tool = data.get("tool")
+    if not isinstance(tool, dict):
+        return None, None
+    pytest = tool.get("pytest")
+    if not isinstance(pytest, dict):
+        return None, None
+    if "ini_options" not in pytest:
+        return None, None
+    opts = pytest.get("ini_options")
+    if not isinstance(opts, dict):
+        return None, None
+    tp = opts.get("testpaths")
+    if tp is None:
+        return "table", None
+    listed = _testpaths_list(tp)
+    return "table", listed if listed is not None else None
+
+
+def _pytest_active_testpaths(ws):
+    """(parse_notes, testpaths): notes in file-order; paths before inside-workspace filtering."""
+    notes = []
+    ini = os.path.join(ws, "pytest.ini")
+    if os.path.isfile(ini):
+        text = read(ini)
+        if text is None:
+            notes.append("pytest.ini could not be parsed; judged as if it held no pytest settings")
+            return notes, ["tests"]
+        tp = _read_ini_testpaths(text, "pytest", "testpaths")
+        if tp == "parse_error":
+            notes.append("pytest.ini could not be parsed; judged as if it held no pytest settings")
+            return notes, ["tests"]
+        return notes, tp if tp is not None else ["tests"]
+    toml_path = os.path.join(ws, "pyproject.toml")
+    if os.path.isfile(toml_path):
+        text = read(toml_path)
+        if text is None:
+            notes.append("pyproject.toml could not be parsed; judged as if it held no pytest settings")
+        else:
+            kind, tp = _read_pyproject_pytest(text)
+            if kind == "parse_error":
+                notes.append("pyproject.toml could not be parsed; judged as if it held no pytest settings")
+            elif kind == "table":
+                return notes, tp if tp is not None else ["tests"]
+    cfg = os.path.join(ws, "setup.cfg")
+    if os.path.isfile(cfg):
+        text = read(cfg)
+        if text is None:
+            notes.append("setup.cfg could not be parsed; judged as if it held no pytest settings")
+        else:
+            tp = _read_ini_testpaths(text, "tool:pytest", "testpaths")
+            if tp == "parse_error":
+                notes.append("setup.cfg could not be parsed; judged as if it held no pytest settings")
+            else:
+                try:
+                    cp = configparser.RawConfigParser()
+                    cp.read_string(text)
+                    if cp.has_section("tool:pytest"):
+                        return notes, tp if tp is not None else ["tests"]
+                except configparser.Error:
+                    notes.append("setup.cfg could not be parsed; judged as if it held no pytest settings")
+    return notes, ["tests"]
+
+
+def _ws_walk_component_ok(path):
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        return True
+    except (OSError, ValueError):
+        return False
+    try:
+        return not bridge_env.is_link(path)
+    except (OSError, ValueError):
+        return False
+
+
+def _testpath_entry_has_dotdot(entry):
+    return ".." in [p for p in re.split(r"[/\\]", entry) if p]
+
+
+def _test_root_path_ok(ws, entry):
+    if not _path_inside_workspace(entry, ws):
+        return False
+    ws_abs = os.path.abspath(ws)
+    target = os.path.normpath(entry if os.path.isabs(entry) else os.path.join(ws_abs, entry))
+    try:
+        rel = os.path.relpath(target, ws_abs)
+    except (ValueError, RecursionError):
+        return False
+    if rel.startswith(".."):
+        return False
+    current = ws_abs
+    for part in [p for p in rel.split(os.sep) if p]:
+        current = os.path.join(current, part)
+        if not _ws_walk_component_ok(current):
+            return False
+    return _ws_walk_component_ok(os.path.join(current, "conftest.py"))
+
+
+def _tests_dir_listable(ws):
+    tests = os.path.join(ws, "tests")
+    try:
+        os.lstat(tests)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+    if bridge_env.is_link(tests):
+        return False
+    if not os.path.isdir(tests):
+        return False
+    return True
+
+
+def _pytest_suite_seen(ws):
+    if os.path.isfile(os.path.join(ws, "pytest.ini")):
+        return True
+    toml_path = os.path.join(ws, "pyproject.toml")
+    if os.path.isfile(toml_path):
+        text = read(toml_path)
+        if text is not None:
+            kind, _ = _read_pyproject_pytest(text)
+            if kind == "table":
+                return True
+    cfg = os.path.join(ws, "setup.cfg")
+    if os.path.isfile(cfg):
+        text = read(cfg)
+        if text is not None:
+            try:
+                cp = configparser.RawConfigParser()
+                cp.read_string(text)
+                if cp.has_section("tool:pytest"):
+                    return True
+            except configparser.Error:
+                pass
+    if _tests_dir_listable(ws):
+        tests = os.path.join(ws, "tests")
+        try:
+            names = os.listdir(tests)
+        except OSError:
+            names = []
+        for name in names:
+            if name.startswith("test_") and name.endswith(".py"):
+                return True
+    return False
+
+
+def _path_inside_workspace(entry, ws):
+    ws_abs = os.path.abspath(ws)
+    target = os.path.normpath(entry if os.path.isabs(entry) else os.path.join(ws_abs, entry))
+    if os.path.splitdrive(target)[0].lower() != os.path.splitdrive(ws_abs)[0].lower():
+        return False
+    try:
+        return os.path.normcase(os.path.commonpath([target, ws_abs])) == os.path.normcase(ws_abs)
+    except ValueError:
+        return False
+
+
+def _pytest_test_roots(ws):
+    notes, raw = _pytest_active_testpaths(ws)
+    kept = [p for p in raw if not _testpath_entry_has_dotdot(p) and _test_root_path_ok(ws, p)]
+    if kept:
+        return notes, kept
+    if _test_root_path_ok(ws, "tests"):
+        return notes, ["tests"]
+    return notes, ["tests"]
+
+
+def _package_json_scripts(ws):
+    pkg_path = os.path.join(ws, "package.json")
+    if not os.path.isfile(pkg_path):
+        return None
+    try:
+        data = json.loads(read(pkg_path) or "{}")
+    except (ValueError, RecursionError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    scripts = data.get("scripts")
+    if not isinstance(scripts, dict):
+        return None
+    script = scripts.get("test")
+    if not isinstance(script, str):
+        return None
+    return script
+
+
+_BACKSLASH_HOLD = "\x1f"
+
+
+def _split_script_words(script):
+    try:
+        protected = script.replace("\\", _BACKSLASH_HOLD)
+        words = shlex.split(protected, posix=True)
+        return [w.replace(_BACKSLASH_HOLD, "\\") for w in words]
+    except ValueError:
+        return script.split()
+
+
+def _script_runner_word(script):
+    for word in _split_script_words(script):
+        if "=" in word or word.startswith("-"):
+            continue
+        if "/" in word or "\\" in word:
+            base = re.split(r"[/\\]", word)[-1]
+            if not base:
+                continue
+            return base
+        return word
+    return None
+
+
+def _load_escape_field():
+    checker = os.path.join(os.path.dirname(os.path.realpath(__file__)), "workflow-check.py")
+    previous_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec = importlib.util.spec_from_file_location("workflow_check_escape", checker)
+        if spec is None or spec.loader is None:
+            return None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.escape_field
+    except (Exception, SystemExit):
+        return None
+    finally:
+        sys.dont_write_bytecode = previous_bytecode
+
+
+def _node_test_runner(ws):
+    script = _package_json_scripts(ws)
+    if not script:
+        return None
+    for needle, label in NODE_RUNNERS:
+        if needle in script:
+            return label
+    return None
+
+
+def _rel_forward(path, ws):
+    try:
+        rel = os.path.relpath(path, ws).replace("\\", "/")
+    except ValueError:
+        return None
+    if ".." in rel.split("/"):
+        return None
+    return rel
+
+
+def _root_conftest_counts(ws):
+    root_conftest = os.path.join(ws, "conftest.py")
+    return _ws_walk_component_ok(root_conftest) and os.path.isfile(root_conftest)
 
 
 def resolve_workspace(path):
@@ -577,6 +902,69 @@ def main():
             add("MISSING", "Boundary log ignored", "%s is not in .gitignore: the hook's log holds this computer's absolute paths, which a commit would publish (FB-031, rule 54)" % BOUNDARY_LOG)
     windowless = "windowless-check" in hooks or os.path.isfile(os.path.join(ws, ".cursor", "hooks", "windowless-check.py"))
     add("OK" if windowless else "MISSING", "Windowless check", "" if windowless else "no windowless-check in the hooks; rule 24 puts it in the pre-commit gate")
+
+    floor_rows = []
+    try:
+        pytest_seen = _pytest_suite_seen(ws)
+        node_runner = _node_test_runner(ws)
+        parse_notes, roots = _pytest_test_roots(ws)
+        for note in parse_notes:
+            floor_rows.append(("NOTE", "Windowless test suite", note))
+        if pytest_seen:
+            root_conftest = os.path.join(ws, "conftest.py")
+            ok_path = None
+            if _root_conftest_counts(ws) and _conftest_windowless_ok(root_conftest):
+                ok_path = root_conftest
+            else:
+                all_ok = True
+                for rel in roots:
+                    if not _test_root_path_ok(ws, rel):
+                        all_ok = False
+                        break
+                    cpath = os.path.join(ws, rel, "conftest.py")
+                    if not os.path.isfile(cpath) or not _conftest_windowless_ok(cpath):
+                        all_ok = False
+                        break
+                if all_ok and roots:
+                    ok_path = os.path.join(ws, roots[0], "conftest.py")
+            rel_ok = ok_path and _rel_forward(ok_path, ws)
+            if rel_ok:
+                escape_field = _load_escape_field()
+                if escape_field is not None:
+                    rel_display = escape_field(rel_ok)
+                elif all(ord(c) < 128 and c.isprintable() for c in rel_ok):
+                    rel_display = rel_ok
+                else:
+                    rel_display = "a test root's conftest.py"
+                floor_rows.append(("OK", "Windowless test suite (%s)" % rel_display, ""))
+            else:
+                floor_rows.append(("MISSING", "Windowless test suite", WINDOWLESS_MISSING))
+        if node_runner:
+            floor_rows.append(("NOTE", "Windowless test suite",
+                "%s: release B ships no default for this runner (INVENTORY, Deferred); use detached: false (KP-059)" % node_runner))
+        if not pytest_seen and not node_runner:
+            script = _package_json_scripts(ws)
+            if script:
+                word = _script_runner_word(script)
+                if word == "echo":
+                    detail = ("no test runner is configured (the package.json test script starts with echo)")
+                elif word:
+                    escape_field = _load_escape_field()
+                    if escape_field is None:
+                        detail = ("the package.json test script names a runner release B ships no default for "
+                                  "(INVENTORY, Deferred); use detached: false (KP-059)")
+                    else:
+                        detail = ("%s: release B ships no default for this runner (INVENTORY, Deferred); "
+                                  "use detached: false (KP-059)" % escape_field(word))
+                else:
+                    detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
+            else:
+                detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
+            floor_rows.append(("NOTE", "Windowless test suite", detail))
+    except Exception as e:
+        floor_rows = [("NOTE", "Windowless test suite", "the floor could not be judged (%s)" % type(e).__name__)]
+    for verdict, floor, detail in floor_rows:
+        add(verdict, floor, detail)
 
     # --- lockfiles
     if os.path.isfile(os.path.join(ws, "package.json")):

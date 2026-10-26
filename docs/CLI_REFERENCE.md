@@ -172,11 +172,15 @@ when it is installed in the project (`node_modules/.bin/`), and `--key-file` is 
 `cursor-agent` (a key must never reach the builder); anything else is refused with exit 125,
 so the launcher's allow rule cannot become a way to run arbitrary commands unseen. A
 benchmark or a runner the launcher does not know runs directly in the background, marked
-`# wake`. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers through it.
+`# wake`. `--kind driver` accepts only `python <program> [args]` where the program is a `.py`
+file under `run/supervisor/` of the launch folder (no link on the path) or
+`~/.claude/cursor-bridge/mutation-run.py`; interpreter options before the program (`-c`,
+`-m`, `py -3`) are refused. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers
+through it (driver commands are never exempt).
 
 Ceilings (release A2, plan 10.3): every run is logged to `run/launcher/runs.jsonl` under the
 folder the launcher is started in (kind, limit, seconds, exit; never the prompt). `--limit
-auto` takes the kind's default (builder 7200, review 3600, watch 3600, test 1800) or, once a
+auto` takes the kind's default (builder 7200, driver 7200, review 3600, watch 3600, test 1800) or, once a
 HEALTHY run of that kind is on record, one and a half times the longest healthy run, never
 below the default and never above twice it unless `docs/RUN_PARAMETERS.md` carries the
 owner's words on a line `Ceiling above twice: <kind> <seconds> (<their words>, <date>)`. The
@@ -288,6 +292,11 @@ What it checks, with the file it reads (the 0b review corrected several of these
     ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program
     writes the record yet), and it is MISSING while docs/BOUNDARY_VIOLATIONS.md, its log of
     absolute paths, is not gitignored (FB-031);
+  - the windowless pytest default (R-039, FIX-001 snapshot in windowless-default.snapshot.md):
+    pytest.ini, then pyproject.toml's [tool.pytest.ini_options], then setup.cfg's [tool:pytest],
+    else tests/test_*.py; test roots from testpaths inside the Workspace or tests/, dropping any
+    root reached through a link; each root's conftest.py (or the rootdir's conftest.py) must hold
+    windowless_kwargs, Popen.__init__ and CREATE_NO_WINDOW
   - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for
     a root requirements.txt (direct pins alone are not a lock; KP-018);
   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,

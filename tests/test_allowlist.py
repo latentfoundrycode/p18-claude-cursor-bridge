@@ -141,6 +141,19 @@ def test_every_agent_run_goes_through_the_launcher_and_review_b_keeps_execution(
         assert "--force" in cmd and ("--limit auto --kind review" in cmd or "--limit 3600" in cmd), "%s: Review B runs with execution under its learned ceiling: %r" % (src, cmd)
 
 
+def test_r039_driver_launcher_rule_in_allow():
+    """R-039: settings.bridge.json allows bridge-run --kind driver."""
+    rule = "Bash(python ~/.claude/cursor-bridge/bridge-run.py --limit * --kind driver -- *)"
+    assert rule in ALLOW
+    for interpreter in ("python", "python3", "py", ".venv/Scripts/python.exe"):
+        cmd = ("python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- %s "
+               "run/supervisor/task028_mutants.py" % interpreter)
+        assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
+    cmd = ("python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python "
+           "~/.claude/cursor-bridge/mutation-run.py run/supervisor/TASK-028-mutants.json")
+    assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
+
+
 def test_the_digest_and_the_merge_step_show_the_same_review_b_form():
     """0b review, finding 4: the digest's Review B command carries the .err redirect the
     activity check reads the launch time from, so the consistency check covers it too."""
