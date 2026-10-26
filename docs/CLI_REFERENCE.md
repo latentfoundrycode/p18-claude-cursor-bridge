@@ -294,9 +294,9 @@ What it checks, with the file it reads (the 0b review corrected several of these
     absolute paths, is not gitignored (FB-031);
   - the windowless pytest default (R-039, FIX-001 snapshot in windowless-default.snapshot.md):
     pytest.ini, then pyproject.toml's [tool.pytest.ini_options], then setup.cfg's [tool:pytest],
-    else tests/test_*.py; test roots from testpaths inside the Workspace or tests/; each root's
-    conftest.py (or the rootdir's conftest.py) must hold windowless_kwargs, Popen.__init__ and
-    CREATE_NO_WINDOW
+    else tests/test_*.py; test roots from testpaths inside the Workspace or tests/, dropping any
+    root reached through a link; each root's conftest.py (or the rootdir's conftest.py) must hold
+    windowless_kwargs, Popen.__init__ and CREATE_NO_WINDOW
   - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for
     a root requirements.txt (direct pins alone are not a lock; KP-018);
   - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,

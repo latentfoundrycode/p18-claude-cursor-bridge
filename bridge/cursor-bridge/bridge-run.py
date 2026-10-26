@@ -146,7 +146,7 @@ def uv_run_pytest(argv):
             i += 1
             continue
         return argv[i] == "pytest"
-    return False
+    return any(":" in p for p in parts)
 
 
 def own_venv_python(path, folder=None):
@@ -177,10 +177,10 @@ def _mutation_run_path():
 
 def _program_abs(token, folder):
     if token.startswith("~/") or token.startswith("~\\"):
-        return os.path.normpath(os.path.join(os.path.expanduser("~"), token[2:].replace("\\", "/")))
+        return os.path.abspath(os.path.join(os.path.expanduser("~"), token[2:].replace("\\", "/")))
     if os.path.isabs(token):
-        return os.path.normpath(token)
-    return os.path.normpath(os.path.join(os.path.abspath(folder), token))
+        return os.path.abspath(token)
+    return os.path.abspath(os.path.join(os.path.abspath(folder), token))
 
 
 def _token_has_dotdot(token):
@@ -197,6 +197,14 @@ def _colon_in_path_after_drive(abs_path):
     return any(":" in p for p in parts)
 
 
+def _link_component_refused(path):
+    try:
+        os.lstat(path)
+    except OSError:
+        return True
+    return bridge_env.is_link(path)
+
+
 def _link_walk_ok(prog, base):
     rel = os.path.relpath(prog, base)
     if rel.startswith(".."):
@@ -204,7 +212,7 @@ def _link_walk_ok(prog, base):
     current = base
     for part in rel.split(os.sep):
         current = os.path.join(current, part)
-        if bridge_env.is_link(current):
+        if _link_component_refused(current):
             return False
     return True
 
@@ -217,6 +225,11 @@ def _supervisor_file_ok(prog, folder):
     if not (p == sup or p.startswith(sup + os.sep)):
         return False
     if not os.path.isfile(prog):
+        return False
+    try:
+        if os.stat(prog).st_nlink != 1:
+            return False
+    except OSError:
         return False
     return _link_walk_ok(prog, base)
 
@@ -239,9 +252,9 @@ def resolve_driver_program(argv, folder=None):
     if _colon_in_path_after_drive(prog):
         return None
     if _supervisor_file_ok(prog, folder):
-        return os.path.normpath(prog)
+        return os.path.abspath(prog)
     if _mutation_program_ok(program, folder):
-        return os.path.normpath(prog)
+        return os.path.abspath(prog)
     return None
 
 
@@ -254,7 +267,7 @@ def verify_driver_program_abs(abs_prog, folder):
     """Re-check (c)-(e) on the absolute program path already placed in the command to start."""
     if not abs_prog.endswith(".py"):
         return False
-    prog = os.path.normpath(abs_prog)
+    prog = os.path.abspath(abs_prog)
     if _colon_in_path_after_drive(prog):
         return False
     if _supervisor_file_ok(prog, folder):

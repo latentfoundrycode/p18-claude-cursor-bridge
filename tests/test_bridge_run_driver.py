@@ -218,12 +218,16 @@ def test_r039_refuse_dotdot_through_supervisor_link(br, tmp_path, allow_any):
     outside.mkdir()
     marker = outside / "marker.txt"
     (outside / "x.py").write_text("open(%r,'w').write('hit')\n" % str(marker).replace("\\", "\\\\"), encoding="utf-8")
+    marker2 = folder / "marker2.txt"
+    (folder / "run" / "supervisor" / "x.py").write_text(
+        "open(%r,'w').write('hit')\n" % str(marker2).replace("\\", "\\\\"), encoding="utf-8")
     _link_folder(folder / "run" / "supervisor" / "j", outside)
     p = run_driver(folder, "run/supervisor/j/../x.py", allow_any=allow_any)
     assert p.returncode == 125
     refuse_line(p.stderr)
     assert runs_of(folder) == []
     assert not marker.is_file()
+    assert not marker2.is_file()
 
 
 @pytest.mark.parametrize("allow_any", [False, True])
@@ -261,10 +265,23 @@ def test_r039_refuse_alternate_data_stream(br, tmp_path, allow_any):
     folder = launch_folder(tmp_path)
     base = folder / "run" / "supervisor" / "x.txt"
     base.write_text("data\n", encoding="utf-8")
+    marker = tmp_path / "ads_marker.txt"
+    stream_body = "open(%r,'w').write('hit')\n" % str(marker).replace("\\", "\\\\")
+    if sys.platform == "win32":
+        stream_path = str(base) + ":hidden.py"
+        try:
+            open(stream_path, "w", encoding="utf-8").write(stream_body)
+        except OSError:
+            pytest.skip("the temporary folder's file system has no alternate data streams")
+    else:
+        stream_path = str(folder / "run" / "supervisor" / "x.txt:hidden.py")
+        open(stream_path, "w", encoding="utf-8").write(stream_body)
+    assert os.path.isfile(stream_path)
     p = run_driver(folder, "run/supervisor/x.txt:hidden.py", allow_any=allow_any)
     assert p.returncode == 125
     refuse_line(p.stderr)
     assert runs_of(folder) == []
+    assert not marker.is_file()
 
 
 @pytest.mark.parametrize("allow_any", [False, True])
@@ -527,6 +544,57 @@ def test_r039_log_head_is_interpreter_only(tmp_path):
     run_driver(folder, str(prog))
     row = runs_of(folder)[-1]
     assert row["head"] == "python" and "supervisor" not in row["head"] and "task" not in row["head"]
+
+
+@pytest.mark.parametrize("allow_any", [False, True])
+def test_r039_refuse_hard_link_supervisor(br, tmp_path, allow_any):
+    """R-039: a hard link to an outside program under run/supervisor/ is refused."""
+    folder = launch_folder(tmp_path)
+    outside = tmp_path / "outside_hl.py"
+    marker = tmp_path / "hl_marker.txt"
+    outside.write_text("open(%r,'w').write('hit')\n" % str(marker).replace("\\", "\\\\"), encoding="utf-8")
+    link = folder / "run" / "supervisor" / "h.py"
+    try:
+        os.link(outside, link)
+    except (OSError, NotImplementedError, AttributeError):
+        pytest.skip("hard links are not supported here")
+    assert os.stat(link).st_nlink == 2
+    p = run_driver(folder, "run/supervisor/h.py", allow_any=allow_any)
+    assert p.returncode == 125
+    refuse_line(p.stderr)
+    assert runs_of(folder) == []
+    assert not marker.is_file()
+
+
+def test_r039_driver_link_walk_fail_closed_lstat(br, tmp_path, monkeypatch):
+    """R-039: os.lstat PermissionError on the program path refuses the driver."""
+    folder = launch_folder(tmp_path)
+    prog = folder / "run" / "supervisor" / "task.py"
+    _write_exit_script(prog, 0)
+    assert br.driver_accepted(["python", "run/supervisor/task.py"], str(folder)) is True
+    real_lstat = os.lstat
+
+    def lstat(path, *a, **k):
+        if os.path.normcase(path) == os.path.normcase(str(prog)):
+            raise PermissionError("denied")
+        return real_lstat(path, *a, **k)
+
+    monkeypatch.setattr(os, "lstat", lstat)
+    assert br.driver_accepted(["python", "run/supervisor/task.py"], str(folder)) is False
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="drive letters exist only on Windows")
+def test_r039_driver_rooted_token_gets_drive(tmp_path):
+    """R-039: a rooted program token is started with the launch folder's drive."""
+    folder = launch_folder(tmp_path)
+    prog = folder / "run" / "supervisor" / "task.py"
+    prog.write_text("import sys\nprint(sys.argv[0])\n", encoding="utf-8")
+    token = os.path.splitdrive(str(prog))[1]
+    p = run_driver(folder, token)
+    assert p.returncode == 0, p.stderr
+    printed = p.stdout.strip()
+    assert os.path.splitdrive(printed)[0]
+    assert os.path.normcase(printed) == os.path.normcase(str(prog))
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="console windows exist only on Windows")

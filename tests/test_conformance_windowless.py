@@ -1,4 +1,5 @@
 """R-039: conformance-check Windowless test suite floor and windowless-default snapshot."""
+import json
 import os
 import re
 import subprocess
@@ -7,7 +8,10 @@ from pathlib import Path
 
 import pytest
 
+from test_bridge_run_driver import _link_folder
+
 HERE = os.path.dirname(os.path.abspath(__file__))
+OUTSIDE_NAME = "outside_r5n8"
 PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "conformance-check.py")
 SNAPSHOT = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "windowless-default.snapshot.md")
 CONFTEST = os.path.join(HERE, "conftest.py")
@@ -406,3 +410,172 @@ def test_r039_bridge_workspace_ok():
     p = subprocess.run([sys.executable, PROG, WORKSPACE, "--offline"], capture_output=True, text=True, timeout=120)
     rows = row_for(p.stdout)
     assert rows == ["  OK       Windowless test suite (tests/conftest.py)"]
+
+
+def _outside(tmp_path):
+    d = tmp_path / OUTSIDE_NAME
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def test_r039_no_crash_nested_pyproject(tmp_path):
+    """R-039: deeply nested pyproject.toml RecursionError yields NOTE then MISSING."""
+    root = fixture_root(tmp_path)
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    (root / "pyproject.toml").write_text("a = " + "[" * 5000 + "]" * 5000, encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc < 2 and "Traceback" not in err
+    assert row_for(out + err) == [
+        "  NOTE     Windowless test suite  - pyproject.toml could not be parsed; judged as if it held no pytest settings",
+        MISSING_ROW,
+    ]
+
+
+def test_r039_no_crash_nested_package_json(tmp_path):
+    """R-039: deeply nested package.json RecursionError yields neither-seen NOTE."""
+    root = fixture_root(tmp_path)
+    (root / "package.json").write_text("[" * 100000 + "]" * 100000, encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc < 2 and "Traceback" not in err
+    assert row_for(out + err) == [NEITHER_NOTE]
+
+
+def test_r039_testpaths_through_link(tmp_path):
+    """R-039: testpaths pointing through a link does not read outside conftest."""
+    root = fixture_root(tmp_path)
+    outside = _outside(tmp_path)
+    (outside / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    _link_folder(root / "checks", outside)
+    (root / "pytest.ini").write_text("[pytest]\ntestpaths = checks\n", encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc == 1 and "Traceback" not in err
+    assert row_for(out + err) == [MISSING_ROW]
+    assert OUTSIDE_NAME not in out + err
+
+
+def test_r039_tests_link_with_config(tmp_path):
+    """R-039: linked tests/ with pytest.ini yields MISSING, not outside OK."""
+    root = fixture_root(tmp_path)
+    outside = _outside(tmp_path)
+    (outside / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    (outside / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    _link_folder(root / "tests", outside)
+    (root / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc == 1 and "Traceback" not in err
+    assert row_for(out + err) == [MISSING_ROW]
+    assert OUTSIDE_NAME not in out + err
+
+
+def test_r039_tests_link_no_config(tmp_path):
+    """R-039: linked tests/ without config yields neither-seen NOTE."""
+    root = fixture_root(tmp_path)
+    outside = _outside(tmp_path)
+    (outside / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    (outside / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    _link_folder(root / "tests", outside)
+    rc, out, err = run_check(tmp_path)
+    assert rc < 2 and "Traceback" not in err
+    assert row_for(out + err) == [NEITHER_NOTE]
+    assert OUTSIDE_NAME not in out + err
+
+
+def test_r039_root_conftest_symlink(tmp_path):
+    """R-039: root conftest.py symlink to outside is ignored for OK."""
+    root = fixture_root(tmp_path)
+    outside = _outside(tmp_path)
+    (outside / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    try:
+        os.symlink(outside / "conftest.py", root / "conftest.py")
+    except OSError:
+        pytest.skip("creating a file symbolic link needs a privilege here")
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc == 1 and "Traceback" not in err
+    assert row_for(out + err) == [MISSING_ROW]
+    assert OUTSIDE_NAME not in out + err
+
+
+def test_r039_testpaths_glob_literal(tmp_path):
+    """R-039: testpaths = tests/* is literal, not expanded."""
+    root = fixture_root(tmp_path)
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    (root / "tests" / "a").mkdir(parents=True)
+    (root / "tests" / "a" / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    (root / "pytest.ini").write_text("[pytest]\ntestpaths = tests/*\n", encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc == 1 and "Traceback" not in err
+    assert row_for(out + err) == [MISSING_ROW]
+
+
+@pytest.mark.parametrize("script,word,forbidden", [
+    (r"C:\Users\usr_q8w3\AppData\Roaming\npm\mocha.cmd tests", "mocha.cmd", "usr_q8w3"),
+    ("/home/usr_q8w3/bin/mocha tests", "mocha", "usr_q8w3"),
+])
+def test_r039_other_runner_path_basename(tmp_path, script, word, forbidden):
+    """R-039: path-like script words reduce to basename for the NOTE."""
+    root = fixture_root(tmp_path)
+    (root / "package.json").write_text('{"scripts":{"test":%s}}' % json.dumps(script), encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    combined = out + err
+    assert forbidden not in combined
+    assert row_for(combined) == [
+        "  NOTE     Windowless test suite  - %s: release B ships no default for this runner "
+        "(INVENTORY, Deferred); use detached: false (KP-059)" % word
+    ]
+
+
+def test_r039_other_runner_escape_control_chars(tmp_path):
+    """R-039: control characters in runner word are escape_field literals."""
+    root = fixture_root(tmp_path)
+    script = "\u001b]0;pwned\u0007mocha tests"
+    (root / "package.json").write_text('{"scripts":{"test":%s}}' % json.dumps(script), encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    combined = out + err
+    assert "\x1b" not in combined and "\x07" not in combined
+    assert row_for(combined) == [
+        "  NOTE     Windowless test suite  - \\x1b]0;pwned\\x07mocha: release B ships no default for this runner "
+        "(INVENTORY, Deferred); use detached: false (KP-059)"
+    ]
+
+
+def test_r039_other_runner_dash_option(tmp_path):
+    """R-039: --token=abc123 mocha tests names mocha."""
+    root = fixture_root(tmp_path)
+    (root / "package.json").write_text('{"scripts":{"test":"--token=abc123 mocha tests"}}', encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    combined = out + err
+    assert "abc123" not in combined
+    assert row_for(combined) == [
+        "  NOTE     Windowless test suite  - mocha: release B ships no default for this runner "
+        "(INVENTORY, Deferred); use detached: false (KP-059)"
+    ]
+
+
+def test_r039_other_runner_quoted_assignment(tmp_path):
+    """R-039: TOKEN=quoted mocha uses shlex grouping."""
+    root = fixture_root(tmp_path)
+    (root / "package.json").write_text('{"scripts":{"test":"TOKEN=\\"abc4x def7z\\" mocha tests"}}', encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    combined = out + err
+    assert "abc4x" not in combined and "def7z" not in combined
+    assert row_for(combined) == [
+        "  NOTE     Windowless test suite  - mocha: release B ships no default for this runner "
+        "(INVENTORY, Deferred); use detached: false (KP-059)"
+    ]
+
+
+def test_r039_other_runner_unclosed_quote(tmp_path):
+    """R-039: unclosed quote falls back to str.split."""
+    root = fixture_root(tmp_path)
+    (root / "package.json").write_text('{"scripts":{"test":"TOKEN=\\"q1w2 mocha tests"}}', encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    combined = out + err
+    assert "q1w2" not in combined
+    assert row_for(combined) == [
+        "  NOTE     Windowless test suite  - mocha: release B ships no default for this runner "
+        "(INVENTORY, Deferred); use detached: false (KP-059)"
+    ]
