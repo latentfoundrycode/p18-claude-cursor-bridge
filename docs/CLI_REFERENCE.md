@@ -296,8 +296,10 @@ What it checks, with the file it reads (the 0b review corrected several of these
     repository, any) docs/PROJECT_STATUS.md holding an absolute path (a drive letter
     followed by a colon and a backslash or a slash, or a macOS home under root Users, or a
     Linux home under root home) is MISSING (rule 54: no computer path enters a commit; FB-026);
-  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or not right after
-    Phase: is MISSING (R-015);
+  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or misplaced is MISSING
+    (R-015); a line naming an unwritten product type or sub-type is MISSING; an unwritten trait
+    is a NOTE `Unwritten trait`; `not yet classified` past intake is a NOTE `Workflows
+    classification` (calibration step 4b; R-027, R-033);
   - with --screens (or a docs/mockups folder): the design detector in the gate;
   - release A1b: a spending limit recorded for every key, account or provider that can charge
     (the inventory's Resources rows); the inventory's `Development data:` decision; every
