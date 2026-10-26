@@ -146,7 +146,7 @@ def uv_run_pytest(argv):
             i += 1
             continue
         return argv[i] == "pytest"
-    return any(":" in p for p in parts)
+    return False
 
 
 def own_venv_python(path, folder=None):

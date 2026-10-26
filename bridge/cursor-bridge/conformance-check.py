@@ -247,6 +247,10 @@ def _ws_walk_component_ok(path):
     return not bridge_env.is_link(path)
 
 
+def _testpath_entry_has_dotdot(entry):
+    return ".." in [p for p in re.split(r"[/\\]", entry) if p]
+
+
 def _test_root_path_ok(ws, entry):
     if not _path_inside_workspace(entry, ws):
         return False
@@ -323,7 +327,7 @@ def _path_inside_workspace(entry, ws):
 
 def _pytest_test_roots(ws):
     notes, raw = _pytest_active_testpaths(ws)
-    kept = [p for p in raw if _test_root_path_ok(ws, p)]
+    kept = [p for p in raw if not _testpath_entry_has_dotdot(p) and _test_root_path_ok(ws, p)]
     if kept:
         return notes, kept
     if _test_root_path_ok(ws, "tests"):
