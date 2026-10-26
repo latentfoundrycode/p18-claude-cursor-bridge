@@ -4,6 +4,7 @@ tests/test_mutation_run.py, so a change to the builder's helpers cannot weaken t
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -419,3 +420,121 @@ def test_task031_r4_b6_an_expected_survivor_killed_is_not_counted_killed(tmp_pat
     assert p.returncode == 1, p.stdout + p.stderr
     counts = [line for line in p.stdout.splitlines() if line.startswith("counts:")]
     assert counts and re.search(r"\bkilled=0\b", counts[0]), p.stdout
+
+
+# After round 4: the tests for the three mutants of the supervisor's driver that survived round 4's code (M30, M38,
+# M39 in run/supervisor/task031_mutants.py).
+
+def test_task031_r4_b6_a_cached_kill_of_an_expected_survivor_is_not_counted_killed(tmp_path):
+    """R-041, TASK-031 Requirement 6 (an `expect: survive` mutant counts as neither killed nor survived; S4: a cached
+    kill of one still gives exit 1; handoff/TASK-031-r4.md, B6): on the rerun that skips it as a kept kill, the
+    summary's killed count stays 0 and the exit stays 1."""
+    ws = _fixture(tmp_path, CALC)
+    mf = _mutants(ws, "b6c", {"mutants": [dict(KILL_CALC, expect="survive claimed equivalent")]})
+    first = _run(ws, mf)
+    assert first.returncode == 1, first.stdout + first.stderr
+    again = _run(ws, mf)
+    assert again.returncode == 1, again.stdout + again.stderr
+    assert len(_cache_lines(ws, "b6c")) == 1, again.stdout
+    counts = [line for line in again.stdout.splitlines() if line.startswith("counts:")]
+    assert counts and re.search(r"\bkilled=0\b", counts[0]), again.stdout
+
+
+def test_task031_r4_b4_a_workspace_edit_before_the_mutants_run_is_not_keyed(tmp_path):
+    """R-041 (a kill is kept only for keyed inputs byte-identical to those of the run that killed it; handoff/TASK-031-
+    r4.md, B4: the keys are computed from the copy's bytes): a keyed file edited in the Workspace after the copy is
+    made, while the resolution check collects, is not the file the mutant ran on, so the kill is kept under the
+    copy's bytes and the next run, whose copy holds the edit, runs the mutant again."""
+    started = tmp_path / "collect-started"
+    go = tmp_path / "collect-go"
+    files = dict(CALC)
+    files["tests/conftest.py"] = (
+        "import time\nfrom pathlib import Path\n\n_started = Path(%r)\n_go = Path(%r)\nif not _started.is_file():\n"
+        "    _started.write_text('x')\n    while not _go.is_file():\n        time.sleep(0.05)\n"
+        % (str(started), str(go)))
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "b4c", {"mutants": [KILL_CALC]})
+    cmd = [sys.executable, PROG, str(mf), "--scratch", str(tmp_path / "scratch")]
+    proc = subprocess.Popen(cmd, cwd=str(ws), **test_conftest.windowless_kwargs(
+        {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True}))
+    try:
+        for _ in range(1200):
+            if started.is_file() or proc.poll() is not None:
+                break
+            time.sleep(0.05)
+        assert started.is_file(), "the collection never started"
+        _write(ws, "demo/calc.py", CALC["demo/calc.py"] + "# edited after the copy was made\n")
+        go.write_text("go", encoding="utf-8")
+        out, err = proc.communicate(timeout=60)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.communicate(timeout=30)
+    assert proc.returncode == 0, out + err
+    assert len(_cache_lines(ws, "b4c")) == 1
+    again = _run(ws, mf)
+    assert again.returncode == 0, again.stdout + again.stderr
+    assert [line["mutant"] for line in _cache_lines(ws, "b4c")[1:]] == ["m"], again.stdout
+
+
+PIPE_TARGET = """import subprocess
+import sys
+import time
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+subprocess.run([sys.executable, sys.argv[1], sys.argv[2]], stdin=subprocess.DEVNULL, stdout=sys.stdout.fileno(),
+               stderr=sys.stderr.fileno(), creationflags=NO_WINDOW, timeout=60)
+while True:
+    time.sleep(0.2)
+"""
+
+PIPE_MIDDLE = """import subprocess
+import sys
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+kw = {} if sys.platform == "win32" else {"start_new_session": True}
+holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"], stdin=subprocess.DEVNULL,
+                          stdout=sys.stdout.fileno(), stderr=sys.stderr.fileno(), creationflags=NO_WINDOW, **kw)
+with open(sys.argv[1], "w") as f:
+    f.write(str(holder.pid))
+"""
+
+PIPE_DRIVER = """import importlib.util
+import sys
+import time
+
+spec = importlib.util.spec_from_file_location("mutation_run_under_test", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+t0 = time.time()
+rc, out, err, timed = mod.run_process([sys.executable, sys.argv[2], sys.argv[3], sys.argv[4]], None, sys.argv[5], 2)
+print("timed=%s elapsed=%.1f" % (timed, time.time() - t0))
+"""
+
+
+def test_task031_r4_item12_a_pipe_holder_outside_the_killed_tree_cannot_hold_the_run(tmp_path):
+    """R-041 (each mutant's run is bounded), TASK-031 S7 (the per-mutant bound; handoff/TASK-031-r4.md, item 12: the
+    bound's kill cannot hang): a process that holds the test run's pipes and is outside the tree the bound kills (its
+    parent gone; on POSIX a session of its own) cannot keep run_process waiting: it returns timed out within the
+    bound plus its two 30-second waits."""
+    for name, text in (("target.py", PIPE_TARGET), ("middle.py", PIPE_MIDDLE), ("driver.py", PIPE_DRIVER)):
+        (tmp_path / name).write_text(text, encoding="utf-8")
+    pidfile = tmp_path / "holder.pid"
+    cmd = [sys.executable, str(tmp_path / "driver.py"), os.path.abspath(PROG), str(tmp_path / "target.py"),
+           str(tmp_path / "middle.py"), str(pidfile), str(tmp_path)]
+    try:
+        p = subprocess.run(cmd, cwd=str(tmp_path), **test_conftest.windowless_kwargs(
+            {"capture_output": True, "text": True, "timeout": 120}))
+    except subprocess.TimeoutExpired:
+        pytest.fail("run_process waited on the pipes past the bound")
+    finally:
+        if pidfile.is_file():
+            try:
+                os.kill(int(pidfile.read_text(encoding="utf-8")), signal.SIGTERM)
+            except (OSError, ValueError):
+                pass
+    assert pidfile.is_file(), p.stdout + p.stderr
+    m = re.search(r"timed=(\w+) elapsed=([\d.]+)", p.stdout)
+    assert m, p.stdout + p.stderr
+    assert m.group(1) == "True"
+    assert float(m.group(2)) < 90
