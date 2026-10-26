@@ -625,47 +625,6 @@ def test_r041_checkpoint_refuse_file_at_commit(tmp_path):
     assert run_mr(ws, mp, extra=["--checkpoint", sha]).returncode == 2
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="console windows exist only on Windows")
-def test_r041_pytest_child_windowless(tmp_path, home_of_the_tests):
-    """R-041, TASK-031 Done when (d): on Windows the test process reports no console window."""
-    from test_tests_windowless import PRINT_WINDOW, window_and_console
-    ws = workspace(tmp_path)
-    init_pkg(ws)
-    cfkey = "creation" + "flags"
-    tpl = textwrap.dedent("""
-import subprocess, sys
-_FLAG = FLAGVAL
-def pytest_sessionstart(session):
-    kw = {CFKEY: _FLAG}
-    p = subprocess.run([sys.executable, "-c", PROBE], capture_output=True, text=True, **kw)
-    open("_win_probe.txt", "w").write(p.stdout.strip())
-""").replace("FLAGVAL", str(NO_WINDOW)).replace("CFKEY", repr(cfkey)).replace("PROBE", repr(PRINT_WINDOW))
-    write(ws, "tests/conftest.py", tpl)
-    git(ws, "add", "tests/conftest.py")
-    mp = mutants_path(ws, "win", basic_mutant())
-    git(ws, "add", "run/supervisor/win-mutants.json")
-    scratch = home_of_the_tests / "scr"
-    env = dict(os.environ)
-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
-    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
-    cmd = [sys.executable, MUTATION_RUN, str(mp), "--scratch", str(scratch), "--mutant-timeout", "60"]
-    proc = subprocess.Popen(cmd, cwd=str(ws), env=env,
-                            **test_conftest.windowless_kwargs({"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True}))
-    line = None
-    while proc.poll() is None:
-        hits = list(scratch.rglob("_win_probe.txt"))
-        if hits:
-            line = hits[0].read_text(encoding="utf-8").strip()
-            break
-        time.sleep(0.05)
-    out, err = proc.communicate(timeout=90)
-    assert proc.returncode == 0, err or out
-    assert line, "probe file missing"
-    window, child, on_console = window_and_console(line)
-    assert window == 0
-    assert os.getpid() not in on_console
-
-
 def test_r041_relaunch_after_partial_cache(tmp_path):
     """R-041, TASK-031 Done when (d): relaunch runs only mutants not kept as killed."""
     ws = workspace(tmp_path)
