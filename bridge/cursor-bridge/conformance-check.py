@@ -242,9 +242,12 @@ def _ws_walk_component_ok(path):
         os.lstat(path)
     except FileNotFoundError:
         return True
-    except OSError:
+    except (OSError, ValueError):
         return False
-    return not bridge_env.is_link(path)
+    try:
+        return not bridge_env.is_link(path)
+    except (OSError, ValueError):
+        return False
 
 
 def _testpath_entry_has_dotdot(entry):
@@ -308,7 +311,11 @@ def _pytest_suite_seen(ws):
                 pass
     if _tests_dir_listable(ws):
         tests = os.path.join(ws, "tests")
-        for name in os.listdir(tests):
+        try:
+            names = os.listdir(tests)
+        except OSError:
+            names = []
+        for name in names:
             if name.startswith("test_") and name.endswith(".py"):
                 return True
     return False
@@ -896,55 +903,68 @@ def main():
     windowless = "windowless-check" in hooks or os.path.isfile(os.path.join(ws, ".cursor", "hooks", "windowless-check.py"))
     add("OK" if windowless else "MISSING", "Windowless check", "" if windowless else "no windowless-check in the hooks; rule 24 puts it in the pre-commit gate")
 
-    pytest_seen = _pytest_suite_seen(ws)
-    node_runner = _node_test_runner(ws)
-    parse_notes, roots = _pytest_test_roots(ws)
-    for note in parse_notes:
-        add("NOTE", "Windowless test suite", note)
-    if pytest_seen:
-        root_conftest = os.path.join(ws, "conftest.py")
-        ok_path = None
-        if _root_conftest_counts(ws) and _conftest_windowless_ok(root_conftest):
-            ok_path = root_conftest
-        else:
-            all_ok = True
-            for rel in roots:
-                if not _test_root_path_ok(ws, rel):
-                    all_ok = False
-                    break
-                cpath = os.path.join(ws, rel, "conftest.py")
-                if not os.path.isfile(cpath) or not _conftest_windowless_ok(cpath):
-                    all_ok = False
-                    break
-            if all_ok and roots:
-                ok_path = os.path.join(ws, roots[0], "conftest.py")
-        rel_ok = ok_path and _rel_forward(ok_path, ws)
-        if rel_ok:
-            add("OK", "Windowless test suite (%s)" % rel_ok)
-        else:
-            add("MISSING", "Windowless test suite", WINDOWLESS_MISSING)
-    if node_runner:
-        add("NOTE", "Windowless test suite",
-            "%s: release B ships no default for this runner (INVENTORY, Deferred); use detached: false (KP-059)" % node_runner)
-    if not pytest_seen and not node_runner:
-        script = _package_json_scripts(ws)
-        if script:
-            word = _script_runner_word(script)
-            if word == "echo":
-                detail = ("no test runner is configured (the package.json test script starts with echo)")
-            elif word:
+    floor_rows = []
+    try:
+        pytest_seen = _pytest_suite_seen(ws)
+        node_runner = _node_test_runner(ws)
+        parse_notes, roots = _pytest_test_roots(ws)
+        for note in parse_notes:
+            floor_rows.append(("NOTE", "Windowless test suite", note))
+        if pytest_seen:
+            root_conftest = os.path.join(ws, "conftest.py")
+            ok_path = None
+            if _root_conftest_counts(ws) and _conftest_windowless_ok(root_conftest):
+                ok_path = root_conftest
+            else:
+                all_ok = True
+                for rel in roots:
+                    if not _test_root_path_ok(ws, rel):
+                        all_ok = False
+                        break
+                    cpath = os.path.join(ws, rel, "conftest.py")
+                    if not os.path.isfile(cpath) or not _conftest_windowless_ok(cpath):
+                        all_ok = False
+                        break
+                if all_ok and roots:
+                    ok_path = os.path.join(ws, roots[0], "conftest.py")
+            rel_ok = ok_path and _rel_forward(ok_path, ws)
+            if rel_ok:
                 escape_field = _load_escape_field()
-                if escape_field is None:
-                    detail = ("the package.json test script names a runner release B ships no default for "
-                              "(INVENTORY, Deferred); use detached: false (KP-059)")
+                if escape_field is not None:
+                    rel_display = escape_field(rel_ok)
+                elif all(ord(c) < 128 and c.isprintable() for c in rel_ok):
+                    rel_display = rel_ok
                 else:
-                    detail = ("%s: release B ships no default for this runner (INVENTORY, Deferred); "
-                              "use detached: false (KP-059)" % escape_field(word))
+                    rel_display = "a test root's conftest.py"
+                floor_rows.append(("OK", "Windowless test suite (%s)" % rel_display, ""))
+            else:
+                floor_rows.append(("MISSING", "Windowless test suite", WINDOWLESS_MISSING))
+        if node_runner:
+            floor_rows.append(("NOTE", "Windowless test suite",
+                "%s: release B ships no default for this runner (INVENTORY, Deferred); use detached: false (KP-059)" % node_runner))
+        if not pytest_seen and not node_runner:
+            script = _package_json_scripts(ws)
+            if script:
+                word = _script_runner_word(script)
+                if word == "echo":
+                    detail = ("no test runner is configured (the package.json test script starts with echo)")
+                elif word:
+                    escape_field = _load_escape_field()
+                    if escape_field is None:
+                        detail = ("the package.json test script names a runner release B ships no default for "
+                                  "(INVENTORY, Deferred); use detached: false (KP-059)")
+                    else:
+                        detail = ("%s: release B ships no default for this runner (INVENTORY, Deferred); "
+                                  "use detached: false (KP-059)" % escape_field(word))
+                else:
+                    detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
             else:
                 detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
-        else:
-            detail = "no pytest configuration, no tests/test_*.py and no package.json test script were found"
-        add("NOTE", "Windowless test suite", detail)
+            floor_rows.append(("NOTE", "Windowless test suite", detail))
+    except Exception as e:
+        floor_rows = [("NOTE", "Windowless test suite", "the floor could not be judged (%s)" % type(e).__name__)]
+    for verdict, floor, detail in floor_rows:
+        add(verdict, floor, detail)
 
     # --- lockfiles
     if os.path.isfile(os.path.join(ws, "package.json")):
