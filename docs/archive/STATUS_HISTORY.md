@@ -17,3 +17,5 @@ Maintainer requests, the part moved out at BUG-028 (2026-10-26): Earlier: the pa
 Last accepted, the part moved out at TASK-028 (2026-10-26): before it TASK-024 (PR #86): calibration aware of conditional workflows, the program half of R-027 and the calibration half of R-033 (the conformance check reports a line naming an unwritten workflow, an unwritten trait, and an unclassified project past intake); before it TASK-023 (PR #85), the text half; before it HOTFIX-002 (PR #84): hotfix 2026.10.25a (release/2026.10.11's c0822c0, PR #83) carried onto main and the project calibrated to it
 
 Last accepted, the part moved out at TASK-029 (2026-10-26): before it BUG-028 (PR #87): the review-guard test fixture records the guard's own sleeps only, so Linux CI no longer fails at random on the lagging-head test (ISS-016)
+
+Last accepted, the part moved out at BUG-029 (2026-10-26): before it TASK-028 (PR #88): windowless launches enforced by the launcher (the driver kind for mutation runs, every launch with CREATE_NO_WINDOW) and the suite's frozen default shipped as windowless-default.snapshot.md, with the conformance floor `Windowless test suite`

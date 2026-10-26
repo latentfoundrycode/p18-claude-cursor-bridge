@@ -143,7 +143,23 @@ def usage():
 
 
 def head_of(argv):
-    return os.path.basename(argv[0]).lower().replace(".exe", "").replace(".cmd", "") if argv else ""
+    if not argv:
+        return ""
+    base = os.path.basename(argv[0]).lower()
+    if base.endswith(".exe"):
+        return base[:-4]
+    if base.endswith(".cmd"):
+        return base[:-4]
+    return base
+
+
+def is_agent_argv(argv):
+    """True when argv[0] is a bare cursor-agent name (AGENT_NAMES), not a path or doubled suffix."""
+    if not argv:
+        return False
+    if os.path.dirname(argv[0]):
+        return False
+    return argv[0].lower() in AGENT_NAMES
 
 
 ESCAPE_OPTIONS = {                                     # options that run another program or delete a folder, per runner
@@ -338,7 +354,7 @@ def test_suite(argv, folder=None):
 def kind_of(argv):
     """The kind a command is, when its name says so."""
     head = head_of(argv)
-    if head == "cursor-agent":
+    if is_agent_argv(argv):
         return "builder"
     if head == "gh" and argv[1:3] == ["pr", "checks"]:
         return "watch"
@@ -475,7 +491,7 @@ def design_refuse_name(name, token, lifts, params_path):
 
 def design_ceiling(argv, folder):
     """Refuse cursor-agent launches naming a design round above the ceiling; None when allowed."""
-    if head_of(argv) != "cursor-agent":
+    if not is_agent_argv(argv):
         return None
     text = DESIGN_TRIM_BEFORE_SEP.sub("", " ".join(argv))
     norm = DESIGN_PATH_NORM.sub("/", text)
@@ -568,8 +584,8 @@ def head_text(argv):
     never a prompt (`cursor-agent`, `gh pr checks`, `pytest`, `npm test`)."""
     head = head_of(argv)
     subs = [a for a in argv[1:3] if a in ("pr", "checks", "test", "run", "pytest", "unittest", "vitest", "jest", "playwright", "--test", "-m") or a.startswith("test")]
-    if head == "cursor-agent":
-        return head
+    if is_agent_argv(argv):
+        return "cursor-agent"
     return " ".join([head] + subs)[:40]
 
 
@@ -932,8 +948,6 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
         if got_lock:
             waited = int(time.monotonic() - wait_mono)
             taken = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-            sys.stderr.write("bridge-run: slot taken %s\n" % taken)
-            sys.stderr.flush()
             created = process_creation_epoch(os.getpid())
             if created is None:
                 sys.stderr.write("bridge-run: note - could not read this process creation time for the slot holder record\n")
@@ -942,6 +956,8 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
                     "kind": kind, "run_id": run_id, "pid": os.getpid(),
                     "created": created, "start": taken, "limit": pub_limit,
                 })
+            sys.stderr.write("bridge-run: slot taken %s\n" % taken)
+            sys.stderr.flush()
             return lock_fd, waited
         now_mono = time.monotonic()
         live = read_holder_record(holder_path)
@@ -984,7 +1000,7 @@ def branch_of(folder):
 def workspace_of(argv, folder):
     """The folder a cursor-agent run works in: its `--workspace <path>` (a worktree builder, relative to
     the launch folder), else the launch folder; the run is logged under that folder's branch (2026.10.25a)."""
-    if head_of(argv) == "cursor-agent":
+    if is_agent_argv(argv):
         for i, a in enumerate(argv):
             if a == "--workspace" and i + 1 < len(argv):
                 return os.path.join(folder, argv[i + 1])
@@ -1019,7 +1035,7 @@ def review_family_refusal(argv, folder):
     """A Review B of the family that built the change in flight is refused (release A4's rule, held by the
     launcher since 2026.10.25a): after a profile switch the new profile's builder rebuilds the change first."""
     model = model_of(argv)
-    if head_of(argv) != "cursor-agent" or not model:
+    if not is_agent_argv(argv) or not model:
         return None
     try:
         roster = roster_program()
@@ -1127,7 +1143,7 @@ def boundary_changes(before, after):
 
 def resolve(argv):
     """Return (argv to start, is_agent)."""
-    if os.path.basename(argv[0]).lower() in AGENT_NAMES:
+    if is_agent_argv(argv):
         launcher = bridge_env.cursor_agent_launcher()
         if launcher is None:
             sys.stderr.write("bridge-run: cursor-agent not found (PATH or %LOCALAPPDATA%/cursor-agent)\n")
@@ -1223,7 +1239,7 @@ def main():
     elif not accepted(cmd, folder):
         sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
         return 125
-    if "--key-file" in flags and head_of(cmd) == "cursor-agent":
+    if "--key-file" in flags and is_agent_argv(cmd):
         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
         return 125
     reason = design_ceiling(cmd, folder)
@@ -1280,7 +1296,7 @@ def main():
         if limit > cap:
             sys.stderr.write("bridge-run: refused - a limit of %ds is above twice the default for %s (%ds); the owner's words in docs/RUN_PARAMETERS.md (`Ceiling above twice: %s <seconds> (<their words>, <date>)`) lift the cap\n" % (int(limit), kind, cap, kind))
             return 125
-    if kind == "review" and kind_of(cmd) is not None and head_of(cmd) != "cursor-agent":
+    if kind == "review" and kind_of(cmd) is not None and not is_agent_argv(cmd):
         sys.stderr.write(REVIEW_ONLY_REFUSE)
         return 125
     if kind == "watch" and kind_of(cmd) != "watch":
