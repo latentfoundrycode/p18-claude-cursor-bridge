@@ -416,7 +416,14 @@ def test_r040_special_file_records_posix(tmp_path):
     os.mkfifo(fifo)
     zero = str(tmp_path / "zero.holder")
     os.symlink("/dev/zero", zero)
-    for path in (fifo, zero):
+    br = load_br()
+    real = tmp_path / "real.holder"  # a valid record naming this live test process
+    real.write_text(json.dumps(good_record(os.getpid(), br.process_creation_epoch(os.getpid()))), encoding="utf-8")
+    first = read_in_child(str(real))
+    assert first is not None and first.stdout.startswith("{"), first and first.stdout + first.stderr  # precondition
+    link = str(tmp_path / "link.holder")
+    os.symlink(str(real), link)  # a link to that regular, valid record: O_NOFOLLOW refuses it
+    for path in (fifo, zero, link):
         t0 = time.monotonic()
         out = read_in_child(path)
         assert out is not None, "the read of %s did not end" % os.path.basename(path)
@@ -447,8 +454,10 @@ def test_r040_untrusted_records_by_launch(tmp_path, plant):
         holder = start_holder(tmp_path, env, delay=0, hold=25, plant=plant)
         _, holder_path = br.heavy_state_paths(env)
         assert wait_until(lambda: os.path.exists(holder_path))
+        t0 = time.monotonic()
         waiter = popen_bridge(root, env, "--limit", "5", "--", sys.executable, "-c", "pass")
         err = waiter.communicate(timeout=15)[1]
+        assert 3.5 <= time.monotonic() - t0 <= 9  # the provisional bound, (14,400 + 120) x 0.0003 = 4.4 s
         assert waiter.returncode == 123
         assert "Traceback" not in err
         assert all(ord(c) >= 32 for c in err.replace("\n", ""))
@@ -532,13 +541,23 @@ def test_r040_review_refuses_a_heavy_command(tmp_path, allow_any):
     knows as another kind (a named test suite, a gh pr checks watch): exit 125 with the review refusal,
     the command never started, no heavy.lock; the limit's cap refusal still comes first."""
     env = env_for() if allow_any else env_without_allow_any()
+    gh = tmp_path / "gh.cmd" if sys.platform == "win32" else tmp_path / "gh"
+    gh.write_text("@echo off\necho stub-ok\n" if sys.platform == "win32" else "#!/bin/sh\necho stub-ok\n", encoding="utf-8")
+    if sys.platform != "win32":
+        gh.chmod(0o755)
+    env["PATH"] = str(tmp_path) + os.pathsep + env.get("PATH", "")
     root = launch_dir(tmp_path)
     for cmd in (["python", "-m", "pytest", "--version"], ["pytest", "-q"], ["gh", "pr", "checks", "1"]):
         out = run_bridge(root, env, "--limit", "30", "--kind", "review", "--", *cmd)
         assert out.returncode == 125, out.stderr
         assert "bridge-run: refused - a review run is only a cursor-agent command" in out.stderr
-        assert "pytest" not in out.stdout and "ok" not in out.stdout
+        assert "pytest" not in out.stdout and "stub-ok" not in out.stdout
     assert not os.path.exists(lock_path_of(env))
+    # precondition: under their own kinds the same commands do start and print
+    watch = run_bridge(root, env, "--limit", "30", "--kind", "watch", "--", "gh", "pr", "checks", "1")
+    assert watch.returncode == 0 and "stub-ok" in watch.stdout, watch.stderr
+    suite = run_bridge(root, env, "--limit", "30", "--", "python", "-m", "pytest", "--version")
+    assert suite.returncode == 0 and "pytest" in suite.stdout, suite.stderr
     capped = run_bridge(root, env, "--limit", "99999", "--kind", "review", "--", "python", "-m", "pytest", "--version")
     assert capped.returncode == 125 and "above twice the default for review" in capped.stderr
     assert "a review run is only" not in capped.stderr
@@ -701,7 +720,10 @@ def test_r040_two_heavy_runs_serialize_commands(tmp_path):
     rid = err1.splitlines()[0].split("started ", 1)[1]
     taken = next(ln.split("slot taken ", 1)[1] for ln in err1.splitlines() if ln.startswith("bridge-run: slot taken "))
     wait_ln = next(ln for ln in err2.splitlines() if ln.startswith("bridge-run: waiting for the slot held by"))
-    assert re.fullmatch(r"bridge-run: waiting for the slot held by test %s since %s, ends by \S+Z" % (re.escape(rid), re.escape(taken)), wait_ln)
+    m = re.fullmatch(r"bridge-run: waiting for the slot held by test %s since %s, ends by (\S+Z)" % (re.escape(rid), re.escape(taken)), wait_ln)
+    assert m, wait_ln
+    # ends by: since + the holder's limit (30 s) + the scaled grace's whole seconds (120 x 0.05 = 6)
+    assert (datetime.strptime(m.group(1), STAMP) - datetime.strptime(taken, STAMP)).total_seconds() == 36
     assert err2.splitlines()[-1] == "bridge-run: exit 0"
     assert float((b / "s2").read_text()) >= float((a / "e").read_text())
     taken_ix = next(i for i, ln in enumerate(err2.splitlines()) if ln.startswith("bridge-run: slot taken "))
