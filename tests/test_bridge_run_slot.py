@@ -799,11 +799,10 @@ def test_r040_driver_rechecked_after_the_wait(tmp_path, swap):
         before = read_until(launcher, "bridge-run: waiting")  # precondition: it passed the first check and waits
         assert not any(ln.startswith("bridge-run: refused") for ln in before)
         if swap:
+            if not hasattr(os, "link"):
+                pytest.skip("this Python has no os.link")
             os.remove(prog)
-            try:
-                os.link(outside, prog)
-            except (OSError, NotImplementedError, AttributeError):
-                pytest.skip("hard links are not supported here")
+            os.link(outside, prog)  # NTFS and CI's ext4 make hard links; an error fails the test, never skips it
             assert os.stat(prog).st_nlink == 2
             assert load_br().verify_driver_program_abs(str(prog), str(root)) is False  # precondition: now refused
         kill_tree(holder)
