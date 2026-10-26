@@ -604,6 +604,30 @@ def test_r040_bound_stays_first_fixed(tmp_path):
     assert elapsed < 8
 
 
+def test_r040_bound_never_before_own_kind_floor(tmp_path):
+    """R-040 (round 1's Requirement 5, the fixing rule: never earlier than the wait's start plus the
+    waiter's own kind's default): a live record whose end has long passed still holds the waiter until
+    its own floor, 1,800 s x 0.002 = 3.6 s for a test run, then 123 naming it."""
+    env = env_for(BRIDGE_RUN_SLOT_SCALE="0.002")
+    root = launch_dir(tmp_path)
+    br = load_br()
+    _, holder_path = br.heavy_state_paths(env)
+    plant = ('{"kind": "test", "run_id": "2026-01-01T00:00:00Z", "start": "2026-01-01T00:00:00Z", '
+             '"pid": __PID__, "created": __CREATED__, "limit": 9}')
+    holder = None
+    try:
+        holder = start_holder(tmp_path, env, delay=0, hold=30, plant=plant)
+        assert wait_until(lambda: br.read_holder_record(holder_path) is not None)  # precondition: it reads live
+        t0 = time.monotonic()
+        out = run_bridge(root, env, "--limit", "30", "--", sys.executable, "-c", "pass", timeout=20)
+        elapsed = time.monotonic() - t0
+    finally:
+        kill_tree(holder)
+    assert out.returncode == 123
+    assert "slot not free - held by test 2026-01-01T00:00:00Z since 2026-01-01T00:00:00Z" in out.stderr
+    assert 3 <= elapsed <= 8
+
+
 def test_r040_waiting_line_keeps_last_live_record(tmp_path):
     """R-040 (Requirement 8; 17(d)): once a live record has been read, a poll that reads no live record
     (the file replaced by text that does not parse) still names the last live record."""

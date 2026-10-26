@@ -122,6 +122,7 @@ RUN_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(?:-\d+)?$", re.AS
 SLOT_START_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", re.ASCII)
 SLOT_START_MIN = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
 WATCH_ONLY_REFUSE = ("bridge-run: refused - a watch run is only a gh pr checks command\n")
+REVIEW_ONLY_REFUSE = ("bridge-run: refused - a review run is only a cursor-agent command\n")
 DESIGN_DEFAULT_ROUNDS = 5
 DESIGN_RESOLUTION_DEFAULT = 1
 DESIGN_RESOLUTION_LIFTED = 2
@@ -629,8 +630,6 @@ def process_alive(pid):
         k = ctypes.WinDLL("kernel32", use_last_error=True)
         k.OpenProcess.restype = wintypes.HANDLE
         k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-        k.GetExitCodeProcess.restype = wintypes.BOOL
-        k.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
         k.WaitForSingleObject.restype = wintypes.DWORD
         k.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
         k.CloseHandle.restype = wintypes.BOOL
@@ -640,10 +639,6 @@ def process_alive(pid):
         if not handle:
             return False
         try:
-            code = wintypes.DWORD()
-            if k.GetExitCodeProcess(handle, ctypes.byref(code)):
-                if int(code.value) == 259:
-                    return True
             if k.WaitForSingleObject(handle, 0) == 258:
                 return True
             return False
@@ -726,61 +721,63 @@ def _slot_start_epoch(start):
 
 def read_holder_record(holder_path):
     """A live holder record, or None when missing, stale or untrusted."""
+    import stat
+    flags = (os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_BINARY", 0))
     try:
-        with open(holder_path, encoding="utf-8") as f:
-            raw = f.read()
+        fd = os.open(holder_path, flags)
     except OSError:
         return None
     try:
-        data = json.loads(raw)
-    except ValueError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    kind = data.get("kind")
-    if not isinstance(kind, str) or kind not in KINDS or not _plain_record_text(kind):
-        return None
-    run_id = data.get("run_id")
-    if not isinstance(run_id, str) or not RUN_ID_RE.match(run_id) or not _plain_record_text(run_id):
-        return None
-    start = data.get("start")
-    if _slot_start_epoch(start) is None:
-        return None
-    pid = data.get("pid")
-    if type(pid) is not int or pid < 1 or pid > PID_MAX:
-        return None
-    limit = data.get("limit")
-    if type(limit) is not int or limit < 1 or limit > SLOT_LIMIT_MAX:
-        return None
-    created = data.get("created")
-    if type(created) not in (int, float) or isinstance(created, bool):
-        return None
-    try:
-        created_f = float(created)
-    except (TypeError, ValueError):
-        return None
-    if not math.isfinite(created_f):
-        return None
-    try:
-        actual = process_creation_epoch(pid)
-    except (OverflowError, OSError, ValueError):
-        return None
-    if not process_alive(pid) or actual is None or abs(actual - created_f) > 0.01:
-        return None
-    return {"kind": kind, "run_id": run_id, "pid": pid, "created": created_f, "start": start, "limit": limit}
-
-
-def run_id_epoch(run_id):
-    """Seconds since epoch for a run id timestamp (ignores a -2 suffix)."""
-    if not isinstance(run_id, str):
-        return None
-    m = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)", run_id)
-    if not m:
-        return None
-    try:
-        return datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc).timestamp()
-    except (ValueError, OverflowError, OSError):
-        return None
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode):
+                return None
+            raw_b = os.read(fd, 4097)
+            if len(raw_b) > 4096:
+                return None
+            raw = raw_b.decode("utf-8")
+            data = json.loads(raw)
+        except (OSError, ValueError, RecursionError, MemoryError, OverflowError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        kind = data.get("kind")
+        if not isinstance(kind, str) or kind not in KINDS or not _plain_record_text(kind):
+            return None
+        run_id = data.get("run_id")
+        if not isinstance(run_id, str) or not RUN_ID_RE.match(run_id) or not _plain_record_text(run_id):
+            return None
+        start = data.get("start")
+        if _slot_start_epoch(start) is None:
+            return None
+        pid = data.get("pid")
+        if type(pid) is not int or pid < 1 or pid > PID_MAX:
+            return None
+        limit = data.get("limit")
+        if type(limit) is not int or limit < 1 or limit > SLOT_LIMIT_MAX:
+            return None
+        created = data.get("created")
+        if type(created) not in (int, float) or isinstance(created, bool):
+            return None
+        try:
+            created_f = float(created)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if not math.isfinite(created_f):
+            return None
+        try:
+            actual = process_creation_epoch(pid)
+        except (OverflowError, OSError, ValueError):
+            return None
+        if not process_alive(pid) or actual is None or abs(actual - created_f) > 0.01:
+            return None
+        return {"kind": kind, "run_id": run_id, "pid": pid, "created": created_f, "start": start, "limit": limit}
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
 
 
 def holder_end_time(record, grace):
@@ -797,25 +794,39 @@ def holder_end_time(record, grace):
 
 def publish_holder_record(holder_path, record):
     folder = os.path.dirname(holder_path)
-    os.makedirs(folder, exist_ok=True)
     import tempfile
-    fd, tmp = tempfile.mkstemp(dir=folder, prefix=".heavy.holder.", suffix=".tmp")
+    tmp = None
     try:
-        os.close(fd)
-    except OSError:
-        pass
-    for _ in range(5):
+        os.makedirs(folder, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=folder, prefix=".heavy.holder.", suffix=".tmp")
         try:
-            with open(tmp, "w", encoding="utf-8") as f:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(record, f)
-            os.replace(tmp, holder_path)
-            return True
-        except (OSError, PermissionError):
-            time.sleep(0.02)
-    try:
-        os.remove(tmp)
+        except OSError:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            raise
+        for _ in range(5):
+            try:
+                os.replace(tmp, holder_path)
+                return True
+            except (OSError, PermissionError):
+                time.sleep(0.02)
     except OSError:
-        pass
+        if tmp is not None:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        sys.stderr.write("bridge-run: note - could not publish the slot holder record\n")
+        return False
+    if tmp is not None:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
     sys.stderr.write("bridge-run: note - could not publish the slot holder record\n")
     return False
 
@@ -879,9 +890,10 @@ def _open_heavy_lock(lock_path, state_dir):
         os.makedirs(state_dir, exist_ok=True)
         return os.open(lock_path, os.O_RDWR | os.O_CREAT)
     os.makedirs(state_dir, mode=0o700, exist_ok=True)
-    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(lock_path, flags, 0o600)
     try:
-        os.chmod(lock_path, 0o600)
+        os.fchmod(fd, 0o600)
     except OSError:
         pass
     return fd
@@ -1268,6 +1280,9 @@ def main():
         if limit > cap:
             sys.stderr.write("bridge-run: refused - a limit of %ds is above twice the default for %s (%ds); the owner's words in docs/RUN_PARAMETERS.md (`Ceiling above twice: %s <seconds> (<their words>, <date>)`) lift the cap\n" % (int(limit), kind, cap, kind))
             return 125
+    if kind == "review" and kind_of(cmd) is not None and head_of(cmd) != "cursor-agent":
+        sys.stderr.write(REVIEW_ONLY_REFUSE)
+        return 125
     if kind == "watch" and kind_of(cmd) != "watch":
         sys.stderr.write(WATCH_ONLY_REFUSE)
         return 125
