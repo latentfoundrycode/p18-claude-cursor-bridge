@@ -523,8 +523,14 @@ def test_r015_conformance_bridge_line_unwritten_is_missing_and_trait_note(tmp_pa
     assert v == "MISSING" and text == (
         "Workflows line  - names an unwritten workflow: Host Extension Development - product type is not written; "
         "Claude Code Extension - sub-type is not written"), out
-    trait = [line for line in out.splitlines() if "Unwritten trait" in line]
-    assert len(trait) == 1 and "Installable" in trait[0] and "work continues" in trait[0], out
+    trait_rows = [line for line in out.splitlines() if "Unwritten trait" in line]
+    assert trait_rows == [
+        "  NOTE     Unwritten trait  - Installable - trait not yet written; flagged, work continues (non-fatal)",
+    ], out
+    lines = out.splitlines()
+    missing_ix = next(i for i, line in enumerate(lines) if line.strip().startswith("MISSING") and "Workflows line" in line)
+    trait_ix = next(i for i, line in enumerate(lines) if "Unwritten trait" in line)
+    assert missing_ix < trait_ix, out
     assert rc == 1
 
 

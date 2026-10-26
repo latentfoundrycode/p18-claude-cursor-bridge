@@ -374,9 +374,10 @@ def judge_workflows_line(path, text):
 def calibration_workflows_grades(path, text):
     """Calibration grades when judge_workflows_line returned valid (R-027, R-033).
 
-    Returns (workflows_verdict, workflows_detail, notes). workflows_verdict is OK or MISSING.
-    workflows_detail is set only for MISSING. notes is a list of (floor, detail) NOTE rows in
-    status-file order. Loads workflow-check.py beside this file's real path.
+    Returns (workflows_verdict, workflows_detail, notes). workflows_verdict is OK, MISSING, or
+    not-checked. workflows_detail is the MISSING detail, empty for OK, or a list of ASCII reasons
+    for not-checked. notes is a list of (floor, detail) NOTE rows in status-file order, empty for
+    not-checked. Loads workflow-check.py beside this file's real path.
     """
 
     def ascii_text(value):
