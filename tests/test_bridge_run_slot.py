@@ -484,7 +484,9 @@ def test_r040_wellformed_record_named_in_wait_line(tmp_path):
     holder = waiter = None
     try:
         holder = start_holder(tmp_path, env, delay=0, hold=20, kind="test", run_id="2026-08-01T09:00:00Z", limit=600)
-        time.sleep(0.3)
+        br = load_br()
+        holder_path = br.heavy_state_paths(env)[1]
+        assert wait_until(lambda: br.read_holder_record(holder_path) is not None)  # precondition: published, live
         waiter = popen_bridge(root, env, "--limit", "5", "--", sys.executable, "-c", "pass")
         lines = read_until(waiter, "bridge-run: waiting")
         assert "waiting for the slot held by test 2026-08-01T09:00:00Z since " in lines[-1]
@@ -599,7 +601,7 @@ def test_r040_bound_stays_first_fixed(tmp_path):
     first = second = waiter = None
     try:
         first = start_holder(tmp_path, env, delay=0, hold=30, kind="test", run_id="2026-03-01T08:00:00Z", limit=2)
-        time.sleep(0.3)
+        assert wait_until(lambda: br.read_holder_record(holder_path) is not None)  # precondition: published, live
         t0 = time.monotonic()
         waiter = popen_bridge(root, env, "--limit", "30", "--", sys.executable, "-c", "import time; time.sleep(0.1)")
         seen = read_until(waiter, "bridge-run: waiting")
@@ -710,10 +712,15 @@ def test_r040_two_heavy_runs_serialize_commands(tmp_path):
     try:
         p1 = popen_bridge(a, env, "--limit", "30", "--", sys.executable, "-c",
                           "import time; open('s','w').write(repr(time.time())); time.sleep(3); open('e','w').write(repr(time.time()))")
-        time.sleep(0.5)
+        head1 = read_until(p1, "bridge-run: slot taken ")
+        br = load_br()
+        holder_path = br.heavy_state_paths(env)[1]
+        rid1 = head1[0].split("started ", 1)[1]
+        # precondition: p1's record is published and live before p2 starts (it follows the slot-taken line)
+        assert wait_until(lambda: (br.read_holder_record(holder_path) or {}).get("run_id") == rid1)
         p2 = popen_bridge(b, env, "--limit", "30", "--", sys.executable, "-c",
                           "import time; open('s2','w').write(repr(time.time()))")
-        err1 = p1.communicate(timeout=25)[1]
+        err1 = "\n".join(head1) + "\n" + p1.communicate(timeout=25)[1]
         err2 = p2.communicate(timeout=25)[1]
     finally:
         kill_tree(p1)
@@ -764,6 +771,57 @@ def test_r040_holder_that_waited_publishes_slot_taken_start(tmp_path):
         kill_tree(holder)
         kill_tree(l1)
         kill_tree(l3)
+
+
+@pytest.mark.parametrize("swap", [False, True])
+def test_r040_driver_rechecked_after_the_wait(tmp_path, swap):
+    """R-039 and R-040 (handoff/TASK-029-r4.md; docs/INVENTORY.md, "Windowless launches enforced by the
+    bridge": the command started holds the checked path, checked again just before the start): a driver
+    run that waited for the slot checks its program again after the slot is taken. A program replaced
+    during the wait by a hard link to a file outside run/supervisor/ is refused like the check before the
+    wait (125, the driver refusal, no log row), never started, and the slot is free again; the twin whose
+    program was not replaced runs it."""
+    root = launch_dir(tmp_path, "d")
+    (root / "run" / "supervisor").mkdir()
+    good, evil = tmp_path / "good.txt", tmp_path / "evil.txt"
+    prog = root / "run" / "supervisor" / "task.py"
+    prog.write_text("open(%r, 'w').write('ran')\n" % str(good), encoding="utf-8")
+    outside = tmp_path / "outside.py"
+    outside.write_text("open(%r, 'w').write('ran')\n" % str(evil), encoding="utf-8")
+    env = env_for(BRIDGE_RUN_SLOT_SCALE="0.02")
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    holder = launcher = None
+    try:
+        holder = start_lock_only(tmp_path, env, hold=30)
+        assert wait_until(lambda: os.path.exists(lock_path_of(env)))
+        time.sleep(0.3)
+        launcher = popen_bridge(root, env, "--limit", "60", "--kind", "driver", "--", "python", "run/supervisor/task.py")
+        before = read_until(launcher, "bridge-run: waiting")  # precondition: it passed the first check and waits
+        assert not any(ln.startswith("bridge-run: refused") for ln in before)
+        if swap:
+            os.remove(prog)
+            try:
+                os.link(outside, prog)
+            except (OSError, NotImplementedError, AttributeError):
+                pytest.skip("hard links are not supported here")
+            assert os.stat(prog).st_nlink == 2
+            assert load_br().verify_driver_program_abs(str(prog), str(root)) is False  # precondition: now refused
+        kill_tree(holder)
+        err = launcher.communicate(timeout=30)[1]
+    finally:
+        kill_tree(holder)
+        kill_tree(launcher)
+    log = root / "run" / "launcher" / "runs.jsonl"
+    if swap:
+        assert launcher.returncode == 125, err
+        assert [ln for ln in err.splitlines() if ln.startswith("bridge-run: refused - driver kind:")], err
+        assert not evil.exists() and not good.exists()
+        assert not log.exists() or not log.read_text(encoding="utf-8").strip()
+        again = run_bridge(root, env, "--limit", "5", "--", sys.executable, "-c", "pass")
+        assert again.returncode == 0 and "waiting for the slot" not in again.stderr, again.stderr
+    else:
+        assert launcher.returncode == 0, err
+        assert good.read_text(encoding="utf-8") == "ran" and not evil.exists()
 
 
 def test_r040_wait_timeout_exit_123_and_log(tmp_path):
