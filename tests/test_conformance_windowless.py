@@ -498,6 +498,57 @@ def test_r039_root_conftest_symlink(tmp_path):
     assert OUTSIDE_NAME not in out + err
 
 
+def test_r039_testpaths_dotdot_component_dropped(tmp_path):
+    """R-039 (the supervisor's, TASK-028 round 3's reviews): a testpaths entry holding a `..`
+    component is dropped, as the driver's rule 1(c) refuses one, so the default tests/ decides:
+    `a/../b` with b/conftest.py holding the default is not OK when tests/ has no conftest.py."""
+    root = fixture_root(tmp_path)
+    (root / "a").mkdir()
+    (root / "b").mkdir()
+    (root / "b" / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    (root / "pytest.ini").write_text("[pytest]\ntestpaths = a/../b\n", encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc == 1 and "Traceback" not in err
+    assert row_for(out + err) == [MISSING_ROW]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows collapses `..` before it follows a link")
+def test_r039_testpaths_link_then_dotdot_posix(tmp_path):
+    """R-039 (the supervisor's, TASK-028 round 3's reviews): on POSIX the kernel follows a link before
+    it applies `..`, so `lnk/../tests` with lnk a link to outside/a would read outside/tests/conftest.py;
+    the entry is dropped and the outside file is never the reason for OK."""
+    root = fixture_root(tmp_path)
+    outside = _outside(tmp_path)
+    (outside / "a").mkdir()
+    (outside / "tests").mkdir()
+    (outside / "tests" / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    _link_folder(root / "lnk", outside / "a")
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    (root / "pytest.ini").write_text("[pytest]\ntestpaths = lnk/../tests\n", encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc == 1 and "Traceback" not in err
+    assert row_for(out + err) == [MISSING_ROW]
+    assert OUTSIDE_NAME not in out + err
+
+
+def test_r039_linked_testpaths_entry_falls_back_to_tests(tmp_path):
+    """R-039 (the supervisor's, Review A round 3, H4): a testpaths entry reached through a link is
+    dropped like an outside entry, and with no entry left the default tests/ decides (9(b))."""
+    root = fixture_root(tmp_path)
+    outside = _outside(tmp_path)
+    _link_folder(root / "checks", outside)
+    (root / "tests").mkdir()
+    (root / "tests" / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    (root / "pytest.ini").write_text("[pytest]\ntestpaths = checks\n", encoding="utf-8")
+    rc, out, err = run_check(tmp_path)
+    assert rc < 2 and "Traceback" not in err
+    assert row_for(out + err) == ["  OK       Windowless test suite (tests/conftest.py)"]
+    assert OUTSIDE_NAME not in out + err
+
+
 def test_r039_testpaths_glob_literal(tmp_path):
     """R-039: testpaths = tests/* is literal, not expanded."""
     root = fixture_root(tmp_path)

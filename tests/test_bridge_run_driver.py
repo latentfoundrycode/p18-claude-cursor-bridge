@@ -507,7 +507,7 @@ def test_r039_healthy_refused_for_driver_exit_3(tmp_path):
     p = subprocess.run([sys.executable, PROG, "--healthy", "2026-01-01", "--kind", "driver"],
                        capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=60)
     assert p.returncode == 1
-    assert "bridge-run: refused - a driver run is healthy at exit 0 or 1 only" in p.stderr
+    assert "bridge-run: refused - a driver run is healthy at exit 0 or 1 only" in p.stderr.splitlines()
     assert log.read_text(encoding="utf-8") == before
 
 
@@ -533,7 +533,23 @@ def test_r039_limit_auto_driver_empty_log(tmp_path):
     p = subprocess.run([sys.executable, PROG, "--limit", "auto", "--kind", "driver", "--", "python", str(prog)],
                        capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=120)
     assert p.returncode == 0, p.stderr
-    assert "bridge-run: limit 7200s for driver (the default for driver)" in p.stderr
+    assert "bridge-run: limit 7200s for driver (the default for driver)" in p.stderr.splitlines()
+
+
+@pytest.mark.parametrize("kind_flags", [["--kind", "test"], []])
+@pytest.mark.parametrize("uv_argv", [["uv", "run", "--frozen"], ["uv", "run"], ["uv", "run", "--project", "x"]])
+def test_r039_uv_run_without_pytest_still_refused(tmp_path, kind_flags, uv_argv):
+    """R-039 (the supervisor's, TASK-028 round 3's inspection): requirement 2, every other kind keeps
+    its acceptance exactly: a uv run form with no pytest after uv's own options is refused with
+    exit 125 and the launcher's message, as before the driver kind, never a traceback."""
+    folder = launch_folder(tmp_path)
+    p = subprocess.run([sys.executable, PROG, "--limit", "30"] + kind_flags + ["--"] + uv_argv,
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=60)
+    assert p.returncode == 125, p.stderr
+    assert "Traceback" not in p.stderr
+    assert any(line.startswith("bridge-run: refused - the launcher runs only cursor-agent")
+               for line in p.stderr.splitlines()), p.stderr
+    assert runs_of(folder) == []
 
 
 def test_r039_log_head_is_interpreter_only(tmp_path):
