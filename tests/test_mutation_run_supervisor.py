@@ -514,7 +514,7 @@ def test_task031_r4_item12_a_pipe_holder_outside_the_killed_tree_cannot_hold_the
     """R-041 (each mutant's run is bounded), TASK-031 S7 (the per-mutant bound; handoff/TASK-031-r4.md, item 12: the
     bound's kill cannot hang): a process that holds the test run's pipes and is outside the tree the bound kills (its
     parent gone; on POSIX a session of its own) cannot keep run_process waiting: it returns timed out within the
-    bound plus its two 30-second waits."""
+    bound plus its 30-second waits, and only after the hold has lasted out the second wait."""
     for name, text in (("target.py", PIPE_TARGET), ("middle.py", PIPE_MIDDLE), ("driver.py", PIPE_DRIVER)):
         (tmp_path / name).write_text(text, encoding="utf-8")
     pidfile = tmp_path / "holder.pid"
@@ -535,4 +535,128 @@ def test_task031_r4_item12_a_pipe_holder_outside_the_killed_tree_cannot_hold_the
     m = re.search(r"timed=(\w+) elapsed=([\d.]+)", p.stdout)
     assert m, p.stdout + p.stderr
     assert m.group(1) == "True"
-    assert float(m.group(2)) < 90
+    assert 30 <= float(m.group(2)) < 90, "the hold did not happen, or it held the run past the bound"
+
+
+# Round 6 (handoff/TASK-031-r6.md): the blocking findings of the security audit on rounds 4 and 5.
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the extended and the admin-share path forms are Windows'")
+@pytest.mark.parametrize("form", ["extended", "admin share"])
+def test_task031_r6_b1_a_scratch_folder_inside_the_workspace_in_another_path_form_is_refused(tmp_path, form):
+    """R-041, TASK-031 Requirement 2 (a scratch folder inside the Workspace is refused; handoff/TASK-031-r6.md, B-1):
+    on Windows a `--scratch` naming a folder inside the Workspace through the `\\\\?\\` extended form or the drive's
+    administrative share exits 2 and creates nothing inside the Workspace."""
+    ws = _fixture(tmp_path, CALC)
+    inside = os.path.abspath(str(ws / "scratch-inside"))
+    if form == "extended":
+        given = "\\\\?\\" + inside
+    else:
+        drive, rest = os.path.splitdrive(inside)
+        given = "\\\\localhost\\" + drive[0] + "$" + rest
+        if not os.path.isdir("\\\\localhost\\" + drive[0] + "$" + os.path.splitdrive(str(ws))[1]):
+            pytest.skip("the drive's administrative share is not reachable here")
+    mf = _mutants(ws, "r6b1", {"mutants": [KILL_CALC]})
+    cmd = [sys.executable, PROG, str(mf), "--scratch", given]
+    p = subprocess.run(cmd, cwd=str(ws), **test_conftest.windowless_kwargs(
+        {"capture_output": True, "text": True, "timeout": 120}))
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert not (ws / "scratch-inside").exists()
+    assert _cache_lines(ws, "r6b1") == []
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="these names reach .git through Windows' name rules")
+@pytest.mark.parametrize("listed", [".git.", ".git ", ".git::$INDEX_ALLOCATION", "short name"])
+def test_task031_r6_b2_an_untracked_entry_reaching_git_by_another_name_is_refused(tmp_path, listed):
+    """R-041, TASK-031 Requirements 1 and 2 (nothing else is copied: no `.git`; handoff/TASK-031-r6.md, B-2): on
+    Windows an `untracked` entry that names the Workspace's `.git` folder another way (a trailing dot or space, a
+    stream name, the 8.3 short name) exits 2 and caches nothing."""
+    ws = _fixture(tmp_path, CALC)
+    if listed == "short name":
+        listed = "GIT~1"
+        if not (os.path.isdir(str(ws / listed)) and os.path.samefile(str(ws / listed), str(ws / ".git"))):
+            pytest.skip("8.3 short names are not made on this volume")
+    mf = _mutants(ws, "r6b2", {"mutants": [KILL_CALC], "untracked": [listed]})
+    p = _run(ws, mf)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert _cache_lines(ws, "r6b2") == []
+
+
+@pytest.mark.parametrize("root_file", ["pyproject.toml", "setup.cfg", "tox.ini"])
+def test_task031_r6_b3_a_root_file_with_no_pytest_section_keeps_the_configuration_above_unread(
+        tmp_path, home_of_the_tests, root_file):
+    """R-041 (every mutant gets a result against the version the gate reads), TASK-031 Requirement 4
+    (handoff/TASK-031-r4.md, B8; handoff/TASK-031-r6.md, B-3): a copy whose root holds a `pyproject.toml`, `setup.cfg`
+    or `tox.ini` with no pytest section has no pytest configuration of its own, so a `pytest.ini` in the home that
+    deselects every test still configures nothing: the mutant is killed, exit 0."""
+    (home_of_the_tests / "pytest.ini").write_text("[pytest]\naddopts = -k nothing_matches_this\n", encoding="utf-8")
+    files = dict(CALC)
+    files[root_file] = {"pyproject.toml": "[project]\nname = \"demo\"\nversion = \"0.0.0\"\n",
+                        "setup.cfg": "[metadata]\nname = demo\n",
+                        "tox.ini": "[tox]\nenvlist = py312\n"}[root_file]
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r6b3", {"mutants": [KILL_CALC]})
+    p = _run(ws, mf, scratch=False)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r6b3")] == ["killed"]
+
+
+@pytest.mark.parametrize("config", [".pytest.ini", "pytest.toml", "pyproject.toml"])
+def test_task031_r6_b3_the_copys_own_pytest_configuration_is_read(tmp_path, config):
+    """R-041 (every mutant gets a result against the version the gate reads), TASK-031 Requirement 4
+    (handoff/TASK-031-r6.md, B-3): a project whose pytest configuration is a `.pytest.ini`, a `pytest.toml` or a
+    `pyproject.toml` `[tool.pytest.ini_options]` table, which the gate's own run reads, configures the mutant's run
+    too: its tests, collected only through that configuration, kill the mutant, exit 0."""
+    files = {
+        "demo/__init__.py": "",
+        "demo/calc.py": "def add(a, b):\n    return a + b\n",
+        "tests/test_calc.py": "from demo.calc import add\n\ndef check_add():\n    assert add(1, 2) == 3\n",
+        config: {".pytest.ini": "[pytest]\npython_functions = check_*\n",
+                 "pytest.toml": "[pytest]\npython_functions = [\"check_*\"]\n",
+                 "pyproject.toml": "[tool.pytest.ini_options]\npython_functions = \"check_*\"\n"}[config],
+    }
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r6cfg", {"mutants": [dict(KILL_CALC, expect_fail=["tests/test_calc.py::check_add"])]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r6cfg")] == ["killed"]
+
+
+@pytest.mark.parametrize("listed", ["tests/test_calc.py::test_p", "tests/test_calc.py::TestNew"])
+def test_task031_r6_a1_a_parametrized_or_class_id_is_judged_by_its_tests_at_the_checkpoint(tmp_path, listed):
+    """R-041, TASK-031 Requirements 8 and 9 (each test that passes on the old code is listed as passing; exit 4
+    when any did; handoff/TASK-031-r4.md, B3: a listed file or a parametrized id; handoff/TASK-031-r6.md, A-1): a
+    listed parametrized function id or class id whose tests ran at the checkpoint, one of them passing on the old
+    code, lists that test by its own id as passing and exits 4, never `not run` and 0."""
+    ws = _fixture(tmp_path, CALC)
+    sha = _git(ws, "rev-parse", "HEAD")
+    _write(ws, "tests/test_calc.py", CALC["tests/test_calc.py"]
+           + "\nimport pytest\n\n@pytest.mark.parametrize(\"n\", [1, 2])\ndef test_p(n):\n    assert add(n, 0) == 1\n"
+           + "\nclass TestNew:\n    def test_passes(self):\n        assert add(1, 1) == 2\n\n"
+           + "    def test_fails(self):\n        assert add(1, 1) == 3\n")
+    _git(ws, "add", "tests/test_calc.py")
+    mf = _mutants(ws, "r6a1", {"mutants": [], "new_tests": [listed]})
+    p = _run(ws, mf, "--checkpoint", sha)
+    assert p.returncode == 4, p.stdout + p.stderr
+    passing = "tests/test_calc.py::test_p[1]" if listed.endswith("test_p") else "tests/test_calc.py::TestNew::test_passes"
+    assert re.search(re.escape(passing) + r": passing on old code", p.stdout), p.stdout
+
+
+def test_task031_r6_a3_a_collection_error_beside_a_kill_is_an_error(tmp_path):
+    """R-041 (a crash is an error, never a kill), TASK-031 Requirement 6 (error: the tests did not collect;
+    handoff/TASK-031-r6.md, A-3): under `--continue-on-collection-errors`, a mutant that breaks one listed test
+    file's import while its expected test fails is an error, exit 3, never a kept kill."""
+    files = {
+        "demo/__init__.py": "",
+        "demo/calc.py": "def add(a, b):\n    return a + b\n\n\ndef sub(a, b):\n    return a - b\n",
+        "tests/test_calc.py": "from demo.calc import add\n\ndef test_add():\n    assert add(1, 2) == 3\n",
+        "tests/test_sub.py": "from demo.calc import sub\n\ndef test_sub():\n    assert sub(3, 2) == 1\n",
+        "pytest.ini": "[pytest]\naddopts = --continue-on-collection-errors\n",
+    }
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r6a3", {"mutants": [{
+        "id": "m", "file": "demo/calc.py",
+        "pairs": [{"old": "return a + b", "new": "return a - b"}, {"old": "def sub(", "new": "def sub2("}],
+        "tests": ["tests/test_calc.py", "tests/test_sub.py"], "expect_fail": ["tests/test_calc.py::test_add"]}]})
+    p = _run(ws, mf)
+    assert p.returncode == 3, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r6a3")] != ["killed"]
