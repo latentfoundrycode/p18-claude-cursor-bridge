@@ -715,11 +715,60 @@ def test_r039_floor_backstop_turns_an_error_into_one_note(program, monkeypatch, 
     monkeypatch.setattr(sys, "argv", ["conformance-check.py", str(root), "--offline"])
     (root / "docs").mkdir(exist_ok=True)
     rc = mod.main()
-    out = capsys.readouterr().out
+    captured = capsys.readouterr()
+    out = captured.out
     assert rc < 2
-    assert "secret_zz91" not in out
+    assert "secret_zz91" not in out and "secret_zz91" not in captured.err
     assert row_for(out) == ["  NOTE     Windowless test suite  - the floor could not be judged (RuntimeError)"]
     assert re.search(r"^\s+(OK|MISSING|NOTE)\s+Lockfile|^\s+(OK|MISSING|NOTE)\s+Records|^conformance-check: \d+ OK", out, re.M)
+
+
+def test_r039_floor_backstop_drops_the_rows_made_before_the_error(program, monkeypatch, capsys, tmp_path):
+    """R-039 (the supervisor's, Review A round 5, HARDENING 2): handoff/TASK-028-r5.md, requirement 4, no
+    partial row printed beside the backstop's NOTE: a parse NOTE made before the failure is not printed."""
+    root = fixture_root(tmp_path)
+    (root / "tests").mkdir()
+    (root / "tests" / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    (root / "tests" / "conftest.py").write_text("# no default here\n", encoding="utf-8")
+    (root / "pyproject.toml").write_text("[tool.pytest.ini_options\n", encoding="utf-8")
+    parse_note = ("  NOTE     Windowless test suite  - pyproject.toml could not be parsed; "
+                  "judged as if it held no pytest settings")
+    mod, rc, rows, out = _floor_rows_in_process(program, monkeypatch, capsys, root)
+    assert rows == [parse_note, MISSING_ROW]          # the precondition: a row exists before the failure
+
+    def boom(path):
+        raise ValueError("secret_zz92")
+
+    monkeypatch.setattr(mod, "_conftest_windowless_ok", boom)
+    rc = mod.main()
+    captured = capsys.readouterr()
+    assert rc < 2
+    assert "secret_zz92" not in captured.out and "secret_zz92" not in captured.err
+    assert row_for(captured.out) == ["  NOTE     Windowless test suite  - the floor could not be judged (ValueError)"]
+
+
+def test_r039_ok_row_path_without_escape_field(program, monkeypatch, capsys, tmp_path):
+    """R-039 (the supervisor's, Review A round 5, HARDENING 3): handoff/TASK-028-r5.md, requirement 3's
+    fallback: when escape_field cannot be loaded, a path that is not all printable ASCII is not printed and
+    the row reads `(a test root's conftest.py)`."""
+    root = fixture_root(tmp_path)
+    folder = "t" + chr(0x202E) + "x"
+    try:
+        (root / folder).mkdir()
+    except OSError:
+        pytest.skip("this file system refuses U+202E in a folder name")
+    (root / folder / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    (root / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\ntestpaths = ["t' + chr(92) + 'u202ex"]\n', encoding="utf-8")
+    mod = program("conformance-check")
+    monkeypatch.setattr(mod, "_load_escape_field", lambda: None)
+    (root / "docs").mkdir(exist_ok=True)
+    monkeypatch.setattr(sys, "argv", ["conformance-check.py", str(root), "--offline"])
+    rc = mod.main()
+    captured = capsys.readouterr()
+    assert rc < 2
+    assert chr(0x202E) not in captured.out + captured.err
+    assert row_for(captured.out) == ["  OK       Windowless test suite (a test root's conftest.py)"]
 
 
 @pytest.mark.parametrize("entry", ["a\\..\\b", "a/..\\b", "ABS"])
