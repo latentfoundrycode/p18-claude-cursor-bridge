@@ -126,7 +126,9 @@ def test_a_snapshot_without_a_hash_copy_cannot_be_verified(repo):
 @pytest.fixture
 def ready(repo, program, monkeypatch):
     """Reviewed, the review files removed and committed: premerge with a pull request number
-    run in this process, gh replaced by pr_head and time.sleep recorded."""
+    run in this process, gh replaced by pr_head and the guard's own time.sleep recorded: the guard
+    gets a stand-in time whose sleep records and whose other names are the real module's, so a
+    sleep elsewhere in the process (subprocess's wait on POSIX) is not recorded (ISS-016)."""
     for k in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"):
         monkeypatch.setenv(k, os.devnull)
     rc, out = run(GUARD, repo, "snapshot", "001")
@@ -138,7 +140,15 @@ def ready(repo, program, monkeypatch):
     git(repo, "commit", "-q", "-m", "remove review files")
     mod = program("review-guard")
     sleeps = []
-    monkeypatch.setattr(mod.time, "sleep", sleeps.append)
+    real_time = mod.time
+
+    class GuardTime:
+        sleep = staticmethod(sleeps.append)
+
+        def __getattr__(self, name):
+            return getattr(real_time, name)
+
+    monkeypatch.setattr(mod, "time", GuardTime())
     head = git(repo, "rev-parse", "HEAD")
 
     def answers(*shas):
@@ -173,6 +183,20 @@ def test_premerge_does_not_wait_when_the_heads_match(ready, repo, capsys):
     rc = mod.cmd_premerge("001", str(repo), "12")
     out = capsys.readouterr().out
     assert rc == 0 and "waited" not in out and sleeps == [], out
+
+
+def test_the_fixture_records_the_guards_sleeps_and_no_others(ready):
+    """ISS-016 (BUG-028): only review-guard's own time.sleep is recorded. A sleep elsewhere in the
+    process is not the guard's: on POSIX, CPython's subprocess wait polls a child that has not exited
+    yet through time.sleep with a first delay of 1 ms, which made the lagging-head test record
+    [0.001, 15, 15] on Linux CI (PR #86). The guard's other uses of time stay the real module's."""
+    import time
+    mod, head, sleeps, answers = ready
+    time.sleep(0)
+    assert sleeps == []
+    mod.time.sleep(15)
+    assert sleeps == [15]
+    assert mod.time.strftime is time.strftime and mod.time.gmtime is time.gmtime
 
 
 # ---------------------------------------------------------------- scope-check.py
