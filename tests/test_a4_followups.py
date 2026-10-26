@@ -38,28 +38,35 @@ def test_a_wrapper_marked_wake_builder_gets_the_builders_ceiling(program):
 def test_bridge_stop_ends_a_launcher_run_and_its_tree(tmp_path):
     (tmp_path / "run").mkdir()
     launcher = os.path.join(CB, "bridge-run.py")
-    env = dict(ENV, BRIDGE_RUN_ALLOW_ANY="1")
+    # built here, not at import: the launcher's heavy-run slot lives under the home, and the
+    # tests' temporary home (conftest.py's home_of_the_tests) is set only once the test runs (TASK-029)
+    env_now = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
+    env = dict(env_now, BRIDGE_RUN_ALLOW_ANY="1")
     p = subprocess.Popen([sys.executable, launcher, "--limit", "120", "--kind", "test", "--", sys.executable, "-c", "import time; time.sleep(100)"],
                          cwd=str(tmp_path), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    pid_dir = tmp_path / "run" / "launcher" / "pids"
-    for _ in range(40):
-        if pid_dir.exists() and list(pid_dir.iterdir()):
-            break
-        time.sleep(0.25)
-    files = list(pid_dir.iterdir()) if pid_dir.exists() else []
-    assert files, "the launcher writes its pid file while it runs (item 4)"
-    run_id = files[0].name
-    launcher_pid, child_pid = (int(x) for x in files[0].read_text(encoding="utf-8").split())
-    assert launcher_pid == p.pid
-    q = subprocess.run([sys.executable, os.path.join(CB, "bridge-stop.py"), run_id[:10]], cwd=str(tmp_path), capture_output=True, text=True, env=ENV)
-    assert q.returncode == 0 and "ended" in q.stdout, q.stdout + q.stderr
     try:
-        p.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        p.kill()
-        raise AssertionError("the launcher survived bridge-stop")
-    stop = subprocess.run([sys.executable, os.path.join(CB, "bridge-stop.py"), "--pid", str(child_pid)], capture_output=True, text=True, env=ENV)
-    assert "is not running" in stop.stdout, "the child is gone with its tree: " + stop.stdout
+        pid_dir = tmp_path / "run" / "launcher" / "pids"
+        for _ in range(40):
+            if pid_dir.exists() and list(pid_dir.iterdir()):
+                break
+            time.sleep(0.25)
+        files = list(pid_dir.iterdir()) if pid_dir.exists() else []
+        assert files, "the launcher writes its pid file while it runs (item 4)"
+        run_id = files[0].name
+        launcher_pid, child_pid = (int(x) for x in files[0].read_text(encoding="utf-8").split())
+        assert launcher_pid == p.pid
+        q = subprocess.run([sys.executable, os.path.join(CB, "bridge-stop.py"), run_id[:10]], cwd=str(tmp_path), capture_output=True, text=True, env=env_now)
+        assert q.returncode == 0 and "ended" in q.stdout, q.stdout + q.stderr
+        try:
+            p.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            raise AssertionError("the launcher survived bridge-stop")
+        stop = subprocess.run([sys.executable, os.path.join(CB, "bridge-stop.py"), "--pid", str(child_pid)], capture_output=True, text=True, env=env_now)
+        assert "is not running" in stop.stdout, "the child is gone with its tree: " + stop.stdout
+    finally:
+        if p.poll() is None:
+            p.kill()
+            p.wait(timeout=10)
 
 
 def test_the_credential_helper_is_reset_in_the_bridges_git_config_file(program, tmp_path):
