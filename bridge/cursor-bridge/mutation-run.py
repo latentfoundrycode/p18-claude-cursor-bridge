@@ -10,10 +10,12 @@ expect-survive mutant was killed; 2 for a malformed file, refused path or resolu
 when any listed new test passed on the old code. ASCII-only on purpose (cp1252 consoles).
 """
 import argparse
+import configparser
 import hashlib
 import json
 import os
 import re
+import tomllib
 import shutil
 import signal
 import struct
@@ -138,6 +140,11 @@ def path_bad(rel):
         return True
     if parts[0].lower() == ".git":
         return True
+    for part in parts:
+        if part.endswith(".") or part.endswith(" "):
+            return True
+        if ":" in part:
+            return True
     return False
 
 
@@ -382,12 +389,83 @@ def paths_overlap_workspace(a, b):
     return False
 
 
+def _samefile_or_identity(a, b):
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        try:
+            sa, sb = os.stat(a), os.stat(b)
+            return sa.st_dev == sb.st_dev and sa.st_ino == sb.st_ino
+        except OSError:
+            return False
+
+
+def _scratch_arg_forbidden(raw):
+    if not raw:
+        return False
+    norm = raw.replace("/", os.sep)
+    if norm.startswith("\\\\?\\") or norm.startswith("\\\\.\\"):
+        return True
+    if norm.startswith("\\\\"):
+        return True
+    return False
+
+
+def _scratch_overlaps_workspace_identity(scratch, workspace):
+    ws = os.path.abspath(workspace)
+    sc = os.path.abspath(scratch)
+    if os.path.lexists(sc) and os.path.lexists(ws) and _samefile_or_identity(sc, ws):
+        return True
+    cur = sc
+    while True:
+        if os.path.lexists(cur) and os.path.lexists(ws) and _samefile_or_identity(cur, ws):
+            return True
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    cur = ws
+    while True:
+        if os.path.lexists(cur) and os.path.lexists(sc) and _samefile_or_identity(cur, sc):
+            return True
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    return paths_overlap_workspace(scratch, workspace)
+
+
+def _untracked_reaches_git(full, workspace):
+    git_p = os.path.join(workspace, ".git")
+    if not os.path.lexists(git_p):
+        return False
+    try:
+        if os.path.lexists(full) and _samefile_or_identity(full, git_p):
+            return True
+        cur = os.path.normpath(full)
+        ws = os.path.abspath(workspace)
+        while True:
+            if os.path.lexists(cur) and _samefile_or_identity(cur, git_p):
+                return True
+            if os.path.normcase(cur) == os.path.normcase(ws):
+                break
+            parent = os.path.dirname(cur)
+            if parent == cur:
+                break
+            cur = parent
+    except OSError:
+        raise Refuse("mutation-run: untracked path is not allowed")
+    return False
+
+
 def validate_untracked(untracked, workspace):
     ws = os.path.abspath(workspace)
     for u in untracked:
         full = os.path.normpath(os.path.join(workspace, u))
         if not path_under_or_equal(full, ws):
             raise Refuse("mutation-run: untracked %r lies outside the Workspace" % u)
+        if _untracked_reaches_git(full, workspace):
+            raise Refuse("mutation-run: untracked %r reaches .git" % u)
         if link_on_path(full, stop=ws):
             raise Refuse("mutation-run: untracked %r is reached through a link" % u)
         if os.path.isdir(full):
@@ -403,9 +481,11 @@ def default_scratch(workspace, env):
 
 
 def validate_scratch(scratch, workspace, run_id):
+    if _scratch_arg_forbidden(scratch):
+        raise Refuse("mutation-run: scratch folder must not lie inside the Workspace or contain it")
     scratch = os.path.abspath(scratch)
     ws = os.path.abspath(workspace)
-    if paths_overlap_workspace(scratch, ws):
+    if _scratch_overlaps_workspace_identity(scratch, ws):
         raise Refuse("mutation-run: scratch folder must not lie inside the Workspace or contain it")
     if link_on_path(scratch):
         raise Refuse("mutation-run: scratch path is reached through a link")
@@ -431,7 +511,16 @@ def kill_tree(proc):
             proc.kill()
 
 
+_last_run_process_still_alive = False
+
+
+def run_process_still_alive_after_timeout():
+    return _last_run_process_still_alive
+
+
 def run_process(argv, env, cwd, timeout_sec):
+    global _last_run_process_still_alive
+    _last_run_process_still_alive = False
     if sys.platform == "win32":
         proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -452,6 +541,7 @@ def run_process(argv, env, cwd, timeout_sec):
                 proc.wait(timeout=30)
             except subprocess.TimeoutExpired:
                 pass
+        _last_run_process_still_alive = proc.poll() is None
         return None, out, err, True
     return proc.returncode, out, err, False
 
@@ -591,7 +681,10 @@ def key_file_set(mutant, workspace, tracked_set):
         for cf in conftest_paths(tf):
             if cf in tracked_set:
                 rels.add(cf)
-    for cfg in ("conftest.py", "pytest.ini", "pyproject.toml", "setup.cfg", "tox.ini"):
+    for cfg in (
+        "conftest.py", "pytest.toml", ".pytest.toml", "pytest.ini", ".pytest.ini",
+        "pyproject.toml", "setup.cfg", "tox.ini",
+    ):
         if cfg in tracked_set:
             rels.add(cfg)
     return sorted(rels)
@@ -730,21 +823,82 @@ def ensure_outcomes_plugin(plugin_dir):
     return path
 
 
-def copy_has_pytest_config(copy_root):
-    for name in ("pytest.ini", "pyproject.toml", "tox.ini", "setup.cfg"):
-        if os.path.isfile(os.path.join(copy_root, name)):
-            return True
-    return False
+_PYTEST_CONFIG_NAMES = (
+    "pytest.toml", ".pytest.toml", "pytest.ini", ".pytest.ini",
+    "pyproject.toml", "tox.ini", "setup.cfg",
+)
+
+
+def _pytest_config_dict_from_file(filepath):
+    name = os.path.basename(filepath)
+    suffix = os.path.splitext(name)[1]
+    if suffix == ".ini":
+        cp = configparser.ConfigParser()
+        try:
+            cp.read(filepath, encoding="utf-8")
+        except configparser.Error:
+            raise Refuse("mutation-run: invalid ini file %s" % name)
+        if name in ("pytest.ini", ".pytest.ini"):
+            if "pytest" in cp:
+                return {k: v for k, v in cp["pytest"].items()}
+            return {}
+        if name == "tox.ini":
+            if "pytest" not in cp:
+                return None
+            return {k: v for k, v in cp["pytest"].items()}
+        return None
+    if suffix == ".cfg":
+        cp = configparser.ConfigParser()
+        try:
+            cp.read(filepath, encoding="utf-8")
+        except configparser.Error:
+            raise Refuse("mutation-run: invalid cfg file %s" % name)
+        if "tool:pytest" not in cp:
+            return None
+        return {k: v for k, v in cp["tool:pytest"].items()}
+    if suffix == ".toml":
+        try:
+            with open(filepath, "rb") as f:
+                config = tomllib.load(f)
+        except tomllib.TOMLDecodeError as e:
+            raise Refuse("mutation-run: invalid toml file %s (%s)" % (name, e))
+        if name in ("pytest.toml", ".pytest.toml"):
+            pytest_config = config.get("pytest", {})
+            if pytest_config:
+                return dict(pytest_config)
+            return {}
+        tool_pytest = config.get("tool", {}).get("pytest", {})
+        toml_config = {k: v for k, v in tool_pytest.items() if k != "ini_options"}
+        ini_config = tool_pytest.get("ini_options")
+        if toml_config and ini_config is not None:
+            raise Refuse("mutation-run: pyproject.toml has conflicting pytest tables")
+        if toml_config:
+            return dict(toml_config)
+        if ini_config is not None:
+            return dict(ini_config)
+        return None
+    return None
+
+
+def copy_pytest_config_file(copy_root):
+    for name in _PYTEST_CONFIG_NAMES:
+        p = os.path.join(copy_root, name)
+        if not os.path.isfile(p):
+            continue
+        cfg = _pytest_config_dict_from_file(p)
+        if cfg is not None:
+            return p
+    return None
 
 
 def pytest_config_argv(plugin_dir, copy_root):
-    if copy_has_pytest_config(copy_root):
-        return []
-    empty_ini = os.path.join(plugin_dir, "pytest-empty.ini")
-    if not os.path.isfile(empty_ini):
-        with open(empty_ini, "wb"):
-            pass
-    return ["-c", empty_ini, "--rootdir", copy_root]
+    cfg_file = copy_pytest_config_file(copy_root)
+    if cfg_file is None:
+        cfg_file = os.path.join(plugin_dir, "pytest-empty.ini")
+        if not os.path.isfile(cfg_file):
+            with open(cfg_file, "wb"):
+                pass
+    return ["-c", cfg_file, "--rootdir", copy_root]
 
 
 def read_pytest_results(results_path):
@@ -783,6 +937,8 @@ def classify_outcome(data, expect_fail, timed_out):
         return "error", "timed out"
     if data is None:
         return "error", "no pytest result"
+    if data.get("collect_errors"):
+        return "error", "collection error"
     statuses = outcome_map_from_results(data)
     ef_set = set(expect_fail)
     reported = set(statuses)
@@ -806,6 +962,17 @@ def checkpoint_label_for_test(nodeid, outcome):
     if outcome in ("failed", "error"):
         return "failing"
     return "not run"
+
+
+def checkpoint_records_for_item(item, tests_run):
+    out = []
+    for rec in tests_run:
+        nid = rec.get("nodeid")
+        if not nid:
+            continue
+        if nid == item or nid.startswith(item + "[") or nid.startswith(item + "::"):
+            out.append(rec)
+    return out
 
 
 def write_resolution_plugin(plugin_dir, copy_root, mutated_files, workspace_tracked, workspace_abs):
@@ -1013,7 +1180,7 @@ def run_mutant_tests(plugin_dir, copy_root, tests, env, timeout_sec, results_pat
     argv = [sys.executable, "-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + tests
     rc, out, err, timed = run_process(argv, run_env, copy_root, timeout_sec)
     data = read_pytest_results(results_path)
-    return rc, out, err, timed, data
+    return rc, out, err, timed, run_process_still_alive_after_timeout(), data
 
 
 def validate_checkpoint(commit, new_tests, workspace, tracked_set):
@@ -1102,7 +1269,6 @@ def main(argv=None):
     cache = read_cache(cache_path)
     plugin_dir = work_sub
     ensure_outcomes_plugin(plugin_dir)
-    results_path = os.path.join(plugin_dir, "pytest-outcomes.json")
     env = dict(os.environ)
     results = []
     counts = {"run": 0, "cached": 0, "killed": 0, "survived": 0, "not applied": 0,
@@ -1124,31 +1290,36 @@ def main(argv=None):
                 checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests)
             items = checkpoint_new_test_items(new_tests)
             any_pass = False
-            for item in items:
-                if os.path.isfile(results_path):
-                    os.remove(results_path)
-                run_env = pytest_env(plugin_dir, copy_root, env, results_path)
+            for chk_idx, item in enumerate(items):
+                chk_results = os.path.join(plugin_dir, "pytest-outcomes-chk-%d.json" % chk_idx)
+                if os.path.isfile(chk_results):
+                    os.remove(chk_results)
+                run_env = pytest_env(plugin_dir, copy_root, env, chk_results)
                 cfg = pytest_config_argv(plugin_dir, copy_root)
                 rc, out, err, timed = run_process(
                     [sys.executable, "-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"]
                     + cfg + [item],
                     run_env, copy_root, timeout_sec)
-                data = read_pytest_results(results_path)
+                data = read_pytest_results(chk_results)
                 if timed or data is None:
                     if "::" in item:
                         print("%s: not run" % item)
                     continue
                 tests_run = data.get("tests", [])
                 if "::" in item:
-                    outcome_by_id = {r["nodeid"]: r["outcome"] for r in tests_run if "nodeid" in r}
-                    raw = outcome_by_id.get(item)
-                    if raw is None:
+                    matched = checkpoint_records_for_item(item, tests_run)
+                    if not matched:
                         print("%s: not run" % item)
                         continue
-                    label = checkpoint_label_for_test(item, raw)
-                    print("%s: %s" % (item, label))
-                    if label == "passing on old code":
-                        any_pass = True
+                    for rec in matched:
+                        nid = rec.get("nodeid")
+                        raw = rec.get("outcome")
+                        if not nid:
+                            continue
+                        label = checkpoint_label_for_test(nid, raw)
+                        print("%s: %s" % (nid, label))
+                        if label == "passing on old code":
+                            any_pass = True
                 else:
                     if not tests_run:
                         print("%s: not run" % item)
@@ -1171,7 +1342,10 @@ def main(argv=None):
         run_resolution_check(plugin_dir, copy_root, mutants, res_tests, tracked_set, workspace, env, timeout_sec)
         mutant_keys = {m["id"]: compute_key(copy_root, m, tracked_set) for m in mutants}
         originals = {}
+        pytest_still_alive = False
         for m in mutants:
+            if pytest_still_alive:
+                break
             key = mutant_keys[m["id"]]
             cached = cache.get((m["id"], key))
             if cached and cached[0] == "killed" and not args.all:
@@ -1196,10 +1370,14 @@ def main(argv=None):
                 counts["not applied"] += 1
                 append_cache(cache_path, m["id"], key, "not applied")
                 continue
-            rc, out, err, timed, data = run_mutant_tests(
-                plugin_dir, copy_root, m["tests"], env, timeout_sec, results_path)
+            mut_results = os.path.join(plugin_dir, "pytest-outcomes-%s.json" % m["id"])
+            rc, out, err, timed, alive, data = run_mutant_tests(
+                plugin_dir, copy_root, m["tests"], env, timeout_sec, mut_results)
             restore_mutant(copy_root, m, originals[m["file"]])
-            if rc not in (0, 1) and not timed:
+            if alive:
+                pytest_still_alive = True
+                outcome, reason = "error", "timed out"
+            elif rc not in (0, 1) and not timed:
                 outcome, reason = "error", "pytest exit %d" % rc
             else:
                 outcome, reason = classify_outcome(data, m["expect_fail"], timed)
@@ -1224,12 +1402,21 @@ def main(argv=None):
                     results.append((m["id"], disp, True))
                     counts[outcome] += 1
                 append_cache(cache_path, m["id"], key, outcome)
+            if pytest_still_alive:
+                break
         for mid, outcome, ran in results:
             tag = "ran" if ran else "cached"
             print("%s: %s (%s)" % (mid, outcome, tag))
         print("counts: run=%d cached=%d killed=%d survived=%d not applied=%d error=%d expected survive=%d" % (
             counts["run"], counts["cached"], counts["killed"], counts["survived"],
             counts["not applied"], counts["error"], counts["expected survive"]))
+        if pytest_still_alive:
+            print(
+                "mutation-run: pytest did not exit within %d s after the mutant timeout"
+                % timeout_sec,
+                file=sys.stderr,
+            )
+            return 3
         if counts["error"]:
             return 3
         if counts["survived"] or counts["not applied"]:

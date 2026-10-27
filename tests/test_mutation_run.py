@@ -64,7 +64,7 @@ def mutants_path(ws, run_id, body):
     return p
 
 
-def run_mr(ws, mutants_file, scratch=None, timeout=60, extra=(), home_env=None):
+def run_mr(ws, mutants_file, scratch=None, timeout=60, extra=(), home_env=None, harness_slack=30):
     env = dict(os.environ)
     env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
     if home_env:
@@ -74,7 +74,7 @@ def run_mr(ws, mutants_file, scratch=None, timeout=60, extra=(), home_env=None):
         cmd += ["--scratch", str(scratch)]
     cmd += ["--mutant-timeout", str(timeout)]
     return subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env,
-                          timeout=timeout + 30, **test_conftest.windowless_kwargs({}))
+                          timeout=timeout + harness_slack, **test_conftest.windowless_kwargs({}))
 
 
 def git_porcelain(ws):
@@ -1242,9 +1242,11 @@ def test_r041_extract_archive_tar_refuses_non_file(tmp_path):
 
 
 def test_r041_grandchild_holding_pipes_times_out(tmp_path):
-    """R-041, TASK-031-r4: a grandchild that inherits pytest's pipes cannot hold the run past the mutant bound."""
+    """R-041, TASK-031 S7, handoff/TASK-031-r6.md item 7: a grandchild holding run_process's real pipes is bounded."""
     ws = workspace(tmp_path)
     init_pkg(ws)
+    write(ws, "pytest.ini", "[pytest]\naddopts = -s\n")
+    git(ws, "add", "pytest.ini")
     write(ws, "tests/test_pipe_hold.py", textwrap.dedent("""
 import subprocess
 import sys
@@ -1280,19 +1282,93 @@ def teardown_module():
     mp = mutants_path(ws, "pipe", body)
     git(ws, "add", "run/supervisor/pipe-mutants.json")
     t0 = time.time()
-    p = run_mr(ws, mp, timeout=5)
+    p = run_mr(ws, mp, timeout=5, harness_slack=120)
     elapsed = time.time() - t0
-    assert elapsed < 5 + 60, "run exceeded bound plus 60 s"
+    assert elapsed >= 5, "the run did not wait through the mutant bound while pipes were held"
+    assert elapsed < 5 + 120, "run exceeded bound plus 120 s"
     assert p.returncode == 3
     assert "pipe: error (timed out)" in p.stdout
 
 
+def test_r041_pytest_survives_kill_stops_run(tmp_path, home_of_the_tests, monkeypatch):
+    """R-041, TASK-031 S7, handoff/TASK-031-r6.md item 6: a pytest that outlives kill ends the run at exit 3 without running the next mutant."""
+    import io
+    import signal
+    from contextlib import redirect_stderr, redirect_stdout
+
+    mod = load_program("mutation-run")
+    real_kill = mod.kill_tree
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    loop_pid = tmp_path / "loop.pid"
+    write(ws, "tests/test_loop.py", textwrap.dedent("""
+import os
+
+def test_loop():
+    open(%r, "w", encoding="utf-8").write(str(os.getpid()))
+    while True:
+        pass
+""" % str(loop_pid).replace("\\", "\\\\")))
+    git(ws, "add", "tests/test_loop.py")
+    body = {"mutants": [
+        {"id": "loop", "file": "tests/test_loop.py", "pairs": [{"old": "pass", "new": "pass"}],
+         "tests": ["tests/test_loop.py"], "expect_fail": ["tests/test_loop.py::test_loop"]},
+        {"id": "two", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+         "tests": ["tests/test_calc.py"], "expect_fail": ["tests/test_calc.py::test_add"]},
+    ]}
+    mutants_path(ws, "surv", body)
+    git(ws, "add", "run/supervisor/surv-mutants.json")
+    scratch = home_of_the_tests / ".cursor-bridge" / "scratch" / "proj"
+    scratch.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(ws)
+    monkeypatch.setenv("HOME", str(home_of_the_tests))
+    monkeypatch.setenv("USERPROFILE", str(home_of_the_tests))
+    monkeypatch.setattr(mod, "kill_tree", lambda _proc: None)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["mutation-run.py", "run/supervisor/surv-mutants.json",
+         "--scratch", str(scratch), "--mutant-timeout", "3"],
+    )
+    out_buf = io.StringIO()
+    err_buf = io.StringIO()
+    try:
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            rc = mod.run_main()
+        stdout = out_buf.getvalue()
+        stderr = err_buf.getvalue()
+        assert rc == 3
+        assert "loop: error (timed out)" in stdout
+        assert "two:" not in stdout
+        assert "mutation-run:" in stderr and "3" in stderr
+        assert "internal error" not in stderr
+    finally:
+        mod.kill_tree = real_kill
+        if loop_pid.is_file():
+            try:
+                lp = int(loop_pid.read_text(encoding="utf-8").strip())
+                if sys.platform == "win32":
+                    subprocess.run(
+                        ["taskkill", "/T", "/F", "/PID", str(lp)],
+                        capture_output=True,
+                        **test_conftest.windowless_kwargs({"stdin": subprocess.DEVNULL, "timeout": 30}),
+                    )
+                else:
+                    os.killpg(os.getpgid(lp), signal.SIGKILL)
+            except (OSError, ValueError, ProcessLookupError):
+                pass
+        work = scratch / "mutation-run-surv"
+        if work.is_dir():
+            shutil.rmtree(work, ignore_errors=True)
+
+
 def test_r041_pipe_holder_outside_tree_cwd_in_copy_times_out(tmp_path, home_of_the_tests):
-    """R-041, TASK-031 S7: a pipe holder outside the killed tree with cwd in the copy times out with exit 3 and no internal error."""
+    """R-041, TASK-031 S7, handoff/TASK-031-r6.md item 7: a pipe holder outside the killed tree holds the real pipes until the bound."""
     import signal
 
     ws = workspace(tmp_path)
     init_pkg(ws)
+    write(ws, "pytest.ini", "[pytest]\naddopts = -s\n")
+    git(ws, "add", "pytest.ini")
     write(ws, ".env", "SECRET=copy\n")
     git(ws, "add", ".env")
     pid_file = tmp_path / "holder.pid"
@@ -1327,8 +1403,8 @@ def test_hold_pipes():
     subprocess.run(
         [sys.executable, "tests/pipe_hold_middle.py", PIDFILE_JSON],
         stdin=subprocess.DEVNULL,
-        stdout=sys.stdout.fileno(),
-        stderr=sys.stderr.fileno(),
+        stdout=sys.stdout,
+        stderr=sys.stderr,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         timeout=60,
     )
@@ -1347,13 +1423,15 @@ def test_hold_pipes():
     work_sub = home_of_the_tests / ".cursor-bridge" / "scratch" / "proj" / "mutation-run-phc"
     try:
         t0 = time.time()
-        p = run_mr(ws, mp, timeout=5, home_env=home_of_the_tests)
+        p = run_mr(ws, mp, timeout=5, home_env=home_of_the_tests, harness_slack=120)
         elapsed = time.time() - t0
-        assert elapsed < 5 + 90, "run exceeded bound plus 90 s"
+        assert elapsed >= 30, "the hold on the real pipes did not last through the bounded wait"
+        assert elapsed < 5 + 120, "run exceeded bound plus 120 s"
         assert p.returncode == 3
         assert "phc: error (timed out)" in p.stdout
         assert "internal error" not in p.stderr
         assert pid_file.is_file()
+        assert not (work_sub / "tree" / ".env").exists(), "copied .env must be absent while the holder lives"
         if sys.platform == "win32":
             assert work_sub.is_dir(), "holder cwd should keep mutation-run-phc on disk until the holder ends"
             assert (work_sub / "tree").is_dir(), "the copy root stays while the holder's cwd is inside it"

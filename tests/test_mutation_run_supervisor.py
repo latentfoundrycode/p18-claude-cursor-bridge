@@ -660,3 +660,97 @@ def test_task031_r6_a3_a_collection_error_beside_a_kill_is_an_error(tmp_path):
     p = _run(ws, mf)
     assert p.returncode == 3, p.stdout + p.stderr
     assert [line["outcome"] for line in _cache_lines(ws, "r6a3")] != ["killed"]
+
+
+# Round 6's mutation run: the survivors that showed a gap in the tests above.
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the extended and the admin-share path forms are Windows'")
+@pytest.mark.parametrize("form", ["extended", "admin share"])
+def test_task031_r6_b1_a_scratch_folder_in_the_extended_or_unc_form_is_refused_outside_the_workspace_too(
+        tmp_path, form):
+    """R-041, TASK-031 Requirement 2 (handoff/TASK-031-r6.md, B-1: a `--scratch` in the extended, device or UNC
+    form is refused): the form alone refuses it, wherever it points, so a `--scratch` naming a folder outside the
+    Workspace through the `\\\\?\\` extended form or the drive's administrative share exits 2 and creates nothing."""
+    ws = _fixture(tmp_path, CALC)
+    outside = os.path.abspath(str(tmp_path / "outside-scratch"))
+    if form == "extended":
+        given = "\\\\?\\" + outside
+    else:
+        drive, rest = os.path.splitdrive(outside)
+        given = "\\\\localhost\\" + drive[0] + "$" + rest
+        if not os.path.isdir("\\\\localhost\\" + drive[0] + "$" + os.path.splitdrive(str(tmp_path))[1]):
+            pytest.skip("the drive's administrative share is not reachable here")
+    mf = _mutants(ws, "r6b1o", {"mutants": [KILL_CALC]})
+    cmd = [sys.executable, PROG, str(mf), "--scratch", given]
+    p = subprocess.run(cmd, cwd=str(ws), **test_conftest.windowless_kwargs(
+        {"capture_output": True, "text": True, "timeout": 120}))
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert not os.path.exists(outside)
+    assert _cache_lines(ws, "r6b1o") == []
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows' name rules drop a component's trailing space")
+def test_task031_r6_b1_a_scratch_folder_reaching_the_workspace_through_a_trailing_space_is_refused(tmp_path):
+    """R-041, TASK-031 Requirement 2 (a scratch folder inside the Workspace is refused; handoff/TASK-031-r6.md, B-1:
+    the overlap compared by file identity): on Windows `<Workspace> \\scratch-inside` names a folder inside the
+    Workspace, which a comparison of the path strings misses; it exits 2 and creates nothing inside the Workspace."""
+    ws = _fixture(tmp_path, CALC)
+    given = os.path.abspath(str(ws)) + " \\scratch-inside"
+    assert os.path.samefile(os.path.abspath(str(ws)) + " ", str(ws))       # precondition: the form reaches ws
+    mf = _mutants(ws, "r6b1s", {"mutants": [KILL_CALC]})
+    cmd = [sys.executable, PROG, str(mf), "--scratch", given]
+    p = subprocess.run(cmd, cwd=str(ws), **test_conftest.windowless_kwargs(
+        {"capture_output": True, "text": True, "timeout": 120}))
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert not (ws / "scratch-inside").exists()
+    assert _cache_lines(ws, "r6b1s") == []
+
+
+@pytest.mark.parametrize("listed", ["notes.txt.", "notes.txt "])
+def test_task031_r6_b2_an_untracked_entry_ending_in_a_dot_or_a_space_is_refused(tmp_path, listed):
+    """R-041, TASK-031 Requirements 1 and 2 (handoff/TASK-031-r6.md, B-2: an untracked entry whose component ends in
+    a dot or a space is refused): such an entry exits 2 and caches nothing, even where Windows' name rules make it
+    name a file that exists (`notes.txt` here)."""
+    ws = _fixture(tmp_path, CALC)
+    _write(ws, "notes.txt", "untracked notes\n")
+    mf = _mutants(ws, "r6b2d", {"mutants": [KILL_CALC], "untracked": [listed]})
+    p = _run(ws, mf)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert _cache_lines(ws, "r6b2d") == []
+
+
+def test_task031_r6_b3_a_pyproject_toml_with_no_pytest_section_leaves_tox_ini_in_force(tmp_path):
+    """R-041 (every mutant gets a result against the version the gate reads), TASK-031 Requirement 4
+    (handoff/TASK-031-r6.md, B-3: the configuration found as pytest 9.1.1 finds it): pytest passes over a root
+    `pyproject.toml` with no pytest table to the `tox.ini` with a `[pytest]` section, so the mutant's run is
+    configured by `tox.ini` too: its tests, collected only through it, kill the mutant, exit 0."""
+    files = {
+        "demo/__init__.py": "",
+        "demo/calc.py": "def add(a, b):\n    return a + b\n",
+        "tests/test_calc.py": "from demo.calc import add\n\ndef check_add():\n    assert add(1, 2) == 3\n",
+        "pyproject.toml": "[project]\nname = \"demo\"\nversion = \"0.0.0\"\n",
+        "tox.ini": "[tox]\nenvlist = py312\n\n[pytest]\npython_functions = check_*\n",
+    }
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r6tox", {"mutants": [dict(KILL_CALC, expect_fail=["tests/test_calc.py::check_add"])]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r6tox")] == ["killed"]
+
+
+@pytest.mark.parametrize("config", ["pytest.toml", ".pytest.ini"])
+def test_task031_r6_b3_a_change_to_a_root_pytest_configuration_reruns_its_mutant(tmp_path, config):
+    """R-041 (a kill is kept only while its keyed inputs are unchanged), TASK-031 Requirement 7 (handoff/TASK-031-
+    r6.md, B-3: the key set holds the configuration names pytest reads): an edit of a root `pytest.toml` or
+    `.pytest.ini` reruns a mutant kept as killed."""
+    files = dict(CALC)
+    files[config] = "[pytest]\n"
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r6key", {"mutants": [KILL_CALC]})
+    first = _run(ws, mf)
+    assert first.returncode == 0, first.stdout + first.stderr        # precondition: killed and recorded
+    assert len(_cache_lines(ws, "r6key")) == 1
+    _write(ws, config, "[pytest]\n# touched\n")
+    second = _run(ws, mf)
+    assert second.returncode == 0, second.stdout + second.stderr
+    assert len(_cache_lines(ws, "r6key")) == 2, second.stdout
