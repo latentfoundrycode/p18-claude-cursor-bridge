@@ -1,5 +1,5 @@
 diff --git a/bridge/agents/cursor-configurator.md b/bridge/agents/cursor-configurator.md
-index 2e8bb6c..9796ea9 100644
+index 2e8bb6c..4f25a8d 100644
 --- a/bridge/agents/cursor-configurator.md
 +++ b/bridge/agents/cursor-configurator.md
 @@ -60,6 +60,15 @@ Only the items the supervisor names, drawn from this set:
@@ -11,7 +11,7 @@ index 2e8bb6c..9796ea9 100644
 +  `~/.claude/cursor-bridge/windowless-default.snapshot.md`**, written verbatim: create the test
 +  root's `conftest.py` from it only where the test root has none (`tests/conftest.py`, with
 +  its folder, where the project has no test root yet); where one exists, insert the block
-+  once, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`,
++  once, at the file's end, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`,
 +  `CREATE_NO_WINDOW`), and leave every other line as it stands. Never regenerate, trim or
 +  reorder it. A Node suite gets nothing from you here: report its runner, and the supervisor
 +  records the conformance check's NOTE.
@@ -19,7 +19,7 @@ index 2e8bb6c..9796ea9 100644
    from `~/.claude/cursor-bridge/`, for **every** Windows-hosted project. Every hook script
    you write carries the windowless idiom (`creationflags=NO_WINDOW` / `windowsHide: true`)
 diff --git a/bridge/agents/diff-reviewer.md b/bridge/agents/diff-reviewer.md
-index 7a9e43c..49849e6 100644
+index 7a9e43c..b3314d9 100644
 --- a/bridge/agents/diff-reviewer.md
 +++ b/bridge/agents/diff-reviewer.md
 @@ -77,12 +77,7 @@ asserts what it says, not what the code does. A test written from a misread spec
@@ -32,7 +32,7 @@ index 7a9e43c..49849e6 100644
 -restore, since an interrupted run once left mutants in the product (KP-056). A driver is
 -the supervisor's side's, never the builder's; one the supervisor did not name as its own in
 -the handoff is a deviation.
-+**A mutation driver is read like a test.** The mutants are the supervisor's mutants file, `run/supervisor/<id>-mutants.json`, and the engine that applies them is the bridge's `mutation-run.py`, which works on a scratch copy of the Workspace and so restores nothing in it. Read each mutant in the file against its name as you read a test against its paragraph: a mutant must be what its name says — a mutant named "drops the retry" that changes a log line proves nothing about the retry — and the test ids it expects to fail must be the tests that check what it breaks. The mutants file, the criterion tests and any other driver (a Python program under `run/supervisor/`) are the supervisor's side's, never the builder's; one the supervisor did not name as its own in the handoff is a deviation, and so is a script in the diff that applies mutants to the product's files (an interrupted one once left mutants in the product, KP-056).
++**A mutation driver is read like a test.** The mutants are the supervisor's mutants file, `run/supervisor/<id>-mutants.json`, and the engine that applies them is the bridge's `mutation-run.py`, which works on a scratch copy of the Workspace and so restores nothing in it. Read each mutant in the file against its name as you read a test against its paragraph: a mutant must be what its name says — a mutant named "drops the retry" that changes a log line proves nothing about the retry — and the test ids it expects to fail must be the tests that check what it breaks. The mutants file, the criterion tests and any other driver (a Python program under `run/supervisor/`) are the supervisor's side's, never the builder's; one the supervisor did not name as its own in the handoff is a deviation, and so is a script in the diff that applies mutants to the product's files (an interrupted one once left mutants in the product, KP-056). A driver of the supervisor's under `run/supervisor/` that edits the Workspace's files in place is read for its restore too: it restores each file in a `finally` and aborts on a byte mismatch at restore; one that works on a scratch copy restores nothing.
  
  **A path that changes data is tested on data the previous version made.** Reset, migration,
  upgrade and repair paths were tested only on empty databases once, and the owner's live data
@@ -68,7 +68,7 @@ index f8afea2..283b3ee 100644
  Your job is as much about **context economy** as correctness: the supervisor should
  receive a short, precise account of what broke and why, never a wall of test output.
 diff --git a/bridge/commands/calibrate-bridge.md b/bridge/commands/calibrate-bridge.md
-index b9a2fd1..fdf80ce 100644
+index b9a2fd1..d63f715 100644
 --- a/bridge/commands/calibrate-bridge.md
 +++ b/bridge/commands/calibrate-bridge.md
 @@ -44,6 +44,16 @@ python ~/.claude/cursor-bridge/conformance-check.py
@@ -78,9 +78,9 @@ index b9a2fd1..fdf80ce 100644
 +**The `Windowless test suite` floor is the one written during this calibration**, before the project resumes, since a suite without it can open a window for every program it starts (rule 24). Where the check prints it `MISSING` for a pytest suite:
 +
 +1. Run the project's recorded suite once, with `-rA` added where the command lacks it, in the background through the launcher: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite command> -rA > run/agent/calibrate-suite-before.out 2>&1`, under the heavy launch's `timeout` (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 3; the run waits for the computer's one slot). Read the output file when its completion arrives.
-+2. Have `cursor-configurator` write the default from `~/.claude/cursor-bridge/windowless-default.snapshot.md` exactly as configuration writes it (`Cursor-Project-Configuration.md` §2, the windowless-default item): the test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block inserted once into the one that exists, every other line left as it stands.
++2. Have `cursor-configurator` write the default from `~/.claude/cursor-bridge/windowless-default.snapshot.md` exactly as configuration writes it (`Cursor-Project-Configuration.md` §2, the windowless-default item): the test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block inserted once at the end of the one that exists, every other line left as it stands.
 +3. Run the same suite once more the same way, into `run/agent/calibrate-suite-after.out`, and read it when its completion arrives.
-+4. Compare the two reports' failed test ids. A failure present before the write is the project's own: it is recorded, and the write stands. A failure present only after the write is the insert's: it leads the report's first line, the insert is reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named in the report. Otherwise the write is committed as the calibration's checkpoint.
++4. Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's exit status. A failure or error present before the write is the project's own: it is recorded, and the write stands. A failure or error present only after the write, fewer tests collected after it than before, or an after-run ending in pytest's exit 2 to 5 (interrupted, an internal error, a usage error such as a `conftest.py` that fails to import, no tests collected) where the before-run did not, is the insert's: it leads the report's first line, the insert is reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named in the report. Otherwise the write is committed as the calibration's checkpoint.
 +5. Write the two runs' results on the `Calibrated:` line (step 5).
 +
 +It is a configuration item: no gate is reopened, and the loop resumes after it. A Node suite's NOTE (its default is not shipped yet) is recorded in `PROJECT_STATUS.md` like any NOTE.
@@ -110,7 +110,7 @@ index b9a2fd1..fdf80ce 100644
  
  Report under the "Reporting to the user" rules — first line is the one thing they own or
 diff --git a/bridge/commands/supervisor.md b/bridge/commands/supervisor.md
-index 025ab92..f6073e2 100644
+index 025ab92..9bf07a8 100644
 --- a/bridge/commands/supervisor.md
 +++ b/bridge/commands/supervisor.md
 @@ -218,12 +218,12 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
@@ -150,8 +150,17 @@ index 025ab92..f6073e2 100644
  25. Refactoring — removing duplication or simplifying while keeping the same functionality —
      happens only in the stage-close pass (Phase 6 step 9), never inside a feature increment
      and never by the builder on its own initiative. One branch per stage, one small commit
+@@ -766,7 +770,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep
+ 41. The project's state lives in two bounded files, both read whole at every start and resume: `PROJECT_STATUS.md` (where the work is — rewritten in place, within 120 lines and 12,000 characters) and `INVENTORY.md` (what the software is — Features, Resources, Decisions, Deferred — edited in place, updated in the same commit as each `CHANGES.md` entry, and entered the moment the owner provides a resource). Look it up before you ask or propose: never ask the owner for something Resources already lists, never propose what Features already has, never reverse a Decision without quoting its reason and the circumstance that changed. Private memory is not project state. `inventory-check.py` runs at every reflection point and must pass. `project.json` at the Workspace root states the fundamentals for people and programs
+     and is brought up to date at every reflection point.
+ 42. Every builder run ends with an `Assumed, not verified` list — it is in the Done section of every brief — because the run is one-shot and where the builder guessed is lost when it ends. Copy it before anything else; a missing list is *unknown*, never *none*. Give every item one disposition — test, contract, council, or accepted (a Decisions row) — record them in the accept commit's `Assumptions:` body, and hand the list to the reviewers (Review B through `run/review/ASSUMPTIONS-<nnn>.md`) as extra places to look, never as their scope. At every stage close and at project end, name your own three least-confident parts, each with the check that settles it, in `HARDENING.md`, and settle the testable ones before the next stage.
+-43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background agent, or a background command **of a kind that finishes**, is still running — its completion notification wakes you: a builder run, a Review B run, the CI watch, or a test suite you await, run through the launcher (`--limit auto --kind test`), or a benchmark, or a test runner the launcher does not know by name (it answers exit 125), run directly in the background, each marked with the comment `# wake` (a wrapper of the project's own that itself calls the launcher is marked `# wake builder` or `# wake review`, and the guard gives it that kind's ceiling; 2026.10.11c); an unknown runner also gets an Issues entry naming it, so the launcher learns it. A background command of yours is ended with `python ~/.claude/cursor-bridge/bridge-stop.py <run id>` (a launcher run, from its pid file) or `--pid <pid>`, which ends its whole process tree after checking that the pid is still the launcher's (a loop not started through the launcher: its pid from `tasklist /V /FI "IMAGENAME eq bash.exe"`, then `--pid`); `TaskStop` ends the loop and not its children, which is how a stopped verification loop advanced into its next driver (KP-056). A reviewer that ends at its turn limit (`maxTurns`) without a verdict is no verdict: run it once more on the part of the diff it had not reached, then record an issue. A server, a worker or a probe you started is never a wake source: it never finishes, so nothing would wake you (KP-031). A background agent counts only under its ceiling, an hour unless `Agent ceiling:` in the run parameters says more (release A2, plan 10.3): when you end a turn to wait for one, write it on the status file's `In flight:` line (or, while a review runs on a snapshot, in `run/supervisor/in-flight.md`, copied to the status file after `verify`, so the reviewed tree is not changed) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the agent>"` (copy the command the loop guard's refusal prints, with the Bash tool's `timeout` at its seconds plus a minute, in milliseconds; the timer's completion wakes you at the ceiling), because a hung agent never completes, and a scheduled wake-up (`CronCreate`) does not fire while a background agent runs, since the session is not idle for the scheduler (KP-043, proven 2026-10-11; KP-039 for the clock arithmetic of any wake-up you still schedule for an idle wait); at that wake-up or at any checkpoint, stop an agent older than its ceiling with `TaskStop` and run its task again in the foreground, where the reviewer's turn limit bounds it; the loop guard refuses a stop that waits on an agent with no timer running to its ceiling — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase. It reads the background tasks and scheduled wake-ups Claude Code hands it, and the session record only when that list is absent.
++43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background agent, or a background command **of a kind that finishes**, is still running — its completion notification wakes you: a builder run, a Review B run, the CI watch, a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run, run through it too (`--kind driver`), or a benchmark, or a test runner the launcher does not know by name (it answers exit 125), run directly in the background, each marked with the comment `# wake` (a wrapper of the project's own that itself calls the launcher is marked `# wake builder` or `# wake review`, and the guard gives it that kind's ceiling; 2026.10.11c); an unknown runner also gets an Issues entry naming it, so the launcher learns it. A background command of yours is ended with `python ~/.claude/cursor-bridge/bridge-stop.py <run id>` (a launcher run, from its pid file) or `--pid <pid>`, which ends its whole process tree after checking that the pid is still the launcher's (a loop not started through the launcher: its pid from `tasklist /V /FI "IMAGENAME eq bash.exe"`, then `--pid`); `TaskStop` ends the loop and not its children, which is how a stopped verification loop advanced into its next driver (KP-056). A reviewer that ends at its turn limit (`maxTurns`) without a verdict is no verdict: run it once more on the part of the diff it had not reached, then record an issue. A server, a worker or a probe you started is never a wake source: it never finishes, so nothing would wake you (KP-031). A background agent counts only under its ceiling, an hour unless `Agent ceiling:` in the run parameters says more (release A2, plan 10.3): when you end a turn to wait for one, write it on the status file's `In flight:` line (or, while a review runs on a snapshot, in `run/supervisor/in-flight.md`, copied to the status file after `verify`, so the reviewed tree is not changed) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the agent>"` (copy the command the loop guard's refusal prints, with the Bash tool's `timeout` at its seconds plus a minute, in milliseconds; the timer's completion wakes you at the ceiling), because a hung agent never completes, and a scheduled wake-up (`CronCreate`) does not fire while a background agent runs, since the session is not idle for the scheduler (KP-043, proven 2026-10-11; KP-039 for the clock arithmetic of any wake-up you still schedule for an idle wait); at that wake-up or at any checkpoint, stop an agent older than its ceiling with `TaskStop` and run its task again in the foreground, where the reviewer's turn limit bounds it; the loop guard refuses a stop that waits on an agent with no timer running to its ceiling — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase. It reads the background tasks and scheduled wake-ups Claude Code hands it, and the session record only when that list is absent.
+ 44. Done is measured against the requirements register, not against the plan. Every requirement the owner stated, supplied, or approved — each screen and state of the approved mockup included — is a row in `docs/REQUIREMENTS.md` with an ID; every build-plan increment names the IDs it satisfies; tests carry the IDs they prove. Only the owner defers or drops a requirement, with a date. `completion-check.py --mode plan` passes at the plan gate and every stage close; `--mode done` must pass before "Project complete" and runs first in every change cycle, so an inherited "done" is verified, never trusted. A stand-in in shipped code is a failure, not a feature.
+ 45. Design is diagram-based. The Project Design Document is `docs/DESIGN.md` plus the normative diagrams in `docs/diagrams/`, drawn per `Diagram-Planning-Conventions.md`: every catalogue kind selected or omitted with a reason; top-down, level by level, drafted by `diagram-specialist` subagents and integrated by you; Level 4-5 detail only where it is load-bearing, with the reason recorded; every normative diagram enforced by a deterministic check, tests, or a named review item. `diagram-check.py --mode design` passes before the design gate, `--mode code` at step 4 of every increment and every stage close, `--mode done` at project end. Briefs carry the diagram slices their increment touches. The terms in `Glossary.md` are the bridge's vocabulary; use them in that sense in everything you write.
+ 46. The build plan is explicit. Every increment states its parent, dependencies, parallel flag, requirements, diagrams, and scope; stages are vertical slices; status is derived from the commits on `origin/main`, never written by hand. `plan-check.py` passes at the plan gate and lists what is ready. With `Parallel increments: on`, the builders of ready increments it lists as `TOGETHER` may run at once, each in its own worktree with `--workspace`, committing their own work; you never work inside a worktree, and you process the finished branches one at a time in your own checkout — scope, diagrams, reviews, tests, gate, merge.
 diff --git a/bridge/cursor-bridge/Cursor-Project-Configuration.md b/bridge/cursor-bridge/Cursor-Project-Configuration.md
-index ca660f3..a8ba91d 100644
+index ca660f3..6c07fbc 100644
 --- a/bridge/cursor-bridge/Cursor-Project-Configuration.md
 +++ b/bridge/cursor-bridge/Cursor-Project-Configuration.md
 @@ -144,6 +144,24 @@ and fix its own lint/type errors without a human in the loop.
@@ -167,7 +176,7 @@ index ca660f3..a8ba91d 100644
 +  suite makes without creation flags of its own `CREATE_NO_WINDOW`. `cursor-configurator`
 +  creates the test root's `conftest.py` from the block only where the test root has none
 +  (`tests/conftest.py`, with its folder, where the project has no test root yet); where one
-+  exists it inserts the block once, unless the file already holds its three tokens
++  exists it inserts the block once, at the file's end, unless the file already holds its three tokens
 +  (`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), and leaves every other line as
 +  it stands. The conformance check's floor `Windowless test suite` checks it: OK where the
 +  test root's or the rootdir's `conftest.py` holds the three tokens, MISSING otherwise. A
@@ -189,7 +198,7 @@ index ca660f3..a8ba91d 100644
  4. §4 any other MCP tools the build needs (escalate secrets).
  5. §5 at most one *project-specific* cross-cutting rule, only if warranted; write the
 diff --git a/bridge/cursor-bridge/Known-Pitfalls.md b/bridge/cursor-bridge/Known-Pitfalls.md
-index 7a59f03..b26af98 100644
+index 7a59f03..a290e60 100644
 --- a/bridge/cursor-bridge/Known-Pitfalls.md
 +++ b/bridge/cursor-bridge/Known-Pitfalls.md
 @@ -489,7 +489,7 @@ it applies.**
@@ -206,7 +215,7 @@ index 7a59f03..b26af98 100644
  - **Surfaced:** reAngle, 2026-10 (ISS-017, twice): a driver that patches a product file and restores it in `finally` was killed mid-run (a dropped builder connection; a `TaskStop` of a background bash loop on Windows, which leaves the loop and its children running), and mutants stayed in the product; once the builder re-anchored its drivers around the mutated code.
  - **Cause:** a killed process never reaches its `finally`, and a stopped loop on Windows does not stop its children.
 -- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver; the driver is written on the supervisor's side with the criterion tests, never by the builder (2026.10.11d); until then only between drivers, its `bash.exe` first; a driver aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
-+- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver; the mutants are written on the supervisor's side, in its mutants file with the criterion tests, never by the builder (2026.10.11d), and since release B the bridge's `mutation-run.py` applies them on a scratch copy of the Workspace, launched through the launcher's driver kind, so a run killed at any point leaves no mutant in the product (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 4); until then only between drivers, its `bash.exe` first; a driver aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
++- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver (before that release, only between drivers, its `bash.exe` first); the mutants are written on the supervisor's side, in its mutants file with the criterion tests, never by the builder (2026.10.11d), and since release B the bridge's `mutation-run.py` applies them on a scratch copy of the Workspace, launched through the launcher's driver kind, so a run killed at any point leaves no mutant in the product (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 4); a driver that edits product files in place aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
  - **Applies:** every mutation or fault-injection driver that edits product files. The sign: `git status` showing a product file changed after a test run.
  
  ### KP-057 — An orphaned server held a delegation open for six hours through an inherited output pipe
@@ -220,21 +229,21 @@ index 7a59f03..b26af98 100644
  
  ### KP-062 — A design critique ran 45 rounds on one change, and the four-round ceiling stopped nothing
 diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
-index 55c64b5..9db205b 100644
+index 55c64b5..9ac7cb4 100644
 --- a/bridge/cursor-bridge/MANIFEST.json
 +++ b/bridge/cursor-bridge/MANIFEST.json
 @@ -1,27 +1,27 @@
  {
    "version": "2026.10.25a",
 -  "generated": "2026-10-27 14:16",
-+  "generated": "2026-10-27 21:21",
++  "generated": "2026-10-27 22:05",
    "files": {
 -    "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
-+    "agents/cursor-configurator.md": "5c03e66bbbdb380316a2330a9d9cc8952df66cde9db945c59d61bb9a7ef171fd",
++    "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
      "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
      "agents/diagram-specialist.md": "7105060c84d870d933be43675b410c90c1e04df6029f92ad4146884c57d2fee5",
 -    "agents/diff-reviewer.md": "91bd2cd177d30b19a3524cc16851a31ede37a64c166afcdd4d24f1e7306a5c6e",
-+    "agents/diff-reviewer.md": "b755cd26a30a740ba3ec2a3f1cb11b1fe550bd71bf48e09b9a85373db4e5f3d8",
++    "agents/diff-reviewer.md": "c8c61cdac4b47c36e0f7e3d257bc2b5bf6ffd88082101216c2295bca97a81262",
      "agents/plan-critic.md": "73185f362894efe04bc0feffe49c4abbbd425a13d00707aabff7bbf661bc3cc2",
      "agents/refactor-scout.md": "8e077479f19b7c4a7a45e5ad38c9935d5b660a6b5f58a2ed0f608facb1dfdbc6",
      "agents/secret-sentinel.md": "ee011fcf065ad01f98e7b9b16f6081d826983a12eeb9ebff2764d5bc05ad81db",
@@ -244,19 +253,19 @@ index 55c64b5..9db205b 100644
 -    "commands/calibrate-bridge.md": "7273e5317e02bffba0c142bc90ecf3026c905a35b0b164e27ff1931835be168d",
 +    "agents/spec-packager.md": "70faa2125b64dfaef114c5a427df9ebcc266d167a03548b2d247e199bf2867da",
 +    "agents/test-runner.md": "abbaa2acc5252dc9357906a4e06fb9a3d49078659c54645fd85068a905c25d36",
-+    "commands/calibrate-bridge.md": "ea82adb3140cc0a4afd2007de534971c3b6e04d175b63aa3ae08139e13a7e774",
++    "commands/calibrate-bridge.md": "c6ef22fd633c98466e036e48bc9b2f6ba726e7763ab32c677d1dcb8439cd4e4c",
      "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
 -    "commands/supervisor.md": "992ae547385446e2680a6f5f15c2d09690cfebe4bc085fbde9015e5cf9011227",
-+    "commands/supervisor.md": "e4fc6627f2ac2b1b2395cc3e592b623b821ff60c924c4347c364de7f405d9f56",
++    "commands/supervisor.md": "44b3e381cd1268d4f027ea188ee926872fd6ce498530893c9d580ff137c73ba5",
      "cursor-bridge/CHANGELOG.md": "99f191412284771d071efc9e6affddc134778145dca068fb020fb837d1f75181",
      "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
 -    "cursor-bridge/Cursor-Project-Configuration.md": "c9b287a8156d327c6e0a0fe9c085e648e692ab88d02f41488a524d75d5724857",
-+    "cursor-bridge/Cursor-Project-Configuration.md": "16a664d1d80b96aaef79ea8d287fb4c3ef4f28a58b5060463eeef29038cae4bd",
++    "cursor-bridge/Cursor-Project-Configuration.md": "d106ea5df69f28ff3ecb23daf034b49581d8d4f94e1fc314833b55a5fdebf468",
      "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
      "cursor-bridge/Diagram-Planning-Conventions.md": "f8e3b7839c7c7466b6bb9654f51bf9d9249973ab5ed9f8e10901ce4392f9cc4d",
      "cursor-bridge/Glossary.md": "17b153fad571ce6e23e117244f366e9c96b035307c6653010df5accab8003d08",
 -    "cursor-bridge/Known-Pitfalls.md": "90828fd942a0aea208160cb9908faaa7ca7870fcd3ebbfc29106012621b5e387",
-+    "cursor-bridge/Known-Pitfalls.md": "03dd03df12523da8058ced17c2b859d35d5177e4f1575a281111bdcd1d8f1a6d",
++    "cursor-bridge/Known-Pitfalls.md": "9ed0485d1bd0065473562f61a7b09de8afe3ad07a0d074d055b3885f6d9a6d06",
      "cursor-bridge/Merge-Verification-Policy.md": "199f265a528d5e164a534ef1b1c34035ed0cd342deaddc592f81b6b07c97b06a",
      "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
      "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
@@ -266,9 +275,9 @@ index 55c64b5..9db205b 100644
      "cursor-bridge/workflow/phases/change-cycle.md": "8b4c12bd4afc80a4adcb2dfbd4ddecb0b5d20848805addd41daf6f04eeb3b37a",
 -    "cursor-bridge/workflow/phases/configuration.md": "4bcb7792438ac85fa7b3246d70c8a0e042d6f0860670e0649c4bf11a4ddf4142",
 -    "cursor-bridge/workflow/phases/delegation-loop.md": "baa4e3203e2ea4ab6ee5962e07c92e2ab4bff7e6ab41b8fb0dddb4703ed73f7e",
-+    "cursor-bridge/workflow/phases/configuration.md": "c3be6632b199ca74c8631b80f22e4ef77f8ee454b34826d45ddc035f3d5dd500",
-+    "cursor-bridge/workflow/phases/delegation-loop.md": "e0d437515baa00e2957f2cada5dfda602cfbcb606aad614fb347678746816cd1",
-+    "cursor-bridge/workflow/phases/delegation-loop/decide.md": "14677e6c48902e28bcb31b443028447ffa12688896d4f885a4eaf7b1fc61ac5c",
++    "cursor-bridge/workflow/phases/configuration.md": "6a4e1c83c3b0ac33db272560b0c790c36994e335c86c9d2d79abea2dad44a2d4",
++    "cursor-bridge/workflow/phases/delegation-loop.md": "ff953059e943a3e697287865a5980a3999c2bfc71313a0506912b8646310f0fd",
++    "cursor-bridge/workflow/phases/delegation-loop/decide.md": "faf8e2157ce09343ffd2724c40a0019c65be3256ceb42c893319aeae67bf4af9",
      "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "40065539a1b0a098569db3d6c35198e0cff7179725ba2bba019287cfa175d987",
      "cursor-bridge/workflow/phases/design.md": "ec2a5a07747b0ff64bcb56599bd4d556870b01fc26a121abd76053943784d5a7",
      "cursor-bridge/workflow/phases/intake.md": "fcea3b5f3ef5d8631cddd901821f0540585be130328b7d83ab56af70fd1916d0",
@@ -282,7 +291,7 @@ index 55c64b5..9db205b 100644
      "cursor-bridge/workflow/traits/external-services.md": "83f325922b7d816d5040e99a58f0d31e5dc05ccf5324fa3f1ce999759e068034",
      "cursor-bridge/workflow/traits/has-screens.md": "665507e53b95f5c63feb052e0a61e6ebdfeca2edf81939ade91fb7ca8dfde82b",
 diff --git a/bridge/cursor-bridge/workflow/phases/configuration.md b/bridge/cursor-bridge/workflow/phases/configuration.md
-index 7ebc177..af289a6 100644
+index 7ebc177..9ff3376 100644
 --- a/bridge/cursor-bridge/workflow/phases/configuration.md
 +++ b/bridge/cursor-bridge/workflow/phases/configuration.md
 @@ -87,6 +87,10 @@ account, or a dependency carrying a consequence the owner bears (money, privacy,
@@ -291,13 +300,13 @@ index 7ebc177..af289a6 100644
  
 +### The windowless test suite
 +
-+Every project's test suite carries the bridge's frozen windowless default (rule 24), written by **cursor-configurator** with the items above (`Cursor-Project-Configuration.md` §2, its windowless-default item). For a pytest suite the default is the fenced block of `~/.claude/cursor-bridge/windowless-default.snapshot.md`, which gives every launch the suite makes without creation flags of its own the flag that opens no window: the configurator creates the test root's `conftest.py` from the block only where the test root has none (`tests/conftest.py`, with its folder, where the project has no test root yet), and where one exists inserts the block once, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), leaving every other line as it stands. The conformance check's floor `Windowless test suite` checks it at every calibration and reflection point. A Node suite has no default yet: the check gives it a NOTE naming its runner and KP-059's mechanism, which you record in the status file. Whatever the runner, the suite itself runs through the launcher, which starts it windowless (`delegation-loop.md`, step 4).
++Every project's test suite carries the bridge's frozen windowless default (rule 24), written by **cursor-configurator** with the items above (`Cursor-Project-Configuration.md` §2, its windowless-default item). For a pytest suite the default is the fenced block of `~/.claude/cursor-bridge/windowless-default.snapshot.md`, which gives every launch the suite makes without creation flags of its own the flag that opens no window: the configurator creates the test root's `conftest.py` from the block only where the test root has none (`tests/conftest.py`, with its folder, where the project has no test root yet), and where one exists inserts the block once, at the file's end, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), leaving every other line as it stands. The conformance check's floor `Windowless test suite` checks it at every calibration and reflection point. A Node suite has no default yet: the check gives it a NOTE naming its runner and KP-059's mechanism, which you record in the status file. Whatever the runner, the suite itself runs through the launcher, which starts it windowless (`delegation-loop.md`, step 4).
 +
  ### Keeping the position
  
  While the phase runs, keep the status file's `Next:` line naming the items configured so far and the next one, rewritten as each is finished, so that a resume after a compaction neither redoes an item nor skips one. It names each item by its name only, never a key's value or a path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the line names the first increment, and what was configured stands in the status file, as "Commit the configuration as its own checkpoint" above asks, with each tool's pinned version in `docs/INVENTORY.md` (Resources).
 diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop.md b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
-index 68d4275..e44c1e7 100644
+index 68d4275..da6ac2c 100644
 --- a/bridge/cursor-bridge/workflow/phases/delegation-loop.md
 +++ b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
 @@ -4,19 +4,20 @@
@@ -354,7 +363,7 @@ index 68d4275..e44c1e7 100644
 +
 +The `--model` value is copied from `docs/ROSTER.resolved.json` (step 1), never typed from memory; the stderr redirect keeps the CLI's own messages in a file, which is what the automatic model switch (step 3b) reads. (`run/agent/` is gitignored.)
 +
-+**Every background launch carries the Bash tool's own `timeout`**, in milliseconds: without it the tool may end a background command after thirty minutes, before the launcher's limit, mid-work and with no report (the TDP's TASK-157 r13d, KP-053, observed once). A review, a CI watch or a wake-timer bounding an agent takes the review cap, twice the launcher's default for a review: `7200000` (a learned `--limit auto` never exceeds the cap). A **heavy launch** — a builder, a test suite or a mutation run (`--kind builder`, `test` or `driver`) — may wait for the computer's one slot before its command starts (step 3b), so it takes the **heavy launch's duration**: the kind's cap, plus the slot wait's bound (the builder's cap, 14,400 s, plus a grace of 120 s), plus the waiter's reporting minute. That is 28,980 s for a builder or a mutation run, a `timeout` of `28980000`, and 18,180 s for a test suite, a `timeout` of `18180000`. The same `timeout` goes on every heavy launch and on a wake-timer that waits for one, and the loop guard counts the same duration with its own notification grace on top. The heavy launch's figures stand here and nowhere else; every other text names this paragraph.
++**Every background launch carries the Bash tool's own `timeout`**, in milliseconds: without it the tool may end a background command after thirty minutes, before the launcher's limit, mid-work and with no report (the TDP's TASK-157 r13d, KP-053, observed once). A review or a CI watch takes the review cap, twice the launcher's default for a review: `7200000` (a learned `--limit auto` never exceeds the cap); a wake-timer bounding an agent takes its own seconds plus a minute (rule 43). A **heavy launch** — a builder, a test suite or a mutation run (`--kind builder`, `test` or `driver`) — may wait for the computer's one slot before its command starts (step 3b), so it takes the **heavy launch's duration**: the kind's cap, plus the slot wait's bound (the builder's cap, 14,400 s, plus a grace of 120 s), plus the waiter's reporting minute. That is 28,980 s for a builder or a mutation run, a `timeout` of `28980000`, and 18,180 s for a test suite, a `timeout` of `18180000`. The same `timeout` goes on every heavy launch and on a wake-timer that waits for one, and the loop guard counts the same duration with its own notification grace on top. The heavy launch's figures stand here and nowhere else; every other text names this paragraph.
 +
 +**The launcher** gives the run its ceiling (`--limit auto`: two hours until a healthy run of this project has taught it more, never above four without the owner's words; release A2) and kills the whole process tree at it (exit code 124), and withholds the owner's GitHub identity from the builder (KP-032, KP-033). Exit 124 is handled in step 3b: inspect the tree first, because a builder that hung on its way out may have finished its work.
 +
@@ -369,9 +378,9 @@ index 68d4275..e44c1e7 100644
 +
 +A heavy launch (step 3) first takes the computer's one slot, which one builder, test suite or mutation run holds at a time. While another run holds it, the launcher waits and prints `bridge-run: waiting for the slot held by <kind> <run id> since <start>, ends by <end>` once a minute, then `bridge-run: slot taken <time>` as the command starts; these lines go to the run's output file (the `.err` file of a builder, the `.out` file of a suite or a mutation run). A run waiting for the slot is the launcher's business: it is never a reason to start the command another way. Nothing below is a model's failure, and no exit below is passed to `roster-check.py`:
 +
-+- **Exit 123 — the slot was not free.** The wait ended unmet (`bridge-run: slot not free - held by ...`), so the command never started and nothing was spent. Wait for the holder's end with `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the run that waits>"` in the background, the seconds being the time left until the `ends by` time the exit line printed, or zero when it has passed; then relaunch once, unchanged. A second 123 naming a holder is retried twice more the same way; after that, tell the owner, naming the holder's kind and run id. A 123 reading `held by unknown` (the launcher waited its provisional bound and never read a live holder's record) relaunches at once, and a second such 123 in a row is told to the owner at once, naming `~/.cursor-bridge/heavy.lock`: it is a sign of a defect, not of a busy computer.
++- **Exit 123 — the slot was not free.** The wait ended unmet (`bridge-run: slot not free - held by ...`), so the command never started and nothing was spent. Wait for the holder's end with `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the run that waits>"` in the background, the seconds being the time left until the `ends by` time the exit line printed, or zero when it has passed; then relaunch once, unchanged. The timer's closing line, which tells you to run a task in the foreground, does not apply here: its completion means the relaunch, through the launcher. A second 123 naming a holder is retried twice more the same way; after that, tell the owner, naming the holder's kind and run id. A 123 reading `held by unknown` (the launcher waited its provisional bound and never read a live holder's record) relaunches at once, and a second such 123 in a row is told to the owner at once, naming `~/.cursor-bridge/heavy.lock`: it is a sign of a defect, not of a busy computer.
 +- **A waiter killed from outside** — its output file holds waiting lines and neither `slot taken` nor `bridge-run: exit` (KP-053) — is relaunched; nothing was spent.
-+- **A mutation run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no `bridge-run: exit` line) — is relaunched once and continues from its cache: the kills it recorded stand (step 7).
++- **A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no `bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it recorded standing (step 7), and a program under `run/supervisor/` starts again.
 +
  ### 4. Inspect
  
@@ -423,9 +432,9 @@ index 68d4275..e44c1e7 100644
 +
 +**The mutants are yours; the engine is the bridge's.** The increment's mutants are written here too, on your side, after the builder's run and never by the builder, in its mutants file `run/supervisor/<id>-mutants.json` (`<id>` the increment's ID): each mutant's `id`, its `file` and `pairs` (the text it replaces and the text it puts in its place), the test files it runs (`tests`) and the test ids that must fail (`expect_fail`), with the criterion tests those name, which are yours too (the brief's mutation list is the builder's own in-process check, by hand, no script of it in the diff). A builder's mutants are judged by nobody, and five that did not model their names once cost three rounds (reAngle TASK-010c); `diff-reviewer` reads your mutants file against each mutant's name as it reads a test against its paragraph, and a fix brief after a driver run asks for the code fix only. The engine that applies each mutant, runs its tests and records the outcome is the bridge's `mutation-run.py`, reviewed at the bridge's own gate; it works on a scratch copy of the Workspace and so restores nothing in it. A **driver** is a Python program under `run/supervisor/` or a `mutation-run.py` run, and nothing else, and every mutation run is a `mutation-run.py` run through the launcher's driver kind (`--kind driver`), in the background under the heavy launch's `timeout` (step 3, "The model, the timeout and the limit") like a suite, since a foreground launcher call ends at ten minutes (KP-061); the step resumes when its completion arrives. `# wake` is not available for a driver: it stays for a benchmark or a runner the launcher does not know, each named with its reason in the status file. A driver run you must end is ended whole with `bridge-stop.py` (KP-056). The full mutation run comes at step 7, once the increment's behaviour is accepted (`delegation-loop/decide.md`, see "The mutation run").
 +
-+**Every suite is the launcher's.** A suite is the project's recorded suite command, or any run of more than the increment's own test files. Delegate to `test-runner` for the increment's tests and the suite, naming the increment's test files (the brief's test paths plus `git diff --name-only <checkpoint> -- <the test folders>`), so it knows which skips are the increment's: a test of the increment that was skipped fails the step, like a failed one (a builder has reported passing tests that had been skipped). The suite runs through the launcher in the background, whatever its length: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite command> > run/agent/TASK-<nnn>-suite.out 2>&1`, under the heavy launch's `timeout` (step 3); its completion wakes you, and `test-runner` then reads that file. The launcher starts it windowless and in the computer's one slot, and the Bash tool ends a foreground command at ten minutes (600 seconds, KP-061), so a suite never runs in the foreground and its expected length no longer chooses the path. A run of the increment's own test files alone may run in the foreground, yours or `test-runner`'s, since this session's console is hidden (a probe of 2026-10-20). A runner the launcher does not know answers 125 and runs directly in the background with `# wake` (rule 43), named with its reason in the status file.
++**Every suite is the launcher's.** A suite is the project's recorded suite command, or any run of more than the increment's own test files. Delegate to `test-runner` for the increment's tests and the suite, naming the increment's test files (the brief's test paths plus `git diff --name-only <checkpoint> -- <the test folders>`), so it knows which skips are the increment's: a test of the increment that was skipped fails the step, like a failed one (a builder has reported passing tests that had been skipped). The suite runs through the launcher in the background, whatever its length: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite command> > run/agent/TASK-<nnn>-suite.out 2>&1`, under the heavy launch's `timeout` (step 3); its completion wakes you, and `test-runner` then reads that file. The launcher starts it windowless and in the computer's one slot, and the Bash tool ends a foreground command at ten minutes (600 seconds, KP-061), so a suite never runs in the foreground and its expected length no longer chooses the path. A run of the increment's own test files alone may run in the foreground, yours or `test-runner`'s, since this session's console is hidden (a probe of 2026-10-20), where it ends within the ten minutes a foreground command has (KP-061); a longer one runs through the launcher like a suite. A runner the launcher does not know answers 125 and runs directly in the background with `# wake` (rule 43), named with its reason in the status file.
 +
-+**Then every new test runs once against the checkpoint's code**, through the same engine: list the increment's new tests in the mutants file's `new_tests` (a new test file by its path, a changed file by its new tests' ids), stage them (`git add`), and launch `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json --checkpoint <the increment's checkpoint commit> > run/agent/<id>-checkpoint.out 2>&1` in the background like any mutation run. The program runs the listed tests on a copy of the tree at that commit, so no worktree of your own is needed (rule 39's `old-<nnn>` worktree stays unused). Exit 4 means a listed test passed on the old code: a test that passes against the old code proves nothing (a test written from a misread specification once made wrong code pass every gate), so each test the output marks `passing on old code` goes back to be rewritten before any reviewer reads the diff. A test the output marks `not run` (it cannot collect, or ran nothing, on the old code) is neither pass nor fail, and is said. Exit 3 stops the step: it is the run's own result, recorded as such, never a model failure; exit 2 is a refused file or path, fixed before the run is launched again. Exit 0 lets a reviewer judge a tested diff.
++**Then every new test runs once against the checkpoint's code**, through the same engine: list the increment's new tests in the mutants file's `new_tests` (a new test file by its path, a changed file by its new tests' ids), stage them (`git add`), and launch `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json --checkpoint <the increment's checkpoint commit> > run/agent/<id>-checkpoint.out 2>&1` in the background like any mutation run. The program runs the listed tests on a copy of the tree at that commit, so no worktree of your own is needed (rule 39's `old-<nnn>` worktree stays unused). Exit 4 means a listed test passed on the old code: a test that passes against the old code proves nothing (a test written from a misread specification once made wrong code pass every gate), so each test the output marks `passing on old code` goes back to be rewritten before any reviewer reads the diff. A test the output marks `not run` (it cannot collect, or ran nothing, on the old code) is neither pass nor fail, and is said. Exit 3 stops the step: it is the run's own result, recorded as such, never a model failure; exit 2 is a refused file or path, fixed before the run is launched again, or the program's resolution check refusing the run (`resolves outside the copy`, `module from Workspace path ... was loaded`), as an editable install of the package makes it (KP-054): no correction of the file helps, so the step records "not run against the checkpoint: editable install", and the reviewer's check of each test against its paragraph stands in. Exit 0 lets a reviewer judge a tested diff.
 +
 +#### The reviewers
  
@@ -529,7 +538,7 @@ index 68d4275..e44c1e7 100644
  
 diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md b/bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md
 new file mode 100644
-index 0000000..3ba44f8
+index 0000000..4380121
 --- /dev/null
 +++ b/bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md
 @@ -0,0 +1,117 @@
@@ -628,7 +637,7 @@ index 0000000..3ba44f8
 +
 +#### The mutation run
 +
-+The increment's mutants are in its mutants file, `run/supervisor/<id>-mutants.json`, which you wrote at step 4 with the criterion tests, never the builder. The mutation run is launched here, on every pass through this step: once Review A and the auditors have accepted the increment's behaviour, and before step 8's snapshot; never at every round's step 4 (the owner's decision of 2026-10-20: the mutation run comes when the increment is otherwise accepted, not every round). The new tests' run against the checkpoint (`--checkpoint`) stays at step 4, before any reviewer. Launch the run in the background through the launcher's driver kind, under the heavy launch's `timeout` (`delegation-loop.md`, step 3):
++The increment's mutants are in its mutants file, `run/supervisor/<id>-mutants.json`, which you wrote at step 4 with the criterion tests, never the builder. The mutation run is launched here, on every pass through this step: once Review A and the auditors have accepted the increment's behaviour, and before step 8's snapshot; never at every round's step 4 (the owner's decision of 2026-10-20: the mutation run comes when the increment is otherwise accepted, not every round). The new tests' run against the checkpoint (`--checkpoint`) stays at step 4, before any reviewer. The Accept bullet's commit may come before the run; the move to the next increment waits for its result. Launch the run in the background through the launcher's driver kind, under the heavy launch's `timeout` (`delegation-loop.md`, step 3):
 +
 +```bash
 +python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json > run/agent/<id>-mutation.out 2>&1
@@ -647,8 +656,8 @@ index 0000000..3ba44f8
 +**What the run's result does:**
 +
 +- **Exit 0** — every mutant was killed, or keeps its kill: go on to step 8.
-+- **Exit 1** — a mutant survived or was not applied, or an `expect: survive` mutant was killed. Take the larger of the two next counts: the review guard's rounds opened for the increment plus one, and the launcher's round of the brief that would carry a code fix. Where it is at or below the code gate's ceiling of three rounds, the mutant is fixed: a criterion test's fix is yours and no round; a code fix is a re-delegation (above) and a round. Above the ceiling, the mutant goes to `docs/HARDENING.md` under the increment and never to a re-delegation, unless the code it shows untested is a safety mechanism the increment relies on, or the result shows a defect of a blocking class (behaviour against the brief or the register, security, data integrity, a defeated safety mechanism, a failing test).
-+- **Exit 2** — the mutants file or a path in it was refused: correct the file and launch again.
++- **Exit 1** — a mutant survived or was not applied, or an `expect: survive` mutant was killed. Take the larger of the two next counts: the review guard's rounds opened for the increment plus one, and the launcher's round of the brief that would carry a code fix. Where it is at or below the code gate's ceiling of three rounds, the mutant is fixed: a criterion test's fix is yours and no round; a code fix is a re-delegation (above) and a round. A mutant not applied (its text no longer in its file) is re-anchored in the mutants file, yours and no round; a fix of yours after Review A's read stands in the diff Review B reads at step 8. Above the ceiling, the mutant goes to `docs/HARDENING.md` under the increment and never to a re-delegation, unless the code it shows untested is a safety mechanism the increment relies on, or the result shows a defect of a blocking class (behaviour against the brief or the register, security, data integrity, a defeated safety mechanism, a failing test).
++- **Exit 2** — the mutants file or a path in it was refused: correct the file and launch again. Or the program's resolution check refused the run (`resolves outside the copy`, `module from Workspace path ... was loaded`), as an editable install of the package makes it (KP-054): no correction of the file helps, so the run is not made, `mutation run not made: editable install` goes on `run/supervisor/in-flight.md` and into the SCOPE file, and the reviewers' reading of each mutant against its name stands in; it is the run's own result, never a model failure.
 +- **Exit 3** — a mutant erred or the program failed: the step stops, and the result is the run's own, recorded as such, never a model failure; no exit of the program is passed to `roster-check.py`. A run that ended at its limit or was killed from outside is relaunched as step 3b says.
 diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
 index 7143063..7466298 100644
@@ -683,7 +692,7 @@ index 44804ba..6168b1d 100644
 +- **Lead for TASK-034:** step 8's SCOPE-file sentence asks for "the tests and mutation drivers you wrote with the paragraph each enforces"; since TASK-030 the supervisor writes a mutants file, which a driver run reads. TASK-034 rewrites that paragraph (the SCOPE file before the snapshot) and can say the mutants file there.
 +- **Lead for TASK-026's review:** session-start.py:571's fallback text, "(no digest found in supervisor.md; re-read the whole file)", tells a reader to read the core whole, which one Read call cannot (FB-036); it is outside TASK-035's four statements and in no planned Scope.
 diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
-index 40ee8d3..77c0ab0 100644
+index 40ee8d3..ebebdfe 100644
 --- a/docs/INVENTORY.md
 +++ b/docs/INVENTORY.md
 @@ -38,6 +38,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
@@ -699,15 +708,15 @@ index 40ee8d3..77c0ab0 100644
  | The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
  | TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
 -| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%), the figure TASK-030's brief starts from | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.9% of its characters after its split: a further addition moves another step into a sub-file first) |
-+| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 51,549 characters (85.9%), decide.md 117 lines and 12,323 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.9% of its characters after its split: a further addition moves another step into a sub-file first) |
++| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 52,298 characters (87.2%), decide.md 117 lines and 13,086 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 87.2% of its characters after TASK-030's move of step 7: a further addition moves another step into a sub-file first) |
  | The session-start hook's threat model is a partial, mismatched or hand-edited install, not a hostile checker: workflow-check.py runs in the hook's process and could write to its output directly. Inside it, nothing the checker returns reaches the output except as an exact str matching its pattern; what lies outside it is docs/HARDENING.md's (Stage B3, TASK-010 with TASK-015) | seven review rounds converged there; every guard past the model narrows a channel an in-process program can open another way | 2026-10-20, supervisor (TASK-015, by-class line) | the hook loads code other than the installed checker, or a finding inside the model |
  | The hook reads the workflow tables only at their installed paths (`~/.claude/cursor-bridge/workflow/open-list.md` and `extension-points.md`), only once the checker's own table paths compare equal to them, and refuses them behind a link at workflow/ or at either file | the link test and the read then concern the same files on every platform (TASK-015 R3-3, R4-3, R5-1) | 2026-10-20, supervisor (TASK-015) | the tables move |
  | TASK-015's accepted assumptions, each in f41f7cb's `Assumptions:` sections (C3 under its round-6 `Decisions:`): a trailing `;` on a pointer line is ignored, and `a.md;b.md` is one path, which fails the pattern (the brief's grammar, Requirements 4 and 7); a pointer line's files are not named when the tables fail (the one plain line stands for them); load_tables returns the path it was given through `slash` unchanged (workflow-check.py); a table key that is not an exact str names no file (HARDENING, Stage B3, decision C3); the checker touches neither `sys.stdout.buffer` nor `reconfigure` at import | each rests on the brief's grammar or on the installed checker as it is, and each fails closed (the plain line, or no file named) | 2026-10-20, supervisor (TASK-015; the row added 2026-10-23 at stage B3's review) | load_tables changes the path it returns, a checker touches stdout at import, or a checker returns keys of another type by design |
 diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
-index 5505ce3..edc8568 100644
+index 5505ce3..a64d714 100644
 --- a/docs/PROJECT_STATUS.md
 +++ b/docs/PROJECT_STATUS.md
-@@ -3,20 +3,20 @@ Last updated: 2026-10-27
+@@ -3,21 +3,21 @@ Last updated: 2026-10-27
  Phase: building
  Workflows: Host Extension Development → Claude Code Extension; traits: Installable
  Change cycle: none
@@ -730,11 +739,13 @@ index 5505ce3..edc8568 100644
  Delegated gates: none
 -Remote sync: main at the merge of PR #92, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
 -Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24; B4 (the first conditional workflows) — closed 2026-10-25: TASK-022 (PR #66), the plan revision (PR #67), TASK-017 to TASK-021 (PRs #68 to #72), BUG-020 (PR #73), REFAC-B4 (PR #74), the stage review's seven rounds fixed by BUG-021 to BUG-027 (PRs #75 to #81), closed at round 7 under the owner's cap; B5 (calibration and acceptance) in progress: HOTFIX-002 (PR #84), TASK-023 (PR #85), TASK-024 (PR #86), BUG-028 (PR #87, ISS-016), TASK-028 (PR #88), TASK-029 (PR #89), BUG-029 (PR #90), TASK-031 (PR #91), the plan revision maintainer-text (PR #92). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B4's close, 2026-10-25 (demonstration passed; the installed conformance check, run by the supervisor signed in to gh, 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-014 completed, ISS-015 recorded; Feedback FB-042 to FB-050; least confident in HARDENING; Project Summary patched)
+-Open issues: ISS-016 fixed by BUG-028 (a review-guard test recorded CPython's POSIX subprocess wait as the guard's sleep, failing PR #86's Linux job once, 2026-10-26). ISS-015 mitigated (stage B4's review ran seven rounds under the owner's decided three-round ceiling, which no program held yet, 2026-10-25; the ceiling applied by hand until TASK-030 and TASK-032 to TASK-035 hold it). ISS-014 fixed (the loop guard's cron_next missed a one-shot wake-up in the hour clocks repeat, 2026-10-25; BUG-020, PR #73). ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged; the plan check's rule is TASK-033's). ISS-012 fixed. ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; TASK-029's thirty-minute wait: a launcher run started from the Bash tool waited 34 min 49 s in the slot and reached slot taken, no outside kill (recorded 2026-10-26); the maintainer's record shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
 +Remote sync: main at the merge of PR #93, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
 +Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24; B4 (the first conditional workflows) — closed 2026-10-25: TASK-022 (PR #66), the plan revision (PR #67), TASK-017 to TASK-021 (PRs #68 to #72), BUG-020 (PR #73), REFAC-B4 (PR #74), the stage review's seven rounds fixed by BUG-021 to BUG-027 (PRs #75 to #81), closed at round 7 under the owner's cap; B5 (calibration and acceptance) in progress: HOTFIX-002 (PR #84), TASK-023 (PR #85), TASK-024 (PR #86), BUG-028 (PR #87, ISS-016), TASK-028 (PR #88), TASK-029 (PR #89), BUG-029 (PR #90), TASK-031 (PR #91), the plan revision maintainer-text (PR #92), TASK-030 (PR #93). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B4's close, 2026-10-25 (demonstration passed; the installed conformance check, run by the supervisor signed in to gh, 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-014 completed, ISS-015 recorded; Feedback FB-042 to FB-050; least confident in HARDENING; Project Summary patched)
- Open issues: ISS-016 fixed by BUG-028 (a review-guard test recorded CPython's POSIX subprocess wait as the guard's sleep, failing PR #86's Linux job once, 2026-10-26). ISS-015 mitigated (stage B4's review ran seven rounds under the owner's decided three-round ceiling, which no program held yet, 2026-10-25; the ceiling applied by hand until TASK-030 and TASK-032 to TASK-035 hold it). ISS-014 fixed (the loop guard's cron_next missed a one-shot wake-up in the hour clocks repeat, 2026-10-25; BUG-020, PR #73). ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged; the plan check's rule is TASK-033's). ISS-012 fixed. ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; TASK-029's thirty-minute wait: a launcher run started from the Bash tool waited 34 min 49 s in the slot and reached slot taken, no outside kill (recorded 2026-10-26); the maintainer's record shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
++Open issues: ISS-016 fixed by BUG-028 (a review-guard test recorded CPython's POSIX subprocess wait as the guard's sleep, failing PR #86's Linux job once, 2026-10-26). ISS-015 mitigated (stage B4's review ran seven rounds under the owner's decided three-round ceiling, which no program held yet, 2026-10-25; the ceiling applied by hand until TASK-032 to TASK-035 hold it). ISS-014 fixed (the loop guard's cron_next missed a one-shot wake-up in the hour clocks repeat, 2026-10-25; BUG-020, PR #73). ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged; the plan check's rule is TASK-033's). ISS-012 fixed. ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; TASK-029's thirty-minute wait: a launcher run started from the Bash tool waited 34 min 49 s in the slot and reached slot taken, no outside kill (recorded 2026-10-26); the maintainer's record shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
  Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
  Bridge version: 2026.10.25a
+ Calibrated: 2026-10-25 from 2026.10.18a to 2026.10.25a — applied: the report cycle's three items until release T writes them (reviewers write nothing under the checkout, a clause of every Review B directive; no plan ID in a title not an increment's; a vendor CLI's banner off and its install without the key, the Socket step already so); the new MISSING, the Layout line's computer path, fixed by HOTFIX-002; no Review B snapshot from before the install was open; the release's building items in force from now; memory notes 11 read, 9 removed (copies of the maintainer's notes); pending: none; not applied (gate passed): none. Earlier calibrations: docs/archive/STATUS_HISTORY.md.
 diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
 index 3cf7719..79981da 100644
 --- a/docs/REQUIREMENTS.md
@@ -777,35 +788,35 @@ index 8c9b914..c6ef67c 100644
      "updated": "2026-10-27"
    }
 diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
-index 8344648..82da7f9 100644
+index 8344648..dde2f64 100644
 --- a/tests/test_b3_least_confident.py
 +++ b/tests/test_b3_least_confident.py
 @@ -120,11 +120,18 @@ EXCUSED_MODULE_SECTIONS = {
      ("change-cycle.md", "What must survive a compaction"): (1809, "789075c8285efd5644e0ae921872172221cf4441c7ee86730fea47d61ae7c6aa"),
      ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
      ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
-+    ("configuration.md", "The windowless test suite"): (1203, "b420c79353ff8386e853160c4f244932270712877253d0a88b6677ef461c64d3"),
++    ("configuration.md", "The windowless test suite"): (1222, "54205dac21fc59bc8e203678d4cfc1a78a13f73765767a78fef8dea1fba2d315"),
      ("configuration.md", "What must survive a compaction"): (963, "338b5c4e338a41c95c7b9b2e1a110ed4e1473a8ad4ed04298359f8b21fd0984a"),
      ("delegation-loop.md", "2. Package the brief"): (964, "5394e345e8d43f10f2f9d98db2d5b092b96d0deea6e2dd75a4d3bb47b45e7e2e"),
 +    ("delegation-loop.md", "7. Decide — in a sub-file"): (241, "9146216638749b537ebdd42d28bdad75eb7ecfdafea1f8236bf90c7bb07c55ee"),
      ("delegation-loop.md", "Extension points"): (1696, "71ab68db2d7893030aa65e8136e44bba2d06a321490d2127803a47a4e9ad680d"),
 -    ("delegation-loop.md", "The procedure"): (288, "c455b10f89b3cfc21f9e0d9d62f36ac7bb68484c47bbb1b0109cab2295e0a51f"),
 -    ("delegation-loop.md", "What must survive a compaction"): (2592, "dcf59727f5776ead8bb2daf4adda3c57af89d350468e2283185c72eb7b156791"),
-+    ("delegation-loop.md", "The model, the timeout and the limit"): (1930, "960d541dc8ed673bc44f8404159a89fe47f39ef83a5f3056b326e3ec45e5702d"),
++    ("delegation-loop.md", "The model, the timeout and the limit"): (1976, "75dd79f1bb1b958f3aaece7bcbf8c38d53d4c24871d79448f02600e1dc1a1ccd"),
 +    ("delegation-loop.md", "The procedure"): (359, "43426ab85b1373afd99983578086509a127d152b6db6ef4c398de9d2aaf480f1"),
-+    ("delegation-loop.md", "The tests before the first reviewer"): (5115, "cf77b66310af39f514b7a799df286c092023953e371db1621c12752e5b7b88c3"),
-+    ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (1946, "ef47999c31b8e0845a5c7539bc129fcb568e65e648d30e21b92bcacc3f10dc24"),
++    ("delegation-loop.md", "The tests before the first reviewer"): (5600, "0687e9f0fc3524e99485d30263a4bf4597a1725b9bd7d5a73271b09643ccbe57"),
++    ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (2164, "a25f876765bffe545f49ac1e1da7cb0eaf402926f5452b7e2c9e3df6ea4f6de1"),
 +    ("delegation-loop.md", "What must survive a compaction"): (2971, "7b0aa4473dd3d8c041aa8c7efee5756d9ba73cb71446cc224058a3cdb239b705"),
-+    ("delegation-loop/decide.md", "The mutation run"): (4880, "a91a612eee4732d2511609883c24f8b8aabfc6c290b82be0ea2e523b77a12525"),
++    ("delegation-loop/decide.md", "The mutation run"): (5643, "3d7ae2339dc4d30dc4b085d5a8f63af9ed2e5740573767890be3c49dafabfbbb"),
 +    ("delegation-loop/decide.md", "Where this sub-file belongs"): (436, "9e38cf68a4da72d205ec742fe0d1cbf6f5c6e6bd75a04469b52333775ad19e01"),
      ("delegation-loop/refactoring-pass.md", "Keeping the pass's position"): (474, "16c05ddcf26b7cfb893f990cc227172f04ef2417dcce816df779b25abd84024b"),
      ("delegation-loop/refactoring-pass.md", "Where this sub-file belongs"): (451, "d5cc03c8c0b31688c8182cc8c13bd6ef7288eb85dcc32c95a7157929cfcb696c"),
      ("design.md", "A part without screens"): (268, "2a16dc74e42feea8823e7d580109fbed8dd2783aae9e58b8ea9fc36058211446"),
 diff --git a/tests/test_core_carve.py b/tests/test_core_carve.py
-index ff714ac..78bbbba 100644
+index ff714ac..710f899 100644
 --- a/tests/test_core_carve.py
 +++ b/tests/test_core_carve.py
-@@ -138,7 +138,12 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
+@@ -138,7 +138,13 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
  # performance-mechanism and code-signing paragraph and its Observability & Verifiability paragraph, under the
  # standing TASK-012 entry on "Phase 2 \u2014 Design", and step 2's brief paragraph, under TASK-017's own entry on
  # "2. Package the brief"; every other passage the trait files take moves whole and is traced in its new home)
@@ -814,12 +825,13 @@ index ff714ac..78bbbba 100644
 +# reworded under TASK-030's own entries on "3. Delegate to Cursor" and "4. Inspect" (the heavy launch's duration;
 +# every suite through the launcher; the mutants file and the checkpoint run through mutation-run.py), and rules 8
 +# and 24, excused by the earlier Standing rules entry and so labelled TASK-015 (the driver kind; the suite's
-+# default); step 7 moves whole into delegation-loop/decide.md and is traced there)
-+TRACED = "TRACED: 424 passages of baseline 0a186da; 153 in supervisor.md, 253 under workflow/, 0 dropped, 18 excused"
++# default), and in round 2 rule 43 the same way (a mutation run a wake source); step 7 moves whole into
++# delegation-loop/decide.md and is traced there)
++TRACED = "TRACED: 424 passages of baseline 0a186da; 152 in supervisor.md, 253 under workflow/, 0 dropped, 19 excused"
  NOTES = [
      "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
      "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
-@@ -148,10 +153,14 @@ NOTES = [
+@@ -148,21 +154,26 @@ NOTES = [
      "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
      "NOTE (reword TASK-012) bridge/commands/supervisor.md: The design-tooling flow - Save the mockup files under `docs/mockups/` (one file per sc",
      "NOTE (reword TASK-017) bridge/commands/supervisor.md: 2. Package the brief - Delegate to **spec-packager** to write `handoff/TASK-<nnn>.m",
@@ -833,8 +845,9 @@ index ff714ac..78bbbba 100644
 +    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 24. Windowless by default. The user works on the same Window",
      "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
      "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 34. A request on a finished project is a change cycle: the s",
++    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 43. Never end a turn while the loop has work unless somethin",
  ]
-@@ -159,10 +168,10 @@ NOTES = [
+ 
  
  def test_r003_the_carve_traces_with_exactly_its_excuses():
      """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
@@ -851,10 +864,10 @@ index ff714ac..78bbbba 100644
      have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
 diff --git a/tests/test_loop_text_windowless.py b/tests/test_loop_text_windowless.py
 new file mode 100644
-index 0000000..92c82c3
+index 0000000..306d6b0
 --- /dev/null
 +++ b/tests/test_loop_text_windowless.py
-@@ -0,0 +1,418 @@
+@@ -0,0 +1,468 @@
 +"""TASK-030: the loop's text for windowless runs, the one heavy job at a time and the mutation run.
 +
 +enforces: docs/BUILD_PLAN.md TASK-030's Done when (step 4's suite and mutants file, the driver kind and the checkpoint
@@ -940,8 +953,9 @@ index 0000000..92c82c3
 +            "a `timeout` of `18180000`.") in s
 +    assert ("The same `timeout` goes on every heavy launch and on a wake-timer that waits for one, and the loop guard "
 +            "counts the same duration with its own notification grace on top.") in s
-+    assert ("A review, a CI watch or a wake-timer bounding an agent takes the review cap, twice the launcher's default "
-+            "for a review: `7200000`") in s
++    assert ("A review or a CI watch takes the review cap, twice the launcher's default for a review: `7200000` (a "
++            "learned `--limit auto` never exceeds the cap); a wake-timer bounding an agent takes its own seconds plus a "
++            "minute (rule 43).") in s
 +    assert run["CAP_FACTOR"] * run["KINDS"]["review"] * 1000 == 7200000
 +
 +
@@ -962,6 +976,10 @@ index 0000000..92c82c3
 +    want = [("cursor-bridge/workflow/phases/delegation-loop.md", 1)]
 +    assert {f: homes.get(f) for f in figures} == {f: want for f in figures}, homes
 +    assert "14400000" not in homes and "3600000" not in homes, homes
++    # the figures in bare seconds stand nowhere either (step 3 writes them with a thousands comma)
++    for path in markdown_files():
++        for fig in ("%d" % d["builder"], "%d" % d["test"]):
++            assert not re.search(r"(?<![\d,])%s(?![\d,])" % fig, read(path)), (path, fig)
 +    kp53 = flat(text("cursor-bridge", "Known-Pitfalls.md")).split("### KP-053")[1].split("### KP-054")[0]
 +    assert ("every background launch sets the Bash tool's `timeout` in milliseconds as "
 +            "`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 3, gives it for its kind (a heavy launch's "
@@ -986,6 +1004,8 @@ index 0000000..92c82c3
 +        "Wait for the holder's end with `python ~/.claude/cursor-bridge/wake-timer.py <seconds> \"<the run that waits>\"` "
 +        "in the background, the seconds being the time left until the `ends by` time the exit line printed, or zero when "
 +        "it has passed; then relaunch once, unchanged.",
++        "The timer's closing line, which tells you to run a task in the foreground, does not apply here: its "
++        "completion means the relaunch, through the launcher.",
 +        "A second 123 naming a holder is retried twice more the same way; after that, tell the owner, naming the holder's "
 +        "kind and run id.",
 +        "A 123 reading `held by unknown` (the launcher waited its provisional bound and never read a live holder's "
@@ -993,9 +1013,9 @@ index 0000000..92c82c3
 +        "`~/.cursor-bridge/heavy.lock`: it is a sign of a defect, not of a busy computer.",
 +        "**A waiter killed from outside** — its output file holds waiting lines and neither `slot taken` nor "
 +        "`bridge-run: exit` (KP-053) — is relaunched; nothing was spent.",
-+        "**A mutation run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
-+        "`bridge-run: exit` line) — is relaunched once and continues from its cache: the kills it recorded stand "
-+        "(step 7).",
++        "**A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
++        "`bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it "
++        "recorded standing (step 7), and a program under `run/supervisor/` starts again.",
 +    ):
 +        assert sentence in s, sentence
 +    launcher = read(os.path.join(CB, "bridge-run.py"))
@@ -1022,7 +1042,8 @@ index 0000000..92c82c3
 +        "and `test-runner` then reads that file.",
 +        "so a suite never runs in the foreground and its expected length no longer chooses the path.",
 +        "A run of the increment's own test files alone may run in the foreground, yours or `test-runner`'s, since this "
-+        "session's console is hidden (a probe of 2026-10-20).",
++        "session's console is hidden (a probe of 2026-10-20), where it ends within the ten minutes a foreground "
++        "command has (KP-061); a longer one runs through the launcher like a suite.",
 +    ):
 +        assert sentence in s, sentence
 +    tr = flat(text("agents", "test-runner.md"))
@@ -1077,11 +1098,17 @@ index 0000000..92c82c3
 +        "A test the output marks `not run` (it cannot collect, or ran nothing, on the old code) is neither pass nor "
 +        "fail, and is said.",
 +        "Exit 3 stops the step: it is the run's own result, recorded as such, never a model failure;",
++        "exit 2 is a refused file or path, fixed before the run is launched again, or the program's resolution check "
++        "refusing the run (`resolves outside the copy`, `module from Workspace path ... was loaded`), as an editable "
++        "install of the package makes it (KP-054): no correction of the file helps, so the step records \"not run "
++        "against the checkpoint: editable install\", and the reviewer's check of each test against its paragraph "
++        "stands in.",
 +    ):
 +        assert sentence in s, sentence
 +    assert "git worktree add" not in s and "Worktrees/old-" not in flat(loop())
 +    program = read(os.path.join(CB, "mutation-run.py"))
-+    for label in ('"passing on old code"', '"%s: not run"', '"new_tests"', "return 4 if any_pass else 0"):
++    for label in ('"passing on old code"', '"%s: not run"', '"new_tests"', "return 4 if any_pass else 0",
++                  "resolves outside the copy", "module from Workspace path %s was loaded"):
 +        assert label in program, label
 +
 +
@@ -1093,6 +1120,9 @@ index 0000000..92c82c3
 +            "applies them is the bridge's `mutation-run.py`, which works on a scratch copy of the Workspace and so "
 +            "restores nothing in it. Read each mutant in the file against its name as you read a test against its "
 +            "paragraph") in dr
++    assert ("A driver of the supervisor's under `run/supervisor/` that edits the Workspace's files in place is read "
++            "for its restore too: it restores each file in a `finally` and aborts on a byte mismatch at restore; one "
++            "that works on a scratch copy restores nothing.") in dr
 +    sp = flat(text("agents", "spec-packager.md"))
 +    assert ("the mutation run itself (the supervisor's mutants file, applied by the bridge's `mutation-run.py` on a "
 +            "scratch copy of the Workspace) is the supervisor's side's, written after your run with the criterion "
@@ -1102,6 +1132,10 @@ index 0000000..92c82c3
 +            "the builder (2026.10.11d), and since release B the bridge's `mutation-run.py` applies them on a scratch copy "
 +            "of the Workspace, launched through the launcher's driver kind, so a run killed at any point leaves no "
 +            "mutant in the product") in kp
++    assert ("so the loop never advances into its next driver (before that release, only between drivers, its "
++            "`bash.exe` first);") in kp
++    assert "a driver that edits product files in place aborts on a byte mismatch at restore;" in kp
++    assert "until then" not in kp
 +
 +
 +# --- step 7: the mutation run, its cut and its estimate (R-043) -----------------------------------------------------
@@ -1122,6 +1156,7 @@ index 0000000..92c82c3
 +        "and the mutant itself) are byte-identical since its last kill keeps that kill, and every survived, unapplied "
 +        "or erred mutant runs again.",
 +        "Add `--all` for the full run where a round changed files outside every key.",
++        "The Accept bullet's commit may come before the run; the move to the next increment waits for its result.",
 +    ):
 +        assert sentence in s, sentence
 +
@@ -1171,6 +1206,14 @@ index 0000000..92c82c3
 +        "launcher's round of the brief that would carry a code fix.",
 +        "Where it is at or below the code gate's ceiling of three rounds, the mutant is fixed: a criterion test's fix is "
 +        "yours and no round; a code fix is a re-delegation (above) and a round.",
++        "A mutant not applied (its text no longer in its file) is re-anchored in the mutants file, yours and no round; "
++        "a fix of yours after Review A's read stands in the diff Review B reads at step 8.",
++        "**Exit 2** — the mutants file or a path in it was refused: correct the file and launch again. Or the "
++        "program's resolution check refused the run (`resolves outside the copy`, `module from Workspace path ... was "
++        "loaded`), as an editable install of the package makes it (KP-054): no correction of the file helps, so the "
++        "run is not made, `mutation run not made: editable install` goes on `run/supervisor/in-flight.md` and into the "
++        "SCOPE file, and the reviewers' reading of each mutant against its name stands in; it is the run's own result, "
++        "never a model failure.",
 +        "Above the ceiling, the mutant goes to `docs/HARDENING.md` under the increment and never to a re-delegation, "
 +        "unless the code it shows untested is a safety mechanism the increment relies on, or the result shows a defect "
 +        "of a blocking class (behaviour against the brief or the register, security, data integrity, a defeated safety "
@@ -1217,7 +1260,12 @@ index 0000000..92c82c3
 +    s = flat(section(module("configuration"), "The windowless test suite", 3))
 +    assert ("the configurator creates the test root's `conftest.py` from the block only where the test root has none "
 +            "(`tests/conftest.py`, with its folder, where the project has no test root yet), and where one exists "
-+            "inserts the block once, unless the file already holds its three tokens") in s
++            "inserts the block once, at the file's end, unless the file already holds its three tokens") in s
++    guide_item = flat(text("cursor-bridge", "Cursor-Project-Configuration.md"))
++    assert "exists it inserts the block once, at the file's end, unless the file already holds its three tokens" in (
++        guide_item)
++    assert "insert the block once, at the file's end, unless the file already holds its three tokens" in flat(
++        text("agents", "cursor-configurator.md"))
 +    assert "A Node suite has no default yet: the check gives it a NOTE naming its runner and KP-059's mechanism" in s
 +    guide = text("cursor-bridge", "Cursor-Project-Configuration.md")
 +    order = flat(guide.split("## Configuration run — order of operations", 1)[1])
@@ -1245,13 +1293,23 @@ index 0000000..92c82c3
 +        "command> -rA > run/agent/calibrate-suite-before.out 2>&1`, under the heavy launch's `timeout`",
 +        "Run the same suite once more the same way, into `run/agent/calibrate-suite-after.out`, and read it when its "
 +        "completion arrives.",
-+        "Compare the two reports' failed test ids. A failure present before the write is the project's own: it is "
-+        "recorded, and the write stands.",
-+        "A failure present only after the write is the insert's: it leads the report's first line, the insert is "
++        "the run waits for the computer's one slot). Read the output file when its completion arrives.",
++        "Have `cursor-configurator` write the default from `~/.claude/cursor-bridge/windowless-default.snapshot.md` "
++        "exactly as configuration writes it (`Cursor-Project-Configuration.md` §2, the windowless-default item): the "
++        "test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block "
++        "inserted once at the end of the one that exists, every other line left as it stands.",
++        "Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's "
++        "exit status. A failure or error present before the write is the project's own: it is recorded, and the write "
++        "stands.",
++        "A failure or error present only after the write, fewer tests collected after it than before, or an after-run "
++        "ending in pytest's exit 2 to 5 (interrupted, an internal error, a usage error such as a `conftest.py` that "
++        "fails to import, no tests collected) where the before-run did not, is the insert's: it leads the report's "
++        "first line, the insert is "
 +        "reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named "
 +        "in the report. Otherwise the write is committed as the calibration's checkpoint.",
 +        "Write the two runs' results on the `Calibrated:` line (step 5).",
 +        "It is a configuration item: no gate is reopened, and the loop resumes after it.",
++        "A Node suite's NOTE (its default is not shipped yet) is recorded in `PROJECT_STATUS.md` like any NOTE.",
 +        "Where step 1b wrote the windowless default, the line also names the two suite runs' results",
 +    ):
 +        assert sentence in cal, sentence
@@ -1268,6 +1326,11 @@ index 0000000..92c82c3
 +            "`mutation-run.py`); never with an option that runs another program, but for the driver kind's `python "
 +            "<program>`, whose program the launcher's path check confines.") in rule8
 +    assert "Every suite and every mutation run goes through it, in the background (the delegation loop's step 4)." in rule8
++    # rule 43 counts a mutation run as a wake source, as the loop guard does (Review A, TASK-030 round 1)
++    rule43 = core.split(" 43. Never end a turn", 1)[1].split(" 44. ", 1)[0]
++    assert ("a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run, run "
++            "through it too (`--kind driver`), or a benchmark,") in rule43
++    assert '"driver"' in read(os.path.join(CB, "loop-guard.py"))
 +    rule24 = core.split(" 24. Windowless by default.", 1)[1].split(" 25. Refactoring", 1)[0]
 +    assert ("A project's test suite carries the bridge's frozen windowless default "
 +            "(`~/.claude/cursor-bridge/windowless-default.snapshot.md`, the pytest `conftest.py` block), written at "
