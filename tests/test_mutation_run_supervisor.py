@@ -1081,3 +1081,29 @@ def test_task031_r13_no_test_run_of_the_program_writes_bytecode(tmp_path):
     p = _run(ws, mf, env=env)
     assert p.returncode == 0, p.stdout + p.stderr
     assert [line["outcome"] for line in _cache_lines(ws, "r13pyc")] == ["killed"]
+
+
+def test_task031_r14_a_tracked_pyc_the_tests_read_stays_in_the_copy(tmp_path):
+    """R-041 (each mutant's result is the result of the mutated bytes; a kill is a test catching the mutant),
+    TASK-031 round 14, Requirement 1 (handoff/TASK-031-r14.md): a project that reads bytecode (a decompiler, a
+    disassembler, a packaging tool) commits `.pyc` files as test data outside any `__pycache__`; round 13 removed
+    every `.pyc` from the copy, so such a test failed for a reason that is not the mutant and an equivalent mutant
+    was recorded killed, exit 0. A loose `.pyc` beside no source is never read for a module, so only `__pycache__`
+    folders are removed: the equivalent mutant survives, exit 1."""
+    files = {"demo/__init__.py": "",
+             "demo/magic.py": "def head(b):\n    return b[:4]\n",
+             "tests/data/sample.pyc": "abcdefgh",
+             "tests/test_magic.py": ("import os\nfrom demo.magic import head\n\n"
+                                     "def test_head():\n"
+                                     "    path = os.path.join(os.path.dirname(__file__), 'data', 'sample.pyc')\n"
+                                     "    with open(path, 'rb') as f:\n"
+                                     "        data = f.read()\n"
+                                     "    assert head(data) == data[:4] == b'abcd'\n")}
+    ws = _fixture(tmp_path, files)
+    assert "tests/data/sample.pyc" in _git(ws, "ls-files").splitlines()
+    mf = _mutants(ws, "r14pyc", {"mutants": [{
+        "id": "equiv", "file": "demo/magic.py", "pairs": [{"old": "return b[:4]", "new": "return b[0:4]"}],
+        "tests": ["tests/test_magic.py"], "expect_fail": ["tests/test_magic.py::test_head"]}]})
+    p = _run(ws, mf)
+    assert p.returncode == 1, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r14pyc")] == ["survived"]
