@@ -969,3 +969,37 @@ def test_task031_r9_a_pytest_section_after_a_line_separator_only_iniconfig_split
     outcomes = [line["outcome"] for line in _cache_lines(ws, "r9sp")]
     assert "killed" not in outcomes, p.stdout + p.stderr
     assert (p.returncode == 2 and outcomes == []) or outcomes == ["survived"], p.stdout + p.stderr
+
+
+def test_task031_r9_iniconfig_not_importable_while_reading_setup_cfg_is_refused(tmp_path, home_of_the_tests):
+    """R-041, TASK-031 Requirement 4 (handoff/TASK-031-r9.md: iniconfig not importable is a refusal, exit 2):
+    the `.cfg` branch, which the builder's test of the `.ini` branch does not reach (Review A, round 9): with an
+    `iniconfig` that raises ImportError first on the program's PYTHONPATH, a root `setup.cfg` exits 2 with the
+    message, and no mutant is run."""
+    block = tmp_path / "block_iniconfig" / "iniconfig"
+    block.mkdir(parents=True)
+    (block / "__init__.py").write_text("raise ImportError('blocked')\n", encoding="ascii")
+    ws = _fixture(tmp_path, dict(CALC, **{"setup.cfg": "[metadata]\nname = demo\n\n[tool:pytest]\n"}))
+    mf = _mutants(ws, "r9ic", {"mutants": [KILL_CALC]})
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(block.parent) + os.pathsep + env.get("PYTHONPATH", "")
+    p = _run(ws, mf, env=env)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "mutation-run: pytest's iniconfig is not importable" in p.stdout + p.stderr
+    assert _cache_lines(ws, "r9ic") == []
+
+
+@pytest.mark.parametrize("shadow", ["iniconfig.py", "iniconfig/__init__.py"])
+def test_task031_r10_a_top_level_iniconfig_in_the_project_is_refused(tmp_path, shadow):
+    """R-041 (a result against the version the gate reads), TASK-031 Requirement 4 (handoff/TASK-031-r10.md): the
+    gate's `python -m pytest`, started at the project's top, imports a top-level `iniconfig` module or package of the
+    project before the installed one, so pytest reads its configuration with it while the program reads with the
+    installed iniconfig; such a project, with a `.ini` or `.cfg` candidate at its root, exits 2 with the refusal
+    naming it before any mutant runs (Review A and the security audit, round 9; convergent)."""
+    ws = _fixture(tmp_path, dict(CALC, **{"tox.ini": "[tox]\nenvlist = py312\n\n[pytest]\n",
+                                          shadow: "from importlib import import_module\n"}))
+    mf = _mutants(ws, "r10sh", {"mutants": [KILL_CALC]})
+    p = _run(ws, mf)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "would shadow pytest's iniconfig" in p.stdout + p.stderr
+    assert _cache_lines(ws, "r10sh") == []
