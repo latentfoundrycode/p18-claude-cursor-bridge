@@ -569,6 +569,22 @@ def copy_tracked(workspace, dest, tracked, untracked):
         elif os.path.isfile(src):
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
+    remove_bytecode_from_copy(dest)
+
+
+def remove_bytecode_from_copy(copy_root):
+    for dirpath, dirnames, filenames in os.walk(copy_root, topdown=True, followlinks=False):
+        for fn in filenames:
+            if fn.endswith(".pyc"):
+                p = os.path.join(dirpath, fn)
+                if not bridge_env.is_link(p):
+                    os.remove(p)
+        for i in range(len(dirnames) - 1, -1, -1):
+            if dirnames[i] == "__pycache__":
+                p = os.path.join(dirpath, dirnames[i])
+                if not bridge_env.is_link(p):
+                    shutil.rmtree(p)
+                del dirnames[i]
 
 
 def extract_archive_tar(tar_bytes, dest):
@@ -635,6 +651,7 @@ def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
         elif os.path.isfile(src):
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
+    remove_bytecode_from_copy(dest)
 
 
 def dotted_module_paths(rel):
@@ -1146,6 +1163,7 @@ def pytest_sessionfinish(session, exitstatus):
 def pytest_env(plugin_dir, copy_root, env, results_path=None):
     run_env = dict(env)
     run_env["PYTHONPATH"] = plugin_dir + os.pathsep + copy_root
+    run_env["PYTHONDONTWRITEBYTECODE"] = "1"
     if results_path:
         run_env["MUTATION_PYTEST_RESULTS"] = results_path
     return run_env
