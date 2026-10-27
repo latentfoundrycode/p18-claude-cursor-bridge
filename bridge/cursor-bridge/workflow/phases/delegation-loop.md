@@ -4,19 +4,20 @@
 
 After a compaction or a resume in this phase, read these before your next action:
 
-- this module and its sub-file, each whole (the session-start hook names both), with `~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole, and the other files the hook names;
+- this module and its sub-files, each whole (the session-start hook names them), with `~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole, and the other files the hook names;
 - `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of `run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the background runs that will wake you and what waits for the owner; while Review B runs the status file is not written and the position is kept in `in-flight.md` (step 8), and at the launch you write there the snapshot's hash `review-guard.py snapshot` printed, since the hash `verify` prints must equal it (this list is where that write is asked for);
 - the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` with every revision of it, and each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);
 - for a fix (step 7, the `root-cause-first` procedure), `docs/debug/BUG-<nnn>.md`, whole: its hypotheses and the diagnostic rounds counted toward a resolution round; the fix brief `handoff/BUG-<nnn>.md` with every revision and report, as for a task; and `git grep DEBUG-BUG-<nnn>` for instrumentation not yet removed;
 - `docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass runs and whether increments run in parallel, and the models the delegate command and Review B name;
-- the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, `run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message (step 4), and `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background; and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, `ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` needs), whole;
+- the increment's verdicts, kept in `run/supervisor/in-flight.md`: Review A's, each auditor's and Review B's reply, each written there as it returns, and the mutation run's cuts and estimate (step 7);
+- the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, `run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message (step 4), `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background, and the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files `run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, `ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` needs), whole;
 - while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's "Keeping the pass's position"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.
 
 ### The procedure
 
-Steps 1 to 8 below run for every increment; step 9, the refactoring and optimization pass at a stage's close, is in a sub-file of this module, read whole with it wherever the module is read:
+Steps 1 to 8 below run for every increment, step 7 in a sub-file of this module; step 9, the refactoring and optimization pass at a stage's close, is in another. Each sub-file is read whole with the module wherever the module is read:
 
-Sub-files: delegation-loop/refactoring-pass.md
+Sub-files: delegation-loop/decide.md; delegation-loop/refactoring-pass.md
 
 For each increment, in order:
 
@@ -64,20 +65,6 @@ Delegate to **spec-packager** to write `handoff/TASK-<nnn>.md`. The brief must b
 python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p --force --model <builder from docs/ROSTER.resolved.json> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a one-paragraph summary and the path of your report file." 2> run/agent/TASK-<nnn>.err
 ```
 
-The `--model` value is copied from `docs/ROSTER.resolved.json` (step 1), never typed from
-memory; the stderr redirect keeps the CLI's own messages in a file, which is what the
-automatic model switch below reads. The call runs in the background with the Bash tool's
-own `timeout` set to the kind's cap in milliseconds, twice the launcher's default
-(`14400000` for a builder, `7200000` for a review or a watch, `3600000` for a test suite;
-a learned `--limit auto` never exceeds the cap): without it the tool may end a background
-command after thirty minutes, before the launcher's limit, mid-work and with no report (the
-TDP's TASK-157 r13d, KP-053, observed once; the same `timeout` goes on every background
-launch, Review B's, the CI watch's, a launched suite's and a wake-timer's). (`run/agent/` is gitignored.) **The launcher** gives
-the run its ceiling (`--limit auto`: two hours until a healthy run of this project has taught it more, never above four without the owner's words; release A2) and kills the whole process tree at it (exit code 124),
-and withholds the owner's GitHub identity from the builder (KP-032, KP-033). Exit 124 is
-handled in step 3b: inspect the tree first, because a builder that hung on its way out may
-have finished its work.
-
 Rules for this call, all of which matter:
 
 - **`cursor-agent`, never `agent`.** On Windows the bare `agent` command may belong
@@ -112,6 +99,14 @@ python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- curs
 5. **A re-delegation** after a review runs in your own checkout like any sequential increment.
 
 Never use Cursor's own `--worktree` option: it places the checkout under your home folder, outside the project and outside the Workspace boundary. **One writer per checkout** holds throughout: no two builders share a checkout, and you never touch a checkout a builder is running in. The price is known: a builder in a worktree has no project environment (no virtual environment, no installed packages), so it cannot run the test suite and its first delivery may need one more iteration. Record each running builder on `In flight:`; each is a background task, so the loop guard knows something will wake you.
+
+#### The model, the timeout and the limit
+
+The `--model` value is copied from `docs/ROSTER.resolved.json` (step 1), never typed from memory; the stderr redirect keeps the CLI's own messages in a file, which is what the automatic model switch (step 3b) reads. (`run/agent/` is gitignored.)
+
+**Every background launch carries the Bash tool's own `timeout`**, in milliseconds: without it the tool may end a background command after thirty minutes, before the launcher's limit, mid-work and with no report (the TDP's TASK-157 r13d, KP-053, observed once). A review or a CI watch takes the review cap, twice the launcher's default for a review: `7200000` (a learned `--limit auto` never exceeds the cap); a wake-timer bounding an agent takes its own seconds plus a minute (rule 43). A **heavy launch** — a builder, a test suite or a mutation run (`--kind builder`, `test` or `driver`) — may wait for the computer's one slot before its command starts (step 3b), so it takes the **heavy launch's duration**: the kind's cap, plus the slot wait's bound (the builder's cap, 14,400 s, plus a grace of 120 s), plus the waiter's reporting minute. That is 28,980 s for a builder or a mutation run, a `timeout` of `28980000`, and 18,180 s for a test suite, a `timeout` of `18180000`. The same `timeout` goes on every heavy launch and on a wake-timer that waits for one, and the loop guard counts the same duration with its own notification grace on top. The heavy launch's figures stand here and nowhere else; every other text names this paragraph.
+
+**The launcher** gives the run its ceiling (`--limit auto`: two hours until a healthy run of this project has taught it more, never above four without the owner's words; release A2) and kills the whole process tree at it (exit code 124), and withholds the owner's GitHub identity from the builder (KP-032, KP-033). Exit 124 is handled in step 3b: inspect the tree first, because a builder that hung on its way out may have finished its work.
 
 ### 3b. A model fails mid-step — switch automatically, restart the step, never wait
 
@@ -190,6 +185,14 @@ the exhaustion (`AUTO-RESET` in its output; put it in the report's first line). 
 can also say "usage reset" (`--mark-reset`) or "usage exhausted" (`--mark-exhausted`) at
 any time. A probe is never used for the return: it cannot tell a reset from 1% remaining.
 
+#### Waiting for the slot, and a mutation run cut short
+
+A heavy launch (step 3) first takes the computer's one slot, which one builder, test suite or mutation run holds at a time. While another run holds it, the launcher waits and prints `bridge-run: waiting for the slot held by <kind> <run id> since <start>, ends by <end>` once a minute, then `bridge-run: slot taken <time>` as the command starts; these lines go to the run's output file (the `.err` file of a builder, the `.out` file of a suite or a mutation run). A run waiting for the slot is the launcher's business: it is never a reason to start the command another way. Nothing below is a model's failure, and no exit below is passed to `roster-check.py`:
+
+- **Exit 123 — the slot was not free.** The wait ended unmet (`bridge-run: slot not free - held by ...`), so the command never started and nothing was spent. Wait for the holder's end with `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the run that waits>"` in the background, the seconds being the time left until the `ends by` time the exit line printed, or zero when it has passed; then relaunch once, unchanged. The timer's closing line, which tells you to run a task in the foreground, does not apply here: its completion means the relaunch, through the launcher. A second 123 naming a holder is retried twice more the same way; after that, tell the owner, naming the holder's kind and run id. A 123 reading `held by unknown` (the launcher waited its provisional bound and never read a live holder's record) relaunches at once, and a second such 123 in a row is told to the owner at once, naming `~/.cursor-bridge/heavy.lock`: it is a sign of a defect, not of a busy computer.
+- **A waiter killed from outside** — its output file holds waiting lines and neither `slot taken` nor `bridge-run: exit` (KP-053) — is relaunched; nothing was spent.
+- **A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no `bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it recorded standing (step 7), and a program under `run/supervisor/` starts again: no driver edits the Workspace's files (step 4), so a run cut short leaves nothing in the product.
+
 ### 4. Inspect
 
 **The builder's report — the file `handoff/TASK-<nnn>-r<N>-report.md` it writes as it runs,
@@ -243,43 +246,17 @@ genuine improvement you choose to keep, widen the brief's Scope explicitly and r
 call in `docs/CHANGES.md`; never let drift pass silently. **Exit 2 (cannot verify):** the
 brief has no `## Scope` — a `spec-packager` defect; fix the brief, do not proceed blind.
 
-**The tests run before the first reviewer** (release A5, plan 13.1). Once the scope and
-diagram checks pass: if the increment's acceptance criteria are not yet covered by tests,
-write those tests yourself first — you are allowed to write tests, and tests written by
-the reviewer rather than the implementer are worth more; each carries the paragraph it
-enforces (`enforces: <document> §<section>` in its docstring or a comment). A mutation
-driver — the script that applies each mutant, runs the tests and restores the code — is
-written here too, on your side, after the builder's run and never by the builder (the
-brief's mutation list is the builder's own in-process check, by hand, no script of it in
-the diff): a builder's driver is judged by
-nobody, and five mutants that did not model their names once cost three rounds (reAngle
-TASK-010c); `diff-reviewer` reads a driver's mutants against their names as it reads a test
-against its paragraph, and a fix brief after a driver run asks for the code fix only. A
-driver run you must end is ended whole with `bridge-stop.py` (KP-056). Then delegate to
-`test-runner` for the increment's tests and the suite, naming the increment's test files
-(the brief's test paths plus `git diff --name-only <checkpoint> -- <the test folders>`), so
-it knows which skips are the increment's: a test of the increment that was skipped fails the
-step, like a failed one (a builder has reported passing tests that had been skipped). A suite that takes more
-than ten minutes is not run inside `test-runner`'s call: the Bash tool ends a foreground
-command at ten minutes (600 seconds, KP-061), so such a suite runs through the launcher in
-the background (`python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the
-recorded suite command> > run/agent/TASK-<nnn>-suite.out 2>&1`, the tool's `timeout` at
-`3600000`; a runner the launcher does not know answers 125 and runs directly with `# wake`,
-rule 43), its completion wakes you, and `test-runner` then reads that file. Then
-run every new or changed test file once against the checkpoint's code: `git worktree add
-../Worktrees/old-<nnn> <the checkpoint commit>` (the one worktree of your own that rule 39
-allows: read-only, torn down in this step), copy in the test files and the fixtures they
-import (`conftest.py`, the fixture folders), and first check where the package resolves from
-there (`python -c "import <package>; print(<package>.__file__)"` run in the worktree): where
-it resolves to the Workspace, as an editable install does (KP-054), the checkpoint run cannot
-run the old code, and the step records "not run against the checkpoint: editable install",
-the reviewer's check of each test against its paragraph standing in; where it resolves to the
-worktree, run the new files there: a test that passes against the old code proves nothing (a
-test written from a misread specification once made wrong code pass every gate) and goes
-back to be rewritten before any reviewer reads the diff; a collection error is "not run",
-neither pass nor fail, and is said. Tear the worktree down with `worktree-teardown.py`. The
-cost where it works is the worktree's seconds and one run of the new files, a minute or two
-per increment; a reviewer then judges a tested diff.
+#### The tests before the first reviewer
+
+**The tests run before the first reviewer** (release A5, plan 13.1). Once the scope and diagram checks pass: if the increment's acceptance criteria are not yet covered by tests, write those tests yourself first — you are allowed to write tests, and tests written by the reviewer rather than the implementer are worth more; each carries the paragraph it enforces (`enforces: <document> §<section>` in its docstring or a comment).
+
+**The mutants are yours; the engine is the bridge's.** The increment's mutants are written here too, on your side, after the builder's run and never by the builder, in its mutants file `run/supervisor/<id>-mutants.json` (`<id>` the increment's ID): each mutant's `id`, its `file` and `pairs` (the text it replaces and the text it puts in its place), the test files it runs (`tests`) and the test ids that must fail (`expect_fail`), with the criterion tests those name, which are yours too (the brief's mutation list is the builder's own in-process check, by hand, no script of it in the diff). A builder's mutants are judged by nobody, and five that did not model their names once cost three rounds (reAngle TASK-010c); `diff-reviewer` reads your mutants file against each mutant's name as it reads a test against its paragraph, and a fix brief after a driver run asks for the code fix only. The engine that applies each mutant, runs its tests and records the outcome is the bridge's `mutation-run.py`, reviewed at the bridge's own gate; it works on a scratch copy of the Workspace and so restores nothing in it. A **driver** is a Python program under `run/supervisor/` or a `mutation-run.py` run, and nothing else, and every mutation run is a `mutation-run.py` run through the launcher's driver kind (`--kind driver`), in the background under the heavy launch's `timeout` (step 3, "The model, the timeout and the limit") like a suite, since a foreground launcher call ends at ten minutes (KP-061); the step resumes when its completion arrives. No driver edits the Workspace's files: a program under `run/supervisor/` that changes code changes it in a scratch copy in the system temporary folder, as `mutation-run.py` does, so a run killed at any point leaves nothing in the product (KP-056). `# wake` is not available for a driver: it stays for a benchmark or a runner the launcher does not know, each named with its reason in the status file. A driver run you must end is ended whole with `bridge-stop.py` (KP-056). The full mutation run comes at step 7, once the increment's behaviour is accepted (`delegation-loop/decide.md`, see "The mutation run").
+
+**Every suite is the launcher's.** A suite is the project's recorded suite command, or any run of more than the increment's own test files. Delegate to `test-runner` for the increment's tests and the suite, naming the increment's test files (the brief's test paths plus `git diff --name-only <checkpoint> -- <the test folders>`), so it knows which skips are the increment's: a test of the increment that was skipped fails the step, like a failed one (a builder has reported passing tests that had been skipped). The suite runs through the launcher in the background, whatever its length: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite command> > run/agent/TASK-<nnn>-suite.out 2>&1`, under the heavy launch's `timeout` (step 3); its completion wakes you, and `test-runner` then reads that file. The launcher starts it windowless and in the computer's one slot, and the Bash tool ends a foreground command at ten minutes (600 seconds, KP-061), so a suite never runs in the foreground and its expected length no longer chooses the path. A run of the increment's own test files alone may run in the foreground, yours or `test-runner`'s, since this session's console is hidden (a probe of 2026-10-20), where it ends within the ten minutes a foreground command has (KP-061); a longer one runs through the launcher like a suite. A runner the launcher does not know answers 125 and runs directly in the background with `# wake` (rule 43), named with its reason in the status file.
+
+**Then every new test runs once against the checkpoint's code**, through the same engine: list the increment's new tests in the mutants file's `new_tests` (a new test file by its path, a changed file by its new tests' ids), stage them (`git add`), and launch `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json --checkpoint <the increment's checkpoint commit> > run/agent/<id>-checkpoint.out 2>&1` in the background like any mutation run. The program runs the listed tests on a copy of the tree at that commit, so no worktree of your own is needed (rule 39's `old-<nnn>` worktree stays unused). Exit 4 means a listed test passed on the old code: a test that passes against the old code proves nothing (a test written from a misread specification once made wrong code pass every gate), so each test the output marks `passing on old code` goes back to be rewritten before any reviewer reads the diff. A test the output marks `not run` (it cannot collect, or ran nothing, on the old code) is neither pass nor fail, and is said. Exit 3 stops the step: it is the run's own result, recorded as such, never a model failure; exit 2 is a refused file or path, or the program's resolution check refusing the run (a module that resolves outside the copy or nowhere, a module loaded from the Workspace, or the check's own failure), each fixed before the run is launched again; where the cause is an editable install of the package (KP-054: its `__file__`, read from a folder outside the Workspace, names the Workspace), no correction helps, so "not run against the checkpoint: editable install" goes on `run/supervisor/in-flight.md` and into the SCOPE file, the reviewer's check of each test against its paragraph standing in, and the first time, an Issues entry names the install and its remedy (the tests run from an environment without it) and the inventory names it as a hazard, so the lost coverage is a recorded condition of the project. Exit 0 lets a reviewer judge a tested diff.
+
+#### The reviewers
 
 Delegate the diff to **diff-reviewer**, naming the tests you wrote and the paragraph each
 enforces, so it judges them against the paragraph and does not take them for the builder's.
@@ -352,92 +329,9 @@ This stops a poisoned package at the moment of admission rather than catching it
 
 The tests already ran in step 4, before the first reviewer, the ones you wrote first.
 
-### 7. Decide (accept the increment)
+### 7. Decide — in a sub-file
 
-- **Accept** — local review, scan, and tests pass. Run `scope-check.py` once more just
-  before this commit (its base is the commit that committed the brief, so a builder's own
-  commits are inside the diff; release A4). Commit to the increment branch with a
-  message referencing the task ID. Update `docs/PROJECT_STATUS.md` (rewrite the fields; never append history) and, when the increment changes behaviour or needs a new resource, `docs/INVENTORY.md` — in the same commit as the increment's `CHANGES.md` entry, moving `Reflected through:` to that entry (rule 41). When the increment completes a requirement, set its row in `docs/REQUIREMENTS.md` to `built` and name the tests — which carry the requirement's ID — in its Evidence cell, in the same commit. Move to the next
-  increment. Increments accumulate on the branch; merging to `main` is a separate,
-  verified step (below), not something you do per increment.
-- **Iterate** — something is wrong and you understand why. Revise the brief *file* (in
-  place, or as `TASK-<nnn>-r2.md`) with specific corrections, commit it, and re-issue the
-  same constant delegate command. Never inline the corrections into the CLI prompt (step 3).
-- **Re-delegate on a review REJECT** — if a reviewer rejects the work (see step 8), that
-  is a code defect, which is the loop's problem, not the user's. Feed the reasons into a
-  corrected brief file and re-delegate — again via the file, never the prompt. This does
-  not count against the user's attention.
-
-**Diagnose before you re-delegate a defect — the `root-cause-first` skill.** A corrected
-brief written from a *symptom* makes the builder guess, and a guessed fix passes the
-failing test by suppressing what it saw. So before any Iterate or Re-delegate for a
-behaviour defect, ask: *is the cause already proven by the failure itself?* If the
-traceback names it, or the brief listed a requirement the diff simply omitted, fix
-directly. Otherwise — an assertion on an output, a fired invariant, an unreachable state,
-a timing or intermittent failure, a regression, a user-reported bug, a `test-runner`
-diagnosis labelled **INFERRED**, or **any second re-delegation for the same defect** — run
-the procedure: reproduce deterministically (a failing test, or an observability test that
-drives the exact state), write two or more hypotheses each with its discriminating
-observation in `docs/debug/BUG-<nnn>.md`, instrument only to tell them apart (tagged
-`DEBUG-BUG-<nnn>`, in the working tree, never committed), capture the run to the
-gitignored artifacts dir, keep the hypothesis the evidence supports, clean up and prove it
-(`git status` clean, `git grep DEBUG-BUG-` empty), then package the **fix brief**
-(`handoff/BUG-<nnn>.md`, spec-packager's fix variant) carrying the confirmed cause, the
-evidence, and the reproduction test that must go red to green. Three diagnostic rounds
-without a confirmed cause go to a resolution round, never to a guessed fix and never to the
-user. The fix goes through the normal gate once — no extra gate pass; `diff-reviewer`'s fix
-mode rejects symptom suppression and a cause left untouched.
-
-**When to stop re-delegating — judge convergence by defect class, not a raw count.** The
-brake exists to stop *grinding on a broken brief or design*, not to interrupt a gate that is
-successfully hardening the code — and **reaching some number of rounds is never itself a
-reason to involve the user.** Whether to continue, draw a line, or stop is your judgment to
-make and record. Judge it like this:
-
-- **Keep going** when each round surfaces *new, legitimate concerns that then get fixed* —
-  that is the gate working (especially a thorough cross-family Review B finding real edges
-  Review A missed). Convergence looks like: fixes land and the concerns get more esoteric
-  round over round.
-- **Draw a by-class line once the core is correct.** When the increment's actual behaviour —
-  what the software *does and produces* — is implemented and verified, and the findings that
-  keep coming are all the long tail of one genuinely hard subsystem (subprocess teardown,
-  retry/timeout races, kill paths, concurrency edges), do **not** re-delegate that tail
-  round after round. Record each such finding to `docs/HARDENING.md` (one line each, on the
-  increment's PR branch) and merge. A late finding blocks the merge only if it is a **new
-  class** — render/output correctness, data integrity, security, or what the software
-  actually does — **or** if it *defeats a safety mechanism this increment relies on* (a bug
-  in the very timeout or kill path built to protect the run is core, not tail). Drawing this
-  line is a decision you make and record, not one you bring to the user.
-- **Stop** on genuine *non-convergence*: the **same** defect rejected twice unfixed, or a
-  fix that **regresses** something already passing. That is a broken brief or design — say so
-  plainly in your report. Raw "several REJECTs" is *not* a stop if each round found a
-  different, legitimate, now-fixed issue. The one kind of deadlock that goes to the user is
-  an **intent** deadlock — reviewers at odds over what the software should *do* — and it goes
-  as an intent question, never a correctness one.
-
-**Split verdicts you resolve yourself, not by escalating.** When one reviewer blocks and
-the other approves, decide it on the merits — and bias toward the project's own
-**established invariants** (a rule the codebase already enforces elsewhere). If the
-blocking concern aligns with an existing project standard (e.g. a path-confinement check
-another increment already added), apply the fix and continue; record the call in
-`docs/CHANGES.md`. Escalate a split **only** when it turns on intent — what the software
-should do — not on code correctness or which reviewer is "right" technically.
-
-**When a split is genuinely hard, convene a resolution round before deciding.** Most splits
-you settle at once on the merits. But when the merits are not clear-cut — the reviewers
-disagree on a substantive correctness question and neither side obviously aligns with an
-established invariant, or the call is entrenchable enough that getting it wrong is expensive
-to undo — do not adjudicate it alone, and do not hand it to the user. Run the bounded
-reviewer-debate step in `~/.claude/cursor-bridge/Merge-Verification-Policy.md`
-(§"Resolution round"): each reviewer reads the other's position from a
-committed file and returns a reasoned vote, and you decide on that fuller record, biasing to
-established invariants and recording the call in `docs/CHANGES.md`. This keeps a hard
-correctness call inside the decorrelated gate instead of on your desk or the user's.
-Escalate to the user only if the crux turns out to be intent — what the software should do —
-never correctness.
-
-If a run has left the tree in a state you cannot make sense of:
-`git reset --hard HEAD` returns you to the checkpoint. Say so plainly when you do it.
+Step 7, the decision on the increment with the mutation run its last pass launches, stands in the sub-file `delegation-loop/decide.md` ("The procedure" names it), read whole with this module; step 8 follows it.
 
 ### 8. Merge (the verified gate)
 

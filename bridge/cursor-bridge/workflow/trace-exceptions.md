@@ -101,3 +101,12 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-021 bridge/cursor-bridge/workflow/types/host-extension.md Add at delegation-loop.test-checks
 - new TASK-021 bridge/cursor-bridge/workflow/types/host-extension.md Add at project-end.delivery for host-installation
 - new TASK-021 bridge/cursor-bridge/workflow/types/host-extension/claude-code-extension.md Add at design.sections
+- reword TASK-030 bridge/commands/supervisor.md 3. Delegate to Cursor
+- reword TASK-030 bridge/commands/supervisor.md 4. Inspect
+- new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop.md The model, the timeout and the limit
+- new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop.md Waiting for the slot, and a mutation run cut short
+- new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop.md The tests before the first reviewer
+- new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop.md 7. Decide — in a sub-file
+- new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md Where this sub-file belongs
+- new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The mutation run
+- new TASK-030 bridge/cursor-bridge/workflow/phases/configuration.md The windowless test suite

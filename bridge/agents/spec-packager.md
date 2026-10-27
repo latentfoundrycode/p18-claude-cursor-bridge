@@ -150,8 +150,8 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   instruction. Where the increment's tests are to be checked by mutation, the brief says so
   and lets you mutate in-process in your own run, and asks you to list each mutation with
   what caught it; you mutate by hand in your own run and no script of it lands in the diff:
-  the mutation driver itself (the script that applies each mutant, runs the tests and
-  restores the code) is the supervisor's side's, written after your run with the criterion
+  the mutation run itself (the supervisor's mutants file, applied by the bridge's
+  `mutation-run.py` on a scratch copy of the Workspace) is the supervisor's side's, written after your run with the criterion
   tests, and a fix brief after a driver run asks you for the code fix only.
 - Prefer reuse over new code — existing helpers, the standard library, native platform
   features, already-installed dependencies — and write the minimum that meets the

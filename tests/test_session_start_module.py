@@ -89,11 +89,11 @@ def test_r005_the_table_maps_every_template_phase_value():
 
 
 # the files a module's own pointer lines name after it, in the installed bridge (TASK-012: the interface variants;
-# TASK-013: the delegation loop's sub-file)
+# TASK-013: the delegation loop's sub-file for step 9; TASK-030: its sub-file for step 7, named first)
 POINTED = {
     "interface": ["interface/mockups.md", "interface/command-design.md", "interface/contract-design.md",
                   "interface/playable-prototype.md"],
-    "delegation-loop": ["delegation-loop/refactoring-pass.md"],
+    "delegation-loop": ["delegation-loop/decide.md", "delegation-loop/refactoring-pass.md"],
 }
 IFACE = [P + "interface.md"] + [P + f for f in POINTED["interface"]]
 LOOP = [P + "delegation-loop.md"] + [P + f for f in POINTED["delegation-loop"]]
@@ -158,6 +158,40 @@ def test_r005_the_conditional_files_that_touch_the_phase_are_named_after_its_mod
     # a heading inside a fenced block changes nothing: the type does not touch the delegation loop
     assert named(out) == LOOP + [P + "reflection.md", P + "project-end.md",
                                  W + "traits/installable.md", W + "traits/external-services.md"], out
+
+
+FIXTURES = os.path.abspath(os.path.join(HERE, "fixtures", "workflows", "pass"))
+
+
+def fixture_home(home):
+    """The installed bridge with its types/ and traits/ replaced by TASK-006's passing fixtures, whose files hold the
+    look-alike headings a change heading must not be read in: fenced and indented `## Replace design`, `## Replacement
+    history`, `## Add-ons`, `## Settings`, a `###` `Add at`, a heading naming no registry point inside a fence."""
+    wf = home / ".claude" / "cursor-bridge" / "workflow"
+    for sub in ("types", "traits"):
+        shutil.rmtree(str(wf / sub))
+        shutil.copytree(os.path.join(FIXTURES, sub), str(wf / sub))
+
+
+FIXTURE_LINE = "Workflows: Host Extension Development → Claude Code Extension; traits: Has screens, Installable"
+
+
+def test_r005_the_hook_reads_the_workflow_check_fixtures_as_the_checker_does(tmp_path, home):
+    """TASK-015's note, taken by TASK-030 (docs/HARDENING.md, Stage B3): one case runs the hook over
+    tests/fixtures/workflows/pass/. The fixtures' changes touch intake (the type's questions and settings, the
+    sub-type's delivery kind, installable's questions), the interface phase (the type's and the sub-type's
+    replacements, the sub-type's and has screens' variants) and project end (the three delivery additions); no file
+    touches design, where only a fenced, an indented or a look-alike heading names it, so design names its module
+    alone; the files follow the order additions apply in (type, sub-type, the traits in the open list's order)."""
+    fixture_home(home)
+    t, s = W + "types/host-extension.md", W + "types/host-extension/claude-code-extension.md"
+    screens, inst = W + "traits/has-screens.md", W + "traits/installable.md"
+    out = pointers(project(tmp_path, "Phase: design", FIXTURE_LINE), home)
+    assert named(out) == [P + "design.md"], out
+    out = pointers(project(tmp_path, "Phase: intake", FIXTURE_LINE), home)
+    assert named(out) == [P + "intake.md", t, s, inst], out
+    out = pointers(project(tmp_path, "Phase: building", FIXTURE_LINE), home)
+    assert named(out) == LOOP + [P + "reflection.md", P + "project-end.md", t, s, inst], out
 
 
 def test_r034_the_conditional_files_follow_the_order_additions_apply_in(tmp_path, home):
