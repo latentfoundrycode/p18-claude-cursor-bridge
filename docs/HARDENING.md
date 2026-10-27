@@ -1158,3 +1158,7 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
 - **pytest also reads every later candidate and stops on one that does not parse**; the program stops at the first file that counts, so with a `.pytest.ini` and an unparsable `tox.ini` it runs mutants where the gate's pytest exits with a usage error. Not a false kill (the security audit, round 9).
 - **A `pyproject.toml` or `pytest.toml` is read in binary by `tomllib`, pytest's with universal newlines**, so a lone `\r` is refused where pytest reads the file (fails closed), and a toml file that does not decode ends as an internal error rather than exit 2 (the security audit, round 9).
 - **The `.cfg` branch's not-importable refusal had no test**; the supervisor's `test_task031_r9_iniconfig_not_importable_while_reading_setup_cfg_is_refused` covers it (Review A, round 9).
+
+### TASK-031 (round 10; the builder's assumptions; recorded, not taken)
+- **A project can still change what the gate's pytest imports by other routes**: a `.pth` file, `sitecustomize`, `conftest.py`, a `-p` option in its configuration. Only a top-level `iniconfig` is refused; a project's `conftest.py` already runs its own code inside pytest (the builder, round 10).
+- **The shadow refusal matches names, so it also refuses entries Python would not import as `iniconfig`** (`iniconfig.txt`, a folder without `__init__.py`, a differently cased name on Windows); fails closed (the builder, round 10).

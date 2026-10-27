@@ -1537,3 +1537,28 @@ def test_task031_r9_iniconfig_not_importable_refused(tmp_path, home_of_the_tests
     assert p.returncode == 2, p.stdout + p.stderr
     assert "mutation-run: pytest's iniconfig is not importable" in p.stdout + p.stderr
     assert not (ws / "run/supervisor/mutation-cache/inicfg.jsonl").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="case-insensitive iniconfig shadow names are a Windows filesystem concern")
+def test_task031_r10_iniconfig_shadow_case_insensitive_refused(tmp_path, home_of_the_tests):
+    """R-041, TASK-031 S7, handoff/TASK-031-r10.md: a root tox.ini and a differently cased top-level IniConfig.py
+    exit 2 with the shadow refusal and no cache line."""
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "tox.ini", "[tox]\nenvlist = py312\n\n[pytest]\n")
+    write(ws, "IniConfig.py", "x = 1\n")
+    git(ws, "add", "tox.ini", "IniConfig.py")
+    git(ws, "commit", "-q", "-m", "tox and shadow")
+    mp = mutants_path(ws, "r10case", {"mutants": [{"id": "m1", "file": "demo/calc.py",
+                                                    "pairs": [{"old": "return a + b", "new": "return b + a"}],
+                                                    "tests": ["tests/test_calc.py"],
+                                                    "expect_fail": ["tests/test_calc.py::test_add"]}]})
+    env = dict(os.environ)
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
+                       **test_conftest.windowless_kwargs({}))
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "mutation-run: a top-level iniconfig in the project would shadow pytest's iniconfig" in p.stdout + p.stderr
+    assert not (ws / "run/supervisor/mutation-cache/r10case.jsonl").exists()

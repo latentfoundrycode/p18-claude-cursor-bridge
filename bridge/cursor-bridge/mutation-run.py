@@ -829,11 +829,26 @@ _PYTEST_CONFIG_NAMES = (
     "pyproject.toml", "tox.ini", "setup.cfg",
 )
 
+_INICONFIG_SHADOW_REFUSE = (
+    "mutation-run: a top-level iniconfig in the project would shadow pytest's iniconfig"
+)
+
+
+def _refuse_if_copy_root_shadows_iniconfig(config_dir):
+    for entry in os.listdir(config_dir):
+        if os.name == "nt":
+            low = entry.lower()
+            if low == "iniconfig" or low.startswith("iniconfig."):
+                raise Refuse(_INICONFIG_SHADOW_REFUSE)
+        elif entry == "iniconfig" or entry.startswith("iniconfig."):
+            raise Refuse(_INICONFIG_SHADOW_REFUSE)
+
 
 def _pytest_config_dict_from_file(filepath):
     name = os.path.basename(filepath)
     suffix = os.path.splitext(name)[1]
     if suffix == ".ini":
+        _refuse_if_copy_root_shadows_iniconfig(os.path.dirname(filepath))
         try:
             import iniconfig
         except ImportError:
@@ -852,6 +867,7 @@ def _pytest_config_dict_from_file(filepath):
         except (iniconfig.ParseError, UnicodeDecodeError):
             raise Refuse("mutation-run: invalid ini file %s" % name)
     if suffix == ".cfg":
+        _refuse_if_copy_root_shadows_iniconfig(os.path.dirname(filepath))
         try:
             import iniconfig
         except ImportError:
