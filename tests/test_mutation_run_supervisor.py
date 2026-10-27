@@ -1009,7 +1009,7 @@ def test_task031_r10_a_top_level_iniconfig_in_the_project_is_refused(tmp_path, s
     ("tomllib.py", "tomllib", {"pyproject.toml": "[tool.pytest.ini_options]\n"}),
     ("pluggy/__init__.py", "pluggy", {"tox.ini": "[tox]\nenvlist = py312\n\n[pytest]\n"}),
     ("_pytest/__init__.py", "_pytest", {}),
-    ("json.py", "json", {}),
+    ("pytest.py", "pytest", {}),
 ])
 def test_task031_r11_a_top_level_module_shadowing_an_installed_one_is_refused(tmp_path, shadow, name, config):
     """R-041 (a result against the version the gate reads), TASK-031 Requirement 4 (handoff/TASK-031-r11.md): the
@@ -1028,14 +1028,36 @@ def test_task031_r11_a_top_level_module_shadowing_an_installed_one_is_refused(tm
     assert _cache_lines(ws, "r11sh") == []
 
 
-@pytest.mark.parametrize("entry", ["r11_own_helper.py", "r11_notes/readme.txt", "tests_data/tomllib.json"])
+@pytest.mark.parametrize("entry", ["r11_own_helper.py", "r11_notes/readme.txt", "tests_data/tomllib.json",
+                                   "test/__init__.py", "tests/__init__.py"])
 def test_task031_r11_a_top_level_name_shadowing_nothing_runs_its_mutant(tmp_path, entry):
-    """R-041, TASK-031 Requirement 4 (handoff/TASK-031-r11.md: only a module or regular package whose name is
-    importable outside the project is refused): a top-level module no installed module is named after, a folder
-    with no `__init__.py`, and a nested file named after a standard module run and kill their mutant, exit 0."""
+    """R-041, TASK-031 Requirement 4 (handoff/TASK-031-r11.md and handoff/TASK-031-r12.md: only a module pytest
+    imports to find its configuration is refused): a top-level module no such module is named after, a folder with
+    no `__init__.py`, a nested file named after a standard module, a `test/` or `tests/` package (CPython ships a
+    `test` package of its own, which pytest never imports; the security audit, round 11: a regression on an ordinary
+    layout) run and kill their mutant, exit 0."""
     files = dict(CALC, **{entry: "VALUE = 1\n"})
     ws = _fixture(tmp_path, files)
     mf = _mutants(ws, "r11ok", {"mutants": [KILL_CALC]})
     p = _run(ws, mf)
     assert p.returncode == 0, p.stdout + p.stderr
     assert [line["outcome"] for line in _cache_lines(ws, "r11ok")] == ["killed"]
+
+
+def test_task031_r12_the_projects_own_package_installed_elsewhere_runs_its_mutant(tmp_path):
+    """R-041, TASK-031 Requirement 4 (handoff/TASK-031-r12.md: only a module pytest imports to find its
+    configuration is refused): the project's own package found by the program's environment outside the project,
+    as after `pip install .` or an editable install from another checkout (here another copy of `demo/` on the
+    caller's PYTHONPATH), is not a shadow; the run kills its mutant, exit 0 (Review A, round 11: a regression on an
+    ordinary layout, round 10 ran it)."""
+    other = tmp_path / "elsewhere"
+    (other / "demo").mkdir(parents=True)
+    (other / "demo" / "__init__.py").write_text("", encoding="utf-8")
+    (other / "demo" / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    ws = _fixture(tmp_path, CALC)
+    mf = _mutants(ws, "r12own", {"mutants": [KILL_CALC]})
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(other) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    p = _run(ws, mf, env=env)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r12own")] == ["killed"]
