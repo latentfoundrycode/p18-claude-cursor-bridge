@@ -1509,3 +1509,31 @@ def test_hold_pipes():
                 pass
         if work_sub.is_dir():
             shutil.rmtree(work_sub, ignore_errors=True)
+
+
+def test_task031_r9_iniconfig_not_importable_refused(tmp_path, home_of_the_tests):
+    """R-041, TASK-031 S7, handoff/TASK-031-r9.md: when iniconfig cannot be imported while reading a root
+    tox.ini, mutation-run exits 2 with the fixed refusal message and writes no cache line."""
+    block = tmp_path / "block_iniconfig"
+    pkg = block / "iniconfig"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("raise ImportError('blocked')\n", encoding="ascii")
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, "tox.ini", "[tox]\nenvlist = py312\n\n[pytest]\n")
+    git(ws, "add", "tox.ini")
+    git(ws, "commit", "-q", "-m", "tox")
+    mp = mutants_path(ws, "inicfg", {"mutants": [{"id": "m1", "file": "demo/calc.py",
+                                                  "pairs": [{"old": "return a + b", "new": "return b + a"}],
+                                                  "tests": ["tests/test_calc.py"],
+                                                  "expect_fail": ["tests/test_calc.py::test_add"]}]})
+    env = dict(os.environ)
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+    env["PYTHONPATH"] = str(block) + os.pathsep + env.get("PYTHONPATH", "")
+    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
+                       **test_conftest.windowless_kwargs({}))
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "mutation-run: pytest's iniconfig is not importable" in p.stdout + p.stderr
+    assert not (ws / "run/supervisor/mutation-cache/inicfg.jsonl").exists()

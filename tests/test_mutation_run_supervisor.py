@@ -899,6 +899,21 @@ def test_task031_r8_a_section_header_holding_a_comment_is_not_read_otherwise_tha
     assert (p.returncode == 2 and outcomes == []) or outcomes == ["survived"], p.stdout + p.stderr
 
 
+@pytest.mark.parametrize("config,kind,section", [("pytest.ini", "ini", "[pytest]"), ("tox.ini", "ini", "[pytest]"),
+                                                 ("setup.cfg", "cfg", "[tool:pytest]")])
+def test_task031_r9_a_pytest_configuration_iniconfig_cannot_parse_is_refused(tmp_path, config, kind, section):
+    """R-041, TASK-031 Requirement 4 (handoff/TASK-031-r9.md: an `iniconfig.ParseError` is a refusal with the
+    existing message, exit 2, never an internal error): a root `pytest.ini`, `tox.ini` or `setup.cfg` holding a line
+    that is neither a key nor a section, which pytest 9.1.1 refuses to read as well, exits 2 with the file named, and
+    no mutant is run."""
+    ws = _fixture(tmp_path, dict(CALC, **{config: section + "\nthis line has no separator\n"}))
+    mf = _mutants(ws, "r9pe", {"mutants": [KILL_CALC]})
+    p = _run(ws, mf)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "invalid %s file %s" % (kind, config) in p.stdout + p.stderr
+    assert _cache_lines(ws, "r9pe") == []
+
+
 @pytest.mark.parametrize("header", ["[pytest] x # the old section", "[pytest] trailing", "[pytest]x"])
 def test_task031_r9_a_header_line_pytest_reads_as_a_value_is_not_read_as_a_section(tmp_path, header):
     """R-041 (a result against the version the gate reads), TASK-031 Requirement 4 (handoff/TASK-031-r6.md, B-3;

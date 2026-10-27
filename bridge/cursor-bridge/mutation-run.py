@@ -10,7 +10,6 @@ expect-survive mutant was killed; 2 for a malformed file, refused path or resolu
 when any listed new test passed on the old code. ASCII-only on purpose (cp1252 consoles).
 """
 import argparse
-import configparser
 import hashlib
 import json
 import os
@@ -831,42 +830,38 @@ _PYTEST_CONFIG_NAMES = (
 )
 
 
-def _refuse_ini_cfg_if_configparser_section_names_disagree(cp, refuse_message):
-    for section in cp:
-        if "#" in section or ";" in section or "]" in section:
-            raise Refuse(refuse_message)
-
-
 def _pytest_config_dict_from_file(filepath):
     name = os.path.basename(filepath)
     suffix = os.path.splitext(name)[1]
     if suffix == ".ini":
-        cp = configparser.ConfigParser(interpolation=None)
         try:
-            cp.read(filepath, encoding="utf-8")
-            _refuse_ini_cfg_if_configparser_section_names_disagree(
-                cp, "mutation-run: invalid ini file %s" % name)
+            import iniconfig
+        except ImportError:
+            raise Refuse("mutation-run: pytest's iniconfig is not importable")
+        try:
+            ini = iniconfig.IniConfig(str(filepath))
             if name in ("pytest.ini", ".pytest.ini"):
-                if "pytest" in cp:
-                    return {k: v for k, v in cp["pytest"].items()}
+                if "pytest" in ini:
+                    return {k: v for k, v in ini["pytest"].items()}
                 return {}
             if name == "tox.ini":
-                if "pytest" not in cp:
+                if "pytest" not in ini:
                     return None
-                return {k: v for k, v in cp["pytest"].items()}
+                return {k: v for k, v in ini["pytest"].items()}
             return None
-        except (configparser.Error, UnicodeDecodeError):
+        except (iniconfig.ParseError, UnicodeDecodeError):
             raise Refuse("mutation-run: invalid ini file %s" % name)
     if suffix == ".cfg":
-        cp = configparser.ConfigParser(interpolation=None)
         try:
-            cp.read(filepath, encoding="utf-8")
-            _refuse_ini_cfg_if_configparser_section_names_disagree(
-                cp, "mutation-run: invalid cfg file %s" % name)
-            if "tool:pytest" not in cp:
+            import iniconfig
+        except ImportError:
+            raise Refuse("mutation-run: pytest's iniconfig is not importable")
+        try:
+            ini = iniconfig.IniConfig(str(filepath))
+            if "tool:pytest" not in ini.sections:
                 return None
-            return {k: v for k, v in cp["tool:pytest"].items()}
-        except (configparser.Error, UnicodeDecodeError):
+            return {k: v for k, v in ini["tool:pytest"].items()}
+        except (iniconfig.ParseError, UnicodeDecodeError):
             raise Refuse("mutation-run: invalid cfg file %s" % name)
     if suffix == ".toml":
         try:
