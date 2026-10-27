@@ -1088,7 +1088,7 @@ def test_task031_r14_a_tracked_pyc_the_tests_read_stays_in_the_copy(tmp_path):
     TASK-031 round 14, Requirement 1 (handoff/TASK-031-r14.md): a project that reads bytecode (a decompiler, a
     disassembler, a packaging tool) commits `.pyc` files as test data outside any `__pycache__`; round 13 removed
     every `.pyc` from the copy, so such a test failed for a reason that is not the mutant and an equivalent mutant
-    was recorded killed, exit 0. A loose `.pyc` beside no source is never read for a module, so only `__pycache__`
+    was recorded killed, exit 0. A loose `.pyc` beside its source is never read for the module, so only `__pycache__`
     folders are removed: the equivalent mutant survives, exit 1."""
     files = {"demo/__init__.py": "",
              "demo/magic.py": "def head(b):\n    return b[:4]\n",
