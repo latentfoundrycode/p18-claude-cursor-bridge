@@ -138,7 +138,12 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # performance-mechanism and code-signing paragraph and its Observability & Verifiability paragraph, under the
 # standing TASK-012 entry on "Phase 2 \u2014 Design", and step 2's brief paragraph, under TASK-017's own entry on
 # "2. Package the brief"; every other passage the trait files take moves whole and is traced in its new home)
-TRACED = "TRACED: 424 passages of baseline 0a186da; 155 in supervisor.md, 255 under workflow/, 0 dropped, 14 excused"
+# (TASK-030: four more move from traced to excused: step 3's timeout paragraph and step 4's tests paragraph,
+# reworded under TASK-030's own entries on "3. Delegate to Cursor" and "4. Inspect" (the heavy launch's duration;
+# every suite through the launcher; the mutants file and the checkpoint run through mutation-run.py), and rules 8
+# and 24, excused by the earlier Standing rules entry and so labelled TASK-015 (the driver kind; the suite's
+# default); step 7 moves whole into delegation-loop/decide.md and is traced there)
+TRACED = "TRACED: 424 passages of baseline 0a186da; 153 in supervisor.md, 253 under workflow/, 0 dropped, 18 excused"
 NOTES = [
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
@@ -148,10 +153,14 @@ NOTES = [
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: The design-tooling flow - Save the mockup files under `docs/mockups/` (one file per sc",
     "NOTE (reword TASK-017) bridge/commands/supervisor.md: 2. Package the brief - Delegate to **spec-packager** to write `handoff/TASK-<nnn>.m",
+    "NOTE (reword TASK-030) bridge/commands/supervisor.md: 3. Delegate to Cursor - The `--model` value is copied from `docs/ROSTER.resolved.jso",
+    "NOTE (reword TASK-030) bridge/commands/supervisor.md: 4. Inspect - **The tests run before the first reviewer** (release A5, pla",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 3. **UI mockups** (Phase 3) **only if the change touches the",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 7. **Project end again.** The close of the addendum's last s",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - The gates of a change cycle are the same approvals the origi",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 8. Never chain shell commands with `&&`, `|`, or `;`, and ne",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 13. Design correctness \\u2014 accessibility and interface MUSTs, ",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 24. Windowless by default. The user works on the same Window",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 34. A request on a finished project is a change cycle: the s",
 ]
@@ -159,10 +168,10 @@ NOTES = [
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the fourteen passages of the six `reword` entries the carve (TASK-010), TASK-012, TASK-014,
-    TASK-015 and TASK-017 declare (three in the core's "Main and conditional workflows", three standing rules, three
-    under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits), one in the design-tooling
-    flow, three in the change cycle, one in step 2), so an increment that excuses anything more changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+    excused ones exactly the eighteen passages of the eight `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+    TASK-015, TASK-017 and TASK-030 declare (three in the core's "Main and conditional workflows", five standing
+    rules, three under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits), one in
+    the design-tooling flow, three in the change cycle, one each in steps 2, 3 and 4), so an increment that excuses anything more changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
     have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)

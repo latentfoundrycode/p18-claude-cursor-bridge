@@ -218,12 +218,12 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
 | Planning (Phase 4, the build plan) | `~/.claude/cursor-bridge/workflow/phases/planning.md` |
 | Run parameters | `~/.claude/cursor-bridge/workflow/phases/run-parameters.md` |
 | Configuration (Phase 5) | `~/.claude/cursor-bridge/workflow/phases/configuration.md` |
-| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` and its sub-file under `~/.claude/cursor-bridge/workflow/phases/delegation-loop/` |
+| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` and its sub-files under `~/.claude/cursor-bridge/workflow/phases/delegation-loop/` |
 | The change cycle | `~/.claude/cursor-bridge/workflow/phases/change-cycle.md` |
 | Reflection points | `~/.claude/cursor-bridge/workflow/phases/reflection.md` |
 | Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
 
-Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`. A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 9 is in `delegation-loop/refactoring-pass.md`.
+Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`. A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 7 is in `delegation-loop/decide.md` and its step 9 in `delegation-loop/refactoring-pass.md`.
 
 **Modules read outside their own phase.** Some procedures run outside the phase whose `Phase:` value names their module; they are read whenever they apply, whatever the phase:
 - `reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;
@@ -529,7 +529,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
    `nohup` and `stdbuf`), so a command wrapped in them matches nothing. Deny rules do see
    through chains and wrappers, so chaining buys nothing and costs a classifier round. The
    one launcher the bridge allows is its own `bridge-run.py`, which the rules name and
-   which accepts only the commands the loop runs through it, each by name: the builder and Review B (`cursor-agent`), the CI watch (`gh pr checks`) and the test suites you await (`pytest`, `python -m pytest`, `python -m unittest`, `uv run pytest`, `npm test`, `npm run test*`, `pnpm test`, `yarn test`, `npx vitest`, `npx jest`, `npx playwright test`, `node --test`, `go test`, `cargo test`, `dotnet test`; never with an option that runs another program; release A2).
+   which accepts only the commands the loop runs through it, each by name: the builder and Review B (`cursor-agent`), the CI watch (`gh pr checks`), the test suites you await (`pytest`, `python -m pytest`, `python -m unittest`, `uv run pytest`, `npm test`, `npm run test*`, `pnpm test`, `yarn test`, `npx vitest`, `npx jest`, `npx playwright test`, `node --test`, `go test`, `cargo test`, `dotnet test`; release A2) and the mutation runs (`--kind driver`: `python` with a program under `run/supervisor/` or the installed `mutation-run.py`); never with an option that runs another program, but for the driver kind's `python <program>`, whose program the launcher's path check confines. Every suite and every mutation run goes through it, in the background (the delegation loop's step 4).
 9. Never merge to `main` unless the full gate holds: CI green, both the Claude reviewer
    and the cross-family verifier APPROVE, and no gate-integrity flag. See
    `~/.claude/cursor-bridge/Merge-Verification-Policy.md`.
@@ -630,7 +630,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     only when it serves the user (they watch it or type into it), marked
     `windowless: visible-ok <reason>` at the call site; a `CTRL_BREAK` process-group spawn is
     hidden only after its stop path is tested. Verify once per project with a throwaway edit
-    while watching the desktop.
+    while watching the desktop. A project's test suite carries the bridge's frozen windowless
+    default (`~/.claude/cursor-bridge/windowless-default.snapshot.md`, the pytest `conftest.py`
+    block), written at configuration and at calibration and checked by the conformance floor
+    `Windowless test suite`; and every suite and mutation run starts through the launcher,
+    which starts it windowless.
 25. Refactoring — removing duplication or simplifying while keeping the same functionality —
     happens only in the stage-close pass (Phase 6 step 9), never inside a feature increment
     and never by the builder on its own initiative. One branch per stage, one small commit

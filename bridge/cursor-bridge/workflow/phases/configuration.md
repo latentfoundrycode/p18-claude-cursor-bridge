@@ -87,6 +87,10 @@ account, or a dependency carrying a consequence the owner bears (money, privacy,
 resolve it with the user before delegating. Routine technical configuration choices you decide
 yourself and record; do not escalate them.
 
+### The windowless test suite
+
+Every project's test suite carries the bridge's frozen windowless default (rule 24), written by **cursor-configurator** with the items above (`Cursor-Project-Configuration.md` §2, its windowless-default item). For a pytest suite the default is the fenced block of `~/.claude/cursor-bridge/windowless-default.snapshot.md`, which gives every launch the suite makes without creation flags of its own the flag that opens no window: the configurator creates the test root's `conftest.py` from the block only where the test root has none (`tests/conftest.py`, with its folder, where the project has no test root yet), and where one exists inserts the block once, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), leaving every other line as it stands. The conformance check's floor `Windowless test suite` checks it at every calibration and reflection point. A Node suite has no default yet: the check gives it a NOTE naming its runner and KP-059's mechanism, which you record in the status file. Whatever the runner, the suite itself runs through the launcher, which starts it windowless (`delegation-loop.md`, step 4).
+
 ### Keeping the position
 
 While the phase runs, keep the status file's `Next:` line naming the items configured so far and the next one, rewritten as each is finished, so that a resume after a compaction neither redoes an item nor skips one. It names each item by its name only, never a key's value or a path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the line names the first increment, and what was configured stands in the status file, as "Commit the configuration as its own checkpoint" above asks, with each tool's pinned version in `docs/INVENTORY.md` (Resources).

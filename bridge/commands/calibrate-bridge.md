@@ -44,6 +44,16 @@ python ~/.claude/cursor-bridge/conformance-check.py
 
 Run it from the project root or from `Workspace/` (it resolves either). It compares this project's configuration with what the installed bridge requires (the scanners in the gate, actions pinned by commit, the boundary and secure-coding rules, lockfiles, the records, the diagram index, the command reference where the software is installable, whether keys sit in `Workspace/.env` within the builder's reach, and since release A1b: a spending limit recorded for every key or account that can charge, the inventory's `Development data:` decision, every adapter of an external service tested against recorded replies, and `run/` ignored) and prints `OK` / `MISSING` / `NOTE` per floor. A project configured before a floor existed never received it otherwise. **Every `MISSING` becomes a calibration item** of this calibration, applied as configuration work in the next stage (a missing diagram index is the diagram retrofit, scheduled at the next natural pause); a `NOTE` is recorded in `PROJECT_STATUS.md`. Nothing here reopens a gate. Pass `--screens` or `--installable` when the project has screens or is installable and the check cannot tell from the files.
 
+**The `Windowless test suite` floor is the one written during this calibration**, before the project resumes, since a suite without it can open a window for every program it starts (rule 24). Where the check prints it `MISSING` for a pytest suite:
+
+1. Run the project's recorded suite once, with `-rA` added where the command lacks it, in the background through the launcher: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite command> -rA > run/agent/calibrate-suite-before.out 2>&1`, under the heavy launch's `timeout` (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 3; the run waits for the computer's one slot). Read the output file when its completion arrives.
+2. Have `cursor-configurator` write the default from `~/.claude/cursor-bridge/windowless-default.snapshot.md` exactly as configuration writes it (`Cursor-Project-Configuration.md` §2, the windowless-default item): the test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block inserted once into the one that exists, every other line left as it stands.
+3. Run the same suite once more the same way, into `run/agent/calibrate-suite-after.out`, and read it when its completion arrives.
+4. Compare the two reports' failed test ids. A failure present before the write is the project's own: it is recorded, and the write stands. A failure present only after the write is the insert's: it leads the report's first line, the insert is reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named in the report. Otherwise the write is committed as the calibration's checkpoint.
+5. Write the two runs' results on the `Calibrated:` line (step 5).
+
+It is a configuration item: no gate is reopened, and the loop resumes after it. A Node suite's NOTE (its default is not shipped yet) is recorded in `PROJECT_STATUS.md` like any NOTE.
+
 ## 2. Re-read the governing files — they supersede what you hold in context
 
 Read, whole, in this order — even if you believe you already know them, and even if
@@ -68,9 +78,9 @@ The session-start hook's table (`PHASE_MODULES` in `session-start.py`), which al
 | `mockups`, `interface` | `interface.md` and its variant files |
 | `planning` | `planning.md`, `run-parameters.md` |
 | `configuration`, `configuring`, `configure` | `configuration.md` |
-| `building` | `delegation-loop.md` and its sub-file, `reflection.md`, `project-end.md` (read at the close of the plan's last stage) |
+| `building` | `delegation-loop.md` and its sub-files, `reflection.md`, `project-end.md` (read at the close of the plan's last stage) |
 | `done` | `change-cycle.md` |
-| `changing` | `change-cycle.md`, `delegation-loop.md` and its sub-file, `reflection.md`, `project-end.md` (read at the close of the plan's last stage) |
+| `changing` | `change-cycle.md`, `delegation-loop.md` and its sub-files, `reflection.md`, `project-end.md` (read at the close of the plan's last stage) |
 
 Subagent definitions under `~/.claude/agents/` are loaded fresh each time a subagent is
 spawned, so they need no re-read here — but note that any subagent spawned **before** the
@@ -174,7 +184,7 @@ A release that adds or changes a conditional workflow (a product type's, a sub-t
 ## 5. Record and report
 
 Update `docs/PROJECT_STATUS.md`: `Bridge version: <new>` and a line
-`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`.
+`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`. Where step 1b wrote the windowless default, the line also names the two suite runs' results (the failed test ids before and after the write) and whether the write stands or was reverted.
 Commit it with the configuration checkpoint if there was one.
 
 Report under the "Reporting to the user" rules — first line is the one thing they own or

@@ -14,10 +14,7 @@ You search only inside the project's `Workspace/`, or the worktree the superviso
 
 You never leave anything of yours running when you end: no background command, and never a polling loop (`until … sleep`, `while … sleep`) on a file or a task's output — wait for a command with the tool's own timeout, and report what did not finish. A loop left behind runs on after you, and the supervisor's loop guard has to find it (KP-042).
 
-A suite that runs longer than ten minutes is not yours to run: the Bash tool ends a
-foreground command at ten minutes (600 seconds, KP-061), and the run is lost with its result.
-Say so and hand the suite command back; the supervisor runs it through the launcher in the
-background and names you the output file to read.
+A suite is the launcher's, whatever its length. One that runs longer than ten minutes is not yours to run, since the Bash tool ends a foreground command at ten minutes (600 seconds, KP-061) and the run is lost with its result, and a shorter one is not either: the launcher starts every suite windowless and in the computer's one slot. The suite is always the supervisor's launch through the launcher in the background, and you read the output file it names you (`run/agent/TASK-<nnn>-suite.out`). A suite is the project's recorded suite command, or any run of more than the increment's own test files; you may run the increment's own test files alone in the foreground. If you are asked to run a suite yourself, say so and hand the command back.
 
 Your job is as much about **context economy** as correctness: the supervisor should
 receive a short, precise account of what broke and why, never a wall of test output.

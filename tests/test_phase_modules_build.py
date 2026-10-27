@@ -26,21 +26,30 @@ HOOK = os.path.join(CB, "session-start.py")
 
 SUB = "delegation-loop/refactoring-pass.md"
 STEP9 = "9. Refactoring and optimization pass (at stage close)"
+DECIDE = "delegation-loop/decide.md"
+STEP7 = "7. Decide (accept the increment)"
+SUBS = [DECIDE, SUB]
 
 
-LOOP_STEPS = ["1. Checkpoint", "2. Package the brief", "3. Delegate to Cursor",
-              "3b. A model fails mid-step — switch automatically, restart the step, never wait", "4. Inspect", "5. Scan",
-              "5b. Dependency-admission gate", "6. Benchmarks and observability", "7. Decide (accept the increment)",
-              "8. Merge (the verified gate)"]
+# the loop's steps as the module holds them, each with the sub-sections TASK-030 adds (step 7 itself in its sub-file,
+# the module keeping a pointer section under the step's number)
+LOOP_HEADINGS = [(3, "1. Checkpoint"), (3, "2. Package the brief"), (3, "3. Delegate to Cursor"),
+                 (4, "The model, the timeout and the limit"),
+                 (3, "3b. A model fails mid-step — switch automatically, restart the step, never wait"),
+                 (4, "Waiting for the slot, and a mutation run cut short"), (3, "4. Inspect"),
+                 (4, "The tests before the first reviewer"), (4, "The reviewers"), (3, "5. Scan"),
+                 (3, "5b. Dependency-admission gate"), (3, "6. Benchmarks and observability"),
+                 (3, "7. Decide — in a sub-file"), (3, "8. Merge (the verified gate)")]
 
 STRUCTURE = {
     "run-parameters": [(2, "Run parameters — asked once, after the plan is approved, before configuration"),
                        (3, "What must survive a compaction"), (3, "The procedure"), (3, "Writing the answers down"),
                        (2, "Extension points")],
     "configuration": [(2, "Phase 5 — Configure the Cursor build environment"), (3, "What must survive a compaction"),
-                      (3, "The procedure"), (3, "Keeping the position"), (2, "Extension points")],
+                      (3, "The procedure"), (3, "The windowless test suite"), (3, "Keeping the position"),
+                      (2, "Extension points")],
     "delegation-loop": [(2, "Phase 6 — The delegation loop"), (3, "What must survive a compaction"), (3, "The procedure")]
-                       + [(3, s) for s in LOOP_STEPS] + [(2, "Extension points")],
+                       + LOOP_HEADINGS + [(2, "Extension points")],
 }
 
 INTRO = {
@@ -72,7 +81,7 @@ SURVIVAL = {
         "spending limit as the items are configured.",
     ],
     "delegation-loop": [
-        "this module and its sub-file, each whole (the session-start hook names both), with "
+        "this module and its sub-files, each whole (the session-start hook names them), with "
         "`~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each "
         "whole, and the other files the hook names;",
         "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of "
@@ -89,9 +98,13 @@ SURVIVAL = {
         "and report, as for a task; and `git grep DEBUG-BUG-<nnn>` for instrumentation not yet removed;",
         "`docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass "
         "runs and whether increments run in parallel, and the models the delegate command and Review B name;",
+        "the increment's verdicts, kept in `run/supervisor/in-flight.md`: Review A's, each auditor's and Review B's "
+        "reply, each written there as it returns, and the mutation run's cuts and estimate (step 7);",
         "the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, "
         "`run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message "
-        "(step 4), and `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background; "
+        "(step 4), `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background, and "
+        "the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files "
+        "`run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); "
         "and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, "
         "`ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` "
         "needs), whole;",
@@ -211,19 +224,60 @@ def pointer_lines(text):
     return [l for l in text.split("\n") if l.startswith("Sub-files: ") or l.startswith("Variants: ")]
 
 
-def test_r032_the_delegation_loop_names_its_sub_file_on_its_pointer_line():
-    """R-032: the delegation-loop module names its one sub-file on a `Sub-files:` line, in the grammar session-start.py
-    reads (a line at column 0, paths relative to workflow/phases/ separated by `; `), in its procedure; every file under
-    workflow/phases/delegation-loop/ is named there, so no sub-file goes unread."""
+def test_r032_the_delegation_loop_names_its_sub_files_on_its_pointer_line():
+    """R-032: the delegation-loop module names its two sub-files, step 7's (TASK-030) and step 9's (TASK-013), on one
+    `Sub-files:` line, in the grammar session-start.py reads (a line at column 0, paths relative to workflow/phases/
+    separated by `; `), in its procedure; every file under workflow/phases/delegation-loop/ is named there, so no
+    sub-file goes unread."""
     text = module("delegation-loop")
-    assert pointer_lines(text) == ["Sub-files: " + SUB], pointer_lines(text)
+    line = "Sub-files: " + "; ".join(SUBS)
+    assert pointer_lines(text) == [line], pointer_lines(text)
     proc = section(text, "The procedure", 3)
-    assert "\nSub-files: " + SUB + "\n" in proc
-    assert flat(proc).strip() == ("Steps 1 to 8 below run for every increment; step 9, the refactoring and optimization "
-                                  "pass at a stage's close, is in a sub-file of this module, read whole with it wherever "
-                                  "the module is read: Sub-files: " + SUB + " For each increment, in order:")
+    assert "\n" + line + "\n" in proc
+    assert flat(proc).strip() == ("Steps 1 to 8 below run for every increment, step 7 in a sub-file of this module; step "
+                                  "9, the refactoring and optimization pass at a stage's close, is in another. Each "
+                                  "sub-file is read whole with the module wherever the module is read: " + line
+                                  + " For each increment, in order:")
     folder = os.path.join(PHASES, "delegation-loop")
-    assert sorted(os.listdir(folder)) == [os.path.basename(SUB)]
+    assert sorted(os.listdir(folder)) == sorted(os.path.basename(s) for s in SUBS)
+
+
+def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
+    """R-032 (TASK-030): the module grew past what its bound allowed with TASK-030's text, so step 7 moved into a
+    sub-file, as step 9 did (TASK-013): the sub-file opens with its own heading and a paragraph that says it is part of
+    the module and when its step runs, holds step 7 under its heading and then the mutation run; the module keeps a
+    pointer section under the step's number, and no other file under workflow/phases/ holds the step's heading."""
+    sub = module(DECIDE)
+    assert headings(sub) == [(2, "The decision (Phase 6, step 7)"), (3, "Where this sub-file belongs"), (3, STEP7),
+                             (4, "The mutation run")], headings(sub)
+    assert flat(section(sub, "Where this sub-file belongs", 3)).strip() == (
+        "This file is a sub-file of the delegation-loop module (`delegation-loop.md`, \"The procedure\"), read whole "
+        "with it. It holds the loop's step 7, which runs for every increment after step 6 and before step 8, the "
+        "merge: the decision on the increment, and the mutation run each pass through the step launches before step "
+        "8's snapshot. It stands in a file of its own to keep the module within its size bound.")
+    assert flat(section(module("delegation-loop"), "7. Decide — in a sub-file", 3)).strip() == (
+        "Step 7, the decision on the increment with the mutation run its last pass launches, stands in the sub-file "
+        "`delegation-loop/decide.md` (\"The procedure\" names it), read whole with this module; step 8 follows it.")
+    for root, _dirs, files in os.walk(PHASES):
+        for f in files:
+            rel = os.path.relpath(os.path.join(root, f), PHASES).replace(os.sep, "/")
+            if rel != DECIDE:
+                assert "### " + STEP7 not in read(os.path.join(root, f)).split("\n"), rel
+
+
+# sha256 of step 7 as the delegation-loop module held it at origin/main 02f0ab5 (from its heading to the line before
+# step 8's, LF, trailing whitespace stripped; 6,967 characters): the step moved verbatim (TASK-030), its mutation run
+# added after it under a heading of its own
+STEP7_SHA256 = "70a1aacaca66592b23a4ce3783c81f7a10b60e9c7a6e9ac536296e1b6aaac2e7"
+
+
+def test_r032_step_7_is_verbatim():
+    """R-032 (TASK-030): the sub-file's step 7, up to its mutation run, is the module's step 7 as it was before the
+    move, character for character."""
+    import hashlib
+    sub = module(DECIDE)
+    step = sub[sub.index("### " + STEP7):sub.index("#### The mutation run")].rstrip()
+    assert len(step) == 6967 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
 
 
 def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
@@ -320,7 +374,7 @@ def test_the_configurations_position_is_kept_on_next():
     assert "`In flight:`" not in module("configuration")
 
 
-@pytest.mark.parametrize("rel", ["run-parameters.md", "configuration.md", "delegation-loop.md", SUB])
+@pytest.mark.parametrize("rel", ["run-parameters.md", "configuration.md", "delegation-loop.md", DECIDE, SUB])
 def test_r032_the_module_and_its_sub_file_are_read_whole(rel):
     """R-032: each enriched module and the sub-file stay within the bound a module is read whole by."""
     text = module(rel)
@@ -344,7 +398,7 @@ def test_r005_the_hook_names_the_delegation_loop_and_its_sub_file(tmp_path):
     assert p.returncode == 0 and p.stderr == "", p.stderr
     w = "~/.claude/cursor-bridge/workflow/phases/"
     named = [re.match(r"  - (\S+)", l).group(1) for l in p.stdout.split("\n") if l.startswith("  - " + w)]
-    assert named == [w + "delegation-loop.md", w + SUB, w + "reflection.md", w + "project-end.md"], p.stdout
+    assert named == [w + "delegation-loop.md", w + DECIDE, w + SUB, w + "reflection.md", w + "project-end.md"], p.stdout
 
 
 def test_the_core_names_the_delegation_loops_sub_file():
@@ -352,6 +406,6 @@ def test_the_core_names_the_delegation_loops_sub_file():
     sentence under the table says where a split module's step keeps its heading."""
     core = flat(read(CORE))
     assert ("| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` and its "
-            "sub-file under `~/.claude/cursor-bridge/workflow/phases/delegation-loop/` |") in core
-    assert ("A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 9 is in "
-            "`delegation-loop/refactoring-pass.md`.") in core
+            "sub-files under `~/.claude/cursor-bridge/workflow/phases/delegation-loop/` |") in core
+    assert ("A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 7 is in "
+            "`delegation-loop/decide.md` and its step 9 in `delegation-loop/refactoring-pass.md`.") in core
