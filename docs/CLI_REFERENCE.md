@@ -542,6 +542,26 @@ background task pending, a missing or unreadable file - ALLOWS the stop. The gua
 open: a parse problem never blocks. ASCII output only. Never writes anything.
 ```
 
+## mutation-run.py
+
+Path: `bridge/cursor-bridge/mutation-run.py`
+
+```
+Apply mutants from a JSON file in a scratch copy of the Workspace and run each mutant's tests with pytest. Usage: python mutation-run.py <mutants file> [--all] [--checkpoint <commit>] [--scratch <folder>] [--mutant-timeout <seconds>]. Default scratch is ~/.cursor-bridge/scratch/<project>/. Exit 0 when every mutant is killed; 1 when any survived, was not applied, or an expect-survive mutant was killed; 2 for malformed input, refused paths, or failed resolution check; 3 when any mutant errored; 4 in --checkpoint mode when a listed new test passed on the old code.
+```
+
+### Positionals
+
+- `mutants_file`; default: null; required: true; run/supervisor/<id>-mutants.json
+
+### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--all`; default: false; required: false; run every mutant, ignoring cached kills
+- `--checkpoint`; default: null; required: false; run new_tests on code at commit
+- `--scratch`; default: null; required: false; scratch folder (default under ~/.cursor-bridge/scratch/)
+- `--mutant-timeout`; default: 900; required: false; per-mutant pytest timeout (default 900)
+
 ## permission-guard.py
 
 Path: `bridge/cursor-bridge/permission-guard.py`

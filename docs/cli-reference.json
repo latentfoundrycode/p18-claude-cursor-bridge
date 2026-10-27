@@ -680,6 +680,88 @@
       "usage": "loop-guard: a Claude Code Stop hook that keeps a bridge supervisor from ending its turn\nwhile the build loop has work and nothing is going to wake it.\n\nRegistered in the bridge's settings.json (hooks -> Stop). Reads the hook's JSON on stdin.\nIt BLOCKS the stop - exit code 2 with the reason on stderr, which Claude Code feeds back to\nthe model (documented; code.claude.com hooks reference) - only when ALL hold:\n\n  1. the session runs in a bridge Workspace: <cwd>/docs/PROJECT_STATUS.md exists;\n  2. its `Phase:` is building or changing;\n  3. its `Awaiting user on:` is `nothing` (the supervisor is not waiting for the owner), and\n     no `Paused:` line in run/supervisor/in-flight.md beside it names a wait (2026.10.25a, FB-027:\n     a pause written in the untracked working file touches no tracked file);\n  (and, in every phase: a turn whose last message holds a shell block and names no terminal\n  is sent back once, because a run sheet without its terminal cannot be followed, rule 27);\n  4. nothing is pending that will wake the session. Since release A2 the hook's own lists\n     decide: a background command *of a kind that finishes* (a builder run, a CI watch, a\n     command run through bridge-run.py, or one marked `# wake`) counts until its limit plus a\n     grace; a heavy bridge-run launch (`builder`, `test` or `driver`) also counts through the\n     longest slot wait (14,400 s), the slot grace (120 s) and the waiter's minute (60 s); a\n     background agent counts only under its ceiling (an hour, or `Agent ceiling:` in\n     the run parameters) AND only while a wake-timer command that ends no later than that\n     ceiling is running, because a hung agent never completes and nothing else would wake the session\n     (plan 10.1, case 5); a scheduled wake-up counts (one past due fires as soon as the\n     session is idle). A background command of any other kind (a dev server, a worker, a\n     probe) is NOT a wake source: a server never finishes (KP-031). A task is classed by its\n     tool (2026.10.25a, TDP FB-006): an Agent task is timer-bound as above, a shell command\n     counts by its pattern, and a monitor (an artifact live-update monitor, a Monitor tool\n     task) is neither a wake source nor an agent: it never demands a wake-timer and never\n     counts; any other task with no command (a workflow, a teammate, an MCP task) is read as\n     an agent, as before. When the hook hands no lists, the\n     transcript is read as before, within GRACE_HOURS;\n  5. this is not already a continuation forced by this hook (`stop_hook_active`), so it\n     nudges at most once per stop sequence and can never trap the session.\n\nEverything else - any other folder, any other phase, an owner question outstanding, a\nbackground task pending, a missing or unreadable file - ALLOWS the stop. The guard fails\nopen: a parse problem never blocks. ASCII output only. Never writes anything.\n"
     },
     {
+      "description": "Apply mutants from a JSON file in a scratch copy of the Workspace and run each mutant's tests with pytest. Usage: python mutation-run.py <mutants file> [--all] [--checkpoint <commit>] [--scratch <folder>] [--mutant-timeout <seconds>]. Default scratch is ~/.cursor-bridge/scratch/<project>/. Exit 0 when every mutant is killed; 1 when any survived, was not applied, or an expect-survive mutant was killed; 2 for malformed input, refused paths, or failed resolution check; 3 when any mutant errored; 4 in --checkpoint mode when a listed new test passed on the old code.",
+      "name": "mutation-run.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": false,
+          "dest": "all",
+          "help": "run every mutant, ignoring cached kills",
+          "nargs": 0,
+          "option_strings": [
+            "--all"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": null,
+          "dest": "checkpoint",
+          "help": "run new_tests on code at commit",
+          "nargs": null,
+          "option_strings": [
+            "--checkpoint"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": null,
+          "dest": "scratch",
+          "help": "scratch folder (default under ~/.cursor-bridge/scratch/)",
+          "nargs": null,
+          "option_strings": [
+            "--scratch"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": 900,
+          "dest": "mutant_timeout",
+          "help": "per-mutant pytest timeout (default 900)",
+          "nargs": null,
+          "option_strings": [
+            "--mutant-timeout"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "bridge/cursor-bridge/mutation-run.py",
+      "positionals": [
+        {
+          "choices": null,
+          "default": null,
+          "dest": "mutants_file",
+          "help": "run/supervisor/<id>-mutants.json",
+          "nargs": null,
+          "option_strings": [],
+          "required": true,
+          "type": null
+        }
+      ],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
       "name": "permission-guard.py",
       "path": "bridge/cursor-bridge/permission-guard.py",
       "source": "docstring",

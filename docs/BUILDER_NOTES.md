@@ -31,3 +31,7 @@
 2026-10-19 CONFIG-B3b-r4: refusing `relpath` `.` in `absolute_default_to_placeholder` keeps round-3 choice refusal for `HERE` while round-4 walks choices to placeholders for paths under the bridge folder; mutation (y) survived for lack of a test (a tuple choice holding a non-absolute string with a path in it passes the walk, and only the string check catches it); the supervisor's `test_cfgb3b_r4_a_choice_holding_a_path_inside_a_string_is_refused` now catches it (corrected by the supervisor after Review A, round 4).
 
 2026-10-25 BUG-020-r1: Done step 1 (`python -m pytest tests -q`) takes ~6 minutes here; the `cron_next` edit landed while that run was near 30% progress, so the logged pre-edit counts mix stale-manifest failures with post-fix loop-guard behaviour and do not capture `test_bug020` TypeError (HEAD still rejects `tz`, verified with `git show`).
+
+2026-10-26 TASK-031-r5: `test_fix001_no_test_starts_a_program_around_the_default` fails on the round-4 supervisor reproduction strings in `tests/test_mutation_run_supervisor.py` (`creationflags=NO_WINDOW` without the `CREATE_NO_WINDOW` substring); that file is out of scope for r5, so verification step 3 cannot pass here until those embedded literals are fixed elsewhere.
+
+2026-10-27 TASK-031-r11: on Python 3.12, only an empty `PYTHONPATH` entry puts the working folder on `sys.path`; round 11's `find_spec` check still refused ordinary layouts when another copy of the project package was on `PYTHONPATH`, which round 12 replaced with a fixed list of names pytest imports for configuration.
