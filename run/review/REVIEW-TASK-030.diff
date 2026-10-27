@@ -68,7 +68,7 @@ index f8afea2..283b3ee 100644
  Your job is as much about **context economy** as correctness: the supervisor should
  receive a short, precise account of what broke and why, never a wall of test output.
 diff --git a/bridge/commands/calibrate-bridge.md b/bridge/commands/calibrate-bridge.md
-index b9a2fd1..a1da5b9 100644
+index b9a2fd1..5574352 100644
 --- a/bridge/commands/calibrate-bridge.md
 +++ b/bridge/commands/calibrate-bridge.md
 @@ -44,6 +44,16 @@ python ~/.claude/cursor-bridge/conformance-check.py
@@ -80,7 +80,7 @@ index b9a2fd1..a1da5b9 100644
 +1. Run the project's recorded suite once, with `-rA` added where the command lacks it, in the background through the launcher: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite command> -rA > run/agent/calibrate-suite-before.out 2>&1`, under the heavy launch's `timeout` (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 3; the run waits for the computer's one slot). Read the output file when its completion arrives.
 +2. Have `cursor-configurator` write the default from `~/.claude/cursor-bridge/windowless-default.snapshot.md` exactly as configuration writes it (`Cursor-Project-Configuration.md` §2, the windowless-default item): the test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block inserted once at the end of the one that exists, every other line left as it stands.
 +3. Run the same suite once more the same way, into `run/agent/calibrate-suite-after.out`, and read it when its completion arrives.
-+4. Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's exit status. A failure or error present before the write is the project's own: it is recorded, and the write stands. A failure or error present only after the write, fewer tests collected after it than before, or an after-run ending in pytest's exit 2 to 5 (interrupted, an internal error, a usage error such as a `conftest.py` that fails to import, no tests collected) where the before-run did not, is the insert's: it leads the report's first line, the insert is reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named in the report. A before-run that itself ends in pytest's exit 2 to 5 ran no comparable tests and proves nothing: the write is then recorded as unverified. Otherwise the write is committed as the calibration's checkpoint.
++4. Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's exit status. A before-run that itself ends in pytest's exit 2 to 5 ran no comparable tests and proves nothing: the write is committed as the calibration's checkpoint and recorded as unverified, whatever the after-run shows. Otherwise, a failure or error present before the write is the project's own: it is recorded, and the write stands. A failure or error present only after the write, fewer tests collected after it than before, or an after-run ending in pytest's exit 2 to 5 (interrupted, an internal error, a usage error such as a `conftest.py` that fails to import, no tests collected) where the before-run did not, is the insert's: it leads the report's first line, the insert is reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named in the report. Otherwise the write is committed as the calibration's checkpoint.
 +5. Write the two runs' results on the `Calibrated:` line (step 5).
 +
 +It is a configuration item: no gate is reopened, and the loop resumes after it. A Node suite's NOTE (its default is not shipped yet) is recorded in `PROJECT_STATUS.md` like any NOTE.
@@ -105,7 +105,7 @@ index b9a2fd1..a1da5b9 100644
  
  Update `docs/PROJECT_STATUS.md`: `Bridge version: <new>` and a line
 -`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`.
-+`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`. Where step 1b wrote the windowless default, the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected counts and the exit statuses, before and after the write) and whether the write stands or was reverted.
++`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`. Where step 1b wrote the windowless default, the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected counts and the exit statuses, before and after the write) and whether the write stands, stands unverified or was reverted.
  Commit it with the configuration checkpoint if there was one.
  
  Report under the "Reporting to the user" rules — first line is the one thing they own or
@@ -229,14 +229,14 @@ index 7a59f03..a290e60 100644
  
  ### KP-062 — A design critique ran 45 rounds on one change, and the four-round ceiling stopped nothing
 diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
-index 55c64b5..6dad2ab 100644
+index 55c64b5..e59c0d3 100644
 --- a/bridge/cursor-bridge/MANIFEST.json
 +++ b/bridge/cursor-bridge/MANIFEST.json
 @@ -1,27 +1,27 @@
  {
    "version": "2026.10.25a",
 -  "generated": "2026-10-27 14:16",
-+  "generated": "2026-10-27 22:40",
++  "generated": "2026-10-27 23:38",
    "files": {
 -    "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
 +    "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
@@ -253,7 +253,7 @@ index 55c64b5..6dad2ab 100644
 -    "commands/calibrate-bridge.md": "7273e5317e02bffba0c142bc90ecf3026c905a35b0b164e27ff1931835be168d",
 +    "agents/spec-packager.md": "70faa2125b64dfaef114c5a427df9ebcc266d167a03548b2d247e199bf2867da",
 +    "agents/test-runner.md": "abbaa2acc5252dc9357906a4e06fb9a3d49078659c54645fd85068a905c25d36",
-+    "commands/calibrate-bridge.md": "05d140c1d7870d2ebe8e60d33dba111d3cd39af2301026ed3379a6ece9e826cf",
++    "commands/calibrate-bridge.md": "a3d315fb00e03bbf60a5f66d6270c60c6ca91141f1f809d1862f6be265588f72",
      "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
 -    "commands/supervisor.md": "992ae547385446e2680a6f5f15c2d09690cfebe4bc085fbde9015e5cf9011227",
 +    "commands/supervisor.md": "566f21b369c83750e285b076d93fa6e1feaa089912d803cf96e53bfe9c389ad4",
@@ -276,7 +276,7 @@ index 55c64b5..6dad2ab 100644
 -    "cursor-bridge/workflow/phases/configuration.md": "4bcb7792438ac85fa7b3246d70c8a0e042d6f0860670e0649c4bf11a4ddf4142",
 -    "cursor-bridge/workflow/phases/delegation-loop.md": "baa4e3203e2ea4ab6ee5962e07c92e2ab4bff7e6ab41b8fb0dddb4703ed73f7e",
 +    "cursor-bridge/workflow/phases/configuration.md": "6a4e1c83c3b0ac33db272560b0c790c36994e335c86c9d2d79abea2dad44a2d4",
-+    "cursor-bridge/workflow/phases/delegation-loop.md": "338645d7750329212d554da58f70149b476bbd03cb76009b83b366abc62a7b54",
++    "cursor-bridge/workflow/phases/delegation-loop.md": "722c9545189e2fe2c8620a8cac104fa94b1c3d627a9ef883d00a49ffc8f99ab8",
 +    "cursor-bridge/workflow/phases/delegation-loop/decide.md": "1664aa5a403a18b33dc3ec5e3b9ce36fc4b50d3092edec2c71cd75b2a1d0e064",
      "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "40065539a1b0a098569db3d6c35198e0cff7179725ba2bba019287cfa175d987",
      "cursor-bridge/workflow/phases/design.md": "ec2a5a07747b0ff64bcb56599bd4d556870b01fc26a121abd76053943784d5a7",
@@ -306,7 +306,7 @@ index 7ebc177..9ff3376 100644
  
  While the phase runs, keep the status file's `Next:` line naming the items configured so far and the next one, rewritten as each is finished, so that a resume after a compaction neither redoes an item nor skips one. It names each item by its name only, never a key's value or a path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the line names the first increment, and what was configured stands in the status file, as "Commit the configuration as its own checkpoint" above asks, with each tool's pinned version in `docs/INVENTORY.md` (Resources).
 diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop.md b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
-index 68d4275..9a5aeac 100644
+index 68d4275..041e9a8 100644
 --- a/bridge/cursor-bridge/workflow/phases/delegation-loop.md
 +++ b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
 @@ -4,19 +4,20 @@
@@ -380,7 +380,7 @@ index 68d4275..9a5aeac 100644
 +
 +- **Exit 123 — the slot was not free.** The wait ended unmet (`bridge-run: slot not free - held by ...`), so the command never started and nothing was spent. Wait for the holder's end with `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the run that waits>"` in the background, the seconds being the time left until the `ends by` time the exit line printed, or zero when it has passed; then relaunch once, unchanged. The timer's closing line, which tells you to run a task in the foreground, does not apply here: its completion means the relaunch, through the launcher. A second 123 naming a holder is retried twice more the same way; after that, tell the owner, naming the holder's kind and run id. A 123 reading `held by unknown` (the launcher waited its provisional bound and never read a live holder's record) relaunches at once, and a second such 123 in a row is told to the owner at once, naming `~/.cursor-bridge/heavy.lock`: it is a sign of a defect, not of a busy computer.
 +- **A waiter killed from outside** — its output file holds waiting lines and neither `slot taken` nor `bridge-run: exit` (KP-053) — is relaunched; nothing was spent.
-+- **A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no `bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it recorded standing (step 7), and a program under `run/supervisor/` starts again only once `git status` shows no product file changed (KP-056's residue check), each changed file first restored from the last commit.
++- **A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no `bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it recorded standing (step 7), and a program under `run/supervisor/` starts again. One that edits the Workspace's files in place keeps a copy of each file it edits under `run/supervisor/` before its first edit, taken from the tree as it stands and never replaced by a relaunch, and at every start first puts back each file that differs from its copy (KP-056's residue check), so a relaunch undoes what the killed run left and the builder's uncommitted work is never touched.
 +
  ### 4. Inspect
  
@@ -677,10 +677,10 @@ index 7143063..7466298 100644
 +- new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The mutation run
 +- new TASK-030 bridge/cursor-bridge/workflow/phases/configuration.md The windowless test suite
 diff --git a/docs/HARDENING.md b/docs/HARDENING.md
-index 44804ba..cbf7c90 100644
+index 44804ba..af32006 100644
 --- a/docs/HARDENING.md
 +++ b/docs/HARDENING.md
-@@ -1198,3 +1198,12 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+@@ -1198,3 +1198,16 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
  - **Taken, a failing test on Linux:** every Ubuntu job of PR #91 lost its runner after about 48 minutes: test_r041_killed_run_keeps_partial_cache started the program with a plain `Popen`, and its cleanup's `os.killpg(os.getpgid(proc.pid))` signalled the test run's own process group, pytest's and the runner's (reproduced on Linux by Review A). The test starts the program in a session of its own on POSIX, and kill_proc_tree never signals the test run's own group (the supervisor; Review A APPROVE).
  - **kill_proc_tree's new guard falls back to `proc.kill()` on the direct child alone**: a later caller passing a child without a session of its own would leave its grandchildren running, with no warning (Review A).
  - **If an assertion of test_r041_killed_run_keeps_partial_cache fails before its marker is written, the mutant pytest it left in its own session polls for the marker for ever**; it holds none of the job's pipes and a CI runner ends it at the job's end, but on a developer's computer it lingers; writing the marker in a `finally` would bound it (Review A).
@@ -693,8 +693,12 @@ index 44804ba..cbf7c90 100644
 +- **Lead for TASK-026's review:** session-start.py:571's fallback text, "(no digest found in supervisor.md; re-read the whole file)", tells a reader to read the core whole, which one Read call cannot (FB-036); it is outside TASK-035's four statements and in no planned Scope.
 +- **Lead (the gate's round 2, Review A's Consider):** step 3b's heading reads "Waiting for the slot, and a mutation run cut short" over a bullet that since round 1 reads "A driver run cut short"; the heading is pinned by tests/test_loop_text_windowless.py, tests/test_phase_modules_build.py, test_b3_least_confident.py and trace-exceptions.md's `new` entry, so its rewording waits for the next increment that edits step 3b.
 +- **Lead (the gate's round 2, Review A's note):** docs/BUILD_PLAN.md TASK-030's Done when reads "the two `-rA` reports' failed test ids compared"; calibrate-bridge.md compares the failed and erred ids, the collected counts and the exit statuses, on Review A's round-1 Blocking finding (a conftest.py that fails to import prints no failed id); the plan's wording is brought into line at the next plan revision.
++- **Lead (the gate's round 3, Review A's Consider):** step 4's exit 2 fixes every resolution refusal but an editable install before the run is launched again, and says nothing of a cause the supervisor cannot fix (a src-layout package that the `--checkpoint` copy cannot import, mutation-run.py's no-module path); after one failed fix such a run could be recorded as the run's own result, as the editable install is.
++- **Lead (the gate's round 3, Review A's Consider and Review B):** decide.md's exit 2 names only the editable-install cause of a resolution refusal; the other refusals follow step 4 by implication, and "as at step 4" would say it.
++- **Lead (the gate's round 3, Review B):** step 4's exit 2 lists "a module that resolves outside the copy or nowhere"; in `--checkpoint` mode mutation-run.py does not refuse a module that resolves nowhere (one the increment adds) and marks its tests `not run`, as the paragraph's `not run` sentence says, so "or nowhere" describes step 7's run only.
++- **Noted (the gate's round 3, Review B):** docs/INVENTORY.md's TASK-030 Features row states the heavy launch's seconds (28,980 s, 18,180 s), as the other Features rows record their figures; the one-place rule and its test cover the bridge's texts under bridge/, not the project's records.
 diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
-index 40ee8d3..01661f9 100644
+index 40ee8d3..41f97b0 100644
 --- a/docs/INVENTORY.md
 +++ b/docs/INVENTORY.md
 @@ -38,6 +38,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
@@ -710,7 +714,7 @@ index 40ee8d3..01661f9 100644
  | The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
  | TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
 -| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%), the figure TASK-030's brief starts from | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.9% of its characters after its split: a further addition moves another step into a sub-file first) |
-+| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 52,812 characters (88.0%), decide.md 117 lines and 13,071 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.0% of its characters after TASK-030's move of step 7: a further addition moves another step into a sub-file first) |
++| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,071 characters (88.5%), decide.md 117 lines and 13,071 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.5% of its characters after TASK-030's move of step 7: a further addition moves another step into a sub-file first) |
  | The session-start hook's threat model is a partial, mismatched or hand-edited install, not a hostile checker: workflow-check.py runs in the hook's process and could write to its output directly. Inside it, nothing the checker returns reaches the output except as an exact str matching its pattern; what lies outside it is docs/HARDENING.md's (Stage B3, TASK-010 with TASK-015) | seven review rounds converged there; every guard past the model narrows a channel an in-process program can open another way | 2026-10-20, supervisor (TASK-015, by-class line) | the hook loads code other than the installed checker, or a finding inside the model |
  | The hook reads the workflow tables only at their installed paths (`~/.claude/cursor-bridge/workflow/open-list.md` and `extension-points.md`), only once the checker's own table paths compare equal to them, and refuses them behind a link at workflow/ or at either file | the link test and the read then concern the same files on every platform (TASK-015 R3-3, R4-3, R5-1) | 2026-10-20, supervisor (TASK-015) | the tables move |
  | TASK-015's accepted assumptions, each in f41f7cb's `Assumptions:` sections (C3 under its round-6 `Decisions:`): a trailing `;` on a pointer line is ignored, and `a.md;b.md` is one path, which fails the pattern (the brief's grammar, Requirements 4 and 7); a pointer line's files are not named when the tables fail (the one plain line stands for them); load_tables returns the path it was given through `slash` unchanged (workflow-check.py); a table key that is not an exact str names no file (HARDENING, Stage B3, decision C3); the checker touches neither `sys.stdout.buffer` nor `reconfigure` at import | each rests on the brief's grammar or on the installed checker as it is, and each fails closed (the plain line, or no file named) | 2026-10-20, supervisor (TASK-015; the row added 2026-10-23 at stage B3's review) | load_tables changes the path it returns, a checker touches stdout at import, or a checker returns keys of another type by design |
@@ -790,7 +794,7 @@ index 8c9b914..c6ef67c 100644
      "updated": "2026-10-27"
    }
 diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
-index 8344648..0fe23fa 100644
+index 8344648..c9fade8 100644
 --- a/tests/test_b3_least_confident.py
 +++ b/tests/test_b3_least_confident.py
 @@ -120,11 +120,18 @@ EXCUSED_MODULE_SECTIONS = {
@@ -807,7 +811,7 @@ index 8344648..0fe23fa 100644
 +    ("delegation-loop.md", "The model, the timeout and the limit"): (1976, "75dd79f1bb1b958f3aaece7bcbf8c38d53d4c24871d79448f02600e1dc1a1ccd"),
 +    ("delegation-loop.md", "The procedure"): (359, "43426ab85b1373afd99983578086509a127d152b6db6ef4c398de9d2aaf480f1"),
 +    ("delegation-loop.md", "The tests before the first reviewer"): (5981, "683cdccc08d3f310335c5ed96371f2eb451ded32930185971c24d1f41b1ab30c"),
-+    ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (2297, "54a9419f0b590d08b6c7b428ef80e12f0e3dfc2338c9694e5a436c24205d93b9"),
++    ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (2556, "d3245a81b73ff585926b1bfa50d09127caec76b7d36682e251c4d2487d1d3afb"),
 +    ("delegation-loop.md", "What must survive a compaction"): (2971, "7b0aa4473dd3d8c041aa8c7efee5756d9ba73cb71446cc224058a3cdb239b705"),
 +    ("delegation-loop/decide.md", "The mutation run"): (5628, "44f27ca570e65d6e8f0d662b2eef25cc93c9fb4aaf2a6d3587ee47d35e9a0f18"),
 +    ("delegation-loop/decide.md", "Where this sub-file belongs"): (436, "9e38cf68a4da72d205ec742fe0d1cbf6f5c6e6bd75a04469b52333775ad19e01"),
@@ -866,10 +870,10 @@ index ff714ac..710f899 100644
      have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
 diff --git a/tests/test_loop_text_windowless.py b/tests/test_loop_text_windowless.py
 new file mode 100644
-index 0000000..19495c2
+index 0000000..f632bbd
 --- /dev/null
 +++ b/tests/test_loop_text_windowless.py
-@@ -0,0 +1,476 @@
+@@ -0,0 +1,481 @@
 +"""TASK-030: the loop's text for windowless runs, the one heavy job at a time and the mutation run.
 +
 +enforces: docs/BUILD_PLAN.md TASK-030's Done when (step 4's suite and mutants file, the driver kind and the checkpoint
@@ -1017,8 +1021,11 @@ index 0000000..19495c2
 +        "`bridge-run: exit` (KP-053) — is relaunched; nothing was spent.",
 +        "**A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
 +        "`bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it "
-+        "recorded standing (step 7), and a program under `run/supervisor/` starts again only once `git status` shows "
-+        "no product file changed (KP-056's residue check), each changed file first restored from the last commit.",
++        "recorded standing (step 7), and a program under `run/supervisor/` starts again.",
++        "One that edits the Workspace's files in place keeps a copy of each file it edits under `run/supervisor/` "
++        "before its first edit, taken from the tree as it stands and never replaced by a relaunch, and at every start "
++        "first puts back each file that differs from its copy (KP-056's residue check), so a relaunch undoes what the "
++        "killed run left and the builder's uncommitted work is never touched.",
 +    ):
 +        assert sentence in s, sentence
 +    launcher = read(os.path.join(CB, "bridge-run.py"))
@@ -1305,19 +1312,21 @@ index 0000000..19495c2
 +        "test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block "
 +        "inserted once at the end of the one that exists, every other line left as it stands.",
 +        "Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's "
-+        "exit status. A failure or error present before the write is the project's own: it is recorded, and the write "
-+        "stands.",
++        "exit status. A before-run that itself ends in pytest's exit 2 to 5 ran no comparable tests and proves "
++        "nothing: the write is committed as the calibration's checkpoint and recorded as unverified, whatever the "
++        "after-run shows. Otherwise, a failure or error present before the write is the project's own: it is "
++        "recorded, and the write stands.",
 +        "A failure or error present only after the write, fewer tests collected after it than before, or an after-run "
 +        "ending in pytest's exit 2 to 5 (interrupted, an internal error, a usage error such as a `conftest.py` that "
 +        "fails to import, no tests collected) where the before-run did not, is the insert's: it leads the report's "
 +        "first line, the insert is "
 +        "reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named "
 +        "in the report.",
-+        "A before-run that itself ends in pytest's exit 2 to 5 ran no comparable tests and proves nothing: the write "
-+        "is then recorded as unverified. Otherwise the write is committed as the calibration's checkpoint.",
++        "named in the report. Otherwise the write is committed as the calibration's checkpoint.",
 +        "Write the two runs' results on the `Calibrated:` line (step 5).",
 +        "the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected "
-+        "counts and the exit statuses, before and after the write) and whether the write stands or was reverted.",
++        "counts and the exit statuses, before and after the write) and whether the write stands, stands unverified or "
++        "was reverted.",
 +        "It is a configuration item: no gate is reopened, and the loop resumes after it.",
 +        "A Node suite's NOTE (its default is not shipped yet) is recorded in `PROJECT_STATUS.md` like any NOTE.",
 +        "Where step 1b wrote the windowless default, the line also names the two suite runs' results",
