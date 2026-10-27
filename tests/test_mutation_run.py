@@ -119,7 +119,12 @@ def kill_proc_tree(proc):
     else:
         import signal
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            # never the test run's own group: a child started without a session of its own shares it, and on
+            # a CI runner that group holds the runner itself (TASK-031: every Ubuntu job lost its runner)
+            if os.getpgid(proc.pid) == os.getpgrp():
+                proc.kill()
+            else:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except OSError:
             proc.kill()
 
@@ -810,7 +815,9 @@ def test_gate():
     cmd = [sys.executable, MUTATION_RUN, str(mp), "--scratch", str(scratch), "--mutant-timeout", "120"]
     before = tree_bytes(ws)
     porcelain_before = git_porcelain_excluding_cache(ws)
-    proc = subprocess.Popen(cmd, cwd=str(ws), env=env,
+    # a session of its own on POSIX, so stopping its process group stops the program and never the test run
+    session = {} if sys.platform == "win32" else {"start_new_session": True}
+    proc = subprocess.Popen(cmd, cwd=str(ws), env=env, **session,
                             **test_conftest.windowless_kwargs({"stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "text": True}))
     cache = ws / "run/supervisor/mutation-cache/kill.jsonl"
     try:
