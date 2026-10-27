@@ -145,7 +145,8 @@ def test_r040_step_3b_handles_the_slots_exits_without_a_model_failure():
         "`bridge-run: exit` (KP-053) — is relaunched; nothing was spent.",
         "**A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
         "`bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it "
-        "recorded standing (step 7), and a program under `run/supervisor/` starts again.",
+        "recorded standing (step 7), and a program under `run/supervisor/` starts again only once `git status` shows "
+        "no product file changed (KP-056's residue check), each changed file first restored from the last commit.",
     ):
         assert sentence in s, sentence
     launcher = read(os.path.join(CB, "bridge-run.py"))
@@ -228,11 +229,14 @@ def test_r041_the_checkpoint_run_is_mutation_run_py_and_each_result_has_its_hand
         "A test the output marks `not run` (it cannot collect, or ran nothing, on the old code) is neither pass nor "
         "fail, and is said.",
         "Exit 3 stops the step: it is the run's own result, recorded as such, never a model failure;",
-        "exit 2 is a refused file or path, fixed before the run is launched again, or the program's resolution check "
-        "refusing the run (`resolves outside the copy`, `module from Workspace path ... was loaded`), as an editable "
-        "install of the package makes it (KP-054): no correction of the file helps, so the step records \"not run "
-        "against the checkpoint: editable install\", and the reviewer's check of each test against its paragraph "
-        "stands in.",
+        "exit 2 is a refused file or path, or the program's resolution check refusing the run (a module that "
+        "resolves outside the copy or nowhere, a module loaded from the Workspace, or the check's own failure), "
+        "each fixed before the run is launched again; where the cause is an editable install of the package "
+        "(KP-054: its `__file__`, read from a folder outside the Workspace, names the Workspace), no correction "
+        "helps, so \"not run against the checkpoint: editable install\" goes on `run/supervisor/in-flight.md` and "
+        "into the SCOPE file, the reviewer's check of each test against its paragraph standing in, and the first "
+        "time, an Issues entry names the install and its remedy (the tests run from an environment without it) "
+        "and the inventory names it as a hazard, so the lost coverage is a recorded condition of the project.",
     ):
         assert sentence in s, sentence
     assert "git worktree add" not in s and "Worktrees/old-" not in flat(loop())
@@ -339,11 +343,11 @@ def test_r043_exit_1_follows_the_ceiling_and_exit_3_is_the_runs_own():
         "A mutant not applied (its text no longer in its file) is re-anchored in the mutants file, yours and no round; "
         "a fix of yours after Review A's read stands in the diff Review B reads at step 8.",
         "**Exit 2** — the mutants file or a path in it was refused: correct the file and launch again. Or the "
-        "program's resolution check refused the run (`resolves outside the copy`, `module from Workspace path ... was "
-        "loaded`), as an editable install of the package makes it (KP-054): no correction of the file helps, so the "
-        "run is not made, `mutation run not made: editable install` goes on `run/supervisor/in-flight.md` and into the "
-        "SCOPE file, and the reviewers' reading of each mutant against its name stands in; it is the run's own result, "
-        "never a model failure.",
+        "program's resolution check refused the run; where the cause is an editable install of the package "
+        "(KP-054; step 4 tells it apart and records it as an issue the first time), no correction helps, so the "
+        "run is not made, `mutation run not made: editable install` goes on `run/supervisor/in-flight.md` and "
+        "into the SCOPE file, and the reviewers' reading of each mutant against its name stands in; it is the "
+        "run's own result, never a model failure.",
         "Above the ceiling, the mutant goes to `docs/HARDENING.md` under the increment and never to a re-delegation, "
         "unless the code it shows untested is a safety mechanism the increment relies on, or the result shows a defect "
         "of a blocking class (behaviour against the brief or the register, security, data integrity, a defeated safety "
@@ -436,8 +440,12 @@ def test_r039_calibration_writes_the_floor_between_two_suite_runs():
         "fails to import, no tests collected) where the before-run did not, is the insert's: it leads the report's "
         "first line, the insert is "
         "reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named "
-        "in the report. Otherwise the write is committed as the calibration's checkpoint.",
+        "in the report.",
+        "A before-run that itself ends in pytest's exit 2 to 5 ran no comparable tests and proves nothing: the write "
+        "is then recorded as unverified. Otherwise the write is committed as the calibration's checkpoint.",
         "Write the two runs' results on the `Calibrated:` line (step 5).",
+        "the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected "
+        "counts and the exit statuses, before and after the write) and whether the write stands or was reverted.",
         "It is a configuration item: no gate is reopened, and the loop resumes after it.",
         "A Node suite's NOTE (its default is not shipped yet) is recorded in `PROJECT_STATUS.md` like any NOTE.",
         "Where step 1b wrote the windowless default, the line also names the two suite runs' results",
@@ -458,8 +466,8 @@ def test_r039_r041_rules_8_and_24_name_the_runs_and_the_default():
     assert "Every suite and every mutation run goes through it, in the background (the delegation loop's step 4)." in rule8
     # rule 43 counts a mutation run as a wake source, as the loop guard does (Review A, TASK-030 round 1)
     rule43 = core.split(" 43. Never end a turn", 1)[1].split(" 44. ", 1)[0]
-    assert ("a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run, run "
-            "through it too (`--kind driver`), or a benchmark,") in rule43
+    assert ("a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run or "
+            "another driver, run through it too (`--kind driver`), or a benchmark,") in rule43
     assert '"driver"' in read(os.path.join(CB, "loop-guard.py"))
     rule24 = core.split(" 24. Windowless by default.", 1)[1].split(" 25. Refactoring", 1)[0]
     assert ("A project's test suite carries the bridge's frozen windowless default "
