@@ -831,6 +831,12 @@ _PYTEST_CONFIG_NAMES = (
 )
 
 
+def _refuse_ini_cfg_if_configparser_section_names_disagree(cp, refuse_message):
+    for section in cp:
+        if "#" in section or ";" in section or "]" in section:
+            raise Refuse(refuse_message)
+
+
 def _pytest_config_dict_from_file(filepath):
     name = os.path.basename(filepath)
     suffix = os.path.splitext(name)[1]
@@ -838,6 +844,8 @@ def _pytest_config_dict_from_file(filepath):
         cp = configparser.ConfigParser(interpolation=None)
         try:
             cp.read(filepath, encoding="utf-8")
+            _refuse_ini_cfg_if_configparser_section_names_disagree(
+                cp, "mutation-run: invalid ini file %s" % name)
             if name in ("pytest.ini", ".pytest.ini"):
                 if "pytest" in cp:
                     return {k: v for k, v in cp["pytest"].items()}
@@ -853,6 +861,8 @@ def _pytest_config_dict_from_file(filepath):
         cp = configparser.ConfigParser(interpolation=None)
         try:
             cp.read(filepath, encoding="utf-8")
+            _refuse_ini_cfg_if_configparser_section_names_disagree(
+                cp, "mutation-run: invalid cfg file %s" % name)
             if "tool:pytest" not in cp:
                 return None
             return {k: v for k, v in cp["tool:pytest"].items()}

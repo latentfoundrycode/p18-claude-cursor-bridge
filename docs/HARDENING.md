@@ -1145,4 +1145,8 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
 - **The run id is checked with `.match`**, so on POSIX a mutants file named with a trailing newline passes; it stays inside the scratch and cache folders (the security audit, round 7).
 - **The grandchild pipe-holder fixture writes its pytest's pid after starting the holder**, so a bound reached between the two leaves no pid file and the holder running (Review A, round 7).
 - **Round 7's report did not run its verification command 7 as written** (`tasklist` failed under Git Bash; `Get-Process` shows no titles) (Review A, round 7).
+
+### TASK-031 (round 8; the builder's assumptions; recorded, not taken)
+- **Section headers the two parsers read differently, other than a comment holding `]`, are not tested.** A header indented before `[`, a header that no longer ends in `]` once its comment is cut, `[]`, and a duplicate section: each either makes iniconfig raise, so the gate's own pytest cannot run on that file, or makes configparser raise, a refusal; where both read a header and disagree on its name, configparser's name holds the `]` that ends iniconfig's, which the round-8 check refuses. Check: one fixture per shape against pytest 9.1.1 (the builder, round 8; accepted by the supervisor).
+- **A non-pytest section whose name holds `#`, `;` or `]` refuses the whole file**, which pytest would read; exit 2 with the file named (the builder, round 8).
 - **The grandchild pipe-holder test's `finally` ends a pid it read from a file, which the system may have reused** if both processes ended long before; the test polls them dead first, so the window is the poll's 10 s (the supervisor, round 7).
