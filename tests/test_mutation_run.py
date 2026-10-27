@@ -1242,12 +1242,17 @@ def test_r041_extract_archive_tar_refuses_non_file(tmp_path):
 
 
 def test_r041_grandchild_holding_pipes_times_out(tmp_path):
-    """R-041, TASK-031 S7, handoff/TASK-031-r6.md item 7: a grandchild holding run_process's real pipes is bounded."""
+    """R-041, TASK-031 S7, handoff/TASK-031-r7.md item 3: a grandchild holding run_process's real pipes is bounded."""
+    import signal
+
+    holder_pid_file = tmp_path / "grandchild_holder.pid"
+    pytest_pid_file = tmp_path / "grandchild_pytest.pid"
     ws = workspace(tmp_path)
     init_pkg(ws)
     write(ws, "pytest.ini", "[pytest]\naddopts = -s\n")
     git(ws, "add", "pytest.ini")
     write(ws, "tests/test_pipe_hold.py", textwrap.dedent("""
+import os
 import subprocess
 import sys
 import time
@@ -1261,7 +1266,14 @@ def test_hold_pipes():
         [sys.executable, "-c", "import time; time.sleep(3600)"],
         stdout=sys.stdout,
         stderr=sys.stderr,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
+    with open(HOLDER_PID_JSON, "w", encoding="utf-8") as f:
+        f.write(str(_holder.pid))
+        f.flush()
+    with open(PYTEST_PID_JSON, "w", encoding="utf-8") as f:
+        f.write(str(os.getpid()))
+        f.flush()
     while True:
         time.sleep(0.2)
 
@@ -1271,7 +1283,8 @@ def teardown_module():
     if _holder is not None and _holder.poll() is None:
         _holder.kill()
         _holder.wait(timeout=10)
-"""))
+""").replace("HOLDER_PID_JSON", json.dumps(str(holder_pid_file))).replace(
+        "PYTEST_PID_JSON", json.dumps(str(pytest_pid_file))))
     git(ws, "add", "tests/test_pipe_hold.py")
     body = {"mutants": [{
         "id": "pipe", "file": "tests/test_pipe_hold.py",
@@ -1281,13 +1294,58 @@ def teardown_module():
     }]}
     mp = mutants_path(ws, "pipe", body)
     git(ws, "add", "run/supervisor/pipe-mutants.json")
-    t0 = time.time()
-    p = run_mr(ws, mp, timeout=5, harness_slack=120)
-    elapsed = time.time() - t0
-    assert elapsed >= 5, "the run did not wait through the mutant bound while pipes were held"
-    assert elapsed < 5 + 120, "run exceeded bound plus 120 s"
-    assert p.returncode == 3
-    assert "pipe: error (timed out)" in p.stdout
+
+    def _end_pid_tree(pid):
+        if pid_dead(pid):
+            return
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(pid)],
+                capture_output=True,
+                **test_conftest.windowless_kwargs({"stdin": subprocess.DEVNULL, "timeout": 30}),
+            )
+        else:
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+            except (OSError, ValueError, ProcessLookupError):
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
+                    pass
+
+    def _read_pid(path):
+        if not path.is_file():
+            return None
+        try:
+            return int(path.read_text(encoding="utf-8").strip())
+        except ValueError:
+            return None
+
+    try:
+        t0 = time.time()
+        p = run_mr(ws, mp, timeout=5, harness_slack=120)
+        elapsed = time.time() - t0
+        assert elapsed >= 5, "the run did not wait through the mutant bound"
+        assert elapsed < 5 + 120, "run exceeded bound plus 120 s"
+        assert p.returncode == 3
+        assert "pipe: error (timed out)" in p.stdout
+        assert holder_pid_file.is_file(), "holder pid file missing; the hold never started"
+        holder_pid = _read_pid(holder_pid_file)
+        pytest_pid = _read_pid(pytest_pid_file)
+        assert holder_pid is not None
+        assert pytest_pid is not None
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if pid_dead(holder_pid) and pid_dead(pytest_pid):
+                break
+            time.sleep(0.1)
+        assert pid_dead(holder_pid), "holder still alive after run"
+        assert pid_dead(pytest_pid), "fixture pytest still alive after run"
+    finally:
+        for path in (holder_pid_file, pytest_pid_file):
+            pid = _read_pid(path)
+            if pid is not None:
+                _end_pid_tree(pid)
 
 
 def test_r041_pytest_survives_kill_stops_run(tmp_path, home_of_the_tests, monkeypatch):

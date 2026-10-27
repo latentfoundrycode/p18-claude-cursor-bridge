@@ -823,3 +823,32 @@ def test_task031_r7_n2_a_pytest_configuration_holding_a_percent_sign_is_read_as_
     p = _run(ws, mf)
     assert p.returncode == 0, p.stdout + p.stderr
     assert [line["outcome"] for line in _cache_lines(ws, "r7n2")] == ["killed"]
+
+
+def test_task031_r7_n1_a_mutant_id_ending_in_a_newline_is_refused(tmp_path):
+    """R-041, TASK-031 Requirement 1 (handoff/TASK-031-r7.md, N-1: the id must match MUTANT_ID_RX as a whole
+    string): an id that is a plain name followed by a newline exits 2 before any test, where a match that lets `$`
+    stop before a trailing newline would take it."""
+    ws = _fixture(tmp_path, CALC)
+    mf = _mutants(ws, "r7n1n", {"mutants": [dict(KILL_CALC, id="x\n")]})
+    p = _run(ws, mf)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "not a valid plain name" in p.stdout + p.stderr
+    assert _cache_lines(ws, "r7n1n") == []
+
+
+@pytest.mark.parametrize("config,kind", [("pytest.ini", "ini"), ("tox.ini", "ini"), ("setup.cfg", "cfg")])
+def test_task031_r7_n2_a_pytest_configuration_that_does_not_decode_is_refused(tmp_path, config, kind):
+    """R-041, TASK-031 Requirement 4 (handoff/TASK-031-r7.md, N-2: a configuration file that does not decode or
+    parse is a refusal, exit 2, never an internal error): a root `pytest.ini`, `tox.ini` or `setup.cfg` holding a
+    byte that is not UTF-8 exits 2 with the file named, and no mutant is run."""
+    section = {"pytest.ini": "[pytest]\n", "tox.ini": "[pytest]\n", "setup.cfg": "[tool:pytest]\n"}[config]
+    ws = _fixture(tmp_path, CALC)
+    (ws / config).write_bytes(section.encode("ascii") + b"python_functions = test_\xe9\n")
+    _git(ws, "add", config)
+    _git(ws, "commit", "-q", "-m", "a configuration that does not decode")
+    mf = _mutants(ws, "r7n2d", {"mutants": [KILL_CALC]})
+    p = _run(ws, mf)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "invalid %s file %s" % (kind, config) in p.stdout + p.stderr
+    assert _cache_lines(ws, "r7n2d") == []

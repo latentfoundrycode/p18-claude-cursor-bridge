@@ -270,6 +270,8 @@ def load_mutants(path, checkpoint):
         mid = m["id"]
         if not isinstance(mid, str) or not mid:
             raise Refuse("mutation-run: mutant id must be a non-empty string")
+        if not MUTANT_ID_RX.fullmatch(mid):
+            raise Refuse("mutation-run: mutant id %r is not a valid plain name" % mid)
         if mid in seen:
             raise Refuse("mutation-run: duplicate mutant id %r" % mid)
         seen.add(mid)
@@ -833,29 +835,29 @@ def _pytest_config_dict_from_file(filepath):
     name = os.path.basename(filepath)
     suffix = os.path.splitext(name)[1]
     if suffix == ".ini":
-        cp = configparser.ConfigParser()
+        cp = configparser.ConfigParser(interpolation=None)
         try:
             cp.read(filepath, encoding="utf-8")
-        except configparser.Error:
-            raise Refuse("mutation-run: invalid ini file %s" % name)
-        if name in ("pytest.ini", ".pytest.ini"):
-            if "pytest" in cp:
+            if name in ("pytest.ini", ".pytest.ini"):
+                if "pytest" in cp:
+                    return {k: v for k, v in cp["pytest"].items()}
+                return {}
+            if name == "tox.ini":
+                if "pytest" not in cp:
+                    return None
                 return {k: v for k, v in cp["pytest"].items()}
-            return {}
-        if name == "tox.ini":
-            if "pytest" not in cp:
-                return None
-            return {k: v for k, v in cp["pytest"].items()}
-        return None
+            return None
+        except (configparser.Error, UnicodeDecodeError):
+            raise Refuse("mutation-run: invalid ini file %s" % name)
     if suffix == ".cfg":
-        cp = configparser.ConfigParser()
+        cp = configparser.ConfigParser(interpolation=None)
         try:
             cp.read(filepath, encoding="utf-8")
-        except configparser.Error:
+            if "tool:pytest" not in cp:
+                return None
+            return {k: v for k, v in cp["tool:pytest"].items()}
+        except (configparser.Error, UnicodeDecodeError):
             raise Refuse("mutation-run: invalid cfg file %s" % name)
-        if "tool:pytest" not in cp:
-            return None
-        return {k: v for k, v in cp["tool:pytest"].items()}
     if suffix == ".toml":
         try:
             with open(filepath, "rb") as f:
@@ -1343,7 +1345,7 @@ def main(argv=None):
         mutant_keys = {m["id"]: compute_key(copy_root, m, tracked_set) for m in mutants}
         originals = {}
         pytest_still_alive = False
-        for m in mutants:
+        for mut_idx, m in enumerate(mutants):
             if pytest_still_alive:
                 break
             key = mutant_keys[m["id"]]
@@ -1370,7 +1372,7 @@ def main(argv=None):
                 counts["not applied"] += 1
                 append_cache(cache_path, m["id"], key, "not applied")
                 continue
-            mut_results = os.path.join(plugin_dir, "pytest-outcomes-%s.json" % m["id"])
+            mut_results = os.path.join(plugin_dir, "pytest-outcomes-%d.json" % mut_idx)
             rc, out, err, timed, alive, data = run_mutant_tests(
                 plugin_dir, copy_root, m["tests"], env, timeout_sec, mut_results)
             restore_mutant(copy_root, m, originals[m["file"]])
