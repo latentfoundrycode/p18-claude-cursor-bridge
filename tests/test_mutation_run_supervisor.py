@@ -897,3 +897,60 @@ def test_task031_r8_a_section_header_holding_a_comment_is_not_read_otherwise_tha
     outcomes = [line["outcome"] for line in _cache_lines(ws, "r8hd")]
     assert "killed" not in outcomes, p.stdout + p.stderr
     assert (p.returncode == 2 and outcomes == []) or outcomes == ["survived"], p.stdout + p.stderr
+
+
+@pytest.mark.parametrize("header", ["[pytest] x # the old section", "[pytest] trailing", "[pytest]x"])
+def test_task031_r9_a_header_line_pytest_reads_as_a_value_is_not_read_as_a_section(tmp_path, header):
+    """R-041 (a result against the version the gate reads), TASK-031 Requirement 4 (handoff/TASK-031-r6.md, B-3;
+    handoff/TASK-031-r8.md, the criterion: the section names the program decides on are the ones pytest's iniconfig
+    reads, or the file is refused; handoff/TASK-031-r9.md): a tox.ini line `[pytest] ...` that does not end in `]`
+    once its comment is cut is, to iniconfig, a continuation of the key above it, so tox.ini holds no pytest section
+    and pytest uses setup.cfg; configparser reads it as the section `pytest`. The run is either refused with exit 2
+    or configured as pytest is, where setup.cfg's `usefixtures` makes an equivalent mutant survive; it never records
+    a kill (Review A, round 8)."""
+    files = dict(CALC)
+    files["demo/__init__.py"] = "READY = False\n"
+    files["tests/conftest.py"] = ("import pytest\nimport demo\n\n@pytest.fixture\ndef ready():\n"
+                                  "    demo.READY = True\n")
+    files["tests/test_calc.py"] = ("import demo\nfrom demo.calc import add\n\ndef test_add():\n"
+                                   "    assert demo.READY\n    assert add(1, 2) == add(2, 1)\n")
+    files["tox.ini"] = "[tox]\nenvlist = py312\n\n" + header + "\nminversion = 7\n"
+    files["setup.cfg"] = "[tool:pytest]\nusefixtures = ready\n"
+    ws = _fixture(tmp_path, files)
+    gate = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"], cwd=str(ws),
+                          **test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 120}))
+    assert gate.returncode == 0, gate.stdout + gate.stderr          # pytest itself takes setup.cfg's section
+    swap = {"id": "swap", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return b + a"}],
+            "tests": ["tests/test_calc.py"], "expect_fail": ["tests/test_calc.py::test_add"]}
+    mf = _mutants(ws, "r9hd", {"mutants": [swap]})
+    p = _run(ws, mf)
+    outcomes = [line["outcome"] for line in _cache_lines(ws, "r9hd")]
+    assert "killed" not in outcomes, p.stdout + p.stderr
+    assert (p.returncode == 2 and outcomes == []) or outcomes == ["survived"], p.stdout + p.stderr
+
+
+@pytest.mark.parametrize("separator", ["\x1c", "\x0c"])
+def test_task031_r9_a_pytest_section_after_a_line_separator_only_iniconfig_splits_on_is_read(tmp_path, separator):
+    """R-041 (a result against the version the gate reads), TASK-031 Requirement 4 (handoff/TASK-031-r6.md, B-3;
+    handoff/TASK-031-r9.md): iniconfig splits a file's lines with `str.splitlines`, so a `[pytest]` header after a
+    file separator or a form feed is a section to pytest, where a reader splitting on `\\n` and `\\r` only sees none;
+    the tox.ini section's `usefixtures` makes an equivalent mutant survive under pytest's reading. The run is either
+    refused with exit 2 or configured as pytest is; it never records a kill (the security audit, round 8)."""
+    files = dict(CALC)
+    files["demo/__init__.py"] = "READY = False\n"
+    files["tests/conftest.py"] = ("import pytest\nimport demo\n\n@pytest.fixture\ndef ready():\n"
+                                  "    demo.READY = True\n")
+    files["tests/test_calc.py"] = ("import demo\nfrom demo.calc import add\n\ndef test_add():\n"
+                                   "    assert demo.READY\n    assert add(1, 2) == add(2, 1)\n")
+    files["tox.ini"] = "[tox]\nenvlist = py312" + separator + "[pytest]\nusefixtures = ready\n"
+    ws = _fixture(tmp_path, files)
+    gate = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"], cwd=str(ws),
+                          **test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 120}))
+    assert gate.returncode == 0, gate.stdout + gate.stderr          # pytest itself reads tox.ini's pytest section
+    swap = {"id": "swap", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return b + a"}],
+            "tests": ["tests/test_calc.py"], "expect_fail": ["tests/test_calc.py::test_add"]}
+    mf = _mutants(ws, "r9sp", {"mutants": [swap]})
+    p = _run(ws, mf)
+    outcomes = [line["outcome"] for line in _cache_lines(ws, "r9sp")]
+    assert "killed" not in outcomes, p.stdout + p.stderr
+    assert (p.returncode == 2 and outcomes == []) or outcomes == ["survived"], p.stdout + p.stderr
