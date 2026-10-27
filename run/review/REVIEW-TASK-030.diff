@@ -19,7 +19,7 @@ index 2e8bb6c..4f25a8d 100644
    from `~/.claude/cursor-bridge/`, for **every** Windows-hosted project. Every hook script
    you write carries the windowless idiom (`creationflags=NO_WINDOW` / `windowsHide: true`)
 diff --git a/bridge/agents/diff-reviewer.md b/bridge/agents/diff-reviewer.md
-index 7a9e43c..b3314d9 100644
+index 7a9e43c..cb6e27a 100644
 --- a/bridge/agents/diff-reviewer.md
 +++ b/bridge/agents/diff-reviewer.md
 @@ -77,12 +77,7 @@ asserts what it says, not what the code does. A test written from a misread spec
@@ -32,7 +32,7 @@ index 7a9e43c..b3314d9 100644
 -restore, since an interrupted run once left mutants in the product (KP-056). A driver is
 -the supervisor's side's, never the builder's; one the supervisor did not name as its own in
 -the handoff is a deviation.
-+**A mutation driver is read like a test.** The mutants are the supervisor's mutants file, `run/supervisor/<id>-mutants.json`, and the engine that applies them is the bridge's `mutation-run.py`, which works on a scratch copy of the Workspace and so restores nothing in it. Read each mutant in the file against its name as you read a test against its paragraph: a mutant must be what its name says — a mutant named "drops the retry" that changes a log line proves nothing about the retry — and the test ids it expects to fail must be the tests that check what it breaks. The mutants file, the criterion tests and any other driver (a Python program under `run/supervisor/`) are the supervisor's side's, never the builder's; one the supervisor did not name as its own in the handoff is a deviation, and so is a script in the diff that applies mutants to the product's files (an interrupted one once left mutants in the product, KP-056). A driver of the supervisor's under `run/supervisor/` that edits the Workspace's files in place is read for its restore too: it restores each file in a `finally` and aborts on a byte mismatch at restore; one that works on a scratch copy restores nothing.
++**A mutation driver is read like a test.** The mutants are the supervisor's mutants file, `run/supervisor/<id>-mutants.json`, and the engine that applies them is the bridge's `mutation-run.py`, which works on a scratch copy of the Workspace and so restores nothing in it. Read each mutant in the file against its name as you read a test against its paragraph: a mutant must be what its name says — a mutant named "drops the retry" that changes a log line proves nothing about the retry — and the test ids it expects to fail must be the tests that check what it breaks. The mutants file, the criterion tests and any other driver (a Python program under `run/supervisor/`) are the supervisor's side's, never the builder's; one the supervisor did not name as its own in the handoff is a deviation, and so is a script in the diff that applies mutants to the product's files (an interrupted one once left mutants in the product, KP-056). A driver of the supervisor's under `run/supervisor/` works on a scratch copy, as the engine does; one that edits the Workspace's files in place is a deviation.
  
  **A path that changes data is tested on data the previous version made.** Reset, migration,
  upgrade and repair paths were tested only on empty databases once, and the owner's live data
@@ -198,7 +198,7 @@ index ca660f3..6c07fbc 100644
  4. §4 any other MCP tools the build needs (escalate secrets).
  5. §5 at most one *project-specific* cross-cutting rule, only if warranted; write the
 diff --git a/bridge/cursor-bridge/Known-Pitfalls.md b/bridge/cursor-bridge/Known-Pitfalls.md
-index 7a59f03..a290e60 100644
+index 7a59f03..b0ff4bf 100644
 --- a/bridge/cursor-bridge/Known-Pitfalls.md
 +++ b/bridge/cursor-bridge/Known-Pitfalls.md
 @@ -489,7 +489,7 @@ it applies.**
@@ -215,7 +215,7 @@ index 7a59f03..a290e60 100644
  - **Surfaced:** reAngle, 2026-10 (ISS-017, twice): a driver that patches a product file and restores it in `finally` was killed mid-run (a dropped builder connection; a `TaskStop` of a background bash loop on Windows, which leaves the loop and its children running), and mutants stayed in the product; once the builder re-anchored its drivers around the mutated code.
  - **Cause:** a killed process never reaches its `finally`, and a stopped loop on Windows does not stop its children.
 -- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver; the driver is written on the supervisor's side with the criterion tests, never by the builder (2026.10.11d); until then only between drivers, its `bash.exe` first; a driver aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
-+- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver (before that release, only between drivers, its `bash.exe` first); the mutants are written on the supervisor's side, in its mutants file with the criterion tests, never by the builder (2026.10.11d), and since release B the bridge's `mutation-run.py` applies them on a scratch copy of the Workspace, launched through the launcher's driver kind, so a run killed at any point leaves no mutant in the product (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 4); a driver that edits product files in place aborts on a byte mismatch at restore; a subagent never leaves a loop behind (KP-042).
++- **Correction:** a residue scan after every driver run, run from the loop (`run/tools/mutant_residue_scan.py` on reAngle; a diff of the product files against the last reviewed commit before any gate elsewhere); a verification run is stopped with `bridge-stop.py` (2026.10.11c), which ends the whole process tree, so the loop never advances into its next driver (before that release, only between drivers, its `bash.exe` first); the mutants are written on the supervisor's side, in its mutants file with the criterion tests, never by the builder (2026.10.11d), and since release B the bridge's `mutation-run.py` applies them on a scratch copy of the Workspace, launched through the launcher's driver kind, so a run killed at any point leaves no mutant in the product (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 4); and no driver of the supervisor's edits the product's files either, working on a scratch copy as the program does; a subagent never leaves a loop behind (KP-042).
  - **Applies:** every mutation or fault-injection driver that edits product files. The sign: `git status` showing a product file changed after a test run.
  
  ### KP-057 — An orphaned server held a delegation open for six hours through an inherited output pipe
@@ -229,21 +229,21 @@ index 7a59f03..a290e60 100644
  
  ### KP-062 — A design critique ran 45 rounds on one change, and the four-round ceiling stopped nothing
 diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
-index 55c64b5..e59c0d3 100644
+index 55c64b5..3a3c245 100644
 --- a/bridge/cursor-bridge/MANIFEST.json
 +++ b/bridge/cursor-bridge/MANIFEST.json
 @@ -1,27 +1,27 @@
  {
    "version": "2026.10.25a",
 -  "generated": "2026-10-27 14:16",
-+  "generated": "2026-10-27 23:38",
++  "generated": "2026-10-28 00:12",
    "files": {
 -    "agents/cursor-configurator.md": "5cf5b34d17ab8e61815d57d902dfba10da98654a39ae451667a4c16f156d7c7e",
 +    "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
      "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
      "agents/diagram-specialist.md": "7105060c84d870d933be43675b410c90c1e04df6029f92ad4146884c57d2fee5",
 -    "agents/diff-reviewer.md": "91bd2cd177d30b19a3524cc16851a31ede37a64c166afcdd4d24f1e7306a5c6e",
-+    "agents/diff-reviewer.md": "c8c61cdac4b47c36e0f7e3d257bc2b5bf6ffd88082101216c2295bca97a81262",
++    "agents/diff-reviewer.md": "2f5995afda69f5f76ca5ee4923da33ac24afba235ffd6c7a5f3c901ed5d0b8b8",
      "agents/plan-critic.md": "73185f362894efe04bc0feffe49c4abbbd425a13d00707aabff7bbf661bc3cc2",
      "agents/refactor-scout.md": "8e077479f19b7c4a7a45e5ad38c9935d5b660a6b5f58a2ed0f608facb1dfdbc6",
      "agents/secret-sentinel.md": "ee011fcf065ad01f98e7b9b16f6081d826983a12eeb9ebff2764d5bc05ad81db",
@@ -265,7 +265,7 @@ index 55c64b5..e59c0d3 100644
      "cursor-bridge/Diagram-Planning-Conventions.md": "f8e3b7839c7c7466b6bb9654f51bf9d9249973ab5ed9f8e10901ce4392f9cc4d",
      "cursor-bridge/Glossary.md": "17b153fad571ce6e23e117244f366e9c96b035307c6653010df5accab8003d08",
 -    "cursor-bridge/Known-Pitfalls.md": "90828fd942a0aea208160cb9908faaa7ca7870fcd3ebbfc29106012621b5e387",
-+    "cursor-bridge/Known-Pitfalls.md": "9ed0485d1bd0065473562f61a7b09de8afe3ad07a0d074d055b3885f6d9a6d06",
++    "cursor-bridge/Known-Pitfalls.md": "7af30234d9cc4e1ca53028071988b0e82cb871b4a91298b7265e95d151ce05a9",
      "cursor-bridge/Merge-Verification-Policy.md": "199f265a528d5e164a534ef1b1c34035ed0cd342deaddc592f81b6b07c97b06a",
      "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
      "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
@@ -276,7 +276,7 @@ index 55c64b5..e59c0d3 100644
 -    "cursor-bridge/workflow/phases/configuration.md": "4bcb7792438ac85fa7b3246d70c8a0e042d6f0860670e0649c4bf11a4ddf4142",
 -    "cursor-bridge/workflow/phases/delegation-loop.md": "baa4e3203e2ea4ab6ee5962e07c92e2ab4bff7e6ab41b8fb0dddb4703ed73f7e",
 +    "cursor-bridge/workflow/phases/configuration.md": "6a4e1c83c3b0ac33db272560b0c790c36994e335c86c9d2d79abea2dad44a2d4",
-+    "cursor-bridge/workflow/phases/delegation-loop.md": "722c9545189e2fe2c8620a8cac104fa94b1c3d627a9ef883d00a49ffc8f99ab8",
++    "cursor-bridge/workflow/phases/delegation-loop.md": "daeb27fd3436da2ae736970e3175ee2e29f843664ec39617b33adff1fd5180fc",
 +    "cursor-bridge/workflow/phases/delegation-loop/decide.md": "1664aa5a403a18b33dc3ec5e3b9ce36fc4b50d3092edec2c71cd75b2a1d0e064",
      "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "40065539a1b0a098569db3d6c35198e0cff7179725ba2bba019287cfa175d987",
      "cursor-bridge/workflow/phases/design.md": "ec2a5a07747b0ff64bcb56599bd4d556870b01fc26a121abd76053943784d5a7",
@@ -306,7 +306,7 @@ index 7ebc177..9ff3376 100644
  
  While the phase runs, keep the status file's `Next:` line naming the items configured so far and the next one, rewritten as each is finished, so that a resume after a compaction neither redoes an item nor skips one. It names each item by its name only, never a key's value or a path on this computer (rules 53 and 54). Once the configuration's checkpoint is committed, the line names the first increment, and what was configured stands in the status file, as "Commit the configuration as its own checkpoint" above asks, with each tool's pinned version in `docs/INVENTORY.md` (Resources).
 diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop.md b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
-index 68d4275..041e9a8 100644
+index 68d4275..2d7f9bc 100644
 --- a/bridge/cursor-bridge/workflow/phases/delegation-loop.md
 +++ b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
 @@ -4,19 +4,20 @@
@@ -380,7 +380,7 @@ index 68d4275..041e9a8 100644
 +
 +- **Exit 123 — the slot was not free.** The wait ended unmet (`bridge-run: slot not free - held by ...`), so the command never started and nothing was spent. Wait for the holder's end with `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the run that waits>"` in the background, the seconds being the time left until the `ends by` time the exit line printed, or zero when it has passed; then relaunch once, unchanged. The timer's closing line, which tells you to run a task in the foreground, does not apply here: its completion means the relaunch, through the launcher. A second 123 naming a holder is retried twice more the same way; after that, tell the owner, naming the holder's kind and run id. A 123 reading `held by unknown` (the launcher waited its provisional bound and never read a live holder's record) relaunches at once, and a second such 123 in a row is told to the owner at once, naming `~/.cursor-bridge/heavy.lock`: it is a sign of a defect, not of a busy computer.
 +- **A waiter killed from outside** — its output file holds waiting lines and neither `slot taken` nor `bridge-run: exit` (KP-053) — is relaunched; nothing was spent.
-+- **A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no `bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it recorded standing (step 7), and a program under `run/supervisor/` starts again. One that edits the Workspace's files in place keeps a copy of each file it edits under `run/supervisor/` before its first edit, taken from the tree as it stands and never replaced by a relaunch, and at every start first puts back each file that differs from its copy (KP-056's residue check), so a relaunch undoes what the killed run left and the builder's uncommitted work is never touched.
++- **A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no `bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it recorded standing (step 7), and a program under `run/supervisor/` starts again: no driver edits the Workspace's files (step 4), so a run cut short leaves nothing in the product.
 +
  ### 4. Inspect
  
@@ -430,7 +430,7 @@ index 68d4275..041e9a8 100644
 +
 +**The tests run before the first reviewer** (release A5, plan 13.1). Once the scope and diagram checks pass: if the increment's acceptance criteria are not yet covered by tests, write those tests yourself first — you are allowed to write tests, and tests written by the reviewer rather than the implementer are worth more; each carries the paragraph it enforces (`enforces: <document> §<section>` in its docstring or a comment).
 +
-+**The mutants are yours; the engine is the bridge's.** The increment's mutants are written here too, on your side, after the builder's run and never by the builder, in its mutants file `run/supervisor/<id>-mutants.json` (`<id>` the increment's ID): each mutant's `id`, its `file` and `pairs` (the text it replaces and the text it puts in its place), the test files it runs (`tests`) and the test ids that must fail (`expect_fail`), with the criterion tests those name, which are yours too (the brief's mutation list is the builder's own in-process check, by hand, no script of it in the diff). A builder's mutants are judged by nobody, and five that did not model their names once cost three rounds (reAngle TASK-010c); `diff-reviewer` reads your mutants file against each mutant's name as it reads a test against its paragraph, and a fix brief after a driver run asks for the code fix only. The engine that applies each mutant, runs its tests and records the outcome is the bridge's `mutation-run.py`, reviewed at the bridge's own gate; it works on a scratch copy of the Workspace and so restores nothing in it. A **driver** is a Python program under `run/supervisor/` or a `mutation-run.py` run, and nothing else, and every mutation run is a `mutation-run.py` run through the launcher's driver kind (`--kind driver`), in the background under the heavy launch's `timeout` (step 3, "The model, the timeout and the limit") like a suite, since a foreground launcher call ends at ten minutes (KP-061); the step resumes when its completion arrives. `# wake` is not available for a driver: it stays for a benchmark or a runner the launcher does not know, each named with its reason in the status file. A driver run you must end is ended whole with `bridge-stop.py` (KP-056). The full mutation run comes at step 7, once the increment's behaviour is accepted (`delegation-loop/decide.md`, see "The mutation run").
++**The mutants are yours; the engine is the bridge's.** The increment's mutants are written here too, on your side, after the builder's run and never by the builder, in its mutants file `run/supervisor/<id>-mutants.json` (`<id>` the increment's ID): each mutant's `id`, its `file` and `pairs` (the text it replaces and the text it puts in its place), the test files it runs (`tests`) and the test ids that must fail (`expect_fail`), with the criterion tests those name, which are yours too (the brief's mutation list is the builder's own in-process check, by hand, no script of it in the diff). A builder's mutants are judged by nobody, and five that did not model their names once cost three rounds (reAngle TASK-010c); `diff-reviewer` reads your mutants file against each mutant's name as it reads a test against its paragraph, and a fix brief after a driver run asks for the code fix only. The engine that applies each mutant, runs its tests and records the outcome is the bridge's `mutation-run.py`, reviewed at the bridge's own gate; it works on a scratch copy of the Workspace and so restores nothing in it. A **driver** is a Python program under `run/supervisor/` or a `mutation-run.py` run, and nothing else, and every mutation run is a `mutation-run.py` run through the launcher's driver kind (`--kind driver`), in the background under the heavy launch's `timeout` (step 3, "The model, the timeout and the limit") like a suite, since a foreground launcher call ends at ten minutes (KP-061); the step resumes when its completion arrives. No driver edits the Workspace's files: a program under `run/supervisor/` that changes code changes it in a scratch copy in the system temporary folder, as `mutation-run.py` does, so a run killed at any point leaves nothing in the product (KP-056). `# wake` is not available for a driver: it stays for a benchmark or a runner the launcher does not know, each named with its reason in the status file. A driver run you must end is ended whole with `bridge-stop.py` (KP-056). The full mutation run comes at step 7, once the increment's behaviour is accepted (`delegation-loop/decide.md`, see "The mutation run").
 +
 +**Every suite is the launcher's.** A suite is the project's recorded suite command, or any run of more than the increment's own test files. Delegate to `test-runner` for the increment's tests and the suite, naming the increment's test files (the brief's test paths plus `git diff --name-only <checkpoint> -- <the test folders>`), so it knows which skips are the increment's: a test of the increment that was skipped fails the step, like a failed one (a builder has reported passing tests that had been skipped). The suite runs through the launcher in the background, whatever its length: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite command> > run/agent/TASK-<nnn>-suite.out 2>&1`, under the heavy launch's `timeout` (step 3); its completion wakes you, and `test-runner` then reads that file. The launcher starts it windowless and in the computer's one slot, and the Bash tool ends a foreground command at ten minutes (600 seconds, KP-061), so a suite never runs in the foreground and its expected length no longer chooses the path. A run of the increment's own test files alone may run in the foreground, yours or `test-runner`'s, since this session's console is hidden (a probe of 2026-10-20), where it ends within the ten minutes a foreground command has (KP-061); a longer one runs through the launcher like a suite. A runner the launcher does not know answers 125 and runs directly in the background with `# wake` (rule 43), named with its reason in the status file.
 +
@@ -677,10 +677,10 @@ index 7143063..7466298 100644
 +- new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The mutation run
 +- new TASK-030 bridge/cursor-bridge/workflow/phases/configuration.md The windowless test suite
 diff --git a/docs/HARDENING.md b/docs/HARDENING.md
-index 44804ba..af32006 100644
+index 44804ba..a172bf9 100644
 --- a/docs/HARDENING.md
 +++ b/docs/HARDENING.md
-@@ -1198,3 +1198,16 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+@@ -1198,3 +1198,17 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
  - **Taken, a failing test on Linux:** every Ubuntu job of PR #91 lost its runner after about 48 minutes: test_r041_killed_run_keeps_partial_cache started the program with a plain `Popen`, and its cleanup's `os.killpg(os.getpgid(proc.pid))` signalled the test run's own process group, pytest's and the runner's (reproduced on Linux by Review A). The test starts the program in a session of its own on POSIX, and kill_proc_tree never signals the test run's own group (the supervisor; Review A APPROVE).
  - **kill_proc_tree's new guard falls back to `proc.kill()` on the direct child alone**: a later caller passing a child without a session of its own would leave its grandchildren running, with no warning (Review A).
  - **If an assertion of test_r041_killed_run_keeps_partial_cache fails before its marker is written, the mutant pytest it left in its own session polls for the marker for ever**; it holds none of the job's pipes and a CI runner ends it at the job's end, but on a developer's computer it lingers; writing the marker in a `finally` would bound it (Review A).
@@ -696,9 +696,10 @@ index 44804ba..af32006 100644
 +- **Lead (the gate's round 3, Review A's Consider):** step 4's exit 2 fixes every resolution refusal but an editable install before the run is launched again, and says nothing of a cause the supervisor cannot fix (a src-layout package that the `--checkpoint` copy cannot import, mutation-run.py's no-module path); after one failed fix such a run could be recorded as the run's own result, as the editable install is.
 +- **Lead (the gate's round 3, Review A's Consider and Review B):** decide.md's exit 2 names only the editable-install cause of a resolution refusal; the other refusals follow step 4 by implication, and "as at step 4" would say it.
 +- **Lead (the gate's round 3, Review B):** step 4's exit 2 lists "a module that resolves outside the copy or nowhere"; in `--checkpoint` mode mutation-run.py does not refuse a module that resolves nowhere (one the increment adds) and marks its tests `not run`, as the paragraph's `not run` sentence says, so "or nowhere" describes step 7's run only.
++- **Lead (the gate's round 4, Review A):** calibrate-bridge.md item 4 commits the write as unverified whatever the after-run shows when the before-run ends in pytest's exit 2 to 5; an after-run whose exit status is worse than the before-run's (exit 5 before, exit 4 after) could revert the insert instead. The block imports only the standard library and is appended at the file's end, so such a break is unlikely, and the owner sees "stands unverified".
 +- **Noted (the gate's round 3, Review B):** docs/INVENTORY.md's TASK-030 Features row states the heavy launch's seconds (28,980 s, 18,180 s), as the other Features rows record their figures; the one-place rule and its test cover the bridge's texts under bridge/, not the project's records.
 diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
-index 40ee8d3..41f97b0 100644
+index 40ee8d3..1cfafd7 100644
 --- a/docs/INVENTORY.md
 +++ b/docs/INVENTORY.md
 @@ -38,6 +38,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
@@ -714,7 +715,7 @@ index 40ee8d3..41f97b0 100644
  | The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
  | TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
 -| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%), the figure TASK-030's brief starts from | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.9% of its characters after its split: a further addition moves another step into a sub-file first) |
-+| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,071 characters (88.5%), decide.md 117 lines and 13,071 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.5% of its characters after TASK-030's move of step 7: a further addition moves another step into a sub-file first) |
++| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,025 characters (88.4%), decide.md 117 lines and 13,071 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.4% of its characters after TASK-030's move of step 7: a further addition moves another step into a sub-file first) |
  | The session-start hook's threat model is a partial, mismatched or hand-edited install, not a hostile checker: workflow-check.py runs in the hook's process and could write to its output directly. Inside it, nothing the checker returns reaches the output except as an exact str matching its pattern; what lies outside it is docs/HARDENING.md's (Stage B3, TASK-010 with TASK-015) | seven review rounds converged there; every guard past the model narrows a channel an in-process program can open another way | 2026-10-20, supervisor (TASK-015, by-class line) | the hook loads code other than the installed checker, or a finding inside the model |
  | The hook reads the workflow tables only at their installed paths (`~/.claude/cursor-bridge/workflow/open-list.md` and `extension-points.md`), only once the checker's own table paths compare equal to them, and refuses them behind a link at workflow/ or at either file | the link test and the read then concern the same files on every platform (TASK-015 R3-3, R4-3, R5-1) | 2026-10-20, supervisor (TASK-015) | the tables move |
  | TASK-015's accepted assumptions, each in f41f7cb's `Assumptions:` sections (C3 under its round-6 `Decisions:`): a trailing `;` on a pointer line is ignored, and `a.md;b.md` is one path, which fails the pattern (the brief's grammar, Requirements 4 and 7); a pointer line's files are not named when the tables fail (the one plain line stands for them); load_tables returns the path it was given through `slash` unchanged (workflow-check.py); a table key that is not an exact str names no file (HARDENING, Stage B3, decision C3); the checker touches neither `sys.stdout.buffer` nor `reconfigure` at import | each rests on the brief's grammar or on the installed checker as it is, and each fails closed (the plain line, or no file named) | 2026-10-20, supervisor (TASK-015; the row added 2026-10-23 at stage B3's review) | load_tables changes the path it returns, a checker touches stdout at import, or a checker returns keys of another type by design |
@@ -794,7 +795,7 @@ index 8c9b914..c6ef67c 100644
      "updated": "2026-10-27"
    }
 diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
-index 8344648..c9fade8 100644
+index 8344648..f4c5b9c 100644
 --- a/tests/test_b3_least_confident.py
 +++ b/tests/test_b3_least_confident.py
 @@ -120,11 +120,18 @@ EXCUSED_MODULE_SECTIONS = {
@@ -810,8 +811,8 @@ index 8344648..c9fade8 100644
 -    ("delegation-loop.md", "What must survive a compaction"): (2592, "dcf59727f5776ead8bb2daf4adda3c57af89d350468e2283185c72eb7b156791"),
 +    ("delegation-loop.md", "The model, the timeout and the limit"): (1976, "75dd79f1bb1b958f3aaece7bcbf8c38d53d4c24871d79448f02600e1dc1a1ccd"),
 +    ("delegation-loop.md", "The procedure"): (359, "43426ab85b1373afd99983578086509a127d152b6db6ef4c398de9d2aaf480f1"),
-+    ("delegation-loop.md", "The tests before the first reviewer"): (5981, "683cdccc08d3f310335c5ed96371f2eb451ded32930185971c24d1f41b1ab30c"),
-+    ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (2556, "d3245a81b73ff585926b1bfa50d09127caec76b7d36682e251c4d2487d1d3afb"),
++    ("delegation-loop.md", "The tests before the first reviewer"): (6229, "eee5f50bdd6c74efe5d336bc5f3cb9aa9e3530d7afd74e838260581ae98a7712"),
++    ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (2262, "83ce830bdcc3897a5195d27756cc1298b3538fb81b93e2164edba740fa2f898f"),
 +    ("delegation-loop.md", "What must survive a compaction"): (2971, "7b0aa4473dd3d8c041aa8c7efee5756d9ba73cb71446cc224058a3cdb239b705"),
 +    ("delegation-loop/decide.md", "The mutation run"): (5628, "44f27ca570e65d6e8f0d662b2eef25cc93c9fb4aaf2a6d3587ee47d35e9a0f18"),
 +    ("delegation-loop/decide.md", "Where this sub-file belongs"): (436, "9e38cf68a4da72d205ec742fe0d1cbf6f5c6e6bd75a04469b52333775ad19e01"),
@@ -870,7 +871,7 @@ index ff714ac..710f899 100644
      have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
 diff --git a/tests/test_loop_text_windowless.py b/tests/test_loop_text_windowless.py
 new file mode 100644
-index 0000000..f632bbd
+index 0000000..8b79687
 --- /dev/null
 +++ b/tests/test_loop_text_windowless.py
 @@ -0,0 +1,481 @@
@@ -1021,11 +1022,8 @@ index 0000000..f632bbd
 +        "`bridge-run: exit` (KP-053) — is relaunched; nothing was spent.",
 +        "**A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
 +        "`bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it "
-+        "recorded standing (step 7), and a program under `run/supervisor/` starts again.",
-+        "One that edits the Workspace's files in place keeps a copy of each file it edits under `run/supervisor/` "
-+        "before its first edit, taken from the tree as it stands and never replaced by a relaunch, and at every start "
-+        "first puts back each file that differs from its copy (KP-056's residue check), so a relaunch undoes what the "
-+        "killed run left and the builder's uncommitted work is never touched.",
++        "recorded standing (step 7), and a program under `run/supervisor/` starts again: no driver edits the "
++        "Workspace's files (step 4), so a run cut short leaves nothing in the product.",
 +    ):
 +        assert sentence in s, sentence
 +    launcher = read(os.path.join(CB, "bridge-run.py"))
@@ -1079,6 +1077,9 @@ index 0000000..f632bbd
 +        "mutation run is a `mutation-run.py` run through the launcher's driver kind (`--kind driver`), in the background "
 +        "under the heavy launch's `timeout`",
 +        "the step resumes when its completion arrives.",
++        "No driver edits the Workspace's files: a program under `run/supervisor/` that changes code changes it in a "
++        "scratch copy in the system temporary folder, as `mutation-run.py` does, so a run killed at any point leaves "
++        "nothing in the product (KP-056).",
 +        "`# wake` is not available for a driver: it stays for a benchmark or a runner the launcher does not know, each "
 +        "named with its reason in the status file.",
 +    ):
@@ -1133,9 +1134,8 @@ index 0000000..f632bbd
 +            "applies them is the bridge's `mutation-run.py`, which works on a scratch copy of the Workspace and so "
 +            "restores nothing in it. Read each mutant in the file against its name as you read a test against its "
 +            "paragraph") in dr
-+    assert ("A driver of the supervisor's under `run/supervisor/` that edits the Workspace's files in place is read "
-+            "for its restore too: it restores each file in a `finally` and aborts on a byte mismatch at restore; one "
-+            "that works on a scratch copy restores nothing.") in dr
++    assert ("A driver of the supervisor's under `run/supervisor/` works on a scratch copy, as the engine does; one "
++            "that edits the Workspace's files in place is a deviation.") in dr
 +    sp = flat(text("agents", "spec-packager.md"))
 +    assert ("the mutation run itself (the supervisor's mutants file, applied by the bridge's `mutation-run.py` on a "
 +            "scratch copy of the Workspace) is the supervisor's side's, written after your run with the criterion "
@@ -1147,7 +1147,8 @@ index 0000000..f632bbd
 +            "mutant in the product") in kp
 +    assert ("so the loop never advances into its next driver (before that release, only between drivers, its "
 +            "`bash.exe` first);") in kp
-+    assert "a driver that edits product files in place aborts on a byte mismatch at restore;" in kp
++    assert ("and no driver of the supervisor's edits the product's files either, working on a scratch copy as the "
++            "program does;") in kp
 +    assert "until then" not in kp
 +
 +
