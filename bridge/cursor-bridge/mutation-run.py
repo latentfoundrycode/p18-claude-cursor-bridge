@@ -574,11 +574,6 @@ def copy_tracked(workspace, dest, tracked, untracked):
 
 def remove_bytecode_from_copy(copy_root):
     for dirpath, dirnames, filenames in os.walk(copy_root, topdown=True, followlinks=False):
-        for fn in filenames:
-            if fn.endswith(".pyc"):
-                p = os.path.join(dirpath, fn)
-                if not bridge_env.is_link(p):
-                    os.remove(p)
         for i in range(len(dirnames) - 1, -1, -1):
             if dirnames[i] == "__pycache__":
                 p = os.path.join(dirpath, dirnames[i])
