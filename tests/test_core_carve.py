@@ -142,8 +142,9 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # reworded under TASK-030's own entries on "3. Delegate to Cursor" and "4. Inspect" (the heavy launch's duration;
 # every suite through the launcher; the mutants file and the checkpoint run through mutation-run.py), and rules 8
 # and 24, excused by the earlier Standing rules entry and so labelled TASK-015 (the driver kind; the suite's
-# default); step 7 moves whole into delegation-loop/decide.md and is traced there)
-TRACED = "TRACED: 424 passages of baseline 0a186da; 153 in supervisor.md, 253 under workflow/, 0 dropped, 18 excused"
+# default), and in round 2 rule 43 the same way (a mutation run a wake source); step 7 moves whole into
+# delegation-loop/decide.md and is traced there)
+TRACED = "TRACED: 424 passages of baseline 0a186da; 152 in supervisor.md, 253 under workflow/, 0 dropped, 19 excused"
 NOTES = [
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
@@ -163,6 +164,7 @@ NOTES = [
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 24. Windowless by default. The user works on the same Window",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 34. A request on a finished project is a change cycle: the s",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 43. Never end a turn while the loop has work unless somethin",
 ]
 
 

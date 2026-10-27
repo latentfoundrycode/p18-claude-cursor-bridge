@@ -65,7 +65,7 @@ Only the items the supervisor names, drawn from this set:
   `~/.claude/cursor-bridge/windowless-default.snapshot.md`**, written verbatim: create the test
   root's `conftest.py` from it only where the test root has none (`tests/conftest.py`, with
   its folder, where the project has no test root yet); where one exists, insert the block
-  once, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`,
+  once, at the file's end, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`,
   `CREATE_NO_WINDOW`), and leave every other line as it stands. Never regenerate, trim or
   reorder it. A Node suite gets nothing from you here: report its runner, and the supervisor
   records the conformance check's NOTE.

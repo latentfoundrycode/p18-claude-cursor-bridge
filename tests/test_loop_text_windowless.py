@@ -83,8 +83,9 @@ def test_r040_step_3_names_the_heavy_launchs_duration_from_the_launchers_figures
             "a `timeout` of `18180000`.") in s
     assert ("The same `timeout` goes on every heavy launch and on a wake-timer that waits for one, and the loop guard "
             "counts the same duration with its own notification grace on top.") in s
-    assert ("A review, a CI watch or a wake-timer bounding an agent takes the review cap, twice the launcher's default "
-            "for a review: `7200000`") in s
+    assert ("A review or a CI watch takes the review cap, twice the launcher's default for a review: `7200000` (a "
+            "learned `--limit auto` never exceeds the cap); a wake-timer bounding an agent takes its own seconds plus a "
+            "minute (rule 43).") in s
     assert run["CAP_FACTOR"] * run["KINDS"]["review"] * 1000 == 7200000
 
 
@@ -105,6 +106,10 @@ def test_r040_the_heavy_figures_stand_in_one_place():
     want = [("cursor-bridge/workflow/phases/delegation-loop.md", 1)]
     assert {f: homes.get(f) for f in figures} == {f: want for f in figures}, homes
     assert "14400000" not in homes and "3600000" not in homes, homes
+    # the figures in bare seconds stand nowhere either (step 3 writes them with a thousands comma)
+    for path in markdown_files():
+        for fig in ("%d" % d["builder"], "%d" % d["test"]):
+            assert not re.search(r"(?<![\d,])%s(?![\d,])" % fig, read(path)), (path, fig)
     kp53 = flat(text("cursor-bridge", "Known-Pitfalls.md")).split("### KP-053")[1].split("### KP-054")[0]
     assert ("every background launch sets the Bash tool's `timeout` in milliseconds as "
             "`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 3, gives it for its kind (a heavy launch's "
@@ -129,6 +134,8 @@ def test_r040_step_3b_handles_the_slots_exits_without_a_model_failure():
         "Wait for the holder's end with `python ~/.claude/cursor-bridge/wake-timer.py <seconds> \"<the run that waits>\"` "
         "in the background, the seconds being the time left until the `ends by` time the exit line printed, or zero when "
         "it has passed; then relaunch once, unchanged.",
+        "The timer's closing line, which tells you to run a task in the foreground, does not apply here: its "
+        "completion means the relaunch, through the launcher.",
         "A second 123 naming a holder is retried twice more the same way; after that, tell the owner, naming the holder's "
         "kind and run id.",
         "A 123 reading `held by unknown` (the launcher waited its provisional bound and never read a live holder's "
@@ -136,9 +143,9 @@ def test_r040_step_3b_handles_the_slots_exits_without_a_model_failure():
         "`~/.cursor-bridge/heavy.lock`: it is a sign of a defect, not of a busy computer.",
         "**A waiter killed from outside** — its output file holds waiting lines and neither `slot taken` nor "
         "`bridge-run: exit` (KP-053) — is relaunched; nothing was spent.",
-        "**A mutation run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
-        "`bridge-run: exit` line) — is relaunched once and continues from its cache: the kills it recorded stand "
-        "(step 7).",
+        "**A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
+        "`bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it "
+        "recorded standing (step 7), and a program under `run/supervisor/` starts again.",
     ):
         assert sentence in s, sentence
     launcher = read(os.path.join(CB, "bridge-run.py"))
@@ -165,7 +172,8 @@ def test_r039_every_suite_runs_through_the_launcher_and_test_runner_reads_its_fi
         "and `test-runner` then reads that file.",
         "so a suite never runs in the foreground and its expected length no longer chooses the path.",
         "A run of the increment's own test files alone may run in the foreground, yours or `test-runner`'s, since this "
-        "session's console is hidden (a probe of 2026-10-20).",
+        "session's console is hidden (a probe of 2026-10-20), where it ends within the ten minutes a foreground "
+        "command has (KP-061); a longer one runs through the launcher like a suite.",
     ):
         assert sentence in s, sentence
     tr = flat(text("agents", "test-runner.md"))
@@ -220,11 +228,17 @@ def test_r041_the_checkpoint_run_is_mutation_run_py_and_each_result_has_its_hand
         "A test the output marks `not run` (it cannot collect, or ran nothing, on the old code) is neither pass nor "
         "fail, and is said.",
         "Exit 3 stops the step: it is the run's own result, recorded as such, never a model failure;",
+        "exit 2 is a refused file or path, fixed before the run is launched again, or the program's resolution check "
+        "refusing the run (`resolves outside the copy`, `module from Workspace path ... was loaded`), as an editable "
+        "install of the package makes it (KP-054): no correction of the file helps, so the step records \"not run "
+        "against the checkpoint: editable install\", and the reviewer's check of each test against its paragraph "
+        "stands in.",
     ):
         assert sentence in s, sentence
     assert "git worktree add" not in s and "Worktrees/old-" not in flat(loop())
     program = read(os.path.join(CB, "mutation-run.py"))
-    for label in ('"passing on old code"', '"%s: not run"', '"new_tests"', "return 4 if any_pass else 0"):
+    for label in ('"passing on old code"', '"%s: not run"', '"new_tests"', "return 4 if any_pass else 0",
+                  "resolves outside the copy", "module from Workspace path %s was loaded"):
         assert label in program, label
 
 
@@ -236,6 +250,9 @@ def test_r041_the_agents_and_kp_056_say_the_same_of_the_mutation_run():
             "applies them is the bridge's `mutation-run.py`, which works on a scratch copy of the Workspace and so "
             "restores nothing in it. Read each mutant in the file against its name as you read a test against its "
             "paragraph") in dr
+    assert ("A driver of the supervisor's under `run/supervisor/` that edits the Workspace's files in place is read "
+            "for its restore too: it restores each file in a `finally` and aborts on a byte mismatch at restore; one "
+            "that works on a scratch copy restores nothing.") in dr
     sp = flat(text("agents", "spec-packager.md"))
     assert ("the mutation run itself (the supervisor's mutants file, applied by the bridge's `mutation-run.py` on a "
             "scratch copy of the Workspace) is the supervisor's side's, written after your run with the criterion "
@@ -245,6 +262,10 @@ def test_r041_the_agents_and_kp_056_say_the_same_of_the_mutation_run():
             "the builder (2026.10.11d), and since release B the bridge's `mutation-run.py` applies them on a scratch copy "
             "of the Workspace, launched through the launcher's driver kind, so a run killed at any point leaves no "
             "mutant in the product") in kp
+    assert ("so the loop never advances into its next driver (before that release, only between drivers, its "
+            "`bash.exe` first);") in kp
+    assert "a driver that edits product files in place aborts on a byte mismatch at restore;" in kp
+    assert "until then" not in kp
 
 
 # --- step 7: the mutation run, its cut and its estimate (R-043) -----------------------------------------------------
@@ -265,6 +286,7 @@ def test_r043_the_mutation_run_is_launched_at_step_7_on_every_pass():
         "and the mutant itself) are byte-identical since its last kill keeps that kill, and every survived, unapplied "
         "or erred mutant runs again.",
         "Add `--all` for the full run where a round changed files outside every key.",
+        "The Accept bullet's commit may come before the run; the move to the next increment waits for its result.",
     ):
         assert sentence in s, sentence
 
@@ -314,6 +336,14 @@ def test_r043_exit_1_follows_the_ceiling_and_exit_3_is_the_runs_own():
         "launcher's round of the brief that would carry a code fix.",
         "Where it is at or below the code gate's ceiling of three rounds, the mutant is fixed: a criterion test's fix is "
         "yours and no round; a code fix is a re-delegation (above) and a round.",
+        "A mutant not applied (its text no longer in its file) is re-anchored in the mutants file, yours and no round; "
+        "a fix of yours after Review A's read stands in the diff Review B reads at step 8.",
+        "**Exit 2** — the mutants file or a path in it was refused: correct the file and launch again. Or the "
+        "program's resolution check refused the run (`resolves outside the copy`, `module from Workspace path ... was "
+        "loaded`), as an editable install of the package makes it (KP-054): no correction of the file helps, so the "
+        "run is not made, `mutation run not made: editable install` goes on `run/supervisor/in-flight.md` and into the "
+        "SCOPE file, and the reviewers' reading of each mutant against its name stands in; it is the run's own result, "
+        "never a model failure.",
         "Above the ceiling, the mutant goes to `docs/HARDENING.md` under the increment and never to a re-delegation, "
         "unless the code it shows untested is a safety mechanism the increment relies on, or the result shows a defect "
         "of a blocking class (behaviour against the brief or the register, security, data integrity, a defeated safety "
@@ -360,7 +390,12 @@ def test_r039_the_configuration_texts_carry_the_item():
     s = flat(section(module("configuration"), "The windowless test suite", 3))
     assert ("the configurator creates the test root's `conftest.py` from the block only where the test root has none "
             "(`tests/conftest.py`, with its folder, where the project has no test root yet), and where one exists "
-            "inserts the block once, unless the file already holds its three tokens") in s
+            "inserts the block once, at the file's end, unless the file already holds its three tokens") in s
+    guide_item = flat(text("cursor-bridge", "Cursor-Project-Configuration.md"))
+    assert "exists it inserts the block once, at the file's end, unless the file already holds its three tokens" in (
+        guide_item)
+    assert "insert the block once, at the file's end, unless the file already holds its three tokens" in flat(
+        text("agents", "cursor-configurator.md"))
     assert "A Node suite has no default yet: the check gives it a NOTE naming its runner and KP-059's mechanism" in s
     guide = text("cursor-bridge", "Cursor-Project-Configuration.md")
     order = flat(guide.split("## Configuration run — order of operations", 1)[1])
@@ -388,13 +423,23 @@ def test_r039_calibration_writes_the_floor_between_two_suite_runs():
         "command> -rA > run/agent/calibrate-suite-before.out 2>&1`, under the heavy launch's `timeout`",
         "Run the same suite once more the same way, into `run/agent/calibrate-suite-after.out`, and read it when its "
         "completion arrives.",
-        "Compare the two reports' failed test ids. A failure present before the write is the project's own: it is "
-        "recorded, and the write stands.",
-        "A failure present only after the write is the insert's: it leads the report's first line, the insert is "
+        "the run waits for the computer's one slot). Read the output file when its completion arrives.",
+        "Have `cursor-configurator` write the default from `~/.claude/cursor-bridge/windowless-default.snapshot.md` "
+        "exactly as configuration writes it (`Cursor-Project-Configuration.md` §2, the windowless-default item): the "
+        "test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block "
+        "inserted once at the end of the one that exists, every other line left as it stands.",
+        "Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's "
+        "exit status. A failure or error present before the write is the project's own: it is recorded, and the write "
+        "stands.",
+        "A failure or error present only after the write, fewer tests collected after it than before, or an after-run "
+        "ending in pytest's exit 2 to 5 (interrupted, an internal error, a usage error such as a `conftest.py` that "
+        "fails to import, no tests collected) where the before-run did not, is the insert's: it leads the report's "
+        "first line, the insert is "
         "reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named "
         "in the report. Otherwise the write is committed as the calibration's checkpoint.",
         "Write the two runs' results on the `Calibrated:` line (step 5).",
         "It is a configuration item: no gate is reopened, and the loop resumes after it.",
+        "A Node suite's NOTE (its default is not shipped yet) is recorded in `PROJECT_STATUS.md` like any NOTE.",
         "Where step 1b wrote the windowless default, the line also names the two suite runs' results",
     ):
         assert sentence in cal, sentence
@@ -411,6 +456,11 @@ def test_r039_r041_rules_8_and_24_name_the_runs_and_the_default():
             "`mutation-run.py`); never with an option that runs another program, but for the driver kind's `python "
             "<program>`, whose program the launcher's path check confines.") in rule8
     assert "Every suite and every mutation run goes through it, in the background (the delegation loop's step 4)." in rule8
+    # rule 43 counts a mutation run as a wake source, as the loop guard does (Review A, TASK-030 round 1)
+    rule43 = core.split(" 43. Never end a turn", 1)[1].split(" 44. ", 1)[0]
+    assert ("a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run, run "
+            "through it too (`--kind driver`), or a benchmark,") in rule43
+    assert '"driver"' in read(os.path.join(CB, "loop-guard.py"))
     rule24 = core.split(" 24. Windowless by default.", 1)[1].split(" 25. Refactoring", 1)[0]
     assert ("A project's test suite carries the bridge's frozen windowless default "
             "(`~/.claude/cursor-bridge/windowless-default.snapshot.md`, the pytest `conftest.py` block), written at "

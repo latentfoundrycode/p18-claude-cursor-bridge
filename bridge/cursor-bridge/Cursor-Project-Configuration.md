@@ -153,7 +153,7 @@ and fix its own lint/type errors without a human in the loop.
   suite makes without creation flags of its own `CREATE_NO_WINDOW`. `cursor-configurator`
   creates the test root's `conftest.py` from the block only where the test root has none
   (`tests/conftest.py`, with its folder, where the project has no test root yet); where one
-  exists it inserts the block once, unless the file already holds its three tokens
+  exists it inserts the block once, at the file's end, unless the file already holds its three tokens
   (`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), and leaves every other line as
   it stands. The conformance check's floor `Windowless test suite` checks it: OK where the
   test root's or the rootdir's `conftest.py` holds the three tokens, MISSING otherwise. A
