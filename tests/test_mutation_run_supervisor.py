@@ -660,6 +660,7 @@ def test_task031_r6_a3_a_collection_error_beside_a_kill_is_an_error(tmp_path):
     p = _run(ws, mf)
     assert p.returncode == 3, p.stdout + p.stderr
     assert [line["outcome"] for line in _cache_lines(ws, "r6a3")] != ["killed"]
+    assert "collection error" in p.stdout, p.stdout
 
 
 # Round 6's mutation run: the survivors that showed a gap in the tests above.
@@ -713,6 +714,8 @@ def test_task031_r6_b2_an_untracked_entry_ending_in_a_dot_or_a_space_is_refused(
     name a file that exists (`notes.txt` here)."""
     ws = _fixture(tmp_path, CALC)
     _write(ws, "notes.txt", "untracked notes\n")
+    control = _run(ws, _mutants(ws, "r6b2c", {"mutants": [KILL_CALC], "untracked": ["notes.txt"]}))
+    assert control.returncode == 0, control.stdout + control.stderr   # precondition: the plain name is accepted
     mf = _mutants(ws, "r6b2d", {"mutants": [KILL_CALC], "untracked": [listed]})
     p = _run(ws, mf)
     assert p.returncode == 2, p.stdout + p.stderr
@@ -754,3 +757,69 @@ def test_task031_r6_b3_a_change_to_a_root_pytest_configuration_reruns_its_mutant
     second = _run(ws, mf)
     assert second.returncode == 0, second.stdout + second.stderr
     assert len(_cache_lines(ws, "r6key")) == 2, second.stdout
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="a junction, which needs no privilege, is Windows'")
+def test_task031_r6_b1_a_scratch_folder_holding_the_workspaces_target_through_a_junction_is_refused(tmp_path):
+    """R-041, TASK-031 Requirement 2 (a scratch folder that contains the Workspace is refused; handoff/TASK-031-r6.md,
+    B-1): a Workspace reached through a junction (`jdir\\J\\Workspace`, J leading to `P\\proj`) with `--scratch P`,
+    a folder holding the Workspace's real location though no folder on the way to the Workspace as named, exits 2
+    and creates nothing in P (Review A, round 6: M20 and M33 are not equivalent)."""
+    import _winapi
+    real_ws = _fixture(tmp_path / "P", CALC)
+    jdir = tmp_path / "jdir"
+    jdir.mkdir()
+    junction = jdir / "J"
+    _winapi.CreateJunction(str(real_ws.parent), str(junction))
+    try:
+        ws = junction / "Workspace"
+        mf = _mutants(ws, "r6jn", {"mutants": [KILL_CALC]})
+        cmd = [sys.executable, PROG, str(mf), "--scratch", str(tmp_path / "P")]
+        p = subprocess.run(cmd, cwd=str(ws), **test_conftest.windowless_kwargs(
+            {"capture_output": True, "text": True, "timeout": 120}))
+        assert p.returncode == 2, p.stdout + p.stderr
+        assert not (tmp_path / "P" / "mutation-run-r6jn").exists()
+        assert _cache_lines(real_ws, "r6jn") == []
+    finally:
+        os.rmdir(str(junction))                          # the link itself; its target is left as it is
+    assert real_ws.is_dir()
+
+
+# Round 7 (handoff/TASK-031-r7.md): the blocking findings of round 6's security audit.
+
+def test_task031_r7_n1_a_mutant_id_that_is_not_a_plain_name_is_refused(tmp_path):
+    """R-041, TASK-031 Requirement 1 (the mutants file is checked whole first; handoff/TASK-031-r7.md, N-1): a mutant
+    id holding a path separator and `..` components exits 2 before any test, and a `.json` file the id's path would
+    reach above the scratch folder is left as it was."""
+    ws = _fixture(tmp_path, CALC)
+    victim = tmp_path / "victim.json"
+    victim.write_text("{\"keep\": true}\n", encoding="utf-8")
+    bad_id = os.sep.join(["x", "..", "..", "..", "victim"])
+    mf = _mutants(ws, "r7n1", {"mutants": [dict(KILL_CALC, id=bad_id)]})
+    p = _run(ws, mf)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert victim.read_text(encoding="utf-8") == "{\"keep\": true}\n"
+    assert _cache_lines(ws, "r7n1") == []
+
+
+@pytest.mark.parametrize("config", ["pytest.ini", "tox.ini", "setup.cfg"])
+def test_task031_r7_n2_a_pytest_configuration_holding_a_percent_sign_is_read_as_pytest_reads_it(tmp_path, config):
+    """R-041 (every mutant gets a result against the version the gate reads), TASK-031 Requirement 4
+    (handoff/TASK-031-r6.md, B-3, and handoff/TASK-031-r7.md, N-2: the configuration found as pytest 9.1.1 finds it):
+    a root `pytest.ini`, `tox.ini` or `setup.cfg` whose pytest section holds logging formats with `%` signs, which
+    pytest reads without interpolation, configures the mutant's run: its tests, collected only through that
+    section, kill the mutant, exit 0."""
+    section = {"pytest.ini": "[pytest]\n", "tox.ini": "[tox]\nenvlist = py312\n\n[pytest]\n",
+               "setup.cfg": "[metadata]\nname = demo\n\n[tool:pytest]\n"}[config]
+    files = {
+        "demo/__init__.py": "",
+        "demo/calc.py": "def add(a, b):\n    return a + b\n",
+        "tests/test_calc.py": "from demo.calc import add\n\ndef check_add():\n    assert add(1, 2) == 3\n",
+        config: section + "python_functions = check_*\nlog_cli_format = %(asctime)s %(message)s\n"
+                          "log_date_format = %Y-%m-%d %H:%M:%S\n",
+    }
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r7n2", {"mutants": [dict(KILL_CALC, expect_fail=["tests/test_calc.py::check_add"])]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r7n2")] == ["killed"]
