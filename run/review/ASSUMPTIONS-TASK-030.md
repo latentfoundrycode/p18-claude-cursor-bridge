@@ -4,3 +4,4 @@ From the `Assumptions:` sections of the branch's commit messages (extra places t
 
 - none: no builder ran (governance text, the supervisor's).
 - none: no builder ran (governance text, the supervisor's).
+- none: no builder ran (governance text, the supervisor's).
