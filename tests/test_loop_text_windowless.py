@@ -145,11 +145,8 @@ def test_r040_step_3b_handles_the_slots_exits_without_a_model_failure():
         "`bridge-run: exit` (KP-053) — is relaunched; nothing was spent.",
         "**A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
         "`bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it "
-        "recorded standing (step 7), and a program under `run/supervisor/` starts again.",
-        "One that edits the Workspace's files in place keeps a copy of each file it edits under `run/supervisor/` "
-        "before its first edit, taken from the tree as it stands and never replaced by a relaunch, and at every start "
-        "first puts back each file that differs from its copy (KP-056's residue check), so a relaunch undoes what the "
-        "killed run left and the builder's uncommitted work is never touched.",
+        "recorded standing (step 7), and a program under `run/supervisor/` starts again: no driver edits the "
+        "Workspace's files (step 4), so a run cut short leaves nothing in the product.",
     ):
         assert sentence in s, sentence
     launcher = read(os.path.join(CB, "bridge-run.py"))
@@ -203,6 +200,9 @@ def test_r041_every_mutation_run_is_mutation_run_py_through_the_driver_kind():
         "mutation run is a `mutation-run.py` run through the launcher's driver kind (`--kind driver`), in the background "
         "under the heavy launch's `timeout`",
         "the step resumes when its completion arrives.",
+        "No driver edits the Workspace's files: a program under `run/supervisor/` that changes code changes it in a "
+        "scratch copy in the system temporary folder, as `mutation-run.py` does, so a run killed at any point leaves "
+        "nothing in the product (KP-056).",
         "`# wake` is not available for a driver: it stays for a benchmark or a runner the launcher does not know, each "
         "named with its reason in the status file.",
     ):
@@ -257,9 +257,8 @@ def test_r041_the_agents_and_kp_056_say_the_same_of_the_mutation_run():
             "applies them is the bridge's `mutation-run.py`, which works on a scratch copy of the Workspace and so "
             "restores nothing in it. Read each mutant in the file against its name as you read a test against its "
             "paragraph") in dr
-    assert ("A driver of the supervisor's under `run/supervisor/` that edits the Workspace's files in place is read "
-            "for its restore too: it restores each file in a `finally` and aborts on a byte mismatch at restore; one "
-            "that works on a scratch copy restores nothing.") in dr
+    assert ("A driver of the supervisor's under `run/supervisor/` works on a scratch copy, as the engine does; one "
+            "that edits the Workspace's files in place is a deviation.") in dr
     sp = flat(text("agents", "spec-packager.md"))
     assert ("the mutation run itself (the supervisor's mutants file, applied by the bridge's `mutation-run.py` on a "
             "scratch copy of the Workspace) is the supervisor's side's, written after your run with the criterion "
@@ -271,7 +270,8 @@ def test_r041_the_agents_and_kp_056_say_the_same_of_the_mutation_run():
             "mutant in the product") in kp
     assert ("so the loop never advances into its next driver (before that release, only between drivers, its "
             "`bash.exe` first);") in kp
-    assert "a driver that edits product files in place aborts on a byte mismatch at restore;" in kp
+    assert ("and no driver of the supervisor's edits the product's files either, working on a scratch copy as the "
+            "program does;") in kp
     assert "until then" not in kp
 
 
