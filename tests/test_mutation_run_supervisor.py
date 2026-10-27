@@ -1061,3 +1061,23 @@ def test_task031_r12_the_projects_own_package_installed_elsewhere_runs_its_mutan
     p = _run(ws, mf, env=env)
     assert p.returncode == 0, p.stdout + p.stderr
     assert [line["outcome"] for line in _cache_lines(ws, "r12own")] == ["killed"]
+
+
+def test_task031_r13_no_test_run_of_the_program_writes_bytecode(tmp_path):
+    """R-041 (each mutant's result is the result of the mutated bytes), TASK-031 round 13, Requirement 1 (handoff/TASK-031-r13.md):
+    a `.pyc` records its source's size and modification time to the second, so a same-size mutant (`+` to `-`)
+    written within the second after its original was compiled, or an original restored within the second after the
+    mutant was, runs the stale bytecode: a mutant that never ran survives, or the next mutant's tests run the last
+    one's code. CI's Windows job showed six such false survivors on round 12's code. Every pytest the program starts
+    writes no bytecode: a test of the fixture asserts `sys.dont_write_bytecode` beside the killed test, so a run
+    whose pytest may write bytecode is an error, exit 3, and a run that writes none kills the mutant, exit 0."""
+    files = dict(CALC)
+    files["tests/test_calc.py"] = ("import sys\nfrom demo.calc import add\n\ndef test_add():\n"
+                                   "    assert add(1, 2) == 3\n\ndef test_no_bytecode():\n"
+                                   "    assert sys.dont_write_bytecode\n")
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r13pyc", {"mutants": [KILL_CALC]})
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+    p = _run(ws, mf, env=env)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r13pyc")] == ["killed"]
