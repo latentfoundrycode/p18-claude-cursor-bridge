@@ -12,7 +12,6 @@ when any listed new test passed on the old code. ASCII-only on purpose (cp1252 c
 import argparse
 import hashlib
 import importlib.machinery
-import importlib.util
 import json
 import os
 import re
@@ -835,6 +834,10 @@ _INICONFIG_SHADOW_REFUSE = (
     "mutation-run: a top-level iniconfig in the project would shadow pytest's iniconfig"
 )
 
+_PYTEST_CONFIG_SHADOW_MODULES = (
+    "pytest", "_pytest", "pluggy", "py", "iniconfig", "tomllib", "tomli",
+)
+
 
 def _refuse_if_copy_root_shadows_iniconfig(config_dir):
     for entry in os.listdir(config_dir):
@@ -907,8 +910,10 @@ def _pytest_config_dict_from_file(filepath):
 
 def _refuse_if_copy_root_shadows_importable_module(copy_root):
     suffixes = importlib.machinery.all_suffixes()
-    croot_p = os.path.normcase(os.path.abspath(copy_root)) + os.sep
-    wroot_p = os.path.normcase(os.path.abspath(os.getcwd())) + os.sep
+    if os.name == "nt":
+        shadow_names = frozenset(n.lower() for n in _PYTEST_CONFIG_SHADOW_MODULES)
+    else:
+        shadow_names = frozenset(_PYTEST_CONFIG_SHADOW_MODULES)
     for entry in os.listdir(copy_root):
         path = os.path.join(copy_root, entry)
         names = []
@@ -927,20 +932,8 @@ def _refuse_if_copy_root_shadows_importable_module(copy_root):
         for mod in names:
             if not mod.isidentifier():
                 continue
-            shadows = (
-                mod in sys.stdlib_module_names
-                or mod in sys.builtin_module_names
-            )
-            if not shadows:
-                try:
-                    spec = importlib.util.find_spec(mod)
-                except ValueError:
-                    spec = None
-                if spec is not None and spec.origin is not None:
-                    origin = os.path.normcase(os.path.abspath(spec.origin))
-                    if not origin.startswith(croot_p) and not origin.startswith(wroot_p):
-                        shadows = True
-            if not shadows:
+            key = mod.lower() if os.name == "nt" else mod
+            if key not in shadow_names:
                 continue
             if mod == "iniconfig" or (os.name == "nt" and mod.lower() == "iniconfig"):
                 raise Refuse(_INICONFIG_SHADOW_REFUSE)

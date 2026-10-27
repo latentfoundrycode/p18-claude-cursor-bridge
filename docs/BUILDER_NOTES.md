@@ -34,4 +34,4 @@
 
 2026-10-26 TASK-031-r5: `test_fix001_no_test_starts_a_program_around_the_default` fails on the round-4 supervisor reproduction strings in `tests/test_mutation_run_supervisor.py` (`creationflags=NO_WINDOW` without the `CREATE_NO_WINDOW` substring); that file is out of scope for r5, so verification step 3 cannot pass here until those embedded literals are fixed elsewhere.
 
-2026-10-27 TASK-031-r11: when `PYTHONPATH` is set, Python 3.12 on Windows also puts the process working directory on `sys.path`, so a naive `importlib.util.find_spec` of a fixture package name such as `demo` can resolve to the Workspace tree; shadow detection must ignore `find_spec` origins under the copy root and under `os.getcwd()`, not only under the copy root.
+2026-10-27 TASK-031-r11: on Python 3.12, only an empty `PYTHONPATH` entry puts the working folder on `sys.path`; round 11's `find_spec` check still refused ordinary layouts when another copy of the project package was on `PYTHONPATH`, which round 12 replaced with a fixed list of names pytest imports for configuration.
