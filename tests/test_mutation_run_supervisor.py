@@ -778,6 +778,7 @@ def test_task031_r6_b1_a_scratch_folder_holding_the_workspaces_target_through_a_
         p = subprocess.run(cmd, cwd=str(ws), **test_conftest.windowless_kwargs(
             {"capture_output": True, "text": True, "timeout": 120}))
         assert p.returncode == 2, p.stdout + p.stderr
+        assert "scratch folder must not lie inside the Workspace or contain it" in p.stdout + p.stderr
         assert not (tmp_path / "P" / "mutation-run-r6jn").exists()
         assert _cache_lines(real_ws, "r6jn") == []
     finally:
@@ -852,3 +853,47 @@ def test_task031_r7_n2_a_pytest_configuration_that_does_not_decode_is_refused(tm
     assert p.returncode == 2, p.stdout + p.stderr
     assert "invalid %s file %s" % (kind, config) in p.stdout + p.stderr
     assert _cache_lines(ws, "r7n2d") == []
+
+
+def test_task031_r7_n1_a_long_plain_mutant_id_runs_its_mutant(tmp_path):
+    """R-041, TASK-031 Requirement 1 (handoff/TASK-031-r7.md, N-1: each mutant's results file is named by its index
+    in the loop, never from its id): a plain id of 240 characters, valid under MUTANT_ID_RX, runs and kills its
+    mutant, exit 0, where a results file named from the id would pass the 255-character limit on one name
+    (Review A, round 7: M53 is not equivalent)."""
+    ws = _fixture(tmp_path, CALC)
+    long_id = "m" * 240
+    mf = _mutants(ws, "r7n1l", {"mutants": [dict(KILL_CALC, id=long_id)]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [(line["mutant"], line["outcome"]) for line in _cache_lines(ws, "r7n1l")] == [(long_id, "killed")]
+
+
+@pytest.mark.parametrize("config,header", [("tox.ini", "[pytest] # the ready fixture]"),
+                                           ("setup.cfg", "[tool:pytest] ; the ready fixture]")])
+def test_task031_r8_a_section_header_holding_a_comment_is_not_read_otherwise_than_pytest_reads_it(
+        tmp_path, config, header):
+    """R-041 (a result against the version the gate reads), TASK-031 Requirement 4 (handoff/TASK-031-r6.md, B-3:
+    the configuration found as pytest 9.1.1 finds it; handoff/TASK-031-r8.md): a pytest section header followed by
+    a comment holding `]`, which pytest's iniconfig reads as the pytest section, is either read as pytest reads it
+    or refused with exit 2; it never configures the mutant's run otherwise. Here the section's `usefixtures` makes
+    the tests pass and an equivalent mutant survive under pytest's reading, so a run reading the file otherwise
+    records a false kill (the security audit, round 7)."""
+    files = dict(CALC)
+    files["demo/__init__.py"] = "READY = False\n"
+    files["tests/conftest.py"] = ("import pytest\nimport demo\n\n@pytest.fixture\ndef ready():\n"
+                                  "    demo.READY = True\n")
+    files["tests/test_calc.py"] = ("import demo\nfrom demo.calc import add\n\ndef test_add():\n"
+                                   "    assert demo.READY\n    assert add(1, 2) == add(2, 1)\n")
+    prefix = "[tox]\nenvlist = py312\n\n" if config == "tox.ini" else "[metadata]\nname = demo\n\n"
+    files[config] = prefix + header + "\nusefixtures = ready\n"
+    ws = _fixture(tmp_path, files)
+    gate = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"], cwd=str(ws),
+                          **test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 120}))
+    assert gate.returncode == 0, gate.stdout + gate.stderr          # pytest itself reads the header as its section
+    swap = {"id": "swap", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return b + a"}],
+            "tests": ["tests/test_calc.py"], "expect_fail": ["tests/test_calc.py::test_add"]}
+    mf = _mutants(ws, "r8hd", {"mutants": [swap]})
+    p = _run(ws, mf)
+    outcomes = [line["outcome"] for line in _cache_lines(ws, "r8hd")]
+    assert "killed" not in outcomes, p.stdout + p.stderr
+    assert (p.returncode == 2 and outcomes == []) or outcomes == ["survived"], p.stdout + p.stderr
