@@ -1,6 +1,6 @@
 {
   "version": "2026.10.25a",
-  "generated": "2026-10-27 22:40",
+  "generated": "2026-10-27 23:38",
   "files": {
     "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -12,7 +12,7 @@
     "agents/security-auditor.md": "6dc6181ed255ea67dbedee6cf0912fb925152b3d74fc45bee74b74e8db6e1c82",
     "agents/spec-packager.md": "70faa2125b64dfaef114c5a427df9ebcc266d167a03548b2d247e199bf2867da",
     "agents/test-runner.md": "abbaa2acc5252dc9357906a4e06fb9a3d49078659c54645fd85068a905c25d36",
-    "commands/calibrate-bridge.md": "05d140c1d7870d2ebe8e60d33dba111d3cd39af2301026ed3379a6ece9e826cf",
+    "commands/calibrate-bridge.md": "a3d315fb00e03bbf60a5f66d6270c60c6ca91141f1f809d1862f6be265588f72",
     "commands/evaluate-reports.md": "aca9e92ab0e3bc5b49b124b9b172589c50abb6e2d81736a5604dd9f296b87bef",
     "commands/supervisor.md": "566f21b369c83750e285b076d93fa6e1feaa089912d803cf96e53bfe9c389ad4",
     "cursor-bridge/CHANGELOG.md": "99f191412284771d071efc9e6affddc134778145dca068fb020fb837d1f75181",
@@ -112,7 +112,7 @@
     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
     "cursor-bridge/workflow/phases/change-cycle.md": "8b4c12bd4afc80a4adcb2dfbd4ddecb0b5d20848805addd41daf6f04eeb3b37a",
     "cursor-bridge/workflow/phases/configuration.md": "6a4e1c83c3b0ac33db272560b0c790c36994e335c86c9d2d79abea2dad44a2d4",
-    "cursor-bridge/workflow/phases/delegation-loop.md": "338645d7750329212d554da58f70149b476bbd03cb76009b83b366abc62a7b54",
+    "cursor-bridge/workflow/phases/delegation-loop.md": "722c9545189e2fe2c8620a8cac104fa94b1c3d627a9ef883d00a49ffc8f99ab8",
     "cursor-bridge/workflow/phases/delegation-loop/decide.md": "1664aa5a403a18b33dc3ec5e3b9ce36fc4b50d3092edec2c71cd75b2a1d0e064",
     "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "40065539a1b0a098569db3d6c35198e0cff7179725ba2bba019287cfa175d987",
     "cursor-bridge/workflow/phases/design.md": "ec2a5a07747b0ff64bcb56599bd4d556870b01fc26a121abd76053943784d5a7",

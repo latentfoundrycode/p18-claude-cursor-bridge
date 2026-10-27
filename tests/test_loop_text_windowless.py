@@ -145,8 +145,11 @@ def test_r040_step_3b_handles_the_slots_exits_without_a_model_failure():
         "`bridge-run: exit` (KP-053) — is relaunched; nothing was spent.",
         "**A driver run cut short** — ended at its limit (exit 124), or killed from outside after `slot taken` (no "
         "`bridge-run: exit` line) — is relaunched once: a mutation run continues from its cache, the kills it "
-        "recorded standing (step 7), and a program under `run/supervisor/` starts again only once `git status` shows "
-        "no product file changed (KP-056's residue check), each changed file first restored from the last commit.",
+        "recorded standing (step 7), and a program under `run/supervisor/` starts again.",
+        "One that edits the Workspace's files in place keeps a copy of each file it edits under `run/supervisor/` "
+        "before its first edit, taken from the tree as it stands and never replaced by a relaunch, and at every start "
+        "first puts back each file that differs from its copy (KP-056's residue check), so a relaunch undoes what the "
+        "killed run left and the builder's uncommitted work is never touched.",
     ):
         assert sentence in s, sentence
     launcher = read(os.path.join(CB, "bridge-run.py"))
@@ -433,19 +436,21 @@ def test_r039_calibration_writes_the_floor_between_two_suite_runs():
         "test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block "
         "inserted once at the end of the one that exists, every other line left as it stands.",
         "Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's "
-        "exit status. A failure or error present before the write is the project's own: it is recorded, and the write "
-        "stands.",
+        "exit status. A before-run that itself ends in pytest's exit 2 to 5 ran no comparable tests and proves "
+        "nothing: the write is committed as the calibration's checkpoint and recorded as unverified, whatever the "
+        "after-run shows. Otherwise, a failure or error present before the write is the project's own: it is "
+        "recorded, and the write stands.",
         "A failure or error present only after the write, fewer tests collected after it than before, or an after-run "
         "ending in pytest's exit 2 to 5 (interrupted, an internal error, a usage error such as a `conftest.py` that "
         "fails to import, no tests collected) where the before-run did not, is the insert's: it leads the report's "
         "first line, the insert is "
         "reverted, the reverted tree is committed as the calibration's checkpoint, and the floor stays `MISSING`, named "
         "in the report.",
-        "A before-run that itself ends in pytest's exit 2 to 5 ran no comparable tests and proves nothing: the write "
-        "is then recorded as unverified. Otherwise the write is committed as the calibration's checkpoint.",
+        "named in the report. Otherwise the write is committed as the calibration's checkpoint.",
         "Write the two runs' results on the `Calibrated:` line (step 5).",
         "the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected "
-        "counts and the exit statuses, before and after the write) and whether the write stands or was reverted.",
+        "counts and the exit statuses, before and after the write) and whether the write stands, stands unverified or "
+        "was reverted.",
         "It is a configuration item: no gate is reopened, and the loop resumes after it.",
         "A Node suite's NOTE (its default is not shipped yet) is recorded in `PROJECT_STATUS.md` like any NOTE.",
         "Where step 1b wrote the windowless default, the line also names the two suite runs' results",
