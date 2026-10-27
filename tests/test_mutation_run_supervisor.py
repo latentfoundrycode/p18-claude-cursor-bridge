@@ -1003,3 +1003,39 @@ def test_task031_r10_a_top_level_iniconfig_in_the_project_is_refused(tmp_path, s
     assert p.returncode == 2, p.stdout + p.stderr
     assert "would shadow pytest's iniconfig" in p.stdout + p.stderr
     assert _cache_lines(ws, "r10sh") == []
+
+
+@pytest.mark.parametrize("shadow,name,config", [
+    ("tomllib.py", "tomllib", {"pyproject.toml": "[tool.pytest.ini_options]\n"}),
+    ("pluggy/__init__.py", "pluggy", {"tox.ini": "[tox]\nenvlist = py312\n\n[pytest]\n"}),
+    ("_pytest/__init__.py", "_pytest", {}),
+    ("json.py", "json", {}),
+])
+def test_task031_r11_a_top_level_module_shadowing_an_installed_one_is_refused(tmp_path, shadow, name, config):
+    """R-041 (a result against the version the gate reads), TASK-031 Requirement 4 (handoff/TASK-031-r11.md): the
+    gate's `python -m pytest`, started at the project's top, imports the project's own top-level module or regular
+    package before a standard-library or installed one of the same name (pytest's `tomllib`, `pluggy`, `_pytest`,
+    any other), while the program decides with the modules of its own environment; such a project exits 2 with the
+    refusal naming the module, before any mutant runs (Review A, round 10: `tomllib`, one module along from
+    round 10's `iniconfig`)."""
+    files = dict(CALC, **config)
+    files[shadow] = "VALUE = 1\n"
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r11sh", {"mutants": [KILL_CALC]})
+    p = _run(ws, mf)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "would shadow" in p.stdout + p.stderr and name in p.stdout + p.stderr
+    assert _cache_lines(ws, "r11sh") == []
+
+
+@pytest.mark.parametrize("entry", ["r11_own_helper.py", "r11_notes/readme.txt", "tests_data/tomllib.json"])
+def test_task031_r11_a_top_level_name_shadowing_nothing_runs_its_mutant(tmp_path, entry):
+    """R-041, TASK-031 Requirement 4 (handoff/TASK-031-r11.md: only a module or regular package whose name is
+    importable outside the project is refused): a top-level module no installed module is named after, a folder
+    with no `__init__.py`, and a nested file named after a standard module run and kill their mutant, exit 0."""
+    files = dict(CALC, **{entry: "VALUE = 1\n"})
+    ws = _fixture(tmp_path, files)
+    mf = _mutants(ws, "r11ok", {"mutants": [KILL_CALC]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "r11ok")] == ["killed"]

@@ -1162,3 +1162,10 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
 ### TASK-031 (round 10; the builder's assumptions; recorded, not taken)
 - **A project can still change what the gate's pytest imports by other routes**: a `.pth` file, `sitecustomize`, `conftest.py`, a `-p` option in its configuration. Only a top-level `iniconfig` is refused; a project's `conftest.py` already runs its own code inside pytest (the builder, round 10).
 - **The shadow refusal matches names, so it also refuses entries Python would not import as `iniconfig`** (`iniconfig.txt`, a folder without `__init__.py`, a differently cased name on Windows); fails closed (the builder, round 10).
+
+### TASK-031 (round 10's reviews; past the owner's three-round ceiling, recorded, not taken)
+- **Taken in round 11, convergent:** a project's own top-level `tomllib.py` is imported by the gate's pytest before the standard one when it reads `pyproject.toml` or `pytest.toml`, while the program reads with the standard `tomllib`; the security audit reproduced a false, cached kill. Round 11 refuses any top-level module or regular package of the project named like a standard-library or installed module (`pluggy`, `_pytest` and the rest), closing the class rather than one module more (Review A and the security audit, round 10).
+- **The shadow check lists the copy**, the tracked tree and the listed `untracked` entries; an ignored, untracked top-level module in the real working tree would be imported by a gate run there and not seen. A gate on a clean checkout is not affected (the security audit, round 10).
+- **The off-Windows exact-match branch of the iniconfig check has no mutant**; CI's Ubuntu job runs its tests (Review A, round 10).
+- **With `PYTHONCASEOK` set (macOS), the exact match off Windows would miss `IniConfig.py`** (Review A, round 10).
+- **Round 10's report says a differently cased `IniConfig.py` "may or may not" be imported on Windows**, where the brief asked which; Python's importer checks case without `PYTHONCASEOK`, so the refusal is over-refusal, accepted (Review A and the security audit, round 10).
