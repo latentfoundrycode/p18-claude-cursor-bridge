@@ -1562,3 +1562,34 @@ def test_task031_r10_iniconfig_shadow_case_insensitive_refused(tmp_path, home_of
     assert p.returncode == 2, p.stdout + p.stderr
     assert "mutation-run: a top-level iniconfig in the project would shadow pytest's iniconfig" in p.stdout + p.stderr
     assert not (ws / "run/supervisor/mutation-cache/r10case.jsonl").exists()
+
+
+def test_task031_r11_extension_suffix_shadow_refused(tmp_path, home_of_the_tests):
+    """R-041, TASK-031 S7, handoff/TASK-031-r11.md: a top-level extension-module filename that also ends in a shorter
+    suffix is refused with the Requirement 1 message naming tomllib and writes no cache line."""
+    import importlib.machinery
+    ext_suffixes = [s for s in importlib.machinery.EXTENSION_SUFFIXES if len(s) > len(".pyd")]
+    if not ext_suffixes:
+        pytest.skip("no platform extension suffix longer than .pyd")
+    ext_name = "tomllib" + ext_suffixes[0]
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    write(ws, ext_name, "not a real extension\n", binary=True)
+    git(ws, "add", ext_name)
+    git(ws, "commit", "-q", "-m", "shadow ext")
+    mp = mutants_path(ws, "r11ext", {"mutants": [{"id": "m1", "file": "demo/calc.py",
+                                                   "pairs": [{"old": "return a + b", "new": "return b + a"}],
+                                                   "tests": ["tests/test_calc.py"],
+                                                   "expect_fail": ["tests/test_calc.py::test_add"]}]})
+    env = dict(os.environ)
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
+                       **test_conftest.windowless_kwargs({}))
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert (
+        "mutation-run: a top-level module tomllib in the project would shadow "
+        "an installed or standard-library module"
+    ) in p.stdout + p.stderr
+    assert not (ws / "run/supervisor/mutation-cache/r11ext.jsonl").exists()

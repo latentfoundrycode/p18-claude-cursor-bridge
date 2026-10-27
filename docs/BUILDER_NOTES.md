@@ -33,3 +33,5 @@
 2026-10-25 BUG-020-r1: Done step 1 (`python -m pytest tests -q`) takes ~6 minutes here; the `cron_next` edit landed while that run was near 30% progress, so the logged pre-edit counts mix stale-manifest failures with post-fix loop-guard behaviour and do not capture `test_bug020` TypeError (HEAD still rejects `tz`, verified with `git show`).
 
 2026-10-26 TASK-031-r5: `test_fix001_no_test_starts_a_program_around_the_default` fails on the round-4 supervisor reproduction strings in `tests/test_mutation_run_supervisor.py` (`creationflags=NO_WINDOW` without the `CREATE_NO_WINDOW` substring); that file is out of scope for r5, so verification step 3 cannot pass here until those embedded literals are fixed elsewhere.
+
+2026-10-27 TASK-031-r11: when `PYTHONPATH` is set, Python 3.12 on Windows also puts the process working directory on `sys.path`, so a naive `importlib.util.find_spec` of a fixture package name such as `demo` can resolve to the Workspace tree; shadow detection must ignore `find_spec` origins under the copy root and under `os.getcwd()`, not only under the copy root.
