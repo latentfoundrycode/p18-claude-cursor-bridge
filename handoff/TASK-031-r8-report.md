@@ -37,7 +37,7 @@ python -m pytest tests/test_mutation_run_supervisor.py tests/test_mutation_run.p
 ```
 PASSED tests/test_mutation_run_supervisor.py::test_task031_r8_a_section_header_holding_a_comment_is_not_read_otherwise_than_pytest_reads_it[tox.ini-[pytest] # the ready fixture]]
 PASSED tests/test_mutation_run_supervisor.py::test_task031_r8_a_section_header_holding_a_comment_is_not_read_otherwise_than_pytest_reads_it[setup.cfg-[tool:pytest] ; the ready fixture]]
-SKIPPED [1] tests\test_mutation_run.py:968: this account cannot create a symbolic link here ([WinError 1314] A required privilege is not held by the client: 'C:\\Users\\jgwess\\AppData\\Local\\Temp\\pytest-of-jgwess\\pytest-69836\\test_r041_scratch_through_link0\\real_scratch' -> 'C:\\Users\\jgwess\\AppData\\Local\\Temp\\pytest-of-jgwess\\pytest-69836\\test_r041_scratch_through_link0\\link_scratch')
+SKIPPED [1] tests\test_mutation_run.py:968: this account cannot create a symbolic link here ([WinError 1314] A required privilege is not held by the client: '<temporary folder>' -> '<temporary folder>')
 127 passed, 1 skipped in 459.88s (0:07:39)
 ```
 
