@@ -35,10 +35,10 @@ def test_verify_never_rewinds_a_branch_another_checkout_holds(tmp_path):
     (r / "a.py").write_text("x = 2\n", encoding="utf-8")
     git(r, "commit", "-q", "-am", "TASK-001")
     (r / "run" / "review").mkdir(parents=True)
-    rc, out = guard(r, "snapshot", "001")
+    rc, out = guard(r, "snapshot", "TASK-001")
     assert rc == 0, out
     stamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() + 1))
-    (r / "run" / "review" / "REVIEW-001.err").write_text("bridge-run: started %sZ\nreview\nbridge-run: exit 0\n" % stamp, encoding="utf-8")
+    (r / "run" / "review" / "REVIEW-TASK-001.err").write_text("bridge-run: started %sZ\nreview\nbridge-run: exit 0\n" % stamp, encoding="utf-8")
     # during the review the checkout moved to another branch, and task-001 was taken by a second worktree
     git(r, "checkout", "-q", "-b", "other")
     (r / "a.py").write_text("x = 3\n", encoding="utf-8")
@@ -47,7 +47,7 @@ def test_verify_never_rewinds_a_branch_another_checkout_holds(tmp_path):
     wt = tmp_path / "wt"
     git(r, "worktree", "add", "-q", str(wt), "task-001")
     task_head = git(r, "rev-parse", "task-001")
-    rc, out = guard(r, "verify", "001")
+    rc, out = guard(r, "verify", "TASK-001")
     assert rc == 1 and "GATE-INTEGRITY" in out and "another" in out and "wt" in out, out
     assert git(r, "rev-parse", "other") == other_head, "the branch the checkout was on was rewound (P3): " + out
     assert git(r, "rev-parse", "task-001") == task_head, out

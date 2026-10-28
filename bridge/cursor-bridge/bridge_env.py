@@ -15,6 +15,7 @@
 ASCII-only on purpose (cp1252 consoles). Writes nothing but the empty gh folder and the
 agent's home folder, %USERPROFILE%/.cursor-bridge/agent-home.
 """
+import json
 import os
 import re
 import shutil
@@ -289,3 +290,353 @@ def cursor_agent_launcher():
         if os.path.isfile(cmd):
             return ["cmd.exe", "/d", "/c", cmd]
     return [found]
+
+
+# --- code-review round ceiling (R-042, TASK-032); imported by bridge-run.py and review-guard.py ---
+
+REVIEW_ROUNDS = 3
+
+BLOCKING_CLASSES = frozenset((
+    "behaviour",
+    "security",
+    "data integrity",
+    "safety mechanism",
+    "failing test",
+))
+
+_REVIEW_ROUND_SUFFIX = re.compile(r"-r([1-9][0-9]*)$")
+_REVIEW_R_IN_ID = re.compile(r"-r[0-9]")
+_REVIEW_ID_BODY = re.compile(r"^[A-Z][A-Za-z0-9-]*$")
+
+REVIEW_LIFT_RE = re.compile(
+    r"^\s*[-*]?\s*(?:\*\*(?i:Review rounds above the ceiling):\*\*|\*\*(?i:Review rounds above the ceiling)\*\*:|(?i:Review rounds above the ceiling):)\s*"
+    r"([A-Z][A-Za-z0-9-]*)\s+([0-9]+)\s*\((.+)\)"
+)
+
+BLOCKING_CLASS_RE = re.compile(
+    r"^\s*(?:[-*]\s+)?Blocking class:\s*([^-\n]+?)\s*-\s*(.+?)\s*$",
+    re.I,
+)
+
+MERGE_UNIT_RE = re.compile(
+    r"^\s*(?:[-*]\s+)?Merge unit:\s*((?:[A-Z][A-Za-z0-9-]*\s+)+[A-Z][A-Za-z0-9-]*)\s*$",
+    re.I,
+)
+
+HANDOFF_PATH_NORM = re.compile(r"[/\\]+(?:\.[/\\]+)*")
+HANDOFF_MARK = re.compile(r"(?i)handoff/")
+HANDOFF_TOKEN_RE = re.compile(r"[^\s\"'`]+")
+HANDOFF_TRIM_BEFORE_SEP = re.compile(r"[. ]+(?=[/\\])")
+HANDOFF_REPORT_NAME = re.compile(r"-r[1-9][0-9]*-report\.md$", re.I)
+HANDOFF_RESOLUTION = re.compile(r"(?i)^RESOLUTION-")
+
+
+def parse_review_name(name):
+    """Read a review increment name: (id, round) or None when the grammar refuses."""
+    if not name or not isinstance(name, str):
+        return None
+    if " " in name or "/" in name or "\\" in name:
+        return None
+    if re.search(r"-R[0-9]", name) or re.search(r"-r0(?:\D|$)", name):
+        return None
+    m = _REVIEW_ROUND_SUFFIX.search(name)
+    if m:
+        id_part = name[: m.start()]
+        try:
+            round_n = int(m.group(1))
+        except ValueError:
+            return None
+    else:
+        id_part = name
+        round_n = 1
+    if not id_part or not _REVIEW_ID_BODY.match(id_part):
+        return None
+    if _REVIEW_R_IN_ID.search(id_part):
+        return None
+    return id_part, round_n
+
+
+def read_blocking_class_line(text):
+    """The first `Blocking class:` line in text: (class, finding, full line) or None."""
+    if not text:
+        return None
+    for line in text.splitlines():
+        m = BLOCKING_CLASS_RE.match(line.strip())
+        if not m:
+            continue
+        cls = m.group(1).strip().lower()
+        finding = m.group(2).strip()
+        if cls not in BLOCKING_CLASSES or not finding:
+            return None
+        return cls, finding, line.strip()
+    return None
+
+
+def review_owner_lifts(folder):
+    """{id: max round} from the first well-formed owner's line per id in docs/RUN_PARAMETERS.md."""
+    lifts = {}
+    path = os.path.join(folder, "docs", "RUN_PARAMETERS.md")
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return lifts
+    for line in lines:
+        m = REVIEW_LIFT_RE.match(line.strip())
+        if not m:
+            continue
+        id_part = m.group(1)
+        if id_part in lifts:
+            continue
+        words = m.group(3).strip()
+        if not words:
+            continue
+        try:
+            rounds = int(m.group(2))
+        except ValueError:
+            continue
+        if rounds <= REVIEW_ROUNDS:
+            continue
+        lifts[id_part] = rounds
+    return lifts
+
+
+def plan_increment_ids(folder):
+    """Increment headings from docs/BUILD_PLAN.md (same shape as plan-check.py's parse)."""
+    ids = set()
+    paths = []
+    for name in ("docs/BUILD_PLAN.md",):
+        p = os.path.join(folder, name)
+        if os.path.isfile(p):
+            paths.append(p)
+    id_pat = re.compile(r"^[A-Z][A-Za-z0-9-]*$")
+    head_rx = re.compile(r"^###\s+([A-Z][A-Za-z0-9-]*)\s*(?:[-:—–]+)?\s*(.*)$")
+    for path in paths:
+        try:
+            text = open(path, encoding="utf-8-sig", errors="replace").read()
+        except OSError:
+            continue
+        for line in text.splitlines():
+            m = head_rx.match(line)
+            if m and id_pat.match(m.group(1)):
+                ids.add(m.group(1))
+    return ids
+
+
+def merge_unit_ids(text):
+    """IDs from a `Merge unit:` line in a brief, or None."""
+    if not text:
+        return None
+    for line in text.splitlines():
+        m = MERGE_UNIT_RE.match(line.strip())
+        if m:
+            return tuple(m.group(1).split())
+    return None
+
+
+def squash_merged_ids(base, id_rx):
+    """Squash subjects on main that merged increments, parameterized by id_rx (plan-check's four forms)."""
+    p = subprocess.run(
+        ["git", "log", base, "--format=%s%n%(trailers:key=Merges,valueonly)"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        creationflags=NO_WINDOW,
+    )
+    if p.returncode != 0:
+        return set()
+    subject_rx = re.compile(r"^\s*((?:%s[\s,:]*)+)" % id_rx.pattern)
+    trail_rx = re.compile(
+        r"\(([^()]*%s[^()]*)\)\s*(?:[-\u2014\u2013]\s*v?[\w.]+\s*)?(?:\(#\d+\))?\s*$" % id_rx.pattern
+    )
+    merge_rx = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')([a-z0-9-]+)\b", re.I)
+    out = set()
+    for line in p.stdout.splitlines():
+        m = subject_rx.match(line)
+        if m:
+            out.update(id_rx.findall(m.group(1)))
+            continue
+        m = merge_rx.match(line)
+        if m:
+            branch = m.group(1)
+            if "-" in branch:
+                out.add(branch.split("-", 1)[0].upper() + "-" + branch.split("-", 1)[1])
+            else:
+                out.add(branch.upper())
+            continue
+        m = trail_rx.search(line)
+        if m:
+            out.update(id_rx.findall(m.group(1)))
+            continue
+        if re.match(r"^\s*(%s)(\s*,\s*%s)*\s*$" % (id_rx.pattern, id_rx.pattern), line):
+            out.update(id_rx.findall(line))
+    return out
+
+
+def _norm_branch(branch):
+    if not branch:
+        return ""
+    if branch.startswith("refs/heads/"):
+        return branch[len("refs/heads/") :]
+    return branch
+
+
+def _read_runs_jsonl(folder):
+    path = os.path.join(folder, "run", "launcher", "runs.jsonl")
+    rows = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    o = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(o, dict):
+                    rows.append(o)
+    except OSError:
+        pass
+    return rows
+
+
+def _read_rounds_files(common):
+    out = {}
+    bridge = os.path.join(common, "bridge")
+    if not os.path.isdir(bridge):
+        return out
+    for name in os.listdir(bridge):
+        if not name.startswith("rounds-") or not name.endswith(".json"):
+            continue
+        id_part = name[len("rounds-") : -len(".json")]
+        try:
+            with open(os.path.join(bridge, name), encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            out[id_part] = data
+    return out
+
+
+def _branch_events(folder, common):
+    """Chronological branch claims from launcher log and guard rounds records."""
+    events = []
+    for row in _read_runs_jsonl(folder):
+        br = row.get("branch")
+        if not br or not row.get("brief"):
+            continue
+        events.append(
+            {
+                "branch": _norm_branch(br),
+                "ids": row.get("merge_ids") or (row.get("brief"),),
+                "source": "launcher",
+                "id": row.get("id"),
+            }
+        )
+    for id_part, data in _read_rounds_files(common).items():
+        for rnd in data.get("rounds") or []:
+            br = _norm_branch(rnd.get("branch") or "")
+            if br:
+                events.append(
+                    {
+                        "branch": br,
+                        "ids": data.get("merge_ids") or (id_part,),
+                        "source": "guard",
+                        "name": rnd.get("name"),
+                    }
+                )
+    return events
+
+
+def branch_declared_ids(folder, common, branch):
+    """The ID set the branch's first brief or snapshot declared."""
+    branch = _norm_branch(branch)
+    for ev in _branch_events(folder, common):
+        if ev["branch"] == branch:
+            return frozenset(ev["ids"])
+    return frozenset()
+
+
+def ids_lapsed_on_main(folder, id_rx):
+    merged = squash_merged_ids("main", id_rx)
+    return frozenset(merged)
+
+
+def branch_allows_id(folder, common, branch, id_part, owner_lifts, id_rx):
+    """Whether id_part may run on branch (owner lift for outside ids; lapse on main merge)."""
+    branch = _norm_branch(branch)
+    if branch == "main":
+        return False, "main"
+    declared = branch_declared_ids(folder, common, branch)
+    if not declared:
+        return True, None
+    if id_part in declared:
+        return True, None
+    if id_part in owner_lifts:
+        return True, "owner"
+    lapsed = ids_lapsed_on_main(folder, id_rx)
+    if declared <= lapsed:
+        return True, "lapsed"
+    return False, declared
+
+
+def handoff_brief_tokens(argv):
+    """Brief file tokens found in argv (normalised paths), excluding resolution and report names."""
+    text = HANDOFF_TRIM_BEFORE_SEP.sub("", " ".join(argv))
+    norm = HANDOFF_PATH_NORM.sub("/", text)
+    out = []
+    for m in HANDOFF_MARK.finditer(norm):
+        tm = HANDOFF_TOKEN_RE.match(norm, m.end())
+        if not tm:
+            continue
+        token = tm.group(0).rstrip(".,;:)])}'\"")
+        if not token.lower().endswith(".md"):
+            continue
+        base = token.rsplit("/", 1)[-1]
+        if base.lower().endswith(".md"):
+            base = base[:-3]
+        if HANDOFF_RESOLUTION.match(base):
+            continue
+        if HANDOFF_REPORT_NAME.search(token):
+            continue
+        out.append(base)
+    return out
+
+
+def launcher_round_for_id(folder, common, branch, id_part):
+    """Distinct completed brief names (id+round) on branch for id_part, plus next round logic."""
+    branch = _norm_branch(branch)
+    completed = set()
+    for row in _read_runs_jsonl(folder):
+        if _norm_branch(row.get("branch") or "") != branch:
+            continue
+        if row.get("brief") != id_part:
+            continue
+        if row.get("exit") != 0:
+            continue
+        rnd = row.get("round")
+        if rnd is None:
+            rnd = 1
+        completed.add((id_part, rnd))
+    for data in _read_rounds_files(common).values():
+        for rnd in data.get("rounds") or []:
+            if _norm_branch(rnd.get("branch") or "") != branch:
+                continue
+            parsed = parse_review_name(rnd.get("name") or "")
+            if not parsed:
+                continue
+            rid, rn = parsed
+            if rid != id_part:
+                continue
+            if rnd.get("reply") is not None:
+                completed.add((rid, rn))
+    return completed
+
+
+def effective_launcher_round(folder, common, branch, id_part, name_round):
+    completed = launcher_round_for_id(folder, common, branch, id_part)
+    return max(name_round, len(completed) + 1)
+
+
+def grammar_id_rx():
+    return re.compile(r"[A-Z][A-Za-z0-9-]*")

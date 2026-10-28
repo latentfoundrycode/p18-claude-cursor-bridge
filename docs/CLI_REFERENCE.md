@@ -783,8 +783,9 @@ What each step does:
             with `--match-head-commit`.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
-2 = cannot verify (no snapshot, dirty tree, git or gh failure). Never prints a value of
-anything. ASCII-only.
+2 = cannot verify (no snapshot, dirty tree, git or gh failure); 125 = refused (review round
+ceiling, grammar, branch rule; writes no snapshot). Never prints a value of anything.
+ASCII-only.
 
 What it does not cover, said plainly (KP-032): the contents of cache folders, anything
 outside the checkout (the owner's profile, the installed bridge, other projects), and a

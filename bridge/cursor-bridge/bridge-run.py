@@ -87,6 +87,7 @@ rule of 2026-10-05: no secret through the environment the owner sets).
 ASCII-only on purpose (cp1252 consoles).
 """
 import datetime
+import hashlib
 import json
 import math
 import os
@@ -367,6 +368,8 @@ def accepted(argv, folder=None):
     """The inner commands the loop runs through the launcher."""
     if not argv:
         return False
+    if head_of(argv) == "cursor-agent":
+        return kind_of(argv) is not None and (kind_of(argv) != "test" or test_suite(argv, folder))
     if kind_of(argv) is not None and (kind_of(argv) != "test" or test_suite(argv, folder)):
         return True
     return os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1"
@@ -455,7 +458,7 @@ def design_round_written(name):
 
 def design_refusal(file_label, subject, round_written, detail, params_path):
     msg = ("design ceiling: %s (subject %s, round %s) %s; looked in %s for "
-           "Design rounds above five: supervisor.md, Phase 2" % (
+           'Design rounds above five: design.md, "The launcher holds the ceiling"' % (
                file_label, subject, round_written, detail, params_path))
     return msg.encode("ascii", "backslashreplace").decode("ascii")
 
@@ -512,6 +515,161 @@ def design_ceiling(argv, folder):
         if reason:
             return reason
     return None
+
+
+BRIEF_RULE_POINTER = "handoff/<ID>[-r<N>].md in the launch arguments (R-042; docs/REQUIREMENTS.md line 48)"
+
+
+def git_common_dir(folder):
+    try:
+        p = subprocess.run(
+            ["git", "-C", folder or ".", "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            creationflags=NO_WINDOW,
+        )
+        if p.returncode != 0:
+            return None
+        gd = p.stdout.strip()
+        if not os.path.isabs(gd):
+            gd = os.path.normpath(os.path.join(os.path.abspath(folder or "."), gd))
+        return gd
+    except OSError:
+        return None
+
+
+def roster_builder_model(folder):
+    try:
+        with open(os.path.join(folder, "docs", "ROSTER.resolved.json"), encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict) and isinstance(data.get("builder"), str):
+            return data["builder"]
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def completed_brief_run(folder, brief_name):
+    for row in read_log(folder):
+        if row.get("brief_name") == brief_name and row.get("exit") == 0:
+            return row
+        bn = row.get("brief")
+        rnd = row.get("round") or 1
+        if bn and row.get("exit") == 0:
+            full = "%s-r%d" % (bn, rnd) if rnd > 1 else bn
+            if full == brief_name or (rnd == 1 and bn == brief_name):
+                return row
+    return None
+
+
+def review_launch_refusal(argv, folder):
+    """Refuse a --kind review launch that names a brief or uses the builder model."""
+    if not is_agent_argv(argv):
+        return None
+    builder = roster_builder_model(folder)
+    model = model_of(argv)
+    if builder and model == builder:
+        return "review launch on the roster builder model (%s) is refused; Review B uses a reviewer model" % builder
+    for token in bridge_env.handoff_brief_tokens(argv):
+        if bridge_env.parse_review_name(token):
+            return "a review launch must not name a brief (%s); only the launcher counts builder briefs" % token
+    return None
+
+
+def builder_review_refusal(argv, folder, kind):
+    """All review-ceiling and brief rules for a cursor-agent launch; None when allowed.
+    Returns (reason, meta) where meta holds log fields when the launch may proceed."""
+    if not is_agent_argv(argv):
+        return None, None
+    ws = workspace_of(argv, folder)
+    common = git_common_dir(ws) or ""
+    id_rx = bridge_env.grammar_id_rx()
+    owner_lifts = bridge_env.review_owner_lifts(ws)
+    if kind == "review":
+        reason = review_launch_refusal(argv, folder)
+        return reason, None
+    tokens = bridge_env.handoff_brief_tokens(argv)
+    parsed = []
+    for t in tokens:
+        p = bridge_env.parse_review_name(t)
+        if not p:
+            return ("brief rule: %s is not a brief name; name exactly one %s" % (t, BRIEF_RULE_POINTER)), None
+        parsed.append((t, p[0], p[1]))
+    if not parsed:
+        return ("brief rule: name exactly one %s" % BRIEF_RULE_POINTER), None
+    if len(parsed) > 1:
+        return ("brief rule: name only one brief, not %d (%s)" % (len(parsed), ", ".join(x[0] for x in parsed))), None
+    brief_name, id_part, name_round = parsed[0]
+    brief_path = os.path.join(ws, "handoff", brief_name + ".md")
+    if not os.path.isfile(brief_path):
+        return ("brief rule: %s does not exist under %s" % (brief_name, ws)), None
+    try:
+        brief_bytes = open(brief_path, "rb").read()
+    except OSError:
+        return ("brief rule: %s cannot be read" % brief_name), None
+    brief_sha = hashlib.sha256(brief_bytes).hexdigest()
+    br = branch_of(ws) or ""
+    if br == "main":
+        return ("brief rule: the loop never builds on main; use a task branch", None)
+    prev = completed_brief_run(folder, brief_name)
+    if prev and prev.get("brief_sha256") and prev["brief_sha256"] != brief_sha and prev.get("exit") == 0:
+        return (
+            "revised in place: write handoff/%s-r%d.md" % (id_part, name_round + 1),
+            None,
+        )
+    merge_ids = bridge_env.merge_unit_ids(brief_bytes.decode("utf-8", errors="replace"))
+    declared = frozenset(merge_ids) if merge_ids else frozenset((id_part,))
+    plan_ids = bridge_env.plan_increment_ids(ws)
+    for mid in declared:
+        if mid not in plan_ids:
+            return ("brief rule: %s is not an increment heading in docs/BUILD_PLAN.md" % mid, None)
+    existing = bridge_env.branch_declared_ids(ws, common, br)
+    if existing and declared != existing and not existing < declared:
+        if declared - existing:
+            return ("brief rule: this brief names more IDs than the branch's first brief (%s)" % ", ".join(sorted(existing)), None)
+    for mid in declared:
+        ok, why = bridge_env.branch_allows_id(ws, common, br, mid, owner_lifts, id_rx)
+        if not ok:
+            if isinstance(why, frozenset):
+                return ("branch rule: %s is not on this branch (counted: %s)" % (mid, ", ".join(sorted(why))), None)
+            return ("branch rule: refused for %s" % mid, None)
+    eff_round = bridge_env.effective_launcher_round(ws, common, br, id_part, name_round)
+    if prev and prev.get("brief_sha256") == brief_sha and prev.get("exit") == 0:
+        eff_round = name_round
+    lift = None
+    lift_line = None
+    class_used = set()
+    for row in read_log(folder):
+        if row.get("brief") == id_part and row.get("lift") == "class" and row.get("lift_line"):
+            class_used.add(row["lift_line"])
+    brief_text = brief_bytes.decode("utf-8", errors="replace")
+    blk = bridge_env.read_blocking_class_line(brief_text)
+    owner_cap = owner_lifts.get(id_part, bridge_env.REVIEW_ROUNDS)
+    if eff_round > bridge_env.REVIEW_ROUNDS:
+        if eff_round <= owner_cap:
+            lift, lift_line = "owner", "Review rounds above the ceiling: %s %d" % (id_part, owner_cap)
+        elif blk:
+            line = blk[2]
+            if line in class_used and not (prev and prev.get("brief_sha256") == brief_sha):
+                return ("review ceiling: class line already used for %s" % id_part, None)
+            lift, lift_line = "class", line
+        else:
+            return (
+                "review ceiling: %s (id %s, branch %s, round %d, ceiling %d); lift with Blocking class: in the brief or Review rounds above the ceiling: in docs/RUN_PARAMETERS.md"
+                % (brief_name, id_part, br, eff_round, bridge_env.REVIEW_ROUNDS),
+                None,
+            )
+    meta = {
+        "brief": id_part,
+        "round": name_round,
+        "brief_sha256": brief_sha,
+        "brief_name": brief_name,
+        "lift": lift,
+        "lift_line": lift_line,
+        "merge_ids": tuple(declared),
+        "branch": br,
+    }
+    return None, meta
 
 
 def learned_limit(kind, folder):
@@ -1246,6 +1404,13 @@ def main():
     if reason:
         sys.stderr.write("bridge-run: refused - %s\n" % reason)
         return 125
+    brief_meta = None
+    if head_of(cmd) == "cursor-agent":
+        pre_kind = kind if kind is not None else (kind_of(cmd) or "builder")
+        reason, brief_meta = builder_review_refusal(cmd, folder, pre_kind)
+        if reason:
+            sys.stderr.write("bridge-run: refused - %s\n" % reason)
+            return 125
     if kind is None:
         kind = kind_of(cmd)
     if kind is None and os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1":
@@ -1320,7 +1485,19 @@ def main():
             return 125
         env.update(keys)
         sys.stderr.write("bridge-run: key file read (%d name(s): %s)\n" % (len(keys), ", ".join(sorted(keys)) or "none"))
-    entry = {"id": run_id, "kind": kind, "head": head, "model": model_of(cmd), "branch": branch_of(workspace_of(argv[argv.index("--") + 1:], folder)), "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
+    ws = workspace_of(cmd, folder)
+    entry = {"id": run_id, "kind": kind, "head": head, "model": model_of(cmd), "branch": branch_of(ws), "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
+    if brief_meta:
+        entry.update(
+            brief=brief_meta["brief"],
+            round=brief_meta["round"],
+            brief_sha256=brief_meta["brief_sha256"],
+            brief_name=brief_meta["brief_name"],
+            lift=brief_meta.get("lift"),
+            merge_ids=list(brief_meta.get("merge_ids") or ()),
+        )
+        if brief_meta.get("lift_line"):
+            entry["lift_line"] = brief_meta["lift_line"]
     if kind == "watch" and head.startswith("gh pr checks"):
         line = wait_for_first_check(argv[argv.index("--") + 1:], folder)
         if line:

@@ -60,8 +60,9 @@ What each step does:
             with `--match-head-commit`.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
-2 = cannot verify (no snapshot, dirty tree, git or gh failure). Never prints a value of
-anything. ASCII-only.
+2 = cannot verify (no snapshot, dirty tree, git or gh failure); 125 = refused (review round
+ceiling, grammar, branch rule; writes no snapshot). Never prints a value of anything.
+ASCII-only.
 
 What it does not cover, said plainly (KP-032): the contents of cache folders, anything
 outside the checkout (the owner's profile, the installed bridge, other projects), and a
@@ -75,6 +76,10 @@ import re
 import subprocess
 import sys
 import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env  # noqa: E402
 
 GIT_TIMEOUT = 120
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -323,6 +328,96 @@ def launch_info(err_path):
     return (m.group(1) if m else None), code
 
 
+def rounds_path(common, id_part):
+    return os.path.join(common, "bridge", "rounds-%s.json" % id_part)
+
+
+def load_rounds(common, id_part):
+    path = rounds_path(common, id_part)
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        data = {"id": id_part, "rounds": []}
+    if not isinstance(data, dict):
+        data = {"id": id_part, "rounds": []}
+    data.setdefault("rounds", [])
+    return data, path
+
+
+def write_rounds(common, id_part, data):
+    path = rounds_path(common, id_part)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=1, sort_keys=True)
+    os.replace(tmp, path)
+
+
+def _norm_branch_ref(branch):
+    if branch.startswith("refs/heads/"):
+        return branch[len("refs/heads/") :]
+    return branch
+
+
+def scope_blocking_line(root, id_part):
+    for name in ("SCOPE-%s.md" % id_part, "SCOPE-STAGE-%s.md" % id_part):
+        p = os.path.join(root, "run", "review", name)
+        if os.path.isfile(p):
+            try:
+                text = open(p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            blk = bridge_env.read_blocking_class_line(text)
+            if blk:
+                return blk
+    return None
+
+
+def snapshot_review_refusal(nnn, root, common):
+    if str(nnn).upper().startswith("DESIGN-"):
+        return None
+    parsed = bridge_env.parse_review_name(str(nnn))
+    if not parsed:
+        return "review-guard: refused - the name cannot be read by the grammar"
+    id_part, name_round = parsed
+    ws = root
+    id_rx = bridge_env.grammar_id_rx()
+    owner_lifts = bridge_env.review_owner_lifts(ws)
+    br = _norm_branch_ref(run_git(["rev-parse", "--abbrev-ref", "HEAD"], root, common).strip())
+    ok, why = bridge_env.branch_allows_id(ws, common, br, id_part, owner_lifts, id_rx)
+    if not ok:
+        if isinstance(why, frozenset):
+            return "review-guard: refused - branch rule: %s is not on this branch (counted: %s)" % (id_part, ", ".join(sorted(why)))
+        return "review-guard: refused - branch rule"
+    data, _ = load_rounds(common, id_part)
+    rounds = data.get("rounds") or []
+    by_num = {r.get("round"): r for r in rounds if r.get("round")}
+    max_open = max(by_num) if by_num else 0
+    tree = run_git(["rev-parse", "HEAD"], root, common).strip()
+    if name_round in by_num:
+        prev = by_num[name_round]
+        if prev.get("reply") is not None and prev.get("tree") != tree:
+            return "review-guard: refused - round %d is reviewed: write %s-r%d" % (name_round, id_part, name_round + 1)
+    elif name_round > max_open + 1 and not (name_round == 1 and not by_num):
+        return "review-guard: refused - round %d is off the count (current %d)" % (name_round, max_open)
+    distinct = len({r.get("round") for r in rounds if r.get("reply") is not None})
+    guard_round = max(name_round, distinct + 1)
+    owner_cap = owner_lifts.get(id_part, bridge_env.REVIEW_ROUNDS)
+    if guard_round > bridge_env.REVIEW_ROUNDS:
+        if guard_round <= owner_cap:
+            return None
+        blk = scope_blocking_line(root, id_part)
+        used = {r.get("lift_line") for r in rounds if r.get("lift") == "class"}
+        if blk and blk[2] not in used:
+            return None
+        return (
+            "review-guard: refused - review ceiling: %s (id %s, branch %s, round %d, ceiling %d)"
+            % (nnn, id_part, br, guard_round, bridge_env.REVIEW_ROUNDS)
+        )
+    return None
+
+
 def remove_mark(common, nnn):
     """Only the last verify of the last snapshot counts: the mark goes before either runs."""
     try:
@@ -336,6 +431,10 @@ def cmd_snapshot(nnn, cwd):
     if not root:
         print("review-guard: not inside a git checkout")
         return 2
+    refusal = snapshot_review_refusal(nnn, root, common)
+    if refusal:
+        print(refusal)
+        return 125
     if run_git(["status", "--porcelain"], root, common).strip():
         print("review-guard: CANNOT SNAPSHOT - the tree is not clean; commit everything of yours first (rule 2)")
         return 2
@@ -355,12 +454,16 @@ def cmd_snapshot(nnn, cwd):
         branch = run_git(["symbolic-ref", "-q", "HEAD"], root, common).strip()
     except RuntimeError:
         branch = ""                               # detached
+    parsed = bridge_env.parse_review_name(str(nnn)) if not str(nnn).upper().startswith("DESIGN-") else None
+    round_n = parsed[1] if parsed else None
     snap = {
         "nnn": str(nnn), "taken": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "root": root, "head": head, "branch": branch,
         "refs": refs(root, common), "stashes": stashes(root, common),
         "git": config_state(common, root), "ignored": ignored_entries(root, common),
     }
+    if round_n is not None:
+        snap["round"] = round_n
     os.makedirs(os.path.join(common, "bridge"), exist_ok=True)
     remove_mark(common, nnn)
     path = snapshot_path(common, nnn)
@@ -373,6 +476,32 @@ def cmd_snapshot(nnn, cwd):
         head[:12], snap["taken"], branch or "detached HEAD", len(snap["refs"]), len(snap["stashes"]), len(snap["ignored"]),
         snap["git"]["hooks_path"] or os.path.join(common, "hooks")))
     print("review-guard: snapshot hash %s - compare it with the hash `verify` prints" % sha256_file(path)[:16])
+    if parsed:
+        id_part, rnd = parsed
+        data, _ = load_rounds(common, id_part)
+        tree = head
+        br_short = _norm_branch_ref(branch)
+        entry = {
+            "round": rnd,
+            "name": str(nnn),
+            "branch": br_short,
+            "tree": tree,
+            "time": snap["taken"],
+            "lift": None,
+            "reply": None,
+        }
+        replaced = False
+        for i, r in enumerate(data["rounds"]):
+            if r.get("round") == rnd:
+                entry["reply"] = r.get("reply")
+                entry["lift"] = r.get("lift")
+                entry["lift_line"] = r.get("lift_line")
+                data["rounds"][i] = entry
+                replaced = True
+                break
+        if not replaced:
+            data["rounds"].append(entry)
+        write_rounds(common, id_part, data)
     return 0
 
 
@@ -526,6 +655,14 @@ def cmd_verify(nnn, cwd):
     # The verified mark premerge needs (second pass of the A1b review, S2): this snapshot's hash
     # and the launch time of the Review B run, so a merge that skipped the review has no mark.
     launched_at, exit_code = launch_info(err_path)
+    if not str(nnn).upper().startswith("DESIGN-") and bridge_env.parse_review_name(str(nnn)):
+        id_part, rnd = bridge_env.parse_review_name(str(nnn))
+        data, _ = load_rounds(common, id_part)
+        for r in data.get("rounds") or []:
+            if r.get("round") == rnd and r.get("name") == str(nnn):
+                r["reply"] = exit_code
+                break
+        write_rounds(common, id_part, data)
     mark = {"nnn": str(nnn), "snapshot": snap_hash, "head": snap["head"], "taken": snap["taken"],
             "launched": launched_at, "exit": exit_code, "verified": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     try:
@@ -635,6 +772,9 @@ def main():
     if len(argv) < 2 or argv[0] not in ("snapshot", "verify", "premerge"):
         print(__doc__.split("\n\n")[1])
         return 2
+    if not str(argv[1]).upper().startswith("DESIGN-") and not bridge_env.parse_review_name(str(argv[1])):
+        print("review-guard: refused - the name cannot be read by the grammar")
+        return 125
     try:
         if argv[0] == "premerge":
             return cmd_premerge(argv[1], os.getcwd(), argv[2] if len(argv) > 2 else None)

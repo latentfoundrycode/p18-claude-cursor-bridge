@@ -129,6 +129,9 @@ def recorded_repo(tmp_path):
     "C:/Users/o/AppData/Local/cursor-agent/agent -p x",
     "pwsh -File C:/Users/o/AppData/Local/cursor-agent/cursor-agent.ps1 -p x",
     "gh api repos/o/r/pulls/12/merge -f merge_method=squash",
+    'cursor-agent -p --force "Read handoff/TASK-001.md"',
+    "cursor-agent -p --force --model x \"Read handoff/TASK-012.md\"",
+    r'cursor-agent -p --force "Read handoff\TASK-010.md"',
 ])
 @pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
 def test_refused(tool, cmd):
@@ -137,7 +140,6 @@ def test_refused(tool, cmd):
 
 
 @pytest.mark.parametrize("cmd", [
-    'cursor-agent -p --force "Read handoff/TASK-001.md"',
     "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x",
     "ssh-agent -s",
     "git commit -m \"start the agent as agent.cmd\"",
@@ -178,7 +180,6 @@ def test_refused(tool, cmd):
     "gh api repos/o/r/pulls/12/merge",
     "gh api repos/o/r/pulls/12 --jq .mergeable",
     "gh pr view 12 --json comments",
-    "cursor-agent -p --force --model x \"Read handoff/TASK-012.md\"",
     "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --model x \"Read handoff/TASK-012.md and implement; do not git push\"",
     "git fetch --force origin",
     "echo hello",

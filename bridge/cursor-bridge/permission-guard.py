@@ -101,6 +101,43 @@ def base(tok):
     return tok.lower().split("/")[-1].split("\\")[-1]
 
 
+def _cursor_agent_probe(w):
+    """KP-024: --version and a one-word -p argument are probes, not gate work."""
+    if not w or base(w[0]) != "cursor-agent":
+        return False
+    if len(w) >= 2 and w[1] == "--version":
+        return True
+    if len(w) >= 3 and w[1] == "-p" and w[2] and " " not in w[2] and not w[2].startswith("-"):
+        return True
+    return False
+
+
+def _inside_bridge_run_cursor_agent(command):
+    """True when a simple command is bridge-run.py ... -- cursor-agent ..."""
+    for simple in split_commands(strip_heredocs(command)):
+        w = strip_prefix(words(simple))
+        if not w:
+            continue
+        if base(w[0]) in ("python", "python3", "py") and len(w) >= 2:
+            if "bridge-run" not in w[1] and "bridge-run.py" not in w[1]:
+                continue
+            if "--" in w:
+                inner = w[w.index("--") + 1 :]
+                if inner and base(inner[0]) == "cursor-agent":
+                    return True
+        if base(w[0]) == "bridge-run.py" or w[0].endswith("bridge-run.py"):
+            if "--" in w:
+                inner = w[w.index("--") + 1 :]
+                if inner and base(inner[0]) == "cursor-agent":
+                    return True
+    return False
+
+
+def _names_bridge_review_paths(w):
+    text = " ".join(w)
+    return bool(re.search(r"(?i)(?:^|[\s\"'`])(?:handoff[/\\]|run[/\\]review[/\\])", text))
+
+
 def around_the_shim(tok):
     """The Cursor agent started by a name other than `cursor-agent` (KP-038): one of the CLI's
     own launcher names, or a bare `agent` without a path or from the CLI's own folder; a
@@ -454,6 +491,9 @@ def check(command, cwd=None):
             r = check(inner, cwd) if inner else None
             if r:
                 return r
+        if base(w[0]) == "cursor-agent" and not _cursor_agent_probe(w):
+            if _names_bridge_review_paths(w) and not _inside_bridge_run_cursor_agent(command):
+                return "cursor-agent with handoff/ or run/review/ in its arguments must run through python ~/.claude/cursor-bridge/bridge-run.py"
         started = w[0] if around_the_shim(w[0]) else (program_behind(w) if head in SHELLS else None)
         if started and around_the_shim(started):
             return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % started
