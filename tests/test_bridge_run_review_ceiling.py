@@ -240,7 +240,7 @@ def test_r042_test_kind_on_main_starts(program, tmp_path):
     git_init(root, "main")
     env = dict(os.environ, BRIDGE_RUN_ALLOW_ANY="1")
     p = run_launch(root, env, "python", "-c", "pass", kind="test", limit="5")
-    assert p.returncode == 0 or "started" in p.stderr
+    assert p.returncode == 0 and "bridge-run: started" in p.stderr
 
 
 def test_r042_log_fields_on_builder(program, tmp_path):
@@ -261,3 +261,44 @@ def test_r042_log_fields_on_builder(program, tmp_path):
     assert row.get("brief") == "TASK-001" and row.get("round") == 1
     assert row.get("brief_sha256") and "lift" in row
     assert "Read handoff" not in json.dumps(row)
+
+
+def _launch_env(tmp_path, root, with_stub=True):
+    env = dict(os.environ)
+    env.pop("BRIDGE_RUN_ALLOW_ANY", None)
+    if with_stub:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        marker = tmp_path / "stub-ran.txt"
+        stub_agent(bin_dir, marker)
+        env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
+        return env, marker
+    return env, None
+
+
+@pytest.mark.parametrize("brief_name", ["TASK-001", "TASK-010c", "CONFIG-B3b", "HOTFIX-001", "B3-CLOSE", "TASK-001-r2"])
+def test_r042_accepted_brief_names_launch(tmp_path, brief_name):
+    root = ws(tmp_path)
+    roster(root)
+    plan(root, "TASK-001", "TASK-010c", "CONFIG-B3b", "HOTFIX-001", "B3-CLOSE")
+    git_init(root, "task-001")
+    brief(root, "%s.md" % brief_name)
+    env, marker = _launch_env(tmp_path, root)
+    p = run_launch(root, env, *agent_cmd("Read handoff/%s.md" % brief_name))
+    assert p.returncode == 0 and "bridge-run: started" in p.stderr
+    assert marker.exists()
+
+
+@pytest.mark.parametrize("bad", ["TASK-001-r0", "TASK-001-r05", "TASK-001-R2", "TASK 001", "TASK-001-r2\n"])
+def test_r042_refused_brief_names(tmp_path, bad):
+    root = ws(tmp_path)
+    roster(root)
+    plan(root, "TASK-001")
+    git_init(root, "task-001")
+    brief(root, "TASK-001.md")
+    env, marker = _launch_env(tmp_path, root)
+    p = run_launch(root, env, *agent_cmd("Read handoff/%s.md" % bad.strip()))
+    assert p.returncode == 125
+    assert "bridge-run: started" not in p.stderr
+    assert not (root / "run" / "launcher" / "runs.jsonl").exists()
+    assert not marker.exists()

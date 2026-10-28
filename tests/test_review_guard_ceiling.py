@@ -94,4 +94,5 @@ def test_r042_design_name_not_grammar_blocked(repo):
 def test_r042_refused_snapshot_writes_no_rounds_file(repo):
     rc, out = guard(repo, "snapshot", "TASK-001-r9")
     assert rc == 125
-    assert not (repo / ".git" / "bridge" / "rounds-TASK-001.json").exists() or True
+    assert not (repo / ".git" / "bridge" / "rounds-TASK-001.json").exists()
+    assert not (repo / ".git" / "bridge" / "review-TASK-001-r9.json").exists()

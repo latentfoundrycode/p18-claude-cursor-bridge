@@ -132,6 +132,9 @@ def recorded_repo(tmp_path):
     'cursor-agent -p --force "Read handoff/TASK-001.md"',
     "cursor-agent -p --force --model x \"Read handoff/TASK-012.md\"",
     r'cursor-agent -p --force "Read handoff\TASK-010.md"',
+    'cursor-agent -p hi --force "Read handoff/TASK-001.md"',
+    'cursor-agent --version "Read handoff/TASK-001.md"',
+    "cursor-agent -p handoff/TASK-001.md",
 ])
 @pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
 def test_refused(tool, cmd):
@@ -140,6 +143,8 @@ def test_refused(tool, cmd):
 
 
 @pytest.mark.parametrize("cmd", [
+    "cursor-agent --version",
+    "cursor-agent -p hi",
     "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force x",
     "ssh-agent -s",
     "git commit -m \"start the agent as agent.cmd\"",

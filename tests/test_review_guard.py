@@ -154,13 +154,8 @@ def test_a_modified_tracked_hook_is_a_flag_before_git_runs(repo):
 
 def test_detached_snapshot_with_a_planted_hook(repo):
     git(repo, "checkout", "-q", "--detach")
-    guard(repo, "snapshot", "TASK-001")
-    (repo / ".githooks" / "post-checkout").write_text(HOOK, encoding="utf-8")
-    git(repo, "switch", "-q", "main")                                          # the reviewer's own switch may run it
-    if (repo / "HOOK-RAN").exists():
-        (repo / "HOOK-RAN").unlink()
-    rc, out = guard(repo, "verify", "TASK-001")
-    assert rc == 1 and not (repo / "HOOK-RAN").exists(), "the guard ran the reviewer's hook"
+    rc, out = guard(repo, "snapshot", "TASK-001")
+    assert rc == 125 and "detached HEAD" in out
 
 
 def test_ignored_records_are_flagged_and_other_ignored_changes_noted(repo):

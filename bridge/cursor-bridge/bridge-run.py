@@ -127,14 +127,14 @@ REVIEW_ONLY_REFUSE = ("bridge-run: refused - a review run is only a cursor-agent
 DESIGN_DEFAULT_ROUNDS = 5
 DESIGN_RESOLUTION_DEFAULT = 1
 DESIGN_RESOLUTION_LIFTED = 2
-DESIGN_PATH_NORM = re.compile(r"[/\\]+(?:\.[/\\]+)*")
-DESIGN_MARK = re.compile(r"(?i)run/review/DESIGN-")
+DESIGN_PATH_NORM = bridge_env.DESIGN_PATH_NORM
+DESIGN_MARK = bridge_env.DESIGN_MARK
 DESIGN_NAME_RE = re.compile(r"^(?:([a-z0-9-]*)-)?(R?)([1-9][0-9]*)$")
-DESIGN_TOKEN_RE = re.compile(r"[^\s\"'`]+")
+DESIGN_TOKEN_RE = bridge_env.DESIGN_TOKEN_RE
 DESIGN_LIFT_RE = re.compile(
     r"^\s*[-*]?\s*(?:\*\*(?i:Design rounds above five):\*\*|\*\*(?i:Design rounds above five)\*\*:|(?i:Design rounds above five):)\s*"
     r"([a-z0-9-]+)\s+([0-9]+)\s*\((.+)\)")
-DESIGN_TRIM_BEFORE_SEP = re.compile(r"[. ]+(?=[/\\])")
+DESIGN_TRIM_BEFORE_SEP = bridge_env.DESIGN_TRIM_BEFORE_SEP
 
 
 def usage():
@@ -517,7 +517,7 @@ def design_ceiling(argv, folder):
     return None
 
 
-BRIEF_RULE_POINTER = "handoff/<ID>[-r<N>].md in the launch arguments (R-042; docs/REQUIREMENTS.md line 48)"
+BRIEF_RULE_POINTER = 'workflow/phases/delegation-loop.md, "3. Delegate to Cursor"'
 
 
 def git_common_dir(folder):
@@ -527,6 +527,7 @@ def git_common_dir(folder):
             capture_output=True,
             text=True,
             creationflags=NO_WINDOW,
+            timeout=bridge_env.GIT_TIMEOUT,
         )
         if p.returncode != 0:
             return None
@@ -576,6 +577,10 @@ def review_launch_refusal(argv, folder):
     return None
 
 
+def _ascii_refusal(msg):
+    return msg.encode("ascii", "backslashreplace").decode("ascii")
+
+
 def builder_review_refusal(argv, folder, kind):
     """All review-ceiling and brief rules for a cursor-agent launch; None when allowed.
     Returns (reason, meta) where meta holds log fields when the launch may proceed."""
@@ -583,11 +588,12 @@ def builder_review_refusal(argv, folder, kind):
         return None, None
     ws = workspace_of(argv, folder)
     common = git_common_dir(ws) or ""
+    log_folder = folder
     id_rx = bridge_env.grammar_id_rx()
     owner_lifts = bridge_env.review_owner_lifts(ws)
     if kind == "review":
         reason = review_launch_refusal(argv, folder)
-        return reason, None
+        return (_ascii_refusal(reason) if reason else None), None
     tokens = bridge_env.handoff_brief_tokens(argv)
     parsed = []
     for t in tokens:
@@ -608,32 +614,43 @@ def builder_review_refusal(argv, folder, kind):
     except OSError:
         return ("brief rule: %s cannot be read" % brief_name), None
     brief_sha = hashlib.sha256(brief_bytes).hexdigest()
-    br = branch_of(ws) or ""
+    br = branch_of(ws)
+    if br is None:
+        return (_ascii_refusal("brief rule: builds run on a branch, not a folder outside git"), None)
+    if br == "HEAD":
+        return (_ascii_refusal("brief rule: builds run on a branch, not a detached HEAD"), None)
     if br == "main":
-        return ("brief rule: the loop never builds on main; use a task branch", None)
+        return (_ascii_refusal("brief rule: builds run on a branch, not main"), None)
     prev = completed_brief_run(folder, brief_name)
     if prev and prev.get("brief_sha256") and prev["brief_sha256"] != brief_sha and prev.get("exit") == 0:
         return (
             "revised in place: write handoff/%s-r%d.md" % (id_part, name_round + 1),
             None,
         )
-    merge_ids = bridge_env.merge_unit_ids(brief_bytes.decode("utf-8", errors="replace"))
+    brief_text = brief_bytes.decode("utf-8", errors="replace")
+    merge_ids = bridge_env.merge_unit_ids(brief_text)
     declared = frozenset(merge_ids) if merge_ids else frozenset((id_part,))
-    plan_ids = bridge_env.plan_increment_ids(ws)
-    for mid in declared:
-        if mid not in plan_ids:
-            return ("brief rule: %s is not an increment heading in docs/BUILD_PLAN.md" % mid, None)
-    existing = bridge_env.branch_declared_ids(ws, common, br)
+    plan_path = os.path.join(ws, "docs", "BUILD_PLAN.md")
+    has_plan = os.path.isfile(plan_path)
+    if has_plan:
+        plan_ids = bridge_env.plan_increment_ids(ws)
+        plan_id_rx = re.compile(bridge_env.PLAN_ID_PATTERN)
+        for mid in declared:
+            if plan_id_rx.fullmatch(mid) and mid not in plan_ids:
+                return (_ascii_refusal("brief rule: %s is not an increment heading in docs/BUILD_PLAN.md" % mid), None)
+    elif merge_ids is not None:
+        return (_ascii_refusal("brief rule: Merge unit: cannot be checked without docs/BUILD_PLAN.md"), None)
+    existing = bridge_env.branch_declared_ids(log_folder, common, ws, br, id_rx)
     if existing and declared != existing and not existing < declared:
         if declared - existing:
-            return ("brief rule: this brief names more IDs than the branch's first brief (%s)" % ", ".join(sorted(existing)), None)
+            return (_ascii_refusal("brief rule: this brief names more IDs than the branch's first brief (%s)" % ", ".join(sorted(existing))), None)
     for mid in declared:
-        ok, why = bridge_env.branch_allows_id(ws, common, br, mid, owner_lifts, id_rx)
+        ok, why = bridge_env.branch_allows_id(log_folder, common, ws, br, mid, owner_lifts, id_rx)
         if not ok:
             if isinstance(why, frozenset):
-                return ("branch rule: %s is not on this branch (counted: %s)" % (mid, ", ".join(sorted(why))), None)
-            return ("branch rule: refused for %s" % mid, None)
-    eff_round = bridge_env.effective_launcher_round(ws, common, br, id_part, name_round)
+                return (_ascii_refusal("branch rule: %s is not on this branch (counted: %s)" % (mid, ", ".join(sorted(why)))), None)
+            return (_ascii_refusal("branch rule: refused for %s" % mid), None)
+    eff_round = bridge_env.launcher_effective_round(log_folder, br, id_part, name_round)
     if prev and prev.get("brief_sha256") == brief_sha and prev.get("exit") == 0:
         eff_round = name_round
     lift = None
@@ -642,12 +659,12 @@ def builder_review_refusal(argv, folder, kind):
     for row in read_log(folder):
         if row.get("brief") == id_part and row.get("lift") == "class" and row.get("lift_line"):
             class_used.add(row["lift_line"])
-    brief_text = brief_bytes.decode("utf-8", errors="replace")
     blk = bridge_env.read_blocking_class_line(brief_text)
-    owner_cap = owner_lifts.get(id_part, bridge_env.REVIEW_ROUNDS)
+    owner_entry = owner_lifts.get(id_part)
+    owner_cap = owner_entry[0] if owner_entry else bridge_env.REVIEW_ROUNDS
     if eff_round > bridge_env.REVIEW_ROUNDS:
         if eff_round <= owner_cap:
-            lift, lift_line = "owner", "Review rounds above the ceiling: %s %d" % (id_part, owner_cap)
+            lift, lift_line = "owner", owner_entry[1] if owner_entry else ""
         elif blk:
             line = blk[2]
             if line in class_used and not (prev and prev.get("brief_sha256") == brief_sha):
@@ -1149,9 +1166,15 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
 def branch_of(folder):
     """The checkout's branch at launch (the roster check matches a builder run to the branch under review)."""
     try:
-        p = subprocess.run(["git", "-C", folder or ".", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, creationflags=NO_WINDOW)
+        p = subprocess.run(
+            ["git", "-C", folder or ".", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            creationflags=NO_WINDOW,
+            timeout=bridge_env.GIT_TIMEOUT,
+        )
         return p.stdout.strip() if p.returncode == 0 else None
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return None
 
 
