@@ -5,7 +5,7 @@
   "version": "2026.10.25a",
   "state": {
     "phase": "building",
-    "stage": "B1 to B4 closed (B4 on 2026-10-25); stage B5, calibration and acceptance, in progress: TASK-023, TASK-024, TASK-028, TASK-029, TASK-031, the plan revision maintainer-text, TASK-030, TASK-032, TASK-033 and TASK-035 merged; next TASK-034",
+    "stage": "B1 to B4 closed (B4 on 2026-10-25); stage B5, calibration and acceptance, in progress: TASK-023, TASK-024, TASK-028, TASK-029, TASK-031, the plan revision maintainer-text, TASK-030, TASK-032, TASK-033, TASK-035 and TASK-034 merged; next TASK-025",
     "bridge": "2026.10.25a",
     "updated": "2026-10-28"
   }

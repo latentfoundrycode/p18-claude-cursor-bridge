@@ -44,8 +44,9 @@ def test_digest_carries_the_literal_commands_and_the_merge_authority_check():
     a, b = TEXT.find("<!-- digest:start -->"), TEXT.find("<!-- digest:end -->")
     digest = TEXT[a:b]
     assert "Read handoff/TASK-<nnn>.md and implement exactly what it specifies." in digest
-    assert "2> run/review/REVIEW-<nnn>.err" in digest
-    assert "review-guard.py snapshot <nnn>" in digest and "review-guard.py verify <nnn>" in digest and "review-guard.py premerge <nnn>" in digest
+    # TASK-034: the review files and the guard's snapshot take the round's name, `<ID>-r<N>` (R-042)
+    assert "2> run/review/REVIEW-<ID>-r<N>.err" in digest
+    assert "review-guard.py snapshot <ID>-r<N>" in digest and "review-guard.py verify <ID>-r<N>" in digest and "review-guard.py premerge <ID>-r<N>" in digest
     assert "Merge authority: owner" in digest and "READY TO MERGE" in digest
     # the 2026.10.06b review, finding 7: the full paths and the CI watch stay literal in the digest
     assert "python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since" in digest

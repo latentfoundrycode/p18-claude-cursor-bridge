@@ -50,7 +50,7 @@ quality. Do not duplicate its pass.
 
 ## Two classes of finding
 
-Mirror the loop's convergence-by-class split:
+Mirror the loop's re-delegation-by-class rule (the convergence rule, which grades a finding's certainty and never its class, is the supervisor's to apply):
 
 - **Blocking** — interface **MUST** violations and other correctness-class defects:
   accessibility, keyboard operability, focus management, labels/accessible names, missing
@@ -59,6 +59,8 @@ Mirror the loop's convergence-by-class split:
 - **Advisory** — taste and craft nits: optical alignment, easing, shadow layering,
   polish. Route these to a `CHANGES`-style note for the supervisor to log; they are **not**
   a re-delegation.
+
+**Above the ceiling.** When the supervisor tells you the round is at or above the code gate's three-round ceiling (the review guard's count of rounds opened for the increment or the stage at three or more), grade each finding by the five blocking classes first — behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, a failing test — and say for each whether it is one; only those make a FAIL, every other finding being advisory for `docs/HARDENING.md`. When you are given a `Blocking class:` line, confirm or deny it: say whether the finding it names is a defect of the class it names. A denial is a breach of the ceiling, which voids the round's result and withholds the merge.
 
 ## Output
 

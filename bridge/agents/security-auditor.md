@@ -78,6 +78,8 @@ entire body on a status code — the latter hides real, non-credential errors fr
 - **Advisory** — defence-in-depth hardening that is not a live hole (extra validation, tighter
   headers, a stronger default). Route to a `CHANGES`/`HARDENING`-style note; **not** a re-delegation.
 
+**Above the ceiling.** When the supervisor tells you the round is at or above the code gate's three-round ceiling (the review guard's count of rounds opened for the increment or the stage at three or more), grade each finding by the five blocking classes first — behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, a failing test — and say for each whether it is one; only those make a FAIL, every other finding being advisory for `docs/HARDENING.md`. When you are given a `Blocking class:` line, confirm or deny it: say whether the finding it names is a defect of the class it names. A denial is a breach of the ceiling, which voids the round's result and withholds the merge.
+
 ## Output
 
 ```

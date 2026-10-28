@@ -209,17 +209,21 @@ When the supervisor tells you the increment runs in parallel (its builder works 
 - **Constraints** add: "This checkout is a separate worktree without the project's environment. Do not install packages or create environments. You cannot run the test suite here: write the tests this brief asks for, check syntax and imports where you can, and leave the running to the supervisor."
 - **Done** adds, as the last step: "Commit everything you changed on the current branch: `git add -A`, then `git commit --no-verify -m "TASK-<nnn> builder hand-off"`. This hand-off commit is a snapshot; the lint and the tests run when the supervisor accepts it."
 
-## The fix variant — `handoff/BUG-<nnn>.md`
+## The fix variant — `handoff/<ID>-r<N>.md` inside a gate, `handoff/BUG-<nnn>.md` after a merge
 
 When the supervisor hands you a **confirmed root cause** from the `root-cause-first`
-procedure (its `docs/debug/BUG-<nnn>.md` with an Evidence section), write a fix brief.
+procedure (its `docs/debug/BUG-<nnn>.md` with an Evidence section), write a fix brief. Inside an
+increment's gate it is the increment's next numbered brief, `handoff/<ID>-r<N>.md`, so that no fix
+within a gate opens a budget of its own; `handoff/BUG-<nnn>.md` is the brief of a defect found after
+a merge. Its content, not its name, makes it a fix brief: the reviewers' fix mode reads its
+Objective, which opens with the confirmed defect and states the root cause and its evidence (below).
 Same file shape, with these differences, stated verbatim:
 
 - **Objective** opens with: "Fix the following confirmed defect — repair the named cause,
   nothing else." Then the **root cause in one sentence**, the **evidence lines** copied
   from the debug file, and the **reproduction test** (path and name) that currently fails
   and must pass.
-- **Scope** names the file(s) the cause lives in, the reproduction test, and `docs/BUILDER_NOTES.md` and the report file (`handoff/BUG-<nnn>-r<N>-report.md`) as in every brief (a cause the builder found on the way belongs in the notes). Nothing else.
+- **Scope** names the file(s) the cause lives in, the reproduction test, and `docs/BUILDER_NOTES.md` and the report file (`handoff/<ID>-r<N>-report.md` inside a gate, `handoff/BUG-<nnn>-r<N>-report.md` after a merge) as in every brief (a cause the builder found on the way belongs in the notes). Nothing else.
 - **Acceptance criteria**: the reproduction test passes; the full suite passes with no
   other change in results; the named cause is addressed at the mechanism the evidence
   points at (state the mechanism).

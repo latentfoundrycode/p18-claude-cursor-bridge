@@ -151,8 +151,27 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # cycle's item 1, whose closing confirmation is not a gate, under the standing TASK-014 entry. Rule 34 stays
 # labelled TASK-015: the check names the first entry that matches a passage, and the TASK-014 entry TASK-035 adds
 # beside it records that increment's reword of rule 34 without relabelling rules 8, 13, 24, 28 and 43)
-TRACED = "TRACED: 424 passages of baseline 0a186da; 149 in supervisor.md, 249 under workflow/, 0 dropped, 26 excused"
+# (TASK-034: twenty-four more move from traced to excused, under TASK-034's own `reword` entries but where an
+# earlier entry matches first: the digest's four paragraphs (the role's "package briefs" -> "brief"; N1's
+# "touches no data it does not own" -> "touches only its own data" and "never runs" -> "runs no"; step 3's
+# "with the constant command" -> "by"; step 4's "list copied, then dispositioned" -> "list dispositioned" (the
+# copy stays in rule 42 and step 4); step 7's "re-delegates with a corrected brief" -> "by a new numbered
+# brief"; step 8's names `<ID>-r<N>` and "the diff committed to `run/review/`" -> "the diff and its SCOPE file
+# committed"; step 9's "on a `stage/<name>` branch" -> "(`stage/<name>`)"; rule 6 in short; rule 43's
+# "a builder run, Review B, the CI watch, a `# wake` command or an agent" -> "a builder, Review B, CI watch or
+# `# wake` run, or an agent"; rule 48's "The session's model" -> "The model", "through Phase 4" -> "to
+# Phase 4" and "told at the stage close before" -> "told a stage close ahead"; rule 55's "(design, brief,
+# conformance check)" dropped), trimmed to keep the digest within its cap; step 3b's exception
+# for the review ceiling's refusals; step 7's Iterate and Re-delegate bullets, its root-cause-first paragraph and
+# its by-class bullet; step 8's Review B item, both convergence paragraphs and the merge paragraph's names; the
+# stage review's steps 2 to 7; and, labelled by the earlier entries, step 3's brief paragraph (TASK-030), the run
+# parameters' fence and its optional-lines paragraph (TASK-035) and rules 6 and 42 (TASK-015))
+TRACED = "TRACED: 424 passages of baseline 0a186da; 143 in supervisor.md, 231 under workflow/, 0 dropped, 50 excused"
 NOTES = [
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **The loop (Phase 6, one increment).** 1 Checkpoint: clean t",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Standing rules.** 1 Never write implementation code. 2 Nev",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Founding rules - These nine rules are the bridge's constitution. Every proced",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - | Layer | Holds | Read when | |---|---|---| | **The main wor",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
@@ -164,31 +183,53 @@ NOTES = [
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: The design-tooling flow - Save the mockup files under `docs/mockups/` (one file per sc",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: The plan - Give each one an ID (`TASK-001`, `TASK-002`, \\u2026). Group the i",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Run parameters \\u2014 asked once, after the plan is approved, before configuration - - `run` *(default)* \\u2014 report the stage close as a notificati",
+    "NOTE (reword TASK-035) bridge/commands/supervisor.md: Run parameters \\u2014 asked once, after the plan is approved, before configuration - ```markdown\\x0a# Run parameters\\x0aSet: <date>   (owner may change",
+    "NOTE (reword TASK-035) bridge/commands/supervisor.md: Run parameters \\u2014 asked once, after the plan is approved, before configuration - Three optional lines are never asked and are written only on",
     "NOTE (reword TASK-017) bridge/commands/supervisor.md: 2. Package the brief - Delegate to **spec-packager** to write `handoff/TASK-<nnn>.m",
     "NOTE (reword TASK-030) bridge/commands/supervisor.md: 3. Delegate to Cursor - The `--model` value is copied from `docs/ROSTER.resolved.jso",
+    "NOTE (reword TASK-030) bridge/commands/supervisor.md: 3. Delegate to Cursor - - **The brief carries the constraints \\u2014 the command line car",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 3b. A model fails mid-step \\u2014 switch automatically, restart the step, never wait - (The one exception: every exit 125 whose message begins `bri",
     "NOTE (reword TASK-030) bridge/commands/supervisor.md: 4. Inspect - **The tests run before the first reviewer** (release A5, pla",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 7. Decide (accept the increment) - - **Iterate** \\u2014 something is wrong and you understand why. R",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 7. Decide (accept the increment) - - **Re-delegate on a review REJECT** \\u2014 if a reviewer rejects",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 7. Decide (accept the increment) - **Diagnose before you re-delegate a defect \\u2014 the `root-cause",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 7. Decide (accept the increment) - - **Draw a by-class line once the core is correct.** When th",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - 3. **Review B** \\u2014 a **cross-family**, non-Anthropic verifier",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - **Convergence is a signal.** When two or more reviewers or a",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - A `REJECT` from either reviewer goes back through re-delegat",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - When all four hold the merge is authorised. A pull request t",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - The pass never escalates. It never introduces an abstraction",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 1. **Intake of the change** (Phase 1, scaled). The session i",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 3. **UI mockups** (Phase 3) **only if the change touches the",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 7. **Project end again.** The close of the addendum's last s",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - The gates of a change cycle are the same approvals the origi",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: Reflection points \\u2014 stage close, phase gates, project end - 2. Write the stage's whole change from committed state: `git",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: Reflection points \\u2014 stage close, phase gates, project end - 3. `python ~/.claude/cursor-bridge/review-guard.py snapshot ",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: Reflection points \\u2014 stage close, phase gates, project end - 4. Review A: `diff-reviewer` on `run/review/STAGE-<name>.dif",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: Reflection points \\u2014 stage close, phase gates, project end - 5. Review B in the background, with execution, exactly as st",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: Reflection points \\u2014 stage close, phase gates, project end - 6. `python ~/.claude/cursor-bridge/review-guard.py verify ST",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: Reflection points \\u2014 stage close, phase gates, project end - 7. A REJECT from either reviewer: do step 8 first (back on `",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Project state - ```markdown\\x0a# Project Status\\x0aLast updated: <timestamp>\\x0aPhase",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 6. Judge re-delegation by defect class, not a round count. N",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 8. Never chain shell commands with `&&`, `|`, or `;`, and ne",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 13. Design correctness \\u2014 accessibility and interface MUSTs, ",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 24. Windowless by default. The user works on the same Window",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 34. A request on a finished project is a change cycle: the s",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 42. Every builder run ends with an `Assumed, not verified` l",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 43. Never end a turn while the loop has work unless somethin",
 ]
 
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the twenty-six passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
-    TASK-015, TASK-017, TASK-030 and TASK-035 declare (three in the core's "Main and conditional workflows", six
+    excused ones exactly the fifty passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+    TASK-015, TASK-017, TASK-030, TASK-034 and TASK-035 declare (three in the core's "Main and conditional workflows", six
     standing rules, three under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits),
     one in the design-tooling flow, four in the change cycle, one each in steps 2, 3, 4 and 9, and one each in the
-    founding rules, the layout, the plan, the run parameters and the status template), so an increment that excuses anything more changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+    founding rules, the layout, the plan, the run parameters and the status template, and TASK-034's twenty-four: the
+    digest's four paragraphs, step 3b's exception, four in step 7, four in step 8, six in the stage review, two
+    more in the run parameters, rules 6 and 42, and step 3's brief paragraph), so an increment that excuses anything more changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
     have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)

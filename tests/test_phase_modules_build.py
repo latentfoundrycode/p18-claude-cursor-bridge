@@ -90,12 +90,14 @@ SURVIVAL = {
         "written and the position is kept in `in-flight.md` (step 8), and at the launch you write there the snapshot's "
         "hash `review-guard.py snapshot` printed, since the hash `verify` prints must equal it (this list is where "
         "that write is asked for);",
-        "the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` with every revision of it, and "
-        "each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report "
+        "the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` and every numbered brief after "
+        "it (`handoff/<ID>-r<N>.md`, step 3), and each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the "
+        "brief bounds the increment, and the report "
         "holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);",
         "for a fix (step 7, the `root-cause-first` procedure), `docs/debug/BUG-<nnn>.md`, whole: its hypotheses and the "
-        "diagnostic rounds counted toward a resolution round; the fix brief `handoff/BUG-<nnn>.md` with every revision "
-        "and report, as for a task; and `git grep DEBUG-BUG-<nnn>` for instrumentation not yet removed;",
+        "diagnostic rounds counted toward a resolution round; the fix brief, `handoff/<ID>-r<N>.md` inside an "
+        "increment's gate or `handoff/BUG-<nnn>.md` for a defect found after a merge (step 7), with its reports, as for "
+        "a task; and `git grep DEBUG-BUG-<nnn>` for instrumentation not yet removed;",
         "`docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass "
         "runs and whether increments run in parallel, and the models the delegate command and Review B name;",
         "the increment's verdicts, kept in `run/supervisor/in-flight.md`: Review A's, each auditor's and Review B's "
@@ -105,9 +107,11 @@ SURVIVAL = {
         "(step 4), `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background, and "
         "the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files "
         "`run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); "
-        "and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, "
-        "`ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` "
-        "needs), whole;",
+        "and, while a gate is open, its files under `run/review/` (the round's `REVIEW-<ID>-r<N>.diff`, "
+        "`ASSUMPTIONS-<ID>-r<N>.md` and `REVIEW-<ID>-r<N>.err`, whose first line is the launch time "
+        "`pr-activity-check.py` needs, and the increment's `SCOPE-<ID>.md`), whole, with the review guard's count of rounds opened for the increment, which "
+        "names the next snapshot `<ID>-r<N>` (step 8) and says whether the round is above the ceiling (step 7, \"The "
+        "review ceiling\");",
         "while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's \"Keeping the "
         "pass's position\"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief "
         "with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.",
@@ -245,11 +249,12 @@ def test_r032_the_delegation_loop_names_its_sub_files_on_its_pointer_line():
 def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
     """R-032 (TASK-030): the module grew past what its bound allowed with TASK-030's text, so step 7 moved into a
     sub-file, as step 9 did (TASK-013): the sub-file opens with its own heading and a paragraph that says it is part of
-    the module and when its step runs, holds step 7 under its heading and then the mutation run; the module keeps a
+    the module and when its step runs, holds step 7 under its heading, then the review ceiling (TASK-034) and the
+    mutation run; the module keeps a
     pointer section under the step's number, and no other file under workflow/phases/ holds the step's heading."""
     sub = module(DECIDE)
     assert headings(sub) == [(2, "The decision (Phase 6, step 7)"), (3, "Where this sub-file belongs"), (3, STEP7),
-                             (4, "The mutation run")], headings(sub)
+                             (4, "The review ceiling"), (4, "The mutation run")], headings(sub)
     assert flat(section(sub, "Where this sub-file belongs", 3)).strip() == (
         "This file is a sub-file of the delegation-loop module (`delegation-loop.md`, \"The procedure\"), read whole "
         "with it. It holds the loop's step 7, which runs for every increment after step 6 and before step 8, the "
@@ -265,19 +270,22 @@ def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
                 assert "### " + STEP7 not in read(os.path.join(root, f)).split("\n"), rel
 
 
-# sha256 of step 7 as the delegation-loop module held it at origin/main 02f0ab5 (from its heading to the line before
-# step 8's, LF, trailing whitespace stripped; 6,967 characters): the step moved verbatim (TASK-030), its mutation run
-# added after it under a heading of its own
-STEP7_SHA256 = "70a1aacaca66592b23a4ce3783c81f7a10b60e9c7a6e9ac536296e1b6aaac2e7"
+# sha256 of step 7 as the sub-file holds it after TASK-034 (from its heading to the line before "The review ceiling",
+# LF, trailing whitespace stripped; 7,628 characters). TASK-030 moved the step verbatim from the module (then 6,967
+# characters at origin/main 02f0ab5, sha256 70a1aacaca66592b...), its mutation run added after it under a heading of its own;
+# TASK-034 reworded its Iterate and Re-delegate bullets (a new numbered brief), the root-cause-first paragraph's fix
+# brief (`<ID>-r<N>` inside a gate, BUG after a merge) and the brake's by-class bullet (the five classes, the class
+# the defect), and added "The review ceiling" between the step and the mutation run (R-042)
+STEP7_SHA256 = "88d85c1599fff5662ffa75cdd3f012b94332a15bba454094d017a2ed98b3a979"
 
 
 def test_r032_step_7_is_verbatim():
-    """R-032 (TASK-030): the sub-file's step 7, up to its mutation run, is the module's step 7 as it was before the
-    move, character for character."""
+    """R-032 (TASK-030, TASK-034): the sub-file's step 7, up to its review ceiling, is the step as TASK-030 moved it
+    and TASK-034 reworded it, character for character."""
     import hashlib
     sub = module(DECIDE)
-    step = sub[sub.index("### " + STEP7):sub.index("#### The mutation run")].rstrip()
-    assert len(step) == 6967 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
+    step = sub[sub.index("### " + STEP7):sub.index("#### The review ceiling")].rstrip()
+    assert len(step) == 7628 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
 
 
 def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():

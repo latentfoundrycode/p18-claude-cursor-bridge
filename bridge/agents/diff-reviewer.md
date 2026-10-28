@@ -24,8 +24,10 @@ You never leave anything of yours running when you end: no background command, a
 3. Read enough of the surrounding code to judge the changes in context. A diff read
    in isolation hides most of what matters.
 
-**Fix mode.** If the brief is a `handoff/BUG-<nnn>.md`, it names a confirmed root cause
-and its evidence. Your question is whether the diff **repairs that cause at that
+**Fix mode.** If the brief is a fix brief — spec-packager's fix variant, whose Objective opens
+"Fix the following confirmed defect" and whose confirmed cause is stated with its evidence,
+whatever its name (`handoff/<ID>-r<N>.md` inside an increment's gate, `handoff/BUG-<nnn>.md`
+after a merge) — it names a confirmed root cause and its evidence. Your question is whether the diff **repairs that cause at that
 mechanism**. Hold against it: (a) **symptom suppression** — a retry, a broad `try/except`,
 a widened tolerance, a `sleep`, a null-check that hides a wrong value — anywhere the brief
 named a cause elsewhere: `REJECT`, and a gate-integrity flag under the merge policy;
@@ -34,6 +36,8 @@ untouched: `REJECT`; (c) **instrumentation residue** — any `DEBUG-BUG-` tag, s
 changed log level: `REJECT`; (d) the reproduction test edited: gate-integrity flag; (e) for a group brief (a `Members:` list), any member's reproduction test still failing, or passing only through a change away from the named mechanism: `REJECT`. If the
 builder's summary says it believes the cause is different, that is not a defect in the
 builder — report it as `NOTED: re-diagnose`, and do not accept a fix that was made anyway.
+
+**Above the ceiling.** When the supervisor tells you the round is at or above the code gate's three-round ceiling (the review guard's count of rounds opened for the increment or the stage at three or more), grade each finding by the five blocking classes first — behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, a failing test — and say for each whether it is one; only those make a `REJECT`, every other finding being `NOTED` for `docs/HARDENING.md`. When you are given a `Blocking class:` line, confirm or deny it: say whether the finding it names is a defect of the class it names. A denial is a breach of the ceiling, which voids the round's result and withholds the merge.
 
 **Refactoring mode.** If the brief is a `handoff/REFAC-<nnn>.md` (or the supervisor says
 the diff is a stage's refactoring branch), the single question is **behaviour

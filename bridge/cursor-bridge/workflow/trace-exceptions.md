@@ -120,3 +120,20 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - reword TASK-035 bridge/commands/supervisor.md 9. Refactoring and optimization pass (at stage close)
 - new TASK-035 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md 9. Refactoring and optimization pass (at stage close)
 - reword TASK-014 bridge/commands/supervisor.md Standing rules
+- reword TASK-034 bridge/commands/supervisor.md The core, in brief
+- reword TASK-034 bridge/commands/supervisor.md Standing rules
+- reword TASK-034 bridge/commands/supervisor.md Run parameters — asked once, after the plan is approved, before configuration
+- reword TASK-034 bridge/commands/supervisor.md 3. Delegate to Cursor
+- reword TASK-034 bridge/commands/supervisor.md 3b. A model fails mid-step — switch automatically, restart the step, never wait
+- reword TASK-034 bridge/commands/supervisor.md 7. Decide (accept the increment)
+- reword TASK-034 bridge/commands/supervisor.md 8. Merge (the verified gate)
+- reword TASK-034 bridge/commands/supervisor.md Reflection points — stage close, phase gates, project end
+- new TASK-034 bridge/cursor-bridge/workflow/phases/run-parameters.md The procedure
+- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md What must survive a compaction
+- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 3. Delegate to Cursor
+- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 3b. A model fails mid-step — switch automatically, restart the step, never wait
+- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 8. Merge (the verified gate)
+- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md 7. Decide (accept the increment)
+- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The review ceiling
+- new TASK-034 bridge/cursor-bridge/workflow/phases/reflection.md What must survive a compaction
+- new TASK-034 bridge/cursor-bridge/workflow/phases/reflection.md The procedure
