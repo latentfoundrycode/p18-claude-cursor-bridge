@@ -1107,3 +1107,45 @@ def test_task031_r14_a_tracked_pyc_the_tests_read_stays_in_the_copy(tmp_path):
     p = _run(ws, mf)
     assert p.returncode == 1, p.stdout + p.stderr
     assert [line["outcome"] for line in _cache_lines(ws, "r14pyc")] == ["survived"]
+
+
+def test_bug030_an_import_failure_exits_3_never_1(tmp_path):
+    """BUG-030 (stage B5's review, round 1; programs S2 and tests-mutation-pace S2, convergent): exit 1 means a
+    survivor, which the launcher marks healthy and the loop's step 7 reads as a test gap; an import the program
+    needs that fails (bridge_env.py missing beside it, as in a damaged install; tomllib on a Python older than
+    3.11, the project's own interpreter running it) is an internal error: exit 3 with a `mutation-run:` line and
+    no traceback.
+    enforces: handoff/TASK-031.md (an internal error exits 3); the program's docstring (exit 1 only for a
+    survivor, a mutant not applied or a killed expect-survive)"""
+    lone = tmp_path / "lone"
+    lone.mkdir()
+    copy = lone / "mutation-run.py"
+    copy.write_bytes(open(PROG, "rb").read())
+    ws = _fixture(tmp_path, {"a.py": "A = 1\n"})
+    p = subprocess.run([sys.executable, str(copy), str(ws / "run" / "supervisor" / "x-mutants.json")], cwd=str(ws),
+                       **test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 60}))
+    assert p.returncode == 3, (p.returncode, p.stderr)
+    assert "Traceback" not in p.stderr and any(l.startswith("mutation-run:") for l in p.stderr.splitlines()), p.stderr
+
+
+@pytest.mark.parametrize("conftest_at_checkpoint", [False, True])
+def test_bug030_the_checkpoint_run_takes_the_new_tests_conftest_files(tmp_path, conftest_at_checkpoint):
+    """BUG-030 (stage B5's review, round 1; modules S1, ruled blocking: a defeated safety mechanism): a new test that
+    uses a fixture the increment adds to a conftest.py on its way, new or changed, is judged at the checkpoint with
+    the working tree's conftest.py files on that way, as step 4 copied "the fixtures they import"; so a new test
+    that passes on the old code is listed passing there and gives exit 4, never `failing` for a missing fixture and
+    exit 0, which would pass the check without testing anything.
+    enforces: R-041 (the new tests run once against the checkpoint's code); handoff/TASK-031.md Requirement 8"""
+    files = dict(CALC)
+    if conftest_at_checkpoint:
+        files["tests/conftest.py"] = "import pytest\n\n\n@pytest.fixture\ndef one():\n    return 1\n"
+    ws = _fixture(tmp_path, files)
+    sha = _git(ws, "rev-parse", "HEAD")
+    _write(ws, "tests/conftest.py", "import pytest\n\n\n@pytest.fixture\ndef one():\n    return 1\n\n\n"
+           "@pytest.fixture\ndef two():\n    return 2\n")
+    _write(ws, "tests/test_two.py", "from demo.calc import add\n\n\ndef test_two(two):\n    assert add(1, 1) == two\n")
+    _git(ws, "add", "-A")
+    mf = _mutants(ws, "ckfx", {"mutants": [], "new_tests": ["tests/test_two.py"]})
+    p = _run(ws, mf, "--checkpoint", sha)
+    assert p.returncode == 4, p.stdout + p.stderr
+    assert "tests/test_two.py::test_two" in p.stdout and "passing on old code" in p.stdout, p.stdout

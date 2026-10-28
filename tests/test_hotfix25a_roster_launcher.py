@@ -191,3 +191,28 @@ def test_a_builder_run_reports_a_write_outside_the_workspace(tmp_path):
     runs = [json.loads(l) for l in (work / "run" / "launcher" / "runs.jsonl").read_text(encoding="utf-8").splitlines()]
     assert runs[-1].get("boundary") == ["new Documents/planted.md"], runs[-1]
     assert p.stderr.strip().splitlines()[-1] == "bridge-run: exit 0", "the exit line stays the last line"
+
+
+def slot_not_free_run(model, branch):
+    """The row the launcher writes when a heavy run ended waiting for the slot (bridge-run.py, exit 123):
+    the command never started."""
+    return json.dumps({"id": "n-" + model, "kind": "builder", "head": "cursor-agent", "model": model, "branch": branch,
+                       "limit": 7200, "waited": 7320, "seconds": 0, "exit": 123, "slot": "not free", "healthy": None}) + "\n"
+
+
+def test_a_launch_that_never_got_the_slot_did_not_build_the_change(program, tmp_path, monkeypatch):
+    """BUG-030 (stage B5's review, round 1, Blocking): a builder launch that ended at exit 123 with
+    `"slot": "not free"` never started its command, so its model built nothing; the change in flight is
+    still the last started builder's, and a Review B of that builder's family stays refused."""
+    git_repo(tmp_path)
+    (tmp_path / "run" / "launcher").mkdir(parents=True)
+    log = tmp_path / "run" / "launcher" / "runs.jsonl"
+    log.write_text(builder_run("grok-4.7-medium", "task-1") + slot_not_free_run("composer-2.5", "task-1"), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    rc = program("roster-check")
+    monkeypatch.setattr(rc, "current_branch", lambda: "task-1")
+    assert rc.built_by(str(log)) == "grok-4.7-medium"
+    br = program("bridge-run")
+    cmd = ["cursor-agent", "-p", "--force", "--model", "grok-4.7-high", "review the diff"]
+    reason = br.review_family_refusal(cmd, str(tmp_path))
+    assert reason and "rebuild" in reason, "a rebuild that never started is no rebuild: %r" % reason

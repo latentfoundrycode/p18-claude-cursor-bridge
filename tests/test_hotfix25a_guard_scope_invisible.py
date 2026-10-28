@@ -353,3 +353,49 @@ def test_non_ascii_lists_every_non_ascii_character_with_its_name(tmp_path):
     rc, out = run(INVISIBLE, r, "HEAD")
     assert "NON-ASCII" not in out, "listed only on request: " + out
     assert all(ord(c) < 128 for c in out), "the output is ASCII"
+
+
+def test_a_builder_window_counts_the_slot_wait(ws):
+    """BUG-030 (stage B5's review, round 1, Blocking): the launcher logs a run's `id` when it starts
+    waiting for the heavy slot and its `seconds` from when the command starts (bridge-run.py), the
+    wait apart as `waited`; the builder's window runs from `id` to `id + waited + seconds` plus the
+    slack. A `supervisor:` test commit made after the window an unwaited run would have had, but
+    while the waited run still ran, is the builder's (the parallel variant), so it is drift."""
+    import json
+    import time
+    b = commit_brief(ws, "src/a.py")
+    builder_change(ws)
+    (ws / "tests" / "test_new.py").write_text("def test_new():\n    pass\n", encoding="utf-8")
+    git(ws, "add", "-A")
+    git(ws, "commit", "-q", "-m", "supervisor: regression tests for TASK-001")
+    start = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 1800))
+    row = {"id": start, "kind": "builder", "head": "cursor-agent", "model": "composer-2.5", "waited": 1500, "seconds": 600, "exit": 0}
+    (ws / "run" / "launcher" / "runs.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    rc, out = run(SCOPE, ws, b)
+    assert rc == 1 and "tests/test_new.py" in drift_list(out), "the commit fell inside the waited run: " + out
+    row["waited"] = 0                                    # the precondition: without the wait the commit is after the window
+    (ws / "run" / "launcher" / "runs.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    rc, out = run(SCOPE, ws, b)
+    assert rc == 0 and "SUPERVISOR TESTS (1)" in out, out
+
+
+def test_a_builder_window_of_another_branch_is_not_counted(ws):
+    """The window filter's branch rule (scope-check.py builder_windows): a builder run logged for
+    another branch did not commit here, so a test commit inside its window stays the supervisor's;
+    the same run logged for this branch makes it drift."""
+    import json
+    import time
+    b = commit_brief(ws, "src/a.py")
+    builder_change(ws)
+    (ws / "tests" / "test_new.py").write_text("def test_new():\n    pass\n", encoding="utf-8")
+    git(ws, "add", "-A")
+    git(ws, "commit", "-q", "-m", "supervisor: regression tests for TASK-001")
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 60))
+    row = {"id": now, "kind": "builder", "head": "cursor-agent", "model": "composer-2.5", "seconds": 600, "exit": 0, "branch": "task-999"}
+    (ws / "run" / "launcher" / "runs.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    rc, out = run(SCOPE, ws, b)
+    assert rc == 0 and "SUPERVISOR TESTS (1)" in out, out
+    row["branch"] = "main"
+    (ws / "run" / "launcher" / "runs.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    rc, out = run(SCOPE, ws, b)
+    assert rc == 1 and "tests/test_new.py" in drift_list(out), out
