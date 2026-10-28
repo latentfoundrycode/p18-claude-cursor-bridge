@@ -837,14 +837,7 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
         else:
             over.append((ident, rnd))
 
-    for ident, rnd in over:
-        lifts = _lift_map(ws, common, ident)
-        parts = ["%s: %d rounds" % (_ascii_name(ident), rnd)]
-        for r in range(ceiling + 1, rnd + 1):
-            lv = lifts.get(r, "unknown")
-            parts.append("r%d %s" % (r, lv))
-        lines.append("- " + "; ".join(parts))
-    for ident, rnd in stage:
+    for ident, rnd in over + stage:
         lifts = _lift_map(ws, common, ident)
         parts = ["%s: %d rounds" % (_ascii_name(ident), rnd)]
         for r in range(ceiling + 1, rnd + 1):

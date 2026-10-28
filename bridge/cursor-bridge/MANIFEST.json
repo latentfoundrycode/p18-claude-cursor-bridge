@@ -1,6 +1,6 @@
 {
   "version": "2026.10.25a",
-  "generated": "2026-10-28 12:39",
+  "generated": "2026-10-28 15:54",
   "files": {
     "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
@@ -86,7 +86,7 @@
     "cursor-bridge/loop-guard.py": "7e53abc536c346a469756ddd43e04a81069aa1289687118ecd1252dede759375",
     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
     "cursor-bridge/mutation-run.py": "38c38fda6590087f16d5dee65d09e60611ab43abff120ea357716ea12a9c6f74",
-    "cursor-bridge/pace-report.py": "4f0e44dcc97c83c60fbc97b9b8e81efbb7d5d10a637d39618686f7ba38c16e9c",
+    "cursor-bridge/pace-report.py": "7fd2893a040aa7afba9fe3488541eb1950109bd192d0a7b81cf3460a3dc24b07",
     "cursor-bridge/permission-guard.py": "311d0cf82b7912467393daac88e2ba1202379c1b27e945a4b7ffe44569164490",
     "cursor-bridge/plan-check.py": "5212b21737d4da78b144ff206595dcbfe1d6145c5e447239177132f7fd33c204",
     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
