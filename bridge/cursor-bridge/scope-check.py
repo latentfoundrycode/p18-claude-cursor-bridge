@@ -222,7 +222,11 @@ def builder_windows():
         except (ValueError, TypeError):
             continue
         seconds = e.get("seconds") if isinstance(e.get("seconds"), (int, float)) else e.get("limit") or 7200
-        waited = e.get("waited") if isinstance(e.get("waited"), (int, float)) else 0
+        _w = e.get("waited")
+        if (type(_w) is int or type(_w) is float) and _w >= 0:
+            waited = _w
+        else:
+            waited = 0
         out.append((start, start + float(waited) + float(seconds) + 120))
     return out
 

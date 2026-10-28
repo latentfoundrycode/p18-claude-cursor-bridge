@@ -28,8 +28,17 @@ from datetime import datetime, timezone
 _BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BRIDGE_DIR not in sys.path:
     sys.path.insert(0, _BRIDGE_DIR)
-tomllib = None
-bridge_env = None
+_IMPORT_ERROR = None
+try:
+    import tomllib
+except Exception as e:
+    _IMPORT_ERROR = e
+    tomllib = None
+try:
+    import bridge_env
+except Exception as e:
+    _IMPORT_ERROR = e
+    bridge_env = None
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 MUTANT_ID_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -634,15 +643,19 @@ def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
             dst = os.path.join(dest, fpart)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
+        ws_abs = os.path.abspath(workspace)
         for cp in conftest_paths(fpart):
             if cp in copied_conftest:
                 continue
             conf_src = os.path.join(workspace, cp)
-            if os.path.isfile(conf_src):
-                conf_dst = os.path.join(dest, cp)
-                os.makedirs(os.path.dirname(conf_dst), exist_ok=True)
-                shutil.copy2(conf_src, conf_dst)
-                copied_conftest.add(cp)
+            if os.path.lexists(conf_src):
+                if link_on_path(conf_src, stop=ws_abs):
+                    raise Refuse("mutation-run: %r is reached through a link" % cp)
+                if os.path.isfile(conf_src):
+                    conf_dst = os.path.join(dest, cp)
+                    os.makedirs(os.path.dirname(conf_dst), exist_ok=True)
+                    shutil.copy2(conf_src, conf_dst)
+                    copied_conftest.add(cp)
     env_src = os.path.join(workspace, ".env")
     if os.path.isfile(env_src):
         shutil.copy2(env_src, os.path.join(dest, ".env"))
@@ -1518,14 +1531,8 @@ def main(argv=None):
 
 
 def run_main():
-    global tomllib, bridge_env
-    try:
-        import tomllib as _tomllib
-        import bridge_env as _bridge_env
-        tomllib = _tomllib
-        bridge_env = _bridge_env
-    except ImportError as e:
-        print("mutation-run: internal error - %s" % e, file=sys.stderr)
+    if _IMPORT_ERROR is not None:
+        print("mutation-run: internal error - %s" % _IMPORT_ERROR, file=sys.stderr)
         return 3
     try:
         return main()

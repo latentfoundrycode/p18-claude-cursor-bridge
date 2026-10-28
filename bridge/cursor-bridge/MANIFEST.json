@@ -1,6 +1,6 @@
 {
   "version": "2026.10.25a",
-  "generated": "2026-10-28 21:42",
+  "generated": "2026-10-28 22:13",
   "files": {
     "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
@@ -85,7 +85,7 @@
     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
     "cursor-bridge/loop-guard.py": "7e53abc536c346a469756ddd43e04a81069aa1289687118ecd1252dede759375",
     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
-    "cursor-bridge/mutation-run.py": "61cc3d8fae79eb9a91dd563b355df8fc4a566be0fd99309747d817ea5c7d60e7",
+    "cursor-bridge/mutation-run.py": "31583a3ca69004ac71505559dd51747d79c5654097be6e4341c7f8f6b771afbb",
     "cursor-bridge/pace-report.py": "7fd2893a040aa7afba9fe3488541eb1950109bd192d0a7b81cf3460a3dc24b07",
     "cursor-bridge/permission-guard.py": "311d0cf82b7912467393daac88e2ba1202379c1b27e945a4b7ffe44569164490",
     "cursor-bridge/plan-check.py": "5212b21737d4da78b144ff206595dcbfe1d6145c5e447239177132f7fd33c204",
@@ -95,7 +95,7 @@
     "cursor-bridge/review-guard.py": "9c22ceb9b2d6b3a977287ba2ca449cce3029b334b30e15a35c393e8412588da6",
     "cursor-bridge/roster-check.py": "dea99884ac6d57a5f661f272a90e1920c38f8e110d5a261dc7f7bc67e0a01d7c",
     "cursor-bridge/run-hidden.py": "bcae418e3cca9d7f1be7bf421ce44b879b343613301df4590d9cc45d00f5be5c",
-    "cursor-bridge/scope-check.py": "8854ab6324719f40988aca9a081f119abb4817ba50bd6f68c6719b5be0f95b11",
+    "cursor-bridge/scope-check.py": "c7a3f778c9443d1804702ce02c7402f4b57330dd2efa3e697d801f5204bdaf3f",
     "cursor-bridge/secure-coding.snapshot.md": "3f41667754917ffef6fb47308645356be6a5fd2fc362cc9c3dedf92a9457324e",
     "cursor-bridge/semgrep-bridge-rules.yml": "924db9d2386c850dafd4e3f829a693dc0fef0d1409ef7f5887302a930c8192ec",
     "cursor-bridge/session-start.py": "a701ce9f242c5d106cd7e5c5232ac01315ecfc5996b9947551d0e786a64b4122",
