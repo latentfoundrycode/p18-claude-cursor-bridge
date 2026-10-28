@@ -24,7 +24,8 @@ built, when the stage closes>` (release A1b); a stage with increments and no suc
 Status is not written in the plan; it is derived from git. An increment counts as merged
 when a commit on <base> has a subject that STARTS with its ID or IDs (a squash commit, a PR
 title: `TASK-103 TASK-104: ...`), a merge commit whose branch name starts with the ID, a
-subject whose IDs stand in parentheses at its end (`feat(x): ... (TASK-100, R-027) - v0.2.0`),
+subject whose closing parenthesis holds only bare IDs (`feat(x): ... (TASK-100, R-027) - v0.2.0`
+merges TASK-100; `(TASK-031's Scope)` and `(pointers, TASK-031's Scope, ...)` merge nothing),
 or a `Merges: TASK-nnn` trailer; a subject that merely mentions an ID ("docs: plan split
 TASK-003 out of TASK-004") merges nothing (release A4). A group is merged when all its children are. A dated addendum file
 (`docs/BUILD_PLAN-<date>*.md`) is read with the plan and noted as such.
@@ -52,6 +53,10 @@ import os
 import re
 import subprocess
 import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -164,35 +169,29 @@ def stages_without_demonstration(paths):
     return missing
 
 
-SUBJECT_RX = re.compile(r"^\s*((?:%s[\s,:]*)+)" % ID)                     # one or more IDs at the start: `TASK-103 TASK-104: ...`
-TRAIL_RX = re.compile(r"\(([^()]*%s[^()]*)\)\s*(?:[-\u2014\u2013]\s*v?[\w.]+\s*)?(?:\(#\d+\))?\s*$" % ID)   # `feat(x): ... (TASK-100, R-027) - v0.2.0 (#148)`
-MERGE_RX = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(task-\d{3,}[a-z]?)\b", re.I)
 BOOKKEEPING = ("docs/BUILDER_NOTES.md", "docs/BOUNDARY_VIOLATIONS.md", "run/")   # every brief names them; no plan lists them
 REPORT_RX = re.compile(r"handoff/[A-Z]+-\w+-r\d+-report\.md$")                 # the builder's report file, named in every Scope (2026.10.11d)
 
 
 def merged_ids(base):
-    p = subprocess.run(["git", "log", base, "--format=%s%n%(trailers:key=Merges,valueonly)"], capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+    folder = os.getcwd()
+    try:
+        p = subprocess.run(
+            ["git", "log", base, "--format=%s%n%(trailers:key=Merges,valueonly)"],
+            cwd=folder,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=NO_WINDOW,
+        )
+    except OSError:
+        return None
     if p.returncode != 0:
         return None
-    out = set()
-    for line in p.stdout.splitlines():
-        m = SUBJECT_RX.match(line)
-        if m:
-            out.update(ID_RX.findall(m.group(1)))              # the case as written: TASK-010c is not TASK-010C
-            continue
-        m = MERGE_RX.match(line)
-        if m:
-            out.add("TASK-" + m.group(1)[5:])                  # a branch name's lower-case prefix, its letter kept
-            continue
-        m = TRAIL_RX.search(line)
-        if m:
-            out.update(ID_RX.findall(m.group(1)))              # the one extra form: the IDs in parentheses at the end
-            continue
-        if re.match(r"^\s*(%s)(\s*,\s*%s)*\s*$" % (ID, ID), line):      # a Merges: trailer line
-            out.update(ID_RX.findall(line))
-    return out
+    return bridge_env.squash_merged_ids_from_lines(
+        p.stdout.splitlines(), bridge_env.PLAN_ID_PATTERN, plan_style=True
+    )
 
 
 def unreadable(value):

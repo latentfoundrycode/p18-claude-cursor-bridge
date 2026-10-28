@@ -762,6 +762,88 @@
       "subcommands": []
     },
     {
+      "description": "Weekly pace table per project (read-only).",
+      "name": "pace-report.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": null,
+          "dest": "weeks",
+          "help": "ISO weeks to show (1-520, default 8)",
+          "nargs": null,
+          "option_strings": [
+            "--weeks"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "dest": "ceiling",
+          "help": "round ceiling (1-100, default REVIEW_ROUNDS)",
+          "nargs": null,
+          "option_strings": [
+            "--ceiling"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": false,
+          "dest": "tokens",
+          "help": "include token columns from session jsonl",
+          "nargs": 0,
+          "option_strings": [
+            "--tokens"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "choices": null,
+          "default": null,
+          "dest": "home",
+          "help": "folder holding .claude/projects (default: user home at run time)",
+          "nargs": null,
+          "option_strings": [
+            "--home"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
+      "path": "bridge/cursor-bridge/pace-report.py",
+      "positionals": [
+        {
+          "choices": null,
+          "default": null,
+          "dest": "roots",
+          "help": "project roots (default: evaluate-reports project list)",
+          "nargs": "*",
+          "option_strings": [],
+          "required": false,
+          "type": null
+        }
+      ],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
       "name": "permission-guard.py",
       "path": "bridge/cursor-bridge/permission-guard.py",
       "source": "docstring",
