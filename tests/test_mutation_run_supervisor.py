@@ -1151,6 +1151,38 @@ def test_bug030_r2_a_damaged_bridge_env_exits_3_never_1(tmp_path):
     assert any(l.startswith("mutation-run: internal error - ") for l in p.stderr.splitlines()), p.stderr
 
 
+def test_bug030_r3_the_internal_error_line_names_every_module_that_failed(tmp_path):
+    """BUG-030 round 3 (Review A of round 2, Should fix 1, ruled blocking: behaviour against the brief; the
+    security audit of round 2, advisory, on the same line): round 2's Requirement 1 asks for "the exception's text,
+    naming the module where the text does not"; round 2 prints the exception's text alone and keeps only the last
+    failure, so a module raising an exception whose text is empty or names nothing (`RuntimeError()`, `1 / 0`)
+    gives `mutation-run: internal error - ` with no module named, and of two failures only the second shows. The
+    script's own folder comes first on sys.path, so a `tomllib.py` beside the copy stands in for a broken standard
+    library module. The one line names each module that failed, with its exception's text; exit 3, no traceback.
+    enforces: handoff/BUG-030-r2.md Requirement 1; handoff/TASK-031.md (an internal error exits 3)"""
+    ws = _fixture(tmp_path, {"a.py": "A = 1\n"})
+    env = {k: v for k, v in os.environ.items()}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    cases = [({"bridge_env.py": "raise RuntimeError()\n"}, ["bridge_env"]),
+             ({"bridge_env.py": "X = 1 / 0\n"}, ["bridge_env", "division by zero"]),
+             ({"tomllib.py": "raise RuntimeError()\n", "bridge_env.py": "raise RuntimeError()\n"}, ["tomllib", "bridge_env"])]
+    for n, (extra, names) in enumerate(cases):
+        lone = tmp_path / ("lone%d" % n)
+        lone.mkdir()
+        (lone / "mutation-run.py").write_bytes(open(PROG, "rb").read())
+        for name, text in extra.items():
+            (lone / name).write_text(text, encoding="utf-8")
+        p = subprocess.run([sys.executable, str(lone / "mutation-run.py"), str(ws / "run" / "supervisor" / "x-mutants.json")],
+                           cwd=str(ws), **test_conftest.windowless_kwargs({"capture_output": True, "text": True,
+                                                                           "timeout": 60, "env": env}))
+        assert p.returncode == 3, (extra, p.returncode, p.stderr)
+        assert "Traceback" not in p.stderr, p.stderr
+        lines = [l for l in p.stderr.splitlines() if l.startswith("mutation-run: internal error - ")]
+        assert len(lines) == 1, p.stderr
+        for word in names:
+            assert word in lines[0], (extra, lines[0])
+
+
 def test_bug030_r2_the_program_loaded_as_a_module_works(program, tmp_path):
     """BUG-030 round 2 (Review A of round 1, Should fix 3): round 1 moved the two imports into run_main and left
     `bridge_env` and `tomllib` as None at module level, so the program loaded as a module (as the tests and any
