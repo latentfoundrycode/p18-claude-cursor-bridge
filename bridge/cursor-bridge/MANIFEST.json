@@ -1,6 +1,6 @@
 {
   "version": "2026.10.25a",
-  "generated": "2026-10-28 03:11",
+  "generated": "2026-10-28 08:01",
   "files": {
     "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -33,7 +33,7 @@
     "cursor-bridge/bridge-install.py": "c679380382e8bd34a6116c4d0abc8e254326059a8c35929f49b8fd6484a52b6d",
     "cursor-bridge/bridge-run.py": "5914ab76dcbbe4518bf496def790cb967691151714cc783e8b4a5cccfe564e8f",
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
-    "cursor-bridge/bridge_env.py": "bd3f588702f39989d5d96c9e94a5630fac8291c05a40f646292424a2dc76b0da",
+    "cursor-bridge/bridge_env.py": "e9b13dd98f5a5e23d492e743b300e80ddc11eb3626b4091471685776f4f1f1c6",
     "cursor-bridge/completion-check.py": "f584af6a6592c7f748beec212ad2b1752356607529fd60c1acb6507190626134",
     "cursor-bridge/conformance-check.py": "f5a9f8a0a33bbc693e717379d0190aa6bfedaa00923c4b9c055701c0380b6ca8",
     "cursor-bridge/cursor-agent.shim": "913f3a0214b76c5a92fca21b8bfe8f9ea63979af412df30dc47509a0accbf8e2",
@@ -86,8 +86,9 @@
     "cursor-bridge/loop-guard.py": "7e53abc536c346a469756ddd43e04a81069aa1289687118ecd1252dede759375",
     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
     "cursor-bridge/mutation-run.py": "38c38fda6590087f16d5dee65d09e60611ab43abff120ea357716ea12a9c6f74",
+    "cursor-bridge/pace-report.py": "4f0e44dcc97c83c60fbc97b9b8e81efbb7d5d10a637d39618686f7ba38c16e9c",
     "cursor-bridge/permission-guard.py": "311d0cf82b7912467393daac88e2ba1202379c1b27e945a4b7ffe44569164490",
-    "cursor-bridge/plan-check.py": "f40ec62685576cbe34f54edb8ceaf40868d2a84c13ef74ff03a627f717bb2a86",
+    "cursor-bridge/plan-check.py": "5212b21737d4da78b144ff206595dcbfe1d6145c5e447239177132f7fd33c204",
     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",

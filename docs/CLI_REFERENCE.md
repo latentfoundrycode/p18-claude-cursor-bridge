@@ -562,6 +562,26 @@ Apply mutants from a JSON file in a scratch copy of the Workspace and run each m
 - `--scratch`; default: null; required: false; scratch folder (default under ~/.cursor-bridge/scratch/)
 - `--mutant-timeout`; default: 900; required: false; per-mutant pytest timeout (default 900)
 
+## pace-report.py
+
+Path: `bridge/cursor-bridge/pace-report.py`
+
+```
+Weekly pace table per project (read-only).
+```
+
+### Positionals
+
+- `roots`; default: null; required: false; project roots (default: evaluate-reports project list)
+
+### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--weeks`; default: null; required: false; ISO weeks to show (1-520, default 8)
+- `--ceiling`; default: null; required: false; round ceiling (1-100, default REVIEW_ROUNDS)
+- `--tokens`; default: false; required: false; include token columns from session jsonl
+- `--home`; default: null; required: false; folder holding .claude/projects (default: user home at run time)
+
 ## permission-guard.py
 
 Path: `bridge/cursor-bridge/permission-guard.py`
