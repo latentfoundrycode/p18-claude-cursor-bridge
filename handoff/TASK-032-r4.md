@@ -38,7 +38,7 @@ Everything else. That includes every other finding of the round-3 reviews, the d
 
 ## Acceptance criteria
 - [ ] `python -m pytest tests/test_task032_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py -q -p no:cacheprovider` passes whole: 4 + 88 + 143 tests.
-- [ ] Those three files are unchanged: `git diff --quiet d8d7547 -- tests/test_task032_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py`.
+- [ ] Those three files are unchanged: `git diff --quiet b1ad478 -- tests/test_task032_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py`.
 - [ ] `python -m pytest tests/test_bridge_run_review_ceiling.py tests/test_review_guard_ceiling.py tests/test_bridge_run.py tests/test_bridge_run_design_ceiling.py tests/test_review_guard.py tests/test_review_guard_a4.py tests/test_permission_guard.py tests/test_hotfix25a_guard_scope_invisible.py -q -p no:cacheprovider` passes.
 - [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge/bridge-run.py bridge/cursor-bridge/review-guard.py` reports 0 FAIL.
 - [ ] Then, last: `python tools/make-manifest.py` and `python bridge/cursor-bridge/bridge-check.py --root bridge --sources` (must end OK), and `python tools/dump-cli.py --check` passes.
