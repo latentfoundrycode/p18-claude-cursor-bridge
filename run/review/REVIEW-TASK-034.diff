@@ -213,14 +213,14 @@ index b0ff4bf..a18e554 100644
 +- **Correction (2026.10.18a):** at most four rounds per subject (the design, the plan, each change and each change's plan addendum), a non-convergent finding starting none; then, if the text changed, one confirming read by both critics, final whatever its number, whose findings are fixed or accepted and recorded; then one resolution round holding every question still Blocking or non-convergent; then the gate, whatever is still open, its record listing it. A subject is one token of lower-case letters, digits and hyphens, distinct from every other. A failed launch follows step 3b, every one recorded: it runs once more (exit 4), then once on the re-resolved profile (exit 3); then the design waits for the roster or the owner's word, and the file runs once more with no re-runs; if that fails too, the round stays not run and the subject goes on to its resolution round or its gate. The convergence rule is the code gate's only. `bridge-run.py` refuses, with exit 125 and a message beginning `bridge-run: refused - design ceiling: `, a `cursor-agent` launch naming `run/review/DESIGN-<name>.md` whose round is above five, is `R2` or later, or cannot be read (a round is a positive integer without a leading zero, or `R` and one, 1 to 5 and `R1` allowed; a name holding a space or a capital cannot be read); a `Design rounds above five: <subject> <rounds>` line in `docs/RUN_PARAMETERS.md`, written only on the owner's own words, allows that subject rounds up to `<rounds>` and `R2`, the same shape once more, once, and nothing beyond. The digest's rule 6 names the exception, and `plan-critic` raises only what is new, or Blocking, in a confirming read. A critique that has run four rounds or fewer when the release is installed follows the new text from where it stands. One that has run five or more, whatever its fifth was, gets no confirming read and no further round: its open findings go to its one resolution round, or to the gate if it has had one. Only that subject's owner's line allows more, and then it continues under Phase 2's shape from where it stands. A running subject whose name is not such a token takes one at calibration, written in its record's heading (a plan critique on the old `DESIGN-<round>.md` files takes `plan`); its next file carries it and its count continues. A round file named other than by its number (a confirming read written `DESIGN-<subject>-confirm.md`, say) cannot be read and is refused: its next file takes the next round's number. Its twin is the code gate's ceiling (release B, R-042): three rounds per increment and per stage review, held by `bridge-run.py` and `review-guard.py`, past which only the five blocking classes send work back (the delegation loop's step 7, "The review ceiling").
  - **Applies:** every design, plan and change-cycle critique; any loop whose stop rule counts only one grade of finding. The sign: a critique past four rounds, rounds whose findings are restatements of earlier ones, or a design-mode `cursor-agent` started other than through `bridge-run.py`, which no ceiling holds (rule 8).
 diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
-index bc24958..ee128e1 100644
+index bc24958..43754d2 100644
 --- a/bridge/cursor-bridge/MANIFEST.json
 +++ b/bridge/cursor-bridge/MANIFEST.json
 @@ -1,28 +1,28 @@
  {
    "version": "2026.10.25a",
 -  "generated": "2026-10-28 09:54",
-+  "generated": "2026-10-28 11:52",
++  "generated": "2026-10-28 12:39",
    "files": {
      "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
 -    "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -250,7 +250,7 @@ index bc24958..ee128e1 100644
 -    "cursor-bridge/Known-Pitfalls.md": "7af30234d9cc4e1ca53028071988b0e82cb871b4a91298b7265e95d151ce05a9",
 -    "cursor-bridge/Merge-Verification-Policy.md": "199f265a528d5e164a534ef1b1c34035ed0cd342deaddc592f81b6b07c97b06a",
 +    "cursor-bridge/Known-Pitfalls.md": "2d36d069a0d8d055e0ce8b6eafed8eff9f1f4eb4f4f4020e3541377fa8c9381a",
-+    "cursor-bridge/Merge-Verification-Policy.md": "2215804c19ffc4952403c8f8c5ccb6b7dec03e7cf86dfc1523f59b34ac939d3b",
++    "cursor-bridge/Merge-Verification-Policy.md": "da272ae147f51be307e596688f785e6fb1fdbf30aecd978ccde929b32f7f74af",
      "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
      "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
      "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
@@ -260,8 +260,8 @@ index bc24958..ee128e1 100644
      "cursor-bridge/workflow/phases/configuration.md": "6a4e1c83c3b0ac33db272560b0c790c36994e335c86c9d2d79abea2dad44a2d4",
 -    "cursor-bridge/workflow/phases/delegation-loop.md": "daeb27fd3436da2ae736970e3175ee2e29f843664ec39617b33adff1fd5180fc",
 -    "cursor-bridge/workflow/phases/delegation-loop/decide.md": "1664aa5a403a18b33dc3ec5e3b9ce36fc4b50d3092edec2c71cd75b2a1d0e064",
-+    "cursor-bridge/workflow/phases/delegation-loop.md": "27247ba5c0ff11b271935c17247b3d9d0a1d29920715d3f564ec51303b2390bb",
-+    "cursor-bridge/workflow/phases/delegation-loop/decide.md": "a84f7fe501a5721272d393790efbcd263f53fc9e6d505073005a045fde64508d",
++    "cursor-bridge/workflow/phases/delegation-loop.md": "4ce9562a7c02b2f7f0186041933b375c87f406e156dbab05604c07212a490ace",
++    "cursor-bridge/workflow/phases/delegation-loop/decide.md": "4a8a18095fcd0179d94c19e04c3b00e0cdcc36405356bb7b33e888f961feadf1",
      "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "8429b28aadba895e4f798e3c2af212e356d5cdfd27742288015079d222a34bc1",
      "cursor-bridge/workflow/phases/design.md": "99085547fc2c7633a46d6856f158b6dd737ff83526eb62c15b64a4f341245d2f",
      "cursor-bridge/workflow/phases/intake.md": "61bbe3237d03fbd407b891d9d3cf2499a3eb938b66341b8e0abb0e2a0f92bfa2",
@@ -288,7 +288,7 @@ index bc24958..ee128e1 100644
    }
  }
 diff --git a/bridge/cursor-bridge/Merge-Verification-Policy.md b/bridge/cursor-bridge/Merge-Verification-Policy.md
-index 7db5330..9bd2921 100644
+index 7db5330..1368f2d 100644
 --- a/bridge/cursor-bridge/Merge-Verification-Policy.md
 +++ b/bridge/cursor-bridge/Merge-Verification-Policy.md
 @@ -54,8 +54,8 @@ a judgement layer — not as a new human gate.
@@ -343,8 +343,8 @@ index 7db5330..9bd2921 100644
 +never a new one, while a defect of one of the five blocks whatever was recorded before.
 +**The ceiling** (R-042): three rounds per increment and per stage review, the owner's number,
 +held by `bridge-run.py`, which counts the builder rounds, and `review-guard.py`, which counts
-+the Review B rounds; the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 7,
-+"The review ceiling"). Below it the by-class line is the supervisor's judgment; at and above it
++the Review B rounds; the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`,
++step 7, "The review ceiling"). Below it the by-class line is the supervisor's judgment; at and above it
 +the line is the rule: only a finding of the five sends the work back, every other finding goes
 +to `docs/HARDENING.md` with the increment, and a round above the ceiling runs only under a
 +`Blocking class:` line or the owner's `Review rounds above the ceiling:` line. Every reviewer
@@ -436,7 +436,7 @@ index 7db5330..9bd2921 100644
    descends from the reviewed head, differs from it only by that removal, and is the pull
    request's head on GitHub; the merge uses `--match-head-commit` with that head. **Then check it wrote nowhere else:**
 diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop.md b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
-index 2d7f9bc..84060c7 100644
+index 2d7f9bc..7c65acc 100644
 --- a/bridge/cursor-bridge/workflow/phases/delegation-loop.md
 +++ b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
 @@ -6,11 +6,11 @@ After a compaction or a resume in this phase, read these before your next action
@@ -470,7 +470,7 @@ index 2d7f9bc..84060c7 100644
    stop and put them in the file.
  - If a run needs a specific model, add `--model <name>`; `cursor-agent --list-models`
    shows what is available.
-@@ -116,12 +119,19 @@ When any `cursor-agent` call — a delegation, a Review B launch, a resolution r
+@@ -116,12 +119,20 @@ When any `cursor-agent` call — a delegation, a Review B launch, a resolution r
  stage-close pass — exits non-zero, produces no output, or hits the launcher's limit (exit
  124):
  
@@ -481,10 +481,11 @@ index 2d7f9bc..84060c7 100644
  its file is recorded like any failed call and follows the exits below, which Phase 2 counts: the
  exit-4 retry, the exit-3 re-resolve and one run on the profile it gives, then the wait Phase 2
 -describes.)
-+describes. Nor is a refusal of the code gate's programs a model's failure: the `review ceiling: `,
-+`brief rule: ` and `branch rule: ` refusals of the launcher and the guard and the guard's refusals of a
-+round off its count or already reviewed (a fourth round with no lift, a brief revised after a completed
-+run, no brief or two, a builder launch on `main`, another ID on a counted branch) are the ceiling's
++describes. Nor is a refusal of the code gate's programs a model's failure: the launcher's
++`review ceiling: `, `brief rule: `, `revised in place: ` and `branch rule: ` refusals (a fourth round
++with no lift, no brief or two, a builder launch on `main`, a brief revised after a completed run, a
++brief under another ID on a counted branch) and the guard's `review ceiling: ` and `branch rule: `
++refusals and its refusals of a round off its count or already reviewed are the ceiling's
 +programs holding, neither a failed launch nor a model's failure, handled as step 7's "The review
 +ceiling" says; every other `bridge-run: refused - ` of a builder or review launch (the slot's
 +`heavy.lock`, a limit, a key file) and every other `review-guard: refused - ` is no model's failure
@@ -492,7 +493,7 @@ index 2d7f9bc..84060c7 100644
  
  **First, when the exit code is 124, look before you discard** (KP-033): `git status` and
  `git diff --stat` in the checkout. A builder that completed its edits and then hung on its
-@@ -350,12 +360,14 @@ instead. In short, a branch merges to `main` only when **all** hold:
+@@ -350,12 +361,14 @@ instead. In short, a branch merges to `main` only when **all** hold:
     shell** (inline heredocs mangle or drop the diff, and a reviewer that received no diff can
     still emit an APPROVE-shaped reply). Two rules make that file whole and reachable:
     (a) **generate it only from committed state** — `git status --porcelain` must print
@@ -510,7 +511,7 @@ index 2d7f9bc..84060c7 100644
     (`--force` lets the reviewer **run the tests and build its own reproductions**, which is
     where its strongest findings have come from — the owner's decision of 2026-10-04 after
     a read-only mode was tried and found weaker; the launcher withholds the owner's
-@@ -366,23 +378,25 @@ instead. In short, a branch merges to `main` only when **all** hold:
+@@ -366,23 +379,25 @@ instead. In short, a branch merges to `main` only when **all** hold:
     (the next brief waits for `verify`; one once wrote `handoff/` during a Review B run and
     the guard flagged GATE-INTEGRITY, reAngle ISS-014), no `diagram-specialist`, no
     `cursor-configurator`, nothing that writes under the checkout, your own status-file edits
@@ -544,7 +545,7 @@ index 2d7f9bc..84060c7 100644
     design for later increments for nine rounds on one of them); verify a claim about a build
     by building it, never by reasoning; reply with APPROVE, REJECT or ESCALATE-INTENT and the
     reasons. A reply that does not name something specific from the diff — or that asks for
-@@ -395,11 +409,18 @@ instead. In short, a branch merges to `main` only when **all** hold:
+@@ -395,11 +410,18 @@ instead. In short, a branch merges to `main` only when **all** hold:
  **Convergence is a signal.** When two or more reviewers or auditors independently name the
  same line or the same defect, treat it as blocking even if each alone marked it advisory:
  decorrelated reviewers agreeing is the strongest evidence the loop produces. This is the code
@@ -565,7 +566,7 @@ index 2d7f9bc..84060c7 100644
  yourself, favouring the project's established invariants; escalate it only if it turns on
  intent. An `ESCALATE-INTENT` verdict, and only that, surfaces to the user — as a plain
  intent question, never a correctness one.
-@@ -409,7 +430,7 @@ intent question, never a correctness one.
+@@ -409,7 +431,7 @@ intent question, never a correctness one.
  When all four hold the merge is authorised. A pull request that changes only records (`docs/`, the inventory, a design text) takes the same round: snapshot, Review B, `verify`, then `premerge`; `premerge` refuses a head whose snapshot has no verified mark, so there is no shorter way (release A1b). **Check `docs/RUN_PARAMETERS.md` first:** under
  `Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
  conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
@@ -575,7 +576,7 @@ index 2d7f9bc..84060c7 100644
  directly with `gh pr merge <n> --squash --match-head-commit <sha>`** (the sha `premerge` printed) rather than waiting on GitHub's auto-merge queue,
  which routinely lags by minutes. This is safe — branch protection enforces the required
 diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md b/bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md
-index b274963..0224b00 100644
+index b274963..ba58305 100644
 --- a/bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md
 +++ b/bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md
 @@ -12,12 +12,12 @@ This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "Th
@@ -624,7 +625,7 @@ index b274963..0224b00 100644
 +  kill path built to protect the run is core, not tail), a failing test. The class is the
 +  defect, not the operator that exposed it: a further mutant, input or operator family that
 +  shows a class already recorded in `docs/HARDENING.md` under the by-class line for the
-+  increment is that class and never a new one, while a defect of one of the five blocks
++  increment or the stage is that class and never a new one, while a defect of one of the five blocks
 +  whatever was recorded before. Below the ceiling, drawing this line is a decision you make and
 +  record, not one you bring to the user; at and above it the line is the rule ("The review
 +  ceiling", below).
@@ -646,7 +647,7 @@ index b274963..0224b00 100644
 +- **A class line**, `Blocking class: <class> - <the finding>`, its `<class>` one of `behaviour`, `security`, `data integrity`, `safety mechanism` and `failing test`, its finding naming the reviewer's finding it answers (`Review A, round 3, B1`, say). You write it into the brief before the builder launch, where the launcher reads it, and into `run/review/SCOPE-<ID>.md` before the snapshot, where the guard reads it; a line lifts the one round it was written for. The reviewers are told of the line and confirm or deny it: a reviewer's denial voids the round's result and withholds the merge as GATE-INTEGRITY does, and the breach is recorded in `docs/HARDENING.md` under the increment and as an issue.
 +- **The owner's line** in `docs/RUN_PARAMETERS.md`, `Review rounds above the ceiling: <ID> <rounds> (<their words>, <date>)`, written only on the owner's own words and never asked for; its `<rounds>` is at least the larger of the guard's and the launcher's next counts for the increment, the count your report names when the ceiling is reached.
 +
-+**The refusals are stops, not failures.** The launcher's `bridge-run: refused - review ceiling: ` and the guard's `review-guard: refused - review ceiling: `, and their other refusals of the ceiling's rules (the `brief rule: ` and `branch rule: ` refusals either prints, a brief revised after a completed run, a new round under a name whose round already has its reply or off the count, a brief or a snapshot under another ID on a counted branch), are the ceiling's programs holding: neither a failed launch nor a model's failure (step 3b), never retried as one and never passed to `roster-check.py`. Read the refusal; then write the next numbered brief or the round's right name, write the class line where a blocking-class finding stands, or record the finding in `docs/HARDENING.md`.
++**The refusals are stops, not failures.** The launcher's `bridge-run: refused - review ceiling: ` and the guard's `review-guard: refused - review ceiling: `, and their other refusals of the ceiling's rules (the launcher's `brief rule: ` and `revised in place: `, the `branch rule: ` either prints, a brief revised after a completed run, a new round under a name whose round already has its reply or off the count, a brief or a snapshot under another ID on a counted branch), are the ceiling's programs holding: neither a failed launch nor a model's failure (step 3b), never retried as one and never passed to `roster-check.py`. Read the refusal; then write the next numbered brief or the round's right name, write the class line where a blocking-class finding stands, or record the finding in `docs/HARDENING.md`.
 +
 +A stage review is bounded the same way (`STAGE-<name>-r<N>`, the reflection module's step 7).
 +
@@ -761,10 +762,10 @@ index ede109f..286ca37 100644
  Done when: **the rounds (R-042):** delegation-loop.md's step 3 says every re-delegation writes a new numbered brief, `handoff/<ID>-r<N>.md`, and never revises one in place (its two revise-in-place sentences reworded — "revise `handoff/TASK-<nnn>.md` in place, or write `TASK-<nnn>-r2.md`" in step 3 and "Revise the brief *file* (in place, or as `TASK-<nnn>-r2.md`)" in step 7 — with KP-009's correction in Known-Pitfalls.md), since the launcher refuses a brief whose bytes changed after a completed run, and that a merge unit's briefs each carry the `Merge unit: <ID> <ID> ...` line the branch's first brief declares (TASK-032); the fix brief inside an increment's gate is `handoff/<ID>-r<N>.md` too, carrying spec-packager's fix variant's content (the root-cause-first paragraph's "package the fix brief (`handoff/BUG-<nnn>.md`, ...)" and the survival list's fix bullet reworded), `BUG-<nnn>` being the brief of a defect found after a merge, so that no fix within a gate opens a budget of its own — said in every text that names the fix brief: spec-packager.md's fix variant (its heading and its report's name), diff-reviewer.md's fix mode and the policy's fix-diff tampering paragraph (both keyed on the fix variant's content, its confirmed-cause section, rather than on the `BUG-` name, so a fix brief named `<ID>-r<N>.md` still gets the fix-mode review) and root-cause-first's SKILL.md ("The builder receives ..."), `tests/test_loop_text_pace.py` asserting the four; step 7 states the ceiling as R-042 gives it — what a round is (a builder run of a numbered brief; a Review B read the guard's snapshot opens, spent when its reply arrived; a fix the supervisor makes and Review A re-reads before step 8's snapshot is none; a failed launch's re-run re-snapshots the same tree under the same name, TASK-032), that the count the gate reads is the guard's count of rounds opened for the increment, which the supervisor's report names, the launcher's count holding the briefs to it, the five blocking classes, that above the ceiling only a blocking-class finding sends the work back and every other finding goes to `docs/HARDENING.md` under the increment and merges with it (today's by-class line becomes the rule above the ceiling and stays the supervisor's judgment below it), the `Blocking class:` line's grammar and that the supervisor writes it, naming the reviewer's finding, into the brief before the builder launch and into `run/review/SCOPE-<ID>.md` before the snapshot — the launcher reads the brief, the guard the scope file, and a line lifts the one round it was written for — the two refusals (`bridge-run: refused - review ceiling: `, `review-guard: refused - review ceiling: `, and the launcher's and the guard's refusals of a revised brief, of a reviewed round and of another ID on a counted branch) as stops that are neither a failed launch nor a model's failure (step 3b's exception named), the owner's line `Review rounds above the ceiling: <ID> <rounds> (<their words>, <date>)` written only on the owner's own words and never asked for, its `<rounds>` at least the larger of the guard's and the launcher's next counts for the increment (the two move independently: a Review A rejection spends a builder round with no snapshot, a supervisor's fix after a Review B REJECT a guard round with no builder run), the count the supervisor's report names when the ceiling is reached, and that a reviewer's denial of a `Blocking class:` line voids the round's result and withholds the merge as GATE-INTEGRITY does, the breach recorded in `docs/HARDENING.md` under the increment and as an issue; step 8 writes `SCOPE-<ID>.md` and commits it before `snapshot <ID>-r<N>` (today's order, where the snapshot comes first, reversed), names the snapshot `<ID>-r<N>` with `<N>` the guard's count, and the same name for `verify`, `premerge` and the `.err` file (`run/review/REVIEW-<ID>-r<N>.err`), the survival list naming them so, and the pins on the old names re-taken: `tests/test_phase_modules_close.py`'s reflection survival bullet (`REVIEW-STAGE-<name>.err`), `tests/test_allowlist.py`'s Review B form (`2> run/review/REVIEW-(<nnn>|STAGE-<name>)\.err`, the digest's included) `tests/test_session_start.py`'s digest literals for `snapshot`, `verify`, `premerge` and the `.err` redirect, and `tests/test_phase_modules_build.py`'s survival-list pin on `REVIEW-<nnn>.err` (today at :95-96); R-043's register row is set `built` by this increment, the later of the two that satisfy it (TASK-030 builds its program part); the convergence rule's sentence says it grades a finding's certainty and never its class, so past the ceiling — the guard's count of rounds opened for the increment or the stage at three or more — a convergent finding outside the five goes to HARDENING marked convergent; **the mutation run (R-043):** step 7 launches the mutation run on every pass through it, once Review A and the auditors have accepted the increment's behaviour and before step 8's snapshot, the cache filtering what is unchanged, with the survivor rules of R-043 (where the larger of the two next counts — the guard's opened rounds plus one, the launcher's round of the brief that would carry a code fix — is at or below the ceiling, a criterion-test fix is the supervisor's and no round, a code fix a re-delegation and a round; above it a survived, not-applied or killed `expect: survive` mutant goes to HARDENING unless the untested code is a safety mechanism the increment relies on or the result shows a blocking-class defect), the `--checkpoint` run staying at step 4; **the stage review (R-042):** reflection.md's steps name the snapshot `STAGE-<name>-r<N>` for the snapshot, `verify`, `premerge` and the `.err` (steps 3, 5 and 6 and the survival list at :11), step 2 writes `run/review/SCOPE-STAGE-<name>.md` and commits it with the diff, step 7 says — the ceiling read against the guard's count of rounds opened for the stage (with three opened, the next round is above it) — that every arm that starts a fix does step 8 first (back on `main`, the stage branch deleted), and that an arm that opens a new stage round runs it from step 1 only after that fix has merged; that below the ceiling (a) any REJECT starts a fix brief and a new stage round, and (b) a stage round ending with no REJECT but with findings the convergence rule makes blocking (two or more reviewers independently naming the same line or the same defect, each alone calling it advisory, as the loop's step 8 convergence paragraph defines them, its exception for a class already recorded under the by-class line for that stage included) puts those findings, with the round's other findings the supervisor takes, into one fix increment through its own gate, the stage closing at its merge with no further stage round and the rest recorded at the close (BUG-014's precedent at stage B2's round 12, ISS-007, before the ceiling existed; the maintainer's T14); and that a round with a REJECT and convergent advisory findings is arm (a), the convergent findings the convergence rule makes blocking riding in its fix brief and a class already recorded under the by-class line for that stage staying recorded; that the fix brief of either arm is a `BUG-<nnn>`, the stage's increments having merged, arm (b)'s an increment with a budget of its own under the programs' branch rule, the brief the fix variant where any of its findings has a cause to confirm, the findings that are their own cause (a wording, a test's strength) carried in it, and the plain brief KP-015's proportionality allows only where every finding is its own cause; that at and above the ceiling the supervisor grades every finding, a convergent one included, against the five classes first, only a blocking-class finding starting a fix brief and a new stage round, its `Blocking class:` line written into `run/review/SCOPE-STAGE-<name>.md` at that round's step 2, before its snapshot (the stage review's one lift, there being no brief; a line lifting the one round it was written for) (INVENTORY, Decisions: why this differs from BUG-027's by-hand close of stage B4), a convergent finding outside the five going to `docs/HARDENING.md` under the stage, marked convergent and opening no fix increment, as the delegation loop's step 8 convergence sentence disposes of one at the same count, and every other finding recorded at the close and never a fix increment, and step 5 carries rule 43's in-flight.md carve-out beside "you write nothing to the checkout meanwhile" (stage B3's review, round 3, C3 and C4); **the gloss (docs/HARDENING.md, Stage B4, the subject `traits`'s lead):** the run-parameters template's `n/a (not a desktop application)` reads `n/a (nothing installs)`, in the same `reword` as the paragraph after the fence; **the core, the policy, the reviewers:** the core's rule 6 and the digest's rule 6 say the same in short, rule 6 naming the five classes, the two programs and that the ceiling's number is the owner's at the plan's gate, and — in rule 6, in the policy's re-delegation paragraph and in the loop's step 7 brake — that the class is the defect, not the operator that exposed it: a further mutant, input or operator family that shows a class already recorded in `docs/HARDENING.md` under the by-class line for the increment or the stage is that class and never a new one, while a defect of one of the five blocking classes blocks whatever was recorded before (R-042), the three homes' "new class" reading as one of R-042's five, below the ceiling as above it (the paragraph's four-item list — output correctness, data integrity, security, what the software does — and step 7's brake's list of the same four with "defeats a safety mechanism" become the five, the safety mechanism the five's fourth; `tests/test_loop_text_pace.py` asserts the five in all three homes), and rule 6 stating the outcomes: one of the five always blocks; below the ceiling the supervisor records the tail under the by-class line and merges it, as the rule says today, and sends a late finding outside the five back when it is not that tail; at and above the ceiling every finding of an increment's review outside the five goes to `docs/HARDENING.md` with the increment, a stage round's findings disposed of as reflection.md's step 7 says (stage B2's review ran eleven rounds reading each operator family as a new class, ISS-007, FB-012; the maintainer's T14), while the policy's convergence paragraph and the loop's step 8 convergence paragraph carry this increment's sentence that the rule grades a finding's certainty and never its class (neither holds one today) and gain one clause stating its bearing: below the ceiling, two reviewers' agreement makes a finding blocking whatever its grade, with one exception, a class already recorded under the by-class line for that increment or that stage — two reviewers naming a further mutant, input or operator family of it name that class, which stays recorded and starts no round, a class of the five never being on that line; and the policy's two pointers to the convergence-by-class rule below (its design section's "governed by the same convergence-by-class rule below" and its security section's "Same convergence-by-class rule below") and design-auditor.md's "the loop's convergence-by-class split" name the two rules apart, the re-delegation-by-class rule and the convergence rule, the digest trimmed elsewhere to stay within its cap with the trimmed sentences named in the increment's trace entry and every rule number kept (`tests/test_session_start.py` green); `Merge-Verification-Policy.md`'s re-delegation and convergence paragraphs and its invocation section carry the ceiling, the snapshot and `.err` names, the class-first grading above the ceiling as the rule for every reviewer and auditor, and the breach; `bridge/agents/diff-reviewer.md`, `security-auditor.md` and `design-auditor.md` each say that at a round above the ceiling the reviewer grades each finding by the five classes first and confirms or denies a `Blocking class:` line it is given; `run-parameters.md` documents the owner's line beside `Ceiling above twice` and `Design rounds above five`; KP-062's correction gains one sentence naming the code gate's ceiling as its twin; **the pace report (R-044):** `evaluate-reports.md`'s step 1 runs `pace-report.py --tokens` into `Reports/Evaluations/<date>/pace.md` on every run, a week with nothing new included, and its step 4's evaluation file — written in such a week too, then holding the Pace section alone, since a creeping slowdown must show the week it starts — gains a "Pace" section that reads it, an increment over the ceiling whose round used no lift, or whose class line a reviewer denied, being an entry like any other; each reworded baseline passage has its `reword` entry and each new section its `new` entry, `trace-check` green with them and `tests/test_core_carve.py`'s pin re-taken; delegation-loop.md stays within the R-032 bound, another step moved into a sub-file first if it would not (TASK-013's precedent, the pointer line extended, the sub-file pins at tests/test_phase_modules_build.py:214-228 and tests/test_session_start_module.py:96 re-taken); `tests/test_loop_text_pace.py` (names R-042, R-043, R-044) asserts each sentence above, that the ceiling figure, the five classes and the owner's line the text names equal `bridge_env`'s constants, and that the digest is within its cap.
  
 diff --git a/docs/HARDENING.md b/docs/HARDENING.md
-index 2ceba1e..85850bd 100644
+index 2ceba1e..7b3ba1c 100644
 --- a/docs/HARDENING.md
 +++ b/docs/HARDENING.md
-@@ -1278,3 +1278,11 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+@@ -1278,3 +1278,12 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
  - **Rule 34's TASK-014 entry excuses nothing** (Review A, round 1, consider 1): the trace check names the first entry that matches a passage, and TASK-015's Standing rules entry stands before it, so every NOTE under the heading keeps the TASK-015 label; the entry records who reworded rule 34. Retiring the section-wide entry for per-passage entries is the lead carried past release B (INVENTORY, Decisions, "Stage B3's review leads with no increment").
  - **The session-start hook's fallback still says "re-read the whole file"** (session-start.py, its message when no digest is found in supervisor.md; Review A, round 1, consider 4): a fifth "whole" about the core, in a program outside this Scope; for the hook's next edit.
  - **intake.md's own step still opens `**Gate:**`** (Review A, round 1, noted): change-cycle.md's item 1 says that step is the confirmation a change cycle runs, outside the three gates; the plan leaves intake.md's step unreworded. Under a change cycle's `Delegated gates:` (rule 50) the intake confirmation stays the owner's, as T23 intends.
@@ -774,10 +775,11 @@ index 2ceba1e..85850bd 100644
 +- **Review A, round 1 (REJECT: 2 Blocking, 4 Should fix, 6 Consider), fixed before the commit, no round spent (a fix the supervisor makes and Review A re-reads before step 8's snapshot):** Blocking 1, MANIFEST.json regenerated after the last edit. Blocking 2, the round-named snapshot had switched off the guard's empty-input check (KP-067): `review_inputs` lists the files under `run/review/` whose names hold the snapshot's name, and `TASK-034-r1` is not in `REVIEW-TASK-034.diff`; the round's diff and assumptions file (and a stage's diff and its parts) now take the snapshot's name, tests/test_loop_text_pace.py running the guard's own `review_inputs` on them. Should fix 1, "at or above" the ceiling for the grading (the agents, step 8's fifth clause, the policy), "above" for the round that needs a lift; 2, the digest's design-critique sentence restored; 3, the trims listed truly (INVENTORY, Decisions); 4, every refusal of the launcher and the guard a stop (step 3b, "The review ceiling"). Considers taken: 2 (the rule-number test reads the Standing rules paragraph), 3 (the old-name sweep reads Known-Pitfalls.md but KP-032's narrative, and the diff's and assumptions file's names), 4 (a week with nothing new holds the Pace section and any entry the owner's messages raised), 6 (step 3b's "The exceptions"). Consider 1 (the digest's rule 6 names neither the five nor the owner's number) accepted: the core's rule 6 names both, and the cap leaves no room. Consider 5, recorded: "at and above" reads the guard's count alone, while Review A rejections can bring the launcher to its ceiling first; the refusal text covers it (write the class line or record the finding).
 +- **Review A's re-read (APPROVE: 0 Blocking, 2 Should fix, 1 Consider), fixed before the commit:** Should fix 1, step 3b and "The review ceiling" had sent every refusal of a builder or review launch to the ceiling's handling, the slot's `heavy.lock`, a limit and a key file among them; now the ceiling's refusals (`review ceiling: `, `brief rule: `, `branch rule: `, the guard's round count) are handled there and the rest read and fixed as the message says, none a model's failure. Should fix 2, evaluate-reports.md's step 1 said a week with nothing new leaves steps 2 and 3 nothing to read, while step 4 kept the entries the owner's messages raise; step 1 now says the same. Consider 1, each round's diff and assumptions file is removed with `git rm` before the next round's diff, which would otherwise carry every earlier round's files. Noted: R-044's Done when says the Pace section alone, the text keeping the owner's-message entries too (INVENTORY, Decisions); R-042's row keeps "Above three rounds", which reads as the text's "at and above" since round 3's findings decide round 4.
 +- **Review A's confirming read (APPROVE: 0 Blocking, 0 Should fix, 1 Consider), recorded:** step 3b's bracket of examples (a fourth round with no lift, a brief revised after a completed run, ...) follows "the guard's refusals of a round off its count or already reviewed" and reads as the guard's alone, while most are the launcher's; the bracket would sit better after "are the ceiling's programs holding". Wording only, for the next edit of step 3b. The full suite's one failure, tests/test_a5_followups.py's pin on the stage review's part name, was re-taken (the plan's Scope widened, dated).
++- **Review B, round 1 (REJECT: 2 Should fix), fixed in round 2:** the ceiling text said both programs print `brief rule: ` refusals, which the guard never prints, and quoted no prefix for the launcher's revised-brief refusal, `revised in place: `; step 3b and "The review ceiling" now name each program's own prefixes (the confirming read's Consider on step 3b's examples taken with it). Step 7's brake said a further operator family of a class recorded "for the increment" is that class, where the plan's Done when, rule 6 and the policy say "the increment or the stage"; now the same. Its Consider taken too: the policy's pointer to "The review ceiling" names delegation-loop/decide.md, where the heading stands.
 +- **The SCOPE file's emptiness is checked by hand** (Review A, round 1, Blocking 2): the guard reads `SCOPE-<ID>.md` by the increment's ID for its class line, so its input listing, keyed on the round's snapshot name, never shows it; step 8 and the stage review's step 3 ask for the check. Matching the inputs by the ID part as well (review-guard.py, `review_inputs`) would close it: a lead for a builder increment after release B.
 +- **The trace check's labels** (TASK-035's class, carried past release B): rule 6, step 3's brief paragraph and the run parameters' fence and optional-lines paragraph keep the TASK-015, TASK-030 and TASK-035 labels in the check's NOTE lines, though TASK-034 reworded them; TASK-034's own entries record it.
 diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
-index e648101..4705dfd 100644
+index e648101..b943b9b 100644
 --- a/docs/INVENTORY.md
 +++ b/docs/INVENTORY.md
 @@ -41,6 +41,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
@@ -793,7 +795,7 @@ index e648101..4705dfd 100644
  | The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
  | TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
 -| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,025 characters (88.4%), decide.md 117 lines and 13,071 characters; after TASK-035, which records R-003's ruling in the core and adds the template's `Deferred increments:` field, the core 864 lines and 97,047 characters, read in parts to its last line (FB-036) | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 88.4% of its characters after TASK-030's move of step 7: a further addition moves another step into a sub-file first) |
-+| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,025 characters (88.4%), decide.md 117 lines and 13,071 characters; after TASK-035, which records R-003's ruling in the core and adds the template's `Deferred increments:` field, the core 864 lines and 97,047 characters, read in parts to its last line (FB-036); after TASK-034, which adds the review ceiling's text, the core 873 lines and 98,103 characters, delegation-loop.md 451 lines and 56,458 characters (94.1% of the bound), decide.md 139 lines and 17,327 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 94.1% of its characters after TASK-034: a further addition moves another step into a sub-file first) |
++| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,025 characters (88.4%), decide.md 117 lines and 13,071 characters; after TASK-035, which records R-003's ruling in the core and adds the template's `Deferred increments:` field, the core 864 lines and 97,047 characters, read in parts to its last line (FB-036); after TASK-034, which adds the review ceiling's text, the core 873 lines and 98,103 characters, delegation-loop.md 452 lines and 56,531 characters (94.2% of the bound), decide.md 139 lines and 17,368 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 94.2% of its characters after TASK-034: a further addition moves another step into a sub-file first) |
  | The session-start hook's threat model is a partial, mismatched or hand-edited install, not a hostile checker: workflow-check.py runs in the hook's process and could write to its output directly. Inside it, nothing the checker returns reaches the output except as an exact str matching its pattern; what lies outside it is docs/HARDENING.md's (Stage B3, TASK-010 with TASK-015) | seven review rounds converged there; every guard past the model narrows a channel an in-process program can open another way | 2026-10-20, supervisor (TASK-015, by-class line) | the hook loads code other than the installed checker, or a finding inside the model |
  | The hook reads the workflow tables only at their installed paths (`~/.claude/cursor-bridge/workflow/open-list.md` and `extension-points.md`), only once the checker's own table paths compare equal to them, and refuses them behind a link at workflow/ or at either file | the link test and the read then concern the same files on every platform (TASK-015 R3-3, R4-3, R5-1) | 2026-10-20, supervisor (TASK-015) | the tables move |
  | TASK-015's accepted assumptions, each in f41f7cb's `Assumptions:` sections (C3 under its round-6 `Decisions:`): a trailing `;` on a pointer line is ignored, and `a.md;b.md` is one path, which fails the pattern (the brief's grammar, Requirements 4 and 7); a pointer line's files are not named when the tables fail (the one plain line stands for them); load_tables returns the path it was given through `slash` unchanged (workflow-check.py); a table key that is not an exact str names no file (HARDENING, Stage B3, decision C3); the checker touches neither `sys.stdout.buffer` nor `reconfigure` at import | each rests on the brief's grammar or on the installed checker as it is, and each fails closed (the plain line, or no file named) | 2026-10-20, supervisor (TASK-015; the row added 2026-10-23 at stage B3's review) | load_tables changes the path it returns, a checker touches stdout at import, or a checker returns keys of another type by design |
@@ -903,7 +905,7 @@ index b606b2e..7142e28 100644
 -    assert all(re.search(r"2> run/review/REVIEW-(<nnn>|STAGE-<name>)\.err", f) and "--force" in f and "--limit auto --kind review" in f for f in forms), forms
 +    assert all(re.search(r"2> run/review/REVIEW-(<ID>-r<N>|STAGE-<name>-r<N>)\.err", f) and "--force" in f and "--limit auto --kind review" in f for f in forms), forms
 diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
-index 4f3fe5e..3361756 100644
+index 4f3fe5e..ad6dcf4 100644
 --- a/tests/test_b3_least_confident.py
 +++ b/tests/test_b3_least_confident.py
 @@ -123,14 +123,19 @@ EXCUSED_MODULE_SECTIONS = {
@@ -911,7 +913,7 @@ index 4f3fe5e..3361756 100644
      ("configuration.md", "What must survive a compaction"): (963, "338b5c4e338a41c95c7b9b2e1a110ed4e1473a8ad4ed04298359f8b21fd0984a"),
      ("delegation-loop.md", "2. Package the brief"): (964, "5394e345e8d43f10f2f9d98db2d5b092b96d0deea6e2dd75a4d3bb47b45e7e2e"),
 +    ("delegation-loop.md", "3. Delegate to Cursor"): (7521, "fb5f8cbe4b249ee91da4271b9ca02b2565e545e4580a5b0bbb6976f8aba8cf57"),
-+    ("delegation-loop.md", "3b. A model fails mid-step — switch automatically, restart the step, never wait"): (8659, "355337aa53f814acbe11948b2c65327a7448c0b3cc458a3495b9bd07e2b59bb6"),
++    ("delegation-loop.md", "3b. A model fails mid-step — switch automatically, restart the step, never wait"): (8732, "ff82fe52582243167c62ec0f37571694fd668c555341af13ea1b7a3b279b7337"),
      ("delegation-loop.md", "7. Decide — in a sub-file"): (241, "9146216638749b537ebdd42d28bdad75eb7ecfdafea1f8236bf90c7bb07c55ee"),
 +    ("delegation-loop.md", "8. Merge (the verified gate)"): (15699, "0b0f7b39432d8c99009cea950414b4e9aedc7893e4a2a6ff14c7baae72ea2e1e"),
      ("delegation-loop.md", "Extension points"): (1696, "71ab68db2d7893030aa65e8136e44bba2d06a321490d2127803a47a4e9ad680d"),
@@ -921,9 +923,9 @@ index 4f3fe5e..3361756 100644
      ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (2262, "83ce830bdcc3897a5195d27756cc1298b3538fb81b93e2164edba740fa2f898f"),
 -    ("delegation-loop.md", "What must survive a compaction"): (2971, "7b0aa4473dd3d8c041aa8c7efee5756d9ba73cb71446cc224058a3cdb239b705"),
 +    ("delegation-loop.md", "What must survive a compaction"): (3334, "a369a6877d83a0602535fe4190ecf152f25f57d1ef6cb46d418771c415b5f635"),
-+    ("delegation-loop/decide.md", "7. Decide (accept the increment)"): (16853, "890258c221da0ac6b1c2c000b6606cf62ea5845b2be402e31edbaa645501a100"),
++    ("delegation-loop/decide.md", "7. Decide (accept the increment)"): (16894, "fab9c03b08075d21ac639c6f94a3c91a7fb98e4ced35416433740ebc7e746278"),
      ("delegation-loop/decide.md", "The mutation run"): (5628, "44f27ca570e65d6e8f0d662b2eef25cc93c9fb4aaf2a6d3587ee47d35e9a0f18"),
-+    ("delegation-loop/decide.md", "The review ceiling"): (3593, "823e118a58312578b66085eb03e6ce0446d5edc4248b88a29310577da762491c"),
++    ("delegation-loop/decide.md", "The review ceiling"): (3621, "229ddf9d643b8be0c4eb050cb0543a7fab7561cf82a9d71ee252788e46c6b536"),
      ("delegation-loop/decide.md", "Where this sub-file belongs"): (436, "9e38cf68a4da72d205ec742fe0d1cbf6f5c6e6bd75a04469b52333775ad19e01"),
      ("delegation-loop/refactoring-pass.md", "9. Refactoring and optimization pass (at stage close)"): (5695, "01eeaa1d78aff824728143fe4a6a2976fac2c400c05f13997ef3578d87e3e355"),
      ("delegation-loop/refactoring-pass.md", "Keeping the pass's position"): (474, "16c05ddcf26b7cfb893f990cc227172f04ef2417dcce816df779b25abd84024b"),
@@ -1033,10 +1035,10 @@ index 9584c6f..7088b83 100644
      have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
 diff --git a/tests/test_loop_text_pace.py b/tests/test_loop_text_pace.py
 new file mode 100644
-index 0000000..b23509c
+index 0000000..9bbb3e2
 --- /dev/null
 +++ b/tests/test_loop_text_pace.py
-@@ -0,0 +1,576 @@
+@@ -0,0 +1,580 @@
 +"""TASK-034: the loop's text for the code gate's review ceiling, the mutation run's place and the pace report.
 +
 +enforces: docs/BUILD_PLAN.md TASK-034's Done when (the rounds: new numbered briefs, the fix brief inside a gate, step
@@ -1212,21 +1214,24 @@ index 0000000..b23509c
 +    assert 'sys.stderr.write("bridge-run: refused - %s\\n" % reason)' in run and '"review ceiling: ' in run
 +    assert '"review-guard: refused - review ceiling: ' in guard
 +    assert '"brief rule: ' in run and '"review-guard: refused - branch rule: ' in guard
++    assert '"revised in place: write handoff/' in run and '"branch rule: ' in run
++    assert "brief rule: " not in guard and "revised in place: " not in guard
 +    assert "is off the count" in guard and "is reviewed: write" in guard
 +    c = ceiling()
 +    assert ("**The refusals are stops, not failures.** The launcher's `bridge-run: refused - review ceiling: ` and "
 +            "the guard's `review-guard: refused - review ceiling: `") in c
-+    assert ("and their other refusals of the ceiling's rules (the `brief rule: ` and `branch rule: ` refusals either "
-+            "prints, a brief revised after a completed run, a new round under a "
++    assert ("and their other refusals of the ceiling's rules (the launcher's `brief rule: ` and `revised in place: `, "
++            "the `branch rule: ` either prints, a brief revised after a completed run, a new round under a "
 +            "name whose round already has its reply or off the count, a brief or a snapshot under another ID on a "
 +            "counted branch), are the ceiling's programs holding: neither a failed launch nor a model's failure (step "
 +            "3b), never retried as one and never passed to `roster-check.py`.") in c
 +    s3b = f(section(loop(), STEP3B, 3))
 +    assert "(The exceptions: every exit 125 whose message begins `bridge-run: refused - design ceiling: `" in s3b
-+    assert ("Nor is a refusal of the code gate's programs a model's failure: the `review ceiling: `, `brief rule: ` "
-+            "and `branch rule: ` refusals of the launcher and the guard and the guard's refusals of a round off its "
-+            "count or already reviewed (a fourth round with no lift, a brief revised after a completed run, no brief "
-+            "or two, a builder launch on `main`, another ID on a counted branch) are the ceiling's programs holding, "
++    assert ("Nor is a refusal of the code gate's programs a model's failure: the launcher's `review ceiling: `, "
++            "`brief rule: `, `revised in place: ` and `branch rule: ` refusals (a fourth round with no lift, no brief "
++            "or two, a builder launch on `main`, a brief revised after a completed run, a brief under another ID on a "
++            "counted branch) and the guard's `review ceiling: ` and `branch rule: ` refusals and its refusals of a "
++            "round off its count or already reviewed are the ceiling's programs holding, "
 +            "neither a failed launch nor a model's failure, handled as step 7's \"The review ceiling\" says; every "
 +            "other `bridge-run: refused - ` of a builder or review launch (the slot's `heavy.lock`, a limit, a key "
 +            "file) and every other `review-guard: refused - ` is no model's failure either, and is read and fixed as "
@@ -1330,7 +1335,7 @@ index 0000000..b23509c
 +    for name, t in homes.items():
 +        assert has_five(t) == [], (name, has_five(t))
 +        assert "The class is the defect, not the operator that exposed it" in t, name
-+        assert "a further mutant, input or operator family that shows a class already recorded in `docs/HARDENING.md` under the by-class line for the increment" in t, name
++        assert "a further mutant, input or operator family that shows a class already recorded in `docs/HARDENING.md` under the by-class line for the increment or the stage is that class" in t, name
 +        assert "is that class and never a new one, while a defect of one of the five" in t, name
 +        assert "blocks whatever was recorded before" in t, name
 +    assert "output correctness, data integrity, security, or what the software does" not in homes["policy"]
@@ -1478,6 +1483,7 @@ index 0000000..b23509c
 +            "the SCOPE file's `Blocking class:` line, where it has one, confirmed or denied,") in p
 +    assert "(`run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot," in p
 +    assert "It also reads `run/review/ASSUMPTIONS-<ID>-r<N>.md`" in p
++    assert "the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`, step 7, \"The review ceiling\")" in p
 +    assert ("`snapshot <ID>-r<N>` before the launch, `<N>` the round it opens by the guard's count, the SCOPE file "
 +            "committed first since the guard reads its `Blocking class:` line (it refuses a dirty tree, a round off "
 +            "its count and a round above the ceiling with no lift,") in p
@@ -1614,7 +1620,7 @@ index 0000000..b23509c
 +            "entry the owner's messages raised.") in fr
 +    assert "A Sunday with nothing new writes the Pace section and any entry the owner's messages raised." in fr
 diff --git a/tests/test_phase_modules_build.py b/tests/test_phase_modules_build.py
-index 6fc77bd..e85cfa4 100644
+index 6fc77bd..712755e 100644
 --- a/tests/test_phase_modules_build.py
 +++ b/tests/test_phase_modules_build.py
 @@ -90,12 +90,14 @@ SURVIVAL = {
@@ -1675,12 +1681,12 @@ index 6fc77bd..e85cfa4 100644
 -# added after it under a heading of its own
 -STEP7_SHA256 = "70a1aacaca66592b23a4ce3783c81f7a10b60e9c7a6e9ac536296e1b6aaac2e7"
 +# sha256 of step 7 as the sub-file holds it after TASK-034 (from its heading to the line before "The review ceiling",
-+# LF, trailing whitespace stripped; 7,628 characters). TASK-030 moved the step verbatim from the module (then 6,967
++# LF, trailing whitespace stripped; 7,641 characters). TASK-030 moved the step verbatim from the module (then 6,967
 +# characters at origin/main 02f0ab5, sha256 70a1aacaca66592b...), its mutation run added after it under a heading of its own;
 +# TASK-034 reworded its Iterate and Re-delegate bullets (a new numbered brief), the root-cause-first paragraph's fix
 +# brief (`<ID>-r<N>` inside a gate, BUG after a merge) and the brake's by-class bullet (the five classes, the class
-+# the defect), and added "The review ceiling" between the step and the mutation run (R-042)
-+STEP7_SHA256 = "88d85c1599fff5662ffa75cdd3f012b94332a15bba454094d017a2ed98b3a979"
++# the defect, for the increment or the stage), and added "The review ceiling" between the step and the mutation run (R-042)
++STEP7_SHA256 = "dcf588e45b134ec855bfc9da83ab356d4ab82b15f294426c849e35c01f9ae261"
  
  
  def test_r032_step_7_is_verbatim():
@@ -1693,7 +1699,7 @@ index 6fc77bd..e85cfa4 100644
 -    step = sub[sub.index("### " + STEP7):sub.index("#### The mutation run")].rstrip()
 -    assert len(step) == 6967 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
 +    step = sub[sub.index("### " + STEP7):sub.index("#### The review ceiling")].rstrip()
-+    assert len(step) == 7628 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
++    assert len(step) == 7641 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
  
  
  def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
