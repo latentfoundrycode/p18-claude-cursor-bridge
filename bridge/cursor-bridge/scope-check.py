@@ -200,7 +200,7 @@ def supervisors_own(path, base, uncommitted):
 
 def builder_windows():
     """[(start, end)] in epoch seconds of every builder run in the launcher's log (run/launcher/runs.jsonl,
-    read from the current folder, the Workspace), each end with two minutes of slack; None when the log
+    read from the current folder, the Workspace), each end at id + waited + seconds + two minutes of slack; None when the log
     cannot be read, so the `supervisor:` test exemption fails closed (the review of 2026.10.25a)."""
     import datetime
     import json
@@ -222,7 +222,8 @@ def builder_windows():
         except (ValueError, TypeError):
             continue
         seconds = e.get("seconds") if isinstance(e.get("seconds"), (int, float)) else e.get("limit") or 7200
-        out.append((start, start + float(seconds) + 120))
+        waited = e.get("waited") if isinstance(e.get("waited"), (int, float)) else 0
+        out.append((start, start + float(waited) + float(seconds) + 120))
     return out
 
 

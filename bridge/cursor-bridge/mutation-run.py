@@ -15,7 +15,6 @@ import importlib.machinery
 import json
 import os
 import re
-import tomllib
 import shutil
 import signal
 import struct
@@ -29,7 +28,8 @@ from datetime import datetime, timezone
 _BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BRIDGE_DIR not in sys.path:
     sys.path.insert(0, _BRIDGE_DIR)
-import bridge_env
+tomllib = None
+bridge_env = None
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 MUTANT_ID_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -622,6 +622,7 @@ def extract_archive_tar(tar_bytes, dest):
 def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
     data = git("archive", "--format=tar", commit, cwd=workspace, binary=True)
     extract_archive_tar(data, dest)
+    copied_conftest = set()
     for item in new_tests or []:
         if "::" in item:
             fpart = item.split("::", 1)[0]
@@ -633,6 +634,15 @@ def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
             dst = os.path.join(dest, fpart)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
+        for cp in conftest_paths(fpart):
+            if cp in copied_conftest:
+                continue
+            conf_src = os.path.join(workspace, cp)
+            if os.path.isfile(conf_src):
+                conf_dst = os.path.join(dest, cp)
+                os.makedirs(os.path.dirname(conf_dst), exist_ok=True)
+                shutil.copy2(conf_src, conf_dst)
+                copied_conftest.add(cp)
     env_src = os.path.join(workspace, ".env")
     if os.path.isfile(env_src):
         shutil.copy2(env_src, os.path.join(dest, ".env"))
@@ -1508,6 +1518,15 @@ def main(argv=None):
 
 
 def run_main():
+    global tomllib, bridge_env
+    try:
+        import tomllib as _tomllib
+        import bridge_env as _bridge_env
+        tomllib = _tomllib
+        bridge_env = _bridge_env
+    except ImportError as e:
+        print("mutation-run: internal error - %s" % e, file=sys.stderr)
+        return 3
     try:
         return main()
     except ResolutionTimeout as e:

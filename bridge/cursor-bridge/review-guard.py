@@ -299,9 +299,35 @@ def snapshot_rewritten(common, nnn):
     return None
 
 
+def _review_name_holds_id(name, nnn):
+    sid = str(nnn)
+    start = 0
+    while True:
+        pos = name.find(sid, start)
+        if pos < 0:
+            return False
+        if (pos == 0 or not name[pos - 1].isalnum()) and _review_id_suffix_ok(name, pos + len(sid)):
+            return True
+        start = pos + 1
+
+
+def _review_id_suffix_ok(name, after):
+    if after >= len(name):
+        return True
+    if name[after] == ".":
+        return True
+    if name[after] == "-":
+        rest = name[after + 1 :]
+        if len(rest) >= 2 and rest[0] in "rR" and rest[1].isdigit():
+            return False
+        return True
+    return False
+
+
 def review_inputs(root, nnn):
-    """[(name, size)] of the files directly under run/review/ whose name contains <nnn>, the
-    launcher's own REVIEW-<nnn>.err excepted: what the two reviewers are told to read."""
+    """[(name, size)] of the files directly under run/review/ whose name holds <nnn> at an ID boundary (the ID
+    starts the name or follows a non-alphanumeric character, and ends the name, a dot, or a hyphen that does not
+    start a round suffix -r<digit>), the launcher's own REVIEW-<nnn>.err excepted: what the two reviewers are told to read."""
     folder = os.path.join(root, "run", "review")
     try:
         names = sorted(os.listdir(folder))
@@ -310,7 +336,7 @@ def review_inputs(root, nnn):
     out = []
     for name in names:
         p = os.path.join(folder, name)
-        if str(nnn) in name and name != "REVIEW-%s.err" % nnn and os.path.isfile(p):
+        if _review_name_holds_id(name, nnn) and name != "REVIEW-%s.err" % nnn and os.path.isfile(p):
             out.append((name, os.path.getsize(p)))
     return out
 

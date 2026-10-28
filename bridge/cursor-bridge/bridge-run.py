@@ -702,6 +702,8 @@ def builder_review_refusal(argv, folder, kind):
     class_used = set()
     for row in bridge_env.read_runs_jsonl(folder):
         if row.get("brief") == id_part and row.get("lift") == "class" and row.get("lift_line"):
+            if row.get("slot") == "not free":
+                continue
             class_used.add(row["lift_line"])
     blk = bridge_env.read_blocking_class_line(brief_text)
     owner_entry = owner_lifts.get(id_part)
@@ -1476,12 +1478,16 @@ def main():
         sys.stderr.write("bridge-run: refused - %s\n" % reason)
         return 125
     brief_meta = None
+    brief_recheck_path = None
     if head_of(cmd) == "cursor-agent":
         pre_kind = kind if kind is not None else (kind_of(cmd) or "builder")
         reason, brief_meta = builder_review_refusal(cmd, folder, pre_kind)
         if reason:
             sys.stderr.write("bridge-run: refused - %s\n" % reason)
             return 125
+        if brief_meta is not None:
+            ws = workspace_of(cmd, folder)
+            brief_recheck_path = os.path.join(ws, "handoff", brief_meta["brief_name"] + ".md")
     if kind is None:
         kind = kind_of(cmd)
     if kind is None and os.environ.get("BRIDGE_RUN_ALLOW_ANY") == "1":
@@ -1611,6 +1617,23 @@ def main():
             write_log(folder, entry)
             return 123
         slot_fd, entry["waited"] = slot_result[0], slot_result[1]
+
+    if brief_meta is not None and slot_fd is not None:
+        try:
+            after_sha = hashlib.sha256(open(brief_recheck_path, "rb").read()).hexdigest()
+        except OSError:
+            after_sha = None
+        if after_sha != brief_meta["brief_sha256"]:
+            _unlock_byte(slot_fd)
+            try:
+                os.close(slot_fd)
+            except OSError:
+                pass
+            sys.stderr.write(
+                "bridge-run: refused - %s\n"
+                % _brief_rule_refusal("brief rule: the brief changed while the launch waited for the slot")
+            )
+            return 125
 
     if kind == "driver" and len(cmd) >= 2 and not verify_driver_program_abs(cmd[1], folder):
         if slot_fd is not None:
