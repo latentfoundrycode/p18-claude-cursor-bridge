@@ -1,0 +1,925 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 43754d2..6be5b9d 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.25a",
+-  "generated": "2026-10-28 12:39",
++  "generated": "2026-10-28 15:54",
+   "files": {
+     "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
+     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
+@@ -86,7 +86,7 @@
+     "cursor-bridge/loop-guard.py": "7e53abc536c346a469756ddd43e04a81069aa1289687118ecd1252dede759375",
+     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
+     "cursor-bridge/mutation-run.py": "38c38fda6590087f16d5dee65d09e60611ab43abff120ea357716ea12a9c6f74",
+-    "cursor-bridge/pace-report.py": "4f0e44dcc97c83c60fbc97b9b8e81efbb7d5d10a637d39618686f7ba38c16e9c",
++    "cursor-bridge/pace-report.py": "7fd2893a040aa7afba9fe3488541eb1950109bd192d0a7b81cf3460a3dc24b07",
+     "cursor-bridge/permission-guard.py": "311d0cf82b7912467393daac88e2ba1202379c1b27e945a4b7ffe44569164490",
+     "cursor-bridge/plan-check.py": "5212b21737d4da78b144ff206595dcbfe1d6145c5e447239177132f7fd33c204",
+     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
+diff --git a/bridge/cursor-bridge/pace-report.py b/bridge/cursor-bridge/pace-report.py
+index 7162bd9..8655827 100644
+--- a/bridge/cursor-bridge/pace-report.py
++++ b/bridge/cursor-bridge/pace-report.py
+@@ -837,14 +837,7 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
+         else:
+             over.append((ident, rnd))
+ 
+-    for ident, rnd in over:
+-        lifts = _lift_map(ws, common, ident)
+-        parts = ["%s: %d rounds" % (_ascii_name(ident), rnd)]
+-        for r in range(ceiling + 1, rnd + 1):
+-            lv = lifts.get(r, "unknown")
+-            parts.append("r%d %s" % (r, lv))
+-        lines.append("- " + "; ".join(parts))
+-    for ident, rnd in stage:
++    for ident, rnd in over + stage:
+         lifts = _lift_map(ws, common, ident)
+         parts = ["%s: %d rounds" % (_ascii_name(ident), rnd)]
+         for r in range(ceiling + 1, rnd + 1):
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index abd99ad..37c02e8 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1294,3 +1294,13 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ - **The full trace runs only where the baseline commit is** (CI's depth-1 checkout skips it, INVENTORY, Decisions); it runs at the supervisor's step 4 and over the split here.
+ - **A passage dropped under a reworded section is excused, not dropped** (the mutation driver's first run: the "Deliver the installer" item cut from installable.md gave 51 excused and RESULT: OK, the core's TASK-034 `reword` under its baseline heading excusing it; the trace check's section-wide entries, INVENTORY, Decisions): "nothing dropped" holds through the recorded list of excused passages, which tests/test_core_carve.py pins and tests/test_trace_full_split.py now asserts too; per-passage entries in the trace check would remove the dependence.
+ - **WALK's pairing of a `Phase:` value with its modules is transcribed** (Review A's confirming read, Consider): the walk checks that each module stands in the core's "The phase modules" table, not which row names it, since the table's Phase column is prose (planning's value covering the run parameters is the hook's map, TASK-015); a module moved to another phase's row is not seen here.
++- **Review B's note on TASK-025** (NOTED, not taken): `references()` in tests/test_reads_only_applicable.py reads the reference lines the hook prints and does not stat each reference file, so a reference text the hook names but the copy of bridge/ lacks is not seen by that test, which compares the names with an unclassified project's at the same phase; a stat of each named reference would close it.
++
++### Stage B5's refactoring pass (REFAC-B5, 2026-10-28)
++- **Inputs:** jscpd 5.4.1 over bridge, tests and tools (104 clones); those touching a file stage B5 changed (e671e39 to 8a29708) ranked by refactor-scout against the 400-line budget.
++- **Taken:** the tests lane, tests/phase_modules.py holding the R-004 and R-006 test bodies (`assert_survival_list`, `assert_declares_registry_points`, `assert_points_placed`, the registry readers) the four phase-module test files copied (stage B4's beyond-budget lead) and the R-005 hook run (`hook_named`) two of them copied, and the seven inline copies of `run_mr`'s body in six tests of tests/test_mutation_run.py (collected test set identical, 3,234; `refactor-check.py --lane tests` PURE); tests/conftest.py registers tests/phase_modules.py for pytest's assertion rewriting, so the moved assertions still run under `python -O` (Review A; shown with a throwaway test that fails under `-O` without the registration); REFAC-003, pace-report.py's two identical lift loops made one (builder).
++- **Skipped, a half uncovered (a characterization test would need its own gate on main first):** conformance-check.py's three loaders of workflow-check.py (about 50 lines; calibration's not-checked returns after a first good load are reached by no test); mutation-run.py's `.env` and untracked copy tail in `copy_tracked` and `archive_checkpoint` (about 22 lines; the checkpoint's untracked copy untested).
++- **Beyond budget (the next stage's scout reads it first):** the date and git helpers the supervisor's acceptance tests share with the builder's tests (tests/test_pace_report.py, tests/test_task033_supervisor.py).
++- **Dropped:** tests/test_conformance_windowless.py's three-line pytest tree (low payoff).
++- **A lead:** tests/instructions.py, the older shared helper module, holds one plain `assert`, which `python -O` strips; nothing runs the suite with `-O` today, and the registration above names phase_modules only.
++- **Held by a recorded decision** (INVENTORY, Decisions, subject `pace`): `_link_folder` in tests/test_session_start_module.py and tests/test_trace_check.py, and now tests/test_bridge_run_driver.py; trace-check.py's `not_checked`.
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 9a9e584..58de517 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -52,7 +52,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | Python 3.12 + pytest 9.1.1 + pyyaml 6.0.3 (with their closure) | tool | requirements.lock (CI installs from it since TASK-002); Python pinned in .github/workflows/tests.yml | the bridge's CI | pre-B; lockfile since TASK-002 |
+ | GitHub repository (public; protected `main`, required checks: the tests jobs and `security floor`) | config | github.com/latentfoundrycode/p18-claude-cursor-bridge | the gate, every PR | pre-B |
+ | Semgrep 1.176.1 / OSV-Scanner 2.7.0 / Socket CLI 1.7.0 | tool | .github/workflows/tests.yml, job `security floor` (Semgrep through pipx at its version; OSV-Scanner's binary checked by SHA-256; Socket CLI at its version) | the bridge's CI gate | TASK-002 |
+-| jscpd 5.4.1 | tool | run by `npx --yes jscpd@5.4.1` at stage B4's refactoring pass (2026-10-25), the newest release then older than two weeks (2026-10-09; 5.4.2 was five days old), with no dependencies beyond its platform binaries, each pinned to 5.4.1 and without dependencies of their own (npm, read 2026-10-25); before it 5.4.0, run at stage B3's refactoring pass (2026-10-22), the newest release then older than two weeks (5.4.1 was 13 days old), with no dependencies beyond its platform binaries, each pinned to 5.4.0 (npm, read 2026-10-22); before it 5.3.3, run at stage B2's refactoring pass, chosen as a release older than two weeks (5.4.1 was eight days old); 5.4.0 (2026-09-30) was also old enough and was overlooked, so the next pass takes the newest release then older than two weeks; jscpd 5.3.3 has no dependencies beyond its platform binaries, each pinned to 5.3.3 and without dependencies of their own, so the pin fixes the whole tree (npm, read 2026-10-17) | the stage-close refactoring pass (bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md) | 2026-10-17, 2026-10-22 and 2026-10-25, supervisor |
++| jscpd 5.4.1 | tool | run by `npx --yes jscpd@5.4.1` at stage B4's refactoring pass (2026-10-25) and again at stage B5's (2026-10-28), the newest release then older than two weeks (2026-10-09; 5.4.2 was five days old on 2026-10-25 and eight on 2026-10-28), with no dependencies beyond its platform binaries, each pinned to 5.4.1 and without dependencies of their own (npm, read 2026-10-25); before it 5.4.0, run at stage B3's refactoring pass (2026-10-22), the newest release then older than two weeks (5.4.1 was 13 days old), with no dependencies beyond its platform binaries, each pinned to 5.4.0 (npm, read 2026-10-22); before it 5.3.3, run at stage B2's refactoring pass, chosen as a release older than two weeks (5.4.1 was eight days old); 5.4.0 (2026-09-30) was also old enough and was overlooked, so the next pass takes the newest release then older than two weeks; jscpd 5.3.3 has no dependencies beyond its platform binaries, each pinned to 5.3.3 and without dependencies of their own, so the pin fixes the whole tree (npm, read 2026-10-17) | the stage-close refactoring pass (bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md) | 2026-10-17, 2026-10-22, 2026-10-25 and 2026-10-28, supervisor |
+ | SOCKET_SECURITY_API_KEY | repo secret | GitHub repository secrets (name only) | the Socket step of the security floor (`SOCKET_CLI_API_TOKEN`) | the owner, 2026-10-12; free tier, no spend possible. 5 characters of its secret part were in public CI logs of PR #16 (ISS-005): those logs deleted and the key replaced by the owner 2026-10-18 (Socket allows one token, so the old one is void) |
+ | SEMGREP_APP_TOKEN | repo secret | GitHub repository secrets (name only) | nothing: Semgrep runs the OSS engine without a token (owner, 2026-10-12) | the owner; unused, no spend possible |
+ | SOCKET_ORG_SLUG, SOCKET_CLI_ORG_SLUG | repo variable (an identifier, public) | SOCKET_ORG_SLUG is a GitHub repository variable, value `latent-foundry`; SOCKET_CLI_ORG_SLUG is only the Socket step's environment name for it | the Socket step of the security floor: `socket ci` 1.7.0 reads SOCKET_CLI_ORG_SLUG before it asks the API (handoff/TASK-002-r6-report.md) | the owner, 2026-10-12 |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index fb8131a..a83c910 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,10 +3,10 @@ Last updated: 2026-10-28
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at the merge of TASK-025 (PR #98); next is stage B5's close
+-Last accepted: TASK-025 (PR #98, at its merge): release B's acceptance tests: the full trace (R-029), reads-only to configuration (R-030) and the fixtures' classification (R-031's half), supervisor-authored (INVENTORY); before it TASK-034 (PR #97); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-025, TASK-028 to TASK-035, BUG-001 to BUG-029, the refactoring passes of B2 to B4, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Increment: none — this file states the position at the merge of stage B5's refactoring pass (PR #99); next is stage B5's review
++Last accepted: stage B5's refactoring pass (PR #99, at its merge): the tests lane's tests/phase_modules.py helpers and run_mr, and REFAC-003; before it TASK-025 (PR #98): release B's acceptance tests; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-025, TASK-028 to TASK-035, BUG-001 to BUG-029, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: nothing
+-Next: stage B5's close: the refactoring pass (on), the stage review of B5's whole change, the demonstration and the reflection items; then stage B6 (TASK-026, TASK-027). The three-round review ceiling applies by hand until release B installs at stage B6 (TASK-032's programs are not installed yet; INVENTORY, Decisions). No increment is marked `Parallel: yes`, so builders run one after the other. No pull-request title that is not an increment's names a plan ID inside its closing parenthesis (ISS-013).
++Next: stage B5's close: the stage review of B5's whole change, the demonstration and the reflection items; then stage B6 (TASK-026, TASK-027). The three-round review ceiling applies by hand until release B installs at stage B6 (TASK-032's programs are not installed yet; INVENTORY, Decisions). No increment is marked `Parallel: yes`, so builders run one after the other. No pull-request title that is not an increment's names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -15,8 +15,8 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); each closed gate's own files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*.py, bug0nn_*.py, stage_b4_scope_r*.py, stage-b4-review-r*.md, and the bug, fix, refactoring and stage-review files of stages B1 to B3; the plan revision maintainer-text's: plan_text_*.py, design_text_file.py, write_review_plantext.py, *-PLAN-TEXT.md, msg-plan-text-*.txt; TASK-030's: task030_*.py; TASK-032's: task032_*.py, task032_*.md; TASK-033's: task033_*.py, task033_*.md; TASK-035's: task035_*.py; TASK-034's: task034_*.py; TASK-025's: task025_*.py); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py, demo_b3.py, demo_b4.py (run with python -X utf8); drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #98, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24; B4 (the first conditional workflows) — closed 2026-10-25: TASK-022 (PR #66), the plan revision (PR #67), TASK-017 to TASK-021 (PRs #68 to #72), BUG-020 (PR #73), REFAC-B4 (PR #74), the stage review's seven rounds fixed by BUG-021 to BUG-027 (PRs #75 to #81), closed at round 7 under the owner's cap; B5 (calibration and acceptance) in progress: HOTFIX-002 (PR #84), TASK-023 (PR #85), TASK-024 (PR #86), BUG-028 (PR #87, ISS-016), TASK-028 (PR #88), TASK-029 (PR #89), BUG-029 (PR #90), TASK-031 (PR #91), the plan revision maintainer-text (PR #92), TASK-030 (PR #93), TASK-032 (PR #94), TASK-033 (PR #95), TASK-035 (PR #96), TASK-034 (PR #97), TASK-025 (PR #98). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B4's close, 2026-10-25 (demonstration passed; the installed conformance check, run by the supervisor signed in to gh, 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-014 completed, ISS-015 recorded; Feedback FB-042 to FB-050; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #99, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24; B4 (the first conditional workflows) — closed 2026-10-25: TASK-022 (PR #66), the plan revision (PR #67), TASK-017 to TASK-021 (PRs #68 to #72), BUG-020 (PR #73), REFAC-B4 (PR #74), the stage review's seven rounds fixed by BUG-021 to BUG-027 (PRs #75 to #81), closed at round 7 under the owner's cap; B5 (calibration and acceptance) in progress: HOTFIX-002 (PR #84), TASK-023 (PR #85), TASK-024 (PR #86), BUG-028 (PR #87, ISS-016), TASK-028 (PR #88), TASK-029 (PR #89), BUG-029 (PR #90), TASK-031 (PR #91), the plan revision maintainer-text (PR #92), TASK-030 (PR #93), TASK-032 (PR #94), TASK-033 (PR #95), TASK-035 (PR #96), TASK-034 (PR #97), TASK-025 (PR #98), REFAC-B5 (PR #99). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B4's close, 2026-10-25 (demonstration passed; the installed conformance check, run by the supervisor signed in to gh, 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-014 completed, ISS-015 recorded; Feedback FB-042 to FB-050; least confident in HARDENING; Project Summary patched)
+ Deferred increments: none
+ Open issues: ISS-017 recorded, recurred in TASK-033 (TASK-032's builder delivered rounds 1 and 2 incomplete and its round-3 report claimed work it had not done; the supervisor wrote the acceptance tests, 2026-10-28; TASK-033's round-3 report claimed deadline checks the code did not make and two mutation kills that survived, 2026-10-28). ISS-016 fixed by BUG-028 (a review-guard test recorded CPython's POSIX subprocess wait as the guard's sleep, failing PR #86's Linux job once, 2026-10-26). ISS-015 mitigated (stage B4's review ran seven rounds under the owner's decided three-round ceiling, which no program held yet, 2026-10-25; the ceiling applied by hand until TASK-032 to TASK-035 hold it). ISS-014 fixed (the loop guard's cron_next missed a one-shot wake-up in the hour clocks repeat, 2026-10-25; BUG-020, PR #73). ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged; the plan check's rule is TASK-033's). ISS-012 fixed. ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; TASK-029's thirty-minute wait: a launcher run started from the Bash tool waited 34 min 49 s in the slot and reached slot taken, no outside kill (recorded 2026-10-26); the maintainer's record shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+diff --git a/handoff/REFAC-003-r1-report.md b/handoff/REFAC-003-r1-report.md
+new file mode 100644
+index 0000000..040e11e
+--- /dev/null
++++ b/handoff/REFAC-003-r1-report.md
+@@ -0,0 +1,83 @@
++# REFAC-003 round 1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/pace-report.py` (lines 840–853 only)
++
++## Summary
++
++In `_project_section`, the two identical loops that printed over-ceiling IDs and stage-review IDs were merged into a single loop `for ident, rnd in over + stage:` with one copy of the six-line body, preserving print order (all `over` entries first, then all `stage` entries) and leaving every other line of the file unchanged.
++
++## Pytest (`python -m pytest -q tests/test_pace_report.py -p no:cacheprovider`)
++
++Before edit:
++
++```
++......                                                                   [100%]
++6 passed in 1.64s
++```
++
++After edit:
++
++```
++......                                                                   [100%]
++6 passed in 2.65s
++```
++
++## Importlib check
++
++```
++ok
++```
++
++(exit code 0)
++
++## `python tools/dump-cli.py --check`
++
++(exit code 0, no stdout)
++
++## Windowless check
++
++```
++windowless-check: 35 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++(exit code 0)
++
++## git status
++
++```
++On branch refactor/B5
++Your branch is ahead of 'origin/main' by 2 commits.
++  (use "git push" to publish your local commits)
++
++Changes not staged for commit:
++  (use "git add <file>..." to update what will be committed)
++  (use "git restore <file>..." to discard changes in working directory)
++	modified:   bridge/cursor-bridge/pace-report.py
++
++no changes added to commit (use "git add" and/or "git commit -a")
++```
++
++## git diff --stat
++
++```
++ bridge/cursor-bridge/pace-report.py | 9 +--------
++ 1 file changed, 1 insertion(+), 8 deletions(-)
++```
++
++## Behaviour identical
++
++The loop iterates the same `(ident, rnd)` pairs in the same sequence as before (`over` then `stage`), and each iteration runs the same body that calls `_lift_map`, builds `parts`, and appends the same formatted line to `lines`, so stdout, stderr, and exit codes are unchanged for every input.
++
++## Manifest
++
++`bridge/cursor-bridge/MANIFEST.json` is now stale for `cursor-bridge/pace-report.py`; manifest-comparing tests are expected to fail on that file until the supervisor regenerates the manifest.
++
++## Noticed, not changed
++
++Nothing beyond the scoped duplicate loops; no other issues observed during this increment.
++
++## Assumed, not verified
++
++Assumed, not verified: none
+diff --git a/handoff/REFAC-003.md b/handoff/REFAC-003.md
+new file mode 100644
+index 0000000..6c61532
+--- /dev/null
++++ b/handoff/REFAC-003.md
+@@ -0,0 +1,123 @@
++# REFAC-003: pace-report.py prints the over-ceiling and stage-review lines from one loop
++
++## Objective
++Refactoring — remove duplication / simplify **without any change in behaviour**.
++
++The pace report (`bridge/cursor-bridge/pace-report.py`, the supervisor's read-only weekly pace tables) ends each project section by listing the IDs over the review ceiling and then the stage reviews (`STAGE-<name>`). The function `def _project_section(name, root, weeks, ceiling, with_tokens, home, er):` collects these in two lists, `over` and `stage` (lines 815-838), and then prints them with two loops whose bodies are identical line for line (lines 840-853). This is refactor-scout's candidate 6 for stage B5 (COVERED: the lines are exercised by `tests/test_pace_report.py` and `tests/test_task033_supervisor*.py`).
++
++Site: `bridge/cursor-bridge/pace-report.py`, lines 840-853, which today read exactly:
++
++```python
++    for ident, rnd in over:
++        lifts = _lift_map(ws, common, ident)
++        parts = ["%s: %d rounds" % (_ascii_name(ident), rnd)]
++        for r in range(ceiling + 1, rnd + 1):
++            lv = lifts.get(r, "unknown")
++            parts.append("r%d %s" % (r, lv))
++        lines.append("- " + "; ".join(parts))
++    for ident, rnd in stage:
++        lifts = _lift_map(ws, common, ident)
++        parts = ["%s: %d rounds" % (_ascii_name(ident), rnd)]
++        for r in range(ceiling + 1, rnd + 1):
++            lv = lifts.get(r, "unknown")
++            parts.append("r%d %s" % (r, lv))
++        lines.append("- " + "; ".join(parts))
++```
++
++Proposed shape: one loop, `for ident, rnd in over + stage:`, with the six-line body written once, unchanged, at the same indentation. The printed lines keep exactly the same order: every `over` line in its current order, then every `stage` line in its current order.
++
++Callers to update: none. The two loops are local to `_project_section`; no other code reads them, and `over` and `stage` are not used after line 853.
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/pace-report.py (lines 840-853 only)
++- docs/BUILDER_NOTES.md (append only)
++- handoff/REFAC-003-r1-report.md
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration, pre-commit configuration, anything under `tools/`. In particular, do **not** run `tools/make-manifest.py`, and do not run `tools/dump-cli.py` without `--check`
++- docs/ and handoff/, except the files the Scope section names
++- every file under `tests/`: no test file may be edited, renamed or created. This branch already carries the supervisor's tests-lane commit (`4a25d36 supervisor: REFAC-B5 tests lane: ...`), and you must not touch it
++- `bridge/cursor-bridge/MANIFEST.json` and `bridge/cursor-bridge/VERSION`: the supervisor regenerates the manifest after your run
++- `docs/CHANGES.md` and `bridge/cursor-bridge/CHANGELOG.md`: a refactoring has no change entry
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md`: no command changes, and the command reference must not change
++- every other line of pace-report.py (the module docstring, the imports, the collection loop at lines 815-838, the `unknown_starts` block from line 855 on, and every other function) and every other file under `bridge/`
++
++## Context
++**What the code is today** (branch `refactor/B5`, head `4a25d36`, the supervisor's tests-lane commit). The supervisor's reality check before this brief, on this branch:
++- Lines 840-853 are exactly the two loops quoted in the Objective; the bodies are identical character for character.
++- `over` and `stage` are plain Python lists built at lines 815-816 (`over = []`, `stage = []`) and filled with `(ident, rnd)` tuples by `.append` at lines 836 and 838. `over + stage` is therefore a new list holding every `over` tuple in order, then every `stage` tuple in order; neither list is modified by the loops, and neither name is read after line 853.
++- `_lift_map(ws, common, id_part)` (line 389) and `_ascii_name(name)` (line 85) are module functions; calling them in the same sequence of arguments as today keeps every call and every appended line in the same order.
++- The program runs `main()` only under `if __name__ == "__main__":` (line 950), so importing it through importlib runs nothing.
++
++**How the tests reach this code.** `tests/test_pace_report.py` runs the Workspace source as a subprocess (`PACE = os.path.join(WORKSPACE, "bridge", "cursor-bridge", "pace-report.py")`, `def pace(args, cwd):`) against git projects it builds under pytest's `tmp_path` (`class MiniProject`), with `GIT_CONFIG_GLOBAL` and `GIT_CONFIG_SYSTEM` set to `os.devnull`; some tests also load it through the `program` fixture (`program("pace-report")`, `tests/conftest.py` `def load_program(name):`). `tests/test_task033_supervisor.py`, `_r2.py`, `_r3.py` and `_r4.py` also cover the over-ceiling and stage lines; you do not run those (see Constraints), the supervisor does after your run.
++
++**The manifest.** `bridge/cursor-bridge/MANIFEST.json` holds a sha256 of every file under `bridge/` (today line 89, `"cursor-bridge/pace-report.py": "4f0e44dc..."`). After your edit that hash no longer matches. Any test that compares the sources with the manifest fails on pace-report.py until the supervisor regenerates the manifest after your run. That is expected: you do not run those tests and you do not regenerate the manifest. Name the expectation in your report.
++
++**The command reference.** `docs/cli-reference.json` is generated from each program's `build_parser()`. This change does not touch `build_parser()` (line 75), so `python tools/dump-cli.py --check` must stay green.
++
++**Security context.** The pace report is logic surface: `.cursor/rules/secure-coding.mdc` is in force for you, and the project's ASVS level is 2 (`docs/INVENTORY.md`, Decisions: "The builder's secure-coding rule is ASVS level 2"). The trust boundary is the project roots given on the command line and the git history, handoff files and launcher/guard records the program reads from them (read-only). This change only merges two printing loops and does not touch that boundary.
++
++**Development data** (`docs/INVENTORY.md`, Decisions): "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you this means: the test below runs the Workspace source against pytest's temporary folders. Never run pace-report.py yourself against a real project root, the real `~/.claude` (your user profile's `.claude` folder) or with no root argument (its default roots are the owner's projects), and never run `bridge-install.py`.
++
++## Diagrams
++No normative diagram covers this file (the repository has no `docs/diagrams/`). Merging two loops inside one function touches no component, data, state or sequence element.
++
++## Requirements
++1. Lines 840-853 of `bridge/cursor-bridge/pace-report.py` are replaced by one loop headed exactly `    for ident, rnd in over + stage:` (four spaces of indentation, as today), followed by the existing six-line body once, byte-identical to today's body, with the file's existing line endings and no trailing whitespace.
++2. The printed output keeps the same order: every `over` line, then every `stage` line, each group in its current order.
++3. No other line of pace-report.py changes. The docstring, the imports, the blank lines, lines 815-838, line 855 onward and every other function stay byte-identical.
++4. No other file changes, apart from your report and (if you have something to note) one appended line in `docs/BUILDER_NOTES.md`.
++
++## Acceptance criteria
++- [ ] Behaviour is identical: every output of pace-report.py (exit code, stdout, stderr) is byte-for-byte unchanged for every input.
++- [ ] `python -m pytest -q tests/test_pace_report.py -p no:cacheprovider` passes, before and after the edit, with the **same** test set (the same count of passed tests, none skipped or failed; record both counts in the report).
++- [ ] The importlib check (the command in Constraints) prints `ok` and exits 0.
++- [ ] `python tools/dump-cli.py --check` exits 0 after the edit; `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` are unchanged.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` reports 0 FAIL.
++- [ ] `git diff --stat` shows `bridge/cursor-bridge/pace-report.py` as the only product file changed, with 8 lines removed and 1 added (`1 insertion(+), 8 deletions(-)`). `git diff bridge/cursor-bridge/pace-report.py` shows only the first loop header changed to `over + stage` and the second loop (header and body) removed.
++- [ ] No test file changed; `bridge/cursor-bridge/MANIFEST.json` and `bridge/cursor-bridge/VERSION` unchanged; no entry in `docs/CHANGES.md` or `bridge/cursor-bridge/CHANGELOG.md`.
++- [ ] The duplicate code is gone: pace-report.py contains neither `for ident, rnd in over:` nor `for ident, rnd in stage:`, and `lifts = _lift_map(ws, common, ident)` appears exactly once in the file.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
++- If the brief, the rules, or the tooling got in your way — an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason — append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python — `0` on other platforms; `windowsHide: true` in Node). Capturing output does not prevent the window. A window is allowed only when it serves the user (they watch it or type into it); then write the reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path. This change launches no process and must not add one.
++- Never start a server, a watcher or a daemon that outlives a test: a test that needs the product running starts it through the test framework's own fixture and stops it there. A server left running keeps your run from ending (plan 10.3, release A2).
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. A development build uses the development data the design names (the inventory's `Development data` decision, quoted in Context) and refuses the installed product's data. Here that means the Workspace sources and pytest's temporary folders only, never the real `~/.claude` and never a real project root.
++- No value in this task is marked as the owner's.
++- Follow existing conventions in the files you touch.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff` and `git log` only.
++- Numbers from text, a file, a reply or an environment variable are parsed with the language's own parser, never by slicing or splitting a string. (This change parses no number.)
++- An increment that starts a process meets the process checklist (windowless, stopped in a `finally`/teardown with its tree, nothing outlives the test, a browser on Windows launched attached, pipes closed or drained). This change starts none.
++- Every verification command is written here in full. Run exactly these, each from the Workspace root (the folder you were started in):
++  - Before the edit, and again after it: `python -m pytest -q tests/test_pace_report.py -p no:cacheprovider`
++  - After the edit: `python -c "import importlib.util; s = importlib.util.spec_from_file_location('pace_report', 'bridge/cursor-bridge/pace-report.py'); m = importlib.util.module_from_spec(s); s.loader.exec_module(m); print('ok')"`
++  - After the edit: `python tools/dump-cli.py --check`
++  - After the edit: `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++  - At the end: `git status` and `git diff --stat`, both pasted into the report.
++  - Do not run the full suite, any other test file (including `tests/test_task033_supervisor*.py`), or `tools/make-manifest.py`. The supervisor regenerates the manifest and runs the full suite after your run, and the manifest-comparing tests fail on pace-report.py until then.
++  Mutation checking is not asked for in this task.
++- Prefer reuse over new code and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability, or accessibility requirement stated above.
++- **Refactoring constraints.** Do not edit any test file. Do not add an entry to `docs/CHANGES.md` (or to `bridge/cursor-bridge/CHANGELOG.md`). Do not "improve" behaviour, messages, edge cases, or defaults you notice along the way; report them in your summary instead. Do not introduce an abstraction beyond what the listed duplicates need: no helper function, no `itertools.chain`, no renamed variable; the change is the one merged loop named above.
++
++## Done
++Your report is the file `handoff/REFAC-003-r1-report.md`, which you write as you go — what you did, what you changed, what you ran and what it printed, what you could not do — so that nothing of it is lost when your run ends early. When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- the before and after outputs of the pytest command, with both counts;
++- the output of the importlib check, of `python tools/dump-cli.py --check` and of the windowless check;
++- `git status` and `git diff --stat`;
++- one sentence stating why the behaviour is identical;
++- a line saying that `bridge/cursor-bridge/MANIFEST.json` is now stale for `cursor-bridge/pace-report.py`, and that the manifest-comparing tests are expected to fail on it until the supervisor regenerates the manifest;
++- anything you noticed but did not change (per the refactoring constraints);
++- a final section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 65340d9..8f271dd 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -5,6 +5,10 @@ import tempfile
+ 
+ import pytest
+ 
++# tests/phase_modules.py holds assertions the phase-module tests share; pytest rewrites them as it does a test module's,
++# so they still run under `python -O` (stage B5's refactoring pass; FIX-004's rule, phase_modules.section_span).
++pytest.register_assert_rewrite("phase_modules")
++
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ CURSOR_BRIDGE = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge")
+ 
+diff --git a/tests/phase_modules.py b/tests/phase_modules.py
+index fb57467..f3a4fdc 100644
+--- a/tests/phase_modules.py
++++ b/tests/phase_modules.py
+@@ -1,8 +1,14 @@
+ """The phase modules as the phase-module tests read them (tests/test_phase_modules_*.py): a module's text with its
+-line endings made "\n", its headings and sections, and the extension points the registry names a module as declaring.
+-Not a test file; the tests import it as they import instructions.py."""
++line endings made "\n", its headings and sections, the extension points the registry names a module as declaring, and
++the R-004 and R-006 shapes every module's test asserts, and the files the session-start hook names for a phase (stage
++B5's refactoring pass). Not a test file; the tests import
++it as they import instructions.py."""
++import json
+ import os
+ import re
++import shutil
++import subprocess
++import sys
+ 
+ BRIDGE = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "bridge"))
+ PHASES = os.path.join(BRIDGE, "cursor-bridge", "workflow", "phases")
+@@ -76,14 +82,87 @@ def section(text, title, level):
+     return "\n".join(lines[start + 1:end])
+ 
+ 
+-def registry_points(module_key):
++def registry_rows(heading="## Extension points"):
++    """The rows of the registry's table under `heading`, each a {column: cell} dict."""
+     text = read(REGISTRY)
+-    table = text.split("\n## Extension points\n", 1)[1].split("\n## ", 1)[0]
++    table = text.split("\n" + heading + "\n", 1)[1].split("\n## ", 1)[0]
+     rows = [l for l in table.split("\n") if l.startswith("|")]
+     header = [c.strip() for c in rows[0].strip("|").split("|")]
+-    out = []
+-    for row in rows[2:]:
+-        cells = dict(zip(header, [c.strip() for c in row.strip("|").split("|")]))
+-        if cells["Declared by"] == module_key:
+-            out.append(cells["Key"])
+-    return out
++    return [dict(zip(header, [c.strip() for c in row.strip("|").split("|")])) for row in rows[2:]]
++
++
++def registry_points(module_key):
++    """The point keys the registry names `module_key` as declaring, in the table's order."""
++    return [r["Key"] for r in registry_rows() if r["Declared by"] == module_key]
++
++
++EXT_PROSE = ("This module offers the points below, each by its key in the extension-point registry "
++             "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and "
++             "whether it applies per part or per project. A conditional workflow's additions at a point are made where the "
++             "point's line places them, in the order the core states in \"Main and conditional workflows\".")
++
++
++def assert_survival_list(key, structure, intro, survival):
++    """R-004's shape for one module: its headings are `structure`; its first section, straight after its heading, is
++    the compaction-survival list, opening with `intro` and holding exactly the items `survival`."""
++    text = module(key)
++    assert headings(text) == structure, headings(text)
++    lines = text.split("\n")
++    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
++    body = section(text, "What must survive a compaction", 3).strip().split("\n")
++    assert body[0] == intro, body[0]
++    assert all(l.startswith("- ") for l in body[1:] if l), body
++    items = [l[2:] for l in body[1:] if l]
++    assert items == survival, items
++
++
++def assert_declares_registry_points(key, may_set=False):
++    """R-006's shape for one module: a `## Extension points` section, one line per point giving its key, exactly the
++    points the registry names the module as declaring, in the table's order, its prose EXT_PROSE; no point line says
++    "may set" unless `may_set` (a module whose points a type workflow may set). Returns the keys."""
++    body = section(module(key), "Extension points", 2).strip().split("\n")
++    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in body if l.startswith("- ")]
++    want = registry_points(key)
++    assert want and keys == want, (keys, want)
++    assert flat(" ".join(l for l in body if l and not l.startswith("- "))) == EXT_PROSE
++    if not may_set:
++        assert "may set" not in "\n".join(body)
++    return want
++
++
++def assert_points_placed(key, points):
++    """R-006: each point line of the module is `points`' text for its key, and says what the registry's Applies cell
++    states: a point that applies per project is made once for the whole project; one that applies per part names the
++    part."""
++    applies = {r["Key"]: r["Applies"] for r in registry_rows()}
++    body = section(module(key), "Extension points", 2).strip().split("\n")
++    for line in [l for l in body if l.startswith("- ")]:
++        k = re.match(r"^- `([a-z0-9.-]+)` — ", line).group(1)
++        assert line == "- `%s` — %s" % (k, points[k]), line
++        if applies[k] == "project":
++            assert line.endswith("; made once for the whole project."), (k, line)
++        else:
++            assert applies[k] == "part" and re.search(r"\b(of|for) the part\b", line), (k, applies[k], line)
++            assert "whole project" not in line, line
++
++
++def hook_named(tmp_path, phase):
++    """R-005: the phase-module files the installed session-start hook names after a compaction for `Phase: <phase>`,
++    the bridge's commands and cursor-bridge folders copied under a home of their own in `tmp_path` and a status file
++    with no classification; the hook exits 0 with nothing on stderr. Each path as the hook prints it, in its order."""
++    home = tmp_path / "home"
++    cb = os.path.join(BRIDGE, "cursor-bridge")
++    shutil.copytree(os.path.join(BRIDGE, "commands"), str(home / ".claude" / "commands"))
++    shutil.copytree(cb, str(home / ".claude" / "cursor-bridge"), ignore=shutil.ignore_patterns("__pycache__"))
++    ws = tmp_path / "proj" / "Workspace"
++    (ws / "docs").mkdir(parents=True)
++    (ws / "docs" / "PROJECT_STATUS.md").write_text(
++        "# Project Status\nPhase: %s\nWorkflows: not yet classified\nAwaiting user on: nothing\n" % phase,
++        encoding="utf-8")
++    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
++    data = {"cwd": str(ws), "hook_event_name": "SessionStart", "source": "compact"}
++    p = subprocess.run([sys.executable, os.path.join(cb, "session-start.py"), "--part", "pointers"],
++                       input=json.dumps(data), capture_output=True, text=True, encoding="utf-8", env=env)
++    assert p.returncode == 0 and p.stderr == "", p.stderr
++    w = "~/.claude/cursor-bridge/workflow/phases/"
++    return [re.match(r"  - (\S+)", l).group(1) for l in p.stdout.split("\n") if l.startswith("  - " + w)]
+diff --git a/tests/test_mutation_run.py b/tests/test_mutation_run.py
+index 4491c56..d1b8fed 100644
+--- a/tests/test_mutation_run.py
++++ b/tests/test_mutation_run.py
+@@ -1,6 +1,5 @@
+ """R-041: mutation-run.py applies mutants in a scratch copy and caches kills (TASK-031)."""
+ import ctypes
+-import hashlib
+ import json
+ import os
+ import shutil
+@@ -64,12 +63,14 @@ def mutants_path(ws, run_id, body):
+     return p
+ 
+ 
+-def run_mr(ws, mutants_file, scratch=None, timeout=60, extra=(), home_env=None, harness_slack=30):
++def run_mr(ws, mutants_file, scratch=None, timeout=60, extra=(), home_env=None, harness_slack=30, python=None,
++           env_extra=None):
+     env = dict(os.environ)
+     env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+     if home_env:
+         env["HOME"] = env["USERPROFILE"] = str(home_env)
+-    cmd = [sys.executable, MUTATION_RUN, str(mutants_file)] + list(extra)
++    env.update(env_extra or {})
++    cmd = [str(python or sys.executable), MUTATION_RUN, str(mutants_file)] + list(extra)
+     if scratch:
+         cmd += ["--scratch", str(scratch)]
+     cmd += ["--mutant-timeout", str(timeout)]
+@@ -690,11 +691,7 @@ def test_r041_editable_install_flat_kills_mutant(tmp_path):
+     }]}
+     mp = mutants_path(ws, "edif", body)
+     git(ws, "add", "run/supervisor/edif-mutants.json")
+-    env = dict(os.environ)
+-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+-    cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
+-                       **test_conftest.windowless_kwargs({}))
++    p = run_mr(ws, mp, harness_slack=60, python=vpy)
+     assert p.returncode == 0 and "killed" in p.stdout, p.stderr + p.stdout
+ 
+ 
+@@ -715,11 +712,7 @@ def test_r041_editable_install_src_kills_mutant(tmp_path):
+     }]}
+     mp = mutants_path(ws, "edis", body)
+     git(ws, "add", "run/supervisor/edis-mutants.json")
+-    env = dict(os.environ)
+-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+-    cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
+-                       **test_conftest.windowless_kwargs({}))
++    p = run_mr(ws, mp, harness_slack=60, python=vpy)
+     assert p.returncode == 0 and "killed" in p.stdout, p.stderr + p.stdout
+ 
+ 
+@@ -739,18 +732,12 @@ def test_r041_editable_src_only_refused(tmp_path):
+     }]}
+     mp = mutants_path(ws, "edir", body)
+     git(ws, "add", "run/supervisor/edir-mutants.json")
+-    env = dict(os.environ)
+-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+-    cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
+-                       **test_conftest.windowless_kwargs({}))
++    p = run_mr(ws, mp, harness_slack=60, python=vpy)
+     assert p.returncode == 2, p.stderr + p.stdout
+     sha = git(ws, "rev-parse", "HEAD")
+     mp2 = mutants_path(ws, "edir2", {"mutants": [], "new_tests": ["tests/test_calc.py::test_add"]})
+     git(ws, "add", "run/supervisor/edir2-mutants.json")
+-    cmd2 = [str(vpy), MUTATION_RUN, str(mp2), "--mutant-timeout", "60", "--checkpoint", sha]
+-    p2 = subprocess.run(cmd2, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
+-                        **test_conftest.windowless_kwargs({}))
++    p2 = run_mr(ws, mp2, extra=["--checkpoint", sha], harness_slack=60, python=vpy)
+     assert p2.returncode == 2, p2.stderr + p2.stdout
+     assert not (ws / "run/supervisor/mutation-cache/edir.jsonl").exists()
+     assert not (ws / "run/supervisor/mutation-cache/edir2.jsonl").exists()
+@@ -1534,13 +1521,8 @@ def test_task031_r9_iniconfig_not_importable_refused(tmp_path, home_of_the_tests
+                                                   "pairs": [{"old": "return a + b", "new": "return b + a"}],
+                                                   "tests": ["tests/test_calc.py"],
+                                                   "expect_fail": ["tests/test_calc.py::test_add"]}]})
+-    env = dict(os.environ)
+-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+-    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+-    env["PYTHONPATH"] = str(block) + os.pathsep + env.get("PYTHONPATH", "")
+-    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
+-                       **test_conftest.windowless_kwargs({}))
++    p = run_mr(ws, mp, home_env=home_of_the_tests,
++               env_extra={"PYTHONPATH": str(block) + os.pathsep + os.environ.get("PYTHONPATH", "")})
+     assert p.returncode == 2, p.stdout + p.stderr
+     assert "mutation-run: pytest's iniconfig is not importable" in p.stdout + p.stderr
+     assert not (ws / "run/supervisor/mutation-cache/inicfg.jsonl").exists()
+@@ -1560,12 +1542,7 @@ def test_task031_r10_iniconfig_shadow_case_insensitive_refused(tmp_path, home_of
+                                                     "pairs": [{"old": "return a + b", "new": "return b + a"}],
+                                                     "tests": ["tests/test_calc.py"],
+                                                     "expect_fail": ["tests/test_calc.py::test_add"]}]})
+-    env = dict(os.environ)
+-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+-    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+-    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
+-                       **test_conftest.windowless_kwargs({}))
++    p = run_mr(ws, mp, home_env=home_of_the_tests)
+     assert p.returncode == 2, p.stdout + p.stderr
+     assert "mutation-run: a top-level iniconfig in the project would shadow pytest's iniconfig" in p.stdout + p.stderr
+     assert not (ws / "run/supervisor/mutation-cache/r10case.jsonl").exists()
+@@ -1588,12 +1565,7 @@ def test_task031_r11_extension_suffix_shadow_refused(tmp_path, home_of_the_tests
+                                                    "pairs": [{"old": "return a + b", "new": "return b + a"}],
+                                                    "tests": ["tests/test_calc.py"],
+                                                    "expect_fail": ["tests/test_calc.py::test_add"]}]})
+-    env = dict(os.environ)
+-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+-    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+-    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
+-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
+-                       **test_conftest.windowless_kwargs({}))
++    p = run_mr(ws, mp, home_env=home_of_the_tests)
+     assert p.returncode == 2, p.stdout + p.stderr
+     assert (
+         "mutation-run: a top-level module tomllib in the project would shadow "
+diff --git a/tests/test_phase_modules_build.py b/tests/test_phase_modules_build.py
+index 712755e..de81c68 100644
+--- a/tests/test_phase_modules_build.py
++++ b/tests/test_phase_modules_build.py
+@@ -5,16 +5,12 @@ R-006 (each phase module declares the points the registry names it as declaring)
+ delegation-loop module, at 94% of the bound's characters before this increment, is split, its step 9 in a sub-file under
+ workflow/phases/delegation-loop/ that the module's own `Sub-files:` line names and the session-start hook follows);
+ docs/BUILD_PLAN.md TASK-013's Done when, and the pointer sweep for the split (the core's module table)."""
+-import json
+ import os
+-import re
+-import shutil
+-import subprocess
+-import sys
+ 
+ import pytest
+ 
+-from phase_modules import read, module, flat, headings, section, registry_points
++from phase_modules import (read, module, flat, headings, section, assert_survival_list, assert_declares_registry_points,
++                           assert_points_placed, hook_named)
+ 
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
+@@ -22,7 +18,6 @@ CB = os.path.join(BRIDGE, "cursor-bridge")
+ PHASES = os.path.join(CB, "workflow", "phases")
+ REGISTRY = os.path.join(CB, "workflow", "extension-points.md")
+ CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
+-HOOK = os.path.join(CB, "session-start.py")
+ 
+ SUB = "delegation-loop/refactoring-pass.md"
+ STEP9 = "9. Refactoring and optimization pass (at stage close)"
+@@ -125,32 +120,14 @@ KEYS = ["run-parameters", "configuration", "delegation-loop"]
+ def test_r004_the_module_opens_with_its_compaction_survival_list(key):
+     """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
+     exactly what a resumed session in that phase reads before its next action."""
+-    text = module(key)
+-    assert headings(text) == STRUCTURE[key], headings(text)
+-    lines = text.split("\n")
+-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
+-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
+-    assert body[0] == INTRO[key]
+-    assert all(l.startswith("- ") for l in body[1:] if l), body
+-    assert [l[2:] for l in body[1:] if l] == SURVIVAL[key]
++    assert_survival_list(key, STRUCTURE[key], INTRO[key], SURVIVAL[key])
+ 
+ 
+ @pytest.mark.parametrize("key", KEYS)
+ def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_order(key):
+     """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
+     per point giving its key, exactly the points the registry names this module as declaring, in the table's order."""
+-    body = section(module(key), "Extension points", 2).strip().split("\n")
+-    lines = [l for l in body if l.startswith("- ")]
+-    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in lines]
+-    want = registry_points(key)
+-    assert want and keys == want, (keys, want)
+-    prose = flat(" ".join(l for l in body if l and not l.startswith("- ")))
+-    assert prose == ("This module offers the points below, each by its key in the extension-point registry "
+-                     "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each "
+-                     "accepts and whether it applies per part or per project. A conditional workflow's additions at a "
+-                     "point are made where the point's line places them, in the order the core states in \"Main and "
+-                     "conditional workflows\".")
+-    assert "may set" not in "\n".join(body)
++    assert_declares_registry_points(key)
+ 
+ 
+ POINTS = {
+@@ -179,30 +156,12 @@ POINTS = {
+ }
+ 
+ 
+-def registry_applies():
+-    text = read(REGISTRY)
+-    table = text.split("\n## Extension points\n", 1)[1].split("\n## ", 1)[0]
+-    rows = [l for l in table.split("\n") if l.startswith("|")]
+-    header = [c.strip() for c in rows[0].strip("|").split("|")]
+-    return {cells["Key"]: cells["Applies"] for cells in
+-            (dict(zip(header, [c.strip() for c in row.strip("|").split("|")])) for row in rows[2:])}
+-
+-
+ @pytest.mark.parametrize("key", KEYS)
+ def test_r006_each_point_says_where_its_additions_are_made(key):
+     """R-006 and the registry's "How a phase module declares its points": each point's line places the additions a
+     conditional workflow makes there, and says what the registry's Applies cell states: a point that applies per
+     project is made once for the whole project; one that applies per part names the part (Review A, round 1, S5)."""
+-    applies = registry_applies()
+-    body = section(module(key), "Extension points", 2).strip().split("\n")
+-    for line in [l for l in body if l.startswith("- ")]:
+-        k = re.match(r"^- `([a-z0-9.-]+)` — ", line).group(1)
+-        assert line == "- `%s` — %s" % (k, POINTS[k]), line
+-        if applies[k] == "project":
+-            assert line.endswith("; made once for the whole project."), (k, line)
+-        else:
+-            assert applies[k] == "part" and re.search(r"\b(of|for) the part\b", line), (k, applies[k], line)
+-            assert "whole project" not in line, line
++    assert_points_placed(key, POINTS)
+ 
+ 
+ def test_r006_the_inspect_point_spans_every_step_the_registry_gives_it():
+@@ -397,21 +356,9 @@ def test_r032_the_module_and_its_sub_file_are_read_whole(rel):
+ def test_r005_the_hook_names_the_delegation_loop_and_its_sub_file(tmp_path):
+     """R-005 with R-032, the first real Sub-files: line: for `Phase: building` the installed hook names
+     delegation-loop.md, then its sub-file, then the reflection and project-end modules."""
+-    home = tmp_path / "home"
+-    shutil.copytree(os.path.join(BRIDGE, "commands"), str(home / ".claude" / "commands"))
+-    shutil.copytree(CB, str(home / ".claude" / "cursor-bridge"), ignore=shutil.ignore_patterns("__pycache__"))
+-    ws = tmp_path / "proj" / "Workspace"
+-    (ws / "docs").mkdir(parents=True)
+-    (ws / "docs" / "PROJECT_STATUS.md").write_text(
+-        "# Project Status\nPhase: building\nWorkflows: not yet classified\nAwaiting user on: nothing\n", encoding="utf-8")
+-    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
+-    data = {"cwd": str(ws), "hook_event_name": "SessionStart", "source": "compact"}
+-    p = subprocess.run([sys.executable, HOOK, "--part", "pointers"], input=json.dumps(data), capture_output=True,
+-                       text=True, encoding="utf-8", env=env)
+-    assert p.returncode == 0 and p.stderr == "", p.stderr
+     w = "~/.claude/cursor-bridge/workflow/phases/"
+-    named = [re.match(r"  - (\S+)", l).group(1) for l in p.stdout.split("\n") if l.startswith("  - " + w)]
+-    assert named == [w + "delegation-loop.md", w + DECIDE, w + SUB, w + "reflection.md", w + "project-end.md"], p.stdout
++    named = hook_named(tmp_path, "building")
++    assert named == [w + "delegation-loop.md", w + DECIDE, w + SUB, w + "reflection.md", w + "project-end.md"], named
+ 
+ 
+ def test_the_core_names_the_delegation_loops_sub_file():
+diff --git a/tests/test_phase_modules_close.py b/tests/test_phase_modules_close.py
+index 664ea05..305eba4 100644
+--- a/tests/test_phase_modules_close.py
++++ b/tests/test_phase_modules_close.py
+@@ -14,13 +14,13 @@ import re
+ 
+ import pytest
+ 
+-from phase_modules import read, module, flat, headings, section, trace_headings
++from phase_modules import (read, module, flat, headings, section, trace_headings, registry_rows, registry_points,
++                           assert_survival_list, assert_declares_registry_points, assert_points_placed)
+ 
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
+ CB = os.path.join(BRIDGE, "cursor-bridge")
+ PHASES = os.path.join(CB, "workflow", "phases")
+-REGISTRY = os.path.join(CB, "workflow", "extension-points.md")
+ EXCEPTIONS = os.path.join(CB, "workflow", "trace-exceptions.md")
+ GLOSSARY = os.path.join(CB, "Glossary.md")
+ 
+@@ -110,32 +110,7 @@ KEYS = ["change-cycle", "reflection", "project-end"]
+ def test_r004_the_module_opens_with_its_compaction_survival_list(key):
+     """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
+     exactly what a resumed session at that point reads before its next action."""
+-    text = module(key)
+-    assert headings(text) == STRUCTURE[key], headings(text)
+-    lines = text.split("\n")
+-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
+-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
+-    assert body[0] == INTRO[key]
+-    assert all(l.startswith("- ") for l in body[1:] if l), body
+-    assert [l[2:] for l in body[1:] if l] == SURVIVAL[key]
+-
+-
+-def registry_rows(heading):
+-    text = read(REGISTRY)
+-    table = text.split("\n" + heading + "\n", 1)[1].split("\n## ", 1)[0]
+-    rows = [l for l in table.split("\n") if l.startswith("|")]
+-    header = [c.strip() for c in rows[0].strip("|").split("|")]
+-    return [dict(zip(header, [c.strip() for c in row.strip("|").split("|")])) for row in rows[2:]]
+-
+-
+-def registry_points(module_key):
+-    return [r["Key"] for r in registry_rows("## Extension points") if r["Declared by"] == module_key]
+-
+-
+-EXT_PROSE = ("This module offers the points below, each by its key in the extension-point registry "
+-             "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and "
+-             "whether it applies per part or per project. A conditional workflow's additions at a point are made where the "
+-             "point's line places them, in the order the core states in \"Main and conditional workflows\".")
++    assert_survival_list(key, STRUCTURE[key], INTRO[key], SURVIVAL[key])
+ 
+ 
+ def declared(text):
+@@ -151,12 +126,7 @@ def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_o
+     """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
+     per point giving its key, exactly the points the registry names this module as declaring, in the table's order;
+     the reflection points declare `reflection.items` and project end Definition of done and Delivery (§6.4's rows)."""
+-    text = module(key)
+-    want = registry_points(key)
+-    assert want and declared(text) == want, (declared(text), want)
+-    body = section(text, "Extension points", 2).strip().split("\n")
+-    assert flat(" ".join(l for l in body if l and not l.startswith("- "))) == EXT_PROSE
+-    assert "may set" not in "\n".join(body)
++    want = assert_declares_registry_points(key)
+     if key == "project-end":
+         assert want == ["project-end.completion-conditions", "project-end.delivery"], want
+ 
+@@ -193,16 +163,7 @@ def test_r006_each_point_says_where_its_additions_are_made(key):
+     """R-006: each point's line places the additions a conditional workflow makes there and says what the registry's
+     Applies cell states: a point that applies per project is made once for the whole project; one that applies per part
+     names the part (TASK-013's rule)."""
+-    applies = {r["Key"]: r["Applies"] for r in registry_rows("## Extension points")}
+-    body = section(module(key), "Extension points", 2).strip().split("\n")
+-    for line in [l for l in body if l.startswith("- ")]:
+-        k = re.match(r"^- `([a-z0-9.-]+)` — ", line).group(1)
+-        assert line == "- `%s` — %s" % (k, POINTS[k]), line
+-        if applies[k] == "project":
+-            assert line.endswith("; made once for the whole project."), (k, line)
+-        else:
+-            assert applies[k] == "part" and re.search(r"\b(of|for) the part\b", line), (k, applies[k], line)
+-            assert "whole project" not in line, line
++    assert_points_placed(key, POINTS)
+ 
+ 
+ def test_r006_the_reflection_items_point_is_placed_before_the_record():
+diff --git a/tests/test_phase_modules_intake_design.py b/tests/test_phase_modules_intake_design.py
+index bafe619..c0d48cf 100644
+--- a/tests/test_phase_modules_intake_design.py
++++ b/tests/test_phase_modules_intake_design.py
+@@ -8,11 +8,10 @@ likewise), R-036 (a new or unwritten trait written into the design and flagged a
+ still pause; the promotion-pass half is TASK-014's); docs/BUILD_PLAN.md TASK-011's Done when, and its Scope's pointer
+ sweep (docs/HARDENING.md, Stage B3)."""
+ import os
+-import re
+ 
+ import pytest
+ 
+-from phase_modules import read, module, flat, headings, section, registry_points
++from phase_modules import read, module, flat, section, assert_survival_list, assert_declares_registry_points
+ 
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
+@@ -72,15 +71,9 @@ SURVIVAL = {
+ def test_r004_the_module_opens_with_its_compaction_survival_list(key):
+     """R-004: the module's first section, straight after its heading, is the compaction-survival list (the Glossary's
+     term), and the list is exactly what a resumed session in that phase reads before its next action."""
+-    text = module(key)
+-    assert headings(text) == STRUCTURE[key], headings(text)
+-    lines = text.split("\n")
+-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
+-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
+-    assert body[0] == "After a compaction or a resume in this phase, read these before your next action:"
+-    items = [l[2:] for l in body[1:] if l]
+-    assert all(l.startswith("- ") for l in body[1:] if l), body
+-    assert items == SURVIVAL[key], items
++    assert_survival_list(key, STRUCTURE[key],
++                         "After a compaction or a resume in this phase, read these before your next action:",
++                         SURVIVAL[key])
+ 
+ 
+ @pytest.mark.parametrize("key", ["intake", "design"])
+@@ -88,18 +81,7 @@ def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_o
+     """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
+     per point giving its key, exactly the points the registry names this module as declaring, in the table's order;
+     each line says where in the module an addition there is made."""
+-    text = module(key)
+-    body = section(text, "Extension points", 2).strip().split("\n")
+-    lines = [l for l in body if l.startswith("- ")]
+-    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in lines]
+-    want = registry_points(key)
+-    assert want and keys == want, (keys, want)
+-    prose = flat(" ".join(l for l in body if l and not l.startswith("- ")))
+-    assert prose == ("This module offers the points below, each by its key in the extension-point registry "
+-                     "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each "
+-                     "accepts and whether it applies per part or per project. A conditional workflow's additions at a "
+-                     "point are made where the point's line places them, in the order the core states in \"Main and "
+-                     "conditional workflows\".")
++    assert_declares_registry_points(key, may_set=True)
+ 
+ 
+ def test_r006_the_set_points_say_who_may_set_them():
+diff --git a/tests/test_phase_modules_interface_planning.py b/tests/test_phase_modules_interface_planning.py
+index e4f0388..cddac64 100644
+--- a/tests/test_phase_modules_interface_planning.py
++++ b/tests/test_phase_modules_interface_planning.py
+@@ -8,23 +8,19 @@ once in the interface module, each variant's text in one place), R-032 (each mod
+ docs/BUILD_PLAN.md TASK-012's Done when (the playable-prototype file a declared pointer worded clear of
+ completion-check's stand-in patterns), and its pointer sweep (docs/HARDENING.md, Stage B3)."""
+ import importlib.util
+-import json
+ import os
+ import re
+-import shutil
+-import subprocess
+-import sys
+ 
+ import pytest
+ 
+-from phase_modules import read, module, flat, headings, section, registry_points
++from phase_modules import (read, module, flat, headings, section, assert_survival_list, assert_declares_registry_points,
++                           hook_named)
+ 
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
+ CB = os.path.join(BRIDGE, "cursor-bridge")
+ PHASES = os.path.join(CB, "workflow", "phases")
+ CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
+-HOOK = os.path.join(CB, "session-start.py")
+ 
+ VARIANTS = [
+     ("Mockups", "screens a person sees", "interface/mockups.md"),
+@@ -92,32 +88,16 @@ SURVIVAL = {
+ def test_r004_the_module_opens_with_its_compaction_survival_list(key):
+     """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
+     exactly what a resumed session in that phase reads before its next action."""
+-    text = module(key)
+-    assert headings(text) == STRUCTURE[key], headings(text)
+-    lines = text.split("\n")
+-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
+-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
+-    assert body[0] == "After a compaction or a resume in this phase, read these before your next action:"
+-    assert all(l.startswith("- ") for l in body[1:] if l), body
+-    assert [l[2:] for l in body[1:] if l] == SURVIVAL[key]
++    assert_survival_list(key, STRUCTURE[key],
++                         "After a compaction or a resume in this phase, read these before your next action:",
++                         SURVIVAL[key])
+ 
+ 
+ @pytest.mark.parametrize("key", ["interface", "planning"])
+ def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_order(key):
+     """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
+     per point giving its key, exactly the points the registry names this module as declaring, in the table's order."""
+-    body = section(module(key), "Extension points", 2).strip().split("\n")
+-    lines = [l for l in body if l.startswith("- ")]
+-    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in lines]
+-    want = registry_points(key)
+-    assert want and keys == want, (keys, want)
+-    prose = flat(" ".join(l for l in body if l and not l.startswith("- ")))
+-    assert prose == ("This module offers the points below, each by its key in the extension-point registry "
+-                     "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each "
+-                     "accepts and whether it applies per part or per project. A conditional workflow's additions at a "
+-                     "point are made where the point's line places them, in the order the core states in \"Main and "
+-                     "conditional workflows\".")
+-    assert "may set" not in "\n".join(body)
++    assert_declares_registry_points(key)
+ 
+ 
+ def test_r012_the_four_variants_are_declared_once_in_the_interface_module():
+@@ -305,21 +285,9 @@ def test_r032_the_module_and_each_variant_file_are_read_whole(rel):
+ def test_r005_the_hook_names_the_interface_module_and_its_four_variants(tmp_path):
+     """R-005 with R-012, the first real pointer line: for `Phase: mockups` the installed hook names interface.md and,
+     after it, the four variant files in the `Variants:` line's order (FIX-003 hardened the hook for this line)."""
+-    home = tmp_path / "home"
+-    shutil.copytree(os.path.join(BRIDGE, "commands"), str(home / ".claude" / "commands"))
+-    shutil.copytree(CB, str(home / ".claude" / "cursor-bridge"), ignore=shutil.ignore_patterns("__pycache__"))
+-    ws = tmp_path / "proj" / "Workspace"
+-    (ws / "docs").mkdir(parents=True)
+-    (ws / "docs" / "PROJECT_STATUS.md").write_text(
+-        "# Project Status\nPhase: mockups\nWorkflows: not yet classified\nAwaiting user on: nothing\n", encoding="utf-8")
+-    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
+-    data = {"cwd": str(ws), "hook_event_name": "SessionStart", "source": "compact"}
+-    p = subprocess.run([sys.executable, HOOK, "--part", "pointers"], input=json.dumps(data), capture_output=True,
+-                       text=True, encoding="utf-8", env=env)
+-    assert p.returncode == 0 and p.stderr == "", p.stderr
+     w = "~/.claude/cursor-bridge/workflow/phases/"
+-    named = [re.match(r"  - (\S+)", l).group(1) for l in p.stdout.split("\n") if l.startswith("  - " + w)]
+-    assert named == [w + "interface.md"] + [w + v[2] for v in VARIANTS], p.stdout
++    named = hook_named(tmp_path, "mockups")
++    assert named == [w + "interface.md"] + [w + v[2] for v in VARIANTS], named
+ 
+ 
+ def test_the_interface_phase_is_named_by_its_variants_outside_the_module():
