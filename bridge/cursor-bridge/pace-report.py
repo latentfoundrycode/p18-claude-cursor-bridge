@@ -56,6 +56,7 @@ USAGE_FIELDS = (
 )
 _MAX_JSONL_LINE = 64 * 1024 * 1024
 LINE_CAP = 64 * 1024 * 1024
+_READ_LINE_TIMED_OUT = object()
 _REVIEW_ERR_RX = re.compile(r"^REVIEW-(.+)\.err$", re.I)
 _COMMIT_HEAD_RX = re.compile(r"^[0-9a-f]{40} ([0-9]+)$")
 _COMMIT_LOG_CMD = (
@@ -213,19 +214,15 @@ def _ids_with_brief(ls_out):
     return ids
 
 
-def _has_brief_file(ws, token):
-    return os.path.isfile(os.path.join(ws, "handoff", "%s.md" % token))
-
-
-def _letter_err_belongs(ws, id_part, token):
+def _letter_err_belongs(brief_ids, id_part, token):
     if token == id_part:
         return True
     if token.startswith(id_part) and len(token) > len(id_part):
         extra = token[len(id_part) :]
         if re.fullmatch(r"[a-z]+", extra):
-            if _has_brief_file(ws, token):
+            if token in brief_ids:
                 return False
-            return _has_brief_file(ws, id_part)
+            return id_part in brief_ids
     return False
 
 
@@ -242,7 +239,7 @@ def _report_rounds(ws, id_part):
     return best
 
 
-def _err_rounds(ws, id_part):
+def _err_rounds(ws, id_part, brief_ids):
     review = os.path.join(ws, "run", "review")
     if not os.path.isdir(review):
         return 0
@@ -258,7 +255,7 @@ def _err_rounds(ws, id_part):
             count += 1
             max_r = max(max_r, parsed[1])
             continue
-        if _letter_err_belongs(ws, id_part, token):
+        if _letter_err_belongs(brief_ids, id_part, token):
             count += 1
     if count > _report_rounds(ws, id_part):
         return count
@@ -273,18 +270,22 @@ def _guard_rounds(common, id_part):
     return len([r for r in rounds if isinstance(r, dict)])
 
 
-def _has_rounds_reading(ws, common, id_part):
+def _has_rounds_reading(ws, common, id_part, brief_ids):
     if _report_rounds(ws, id_part) > 0:
         return True
-    if _err_rounds(ws, id_part) > 0:
+    if _err_rounds(ws, id_part, brief_ids) > 0:
         return True
     if _guard_rounds(common, id_part) > 0:
         return True
     return False
 
 
-def _rounds_for_id(ws, common, id_part):
-    return max(_report_rounds(ws, id_part), _err_rounds(ws, id_part), _guard_rounds(common, id_part))
+def _rounds_for_id(ws, common, id_part, brief_ids):
+    return max(
+        _report_rounds(ws, id_part),
+        _err_rounds(ws, id_part, brief_ids),
+        _guard_rounds(common, id_part),
+    )
 
 
 def _start_times(ws, common, id_part):
@@ -470,13 +471,15 @@ def _parse_transcript_record(line):
 
 
 def _read_line_capped(f, cap, past_deadline):
+    if past_deadline():
+        return _READ_LINE_TIMED_OUT
     line = f.readline(cap + 1)
     if line == "":
         return ""
     if len(line) > cap and not line.endswith("\n"):
         while line and not line.endswith("\n"):
             if past_deadline():
-                pass
+                return _READ_LINE_TIMED_OUT
             chunk = f.readline(65536)
             if chunk == "":
                 break
@@ -554,6 +557,8 @@ def _read_tokens(home, keys, weeks_set, timeout=None):
                     line = _read_line_capped(
                         f, LINE_CAP, lambda: datetime.datetime.now(datetime.timezone.utc) > deadline
                     )
+                    if line is _READ_LINE_TIMED_OUT:
+                        return "timeout"
                     if line == "":
                         break
                     if line is None:
@@ -658,7 +663,7 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
         round_ids = set(brief_ids)
         round_ids.update(_rounds_file_ids(common))
         for ident in round_ids:
-            rounds_cache[ident] = _rounds_for_id(ws, common, ident)
+            rounds_cache[ident] = _rounds_for_id(ws, common, ident, brief_ids)
 
     week_rows = {
         wk: {"started": 0, "merged": 0, "rounds": [], "days": [], "hardening": hardening.get(wk, 0)}
@@ -674,7 +679,7 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
     for ident, mw in merge_week.items():
         if mw in week_rows:
             week_rows[mw]["merged"] += 1
-            if not untracked and _has_rounds_reading(ws, common, ident):
+            if not untracked and _has_rounds_reading(ws, common, ident, brief_ids):
                 week_rows[mw]["rounds"].append(rounds_cache.get(ident, 0))
             st = starts.get(ident)
             if st is not None:
@@ -814,7 +819,11 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
     rounds_keys = set(_rounds_file_ids(common))
     for ident in sorted(all_ids):
         is_stage = ident.startswith("STAGE-")
-        rnd = rounds_cache.get(ident, 0) if not untracked else _rounds_for_id(ws, common, ident)
+        rnd = (
+            rounds_cache.get(ident, 0)
+            if not untracked
+            else _rounds_for_id(ws, common, ident, brief_ids)
+        )
         if ident not in brief_ids and not is_stage:
             continue
         if is_stage and ident not in rounds_keys:

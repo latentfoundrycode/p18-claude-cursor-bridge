@@ -553,12 +553,12 @@ def _is_plan_id_rx(id_rx):
 
 
 def _parenthesis_bare_item(item, id_rx):
-    """Bare parenthesis item: R-nnn token, or id_rx match with hyphen-and-digit rule."""
+    """Bare parenthesis item: id_rx match with hyphen-and-digit rule, or R-nnn token."""
+    if _id_token_hyphen_and_digit(id_rx, item):
+        return "id"
     if _R_BARE_RX.fullmatch(item):
         return "r"
-    if not _id_token_hyphen_and_digit(id_rx, item):
-        return None
-    return "id"
+    return None
 
 
 def _parenthesis_merged_ids(inner, id_rx, plan_style):
