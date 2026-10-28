@@ -53,7 +53,8 @@ SURVIVAL = {
         "`delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the "
         "session-start hook names with this module while the phase is `changing`;",
         "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its "
-        "date and the step it has reached, and `Awaiting user on:` a gate that waits for the owner; the inventory's "
+        "date and the step it has reached, and `Awaiting user on:` a gate, or an intake question, that waits for the "
+        "owner; the inventory's "
         "Features answer a request already satisfied, and its Decisions name one the change reverses (item 1);",
         "`docs/REQUIREMENTS.md`, with the failures `completion-check.py --mode done` printed at item 1: each is a gap in "
         "the previous delivery, reported to the owner first and planned ahead of the request unless the owner defers it;",
@@ -305,12 +306,13 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
     assert "the mockup if any" not in proc
 
 
-# sha256 of the change cycle's procedure as TASK-014 leaves it (from its heading to the file's end, LF, the whitespace at
-# its end stripped; 6,378 characters): the trace entry on "The procedure" excuses new text anywhere under it, so CI holds
-# the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this pin is reviewed as a new
-# trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the increment's record names
-# each passage it adds or rewords under the procedure
-PROCEDURE_SHA256 = "02c6c662783f67e65f38c3394b4f4091c742ccb06bf1541db2568b077583a4ac"
+# sha256 of the change cycle's procedure as TASK-035 leaves it (from its heading to the file's end, LF, the whitespace at
+# its end stripped; 6,772 characters: item 1's closing confirmation, not a gate, and the closing paragraph's second
+# sentence, the only gates; TASK-014 left it at 6,378): the trace entry on "The procedure" excuses new text anywhere
+# under it, so CI holds the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this
+# pin is reviewed as a new trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the
+# increment's record names each passage it adds or rewords under the procedure
+PROCEDURE_SHA256 = "dcef638691afd09a52d40d5faab5a5501be74de54396ccb2ac71b0c98291b42f"
 
 
 def test_the_change_cycles_procedure_is_pinned():
@@ -318,7 +320,7 @@ def test_the_change_cycles_procedure_is_pinned():
     one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
     text = module("change-cycle")
     proc = text[text.index("### The procedure"):].rstrip()
-    assert len(proc) == 6378 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
+    assert len(proc) == 6772 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
 
 
 def test_r004_the_positions_the_survival_lists_name_are_kept():

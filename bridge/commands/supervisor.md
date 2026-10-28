@@ -63,7 +63,7 @@ no gate. The owner may also run `/calibrate-bridge` at any time after updating t
 
 ## Founding rules
 
-These nine rules are the bridge's constitution. Every procedure in this file serves them, no run parameter loosens them, and a calibration never removes one. Each names what enforces it.
+These nine rules are the bridge's constitution. Every procedure in this file and in its phase modules serves them, no run parameter loosens them, and a calibration never removes one. Each names what enforces it.
 
 - **N1 — Files are the truth; programs are one-shot.** The loop's state lives in files; deterministic one-shot programs compute everything the loop relies on. A background process is allowed only when all eight hold: it reads the project and never writes tracked files; everything it holds can be rebuilt from the files; every answer states the commit or version it reflects; it starts on demand, stops when idle, and every call to it has a hard time limit; no gate depends on it being up; starting it changes no data it does not own, and it runs no migration of the owner's live data outside a release; it never runs unreleased code against live data; it spends nothing unless asked. The last three came from two development builds that upgraded the owner's live databases (plan 8.1). *Enforced by:* the bridge's programs are one-shot by construction; the launcher bounds every background run (KP-033); the loop guard (rule 43).
 - **N2 — No secret in a prompt.** Nothing sent to Cursor ever carries a secret; keys are repository secrets for CI, and otherwise live in a key file outside the Workspace or in the product's encrypted store, named in the inventory. Never in a file the builder reads, and never in an environment variable the owner is asked to set: every program started in that environment inherits it, the builder included. A store's unlock passphrase is a key. *Enforced by:* `secret-sentinel` before every commit; the builder's identity withheld (KP-032).
@@ -99,13 +99,13 @@ Every project runs the main workflow. What differs by product lives in condition
 
 | Layer | Holds | Read when |
 |---|---|---|
-| **The main workflow's core** | The roles and the division of labour; the founding rules; the loop's shape; escalation and reporting; project state; the standing rules that hold in every phase | Always, whole, at every start and calibration |
+| **The main workflow's core** | The roles and the division of labour; the founding rules; the loop's shape; escalation and reporting; project state; the standing rules that hold in every phase | Always, in parts to its last line, each part starting where the last ended, at every start, resume and calibration |
 | **Phase modules** | The procedure for one phase each: intake, design, the interface phase, planning, run parameters, configuration, the delegation loop, the change cycle, reflection points and project end | The current phase's module or modules, whole, on entering the phase and at every calibration; a module read outside its own phase when "The phase modules" says |
 | **Type workflow** | For one product type: its changes at named extension points | Its changes to the current phase, whole, alongside the phase's module or modules |
 | **Sub-workflow** | For one sub-type: a more detailed version of its type workflow, changing only what differs for that sub-type | Alongside its type workflow, when the part has a sub-type |
 | **Trait additions** | For one trait: what it adds, whatever the product type | Their additions to the current phase, when the part has the trait |
 
-Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, whose module declares its four variants (mockups, command design, contract design, a playable prototype), each in a file of its own; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read whole at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in or a conditional workflow that does not apply, except a module "The phase modules" says is read outside its own phase. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
+Each phase's procedure is its phase module, one file per phase (see "The phase modules"): the interface phase is Phase 3, whose module declares its four variants (mockups, command design, contract design, a playable prototype), each in a file of its own; planning is Phase 4, configuration is Phase 5, the delegation loop is Phase 6; project end, once part of the reflection points, is a module of its own. This file, the core, is read in parts to its last line, each part starting where the last ended, at every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you read what the session-start hook names before your next action (rule 28). You never read a phase you are not in or a conditional workflow that does not apply, except a module "The phase modules" says is read outside its own phase. Which conditional workflows apply follows from each part's product type, at most one of its sub-types, and its traits.
 
 **Three kinds of change.** Each change a conditional workflow makes is one of these:
 
@@ -142,7 +142,7 @@ children on every project:
 You work in `Workspace/`; `Documents/` is its sibling (`../Documents`). The owner may start
 the session in `Workspace/` or in the project root above it (the folder that holds
 `Documents/` and `Workspace/`): in the root, `cd Workspace` once before anything else, and
-every path below is relative to `Workspace/`. Resolve both folders once, at intake, and
+every path below and in the phase modules is relative to `Workspace/`. Resolve both folders once, at intake, and
 record the resolved paths in `docs/PROJECT_STATUS.md`. If `Documents/` is missing, create
 it. If the folder you started in is neither `Workspace` nor a project root, stop and ask —
 the boundary below depends on it.
@@ -224,6 +224,8 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
 | Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
 
 Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`. A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 7 is in `delegation-loop/decide.md` and its step 9 in `delegation-loop/refactoring-pass.md`.
+
+All 58 standing rules stay in this file, the phase-specific ones (29, 31 and 33) included: the digest cites them by number, and a rule moved to a module would leave a number the digest names pointing at nothing.
 
 **Modules read outside their own phase.** Some procedures run outside the phase whose `Phase:` value names their module; they are read whenever they apply, whatever the phase:
 - `reflection.md` is read whole at every reflection point: a stage close, each approved phase gate, and project end;
@@ -408,6 +410,7 @@ Working files: <none | run/supervisor/ — what is there (helper scripts, notes)
 Delegated gates: <none | "<the owner's words>" (<date>) for <the named change or cycle>>
 Remote sync: <in sync at <date> | NO REMOTE | OFFLINE since <date> | UNPUBLISHED — first push pending>
 Stage: <current stage name> — Last reflection: <stage close | phase gate | none yet, and when>
+Deferred increments: <none | TASK-<nnn> — <title> — deferred by the owner on <date>; one per line>
 Open issues: <ISS-nnn …, or none>
 Maintainer requests: <none | <what> — asked <date> — open | answered FB-nnn>
 Bridge version: <contents of ~/.claude/cursor-bridge/VERSION when last calibrated>
@@ -672,7 +675,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     `/calibrate-bridge`, verify the tree with `bridge-check.py` (stop on STALE/MISSING and
     hand the owner a run sheet), run `conformance-check.py` (every `MISSING` floor is a
     calibration item, applied as configuration work in the next stage), re-read the
-    governing files whole, and apply the `CHANGELOG.md` delta **by phase**: now for the
+    governing files whole, the core in parts to its last line, each part starting where the last ended, and apply the `CHANGELOG.md` delta **by phase**: now for the
     current phase and record-keeping, later for phases not yet reached, never for a gate
     already passed. A calibration reopens no approval, restarts no increment, and defaults
     any new owner setting with a one-line notice rather than a question. After every

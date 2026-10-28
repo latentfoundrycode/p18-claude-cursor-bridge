@@ -300,7 +300,9 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
         "**Purity check — deterministic, before any reviewer:**",
         "python ~/.claude/cursor-bridge/refactor-check.py main --max-lines 400",
         "**Beyond budget** candidates go to `docs/HARDENING.md` under the stage name",
-        "At **project end** run one final pass over the whole tree before the User Manual is written.",
+        "At **project end** no pass of its own runs: the last stage's close runs this pass, as every stage's close "
+        "does under the refactoring parameter, and project end adds none, since a merge after project end's strict "
+        "sync check would void that check.",
     )
     for p in passages:
         assert p in fs, p
@@ -315,19 +317,22 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
                 assert p not in flat(text), (rel, p)
 
 
-# sha256 of step 9 as the delegation-loop module held it at origin/main 5bed396 (from its heading to its last line, LF,
-# trailing whitespace stripped; 5,542 characters): the step moved verbatim, and trace-check, which would see a change,
-# has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword updates this with its record
-STEP9_SHA256 = "43584d2cbcec544785ddfcff165ed636da09101ffe47af8d836845aef9d70a50"
+# sha256 of step 9 as TASK-035 leaves it (from its heading to its last line, LF, trailing whitespace stripped; 5,695
+# characters): the project-end sentence reworded under its `reword` and `new` entries; before it the step as the
+# delegation-loop module held it at origin/main 5bed396 (5,542 characters), moved verbatim. trace-check, which would
+# see a change, has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword updates this
+# with its record
+STEP9_SHA256 = "01eeaa1d78aff824728143fe4a6a2976fac2c400c05f13997ef3578d87e3e355"
 
 
 def test_r032_step_9_is_verbatim():
     """R-032 (Review A, round 1, C1): the sub-file's step 9 is the module's step 9 as it was before the split, character
-    for character."""
+    for character, but the project-end sentence TASK-035 rewords (R-003; INVENTORY, Decisions: project end adds no
+    pass of its own)."""
     import hashlib
     sub = module(SUB)
     step = sub[sub.index("### " + STEP9):sub.index("### Keeping the pass's position")].rstrip()
-    assert len(step) == 5542 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
+    assert len(step) == 5695 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
 
 
 def test_the_refactoring_passs_position_is_written_down():
