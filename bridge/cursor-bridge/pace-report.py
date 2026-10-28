@@ -10,7 +10,8 @@ are resolved in main(), not in the parser.
 
 Columns per ISO week (UTC): increments started (earliest launcher brief row or guard round with
 a time, else unknown), merged (squash subjects on main via bridge_env's reader and
-GRAMMAR_ID_PATTERN, for IDs that have a brief), rounds mean and max among merges that week, mean
+GRAMMAR_ID_PATTERN; with a tracked handoff/ only IDs that have a brief, with handoff/ untracked
+every ID the reader finds), rounds mean and max among merges that week, mean
 days from known start to merge, docs/HARDENING.md lines added on main that week (added lines only).
 A total row follows. Below the table, IDs over --ceiling with round counts and lifts (class, owner,
 none, unknown), then stage reviews (STAGE-<name>). With --tokens, token millions (sum of
@@ -20,11 +21,12 @@ from evaluate-reports.py's project_keys, plus tokens per merged increment.
 
 Sources: git log on Workspace/main (committer week), run/launcher/runs.jsonl, .git/bridge/rounds-*.json,
 handoff/*.md and *-report.md, run/review/REVIEW-*.err, docs/HARDENING.md numstat, session jsonl.
-Untracked handoff/ (git ls-files): started and rounds show n/a (handoff/ untracked); merged still counts.
+Untracked handoff/ (git ls-files): started and rounds show n/a (handoff/ untracked); merged counts
+every ID the reader finds in squash subjects.
 Every git command is read-only with a 120-second limit; session folder reads use the same limit per project.
 
-Exit 0 when done; 1 when a project's git command hits the limit (others still printed); 2 for usage
-or a given root that is not a project.
+Exit 0 when done; 1 when a project's git command failed (timed out, exited non-zero, or could not
+start; others still printed); 2 for usage or a given root that is not a project.
 """
 import argparse
 import datetime
@@ -53,8 +55,12 @@ USAGE_FIELDS = (
     "cache_read_input_tokens",
 )
 _MAX_JSONL_LINE = 64 * 1024 * 1024
+LINE_CAP = 64 * 1024 * 1024
 _REVIEW_ERR_RX = re.compile(r"^REVIEW-(.+)\.err$", re.I)
 _COMMIT_HEAD_RX = re.compile(r"^[0-9a-f]{40} ([0-9]+)$")
+_COMMIT_LOG_CMD = (
+    "git log --format=%x00%H %ct%n%s%n%(trailers:key=Merges,valueonly) refs/heads/main --"
+)
 
 
 def _load_evaluate_reports():
@@ -113,10 +119,21 @@ def _parse_run_time(text):
 def _git_env():
     env = os.environ.copy()
     env["GIT_OPTIONAL_LOCKS"] = "0"
+    env["GIT_NO_LAZY_FETCH"] = "1"
+    for key in (
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+        "GIT_NAMESPACE",
+    ):
+        env.pop(key, None)
     return env
 
 
-def _git(ws, args, diff_output=False):
+def _git(ws, args, diff_output=False, as_bytes=False):
     cmd = [
         "git",
         "-c",
@@ -137,16 +154,25 @@ def _git(ws, args, diff_output=False):
             arglist = arglist + ["--no-textconv", "--no-ext-diff"]
     cmd.extend(arglist)
     try:
-        p = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=NO_WINDOW,
-            timeout=GIT_LIMIT,
-            env=_git_env(),
-        )
+        if as_bytes:
+            p = subprocess.run(
+                cmd,
+                capture_output=True,
+                creationflags=NO_WINDOW,
+                timeout=GIT_LIMIT,
+                env=_git_env(),
+            )
+        else:
+            p = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=NO_WINDOW,
+                timeout=GIT_LIMIT,
+                env=_git_env(),
+            )
     except subprocess.TimeoutExpired:
         return "timeout", None, None
     except OSError:
@@ -154,6 +180,15 @@ def _git(ws, args, diff_output=False):
     if p.returncode != 0:
         return "fail", None, p.returncode
     return "ok", p.stdout, None
+
+
+def _rounds_file_ids(common):
+    out = []
+    for id_part in bridge_env._read_rounds_files(common).keys():
+        if id_part.startswith("STAGE-") and bridge_env.parse_review_name(id_part) is None:
+            continue
+        out.append(id_part)
+    return out
 
 
 def _handoff_untracked(ls_out):
@@ -165,6 +200,9 @@ def _ids_with_brief(ls_out):
     for line in (ls_out or "").splitlines():
         line = line.replace("\\", "/").strip()
         if not line.startswith("handoff/") or not line.endswith(".md"):
+            continue
+        rest = line[len("handoff/") :]
+        if "/" in rest:
             continue
         base = os.path.basename(line)
         if bridge_env.HANDOFF_REPORT_NAME.search(base):
@@ -188,8 +226,6 @@ def _letter_err_belongs(ws, id_part, token):
             if _has_brief_file(ws, token):
                 return False
             return _has_brief_file(ws, id_part)
-    if "-r" in token:
-        return False
     return False
 
 
@@ -240,19 +276,9 @@ def _guard_rounds(common, id_part):
 def _has_rounds_reading(ws, common, id_part):
     if _report_rounds(ws, id_part) > 0:
         return True
-    review = os.path.join(ws, "run", "review")
-    if os.path.isdir(review):
-        for name in os.listdir(review):
-            m = _REVIEW_ERR_RX.match(name)
-            if not m:
-                continue
-            token = m.group(1)
-            parsed = bridge_env.parse_review_name(token)
-            if parsed and parsed[0] == id_part:
-                return True
-            if _letter_err_belongs(ws, id_part, token):
-                return True
-    if bridge_env._read_rounds_files(common).get(id_part):
+    if _err_rounds(ws, id_part) > 0:
+        return True
+    if _guard_rounds(common, id_part) > 0:
         return True
     return False
 
@@ -285,12 +311,19 @@ def _start_times(ws, common, id_part):
 def _commits(ws):
     status, out, code = _git(
         ws,
-        ["log", "main", "--format=%x00%H %ct%n%s%n%(trailers:key=Merges,valueonly)"],
+        [
+            "log",
+            "--format=%x00%H %ct%n%s%n%(trailers:key=Merges,valueonly)",
+            "refs/heads/main",
+            "--",
+        ],
+        as_bytes=True,
     )
     if status != "ok":
         return status, None, code
+    text = out.decode("utf-8", errors="replace")
     commits = []
-    for rec in out.lstrip("\x00").split("\x00"):
+    for rec in text.lstrip("\x00").split("\x00"):
         if not rec.strip():
             continue
         lines = rec.split("\n")
@@ -302,7 +335,10 @@ def _commits(ws):
             ts = int(m.group(1))
         except ValueError:
             continue
-        dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
+        try:
+            dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            continue
         body = lines[1:]
         merged = bridge_env.squash_merged_ids_from_lines(
             body, bridge_env.GRAMMAR_ID_PATTERN, plan_style=False
@@ -340,7 +376,11 @@ def _hardening_by_week(ws):
             continue
         if added <= 0:
             continue
-        wk = _iso_week(datetime.datetime.fromtimestamp(cur_ts, tz=datetime.timezone.utc))
+        try:
+            wk = _iso_week(datetime.datetime.fromtimestamp(cur_ts, tz=datetime.timezone.utc))
+        except (OverflowError, OSError, ValueError):
+            cur_ts = None
+            continue
         by_week[wk] = by_week.get(wk, 0) + added
     return "ok", by_week, None
 
@@ -424,18 +464,25 @@ def _parse_transcript_record(line):
             dt = dt.replace(tzinfo=datetime.timezone.utc)
         else:
             dt = dt.astimezone(datetime.timezone.utc)
-    except ValueError:
+    except (ValueError, TypeError, OverflowError):
         return None
     return mid, dt, total
 
 
-def _read_line_capped(f, cap):
-    line = f.readline()
+def _read_line_capped(f, cap, past_deadline):
+    line = f.readline(cap + 1)
     if line == "":
         return ""
-    if len(line) > cap:
+    if len(line) > cap and not line.endswith("\n"):
         while line and not line.endswith("\n"):
-            line = f.read(65536)
+            if past_deadline():
+                pass
+            chunk = f.readline(65536)
+            if chunk == "":
+                break
+            line = chunk
+        return None
+    if len(line) > cap:
         return None
     return line
 
@@ -455,6 +502,8 @@ def _walk_key_dir(key_dir, deadline, file_handler, counts):
                 for entry in it:
                     if datetime.datetime.now(datetime.timezone.utc) > deadline:
                         return "timeout"
+                    if entry.name.startswith("."):
+                        continue
                     if _entry_is_link(entry):
                         continue
                     if entry.is_dir(follow_symlinks=False):
@@ -502,7 +551,9 @@ def _read_tokens(home, keys, weeks_set, timeout=None):
                 while True:
                     if datetime.datetime.now(datetime.timezone.utc) > deadline:
                         return "timeout"
-                    line = _read_line_capped(f, _MAX_JSONL_LINE)
+                    line = _read_line_capped(
+                        f, LINE_CAP, lambda: datetime.datetime.now(datetime.timezone.utc) > deadline
+                    )
                     if line == "":
                         break
                     if line is None:
@@ -566,14 +617,12 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
         return None, ("start", "git ls-files handoff/")
     if status == "fail":
         return None, ("fail", "git ls-files handoff/", code)
-    if status != "ok":
-        ls_out = ""
     untracked = _handoff_untracked(ls_out)
     brief_ids = _ids_with_brief(ls_out)
 
     status, commits, code = _commits(ws)
     if status != "ok":
-        return None, (status, "git log main -- ...", code)
+        return None, (status, _COMMIT_LOG_CMD, code)
 
     status, hardening, code = _hardening_by_week(ws)
     if status == "timeout":
@@ -582,15 +631,16 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
         return None, ("start", "git log main --numstat docs/HARDENING.md")
     if status == "fail":
         return None, ("fail", "git log main --numstat docs/HARDENING.md", code)
-    if status != "ok":
-        hardening = {}
 
     merge_week = {}
+    merge_dt = {}
     for dt, merged in commits:
         wk = _iso_week(dt)
         for ident in merged:
             if untracked or ident in brief_ids:
-                if ident not in merge_week:
+                prev = merge_dt.get(ident)
+                if prev is None or dt < prev:
+                    merge_dt[ident] = dt
                     merge_week[ident] = wk
 
     starts = {}
@@ -606,7 +656,7 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
     rounds_cache = {}
     if not untracked:
         round_ids = set(brief_ids)
-        round_ids.update(bridge_env._read_rounds_files(common).keys())
+        round_ids.update(_rounds_file_ids(common))
         for ident in round_ids:
             rounds_cache[ident] = _rounds_for_id(ws, common, ident)
 
@@ -760,13 +810,14 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
     over = []
     stage = []
     all_ids = set(brief_ids)
-    all_ids.update(bridge_env._read_rounds_files(common).keys())
+    all_ids.update(_rounds_file_ids(common))
+    rounds_keys = set(_rounds_file_ids(common))
     for ident in sorted(all_ids):
         is_stage = ident.startswith("STAGE-")
         rnd = rounds_cache.get(ident, 0) if not untracked else _rounds_for_id(ws, common, ident)
         if ident not in brief_ids and not is_stage:
             continue
-        if is_stage and ident not in bridge_env._read_rounds_files(common):
+        if is_stage and ident not in rounds_keys:
             continue
         mw = merge_week.get(ident)
         in_window = mw in weeks if mw else True

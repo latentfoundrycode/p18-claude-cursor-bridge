@@ -171,7 +171,6 @@ def _former_merged_ids_per_commit(repo):
 
 
 def _new_merged_ids_per_commit(repo):
-    sys.path.insert(0, CB)
     import bridge_env
 
     revs = subprocess.run(
@@ -239,7 +238,7 @@ def test_r044_non_bare_parenthesis_merges_nothing(tmp_path, subject, monkeypatch
 
 
 def test_r044_main_regression_minus_task031(monkeypatch):
-    """R-044. Reader on Workspace main equals former rule minus {TASK-031} per commit."""
+    """R-044. Reader on Workspace main equals former rule minus {TASK-031} at 9f6ace6 only."""
     shallow = subprocess.run(
         ["git", "-C", WORKSPACE, "rev-parse", "--is-shallow-repository"],
         capture_output=True,
@@ -257,13 +256,17 @@ def test_r044_main_regression_minus_task031(monkeypatch):
         != 0
     ):
         pytest.skip("no local main")
+    monkeypatch.syspath_prepend(CB)
     monkeypatch.chdir(WORKSPACE)
     former = _former_merged_ids_per_commit(WORKSPACE)
     new = _new_merged_ids_per_commit(WORKSPACE)
+    seen_9f6 = False
     for sha, fset in former.items():
         nset = new.get(sha, set())
         if sha.startswith("9f6ace6") or sha == "9f6ace6":
-            assert fset - nset <= {"TASK-031"}, (sha, fset, nset)
+            seen_9f6 = True
+            assert fset - nset == {"TASK-031"}, (sha, fset, nset)
             assert nset - fset == set(), (sha, fset, nset)
         else:
             assert nset == fset, (sha, fset, nset)
+    assert seen_9f6

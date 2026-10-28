@@ -489,6 +489,11 @@ def _branch_name_to_id(branch, id_rx):
     return None
 
 
+def _id_token_hyphen_and_digit(id_rx, tok):
+    """True when tok fully matches id_rx and holds a hyphen and a digit (bare ID test for subject and parenthesis)."""
+    return bool(id_rx.fullmatch(tok) and "-" in tok and any(ch.isdigit() for ch in tok))
+
+
 def _subject_leading_ids(line, id_rx):
     subject_rx = re.compile(r"^\s*((?:%s[\s,:]*)+)" % id_rx.pattern)
     m = subject_rx.match(line)
@@ -506,7 +511,7 @@ def _subject_leading_ids(line, id_rx):
         if not m_tok:
             break
         tok = m_tok.group(0)
-        if not id_rx.fullmatch(tok) or "-" not in tok or not any(ch.isdigit() for ch in tok):
+        if not _id_token_hyphen_and_digit(id_rx, tok):
             break
         out.append(tok)
         pos += m_tok.end()
@@ -518,14 +523,14 @@ _PLAN_MERGE_RX = re.compile(
 )
 _GRAMMAR_MERGE_RX = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')([a-z0-9-]+)\b", re.I)
 def _trail_paren_inner(line):
-    """Closing parenthesis at end of subject; linear in line length (same forms as round 1's regex)."""
-    rest = line.rstrip(" \t\r\n")
+    """Closing parenthesis at end of subject; linear in line length (round 1's trailing form, last match)."""
+    rest = line.rstrip()
     m = re.search(r"\(#\d+\)$", rest)
     if m:
-        rest = rest[: m.start()].rstrip(" \t")
-    ver = re.search(r"[-\u2014\u2013][ \t]*v?[\w.]+(?:[ \t]+[\w.]*)?$", rest)
+        rest = rest[: m.start()].rstrip()
+    ver = re.search(r"[-\u2014\u2013]\s*v?[\w.]+\s*$", rest)
     if ver:
-        rest = rest[: ver.start()].rstrip(" \t")
+        rest = rest[: ver.start()].rstrip()
     if not rest.endswith(")"):
         return None
     open_i = rest.rfind("(")
@@ -537,21 +542,8 @@ def _trail_paren_inner(line):
     return inner
 
 
-class _TrailMatch(object):
-    __slots__ = ("_inner",)
-
-    def __init__(self, inner):
-        self._inner = inner
-
-    def group(self, n):
-        return self._inner
-
-
 def _trail_subject_search(line):
-    inner = _trail_paren_inner(line)
-    if inner is None:
-        return None
-    return _TrailMatch(inner)
+    return _trail_paren_inner(line)
 _TRAILER_LINE_TEMPLATE = r"^\s*(%s)(\s*,\s*%s)*\s*$"
 _R_BARE_RX = re.compile(r"R-\d{3,}[a-z]?")
 
@@ -561,12 +553,10 @@ def _is_plan_id_rx(id_rx):
 
 
 def _parenthesis_bare_item(item, id_rx):
-    """True when item is a bare parenthesis ID (same hyphen-and-digit rule as _subject_leading_ids)."""
-    if not id_rx.fullmatch(item):
-        if _R_BARE_RX.fullmatch(item):
-            return "r"
-        return None
-    if "-" not in item or not any(ch.isdigit() for ch in item):
+    """Bare parenthesis item: R-nnn token, or id_rx match with hyphen-and-digit rule."""
+    if _R_BARE_RX.fullmatch(item):
+        return "r"
+    if not _id_token_hyphen_and_digit(id_rx, item):
         return None
     return "id"
 
@@ -627,9 +617,9 @@ def squash_merged_ids_from_lines(lines, id_rx, plan_style=None):
             if mapped:
                 out.add(mapped)
                 continue
-            m = _trail_subject_search(line)
-            if m:
-                ids = _parenthesis_merged_ids(m.group(1), id_rx, True)
+            inner = _trail_subject_search(line)
+            if inner is not None:
+                ids = _parenthesis_merged_ids(inner, id_rx, True)
                 if ids is not None:
                     out.update(ids)
                 continue
@@ -644,9 +634,9 @@ def squash_merged_ids_from_lines(lines, id_rx, plan_style=None):
             if subs:
                 out.update(subs)
                 continue
-            m = _trail_subject_search(line)
-            if m:
-                ids = _parenthesis_merged_ids(m.group(1), id_rx, False)
+            inner = _trail_subject_search(line)
+            if inner is not None:
+                ids = _parenthesis_merged_ids(inner, id_rx, False)
                 if ids is not None:
                     out.update(ids)
                 continue
@@ -667,9 +657,6 @@ def squash_merged_ids(folder, id_rx, git_runner=None, ref="main"):
             return subprocess.run(
                 ["git", "-C", folder] + args,
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
                 creationflags=NO_WINDOW,
                 timeout=GIT_TIMEOUT,
             )
@@ -679,7 +666,12 @@ def squash_merged_ids(folder, id_rx, git_runner=None, ref="main"):
         return None
     if p.returncode != 0:
         return None
-    return squash_merged_ids_from_lines(p.stdout.splitlines(), id_rx, plan_style=plan_style)
+    raw = p.stdout
+    if isinstance(raw, bytes):
+        text = raw.decode("utf-8", errors="replace")
+    else:
+        text = raw
+    return squash_merged_ids_from_lines(text.split("\n"), id_rx, plan_style=plan_style)
 
 
 def branch_exists(folder, branch, git_runner=None):

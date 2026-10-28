@@ -180,9 +180,6 @@ def merged_ids(base):
             ["git", "log", base, "--format=%s%n%(trailers:key=Merges,valueonly)"],
             cwd=folder,
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             creationflags=NO_WINDOW,
             timeout=120,
         )
@@ -192,8 +189,13 @@ def merged_ids(base):
         raise
     if p.returncode != 0:
         return None
+    raw = p.stdout
+    if isinstance(raw, bytes):
+        text = raw.decode("utf-8", errors="replace")
+    else:
+        text = raw
     return bridge_env.squash_merged_ids_from_lines(
-        p.stdout.splitlines(), bridge_env.PLAN_ID_PATTERN, plan_style=True
+        text.split("\n"), bridge_env.PLAN_ID_PATTERN, plan_style=True
     )
 
 
