@@ -1125,7 +1125,94 @@ def test_bug030_an_import_failure_exits_3_never_1(tmp_path):
     p = subprocess.run([sys.executable, str(copy), str(ws / "run" / "supervisor" / "x-mutants.json")], cwd=str(ws),
                        **test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 60}))
     assert p.returncode == 3, (p.returncode, p.stderr)
-    assert "Traceback" not in p.stderr and any(l.startswith("mutation-run:") for l in p.stderr.splitlines()), p.stderr
+    assert "Traceback" not in p.stderr and any(l.startswith("mutation-run: internal error - ") for l in p.stderr.splitlines()), p.stderr
+
+
+def test_bug030_r2_a_damaged_bridge_env_exits_3_never_1(tmp_path):
+    """BUG-030 round 2 (Review A of round 1, Blocking 1): a damaged install is not only a missing module; a
+    bridge_env.py beside the program that cannot be compiled (a truncated copy) raises SyntaxError, not
+    ImportError, and round 1 caught ImportError alone, so the program still ended with a traceback and exit 1,
+    the survivor code. Any failure to import what the program needs is an internal error: exit 3, one line
+    `mutation-run: internal error - ...` and no traceback.
+    enforces: handoff/TASK-031.md (an internal error exits 3); the program's docstring (exit 1 only for a
+    survivor, a mutant not applied or a killed expect-survive); handoff/BUG-030.md Requirement 5"""
+    lone = tmp_path / "lone"
+    lone.mkdir()
+    copy = lone / "mutation-run.py"
+    copy.write_bytes(open(PROG, "rb").read())
+    (lone / "bridge_env.py").write_text("def broken(:\n    pass\n", encoding="utf-8")
+    ws = _fixture(tmp_path, {"a.py": "A = 1\n"})
+    env = {k: v for k, v in os.environ.items()}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    p = subprocess.run([sys.executable, str(copy), str(ws / "run" / "supervisor" / "x-mutants.json")], cwd=str(ws),
+                       **test_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 60, "env": env}))
+    assert p.returncode == 3, (p.returncode, p.stderr)
+    assert "Traceback" not in p.stderr, p.stderr
+    assert any(l.startswith("mutation-run: internal error - ") for l in p.stderr.splitlines()), p.stderr
+
+
+def test_bug030_r2_the_program_loaded_as_a_module_works(program, tmp_path):
+    """BUG-030 round 2 (Review A of round 1, Should fix 3): round 1 moved the two imports into run_main and left
+    `bridge_env` and `tomllib` as None at module level, so the program loaded as a module (as the tests and any
+    caller of its functions load it) had no working link check: `link_on_path` raised AttributeError. The imports
+    stay where a clean load makes every function work; only their failure is turned into exit 3.
+    enforces: handoff/BUG-030.md Requirement 5 ("the program still imports cleanly as a module in the tests when
+    both imports succeed")"""
+    mr = program("mutation-run")
+    (tmp_path / "plain").mkdir()
+    assert mr.link_on_path(str(tmp_path / "plain"), stop=str(tmp_path)) is False
+    assert mr.tomllib is not None and mr.tomllib.loads("a = 1") == {"a": 1}
+
+
+def test_bug030_r2_a_linked_untracked_conftest_is_refused(tmp_path):
+    """BUG-030 round 2 (the security audit of round 1, Blocking): the checkpoint run copies the working tree's
+    conftest.py files on the way to each new test; one that is untracked is checked by nothing else, and round 1
+    copied it with shutil.copy2, which follows a link, so a link at tests/conftest.py brought a file from outside
+    the Workspace into the copy and ran it. A link on a conftest path is refused like the program's other copies
+    (`link_on_path`, `bridge_env.is_link`): exit 2, a `mutation-run:` line, no test run.
+    enforces: handoff/TASK-031.md (no link from the Workspace down is followed into the copy); handoff/BUG-030.md
+    Requirement 6 and its "to confirm" item; the brief's Context, mutation-run's scratch copy as a trust boundary"""
+    ws = _fixture(tmp_path, CALC)
+    sha = _git(ws, "rev-parse", "HEAD")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "conftest.py").write_text("import pytest\n\n\n@pytest.fixture\ndef two():\n    return 2\n", encoding="utf-8")
+    try:
+        os.symlink(str(outside / "conftest.py"), str(ws / "tests" / "conftest.py"))
+    except (OSError, NotImplementedError):
+        pytest.skip("a symbolic link cannot be made here")
+    _write(ws, "tests/test_two.py", "from demo.calc import add\n\n\ndef test_two(two):\n    assert add(1, 1) == two\n")
+    _git(ws, "add", "tests/test_two.py")
+    assert "tests/conftest.py" not in _git(ws, "ls-files").splitlines(), "the precondition: the link is untracked"
+    mf = _mutants(ws, "cklink", {"mutants": [], "new_tests": ["tests/test_two.py"]})
+    p = _run(ws, mf, "--checkpoint", sha)
+    assert p.returncode == 2, p.stdout + p.stderr
+    assert "passing on old code" not in p.stdout, p.stdout
+    assert any(l.startswith("mutation-run:") and "conftest.py" in l for l in p.stderr.splitlines()), p.stderr
+
+
+def test_bug030_r2_the_conftest_copy_asks_the_link_check(program, tmp_path, monkeypatch):
+    """BUG-030 round 2, the test above where no symbolic link can be made (Windows without the privilege): the
+    copy of a conftest.py on the way to a new test asks the program's link check (`bridge_env.is_link`, through
+    `link_on_path` or directly) before it reads the file, and a path the check calls a link is refused with
+    `Refuse`, nothing copied.
+    enforces: handoff/BUG-030.md Requirement 6 and its "to confirm" item; handoff/TASK-031.md (no link followed
+    into the copy)"""
+    ws = _fixture(tmp_path, CALC)
+    sha = _git(ws, "rev-parse", "HEAD")
+    _write(ws, "tests/conftest.py", "import pytest\n\n\n@pytest.fixture\ndef two():\n    return 2\n")
+    _write(ws, "tests/test_two.py", "from demo.calc import add\n\n\ndef test_two(two):\n    assert add(1, 1) == two\n")
+    _git(ws, "add", "tests/test_two.py")
+    mr = program("mutation-run")
+    real = mr.bridge_env.is_link
+    target = os.path.normcase(os.path.abspath(str(ws / "tests" / "conftest.py")))
+    monkeypatch.setattr(mr.bridge_env, "is_link",
+                        lambda p: os.path.normcase(os.path.abspath(str(p))) == target or real(p))
+    dest = tmp_path / "copy"
+    dest.mkdir()
+    with pytest.raises(mr.Refuse):
+        mr.archive_checkpoint(str(ws), sha, str(dest), ["tests/test_two.py"], [])
+    assert not (dest / "tests" / "conftest.py").exists()
 
 
 @pytest.mark.parametrize("conftest_at_checkpoint", [False, True])

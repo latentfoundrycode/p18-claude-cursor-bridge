@@ -203,14 +203,18 @@ def slot_not_free_run(model, branch):
 def test_a_launch_that_never_got_the_slot_did_not_build_the_change(program, tmp_path, monkeypatch):
     """BUG-030 (stage B5's review, round 1, Blocking): a builder launch that ended at exit 123 with
     `"slot": "not free"` never started its command, so its model built nothing; the change in flight is
-    still the last started builder's, and a Review B of that builder's family stays refused."""
+    still the last started builder's, and a Review B of that builder's family stays refused.
+    enforces: R-040 (a run that ended waiting for the slot never started its command); R-038's REBUILD
+    (hotfix 2026.10.25a, the review's family against the change's builder); handoff/BUG-030.md Requirement 2"""
     git_repo(tmp_path)
     (tmp_path / "run" / "launcher").mkdir(parents=True)
     log = tmp_path / "run" / "launcher" / "runs.jsonl"
-    log.write_text(builder_run("grok-4.7-medium", "task-1") + slot_not_free_run("composer-2.5", "task-1"), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     rc = program("roster-check")
     monkeypatch.setattr(rc, "current_branch", lambda: "task-1")
+    log.write_text(builder_run("grok-4.7-medium", "task-1") + builder_run("composer-2.5", "task-1"), encoding="utf-8")
+    assert rc.built_by(str(log)) == "composer-2.5", "the precondition: the last started builder decides"
+    log.write_text(builder_run("grok-4.7-medium", "task-1") + slot_not_free_run("composer-2.5", "task-1"), encoding="utf-8")
     assert rc.built_by(str(log)) == "grok-4.7-medium"
     br = program("bridge-run")
     cmd = ["cursor-agent", "-p", "--force", "--model", "grok-4.7-high", "review the diff"]

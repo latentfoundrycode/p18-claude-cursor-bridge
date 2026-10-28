@@ -360,7 +360,8 @@ def test_a_builder_window_counts_the_slot_wait(ws):
     waiting for the heavy slot and its `seconds` from when the command starts (bridge-run.py), the
     wait apart as `waited`; the builder's window runs from `id` to `id + waited + seconds` plus the
     slack. A `supervisor:` test commit made after the window an unwaited run would have had, but
-    while the waited run still ran, is the builder's (the parallel variant), so it is drift."""
+    while the waited run still ran, is the builder's (the parallel variant), so it is drift.
+    enforces: R-040 (the slot's wait logged apart as `waited`); handoff/BUG-030.md Requirement 1"""
     import json
     import time
     b = commit_brief(ws, "src/a.py")
@@ -382,7 +383,9 @@ def test_a_builder_window_counts_the_slot_wait(ws):
 def test_a_builder_window_of_another_branch_is_not_counted(ws):
     """The window filter's branch rule (scope-check.py builder_windows): a builder run logged for
     another branch did not commit here, so a test commit inside its window stays the supervisor's;
-    the same run logged for this branch makes it drift."""
+    the same run logged for this branch makes it drift.
+    enforces: hotfix 2026.10.25a C6 (the `supervisor:` test commits); handoff/BUG-030.md Requirement 1 (the
+    branch filter unchanged)"""
     import json
     import time
     b = commit_brief(ws, "src/a.py")
@@ -399,3 +402,23 @@ def test_a_builder_window_of_another_branch_is_not_counted(ws):
     (ws / "run" / "launcher" / "runs.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
     rc, out = run(SCOPE, ws, b)
     assert rc == 1 and "tests/test_new.py" in drift_list(out), out
+
+
+def test_bug030_r2_a_waited_that_is_not_a_count_of_seconds_is_not_used(program, ws, monkeypatch):
+    """BUG-030 round 2 (Review A of round 1, Blocking 2; the security audit's advisory): the window's end adds
+    `waited` only when it is a number of seconds, as Requirement 1 and the brief's number constraint say: an int
+    or a float, never a bool (Python's True is the int 1), and 0 or more (the launcher logs the slot's wait, which
+    is never negative). A row is data, read defensively; a bool, a negative number or a string counts as 0, so a
+    hand-edited or damaged row cannot end a builder's window before its run ended.
+    enforces: handoff/BUG-030.md Requirement 1 and Constraints ("`waited` 0 or more; a value that is not an int or
+    float (or is a bool) is not used"); R-040"""
+    import json
+    sc = program("scope-check")
+    start = "2026-01-01T00:00:00Z"
+    t0 = 1767225600.0
+    rows = [{"id": start, "kind": "builder", "seconds": 600, "exit": 0, "waited": w}
+            for w in (True, False, -1500, -0.5, "1500", None, 1500, 1500.5, 0)]
+    (ws / "run" / "launcher" / "runs.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    monkeypatch.chdir(ws)
+    ends = [end - t0 for start_, end in sc.builder_windows()]
+    assert ends == [720.0] * 6 + [2220.0, 2220.5, 720.0], ends
