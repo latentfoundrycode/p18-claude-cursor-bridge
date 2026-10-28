@@ -116,6 +116,16 @@ def snap_ok(repo, name):
     return out
 
 
+def next_second():
+    """Wait until the UTC clock's second changes. A round's `time` is kept to the second, and the
+    branch rule takes the branch's first record by that time, so two snapshots in one second tie
+    and their order is the bridge folder's listing order, which Linux does not keep alphabetical;
+    a test that relies on which record came first takes its later snapshot in a later second."""
+    start = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+    while time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()) == start:
+        time.sleep(0.05)
+
+
 def verify_ok(repo, name):
     rc, out = guard(repo, "verify", name)
     assert rc == 0 and "verified mark written" in out, out
@@ -563,6 +573,7 @@ def test_task032_guard_r4_third_id_class_line_refused_owner_line_allowed_set_unc
     put(repo / "run" / "review" / "SCOPE-TASK-016.md", "Blocking class: security - the third increment's finding\n")
     refuse_and_nothing(repo, "TASK-016", REFUSED, "TASK-010")
     put(repo / "docs" / "RUN_PARAMETERS.md", "Review rounds above the ceiling: TASK-016 4 (allow it on this branch, 2026-10-28)\n")
+    next_second()
     snap_ok(repo, "TASK-016")
     refuse_and_nothing(repo, "TASK-017", REFUSED, "TASK-010", "TASK-015")
 
@@ -598,6 +609,7 @@ def test_task032_guard_r4_records_subject_scope_merge_unit_supplies_set(tmp_path
     repo = make_repo(tmp_path, branch="b3-close", files={"docs/BUILD_PLAN.md": "### TASK-040: the stage's last\n\n### TASK-041: another\n"})
     put(repo / "run" / "review" / "SCOPE-B3-CLOSE.md", "# Records close of B3\n\nMerge unit: B3-CLOSE TASK-040\n")
     snap_ok(repo, "B3-CLOSE")
+    next_second()
     rc, out = guard(repo, "snapshot", "TASK-040")
     assert rc == 0, "the records subject's SCOPE Merge unit line declares TASK-040: " + out
     refuse_and_nothing(repo, "TASK-041", REFUSED, "B3-CLOSE")
