@@ -101,6 +101,14 @@ def base(tok):
     return tok.lower().split("/")[-1].split("\\")[-1]
 
 
+def _names_bridge_review_paths(w):
+    text = " ".join(w)
+    return bool(
+        re.search(r"(?i)(?:^|[^A-Za-z0-9_])handoff[/\\]", text)
+        or re.search(r"(?i)(?:^|[^A-Za-z0-9_])run[/\\]+review[/\\]", text)
+    )
+
+
 def around_the_shim(tok):
     """The Cursor agent started by a name other than `cursor-agent` (KP-038): one of the CLI's
     own launcher names, or a bare `agent` without a path or from the CLI's own folder; a
@@ -454,6 +462,8 @@ def check(command, cwd=None):
             r = check(inner, cwd) if inner else None
             if r:
                 return r
+        if base(w[0]) == "cursor-agent" and _names_bridge_review_paths(w):
+            return "cursor-agent with handoff/ or run/review/ in its arguments must run through python ~/.claude/cursor-bridge/bridge-run.py"
         started = w[0] if around_the_shim(w[0]) else (program_behind(w) if head in SHELLS else None)
         if started and around_the_shim(started):
             return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % started

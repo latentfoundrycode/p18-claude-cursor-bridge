@@ -1,4 +1,4 @@
-"""bridge-run.py holds the design critique's ceiling (2026.10.18a, KP-062; enforces: supervisor.md, Phase 2, "The loop
+"""bridge-run.py holds the design critique's ceiling (2026.10.18a, KP-062; enforces: design.md, "The launcher holds the ceiling", "The loop
 stops by what was found, and after four rounds at the most", and "The launcher holds the ceiling"): a cursor-agent
 launch whose arguments name run/review/DESIGN-<subject>-<n>.md with n above five is refused, and so are a second
 resolution round, DESIGN-<subject>-R2 or later, and a round that cannot be read (only 1 to 5 and R1 can), unless docs/RUN_PARAMETERS.md carries the owner's words on a line
@@ -44,7 +44,7 @@ def test_a_sixth_round_and_a_second_resolution_round_are_refused(program, tmp_pa
     br = program("bridge-run")
     reason = br.design_ceiling(design_cmd(name), str(tmp_path))
     assert reason is not None, name
-    assert "Design rounds above five:" in reason and "supervisor.md" in reason, reason
+    assert 'design.md, "The launcher holds the ceiling"' in reason, reason
     if subject:
         assert subject in reason, reason
 

@@ -51,13 +51,13 @@ def repo(tmp_path):
     git(r, "checkout", "-q", "-b", "task-001")
     (r / "a.py").write_text("x = 2\n", encoding="utf-8")
     (r / "run" / "review").mkdir(parents=True)
-    (r / "run" / "review" / "REVIEW-001.diff").write_bytes(b"diff\n")
-    git(r, "add", "-f", "run/review/REVIEW-001.diff")
+    (r / "run" / "review" / "REVIEW-TASK-001.diff").write_bytes(b"diff\n")
+    git(r, "add", "-f", "run/review/REVIEW-TASK-001.diff")
     git(r, "commit", "-q", "-am", "TASK-001")
     return r
 
 
-def launched(repo, nnn="001"):
+def launched(repo, nnn="TASK-001"):
     import time
     stamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() + 1))
     (repo / "run" / "review" / ("REVIEW-%s.err" % nnn)).write_text("bridge-run: started %sZ\nbridge-run: exit 0\n" % stamp, encoding="utf-8")
@@ -66,22 +66,23 @@ def launched(repo, nnn="001"):
 def test_snapshot_refuses_an_empty_review_input_and_prints_the_sizes(repo):
     """C4 (rows 23, 36; KP-067): an empty input under run/review/ named for the id is refused,
     nothing written; the launcher's own .err is not an input; no input at all is a NOTE."""
-    (repo / "run" / "review" / "PLAN-001.md").write_bytes(b"")
-    (repo / "run" / "review" / "REVIEW-001.err").write_bytes(b"")          # the launcher's file, not an input
+    (repo / "run" / "review" / "PLAN-TASK-001.md").write_bytes(b"")
+    (repo / "run" / "review" / "REVIEW-TASK-001.err").write_bytes(b"")          # the launcher's file, not an input
     (repo / "run" / "review" / "PLAN-002.md").write_bytes(b"")             # another review's
-    rc, out = run(GUARD, repo, "snapshot", "001")
-    assert rc == 2 and "PLAN-001.md" in out and "empty" in out and "both reviewers" in out, out
-    assert "REVIEW-001.diff  5 bytes" in out, out
-    assert "PLAN-002" not in out and "REVIEW-001.err" not in out, out
-    assert not (repo / ".git" / "bridge" / "review-001.json").exists(), "nothing is written on a refusal"
-    (repo / "run" / "review" / "PLAN-001.md").write_bytes(b"sections\n")
-    rc, out = run(GUARD, repo, "snapshot", "001")
-    assert rc == 0 and "PLAN-001.md  9 bytes" in out, out
-    rc, out = run(GUARD, repo, "snapshot", "003")
+    rc, out = run(GUARD, repo, "snapshot", "TASK-001")
+    assert rc == 2 and "PLAN-TASK-001.md" in out and "empty" in out and "both reviewers" in out, out
+    assert "REVIEW-TASK-001.diff  5 bytes" in out, out
+    assert "PLAN-002" not in out and "REVIEW-TASK-001.err" not in out, out
+    assert not (repo / ".git" / "bridge" / "review-TASK-001.json").exists(), "nothing is written on a refusal"
+    (repo / "run" / "review" / "PLAN-TASK-001.md").write_bytes(b"sections\n")
+    rc, out = run(GUARD, repo, "snapshot", "TASK-001")
+    assert rc == 0 and "PLAN-TASK-001.md  9 bytes" in out, out
+    git(repo, "checkout", "-q", "-b", "task-003")
+    rc, out = run(GUARD, repo, "snapshot", "TASK-003")
     assert rc == 0 and "NOTE no review input" in out, out
 
 
-def hash_copy(repo, nnn="001"):
+def hash_copy(repo, nnn="TASK-001"):
     """This repository's copy: the key is the hash of its git common dir, as review-guard.py names it."""
     folder = os.environ["BRIDGE_REVIEW_HASHES"]
     key = hashlib.sha256(os.path.normcase(os.path.abspath(str(repo / ".git"))).encode("utf-8")).hexdigest()[:16]
@@ -93,9 +94,9 @@ def hash_copy(repo, nnn="001"):
 def test_the_snapshot_hash_has_a_copy_and_a_rewritten_snapshot_is_gate_integrity(repo):
     """C4 (row 70, FB-037): snapshot writes the hash outside the checkout the reviewer runs in;
     verify and premerge compare with it."""
-    rc, out = run(GUARD, repo, "snapshot", "001")
+    rc, out = run(GUARD, repo, "snapshot", "TASK-001")
     assert rc == 0, out
-    snap = repo / ".git" / "bridge" / "review-001.json"
+    snap = repo / ".git" / "bridge" / "review-TASK-001.json"
     copy = hash_copy(repo)
     assert os.path.commonpath([copy, str(repo)]) != str(repo), "the copy lies outside the checkout"
     with open(copy, encoding="utf-8") as f:
@@ -103,23 +104,23 @@ def test_the_snapshot_hash_has_a_copy_and_a_rewritten_snapshot_is_gate_integrity
     assert re.search(r"snapshot hash [0-9a-f]{16}", out), "the hash is still printed"
     launched(repo)
     snap.write_text(snap.read_text(encoding="utf-8").replace('"nnn"', '"nnn" ', 1), encoding="utf-8")
-    rc, out = run(GUARD, repo, "verify", "001")
+    rc, out = run(GUARD, repo, "verify", "TASK-001")
     assert rc == 1 and "GATE-INTEGRITY" in out and "rewritten after it was taken" in out, out
-    assert not (repo / ".git" / "bridge" / "verified-001.json").exists()
-    rc, out = run(GUARD, repo, "premerge", "001")
+    assert not (repo / ".git" / "bridge" / "verified-TASK-001.json").exists()
+    rc, out = run(GUARD, repo, "premerge", "TASK-001")
     assert rc == 1 and "rewritten after it was taken" in out, out
 
 
 def test_a_snapshot_without_a_hash_copy_cannot_be_verified(repo):
     """C4: a deleted copy (or a snapshot taken before this release) fails closed: take the snapshot again."""
-    rc, out = run(GUARD, repo, "snapshot", "001")
+    rc, out = run(GUARD, repo, "snapshot", "TASK-001")
     assert rc == 0, out
     os.remove(hash_copy(repo))
     launched(repo)
-    rc, out = run(GUARD, repo, "verify", "001")
+    rc, out = run(GUARD, repo, "verify", "TASK-001")
     assert rc == 2 and "CANNOT VERIFY" in out and "take the snapshot again" in out, out
-    assert not (repo / ".git" / "bridge" / "verified-001.json").exists()
-    rc, out = run(GUARD, repo, "premerge", "001")
+    assert not (repo / ".git" / "bridge" / "verified-TASK-001.json").exists()
+    rc, out = run(GUARD, repo, "premerge", "TASK-001")
     assert rc == 2 and "take the snapshot again" in out, out
 
 
@@ -131,12 +132,12 @@ def ready(repo, program, monkeypatch):
     sleep elsewhere in the process (subprocess's wait on POSIX) is not recorded (ISS-016)."""
     for k in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"):
         monkeypatch.setenv(k, os.devnull)
-    rc, out = run(GUARD, repo, "snapshot", "001")
+    rc, out = run(GUARD, repo, "snapshot", "TASK-001")
     assert rc == 0, out
     launched(repo)
-    rc, out = run(GUARD, repo, "verify", "001")
+    rc, out = run(GUARD, repo, "verify", "TASK-001")
     assert rc == 0, out
-    git(repo, "rm", "-q", "run/review/REVIEW-001.diff")
+    git(repo, "rm", "-q", "run/review/REVIEW-TASK-001.diff")
     git(repo, "commit", "-q", "-m", "remove review files")
     mod = program("review-guard")
     sleeps = []
@@ -162,7 +163,7 @@ def test_premerge_reads_a_lagging_head_on_github_again_before_it_flags(ready, re
     15 seconds; it matches after 30, so premerge is OK and says how long it waited."""
     mod, head, sleeps, answers = ready
     answers("0" * 40, "0" * 40, head)
-    rc = mod.cmd_premerge("001", str(repo), "12")
+    rc = mod.cmd_premerge("TASK-001", str(repo), "12")
     out = capsys.readouterr().out
     assert rc == 0 and "waited 30 seconds" in out and "now it matches" in out, out
     assert sleeps == [15, 15]
@@ -171,7 +172,7 @@ def test_premerge_reads_a_lagging_head_on_github_again_before_it_flags(ready, re
 def test_premerge_flags_a_head_that_still_differs_after_ninety_seconds(ready, repo, capsys):
     mod, head, sleeps, answers = ready
     answers("0" * 40)
-    rc = mod.cmd_premerge("001", str(repo), "12")
+    rc = mod.cmd_premerge("TASK-001", str(repo), "12")
     out = capsys.readouterr().out
     assert rc == 1 and "NOT READY" in out and "waited 90 seconds" in out and "still differs" in out, out
     assert sum(sleeps) == 90 and set(sleeps) == {15}
@@ -180,7 +181,7 @@ def test_premerge_flags_a_head_that_still_differs_after_ninety_seconds(ready, re
 def test_premerge_does_not_wait_when_the_heads_match(ready, repo, capsys):
     mod, head, sleeps, answers = ready
     answers(head)
-    rc = mod.cmd_premerge("001", str(repo), "12")
+    rc = mod.cmd_premerge("TASK-001", str(repo), "12")
     out = capsys.readouterr().out
     assert rc == 0 and "waited" not in out and sleeps == [], out
 
