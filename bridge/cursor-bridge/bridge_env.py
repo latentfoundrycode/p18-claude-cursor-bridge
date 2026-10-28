@@ -12,8 +12,13 @@
 - cursor_agent_launcher(): the argv prefix that starts cursor-agent the way Windows needs it
   (the .cmd launcher through cmd.exe), or the binary elsewhere.
 
-ASCII-only on purpose (cp1252 consoles). Writes nothing but the empty gh folder and the
-agent's home folder, %USERPROFILE%/.cursor-bridge/agent-home.
+R-042 (TASK-032): REVIEW_ROUNDS, BLOCKING_CLASSES, the review name grammar, Blocking class and
+Review rounds above the ceiling readers, plan headings, squash_merged_ids (Merge form first),
+branch_declared_ids / branch_allows_id (launcher log plus guard rounds, lapse on main), and
+handoff_brief_tokens live here for bridge-run.py and review-guard.py.
+
+ASCII-only on purpose (cp1252 consoles). Writes nothing (read-only helpers except gh_empty_dir
+and agent_home side effects used by stripped_env).
 """
 import json
 import os
@@ -321,7 +326,6 @@ REVIEW_LIFT_RE = re.compile(
 
 BLOCKING_CLASS_RE = re.compile(
     r"^\s*(?:[-*]\s+)?Blocking class:\s*([^-\n]+?)\s*-\s*(.+?)\s*$",
-    re.I,
 )
 
 MERGE_UNIT_RE = re.compile(
@@ -355,7 +359,10 @@ def parse_review_name(name):
     id_part = m.group(1)
     if _REVIEW_R_IN_ID.search(id_part):
         return None
-    round_n = int(m.group(2)) if m.group(2) else 1
+    try:
+        round_n = int(m.group(2)) if m.group(2) else 1
+    except ValueError:
+        return None
     return id_part, round_n
 
 
@@ -367,7 +374,7 @@ def read_blocking_class_line(text):
         m = BLOCKING_CLASS_RE.match(line.strip())
         if not m:
             continue
-        cls = m.group(1).strip().lower()
+        cls = m.group(1).strip()
         finding = m.group(2).strip()
         if cls not in BLOCKING_CLASSES or not finding:
             continue
@@ -423,8 +430,18 @@ def plan_increment_ids(folder):
     return ids
 
 
+def merge_unit_line_present(text):
+    if not text:
+        return False
+    for line in text.splitlines():
+        m = MERGE_UNIT_RE.match(line.strip())
+        if m and m.group(1):
+            return True
+    return False
+
+
 def merge_unit_ids(text):
-    """IDs from a `Merge unit:` line in a brief, or None."""
+    """IDs from a `Merge unit:` line in a brief, or None when no line or the line is invalid."""
     if not text:
         return None
     for line in text.splitlines():
@@ -433,7 +450,8 @@ def merge_unit_ids(text):
             continue
         ids = []
         for tok in m.group(1).split():
-            if parse_review_name(tok) is None and not re.fullmatch(GRAMMAR_ID_PATTERN, tok):
+            bare = parse_review_name(tok)
+            if bare is None or bare[1] != 1 or bare[0] != tok:
                 return None
             ids.append(tok)
         return tuple(ids)
@@ -455,7 +473,11 @@ def _ids_subset_merged(declared, merged):
 
 
 def _branch_name_to_id(branch, id_rx):
-    """Map a merge branch name to an ID when it matches id_rx (case-insensitive)."""
+    """Map a merge branch name to an ID when it matches id_rx (case-insensitive, letter kept)."""
+    if re.match(r"^task-\d", branch, re.I):
+        cand = "TASK-" + branch[5:]
+        if id_rx.fullmatch(cand):
+            return cand
     for cand in (branch, branch.upper()):
         if id_rx.fullmatch(cand):
             return cand
@@ -467,23 +489,39 @@ def _branch_name_to_id(branch, id_rx):
     return None
 
 
-def squash_merged_ids(folder, id_rx):
-    """Squash subjects on main that merged increments (plan-check order, id_rx on branch names)."""
+def _subject_leading_ids(line, id_rx):
+    subject_rx = re.compile(r"^\s*((?:%s[\s,:]*)+)" % id_rx.pattern)
+    m = subject_rx.match(line)
+    if not m:
+        return ()
+    out = []
+    for tok in re.findall(id_rx.pattern, m.group(1)):
+        if id_rx.fullmatch(tok) and "-" in tok and any(ch.isdigit() for ch in tok):
+            out.append(tok)
+    return out
+
+
+def squash_merged_ids(folder, id_rx, git_runner=None):
+    """Squash subjects on main that merged increments (Merge form first; id_rx on branch names)."""
+    if isinstance(id_rx, str):
+        id_rx = re.compile(id_rx)
+    if git_runner is None:
+        def git_runner(args):
+            return subprocess.run(
+                ["git", "-C", folder] + args,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=NO_WINDOW,
+                timeout=GIT_TIMEOUT,
+            )
     try:
-        p = subprocess.run(
-            ["git", "-C", folder, "log", "main", "--format=%s%n%(trailers:key=Merges,valueonly)"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=NO_WINDOW,
-            timeout=GIT_TIMEOUT,
-        )
+        p = git_runner(["log", "main", "--format=%s%n%(trailers:key=Merges,valueonly)"])
     except (OSError, subprocess.TimeoutExpired):
         return None
     if p.returncode != 0:
         return None
-    subject_rx = re.compile(r"^\s*((?:%s[\s,:]*)+)" % id_rx.pattern)
     trail_rx = re.compile(
         r"\(([^()]*%s[^()]*)\)\s*(?:[-\u2014\u2013]\s*v?[\w.]+\s*)?(?:\(#\d+\))?\s*$" % id_rx.pattern
     )
@@ -492,15 +530,22 @@ def squash_merged_ids(folder, id_rx):
     for line in p.stdout.splitlines():
         m = merge_rx.match(line)
         if m:
-            mapped = _branch_name_to_id(m.group(1), id_rx)
+            branch = m.group(1)
+            mapped = None
+            if re.match(r"^task-\d", branch, re.I):
+                bm = re.match(r"(task-\d{3,}[a-z]?)", branch, re.I)
+                if bm:
+                    cand = "TASK-" + bm.group(1)[5:]
+                    if id_rx.fullmatch(cand):
+                        mapped = cand
+            if mapped is None:
+                mapped = _branch_name_to_id(branch, id_rx)
             if mapped:
                 out.add(mapped)
             continue
-        m = subject_rx.match(line)
-        if m:
-            for tok in re.findall(id_rx.pattern, m.group(1)):
-                if id_rx.fullmatch(tok):
-                    out.add(tok)
+        subs = _subject_leading_ids(line, id_rx)
+        if subs:
+            out.update(subs)
             continue
         m = trail_rx.search(line)
         if m:
@@ -515,16 +560,19 @@ def squash_merged_ids(folder, id_rx):
     return out
 
 
-def branch_exists(folder, branch):
+def branch_exists(folder, branch, git_runner=None):
     if not branch or branch == "main":
         return branch == "main"
+    if git_runner is None:
+        def git_runner(args):
+            return subprocess.run(
+                ["git", "-C", folder] + args,
+                capture_output=True,
+                creationflags=NO_WINDOW,
+                timeout=GIT_TIMEOUT,
+            )
     try:
-        p = subprocess.run(
-            ["git", "-C", folder, "rev-parse", "--verify", "--quiet", "refs/heads/%s" % branch],
-            capture_output=True,
-            creationflags=NO_WINDOW,
-            timeout=GIT_TIMEOUT,
-        )
+        p = git_runner(["rev-parse", "--verify", "--quiet", "refs/heads/%s" % branch])
         return p.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -577,6 +625,29 @@ def launcher_log_folder(common, worktree_root):
     return os.path.dirname(common) if common else worktree_root
 
 
+def _valid_rounds_file(data):
+    if not isinstance(data, dict):
+        return False
+    rounds = data.get("rounds")
+    if rounds is None:
+        return True
+    if not isinstance(rounds, list):
+        return False
+    for r in rounds:
+        if not isinstance(r, dict):
+            return False
+        rn = r.get("round")
+        if rn is not None and (isinstance(rn, bool) or not isinstance(rn, int)):
+            return False
+        t = r.get("time")
+        if t is not None and not isinstance(t, str):
+            return False
+    mi = data.get("merge_ids")
+    if mi is not None and (not isinstance(mi, list) or not all(isinstance(x, str) for x in mi)):
+        return False
+    return True
+
+
 def _read_rounds_files(common):
     out = {}
     bridge = os.path.join(common, "bridge")
@@ -591,18 +662,25 @@ def _read_rounds_files(common):
                 data = json.load(f)
         except (OSError, ValueError):
             continue
-        if isinstance(data, dict):
+        if _valid_rounds_file(data):
             out[id_part] = data
     return out
 
 
 def _event_time_launcher(row):
-    rid = row.get("id") or ""
+    rid = row.get("id")
+    if not isinstance(rid, str):
+        rid = ""
     m = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)", rid)
     return m.group(1) if m else rid
 
 
-def _declared_from_brief_folder(folder, id_part):
+def declared_set_for_id(folder, id_part):
+    """Declared ID set from the branch's first brief or a records subject's SCOPE file."""
+    if id_part.startswith("STAGE-"):
+        scope_names = ("SCOPE-%s.md" % id_part,)
+    else:
+        scope_names = ("SCOPE-%s.md" % id_part, "SCOPE-STAGE-%s.md" % id_part)
     for pat in ("%s.md" % id_part,):
         p = os.path.join(folder, "handoff", pat)
         if os.path.isfile(p):
@@ -612,15 +690,16 @@ def _declared_from_brief_folder(folder, id_part):
                 break
             mu = merge_unit_ids(text)
             return frozenset(mu) if mu else frozenset((id_part,))
-    scope = os.path.join(folder, "run", "review", "SCOPE-%s.md" % id_part)
-    if os.path.isfile(scope):
-        try:
-            text = open(scope, encoding="utf-8", errors="replace").read()
-        except OSError:
-            return frozenset((id_part,))
-        mu = merge_unit_ids(text)
-        if mu:
-            return frozenset(mu)
+    for name in scope_names:
+        scope = os.path.join(folder, "run", "review", name)
+        if os.path.isfile(scope):
+            try:
+                text = open(scope, encoding="utf-8", errors="replace").read()
+            except OSError:
+                return frozenset((id_part,))
+            mu = merge_unit_ids(text)
+            if mu:
+                return frozenset(mu)
     return frozenset((id_part,))
 
 
@@ -643,7 +722,13 @@ def _branch_events(log_folder, common, worktree_root):
                 "first_id": row.get("brief"),
             }
         )
+    git_folder = worktree_root or log_folder
     for id_part, data in _read_rounds_files(common).items():
+        merge_ids = data.get("merge_ids")
+        if merge_ids:
+            file_decl = frozenset(merge_ids)
+        else:
+            file_decl = declared_set_for_id(git_folder, id_part)
         for rnd in data.get("rounds") or []:
             if not isinstance(rnd, dict):
                 continue
@@ -653,7 +738,7 @@ def _branch_events(log_folder, common, worktree_root):
             events.append(
                 {
                     "branch": br,
-                    "ids": frozenset(data.get("merge_ids") or (id_part,)),
+                    "ids": file_decl,
                     "time": rnd.get("time") or "",
                     "first_id": id_part,
                 }
@@ -662,19 +747,19 @@ def _branch_events(log_folder, common, worktree_root):
     return events
 
 
-def _claim_lapsed(git_folder, branch, declared, id_rx):
-    merged = squash_merged_ids(git_folder, id_rx)
+def _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=None):
+    merged = squash_merged_ids(git_folder, id_rx, git_runner=git_runner)
     if merged is None:
         return False
     if _ids_subset_merged(declared, merged):
         return True
-    exists = branch_exists(git_folder, branch)
+    exists = branch_exists(git_folder, branch, git_runner=git_runner)
     if exists is None:
         return False
     return not exists
 
 
-def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx):
+def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_runner=None):
     """Active declared ID set on branch after lapse (R3)."""
     branch = norm_branch(branch)
     if branch == "main":
@@ -684,17 +769,17 @@ def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx):
         if ev["branch"] != branch:
             continue
         declared = ev["ids"]
-        if _claim_lapsed(git_folder, branch, declared, id_rx):
+        if _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=git_runner):
             continue
         return declared
     return frozenset()
 
 
-def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx):
+def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx, git_runner=None):
     branch = norm_branch(branch)
     if branch == "main":
         return False, "main"
-    declared = branch_declared_ids(log_folder, common, worktree_root, branch, id_rx)
+    declared = branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_runner=git_runner)
     git_folder = worktree_root or log_folder
     if not declared:
         return True, None
@@ -702,7 +787,7 @@ def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_l
         return True, None
     if id_part in owner_lifts:
         return True, "owner"
-    if _claim_lapsed(git_folder, branch, declared, id_rx):
+    if _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=git_runner):
         return True, "lapsed"
     return False, declared
 
@@ -721,7 +806,10 @@ def launcher_round_for_id(log_folder, branch, id_part):
         rnd = row.get("round")
         if rnd is None:
             rnd = 1
-        name = row.get("brief_name") or (id_part if rnd == 1 else "%s-r%d" % (id_part, rnd))
+        bn = row.get("brief_name")
+        if not isinstance(bn, str):
+            bn = id_part if rnd == 1 else "%s-r%d" % (id_part, rnd)
+        name = bn
         completed.add(name)
     return completed
 

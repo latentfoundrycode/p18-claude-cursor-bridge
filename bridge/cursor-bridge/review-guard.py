@@ -82,7 +82,6 @@ sys.path.insert(0, HERE)
 import bridge_env  # noqa: E402
 
 GIT_TIMEOUT = 120
-GIT_SHORT = bridge_env.GIT_TIMEOUT
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 CACHE_DIRS = {".venv", "venv", "env", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
               ".tox", ".nox", "dist", "build", ".cache", "target", ".next", ".turbo", "coverage", "site-packages", ".ipynb_checkpoints"}
@@ -98,11 +97,24 @@ def no_hooks_dir(common):
     return d
 
 
+def _git_proc(args, root, common):
+    cmd = ["git", "-c", "core.hooksPath=" + no_hooks_dir(common), "-c", "core.fsmonitor=false"] + list(args)
+    return subprocess.run(
+        cmd,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=GIT_TIMEOUT,
+        creationflags=NO_WINDOW,
+    )
+
+
 def run_git(args, root, common):
     """Every git command of the guard runs with the repository's hooks and file monitor
     switched off: a hook a reviewer left in the active hooks folder must never run here."""
-    cmd = ["git", "-c", "core.hooksPath=" + no_hooks_dir(common), "-c", "core.fsmonitor=false"] + list(args)
-    p = subprocess.run(cmd, cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT, creationflags=NO_WINDOW)
+    p = _git_proc(args, root, common)
     if p.returncode != 0:
         raise RuntimeError("git %s failed: %s" % (" ".join(args), p.stderr.strip()[:300]))
     return p.stdout
@@ -334,8 +346,9 @@ def rounds_path(common, id_part):
 
 
 def rounds_hash_copy_path(common, id_part):
-    key = hashlib.sha256(os.path.normcase(os.path.abspath(common)).encode("utf-8")).hexdigest()[:16]
-    folder = os.environ.get("BRIDGE_REVIEW_HASHES") or os.path.join(os.path.expanduser("~"), ".cursor-bridge", "review-hashes")
+    base = hash_copy_path(common, "x")
+    folder = os.path.dirname(base)
+    key = os.path.basename(base).split("-", 1)[0]
     return os.path.join(folder, "%s-rounds-%s.sha256" % (key, id_part))
 
 
@@ -404,19 +417,23 @@ def _letter_snapshot_rounds(common, root, id_part):
     entries.sort(key=lambda x: x[0])
     if not entries:
         return 0, None
-    branches = []
+    base_branch = None
+    count = 0
     for _, _, fname in entries:
         try:
             with open(os.path.join(bridge, fname), encoding="utf-8", errors="replace") as f:
                 snap = json.load(f)
         except (OSError, ValueError):
-            return 0, None
+            continue
         if not isinstance(snap, dict):
-            return 0, None
-        branches.append(bridge_env.norm_branch(snap.get("branch") or ""))
-    if branches and any(b != branches[0] for b in branches):
-        return 0, None
-    return len(entries), branches[0] if branches else ""
+            continue
+        br = bridge_env.norm_branch(snap.get("branch") or "")
+        if base_branch is None:
+            base_branch = br
+        if br != base_branch:
+            continue
+        count += 1
+    return count, base_branch if count else None
 
 
 def _report_file_rounds(root, common, id_part):
@@ -482,19 +499,19 @@ def _rounds_tamper(common, id_part, path):
     return None
 
 
-def load_rounds(common, id_part, root=None):
+def load_rounds(common, id_part, root=None, seed=True):
     path = rounds_path(common, id_part)
-    if not os.path.isfile(path) and root is not None:
+    tamper = _rounds_tamper(common, id_part, path)
+    if tamper:
+        return None, path, tamper
+    if not os.path.isfile(path) and seed and root is not None:
         seeded, err = _seed_rounds(common, root, id_part)
         if err:
             return None, path, err
-        if seeded and seeded.get("rounds"):
-            write_rounds(common, id_part, seeded)
-        elif seeded:
+        if seeded:
             return seeded, path, None
-    tamper = _rounds_tamper(common, id_part, path) if os.path.isfile(path) else None
-    if tamper:
-        return None, path, tamper
+    if not os.path.isfile(path):
+        return {"id": id_part, "rounds": []}, path, None
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
             data = json.load(f)
@@ -531,7 +548,10 @@ def write_rounds(common, id_part, data):
 
 
 def scope_blocking_line(root, id_part):
-    for name in ("SCOPE-%s.md" % id_part, "SCOPE-STAGE-%s.md" % id_part):
+    names = ["SCOPE-%s.md" % id_part]
+    if not id_part.startswith("STAGE-"):
+        names.append("SCOPE-STAGE-%s.md" % id_part)
+    for name in names:
         p = os.path.join(root, "run", "review", name)
         if os.path.isfile(p):
             try:
@@ -554,12 +574,15 @@ def snapshot_review_refusal(nnn, root, common):
     log_folder = bridge_env.launcher_log_folder(common, root)
     id_rx = bridge_env.grammar_id_rx()
     owner_lifts = bridge_env.review_owner_lifts(root)
-    br = bridge_env.norm_branch(run_git(["rev-parse", "--abbrev-ref", "HEAD"], root, common).strip())
+    git_runner = lambda args: _git_proc(args, root, common)
+    br = bridge_env.norm_branch(git_runner(["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip())
     if br == "main":
         return "review-guard: refused - branch rule: reviews run on a branch, not main"
     if br == "HEAD":
         return "review-guard: refused - branch rule: reviews run on a branch, not a detached HEAD"
-    ok, why = bridge_env.branch_allows_id(log_folder, common, root, br, id_part, owner_lifts, id_rx)
+    ok, why = bridge_env.branch_allows_id(
+        log_folder, common, root, br, id_part, owner_lifts, id_rx, git_runner=git_runner
+    )
     if not ok:
         if isinstance(why, frozenset):
             return "review-guard: refused - branch rule: %s is not on this branch (counted: %s)" % (id_part, ", ".join(sorted(why)))
@@ -570,29 +593,28 @@ def snapshot_review_refusal(nnn, root, common):
     rounds = data.get("rounds") or []
     by_num = {r.get("round"): r for r in rounds if isinstance(r.get("round"), int)}
     current = max(by_num) if by_num else 0
-    tree = run_git(["rev-parse", "HEAD^{tree}"], root, common).strip()
+    tree = git_runner(["rev-parse", "HEAD^{tree}"]).stdout.strip()
     if name_round not in (current, current + 1) and not (name_round == 1 and current == 0):
         return "review-guard: refused - round %d is off the count (current %d)" % (name_round, current)
     if name_round in by_num:
         prev = by_num[name_round]
-        if prev.get("reply") is not None and prev.get("tree") and prev.get("tree") != tree:
-            return "review-guard: refused - round %d is reviewed: write %s-r%d" % (name_round, id_part, name_round + 1)
-    scope_text = ""
-    scope_path = os.path.join(root, "run", "review", "SCOPE-%s.md" % id_part)
-    if os.path.isfile(scope_path):
-        try:
-            scope_text = open(scope_path, encoding="utf-8", errors="replace").read()
-        except OSError:
-            pass
-    blk = bridge_env.read_blocking_class_line(scope_text)
-    used_class = {r.get("lift_line") for r in rounds if r.get("lift") == "class" and r.get("lift_line")}
-    if blk and blk[2] in used_class and name_round > current:
-        return "review-guard: refused - class line already recorded for %s" % id_part
+        if prev.get("reply") is not None:
+            prev_tree = prev.get("tree") or ""
+            if not prev_tree or prev_tree != tree:
+                return "review-guard: refused - round %d is reviewed: write %s-r%d" % (name_round, id_part, name_round + 1)
+    blk = scope_blocking_line(root, id_part)
+    used_class = {
+        r.get("lift_line")
+        for r in rounds
+        if r.get("lift") == "class" and r.get("lift_line") and r.get("round") != name_round
+    }
     owner_entry = owner_lifts.get(id_part)
     owner_cap = owner_entry[0] if owner_entry else bridge_env.REVIEW_ROUNDS
-    test_round = name_round if name_round > current else name_round
+    recorded = by_num.get(name_round) if name_round == current else None
     if name_round > bridge_env.REVIEW_ROUNDS:
         if name_round <= owner_cap:
+            return None
+        if recorded and recorded.get("lift"):
             return None
         if blk and blk[2] not in used_class:
             return None
@@ -600,6 +622,8 @@ def snapshot_review_refusal(nnn, root, common):
             "review-guard: refused - review ceiling: %s (id %s, branch %s, round %d, ceiling %d)"
             % (nnn, id_part, br, name_round, bridge_env.REVIEW_ROUNDS)
         )
+    if blk and blk[2] in used_class and name_round > current:
+        return "review-guard: refused - review ceiling: class line already recorded for %s" % id_part
     return None
 
 
@@ -628,6 +652,9 @@ def clear_verified_marks(common, id_part):
 def cmd_snapshot(nnn, cwd):
     root, git_dir, common = find_git_dirs(cwd)
     if not root:
+        if not str(nnn).startswith("DESIGN-") and bridge_env.parse_review_name(str(nnn)):
+            print("review-guard: refused - branch rule: reviews run on a branch, not a folder outside git")
+            return 125
         print("review-guard: not inside a git checkout")
         return 2
     refusal = snapshot_review_refusal(nnn, root, common)
@@ -700,11 +727,14 @@ def cmd_snapshot(nnn, cwd):
             "reply": None,
         }
         replaced = False
+        if not data.get("merge_ids"):
+            data["merge_ids"] = sorted(bridge_env.declared_set_for_id(root, id_part))
         for i, r in enumerate(data["rounds"]):
             if r.get("round") == rnd:
                 entry["reply"] = r.get("reply")
                 entry["lift"] = r.get("lift")
                 entry["lift_line"] = r.get("lift_line")
+                entry["time"] = r.get("time") or entry["time"]
                 data["rounds"][i] = entry
                 replaced = True
                 break
@@ -881,13 +911,15 @@ def cmd_verify(nnn, cwd):
         and launch_ok
     ):
         id_part, rnd = bridge_env.parse_review_name(str(nnn))
-        data, _, err = load_rounds(common, id_part, root)
-        if not err:
-            for r in data.get("rounds") or []:
-                if r.get("round") == rnd and r.get("reply") is None:
-                    r["reply"] = 0
-                    break
-            write_rounds(common, id_part, data)
+        rpath = rounds_path(common, id_part)
+        if os.path.isfile(rpath):
+            data, _, err = load_rounds(common, id_part, root=None, seed=False)
+            if not err:
+                for r in data.get("rounds") or []:
+                    if r.get("round") == rnd and r.get("reply") is None:
+                        r["reply"] = 0
+                        break
+                write_rounds(common, id_part, data)
     mark = {"nnn": str(nnn), "snapshot": snap_hash, "head": snap["head"], "taken": snap["taken"],
             "launched": launched_at, "exit": exit_code, "verified": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     try:

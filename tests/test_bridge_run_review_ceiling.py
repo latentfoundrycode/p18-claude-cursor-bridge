@@ -297,7 +297,7 @@ def test_r042_refused_brief_names(tmp_path, bad):
     git_init(root, "task-001")
     brief(root, "TASK-001.md")
     env, marker = _launch_env(tmp_path, root)
-    p = run_launch(root, env, *agent_cmd("Read handoff/%s.md" % bad.strip()))
+    p = run_launch(root, env, *agent_cmd("Read handoff/%s.md" % bad))
     assert p.returncode == 125
     assert "bridge-run: started" not in p.stderr
     assert not (root / "run" / "launcher" / "runs.jsonl").exists()

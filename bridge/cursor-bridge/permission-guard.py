@@ -101,38 +101,6 @@ def base(tok):
     return tok.lower().split("/")[-1].split("\\")[-1]
 
 
-def _cursor_agent_probe(w):
-    """KP-024: --version and a one-word -p argument are probes, not gate work."""
-    if not w or base(w[0]) != "cursor-agent":
-        return False
-    if len(w) >= 2 and w[1] == "--version":
-        return True
-    if len(w) >= 3 and w[1] == "-p" and w[2] and " " not in w[2] and not w[2].startswith("-"):
-        return True
-    return False
-
-
-def _inside_bridge_run_cursor_agent(command):
-    """True when a simple command is bridge-run.py ... -- cursor-agent ..."""
-    for simple in split_commands(strip_heredocs(command)):
-        w = strip_prefix(words(simple))
-        if not w:
-            continue
-        if base(w[0]) in ("python", "python3", "py") and len(w) >= 2:
-            if "bridge-run" not in w[1] and "bridge-run.py" not in w[1]:
-                continue
-            if "--" in w:
-                inner = w[w.index("--") + 1 :]
-                if inner and base(inner[0]) == "cursor-agent":
-                    return True
-        if base(w[0]) == "bridge-run.py" or w[0].endswith("bridge-run.py"):
-            if "--" in w:
-                inner = w[w.index("--") + 1 :]
-                if inner and base(inner[0]) == "cursor-agent":
-                    return True
-    return False
-
-
 def _names_bridge_review_paths(w):
     text = " ".join(w)
     return bool(

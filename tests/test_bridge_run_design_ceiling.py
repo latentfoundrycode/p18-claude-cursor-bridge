@@ -44,7 +44,7 @@ def test_a_sixth_round_and_a_second_resolution_round_are_refused(program, tmp_pa
     br = program("bridge-run")
     reason = br.design_ceiling(design_cmd(name), str(tmp_path))
     assert reason is not None, name
-    assert "Design rounds above five:" in reason and "design.md" in reason, reason
+    assert 'design.md, "The launcher holds the ceiling"' in reason, reason
     if subject:
         assert subject in reason, reason
 

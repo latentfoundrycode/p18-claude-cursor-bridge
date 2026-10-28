@@ -111,9 +111,7 @@ def test_a_new_tag_is_flagged_and_deleted_but_a_fetched_remote_ref_is_only_a_not
     assert rc == 1 and "new ref during the review: refs/tags/reviewer-tag" in out and "repaired: refs/tags/reviewer-tag deleted" in out
     assert "reviewer-tag" not in git(repo, "tag", "-l")
     git(repo, "checkout", "-q", "-b", "task-002")
-    (repo / "run" / "review" / "REVIEW-TASK-002.diff").write_text("diff2\n", encoding="utf-8")
-    git(repo, "add", "-f", "run/review/REVIEW-TASK-002.diff")
-    git(repo, "commit", "-q", "-m", "TASK-002")
+    git(repo, "commit", "--allow-empty", "-q", "-m", "TASK-002")
     guard(repo, "snapshot", "TASK-002")
     git(repo, "update-ref", "refs/remotes/origin/main", git(repo, "rev-parse", "HEAD"))   # what a fetch does
     rc, out = guard(repo, "verify", "TASK-002")
@@ -156,6 +154,15 @@ def test_detached_snapshot_with_a_planted_hook(repo):
     git(repo, "checkout", "-q", "--detach")
     rc, out = guard(repo, "snapshot", "TASK-001")
     assert rc == 125 and "detached HEAD" in out
+    rc, out = guard(repo, "snapshot", "DESIGN-1")
+    assert rc == 0, out
+    (repo / ".githooks" / "post-checkout").write_text(HOOK, encoding="utf-8")
+    os.chmod(repo / ".githooks" / "post-checkout", 0o755)
+    if (repo / "HOOK-RAN").exists():
+        (repo / "HOOK-RAN").unlink()
+    rc, out = guard(repo, "verify", "DESIGN-1")
+    assert rc == 1 and "hook files changed" in out and "no git command was run" in out
+    assert not (repo / "HOOK-RAN").exists(), "the guard ran the reviewer's hook on a detached snapshot"
 
 
 def test_ignored_records_are_flagged_and_other_ignored_changes_noted(repo):
@@ -168,17 +175,13 @@ def test_ignored_records_are_flagged_and_other_ignored_changes_noted(repo):
     rc, out = guard(repo, "verify", "TASK-001")
     assert rc == 0 and "LEFT BEHIND (ignored, changed): run/hold/test_x.py" in out and "parked/x.txt" in out
     git(repo, "checkout", "-q", "-b", "task-002b")
-    (repo / "run" / "review" / "REVIEW-TASK-002.diff").write_text("diff2b\n", encoding="utf-8")
-    git(repo, "add", "-f", "run/review/REVIEW-TASK-002.diff")
-    git(repo, "commit", "-q", "-m", "TASK-002b")
+    git(repo, "commit", "--allow-empty", "-q", "-m", "TASK-002b")
     guard(repo, "snapshot", "TASK-002")
     (repo / "docs" / "RUN_PARAMETERS.md").write_text("Merge authority: supervisor\n", encoding="utf-8")
     rc, out = guard(repo, "verify", "TASK-002")
     assert rc == 1 and "docs/RUN_PARAMETERS.md changed during the review" in out
     git(repo, "checkout", "-q", "-b", "task-003")
-    (repo / "run" / "review" / "REVIEW-TASK-003.diff").write_text("diff3\n", encoding="utf-8")
-    git(repo, "add", "-f", "run/review/REVIEW-TASK-003.diff")
-    git(repo, "commit", "-q", "-m", "TASK-003")
+    git(repo, "commit", "--allow-empty", "-q", "-m", "TASK-003")
     guard(repo, "snapshot", "TASK-003")
     with open(repo / ".env", "a", encoding="utf-8") as f:
         f.write("MORE=2\n")
@@ -240,10 +243,11 @@ def test_premerge_refuses_a_snapshot_without_its_verified_mark(repo):
     git(repo, "commit", "-q", "-m", "remove review files")
     rc, out = guard(repo, "premerge", "TASK-001")
     assert rc == 0 and "verified mark for TASK-001" in out, out
-    (repo / "a.py").write_text("x = 3\n", encoding="utf-8")
-    git(repo, "commit", "-q", "-am", "after review")
     rc, out = guard(repo, "snapshot", "TASK-001-r2")              # a new snapshot needs a new review round
     assert rc == 0, out
+    rc, out = guard(repo, "premerge", "TASK-001")
+    assert rc == 2 and "no verified mark" in out, out
+    assert not (repo / ".git" / "bridge" / "verified-TASK-001.json").exists()
     rc, out = guard(repo, "premerge", "TASK-001-r2")
     assert rc == 2 and "no verified mark" in out, "the snapshot removed the older mark: " + out
 
