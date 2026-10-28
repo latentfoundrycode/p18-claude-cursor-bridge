@@ -556,6 +556,21 @@ def prior_brief_run(folder, brief_name):
     return None
 
 
+def prior_brief_run_same_sha(folder, brief_name, brief_sha):
+    for row in read_log(folder):
+        if row.get("brief_sha256") != brief_sha:
+            continue
+        if row.get("brief_name") == brief_name:
+            return row
+        bn = row.get("brief")
+        rnd = row.get("round") or 1
+        if bn:
+            full = "%s-r%d" % (bn, rnd) if rnd > 1 else bn
+            if full == brief_name or (rnd == 1 and bn == brief_name):
+                return row
+    return None
+
+
 def completed_brief_run(folder, brief_name):
     row = prior_brief_run(folder, brief_name)
     if row and row.get("exit") == 0:
@@ -634,7 +649,7 @@ def builder_review_refusal(argv, folder, kind):
         return (_brief_rule_refusal("brief rule: builds run on a branch, not a detached HEAD"), None)
     if br == "main":
         return (_brief_rule_refusal("brief rule: builds run on a branch, not main"), None)
-    prior = prior_brief_run(folder, brief_name)
+    prior = prior_brief_run_same_sha(folder, brief_name, brief_sha)
     prev = completed_brief_run(folder, brief_name)
     if prev and prev.get("brief_sha256") and prev["brief_sha256"] != brief_sha and prev.get("exit") == 0:
         return (
@@ -680,7 +695,7 @@ def builder_review_refusal(argv, folder, kind):
                 return (_ascii_refusal("branch rule: %s is not on this branch (counted: %s)" % (mid, ", ".join(sorted(why)))), None)
             return (_ascii_refusal("branch rule: refused for %s" % mid), None)
     eff_round = bridge_env.launcher_effective_round(log_folder, br, id_part, name_round)
-    if prior and prior.get("brief_sha256") == brief_sha:
+    if prior:
         eff_round = name_round
     lift = None
     lift_line = None
@@ -696,7 +711,7 @@ def builder_review_refusal(argv, folder, kind):
             lift, lift_line = "owner", owner_entry[1] if owner_entry else ""
         elif blk:
             line = blk[2]
-            if line in class_used and not (prior and prior.get("brief_sha256") == brief_sha):
+            if line in class_used and not prior:
                 return (_ascii_refusal("review ceiling: class line already used for %s" % id_part), None)
             lift, lift_line = "class", line
         else:

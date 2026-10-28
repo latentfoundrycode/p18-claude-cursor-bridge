@@ -319,6 +319,55 @@ def mark_path(common, nnn):
     return os.path.join(common, "bridge", "verified-%s.json" % nnn)
 
 
+def _launch_time_ge_round(launched_at, round_time):
+    if not launched_at or not round_time:
+        return False
+    return launched_at.rstrip("Z") >= round_time.rstrip("Z")
+
+
+def err_counts_as_reply(root, round_entry):
+    """Review B exit 0 in .err at or after the round's snapshot time, unless voided by GATE-INTEGRITY."""
+    if not round_entry:
+        return False
+    name = round_entry.get("name")
+    if not name:
+        return False
+    err_path = os.path.join(root, "run", "review", "REVIEW-%s.err" % name)
+    launched_at, exit_code = launch_info(err_path)
+    if exit_code != 0 or not _launch_time_ge_round(launched_at, round_entry.get("time")):
+        return False
+    flagged = (round_entry.get("flagged_launch") or "").rstrip("Z")
+    if flagged and flagged == launched_at.rstrip("Z"):
+        return False
+    return True
+
+
+def record_flagged_launch(common, root, nnn, snap):
+    """A GATE-INTEGRITY verify voids a qualifying Review B launch for round counting (R11)."""
+    if str(nnn).startswith("DESIGN-"):
+        return
+    parsed = bridge_env.parse_review_name(str(nnn))
+    if not parsed:
+        return
+    id_part, rnd = parsed
+    err_path = os.path.join(root, "run", "review", "REVIEW-%s.err" % nnn)
+    launched_at, exit_code = launch_info(err_path)
+    snap_taken = (snap.get("taken") or "").rstrip("Z")
+    if exit_code != 0 or not launched_at or launched_at.rstrip("Z") < snap_taken:
+        return
+    rpath = rounds_path(common, id_part)
+    if not os.path.isfile(rpath):
+        return
+    data, _, err = load_rounds(common, id_part, root=None, seed=False)
+    if err:
+        return
+    for r in data.get("rounds") or []:
+        if r.get("round") == rnd:
+            r["flagged_launch"] = launched_at
+            break
+    write_rounds(common, id_part, data)
+
+
 def launch_info(err_path):
     """(launch time, exit code) from run/review/REVIEW-<nnn>.err: the launcher's first line
     `bridge-run: started <UTC>Z` and its last `bridge-run: exit <code>` (None while it runs)."""
@@ -598,7 +647,10 @@ def snapshot_review_refusal(nnn, root, common):
         return "review-guard: refused - round %d is off the count (current %d)" % (name_round, current)
     if name_round in by_num:
         prev = by_num[name_round]
-        if prev.get("reply") is not None:
+        has_reply = prev.get("reply") is not None
+        if not has_reply and name_round == current:
+            has_reply = err_counts_as_reply(root, prev)
+        if has_reply:
             prev_tree = prev.get("tree") or ""
             if not prev_tree or prev_tree != tree:
                 return "review-guard: refused - round %d is reviewed: write %s-r%d" % (name_round, id_part, name_round + 1)
@@ -898,6 +950,7 @@ def cmd_verify(nnn, cwd):
     left = sum(1 for n in notes if n.startswith("LEFT BEHIND"))
     if flags:
         print("review-guard: GATE-INTEGRITY - the tree is back at %s on %s and the refs are repaired, but the review left the marks above: open the flag (condition 4) and an issue; do not merge" % (snap["head"][:12], snap["branch"] or "detached HEAD"))
+        record_flagged_launch(common, root, nnn, snap)
         return 1
     # The verified mark premerge needs (second pass of the A1b review, S2): this snapshot's hash
     # and the launch time of the Review B run, so a merge that skipped the review has no mark.

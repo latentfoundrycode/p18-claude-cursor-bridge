@@ -1,6 +1,6 @@
 {
   "version": "2026.10.25a",
-  "generated": "2026-10-28 02:38",
+  "generated": "2026-10-28 03:11",
   "files": {
     "agents/cursor-configurator.md": "823600362d447feec8622c3e3e71615b9b3805f2c2c8c3fd391f9ce373431eee",
     "agents/design-auditor.md": "d89cf61c501e528e5be03789e511ec1bcdd6ad9907fe4e07c9336fb7bae3f514",
@@ -31,7 +31,7 @@
     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
     "cursor-bridge/bridge-install.py": "c679380382e8bd34a6116c4d0abc8e254326059a8c35929f49b8fd6484a52b6d",
-    "cursor-bridge/bridge-run.py": "bcdfdc092d950ff799abad2d09fb5f246313adaf37ccf5349f838bfe9c29ec02",
+    "cursor-bridge/bridge-run.py": "5914ab76dcbbe4518bf496def790cb967691151714cc783e8b4a5cccfe564e8f",
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
     "cursor-bridge/bridge_env.py": "bd3f588702f39989d5d96c9e94a5630fac8291c05a40f646292424a2dc76b0da",
     "cursor-bridge/completion-check.py": "f584af6a6592c7f748beec212ad2b1752356607529fd60c1acb6507190626134",
@@ -91,7 +91,7 @@
     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
-    "cursor-bridge/review-guard.py": "a79a95e54be6664d91146c6a7ad208b8d3c529b0334238d1836336ce9831987c",
+    "cursor-bridge/review-guard.py": "7426e3bedf9b60fab6d7b316d587fe177b285b791b44645783790d8d38c9c417",
     "cursor-bridge/roster-check.py": "9d6954efc5afd3a8c165f73c64196e7ff49994a78deda8f06884320f21b7e9d2",
     "cursor-bridge/run-hidden.py": "bcae418e3cca9d7f1be7bf421ce44b879b343613301df4590d9cc45d00f5be5c",
     "cursor-bridge/scope-check.py": "20cbe2e83affe3183f36a53cbf1d51adaa05edd2027b64d9bd35c98ecf247bfa",
