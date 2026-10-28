@@ -319,8 +319,8 @@ further mutant, input or operator family that shows a class already recorded in
 never a new one, while a defect of one of the five blocks whatever was recorded before.
 **The ceiling** (R-042): three rounds per increment and per stage review, the owner's number,
 held by `bridge-run.py`, which counts the builder rounds, and `review-guard.py`, which counts
-the Review B rounds; the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 7,
-"The review ceiling"). Below it the by-class line is the supervisor's judgment; at and above it
+the Review B rounds; the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`,
+step 7, "The review ceiling"). Below it the by-class line is the supervisor's judgment; at and above it
 the line is the rule: only a finding of the five sends the work back, every other finding goes
 to `docs/HARDENING.md` with the increment, and a round above the ceiling runs only under a
 `Blocking class:` line or the owner's `Review rounds above the ceiling:` line. Every reviewer

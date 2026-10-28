@@ -63,7 +63,7 @@ make and record. Judge it like this:
   kill path built to protect the run is core, not tail), a failing test. The class is the
   defect, not the operator that exposed it: a further mutant, input or operator family that
   shows a class already recorded in `docs/HARDENING.md` under the by-class line for the
-  increment is that class and never a new one, while a defect of one of the five blocks
+  increment or the stage is that class and never a new one, while a defect of one of the five blocks
   whatever was recorded before. Below the ceiling, drawing this line is a decision you make and
   record, not one you bring to the user; at and above it the line is the rule ("The review
   ceiling", below).
@@ -109,7 +109,7 @@ The code gate stops at three rounds per increment, the owner's number at the pla
 - **A class line**, `Blocking class: <class> - <the finding>`, its `<class>` one of `behaviour`, `security`, `data integrity`, `safety mechanism` and `failing test`, its finding naming the reviewer's finding it answers (`Review A, round 3, B1`, say). You write it into the brief before the builder launch, where the launcher reads it, and into `run/review/SCOPE-<ID>.md` before the snapshot, where the guard reads it; a line lifts the one round it was written for. The reviewers are told of the line and confirm or deny it: a reviewer's denial voids the round's result and withholds the merge as GATE-INTEGRITY does, and the breach is recorded in `docs/HARDENING.md` under the increment and as an issue.
 - **The owner's line** in `docs/RUN_PARAMETERS.md`, `Review rounds above the ceiling: <ID> <rounds> (<their words>, <date>)`, written only on the owner's own words and never asked for; its `<rounds>` is at least the larger of the guard's and the launcher's next counts for the increment, the count your report names when the ceiling is reached.
 
-**The refusals are stops, not failures.** The launcher's `bridge-run: refused - review ceiling: ` and the guard's `review-guard: refused - review ceiling: `, and their other refusals of the ceiling's rules (the `brief rule: ` and `branch rule: ` refusals either prints, a brief revised after a completed run, a new round under a name whose round already has its reply or off the count, a brief or a snapshot under another ID on a counted branch), are the ceiling's programs holding: neither a failed launch nor a model's failure (step 3b), never retried as one and never passed to `roster-check.py`. Read the refusal; then write the next numbered brief or the round's right name, write the class line where a blocking-class finding stands, or record the finding in `docs/HARDENING.md`.
+**The refusals are stops, not failures.** The launcher's `bridge-run: refused - review ceiling: ` and the guard's `review-guard: refused - review ceiling: `, and their other refusals of the ceiling's rules (the launcher's `brief rule: ` and `revised in place: `, the `branch rule: ` either prints, a brief revised after a completed run, a new round under a name whose round already has its reply or off the count, a brief or a snapshot under another ID on a counted branch), are the ceiling's programs holding: neither a failed launch nor a model's failure (step 3b), never retried as one and never passed to `roster-check.py`. Read the refusal; then write the next numbered brief or the round's right name, write the class line where a blocking-class finding stands, or record the finding in `docs/HARDENING.md`.
 
 A stage review is bounded the same way (`STAGE-<name>-r<N>`, the reflection module's step 7).
 

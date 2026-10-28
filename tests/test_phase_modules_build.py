@@ -271,12 +271,12 @@ def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
 
 
 # sha256 of step 7 as the sub-file holds it after TASK-034 (from its heading to the line before "The review ceiling",
-# LF, trailing whitespace stripped; 7,628 characters). TASK-030 moved the step verbatim from the module (then 6,967
+# LF, trailing whitespace stripped; 7,641 characters). TASK-030 moved the step verbatim from the module (then 6,967
 # characters at origin/main 02f0ab5, sha256 70a1aacaca66592b...), its mutation run added after it under a heading of its own;
 # TASK-034 reworded its Iterate and Re-delegate bullets (a new numbered brief), the root-cause-first paragraph's fix
 # brief (`<ID>-r<N>` inside a gate, BUG after a merge) and the brake's by-class bullet (the five classes, the class
-# the defect), and added "The review ceiling" between the step and the mutation run (R-042)
-STEP7_SHA256 = "88d85c1599fff5662ffa75cdd3f012b94332a15bba454094d017a2ed98b3a979"
+# the defect, for the increment or the stage), and added "The review ceiling" between the step and the mutation run (R-042)
+STEP7_SHA256 = "dcf588e45b134ec855bfc9da83ab356d4ab82b15f294426c849e35c01f9ae261"
 
 
 def test_r032_step_7_is_verbatim():
@@ -285,7 +285,7 @@ def test_r032_step_7_is_verbatim():
     import hashlib
     sub = module(DECIDE)
     step = sub[sub.index("### " + STEP7):sub.index("#### The review ceiling")].rstrip()
-    assert len(step) == 7628 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
+    assert len(step) == 7641 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
 
 
 def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():

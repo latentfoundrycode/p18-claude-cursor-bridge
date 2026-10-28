@@ -173,21 +173,24 @@ def test_r042_the_refusals_are_stops_named_as_the_programs_print_them():
     assert 'sys.stderr.write("bridge-run: refused - %s\\n" % reason)' in run and '"review ceiling: ' in run
     assert '"review-guard: refused - review ceiling: ' in guard
     assert '"brief rule: ' in run and '"review-guard: refused - branch rule: ' in guard
+    assert '"revised in place: write handoff/' in run and '"branch rule: ' in run
+    assert "brief rule: " not in guard and "revised in place: " not in guard
     assert "is off the count" in guard and "is reviewed: write" in guard
     c = ceiling()
     assert ("**The refusals are stops, not failures.** The launcher's `bridge-run: refused - review ceiling: ` and "
             "the guard's `review-guard: refused - review ceiling: `") in c
-    assert ("and their other refusals of the ceiling's rules (the `brief rule: ` and `branch rule: ` refusals either "
-            "prints, a brief revised after a completed run, a new round under a "
+    assert ("and their other refusals of the ceiling's rules (the launcher's `brief rule: ` and `revised in place: `, "
+            "the `branch rule: ` either prints, a brief revised after a completed run, a new round under a "
             "name whose round already has its reply or off the count, a brief or a snapshot under another ID on a "
             "counted branch), are the ceiling's programs holding: neither a failed launch nor a model's failure (step "
             "3b), never retried as one and never passed to `roster-check.py`.") in c
     s3b = f(section(loop(), STEP3B, 3))
     assert "(The exceptions: every exit 125 whose message begins `bridge-run: refused - design ceiling: `" in s3b
-    assert ("Nor is a refusal of the code gate's programs a model's failure: the `review ceiling: `, `brief rule: ` "
-            "and `branch rule: ` refusals of the launcher and the guard and the guard's refusals of a round off its "
-            "count or already reviewed (a fourth round with no lift, a brief revised after a completed run, no brief "
-            "or two, a builder launch on `main`, another ID on a counted branch) are the ceiling's programs holding, "
+    assert ("Nor is a refusal of the code gate's programs a model's failure: the launcher's `review ceiling: `, "
+            "`brief rule: `, `revised in place: ` and `branch rule: ` refusals (a fourth round with no lift, no brief "
+            "or two, a builder launch on `main`, a brief revised after a completed run, a brief under another ID on a "
+            "counted branch) and the guard's `review ceiling: ` and `branch rule: ` refusals and its refusals of a "
+            "round off its count or already reviewed are the ceiling's programs holding, "
             "neither a failed launch nor a model's failure, handled as step 7's \"The review ceiling\" says; every "
             "other `bridge-run: refused - ` of a builder or review launch (the slot's `heavy.lock`, a limit, a key "
             "file) and every other `review-guard: refused - ` is no model's failure either, and is read and fixed as "
@@ -291,7 +294,7 @@ def test_r042_the_five_and_the_class_is_the_defect_in_all_three_homes():
     for name, t in homes.items():
         assert has_five(t) == [], (name, has_five(t))
         assert "The class is the defect, not the operator that exposed it" in t, name
-        assert "a further mutant, input or operator family that shows a class already recorded in `docs/HARDENING.md` under the by-class line for the increment" in t, name
+        assert "a further mutant, input or operator family that shows a class already recorded in `docs/HARDENING.md` under the by-class line for the increment or the stage is that class" in t, name
         assert "is that class and never a new one, while a defect of one of the five" in t, name
         assert "blocks whatever was recorded before" in t, name
     assert "output correctness, data integrity, security, or what the software does" not in homes["policy"]
@@ -439,6 +442,7 @@ def test_r042_the_policy_carries_the_ceiling_the_names_and_the_breach():
             "the SCOPE file's `Blocking class:` line, where it has one, confirmed or denied,") in p
     assert "(`run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot," in p
     assert "It also reads `run/review/ASSUMPTIONS-<ID>-r<N>.md`" in p
+    assert "the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`, step 7, \"The review ceiling\")" in p
     assert ("`snapshot <ID>-r<N>` before the launch, `<N>` the round it opens by the guard's count, the SCOPE file "
             "committed first since the guard reads its `Blocking class:` line (it refuses a dirty tree, a round off "
             "its count and a round above the ceiling with no lift,") in p
