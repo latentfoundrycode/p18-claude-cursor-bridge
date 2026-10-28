@@ -27,3 +27,5 @@ Last accepted, the part moved out at TASK-030 (2026-10-27): before it the plan r
 Last accepted, the part moved out at TASK-032 (2026-10-28): before it TASK-030 (PR #93): the loop's text for windowless runs, the slot and the mutation run, step 7 moved into delegation-loop/decide.md, the windowless default a configuration item written at calibration, R-039 and R-041 built (INVENTORY, Features); before it the plan revision maintainer-text (PR #92)
 
 Last accepted, the part moved out at TASK-033 (2026-10-28): before it TASK-032 (PR #94): the code-review ceiling held by the launcher and the guard, R-042 in part, four builder rounds on the supervisor's acceptance tests, the fourth past the ceiling under a class line (INVENTORY, Features; docs/HARDENING.md, TASK-032)
+
+Last accepted, the part moved out at TASK-035 (2026-10-28): before it TASK-033 (PR #95): one reading of a squash subject (the closing parenthesis merging only bare IDs, ISS-013) and pace-report.py, R-044 in part, four builder rounds on the supervisor's acceptance tests, the fourth past the ceiling under a class line (INVENTORY, Features; docs/HARDENING.md, TASK-033)
