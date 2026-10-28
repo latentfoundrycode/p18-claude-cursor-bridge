@@ -5,16 +5,12 @@ R-006 (each phase module declares the points the registry names it as declaring)
 delegation-loop module, at 94% of the bound's characters before this increment, is split, its step 9 in a sub-file under
 workflow/phases/delegation-loop/ that the module's own `Sub-files:` line names and the session-start hook follows);
 docs/BUILD_PLAN.md TASK-013's Done when, and the pointer sweep for the split (the core's module table)."""
-import json
 import os
-import re
-import shutil
-import subprocess
-import sys
 
 import pytest
 
-from phase_modules import read, module, flat, headings, section, registry_points
+from phase_modules import (read, module, flat, headings, section, assert_survival_list, assert_declares_registry_points,
+                           assert_points_placed, hook_named)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
@@ -22,7 +18,6 @@ CB = os.path.join(BRIDGE, "cursor-bridge")
 PHASES = os.path.join(CB, "workflow", "phases")
 REGISTRY = os.path.join(CB, "workflow", "extension-points.md")
 CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
-HOOK = os.path.join(CB, "session-start.py")
 
 SUB = "delegation-loop/refactoring-pass.md"
 STEP9 = "9. Refactoring and optimization pass (at stage close)"
@@ -125,32 +120,14 @@ KEYS = ["run-parameters", "configuration", "delegation-loop"]
 def test_r004_the_module_opens_with_its_compaction_survival_list(key):
     """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
     exactly what a resumed session in that phase reads before its next action."""
-    text = module(key)
-    assert headings(text) == STRUCTURE[key], headings(text)
-    lines = text.split("\n")
-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
-    assert body[0] == INTRO[key]
-    assert all(l.startswith("- ") for l in body[1:] if l), body
-    assert [l[2:] for l in body[1:] if l] == SURVIVAL[key]
+    assert_survival_list(key, STRUCTURE[key], INTRO[key], SURVIVAL[key])
 
 
 @pytest.mark.parametrize("key", KEYS)
 def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_order(key):
     """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
     per point giving its key, exactly the points the registry names this module as declaring, in the table's order."""
-    body = section(module(key), "Extension points", 2).strip().split("\n")
-    lines = [l for l in body if l.startswith("- ")]
-    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in lines]
-    want = registry_points(key)
-    assert want and keys == want, (keys, want)
-    prose = flat(" ".join(l for l in body if l and not l.startswith("- ")))
-    assert prose == ("This module offers the points below, each by its key in the extension-point registry "
-                     "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each "
-                     "accepts and whether it applies per part or per project. A conditional workflow's additions at a "
-                     "point are made where the point's line places them, in the order the core states in \"Main and "
-                     "conditional workflows\".")
-    assert "may set" not in "\n".join(body)
+    assert_declares_registry_points(key)
 
 
 POINTS = {
@@ -179,30 +156,12 @@ POINTS = {
 }
 
 
-def registry_applies():
-    text = read(REGISTRY)
-    table = text.split("\n## Extension points\n", 1)[1].split("\n## ", 1)[0]
-    rows = [l for l in table.split("\n") if l.startswith("|")]
-    header = [c.strip() for c in rows[0].strip("|").split("|")]
-    return {cells["Key"]: cells["Applies"] for cells in
-            (dict(zip(header, [c.strip() for c in row.strip("|").split("|")])) for row in rows[2:])}
-
-
 @pytest.mark.parametrize("key", KEYS)
 def test_r006_each_point_says_where_its_additions_are_made(key):
     """R-006 and the registry's "How a phase module declares its points": each point's line places the additions a
     conditional workflow makes there, and says what the registry's Applies cell states: a point that applies per
     project is made once for the whole project; one that applies per part names the part (Review A, round 1, S5)."""
-    applies = registry_applies()
-    body = section(module(key), "Extension points", 2).strip().split("\n")
-    for line in [l for l in body if l.startswith("- ")]:
-        k = re.match(r"^- `([a-z0-9.-]+)` — ", line).group(1)
-        assert line == "- `%s` — %s" % (k, POINTS[k]), line
-        if applies[k] == "project":
-            assert line.endswith("; made once for the whole project."), (k, line)
-        else:
-            assert applies[k] == "part" and re.search(r"\b(of|for) the part\b", line), (k, applies[k], line)
-            assert "whole project" not in line, line
+    assert_points_placed(key, POINTS)
 
 
 def test_r006_the_inspect_point_spans_every_step_the_registry_gives_it():
@@ -397,21 +356,9 @@ def test_r032_the_module_and_its_sub_file_are_read_whole(rel):
 def test_r005_the_hook_names_the_delegation_loop_and_its_sub_file(tmp_path):
     """R-005 with R-032, the first real Sub-files: line: for `Phase: building` the installed hook names
     delegation-loop.md, then its sub-file, then the reflection and project-end modules."""
-    home = tmp_path / "home"
-    shutil.copytree(os.path.join(BRIDGE, "commands"), str(home / ".claude" / "commands"))
-    shutil.copytree(CB, str(home / ".claude" / "cursor-bridge"), ignore=shutil.ignore_patterns("__pycache__"))
-    ws = tmp_path / "proj" / "Workspace"
-    (ws / "docs").mkdir(parents=True)
-    (ws / "docs" / "PROJECT_STATUS.md").write_text(
-        "# Project Status\nPhase: building\nWorkflows: not yet classified\nAwaiting user on: nothing\n", encoding="utf-8")
-    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
-    data = {"cwd": str(ws), "hook_event_name": "SessionStart", "source": "compact"}
-    p = subprocess.run([sys.executable, HOOK, "--part", "pointers"], input=json.dumps(data), capture_output=True,
-                       text=True, encoding="utf-8", env=env)
-    assert p.returncode == 0 and p.stderr == "", p.stderr
     w = "~/.claude/cursor-bridge/workflow/phases/"
-    named = [re.match(r"  - (\S+)", l).group(1) for l in p.stdout.split("\n") if l.startswith("  - " + w)]
-    assert named == [w + "delegation-loop.md", w + DECIDE, w + SUB, w + "reflection.md", w + "project-end.md"], p.stdout
+    named = hook_named(tmp_path, "building")
+    assert named == [w + "delegation-loop.md", w + DECIDE, w + SUB, w + "reflection.md", w + "project-end.md"], named
 
 
 def test_the_core_names_the_delegation_loops_sub_file():

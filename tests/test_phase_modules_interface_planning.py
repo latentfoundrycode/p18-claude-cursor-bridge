@@ -8,23 +8,19 @@ once in the interface module, each variant's text in one place), R-032 (each mod
 docs/BUILD_PLAN.md TASK-012's Done when (the playable-prototype file a declared pointer worded clear of
 completion-check's stand-in patterns), and its pointer sweep (docs/HARDENING.md, Stage B3)."""
 import importlib.util
-import json
 import os
 import re
-import shutil
-import subprocess
-import sys
 
 import pytest
 
-from phase_modules import read, module, flat, headings, section, registry_points
+from phase_modules import (read, module, flat, headings, section, assert_survival_list, assert_declares_registry_points,
+                           hook_named)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
 CB = os.path.join(BRIDGE, "cursor-bridge")
 PHASES = os.path.join(CB, "workflow", "phases")
 CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
-HOOK = os.path.join(CB, "session-start.py")
 
 VARIANTS = [
     ("Mockups", "screens a person sees", "interface/mockups.md"),
@@ -92,32 +88,16 @@ SURVIVAL = {
 def test_r004_the_module_opens_with_its_compaction_survival_list(key):
     """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
     exactly what a resumed session in that phase reads before its next action."""
-    text = module(key)
-    assert headings(text) == STRUCTURE[key], headings(text)
-    lines = text.split("\n")
-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
-    assert body[0] == "After a compaction or a resume in this phase, read these before your next action:"
-    assert all(l.startswith("- ") for l in body[1:] if l), body
-    assert [l[2:] for l in body[1:] if l] == SURVIVAL[key]
+    assert_survival_list(key, STRUCTURE[key],
+                         "After a compaction or a resume in this phase, read these before your next action:",
+                         SURVIVAL[key])
 
 
 @pytest.mark.parametrize("key", ["interface", "planning"])
 def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_order(key):
     """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
     per point giving its key, exactly the points the registry names this module as declaring, in the table's order."""
-    body = section(module(key), "Extension points", 2).strip().split("\n")
-    lines = [l for l in body if l.startswith("- ")]
-    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in lines]
-    want = registry_points(key)
-    assert want and keys == want, (keys, want)
-    prose = flat(" ".join(l for l in body if l and not l.startswith("- ")))
-    assert prose == ("This module offers the points below, each by its key in the extension-point registry "
-                     "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each "
-                     "accepts and whether it applies per part or per project. A conditional workflow's additions at a "
-                     "point are made where the point's line places them, in the order the core states in \"Main and "
-                     "conditional workflows\".")
-    assert "may set" not in "\n".join(body)
+    assert_declares_registry_points(key)
 
 
 def test_r012_the_four_variants_are_declared_once_in_the_interface_module():
@@ -305,21 +285,9 @@ def test_r032_the_module_and_each_variant_file_are_read_whole(rel):
 def test_r005_the_hook_names_the_interface_module_and_its_four_variants(tmp_path):
     """R-005 with R-012, the first real pointer line: for `Phase: mockups` the installed hook names interface.md and,
     after it, the four variant files in the `Variants:` line's order (FIX-003 hardened the hook for this line)."""
-    home = tmp_path / "home"
-    shutil.copytree(os.path.join(BRIDGE, "commands"), str(home / ".claude" / "commands"))
-    shutil.copytree(CB, str(home / ".claude" / "cursor-bridge"), ignore=shutil.ignore_patterns("__pycache__"))
-    ws = tmp_path / "proj" / "Workspace"
-    (ws / "docs").mkdir(parents=True)
-    (ws / "docs" / "PROJECT_STATUS.md").write_text(
-        "# Project Status\nPhase: mockups\nWorkflows: not yet classified\nAwaiting user on: nothing\n", encoding="utf-8")
-    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
-    data = {"cwd": str(ws), "hook_event_name": "SessionStart", "source": "compact"}
-    p = subprocess.run([sys.executable, HOOK, "--part", "pointers"], input=json.dumps(data), capture_output=True,
-                       text=True, encoding="utf-8", env=env)
-    assert p.returncode == 0 and p.stderr == "", p.stderr
     w = "~/.claude/cursor-bridge/workflow/phases/"
-    named = [re.match(r"  - (\S+)", l).group(1) for l in p.stdout.split("\n") if l.startswith("  - " + w)]
-    assert named == [w + "interface.md"] + [w + v[2] for v in VARIANTS], p.stdout
+    named = hook_named(tmp_path, "mockups")
+    assert named == [w + "interface.md"] + [w + v[2] for v in VARIANTS], named
 
 
 def test_the_interface_phase_is_named_by_its_variants_outside_the_module():

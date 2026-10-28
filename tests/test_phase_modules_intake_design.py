@@ -8,11 +8,10 @@ likewise), R-036 (a new or unwritten trait written into the design and flagged a
 still pause; the promotion-pass half is TASK-014's); docs/BUILD_PLAN.md TASK-011's Done when, and its Scope's pointer
 sweep (docs/HARDENING.md, Stage B3)."""
 import os
-import re
 
 import pytest
 
-from phase_modules import read, module, flat, headings, section, registry_points
+from phase_modules import read, module, flat, section, assert_survival_list, assert_declares_registry_points
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
@@ -72,15 +71,9 @@ SURVIVAL = {
 def test_r004_the_module_opens_with_its_compaction_survival_list(key):
     """R-004: the module's first section, straight after its heading, is the compaction-survival list (the Glossary's
     term), and the list is exactly what a resumed session in that phase reads before its next action."""
-    text = module(key)
-    assert headings(text) == STRUCTURE[key], headings(text)
-    lines = text.split("\n")
-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
-    assert body[0] == "After a compaction or a resume in this phase, read these before your next action:"
-    items = [l[2:] for l in body[1:] if l]
-    assert all(l.startswith("- ") for l in body[1:] if l), body
-    assert items == SURVIVAL[key], items
+    assert_survival_list(key, STRUCTURE[key],
+                         "After a compaction or a resume in this phase, read these before your next action:",
+                         SURVIVAL[key])
 
 
 @pytest.mark.parametrize("key", ["intake", "design"])
@@ -88,18 +81,7 @@ def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_o
     """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
     per point giving its key, exactly the points the registry names this module as declaring, in the table's order;
     each line says where in the module an addition there is made."""
-    text = module(key)
-    body = section(text, "Extension points", 2).strip().split("\n")
-    lines = [l for l in body if l.startswith("- ")]
-    keys = [re.match(r"^- `([a-z0-9.-]+)` — \S", l).group(1) for l in lines]
-    want = registry_points(key)
-    assert want and keys == want, (keys, want)
-    prose = flat(" ".join(l for l in body if l and not l.startswith("- ")))
-    assert prose == ("This module offers the points below, each by its key in the extension-point registry "
-                     "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each "
-                     "accepts and whether it applies per part or per project. A conditional workflow's additions at a "
-                     "point are made where the point's line places them, in the order the core states in \"Main and "
-                     "conditional workflows\".")
+    assert_declares_registry_points(key, may_set=True)
 
 
 def test_r006_the_set_points_say_who_may_set_them():

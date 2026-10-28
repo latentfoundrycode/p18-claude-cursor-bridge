@@ -14,13 +14,13 @@ import re
 
 import pytest
 
-from phase_modules import read, module, flat, headings, section, trace_headings
+from phase_modules import (read, module, flat, headings, section, trace_headings, registry_rows, registry_points,
+                           assert_survival_list, assert_declares_registry_points, assert_points_placed)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
 CB = os.path.join(BRIDGE, "cursor-bridge")
 PHASES = os.path.join(CB, "workflow", "phases")
-REGISTRY = os.path.join(CB, "workflow", "extension-points.md")
 EXCEPTIONS = os.path.join(CB, "workflow", "trace-exceptions.md")
 GLOSSARY = os.path.join(CB, "Glossary.md")
 
@@ -110,32 +110,7 @@ KEYS = ["change-cycle", "reflection", "project-end"]
 def test_r004_the_module_opens_with_its_compaction_survival_list(key):
     """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
     exactly what a resumed session at that point reads before its next action."""
-    text = module(key)
-    assert headings(text) == STRUCTURE[key], headings(text)
-    lines = text.split("\n")
-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
-    assert body[0] == INTRO[key]
-    assert all(l.startswith("- ") for l in body[1:] if l), body
-    assert [l[2:] for l in body[1:] if l] == SURVIVAL[key]
-
-
-def registry_rows(heading):
-    text = read(REGISTRY)
-    table = text.split("\n" + heading + "\n", 1)[1].split("\n## ", 1)[0]
-    rows = [l for l in table.split("\n") if l.startswith("|")]
-    header = [c.strip() for c in rows[0].strip("|").split("|")]
-    return [dict(zip(header, [c.strip() for c in row.strip("|").split("|")])) for row in rows[2:]]
-
-
-def registry_points(module_key):
-    return [r["Key"] for r in registry_rows("## Extension points") if r["Declared by"] == module_key]
-
-
-EXT_PROSE = ("This module offers the points below, each by its key in the extension-point registry "
-             "(`~/.claude/cursor-bridge/workflow/extension-points.md`), which states the kinds of change each accepts and "
-             "whether it applies per part or per project. A conditional workflow's additions at a point are made where the "
-             "point's line places them, in the order the core states in \"Main and conditional workflows\".")
+    assert_survival_list(key, STRUCTURE[key], INTRO[key], SURVIVAL[key])
 
 
 def declared(text):
@@ -151,12 +126,7 @@ def test_r006_the_module_declares_exactly_its_registry_points_in_the_registrys_o
     """R-006 and the registry's "How a phase module declares its points": a `## Extension points` section, one line
     per point giving its key, exactly the points the registry names this module as declaring, in the table's order;
     the reflection points declare `reflection.items` and project end Definition of done and Delivery (§6.4's rows)."""
-    text = module(key)
-    want = registry_points(key)
-    assert want and declared(text) == want, (declared(text), want)
-    body = section(text, "Extension points", 2).strip().split("\n")
-    assert flat(" ".join(l for l in body if l and not l.startswith("- "))) == EXT_PROSE
-    assert "may set" not in "\n".join(body)
+    want = assert_declares_registry_points(key)
     if key == "project-end":
         assert want == ["project-end.completion-conditions", "project-end.delivery"], want
 
@@ -193,16 +163,7 @@ def test_r006_each_point_says_where_its_additions_are_made(key):
     """R-006: each point's line places the additions a conditional workflow makes there and says what the registry's
     Applies cell states: a point that applies per project is made once for the whole project; one that applies per part
     names the part (TASK-013's rule)."""
-    applies = {r["Key"]: r["Applies"] for r in registry_rows("## Extension points")}
-    body = section(module(key), "Extension points", 2).strip().split("\n")
-    for line in [l for l in body if l.startswith("- ")]:
-        k = re.match(r"^- `([a-z0-9.-]+)` — ", line).group(1)
-        assert line == "- `%s` — %s" % (k, POINTS[k]), line
-        if applies[k] == "project":
-            assert line.endswith("; made once for the whole project."), (k, line)
-        else:
-            assert applies[k] == "part" and re.search(r"\b(of|for) the part\b", line), (k, applies[k], line)
-            assert "whole project" not in line, line
+    assert_points_placed(key, POINTS)
 
 
 def test_r006_the_reflection_items_point_is_placed_before_the_record():
