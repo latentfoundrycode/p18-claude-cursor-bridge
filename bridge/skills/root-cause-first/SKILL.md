@@ -131,7 +131,9 @@ treats a `DEBUG-BUG-` tag in any diff as a block, so a leak cannot reach a commi
 
 ### 6. The fix brief carries the cause, not the symptom
 
-The builder receives `handoff/BUG-<nnn>.md` (spec-packager's fix variant): the **confirmed
+The builder receives the fix brief (spec-packager's fix variant) — inside an increment's gate the
+increment's next numbered brief, `handoff/<ID>-r<N>.md`, and `handoff/BUG-<nnn>.md` for a defect
+found after a merge: the **confirmed
 root cause** in one sentence, the **evidence lines**, the **reproduction test** that must go
 from red to green, and two constraints — *fix that cause and nothing else*, and *if you
 believe the cause is different, stop and report instead of fixing*. The builder is not

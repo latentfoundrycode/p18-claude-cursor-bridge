@@ -6,11 +6,11 @@ After a compaction or a resume in this phase, read these before your next action
 
 - this module and its sub-files, each whole (the session-start hook names them), with `~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole, and the other files the hook names;
 - `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of `run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the background runs that will wake you and what waits for the owner; while Review B runs the status file is not written and the position is kept in `in-flight.md` (step 8), and at the launch you write there the snapshot's hash `review-guard.py snapshot` printed, since the hash `verify` prints must equal it (this list is where that write is asked for);
-- the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` with every revision of it, and each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);
-- for a fix (step 7, the `root-cause-first` procedure), `docs/debug/BUG-<nnn>.md`, whole: its hypotheses and the diagnostic rounds counted toward a resolution round; the fix brief `handoff/BUG-<nnn>.md` with every revision and report, as for a task; and `git grep DEBUG-BUG-<nnn>` for instrumentation not yet removed;
+- the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` and every numbered brief after it (`handoff/<ID>-r<N>.md`, step 3), and each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the brief bounds the increment, and the report holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);
+- for a fix (step 7, the `root-cause-first` procedure), `docs/debug/BUG-<nnn>.md`, whole: its hypotheses and the diagnostic rounds counted toward a resolution round; the fix brief, `handoff/<ID>-r<N>.md` inside an increment's gate or `handoff/BUG-<nnn>.md` for a defect found after a merge (step 7), with its reports, as for a task; and `git grep DEBUG-BUG-<nnn>` for instrumentation not yet removed;
 - `docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass runs and whether increments run in parallel, and the models the delegate command and Review B name;
 - the increment's verdicts, kept in `run/supervisor/in-flight.md`: Review A's, each auditor's and Review B's reply, each written there as it returns, and the mutation run's cuts and estimate (step 7);
-- the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, `run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message (step 4), `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background, and the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files `run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); and, while a gate is open, its files under `run/review/` (`REVIEW-<nnn>.diff`, `SCOPE-<nnn>.md`, `ASSUMPTIONS-<nnn>.md`, and `REVIEW-<nnn>.err`, whose first line is the launch time `pr-activity-check.py` needs), whole;
+- the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, `run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message (step 4), `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background, and the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files `run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); and, while a gate is open, its files under `run/review/` (the round's `REVIEW-<ID>-r<N>.diff`, `ASSUMPTIONS-<ID>-r<N>.md` and `REVIEW-<ID>-r<N>.err`, whose first line is the launch time `pr-activity-check.py` needs, and the increment's `SCOPE-<ID>.md`), whole, with the review guard's count of rounds opened for the increment, which names the next snapshot `<ID>-r<N>` (step 8) and says whether the round is above the ceiling (step 7, "The review ceiling");
 - while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's "Keeping the pass's position"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.
 
 ### The procedure
@@ -78,9 +78,12 @@ Rules for this call, all of which matter:
   special characters, no multi-line instructions, no corrections. The shell (Git Bash) eats
   backticks and `${…}` before Cursor ever sees them, and a builder handed a mangled prompt
   "improvises" — in practice it has skipped the exact fix it was asked for. **This applies
-  to re-delegations too:** corrections go into the committed brief (revise
-  `handoff/TASK-<nnn>.md` in place, or write `TASK-<nnn>-r2.md`), then re-issue the *same*
-  constant pointer command. If you catch yourself typing instructions inside the quotes,
+  to re-delegations too:** corrections go into a new numbered brief, `handoff/<ID>-r<N>.md`
+  (`<N>` the round it opens, `-r2` after the first brief), committed, and never into a revision
+  of a brief in place: the launcher refuses a brief whose bytes changed after a completed run
+  under its name. A merge unit's briefs each carry the `Merge unit: <ID> <ID> ...` line the
+  branch's first brief declares. Then re-issue the *same* constant pointer command, naming the
+  new brief. If you catch yourself typing instructions inside the quotes,
   stop and put them in the file.
 - If a run needs a specific model, add `--model <name>`; `cursor-agent --list-models`
   shows what is available.
@@ -116,12 +119,20 @@ When any `cursor-agent` call — a delegation, a Review B launch, a resolution r
 stage-close pass — exits non-zero, produces no output, or hits the launcher's limit (exit
 124):
 
-(The one exception: every exit 125 whose message begins `bridge-run: refused - design
+(The exceptions: every exit 125 whose message begins `bridge-run: refused - design
 ceiling: ` is the design critique's ceiling holding, never a model's failure: it is not retried
 and no `--record-failure` follows it; Phase 2. A design-critique reply that names nothing from
 its file is recorded like any failed call and follows the exits below, which Phase 2 counts: the
 exit-4 retry, the exit-3 re-resolve and one run on the profile it gives, then the wait Phase 2
-describes.)
+describes. Nor is a refusal of the code gate's programs a model's failure: the launcher's
+`review ceiling: `, `brief rule: `, `revised in place: ` and `branch rule: ` refusals (a fourth round
+with no lift, no brief or two, a builder launch on `main`, a brief revised after a completed run, a
+brief under another ID on a counted branch) and the guard's `review ceiling: ` and `branch rule: `
+refusals and its refusals of a round off its count or already reviewed are the ceiling's
+programs holding, neither a failed launch nor a model's failure, handled as step 7's "The review
+ceiling" says; every other `bridge-run: refused - ` of a builder or review launch (the slot's
+`heavy.lock`, a limit, a key file) and every other `review-guard: refused - ` is no model's failure
+either, and is read and fixed as its message says.)
 
 **First, when the exit code is 124, look before you discard** (KP-033): `git status` and
 `git diff --stat` in the checkout. A builder that completed its edits and then hung on its
@@ -350,12 +361,14 @@ instead. In short, a branch merges to `main` only when **all** hold:
    shell** (inline heredocs mangle or drop the diff, and a reviewer that received no diff can
    still emit an APPROVE-shaped reply). Two rules make that file whole and reachable:
    (a) **generate it only from committed state** — `git status --porcelain` must print
-   nothing first, then `git diff <merge-base>...HEAD > run/review/REVIEW-<nnn>.diff`; a diff
+   nothing first, then `git diff <merge-base>...HEAD > run/review/REVIEW-<ID>-r<N>.diff`, named as the round's
+   snapshot below is, the earlier round's diff and assumptions file removed with `git rm` and committed
+   first, so that no round's diff carries another's; a diff
    taken from the working tree silently omits every untracked new file (KP-017);
    (b) **the file lives inside `Workspace/`** at `run/review/`, committed on the increment's
    branch and removed with `git rm` before the merge — never in a temp folder outside the
-   project, which the Workspace boundary rightly blocks (KP-016); (c) **the branch's assumption lists travel with it** — write `run/review/ASSUMPTIONS-<nnn>.md` from the `Assumptions:` sections of the branch's commit messages (`git log <merge-base>..HEAD --format=%B`), commit it beside the diff, remove it with the diff before the merge, and name both files in the prompt: the list as extra places to look, never as the review's scope. Launch it exactly as the policy shows. **First** `python ~/.claude/cursor-bridge/review-guard.py snapshot <nnn>` — it refuses a tree that is not clean (commit everything of yours first) and records HEAD, the branch, every ref, the stash list, the repository's configuration and the ignored entries. **Then** the launcher, **in the background** (`run_in_background`; its completion is what wakes you, rule 43):
-   `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<nnn>.err`
+   project, which the Workspace boundary rightly blocks (KP-016); (c) **the branch's assumption lists travel with it** — write `run/review/ASSUMPTIONS-<ID>-r<N>.md` from the `Assumptions:` sections of the branch's commit messages (`git log <merge-base>..HEAD --format=%B`), commit it beside the diff, remove it with the diff before the merge, and name both files in the prompt: the list as extra places to look, never as the review's scope. Launch it exactly as the policy shows. **First** write `run/review/SCOPE-<ID>.md` (below) and commit it beside the diff: the guard reads it at the snapshot, its `Blocking class:` line included (step 7, "The review ceiling"). **Then** `python ~/.claude/cursor-bridge/review-guard.py snapshot <ID>-r<N>`, `<ID>` the increment's ID (`TASK-<nnn>`) and `<N>` the round it opens: one more than the rounds the guard has counted for the increment, or the same `<N>` again to re-run a failed launch on the same tree; the round's diff and assumptions file carry the snapshot's name, since the guard lists as the review's inputs, and refuses empty, the files under `run/review/` whose names hold it (KP-067); the SCOPE file, which it reads by `<ID>`, is not among them, so confirm yourself that it is not empty. It refuses a tree that is not clean (commit everything of yours first), a round off its count and a round above the ceiling with no lift, and records HEAD, the branch, every ref, the stash list, the repository's configuration and the ignored entries. **Then** the launcher, **in the background** (`run_in_background`; its completion is what wakes you, rule 43):
+   `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<ID>-r<N>.err`
    (`--force` lets the reviewer **run the tests and build its own reproductions**, which is
    where its strongest findings have come from — the owner's decision of 2026-10-04 after
    a read-only mode was tried and found weaker; the launcher withholds the owner's
@@ -366,23 +379,25 @@ instead. In short, a branch merges to `main` only when **all** hold:
    (the next brief waits for `verify`; one once wrote `handoff/` during a Review B run and
    the guard flagged GATE-INTEGRITY, reAngle ISS-014), no `diagram-specialist`, no
    `cursor-configurator`, nothing that writes under the checkout, your own status-file edits
-   included (`run/supervisor/in-flight.md` exists for those, rule 43); besides that file, the launcher's own `run/review/REVIEW-<nnn>.err` is
+   included (`run/supervisor/in-flight.md` exists for those, rule 43); besides that file, the launcher's own `run/review/REVIEW-<ID>-r<N>.err` is
    the one file written meanwhile, and the guard keeps it; read-only subagents
    (`security-auditor`, a Review A on another branch's committed diff) may run.
-   **Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <nnn>` must print `OK`: it reads `.git/config`, the active hooks folder (`core.hooksPath`, `.githooks` on every project today) and `.git/hooks` first, as files, without git — a `core.fsmonitor` line or a hook left there would run the reviewer's program with your identity on your next git command, and a change there stops the guard before it runs any git command of its own; every git command it then runs has the repository's hooks and file monitor switched off. It checks HEAD, the branch, the local refs and the stashes, puts the branch and every moved or added local ref back, restores the tree with `git reset --hard` and `git clean -fd` (keeping the `.err` file, whose first line — the launch time — it prints), lists what it removed, and compares every ignored file (cache folders apart): a change under `docs/`, `handoff/` or `run/review/`, or to `.env*`, is a flag even where the project gitignores those files; any other is listed as left behind. `GATE-INTEGRITY` — a commit, a moved HEAD, a new or moved ref or stash, a changed configuration, hook, record or `.env` — opens the flag (condition 4) and an issue; the tree is back at the checkpoint, the merge is not. It prints the snapshot file's hash, which must equal the one `snapshot` printed (a reviewer could rewrite the snapshot). What the guard cannot see is said in its header and KP-032: the contents of cache folders, anything outside the checkout, a reviewer that reaches for the credential store on purpose. **Note the
+   **Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`: it reads `.git/config`, the active hooks folder (`core.hooksPath`, `.githooks` on every project today) and `.git/hooks` first, as files, without git — a `core.fsmonitor` line or a hook left there would run the reviewer's program with your identity on your next git command, and a change there stops the guard before it runs any git command of its own; every git command it then runs has the repository's hooks and file monitor switched off. It checks HEAD, the branch, the local refs and the stashes, puts the branch and every moved or added local ref back, restores the tree with `git reset --hard` and `git clean -fd` (keeping the `.err` file, whose first line — the launch time — it prints), lists what it removed, and compares every ignored file (cache folders apart): a change under `docs/`, `handoff/` or `run/review/`, or to `.env*`, is a flag even where the project gitignores those files; any other is listed as left behind. `GATE-INTEGRITY` — a commit, a moved HEAD, a new or moved ref or stash, a changed configuration, hook, record or `.env` — opens the flag (condition 4) and an issue; the tree is back at the checkpoint, the merge is not. It prints the snapshot file's hash, which must equal the one `snapshot` printed (a reviewer could rewrite the snapshot). What the guard cannot see is said in its header and KP-032: the contents of cache folders, anything outside the checkout, a reviewer that reaches for the credential store on purpose. **Note the
    launch time in UTC** — the
    launcher prints `bridge-run: started <time>Z` as its first stderr line, so it is the
    first line of the `.err` file. The launch carries the Bash tool's `timeout` at the review
-   cap (`7200000`, step 3). Before the launch, write `run/review/SCOPE-<nnn>.md` and commit
-   it beside the diff (removed with `git rm` with it): the brief's Scope and Out of scope
-   sections quoted, the tests and mutation drivers you wrote with the paragraph each enforces, and the
+   cap (`7200000`, step 3). The SCOPE file, `run/review/SCOPE-<ID>.md`, written and committed
+   before the snapshot (above) and removed with `git rm` with the diff, holds the brief's Scope
+   and Out of scope sections quoted, the tests and mutation drivers you wrote with the paragraph each enforces, and the
    bookkeeping and record files in the diff that are expected (`docs/BUILDER_NOTES.md`, the
    builder's report `handoff/TASK-<nnn>-r<N>-report.md`, the records you committed,
-   `run/review/`). Nothing of this goes inline through the shell,
+   `run/review/`), and, at a round above the ceiling, that round's `Blocking class:` line. Nothing of this goes inline through the shell,
    which mangles quoted text (KP-009). Give a **directive** prompt ("the diff is already at
    `<path>`; read it; do not ask for it") with four short clauses (release A5): where the
-   increment ends and which tests the supervisor wrote are in `run/review/SCOPE-<nnn>.md`,
-   read it; design for later increments is not this diff's defect (a reviewer once reviewed
+   increment ends and which tests the supervisor wrote are in `run/review/SCOPE-<ID>.md`,
+   read it (at a round at or above the ceiling, the guard's count at three or more, a fifth clause: grade every
+   finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line where
+   it has one); design for later increments is not this diff's defect (a reviewer once reviewed
    design for later increments for nine rounds on one of them); verify a claim about a build
    by building it, never by reasoning; reply with APPROVE, REJECT or ESCALATE-INTENT and the
    reasons. A reply that does not name something specific from the diff — or that asks for
@@ -395,11 +410,18 @@ instead. In short, a branch merges to `main` only when **all** hold:
 **Convergence is a signal.** When two or more reviewers or auditors independently name the
 same line or the same defect, treat it as blocking even if each alone marked it advisory:
 decorrelated reviewers agreeing is the strongest evidence the loop produces. This is the code
-gate's rule; a design critique's two critics are bounded by its ceiling instead (Phase 2).
+gate's rule; a design critique's two critics are bounded by its ceiling instead (Phase 2). The
+rule grades a finding's certainty, never its class. Below the ceiling, two reviewers' agreement
+makes a finding blocking whatever its grade, with one exception: a class already recorded under
+the by-class line for that increment or that stage — two reviewers naming a further mutant,
+input or operator family of it name that class, which stays recorded and starts no round, and no
+class of the five is ever on that line. Past the ceiling — the guard's count of rounds opened
+for the increment or the stage at three or more — a convergent finding outside the five goes to
+`docs/HARDENING.md`, marked convergent (step 7, "The review ceiling").
 
 A `REJECT` from either reviewer goes back through re-delegation (step 7), not to the user
 — continue while concerns converge and get fixed, stopping only on non-convergence per
-step 7's brake. A **split** verdict (one reviewer blocks, the other approves) you resolve
+step 7's brake, and at and above the ceiling only for a finding of one of the five blocking classes. A **split** verdict (one reviewer blocks, the other approves) you resolve
 yourself, favouring the project's established invariants; escalate it only if it turns on
 intent. An `ESCALATE-INTENT` verdict, and only that, surfaces to the user — as a plain
 intent question, never a correctness one.
@@ -409,7 +431,7 @@ intent question, never a correctness one.
 When all four hold the merge is authorised. A pull request that changes only records (`docs/`, the inventory, a design text) takes the same round: snapshot, Review B, `verify`, then `premerge`; `premerge` refuses a head whose snapshot has no verified mark, so there is no shorter way (release A1b). **Check `docs/RUN_PARAMETERS.md` first:** under
 `Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
 conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
-auto-merge. Under either authority, remove the review files with `git rm`, commit (that commit removes the review files and nothing else: a records edit in it is a change outside `run/review/`, which `premerge` refuses as GATE-INTEGRITY; the records move after the merge), push, and run `python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> <n>`: `OK` means the head about to merge descends from the head the reviews approved, differs from it only under `run/review/`, and is the pull request's head on GitHub; it prints the merge command, `gh pr merge <n> --squash --match-head-commit <sha>`, which refuses to merge any other head. A head that does not descend from the reviewed one, or a change outside `run/review/`, is a gate-integrity flag. A branch updated from `main` on GitHub ("Update branch") is a new head: the reviews run again on it — a re-review, not a flag. Under `supervisor` (the default), arm `gh pr merge <n> --squash --auto --match-head-commit <sha>` (the sha `premerge` printed and recorded) and watch the
+auto-merge. Under either authority, remove the review files with `git rm`, commit (that commit removes the review files and nothing else: a records edit in it is a change outside `run/review/`, which `premerge` refuses as GATE-INTEGRITY; the records move after the merge), push, and run `python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took: `OK` means the head about to merge descends from the head the reviews approved, differs from it only under `run/review/`, and is the pull request's head on GitHub; it prints the merge command, `gh pr merge <n> --squash --match-head-commit <sha>`, which refuses to merge any other head. A head that does not descend from the reviewed one, or a change outside `run/review/`, is a gate-integrity flag. A branch updated from `main` on GitHub ("Update branch") is a new head: the reviews run again on it — a re-review, not a flag. Under `supervisor` (the default), arm `gh pr merge <n> --squash --auto --match-head-commit <sha>` (the sha `premerge` printed and recorded) and watch the
 required `gate` check — **with one background command, never by ending your turn**: run `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast` in the background with the tool's `timeout` at the watch cap (`7200000`, step 3; `run_in_background`). Its completion notification is what wakes you; nothing else will. The launcher ends a watch that outlives an hour (exit 124: look at the pull request's checks yourself, then start a new watch); never prefix the command with anything else (`sleep`, `cd`, `timeout`): the rules match the command as written, and a wrapped command matches nothing. If it returns at once reporting no checks, CI has not registered the push yet: wait for the first check to appear (`gh pr checks <n>` once, a minute after the push), then start the same watch again; and when any watch ends green, confirm that the green run's head is the pushed head (`gh pr view <n> --json statusCheckRollup,headRefOid`) before `premerge` — a watch started right after a push once reported the previous commit's run (KP-051). The desktop app's CI monitor ("Auto-fix pull requests", `<ci-monitor-event>`) reports only problems — a failed check, a review comment — and **never a green gate**, so waiting for it after a green run waits forever (KP-028). Registering the PR with it is fine and its autofix of a failure is welcome, but it is never your wake-up. The owner authorises and requires this watch: it is one blocking command per PR, not a polling loop — never `sleep` loops, repeated status checks, or scheduled wake-ups for this. **While it runs, keep building:** if the next increment's Scope does not overlap the pending PR's files, start it now from `origin/main`; if it does overlap, prepare what does not depend on the merge (the next brief, reviews, docs), and only then end your turn — the watch will wake you. When the watch completes green (and the PR is mergeable), **complete the squash
 directly with `gh pr merge <n> --squash --match-head-commit <sha>`** (the sha `premerge` printed) rather than waiting on GitHub's auto-merge queue,
 which routinely lags by minutes. This is safe — branch protection enforces the required

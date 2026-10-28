@@ -12,12 +12,12 @@ This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "Th
   message referencing the task ID. Update `docs/PROJECT_STATUS.md` (rewrite the fields; never append history) and, when the increment changes behaviour or needs a new resource, `docs/INVENTORY.md` — in the same commit as the increment's `CHANGES.md` entry, moving `Reflected through:` to that entry (rule 41). When the increment completes a requirement, set its row in `docs/REQUIREMENTS.md` to `built` and name the tests — which carry the requirement's ID — in its Evidence cell, in the same commit. Move to the next
   increment. Increments accumulate on the branch; merging to `main` is a separate,
   verified step (below), not something you do per increment.
-- **Iterate** — something is wrong and you understand why. Revise the brief *file* (in
-  place, or as `TASK-<nnn>-r2.md`) with specific corrections, commit it, and re-issue the
-  same constant delegate command. Never inline the corrections into the CLI prompt (step 3).
+- **Iterate** — something is wrong and you understand why. Write the next numbered brief,
+  `handoff/<ID>-r<N>.md`, with specific corrections (never a revision in place, step 3), commit
+  it, and re-issue the same constant delegate command, naming it. Never inline the corrections into the CLI prompt (step 3).
 - **Re-delegate on a review REJECT** — if a reviewer rejects the work (see step 8), that
-  is a code defect, which is the loop's problem, not the user's. Feed the reasons into a
-  corrected brief file and re-delegate — again via the file, never the prompt. This does
+  is a code defect, which is the loop's problem, not the user's. Feed the reasons into the
+  next numbered brief and re-delegate — again via the file, never the prompt. This does
   not count against the user's attention.
 
 **Diagnose before you re-delegate a defect — the `root-cause-first` skill.** A corrected
@@ -34,8 +34,10 @@ observation in `docs/debug/BUG-<nnn>.md`, instrument only to tell them apart (ta
 `DEBUG-BUG-<nnn>`, in the working tree, never committed), capture the run to the
 gitignored artifacts dir, keep the hypothesis the evidence supports, clean up and prove it
 (`git status` clean, `git grep DEBUG-BUG-` empty), then package the **fix brief**
-(`handoff/BUG-<nnn>.md`, spec-packager's fix variant) carrying the confirmed cause, the
-evidence, and the reproduction test that must go red to green. Three diagnostic rounds
+(spec-packager's fix variant) carrying the confirmed cause, the
+evidence, and the reproduction test that must go red to green. Inside an increment's gate the fix
+brief is the increment's next numbered brief, `handoff/<ID>-r<N>.md`, so that no fix within a gate
+opens a budget of its own; `handoff/BUG-<nnn>.md` is the brief of a defect found after a merge. Three diagnostic rounds
 without a confirmed cause go to a resolution round, never to a guessed fix and never to the
 user. The fix goes through the normal gate once — no extra gate pass; `diff-reviewer`'s fix
 mode rejects symptom suppression and a cause left untouched.
@@ -55,11 +57,16 @@ make and record. Judge it like this:
   keep coming are all the long tail of one genuinely hard subsystem (subprocess teardown,
   retry/timeout races, kill paths, concurrency edges), do **not** re-delegate that tail
   round after round. Record each such finding to `docs/HARDENING.md` (one line each, on the
-  increment's PR branch) and merge. A late finding blocks the merge only if it is a **new
-  class** — render/output correctness, data integrity, security, or what the software
-  actually does — **or** if it *defeats a safety mechanism this increment relies on* (a bug
-  in the very timeout or kill path built to protect the run is core, not tail). Drawing this
-  line is a decision you make and record, not one you bring to the user.
+  increment's PR branch) and merge. A late finding blocks the merge only if it is of one of
+  the five **blocking classes** — behaviour against the brief or the register, security, data
+  integrity, a defeated safety mechanism this increment relies on (a bug in the very timeout or
+  kill path built to protect the run is core, not tail), a failing test. The class is the
+  defect, not the operator that exposed it: a further mutant, input or operator family that
+  shows a class already recorded in `docs/HARDENING.md` under the by-class line for the
+  increment or the stage is that class and never a new one, while a defect of one of the five blocks
+  whatever was recorded before. Below the ceiling, drawing this line is a decision you make and
+  record, not one you bring to the user; at and above it the line is the rule ("The review
+  ceiling", below).
 - **Stop** on genuine *non-convergence*: the **same** defect rejected twice unfixed, or a
   fix that **regresses** something already passing. That is a broken brief or design — say so
   plainly in your report. Raw "several REJECTs" is *not* a stop if each round found a
@@ -90,6 +97,21 @@ never correctness.
 
 If a run has left the tree in a state you cannot make sense of:
 `git reset --hard HEAD` returns you to the checkpoint. Say so plainly when you do it.
+
+#### The review ceiling
+
+The code gate stops at three rounds per increment, the owner's number at the plan's gate (2026-10-24), held by two programs (R-042). **A round** is one version of the increment the gate's reviewers read: each builder run of a numbered brief (`handoff/<ID>.md`, then `handoff/<ID>-r<N>.md`, step 3), and each Review B read that `review-guard.py snapshot <ID>-r<N>` opens (step 8), spent when its reply arrived. A fix you make and Review A re-reads before step 8's snapshot is no round, and a failed launch's re-run re-snapshots the same tree under the same name. **The count the gate reads** is the guard's count of rounds opened for the increment, which your report names; the launcher's count of builder rounds holds the briefs to it. The two move independently — a Review A rejection spends a builder round with no snapshot, a fix of yours after a Review B REJECT a guard round with no builder run — so where a next count matters, take the larger of the guard's and the launcher's.
+
+**Below the ceiling** the brake above is your judgment, and the by-class line yours to draw. **At and above it** — the guard's count of rounds opened for the increment at three or more — only a finding of one of the five blocking classes (behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, a failing test) sends the work back; every other finding goes to `docs/HARDENING.md` under the increment and merges with it. Every reviewer and auditor grades each finding by the five first, a convergent finding included (step 8).
+
+**A round above the ceiling is lifted** one of two ways:
+
+- **A class line**, `Blocking class: <class> - <the finding>`, its `<class>` one of `behaviour`, `security`, `data integrity`, `safety mechanism` and `failing test`, its finding naming the reviewer's finding it answers (`Review A, round 3, B1`, say). You write it into the brief before the builder launch, where the launcher reads it, and into `run/review/SCOPE-<ID>.md` before the snapshot, where the guard reads it; a line lifts the one round it was written for. The reviewers are told of the line and confirm or deny it: a reviewer's denial voids the round's result and withholds the merge as GATE-INTEGRITY does, and the breach is recorded in `docs/HARDENING.md` under the increment and as an issue.
+- **The owner's line** in `docs/RUN_PARAMETERS.md`, `Review rounds above the ceiling: <ID> <rounds> (<their words>, <date>)`, written only on the owner's own words and never asked for; its `<rounds>` is at least the larger of the guard's and the launcher's next counts for the increment, the count your report names when the ceiling is reached.
+
+**The refusals are stops, not failures.** The launcher's `bridge-run: refused - review ceiling: ` and the guard's `review-guard: refused - review ceiling: `, and their other refusals of the ceiling's rules (the launcher's `brief rule: ` and `revised in place: `, the `branch rule: ` either prints, a brief revised after a completed run, a new round under a name whose round already has its reply or off the count, a brief or a snapshot under another ID on a counted branch), are the ceiling's programs holding: neither a failed launch nor a model's failure (step 3b), never retried as one and never passed to `roster-check.py`. Read the refusal; then write the next numbered brief or the round's right name, write the class line where a blocking-class finding stands, or record the finding in `docs/HARDENING.md`.
+
+A stage review is bounded the same way (`STAGE-<name>-r<N>`, the reflection module's step 7).
 
 #### The mutation run
 

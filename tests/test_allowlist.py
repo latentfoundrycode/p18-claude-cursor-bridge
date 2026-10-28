@@ -156,7 +156,8 @@ def test_r039_driver_launcher_rule_in_allow():
 
 def test_the_digest_and_the_merge_step_show_the_same_review_b_form():
     """0b review, finding 4: the digest's Review B command carries the .err redirect the
-    activity check reads the launch time from, so the consistency check covers it too."""
+    activity check reads the launch time from, so the consistency check covers it too; since TASK-034 the file
+    carries the round's name, `<ID>-r<N>` or `STAGE-<name>-r<N>` (R-042)."""
     forms = [cmd for src, cmd in collect_agent_invocations() if "REVIEW-" in cmd and "REVIEW-DESIGN" not in cmd]
     assert len(forms) >= 2, forms
-    assert all(re.search(r"2> run/review/REVIEW-(<nnn>|STAGE-<name>)\.err", f) and "--force" in f and "--limit auto --kind review" in f for f in forms), forms
+    assert all(re.search(r"2> run/review/REVIEW-(<ID>-r<N>|STAGE-<name>-r<N>)\.err", f) and "--force" in f and "--limit auto --kind review" in f for f in forms), forms

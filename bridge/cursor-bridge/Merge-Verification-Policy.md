@@ -54,8 +54,8 @@ a judgement layer — not as a new human gate.
   **no** CI, the supervisor runs that same command locally before merge.
 - **Judgement layer.** The `design-auditor` subagent is a review input (read-only, returns
   only violations). A **blocking** design finding re-delegates and an **advisory** one is
-  logged to `docs/CHANGES.md` — governed by the same convergence-by-class rule below, not a
-  separate mechanism. Its blocking class (accessibility / keyboard / label MUSTs, missing
+  logged to `docs/CHANGES.md` — governed by the same two rules below, the re-delegation-by-class
+  rule and the convergence rule, not a separate mechanism. Its blocking class (accessibility / keyboard / label MUSTs, missing
   required states) is a correctness class and behaves like any other REJECT.
 - **No new human gate.** Design correctness never reaches the owner. Only a genuine *intent*
   question — how the UI should look or behave — does, and that routes through the
@@ -80,7 +80,8 @@ model families — and, like design, adds **no new human gate**.
 - **Review A judgement — Anthropic family.** The `security-auditor` subagent (read-only,
   strong model) catches the classes SAST misses — IDOR/BOLA, broken authN, business-logic
   and authz gaps. A **blocking** finding re-delegates like any REJECT; an **advisory** one is
-  logged to `docs/HARDENING.md` / `docs/CHANGES.md`. Same convergence-by-class rule below.
+  logged to `docs/HARDENING.md` / `docs/CHANGES.md`. The same two rules below, the
+  re-delegation-by-class rule and the convergence rule.
 - **Review B judgement — cross-family.** Review B already reads the whole cumulative diff;
   its mandate is **extended** to cover the same vuln classes and the security anti-gaming
   checks (below). No new model, no new invocation — a prompt extension (see Review B's
@@ -246,8 +247,11 @@ budget stated a cold one. A budget passes by the software getting faster, never 
 budget getting looser; relaxing one is a product decision that goes through the change
 cycle's intake.
 
-**Fix-diff tampering** is a gate-integrity flag on the same footing. A `handoff/BUG-<nnn>.md`
-fix brief names a confirmed root cause and its evidence (the `root-cause-first` procedure).
+**Fix-diff tampering** is a gate-integrity flag on the same footing. A fix brief — spec-packager's
+fix variant, known by its Objective, which opens "Fix the following confirmed defect" and
+states the confirmed cause with its evidence, whatever its name: `handoff/<ID>-r<N>.md`
+inside an increment's gate, `handoff/BUG-<nnn>.md` for a defect found after a merge — names a
+confirmed root cause and its evidence (the `root-cause-first` procedure).
 Both reviewers must treat as a flag:
 
 - **symptom suppression** where the brief named a cause elsewhere — a retry, a broad
@@ -306,10 +310,23 @@ is implemented and verified, and the findings that keep arriving are all the lon
 genuinely hard subsystem (subprocess teardown, retry/timeout races, kill paths, concurrency
 edges), the supervisor draws a **by-class line**: it records each such finding to
 `docs/HARDENING.md` and merges, rather than re-delegating the tail indefinitely. A late
-finding still blocks the merge if it is a **new class** — output correctness, data integrity,
-security, or what the software does — **or** if it *defeats a safety mechanism the increment
-relies on* (a bug in the very timeout or kill path built to protect the run is core, not
-tail). Stop entirely only on genuine non-convergence: the **same** defect unfixed twice, or a
+finding still blocks the merge if it is of one of the five **blocking classes** — behaviour
+against the brief or the register, security, data integrity, a defeated safety mechanism the
+increment relies on (a bug in the very timeout or kill path built to protect the run is core,
+not tail), a failing test. The class is the defect, not the operator that exposed it: a
+further mutant, input or operator family that shows a class already recorded in
+`docs/HARDENING.md` under the by-class line for the increment or the stage is that class and
+never a new one, while a defect of one of the five blocks whatever was recorded before.
+**The ceiling** (R-042): three rounds per increment and per stage review, the owner's number,
+held by `bridge-run.py`, which counts the builder rounds, and `review-guard.py`, which counts
+the Review B rounds; the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`,
+step 7, "The review ceiling"). Below it the by-class line is the supervisor's judgment; at and above it
+the line is the rule: only a finding of the five sends the work back, every other finding goes
+to `docs/HARDENING.md` with the increment, and a round above the ceiling runs only under a
+`Blocking class:` line or the owner's `Review rounds above the ceiling:` line. Every reviewer
+and auditor grades each finding of a round at or above the ceiling by the five first and confirms
+or denies the round's `Blocking class:` line where it has one; a denial is a breach, which voids the round's result and
+withholds the merge as GATE-INTEGRITY does, recorded in `docs/HARDENING.md` and as an issue. Stop entirely only on genuine non-convergence: the **same** defect unfixed twice, or a
 fix that **regresses** something already passing. A deadlock over what the software should
 **do** is the one thing that reaches the human, as an intent question.
 
@@ -318,7 +335,13 @@ same line or the same defect, it is blocking even if each alone marked it adviso
 decorrelated reviewers agreeing is the strongest evidence this gate produces (three of four
 converged on a lock-leaking lifecycle bug that each had called advisory). The rule is the code
 gate's: a design critique's two critics are bounded by rounds instead (§"Review B's design
-mode", below), and a finding both name keeps the grade its content earns.
+mode", below), and a finding both name keeps the grade its content earns. The rule grades a
+finding's certainty, never its class. Below the ceiling, two reviewers' agreement makes a
+finding blocking whatever its grade, with one exception: a class already recorded under the
+by-class line for that increment or that stage — two reviewers naming a further mutant, input
+or operator family of it name that class, which stays recorded and starts no round, and no
+class of the five is ever on that line. At and above the ceiling a convergent finding outside
+the five goes to `docs/HARDENING.md`, marked convergent.
 
 **Split verdicts are resolved by the supervisor, not escalated.** First **name the
 disagreement out loud** — `REVIEWERS DISAGREE on <crux>`, which reviewers, and whether the
@@ -496,13 +519,13 @@ not a new model or invocation: the directive prompt tells it to check those clas
 Two options for reaching it:
 
 - *Default — via Cursor's CLI (no new secret, no script):* write the verification brief and
-  the diff to a committed file **inside the workspace** (`run/review/REVIEW-<nnn>.diff`,
+  the diff to a committed file **inside the workspace** (`run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot,
   committed on the increment's branch, `git rm`-ed before the merge — never a temp path
   outside `Workspace/`, which the boundary blocks), **generated only from committed state**
   (`git status --porcelain` empty, then `git diff <merge-base>...HEAD`; a working-tree diff
   omits every untracked new file, and a reviewer that receives an incomplete diff has
   correctly refused it twice), then invoke Review B **through the launcher, with execution**:
-  `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<nnn>.err`
+  `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<ID>-r<N>.err`
   (`--force` lets it run the project's tests, write throwaway reproductions, and try a
   temporary mutation to see whether the tests catch it — the reviewer's strongest findings
   in the record came from exactly that, and the owner decided on 2026-10-04 to keep it
@@ -510,27 +533,31 @@ Two options for reaching it:
   GitHub identity from the process, so a post, push or merge from inside the review fails,
   and ends the run at the limit, KP-032 and KP-033) with
   a prompt that tells it to **read the diff from that file** — do **not** pass the diff
-  inline through the shell — and that names `run/review/SCOPE-<nnn>.md`, committed beside
-  the diff, where the supervisor wrote the brief's Scope and Out of scope, the tests it wrote
+  inline through the shell — and that names `run/review/SCOPE-<ID>.md`, committed beside
+  the diff before the snapshot, where the supervisor wrote the brief's Scope and Out of scope, the tests it wrote
   first with the paragraph each enforces, and the bookkeeping files in the diff that are
   expected (`docs/BUILDER_NOTES.md`, the builder's report file under `handoff/`); the prompt itself says only that design for later increments is not this diff's
-  defect, that a claim about a build is verified by building it, and that the reply is one of
+  defect, that a claim about a build is verified by building it, that at a round at or above the
+  ceiling every finding is graded by the five blocking classes first and the SCOPE file's
+  `Blocking class:` line, where it has one, confirmed or denied, and that the reply is one of
   the three verdicts (release A5; `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 8, has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
   real failure that has happened — the file path avoids it.) Confirm from its reply that it
-  actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<nnn>.md` — the branch's builder assumption lists with their dispositions (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 8) — as extra places to look, never as its scope. Per the roster above, Review B is
+  actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<ID>-r<N>.md` — the branch's builder assumption lists with their dispositions (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 8) — as extra places to look, never as its scope. Per the roster above, Review B is
   **GPT-5.6 Sol** while the builder is Grok 4.7 (full profile), or **Grok 4.7** while the builder is Composer 2.5 (native profile) — a genuine third family either way; the ids in use are always the ones in `docs/ROSTER.resolved.json`.
   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
   nothing that reaches the branch: run it on a clean committed checkpoint, **commit your
   own work first and write nothing to the checkout while it runs** (no builder, no
   `test-runner`, no commit; the launch is in the background and its completion wakes you).
-  The checkpoint is guarded by `review-guard.py`: `snapshot <nnn>` before the launch (it
-  refuses a dirty tree and records HEAD, the branch, the refs, the stashes, `.git/config`,
-  the hooks folder and the ignored entries), `verify <nnn>` after the run, and
-  `premerge <nnn>` before `gh pr merge`; since release A1b `verify` writes a verified mark when it prints OK (the snapshot's hash, the launch time and the exit code of the Review B run from `run/review/REVIEW-<nnn>.err`; `snapshot` and `verify` remove an older mark first), `premerge` refuses a snapshot without that mark, with a mark of another snapshot, with a launch before the snapshot or with an exit other than 0, and then writes a record of the head it approved (`<git common dir>/bridge/premerge/<sha>`), and the `permission-guard` hook refuses a `gh pr merge` whose `--match-head-commit <sha>` has no such record, so a merge that skipped the cross-family review or the pre-merge check is refused by the computer, not only by the rule (the sha alone proves nothing; the mark and the record do). A pull request that changes only records takes the same round. **What the restore covers and what it does not:**
+  The checkpoint is guarded by `review-guard.py`: `snapshot <ID>-r<N>` before the launch, `<N>`
+  the round it opens by the guard's count, the SCOPE file committed first since the guard reads
+  its `Blocking class:` line (it refuses a dirty tree, a round off its count and a round above
+  the ceiling with no lift, and records HEAD, the branch, the refs, the stashes, `.git/config`,
+  the hooks folder and the ignored entries), `verify <ID>-r<N>` after the run, and
+  `premerge <ID>-r<N>` before `gh pr merge`; since release A1b `verify` writes a verified mark when it prints OK (the snapshot's hash, the launch time and the exit code of the Review B run from `run/review/REVIEW-<ID>-r<N>.err`; `snapshot` and `verify` remove an older mark first), `premerge` refuses a snapshot without that mark, with a mark of another snapshot, with a launch before the snapshot or with an exit other than 0, and then writes a record of the head it approved (`<git common dir>/bridge/premerge/<sha>`), and the `permission-guard` hook refuses a `gh pr merge` whose `--match-head-commit <sha>` has no such record, so a merge that skipped the cross-family review or the pre-merge check is refused by the computer, not only by the rule (the sha alone proves nothing; the mark and the record do). A pull request that changes only records takes the same round. **What the restore covers and what it does not:**
   `verify` puts tracked and untracked files back with `git reset --hard` and `git clean -fd`
-  (keeping the launcher's own `run/review/REVIEW-<nnn>.err`, whose first line it prints) and
+  (keeping the launcher's own `run/review/REVIEW-<ID>-r<N>.err`, whose first line it prints) and
   lists what it removed — a temporary file or mutation the reviewer made for a check is
   expected. A commit, a moved HEAD or branch, a new or moved local ref or stash, a changed
   `.git/config` or hook file, a changed record under `docs/`, `handoff/` or `run/review/`
@@ -545,7 +572,7 @@ Two options for reaching it:
   reviewer could rewrite the snapshot. It does not see the contents of cache folders,
   anything outside the checkout (the owner's profile, the installed bridge, other projects),
   or a reviewer that reaches for the credential store on purpose: it is a guard against
-  what a reviewer does in passing, not a sandbox (KP-032). `premerge <nnn> <pr>`, run after
+  what a reviewer does in passing, not a sandbox (KP-032). `premerge <ID>-r<N> <pr>`, run after
   the review files are removed, committed and pushed, then proves the head about to merge
   descends from the reviewed head, differs from it only by that removal, and is the pull
   request's head on GitHub; the merge uses `--match-head-commit` with that head. **Then check it wrote nowhere else:**
