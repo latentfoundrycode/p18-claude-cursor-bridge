@@ -1051,3 +1051,144 @@ def test_task032_launcher_malformed_runs_jsonl_line_skipped(tmp_path, field, val
     lab.log.write_text(json.dumps(rows[0]) + "\n", encoding="utf-8")
     data = write_brief(lab.root, "TASK-001")
     check_row(assert_ran(launch(lab, build("TASK-001"))), "TASK-001", 1, data)
+
+
+def write_slot_not_free_row(lab, brief_name, data, lift=None, lift_line=None, branch="task-001"):
+    """The row bridge-run.py writes when a heavy run ended waiting for the slot: the brief's fields as computed
+    before the wait, then `waited`, `seconds` 0, exit 123 and `"slot": "not free"`; the command never started."""
+    entry = write_row(lab, brief_name, 0, brief_sha=sha(data), branch=branch, lift=lift, lift_line=lift_line)
+    lines = log_lines(lab.log)
+    entry.update(exit=123, seconds=0, waited=7320, slot="not free")
+    lab.log.write_bytes(b"".join(l + b"\n" for l in lines[:-1]) + (json.dumps(entry) + "\n").encode("utf-8"))
+    return entry
+
+
+def test_bug030_a_launch_that_never_got_the_slot_spends_no_class_line(tmp_path):
+    """BUG-030 (stage B5's review, round 1; launcher C6 and tests-launcher S1, convergent): a lifted round-4 launch that
+    ended at exit 123 with `"slot": "not free"` never ran, so it spends no class line: the brief revised after it
+    (different bytes, the same line) runs lifted. The same revision after a lifted run that did start (exit 1) is
+    refused, as R8 rules (test_task032_launcher_class_line_repeat_same_name_new_bytes).
+    enforces: docs/BUILD_PLAN.md TASK-032 clause (e), a round being a builder run of a brief; handoff/TASK-032-r2.md R8"""
+    lab = Lab(tmp_path)
+    three_completed(lab)
+    cls = "Blocking class: behaviour - the reader drops the last record"
+    data = write_brief(lab.root, "TASK-001-r4", "\n%s\n" % cls)
+    write_slot_not_free_row(lab, "TASK-001-r4", data, lift="class", lift_line=cls)
+    revised = write_brief(lab.root, "TASK-001-r4", "\n%s\n" % cls, tag="revised")
+    check_row(assert_ran(launch(lab, build("TASK-001-r4"))), "TASK-001", 4, revised, lift="class", lift_line=cls)
+
+
+def test_bug030_a_launch_that_never_got_the_slot_still_claims_its_branch(tmp_path):
+    """BUG-030 (the supervisor's ruling on tests-launcher S1(b)): a launch that ended at exit 123 states the IDs its
+    brief declares for its branch as a run that started would, so its claim stands: another ID's brief on that
+    branch is refused after it. A claim is what the launch meant to build, which the relaunch builds.
+    enforces: docs/BUILD_PLAN.md TASK-032 clause (e), the branch rule (one ID, or a `Merge unit:` line's)"""
+    lab = Lab(tmp_path)
+    data = write_brief(lab.root, "TASK-001")
+    write_slot_not_free_row(lab, "TASK-001", data)
+    write_brief(lab.root, "TASK-002")
+    assert_refused(launch(lab, build("TASK-002")), prefix="bridge-run: refused - branch rule: ")
+
+
+LOCK_HOLDER_SRC = r'''
+import os, sys, time
+import importlib.util
+spec = importlib.util.spec_from_file_location("bridge_run", os.path.join(sys.argv[1], "bridge-run.py"))
+br = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(br)
+lock_path, _ = br.heavy_state_paths()
+os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+fd = os.open(lock_path, os.O_RDWR | os.O_CREAT)
+if not br._try_lock_byte(fd):
+    sys.exit(2)
+open(sys.argv[2], "w").write("held")
+time.sleep(float(sys.argv[3]))
+'''
+
+
+def hold_the_slot(lab, env, hold=60):
+    """A process holding heavy.lock (the slot) under the lab's home, with no holder record; returns it once it holds."""
+    script = lab.tmp / "lock_holder.py"
+    script.write_text(LOCK_HOLDER_SRC, encoding="utf-8")
+    flag = lab.tmp / "lock_held.txt"
+    proc = subprocess.Popen([sys.executable, str(script), CB, str(flag), str(hold)], env=env,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    end = datetime.datetime.now() + datetime.timedelta(seconds=15)
+    while not flag.exists():
+        assert datetime.datetime.now() < end, "the holder did not take the slot"
+        try:
+            proc.wait(timeout=0.05)
+        except subprocess.TimeoutExpired:
+            continue
+        raise AssertionError("the holder ended before it took the slot (exit %r)" % proc.returncode)
+    return proc
+
+
+def end_process(proc):
+    if proc is not None and proc.poll() is None:
+        proc.kill()
+        proc.wait(timeout=10)
+
+
+@pytest.mark.parametrize("revise", [False, True])
+def test_bug030_the_brief_is_checked_again_after_the_slot_wait(tmp_path, revise):
+    """BUG-030 (stage B5's review, round 1; launcher S3 and tests-launcher C5, convergent): the brief rules are judged
+    on the brief's bytes before the slot wait; a brief changed during the wait is refused when the slot is taken
+    (125, a `bridge-run: refused - ` line, the command never run, no runs.jsonl line), so the run never builds
+    bytes that were not checked and logged; the twin whose brief did not change runs it.
+    enforces: docs/BUILD_PLAN.md TASK-032 clause (e) (the launch logs `brief_sha256`, a brief revised after a run
+    refused); TASK-028's rule, docs/INVENTORY.md "Windowless launches enforced by the bridge": checked again just
+    before the start"""
+    lab = Lab(tmp_path)
+    write_brief(lab.root, "TASK-001")
+    env = launch_env(lab, allow_any=True)
+    env["BRIDGE_RUN_SLOT_SCALE"] = "0.02"
+    holder = launcher = None
+    try:
+        holder = hold_the_slot(lab, env)
+        launcher = subprocess.Popen([sys.executable, PROG, "--limit", "300", "--"] + build("TASK-001"), cwd=str(lab.root),
+                                    env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        first = launcher.stderr.readline()
+        while first and not first.startswith("bridge-run: waiting"):
+            assert not first.startswith("bridge-run: refused"), first
+            first = launcher.stderr.readline()
+        assert first.startswith("bridge-run: waiting"), "the launch did not wait for the slot"
+        if revise:
+            write_brief(lab.root, "TASK-001", tag="changed while it waited")
+        end_process(holder)
+        err = first + launcher.communicate(timeout=60)[1]
+    finally:
+        end_process(holder)
+        end_process(launcher)
+    if revise:
+        assert launcher.returncode == 125, err
+        assert [l for l in err.splitlines() if l.startswith(REFUSED)], err
+        assert not lab.marker.exists(), "the stand-in ran: " + err
+        assert log_lines(lab.log) == [], "a refused launch writes no runs.jsonl line"
+    else:
+        assert launcher.returncode == 0, err
+        assert lab.marker.exists(), err
+
+
+def test_bug030_a_ceiling_refusal_does_not_wait_for_the_slot(tmp_path):
+    """BUG-030 (stage B5's review, round 1; tests-launcher S2): every brief, branch and ceiling refusal comes before the
+    slot, so while another run holds heavy.lock a fourth round with no class line is refused at once (125, the
+    ceiling's line, no waiting line), never after the slot's bound.
+    enforces: docs/BUILD_PLAN.md TASK-032 clause (e); handoff/TASK-029.md (the slot is taken just before the command)"""
+    lab = Lab(tmp_path)
+    three_completed(lab)
+    write_brief(lab.root, "TASK-001-r4")
+    env = launch_env(lab, allow_any=True)
+    env["BRIDGE_RUN_SLOT_SCALE"] = "1"
+    holder = None
+    try:
+        holder = hold_the_slot(lab, env)
+        start = datetime.datetime.now()
+        p = subprocess.run([sys.executable, PROG, "--limit", "300", "--"] + build("TASK-001-r4"), cwd=str(lab.root),
+                           env=env, capture_output=True, text=True, timeout=60)
+        took = (datetime.datetime.now() - start).total_seconds()
+    finally:
+        end_process(holder)
+    assert p.returncode == 125, p.stderr
+    assert [l for l in p.stderr.splitlines() if l.startswith(CEILING)], p.stderr
+    assert "bridge-run: waiting" not in p.stderr and took < 30, (took, p.stderr)

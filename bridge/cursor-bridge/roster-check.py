@@ -134,6 +134,8 @@ def built_by(run_log, branch=None):
         except ValueError:
             continue
         if isinstance(e, dict) and e.get("kind") == "builder" and e.get("model"):
+            if e.get("slot") == "not free":
+                continue
             entries.append(e)
     for e in reversed(entries):
         if branch and e.get("branch") == branch:

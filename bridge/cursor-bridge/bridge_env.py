@@ -341,7 +341,10 @@ HANDOFF_PATH_NORM = DESIGN_PATH_NORM
 HANDOFF_MARK = re.compile(r"(?i)handoff/")
 HANDOFF_TOKEN_RE = DESIGN_TOKEN_RE
 HANDOFF_TRIM_BEFORE_SEP = DESIGN_TRIM_BEFORE_SEP
-HANDOFF_REPORT_NAME = re.compile(r"-r[1-9][0-9]*-report\.md$", re.I)
+HANDOFF_REPORT_NAME = re.compile(
+    r"(?:-r[1-9][0-9]*[a-z]-report|-r[1-9][0-9]*-report|[A-Z][A-Za-z0-9-]*-report)\.md$",
+    re.I,
+)
 HANDOFF_RESOLUTION = re.compile(r"(?i)^RESOLUTION-")
 
 
