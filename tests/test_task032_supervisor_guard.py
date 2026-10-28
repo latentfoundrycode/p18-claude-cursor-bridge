@@ -23,7 +23,6 @@ import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROG = os.path.normpath(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "review-guard.py"))
 PGUARD = os.path.normpath(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "permission-guard.py"))
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 TIMEOUT = 120
 
 REFUSED = "review-guard: refused - "
@@ -47,7 +46,7 @@ def env():
 
 def git(repo, *args):
     p = subprocess.run(["git", "-C", str(repo)] + list(args), capture_output=True, text=True, env=env(),
-                       timeout=TIMEOUT, creationflags=NO_WINDOW)
+                       timeout=TIMEOUT)
     assert p.returncode == 0, (args, p.stderr)
     return p.stdout.strip()
 
@@ -55,7 +54,7 @@ def git(repo, *args):
 def guard(repo, *args):
     """rc and stdout+stderr of review-guard.py run in `repo`."""
     p = subprocess.run([sys.executable, PROG] + list(args), cwd=str(repo), capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", env=env(), timeout=TIMEOUT, creationflags=NO_WINDOW)
+                       encoding="utf-8", errors="replace", env=env(), timeout=TIMEOUT)
     return p.returncode, p.stdout + p.stderr
 
 
@@ -942,7 +941,7 @@ def test_task032_guard_r13_rounds_record_written_atomically_and_survives_verify(
 
     def run(mode, *args):
         p = subprocess.run([sys.executable, str(wrap), PROG, str(log), mode] + list(args), cwd=str(repo), capture_output=True,
-                           text=True, encoding="utf-8", errors="replace", env=env(), timeout=TIMEOUT, creationflags=NO_WINDOW)
+                           text=True, encoding="utf-8", errors="replace", env=env(), timeout=TIMEOUT)
         with open(str(log), encoding="utf-8") as f:
             return p.returncode, p.stdout + p.stderr, json.load(f)
 
@@ -1120,7 +1119,7 @@ def test_task032_guard_r14_five_report_files_outrank_two_snapshots(tmp_path):
 def pguard(tmp_path, tool, command):
     payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto", "cwd": str(tmp_path)}
     p = subprocess.run([sys.executable, PGUARD], input=json.dumps(payload), capture_output=True, text=True,
-                       cwd=str(tmp_path), env=env(), timeout=TIMEOUT, creationflags=NO_WINDOW)
+                       cwd=str(tmp_path), env=env(), timeout=TIMEOUT)
     return p.returncode, p.stderr
 
 

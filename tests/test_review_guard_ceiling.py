@@ -10,17 +10,16 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "review-guard.py")
 ENV = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@x", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@x",
            GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull)
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def git(repo, *args):
-    p = subprocess.run(["git"] + list(args), cwd=repo, capture_output=True, text=True, env=ENV, creationflags=NO_WINDOW)
+    p = subprocess.run(["git"] + list(args), cwd=repo, capture_output=True, text=True, env=ENV)
     assert p.returncode == 0, p.stderr
     return p.stdout.strip()
 
 
 def guard(repo, *args):
-    p = subprocess.run([sys.executable, PROG] + list(args), cwd=repo, capture_output=True, text=True, env=ENV, timeout=120, creationflags=NO_WINDOW)
+    p = subprocess.run([sys.executable, PROG] + list(args), cwd=repo, capture_output=True, text=True, env=ENV, timeout=120)
     return p.returncode, p.stdout + p.stderr
 
 

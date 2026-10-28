@@ -8,7 +8,6 @@ import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "bridge-run.py")
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 sys.path.insert(0, os.path.join(HERE, os.pardir, "bridge", "cursor-bridge"))
 import bridge_env  # noqa: E402
 
@@ -50,11 +49,11 @@ def git_init(root, branch):
         GIT_COMMITTER_NAME="t",
         GIT_COMMITTER_EMAIL="t@x",
     )
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(root), env=env, check=True, creationflags=NO_WINDOW)
-    subprocess.run(["git", "checkout", "-q", "-b", branch], cwd=str(root), env=env, check=True, creationflags=NO_WINDOW)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(root), env=env, check=True)
+    subprocess.run(["git", "checkout", "-q", "-b", branch], cwd=str(root), env=env, check=True)
     (root / "README").write_text("x\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README"], cwd=str(root), env=env, check=True, creationflags=NO_WINDOW)
-    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=str(root), env=env, check=True, creationflags=NO_WINDOW)
+    subprocess.run(["git", "add", "README"], cwd=str(root), env=env, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=str(root), env=env, check=True)
 
 
 def run_launch(root, env, *cmd, kind=None, limit="30"):
@@ -68,7 +67,6 @@ def run_launch(root, env, *cmd, kind=None, limit="30"):
         capture_output=True,
         text=True,
         timeout=60,
-        creationflags=NO_WINDOW,
     )
 
 
