@@ -25,19 +25,20 @@ import tempfile
 import time
 from datetime import datetime, timezone
 
-_BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
-if _BRIDGE_DIR not in sys.path:
-    sys.path.insert(0, _BRIDGE_DIR)
-_IMPORT_ERROR = None
+_IMPORT_ERRORS = []
 try:
     import tomllib
 except Exception as e:
-    _IMPORT_ERROR = e
+    _IMPORT_ERRORS.append(("tomllib", e))
     tomllib = None
+
+_BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BRIDGE_DIR not in sys.path:
+    sys.path.insert(0, _BRIDGE_DIR)
 try:
     import bridge_env
 except Exception as e:
-    _IMPORT_ERROR = e
+    _IMPORT_ERRORS.append(("bridge_env", e))
     bridge_env = None
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -1531,8 +1532,9 @@ def main(argv=None):
 
 
 def run_main():
-    if _IMPORT_ERROR is not None:
-        print("mutation-run: internal error - %s" % _IMPORT_ERROR, file=sys.stderr)
+    if _IMPORT_ERRORS:
+        parts = ["cannot import %s: %s: %s" % (name, type(exc).__name__, exc) for name, exc in _IMPORT_ERRORS]
+        print("mutation-run: internal error - " + "; ".join(parts), file=sys.stderr)
         return 3
     try:
         return main()
