@@ -5,6 +5,10 @@ import tempfile
 
 import pytest
 
+# tests/phase_modules.py holds assertions the phase-module tests share; pytest rewrites them as it does a test module's,
+# so they still run under `python -O` (stage B5's refactoring pass; FIX-004's rule, phase_modules.section_span).
+pytest.register_assert_rewrite("phase_modules")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 CURSOR_BRIDGE = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge")
 
