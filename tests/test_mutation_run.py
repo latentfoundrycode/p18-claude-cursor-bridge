@@ -1,6 +1,5 @@
 """R-041: mutation-run.py applies mutants in a scratch copy and caches kills (TASK-031)."""
 import ctypes
-import hashlib
 import json
 import os
 import shutil
@@ -64,12 +63,14 @@ def mutants_path(ws, run_id, body):
     return p
 
 
-def run_mr(ws, mutants_file, scratch=None, timeout=60, extra=(), home_env=None, harness_slack=30):
+def run_mr(ws, mutants_file, scratch=None, timeout=60, extra=(), home_env=None, harness_slack=30, python=None,
+           env_extra=None):
     env = dict(os.environ)
     env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
     if home_env:
         env["HOME"] = env["USERPROFILE"] = str(home_env)
-    cmd = [sys.executable, MUTATION_RUN, str(mutants_file)] + list(extra)
+    env.update(env_extra or {})
+    cmd = [str(python or sys.executable), MUTATION_RUN, str(mutants_file)] + list(extra)
     if scratch:
         cmd += ["--scratch", str(scratch)]
     cmd += ["--mutant-timeout", str(timeout)]
@@ -690,11 +691,7 @@ def test_r041_editable_install_flat_kills_mutant(tmp_path):
     }]}
     mp = mutants_path(ws, "edif", body)
     git(ws, "add", "run/supervisor/edif-mutants.json")
-    env = dict(os.environ)
-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
-    cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
-                       **test_conftest.windowless_kwargs({}))
+    p = run_mr(ws, mp, harness_slack=60, python=vpy)
     assert p.returncode == 0 and "killed" in p.stdout, p.stderr + p.stdout
 
 
@@ -715,11 +712,7 @@ def test_r041_editable_install_src_kills_mutant(tmp_path):
     }]}
     mp = mutants_path(ws, "edis", body)
     git(ws, "add", "run/supervisor/edis-mutants.json")
-    env = dict(os.environ)
-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
-    cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
-                       **test_conftest.windowless_kwargs({}))
+    p = run_mr(ws, mp, harness_slack=60, python=vpy)
     assert p.returncode == 0 and "killed" in p.stdout, p.stderr + p.stdout
 
 
@@ -739,18 +732,12 @@ def test_r041_editable_src_only_refused(tmp_path):
     }]}
     mp = mutants_path(ws, "edir", body)
     git(ws, "add", "run/supervisor/edir-mutants.json")
-    env = dict(os.environ)
-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
-    cmd = [str(vpy), MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
-                       **test_conftest.windowless_kwargs({}))
+    p = run_mr(ws, mp, harness_slack=60, python=vpy)
     assert p.returncode == 2, p.stderr + p.stdout
     sha = git(ws, "rev-parse", "HEAD")
     mp2 = mutants_path(ws, "edir2", {"mutants": [], "new_tests": ["tests/test_calc.py::test_add"]})
     git(ws, "add", "run/supervisor/edir2-mutants.json")
-    cmd2 = [str(vpy), MUTATION_RUN, str(mp2), "--mutant-timeout", "60", "--checkpoint", sha]
-    p2 = subprocess.run(cmd2, cwd=str(ws), capture_output=True, text=True, env=env, timeout=120,
-                        **test_conftest.windowless_kwargs({}))
+    p2 = run_mr(ws, mp2, extra=["--checkpoint", sha], harness_slack=60, python=vpy)
     assert p2.returncode == 2, p2.stderr + p2.stdout
     assert not (ws / "run/supervisor/mutation-cache/edir.jsonl").exists()
     assert not (ws / "run/supervisor/mutation-cache/edir2.jsonl").exists()
@@ -1534,13 +1521,8 @@ def test_task031_r9_iniconfig_not_importable_refused(tmp_path, home_of_the_tests
                                                   "pairs": [{"old": "return a + b", "new": "return b + a"}],
                                                   "tests": ["tests/test_calc.py"],
                                                   "expect_fail": ["tests/test_calc.py::test_add"]}]})
-    env = dict(os.environ)
-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
-    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
-    env["PYTHONPATH"] = str(block) + os.pathsep + env.get("PYTHONPATH", "")
-    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
-                       **test_conftest.windowless_kwargs({}))
+    p = run_mr(ws, mp, home_env=home_of_the_tests,
+               env_extra={"PYTHONPATH": str(block) + os.pathsep + os.environ.get("PYTHONPATH", "")})
     assert p.returncode == 2, p.stdout + p.stderr
     assert "mutation-run: pytest's iniconfig is not importable" in p.stdout + p.stderr
     assert not (ws / "run/supervisor/mutation-cache/inicfg.jsonl").exists()
@@ -1560,12 +1542,7 @@ def test_task031_r10_iniconfig_shadow_case_insensitive_refused(tmp_path, home_of
                                                     "pairs": [{"old": "return a + b", "new": "return b + a"}],
                                                     "tests": ["tests/test_calc.py"],
                                                     "expect_fail": ["tests/test_calc.py::test_add"]}]})
-    env = dict(os.environ)
-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
-    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
-    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
-                       **test_conftest.windowless_kwargs({}))
+    p = run_mr(ws, mp, home_env=home_of_the_tests)
     assert p.returncode == 2, p.stdout + p.stderr
     assert "mutation-run: a top-level iniconfig in the project would shadow pytest's iniconfig" in p.stdout + p.stderr
     assert not (ws / "run/supervisor/mutation-cache/r10case.jsonl").exists()
@@ -1588,12 +1565,7 @@ def test_task031_r11_extension_suffix_shadow_refused(tmp_path, home_of_the_tests
                                                    "pairs": [{"old": "return a + b", "new": "return b + a"}],
                                                    "tests": ["tests/test_calc.py"],
                                                    "expect_fail": ["tests/test_calc.py::test_add"]}]})
-    env = dict(os.environ)
-    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
-    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
-    cmd = [sys.executable, MUTATION_RUN, str(mp), "--mutant-timeout", "60"]
-    p = subprocess.run(cmd, cwd=str(ws), capture_output=True, text=True, env=env, timeout=90,
-                       **test_conftest.windowless_kwargs({}))
+    p = run_mr(ws, mp, home_env=home_of_the_tests)
     assert p.returncode == 2, p.stdout + p.stderr
     assert (
         "mutation-run: a top-level module tomllib in the project would shadow "
