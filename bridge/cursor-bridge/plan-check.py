@@ -184,9 +184,12 @@ def merged_ids(base):
             encoding="utf-8",
             errors="replace",
             creationflags=NO_WINDOW,
+            timeout=120,
         )
-    except OSError:
+    except subprocess.TimeoutExpired:
         return None
+    except OSError:
+        raise
     if p.returncode != 0:
         return None
     return bridge_env.squash_merged_ids_from_lines(

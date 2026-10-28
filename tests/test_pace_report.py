@@ -50,7 +50,7 @@ def git_env():
 
 
 def pace(args, cwd):
-    p = subprocess.run(  # windowless: visible-ok pace-report under test
+    p = subprocess.run(
         [sys.executable, PACE] + [str(a) for a in args],
         cwd=str(cwd),
         env=git_env(),
@@ -65,7 +65,7 @@ class MiniProject(object):
         self.root = tmp_path / name
         self.ws = self.root / "Workspace"
         self.ws.mkdir(parents=True)
-        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(self.ws), env=git_env(), check=True)  # windowless: visible-ok temp-repo git for tests
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(self.ws), env=git_env(), check=True, timeout=120)
         (self.ws / ".gitignore").write_text("run/\n", encoding="utf-8")
 
     def brief(self, ident):
@@ -74,11 +74,12 @@ class MiniProject(object):
         p.write_text("# %s\n" % ident, encoding="utf-8")
 
     def commit(self, subject, when):
-        subprocess.run(["git", "-C", str(self.ws), "add", "-A"], env=git_env(), check=True)  # windowless: visible-ok temp-repo git for tests
-        subprocess.run(  # windowless: visible-ok temp-repo git for tests
+        subprocess.run(["git", "-C", str(self.ws), "add", "-A"], env=git_env(), check=True, timeout=120)
+        subprocess.run(
             ["git", "-C", str(self.ws), "commit", "-q", "--allow-empty", "--no-verify", "-m", subject],
             env={**git_env(), "GIT_AUTHOR_DATE": gitdate(when), "GIT_COMMITTER_DATE": gitdate(when)},
             check=True,
+            timeout=120,
         )
 
     def launch(self, ident, when):
@@ -130,7 +131,7 @@ def test_r044_merge_and_start_weeks(tmp_path):
     assert "1" in out
 
 
-def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program):
+def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program, monkeypatch):
     """R-044. ISS-013-shaped subject counts no merge; plan-check agrees on TASK-031."""
     p = MiniProject(tmp_path)
     p.brief("TASK-031")
@@ -143,7 +144,7 @@ def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program):
     parts = [c.strip() for c in row.strip("|").split("|")]
     assert parts[2] == "0"
     pc = program("plan-check")
-    os.chdir(str(p.ws))
+    monkeypatch.chdir(str(p.ws))
     assert "TASK-031" not in (pc.merged_ids("main") or set())
 
 
@@ -162,8 +163,7 @@ def test_r044_blank_mean_when_no_merge(tmp_path):
 
 def test_r044_usage_error_on_bad_weeks(tmp_path):
     """R-044. --weeks 0 is usage error exit 2."""
-    p = MiniProject(tmp_path)
-    p.commit("x (#1)", at(2))
-    rc, out, _ = pace([p.root, "--weeks", "0"], tmp_path)
+    rc, out, err = pace(["--weeks", "0"], tmp_path)
     assert rc == 2
+    assert "pace-report" in err and "--weeks" in err
     assert "|" not in out

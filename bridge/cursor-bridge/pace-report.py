@@ -28,13 +28,14 @@ or a given root that is not a project.
 """
 import argparse
 import datetime
-import glob
 import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
+
+sys.dont_write_bytecode = True
 
 _BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BRIDGE_DIR not in sys.path:
@@ -51,8 +52,9 @@ USAGE_FIELDS = (
     "cache_creation_input_tokens",
     "cache_read_input_tokens",
 )
+_MAX_JSONL_LINE = 64 * 1024 * 1024
 _REVIEW_ERR_RX = re.compile(r"^REVIEW-(.+)\.err$", re.I)
-_ERR_R_RX = re.compile(r"-r([1-9][0-9]*)$", re.I)
+_COMMIT_HEAD_RX = re.compile(r"^[0-9a-f]{40} ([0-9]+)$")
 
 
 def _load_evaluate_reports():
@@ -73,7 +75,15 @@ def build_parser():
     return ap
 
 
+def _ascii_name(name):
+    return name.encode("ascii", "backslashreplace").decode("ascii")
+
+
 def _iso_week(dt):
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    else:
+        dt = dt.astimezone(datetime.timezone.utc)
     y, w, _ = dt.date().isocalendar()
     return (y, w)
 
@@ -85,7 +95,7 @@ def _week_range(n):
         datetime.time(0, 0),
         tzinfo=datetime.timezone.utc,
     )
-    return [ _iso_week(monday - datetime.timedelta(weeks=k)) for k in range(n) ]
+    return [_iso_week(monday - datetime.timedelta(weeks=k)) for k in range(n)]
 
 
 def _parse_run_time(text):
@@ -100,46 +110,66 @@ def _parse_run_time(text):
         return None
 
 
-def _git(ws, args, timeout=GIT_LIMIT):
+def _git_env():
+    env = os.environ.copy()
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    return env
+
+
+def _git(ws, args, diff_output=False):
+    cmd = [
+        "git",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.untrackedCache=false",
+        "-c",
+        "log.showSignature=false",
+        "-C",
+        ws,
+    ]
+    arglist = list(args)
+    if diff_output:
+        if "--" in arglist:
+            i = arglist.index("--")
+            arglist = arglist[:i] + ["--no-textconv", "--no-ext-diff"] + arglist[i:]
+        else:
+            arglist = arglist + ["--no-textconv", "--no-ext-diff"]
+    cmd.extend(arglist)
     try:
         p = subprocess.run(
-            ["git", "-C", ws] + list(args),
+            cmd,
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
             creationflags=NO_WINDOW,
-            timeout=timeout,
+            timeout=GIT_LIMIT,
+            env=_git_env(),
         )
     except subprocess.TimeoutExpired:
-        return "timeout", None
+        return "timeout", None, None
     except OSError:
-        return "error", None
+        return "start", None, None
     if p.returncode != 0:
-        return "fail", None
-    return "ok", p.stdout
+        return "fail", None, p.returncode
+    return "ok", p.stdout, None
 
 
-def _handoff_untracked(ws, ls_out):
-    handoff = os.path.join(ws, "handoff")
-    if not os.path.isdir(handoff):
-        return False
-    listed = set(line.replace("\\", "/").strip() for line in (ls_out or "").splitlines() if line.strip())
-    for name in os.listdir(handoff):
-        if name.endswith(".md") and ("handoff/" + name) not in listed:
-            return True
-    return False
+def _handoff_untracked(ls_out):
+    return not any(line.strip() for line in (ls_out or "").splitlines())
 
 
-def _ids_with_brief(ws):
+def _ids_with_brief(ls_out):
     ids = set()
-    handoff = os.path.join(ws, "handoff")
-    if not os.path.isdir(handoff):
-        return ids
-    for name in os.listdir(handoff):
-        if not name.endswith(".md") or bridge_env.HANDOFF_REPORT_NAME.search(name):
+    for line in (ls_out or "").splitlines():
+        line = line.replace("\\", "/").strip()
+        if not line.startswith("handoff/") or not line.endswith(".md"):
             continue
-        parsed = bridge_env.parse_review_name(name[:-3])
+        base = os.path.basename(line)
+        if bridge_env.HANDOFF_REPORT_NAME.search(base):
+            continue
+        parsed = bridge_env.parse_review_name(base[:-3])
         if parsed:
             ids.add(parsed[0])
     return ids
@@ -207,6 +237,26 @@ def _guard_rounds(common, id_part):
     return len([r for r in rounds if isinstance(r, dict)])
 
 
+def _has_rounds_reading(ws, common, id_part):
+    if _report_rounds(ws, id_part) > 0:
+        return True
+    review = os.path.join(ws, "run", "review")
+    if os.path.isdir(review):
+        for name in os.listdir(review):
+            m = _REVIEW_ERR_RX.match(name)
+            if not m:
+                continue
+            token = m.group(1)
+            parsed = bridge_env.parse_review_name(token)
+            if parsed and parsed[0] == id_part:
+                return True
+            if _letter_err_belongs(ws, id_part, token):
+                return True
+    if bridge_env._read_rounds_files(common).get(id_part):
+        return True
+    return False
+
+
 def _rounds_for_id(ws, common, id_part):
     return max(_report_rounds(ws, id_part), _err_rounds(ws, id_part), _guard_rounds(common, id_part))
 
@@ -233,36 +283,43 @@ def _start_times(ws, common, id_part):
 
 
 def _commits(ws):
-    status, out = _git(ws, ["log", "main", "--format=%ct%x1f%s%x1f%(trailers:key=Merges,valueonly)"])
+    status, out, code = _git(
+        ws,
+        ["log", "main", "--format=%x00%H %ct%n%s%n%(trailers:key=Merges,valueonly)"],
+    )
     if status != "ok":
-        return status, None
+        return status, None, code
     commits = []
-    for line in out.splitlines():
-        parts = line.split("\x1f", 2)
-        if len(parts) < 2:
+    for rec in out.lstrip("\x00").split("\x00"):
+        if not rec.strip():
+            continue
+        lines = rec.split("\n")
+        head = lines[0].strip()
+        m = _COMMIT_HEAD_RX.match(head)
+        if not m:
             continue
         try:
-            ts = int(parts[0])
+            ts = int(m.group(1))
         except ValueError:
             continue
         dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
-        subject = parts[1]
-        trailer = parts[2] if len(parts) > 2 else ""
-        lines = [subject]
-        if trailer:
-            lines.append(trailer)
-        merged = bridge_env.squash_merged_ids_from_lines(lines, bridge_env.GRAMMAR_ID_PATTERN, plan_style=False)
+        body = lines[1:]
+        merged = bridge_env.squash_merged_ids_from_lines(
+            body, bridge_env.GRAMMAR_ID_PATTERN, plan_style=False
+        )
         commits.append((dt, merged))
-    return "ok", commits
+    commits.reverse()
+    return "ok", commits, None
 
 
 def _hardening_by_week(ws):
-    status, out = _git(
+    status, out, code = _git(
         ws,
         ["log", "main", "--format=%ct", "--numstat", "--", "docs/HARDENING.md"],
+        diff_output=True,
     )
     if status != "ok":
-        return status, None
+        return status, None, code
     by_week = {}
     cur_ts = None
     for line in out.splitlines():
@@ -285,7 +342,7 @@ def _hardening_by_week(ws):
             continue
         wk = _iso_week(datetime.datetime.fromtimestamp(cur_ts, tz=datetime.timezone.utc))
         by_week[wk] = by_week.get(wk, 0) + added
-    return "ok", by_week
+    return "ok", by_week, None
 
 
 def _lift_map(ws, common, id_part):
@@ -323,62 +380,137 @@ def _lift_map(ws, common, id_part):
     return lifts
 
 
-def _session_paths(home, keys):
-    paths = []
-    for key in keys:
-        base = os.path.join(home, ".claude", "projects", key)
-        paths.extend(glob.glob(os.path.join(base, "*.jsonl")))
-        paths.extend(glob.glob(os.path.join(base, "**", "subagents", "*.jsonl"), recursive=True))
-    return sorted(set(paths))
+def _entry_is_link(entry):
+    if entry.is_symlink():
+        return True
+    is_junction = getattr(entry, "is_junction", None)
+    if is_junction and is_junction():
+        return True
+    return False
+
+
+def _parse_transcript_record(line):
+    try:
+        o = json.loads(line)
+    except (ValueError, TypeError, RecursionError):
+        return None
+    if not isinstance(o, dict) or o.get("type") != "assistant":
+        return None
+    msg = o.get("message")
+    if not isinstance(msg, dict):
+        return None
+    mid = msg.get("id")
+    if not isinstance(mid, str):
+        return None
+    usage = msg.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    total = 0
+    for f in USAGE_FIELDS:
+        v = usage.get(f)
+        if v is None:
+            continue
+        if type(v) is not int or v < 0 or v > 10 ** 12:
+            return None
+        total += v
+    ts = o.get("timestamp")
+    if not isinstance(ts, str):
+        return None
+    try:
+        if ts.endswith("Z"):
+            ts = ts[:-1] + "+00:00"
+        dt = datetime.datetime.fromisoformat(ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        else:
+            dt = dt.astimezone(datetime.timezone.utc)
+    except ValueError:
+        return None
+    return mid, dt, total
+
+
+def _read_line_capped(f, cap):
+    line = f.readline()
+    if line == "":
+        return ""
+    if len(line) > cap:
+        while line and not line.endswith("\n"):
+            line = f.read(65536)
+        return None
+    return line
+
+
+def _walk_key_dir(key_dir, deadline, file_handler, counts):
+    """Walk key_dir without following links; counts [session, subagent] files seen."""
+    stack = [key_dir]
+    key_norm = os.path.normcase(os.path.abspath(key_dir))
+    while stack:
+        if datetime.datetime.now(datetime.timezone.utc) > deadline:
+            return "timeout"
+        dirpath = stack.pop()
+        if datetime.datetime.now(datetime.timezone.utc) > deadline:
+            return "timeout"
+        try:
+            with os.scandir(dirpath) as it:
+                for entry in it:
+                    if datetime.datetime.now(datetime.timezone.utc) > deadline:
+                        return "timeout"
+                    if _entry_is_link(entry):
+                        continue
+                    if entry.is_dir(follow_symlinks=False):
+                        if datetime.datetime.now(datetime.timezone.utc) > deadline:
+                            return "timeout"
+                        stack.append(entry.path)
+                    elif entry.is_file(follow_symlinks=False):
+                        if datetime.datetime.now(datetime.timezone.utc) > deadline:
+                            return "timeout"
+                        path = entry.path
+                        rel = os.path.normcase(os.path.abspath(path))
+                        if not rel.startswith(key_norm):
+                            continue
+                        parent = os.path.basename(os.path.dirname(path))
+                        base = os.path.basename(path)
+                        if not base.endswith(".jsonl"):
+                            continue
+                        if os.path.dirname(path) == key_dir:
+                            counts[0] += 1
+                        elif parent == "subagents":
+                            counts[1] += 1
+                        else:
+                            continue
+                        err = file_handler(path)
+                        if err:
+                            return err
+        except OSError:
+            continue
+    return None
 
 
 def _read_tokens(home, keys, weeks_set, timeout=None):
     if timeout is None:
         timeout = SESSION_READ_LIMIT
-    best = {}
-    found_keys = []
-    for key in keys:
-        if os.path.isdir(os.path.join(home, ".claude", "projects", key)):
-            found_keys.append(key)
-    if timeout <= 0:
-        return {}, found_keys, "timeout"
-    paths = _session_paths(home, keys)
-    if not paths:
-        return {}, found_keys, None
     deadline = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=timeout)
-    for path in paths:
-        if datetime.datetime.now(datetime.timezone.utc) > deadline:
-            return {}, found_keys, "timeout"
+    if timeout <= 0:
+        return {}, 0, 0, "timeout"
+    best = {}
+    session_count = 0
+    subagent_count = 0
+
+    def handle_file(path):
         try:
             with open(path, encoding="utf-8", errors="replace") as f:
-                for line in f:
+                while True:
                     if datetime.datetime.now(datetime.timezone.utc) > deadline:
-                        return {}, found_keys, "timeout"
-                    try:
-                        o = json.loads(line)
-                    except ValueError:
+                        return "timeout"
+                    line = _read_line_capped(f, _MAX_JSONL_LINE)
+                    if line == "":
+                        break
+                    if line is None:
                         continue
-                    if o.get("type") != "assistant":
+                    rec = _parse_transcript_record(line)
+                    if rec is None:
                         continue
-                    msg = o.get("message") or {}
-                    usage = msg.get("usage") or {}
-                    try:
-                        total = sum(int(usage.get(f) or 0) for f in USAGE_FIELDS)
-                    except (TypeError, ValueError):
-                        continue
-                    mid = msg.get("id")
-                    if not mid:
-                        continue
-                    ts = str(o.get("timestamp") or "")
-                    try:
-                        if ts.endswith("Z"):
-                            dt = datetime.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S").replace(
-                                tzinfo=datetime.timezone.utc
-                            )
-                        else:
-                            dt = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                    except ValueError:
-                        continue
+                    mid, dt, total = rec
                     wk = _iso_week(dt)
                     if wk not in weeks_set:
                         continue
@@ -386,11 +518,24 @@ def _read_tokens(home, keys, weeks_set, timeout=None):
                     if prev is None or total > prev:
                         best[(wk, mid)] = total
         except OSError:
+            pass
+        return None
+
+    for key in keys:
+        key_dir = os.path.join(home, ".claude", "projects", key)
+        if not os.path.isdir(key_dir):
             continue
+        counts = [0, 0]
+        err = _walk_key_dir(key_dir, deadline, handle_file, counts)
+        session_count += counts[0]
+        subagent_count += counts[1]
+        if err == "timeout":
+            return {}, session_count, subagent_count, "timeout"
+
     by_week = {}
     for (wk, _), total in best.items():
         by_week[wk] = by_week.get(wk, 0) + total
-    return by_week, found_keys, None
+    return by_week, session_count, subagent_count, None
 
 
 def _fmt_num(n):
@@ -412,25 +557,31 @@ def _fmt_tokens(millions):
 def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
     ws = os.path.join(root, "Workspace")
     common = os.path.join(ws, ".git")
-    lines = ["# %s" % name, ""]
-    git_fail = None
-    status, ls_out = _git(ws, ["ls-files", "handoff/"])
+    aname = _ascii_name(name)
+    lines = ["# %s" % aname, ""]
+    status, ls_out, code = _git(ws, ["ls-files", "handoff/"])
     if status == "timeout":
-        return None, "git ls-files handoff/"
+        return None, ("timeout", "git ls-files handoff/")
+    if status == "start":
+        return None, ("start", "git ls-files handoff/")
+    if status == "fail":
+        return None, ("fail", "git ls-files handoff/", code)
     if status != "ok":
         ls_out = ""
-    untracked = _handoff_untracked(ws, ls_out)
-    brief_ids = _ids_with_brief(ws)
+    untracked = _handoff_untracked(ls_out)
+    brief_ids = _ids_with_brief(ls_out)
 
-    status, commits = _commits(ws)
-    if status == "timeout":
-        return None, "git log main"
+    status, commits, code = _commits(ws)
     if status != "ok":
-        return None, "git log main"
+        return None, (status, "git log main -- ...", code)
 
-    status, hardening = _hardening_by_week(ws)
+    status, hardening, code = _hardening_by_week(ws)
     if status == "timeout":
-        return None, "git log main --numstat docs/HARDENING.md"
+        return None, ("timeout", "git log main --numstat docs/HARDENING.md")
+    if status == "start":
+        return None, ("start", "git log main --numstat docs/HARDENING.md")
+    if status == "fail":
+        return None, ("fail", "git log main --numstat docs/HARDENING.md", code)
     if status != "ok":
         hardening = {}
 
@@ -438,8 +589,9 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
     for dt, merged in commits:
         wk = _iso_week(dt)
         for ident in merged:
-            if ident in brief_ids:
-                merge_week.setdefault(ident, wk)
+            if untracked or ident in brief_ids:
+                if ident not in merge_week:
+                    merge_week[ident] = wk
 
     starts = {}
     for ident in brief_ids:
@@ -458,8 +610,10 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
         for ident in round_ids:
             rounds_cache[ident] = _rounds_for_id(ws, common, ident)
 
-    week_rows = {wk: {"started": 0, "merged": 0, "rounds": [], "days": [], "hardening": hardening.get(wk, 0)}
-                 for wk in weeks}
+    week_rows = {
+        wk: {"started": 0, "merged": 0, "rounds": [], "days": [], "hardening": hardening.get(wk, 0)}
+        for wk in weeks
+    }
 
     for ident, wk in starts.items():
         if wk is None:
@@ -467,29 +621,40 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
         if wk in week_rows:
             week_rows[wk]["started"] += 1
 
-    for ident, wk in merge_week.items():
-        if wk in week_rows:
-            week_rows[wk]["merged"] += 1
-            if not untracked:
-                week_rows[wk]["rounds"].append(rounds_cache.get(ident, 0))
+    for ident, mw in merge_week.items():
+        if mw in week_rows:
+            week_rows[mw]["merged"] += 1
+            if not untracked and _has_rounds_reading(ws, common, ident):
+                week_rows[mw]["rounds"].append(rounds_cache.get(ident, 0))
             st = starts.get(ident)
-            if st is not None and starts.get(ident) is not None:
+            if st is not None:
                 start_dt = _start_times(ws, common, ident)
                 if start_dt:
                     for dt, merged in commits:
-                        if ident in merged and _iso_week(dt) == wk:
-                            days = (dt.date() - start_dt.date()).days
-                            week_rows[wk]["days"].append(days)
+                        if ident in merged and _iso_week(dt) == mw:
+                            if start_dt.date() <= dt.date():
+                                days = (dt.date() - start_dt.date()).days
+                                week_rows[mw]["days"].append(days)
                             break
 
     tokens_by_week = {}
-    token_keys = []
+    session_files = 0
+    subagent_files = 0
     token_note = ""
     if with_tokens:
-        tokens_by_week, token_keys, tok_err = _read_tokens(home, er.project_keys(name, root), set(weeks))
+        tokens_by_week, session_files, subagent_files, tok_err = _read_tokens(
+            home, er.project_keys(name, root), set(weeks)
+        )
         if tok_err == "timeout":
-            token_note = "pace-report: %s: session read reached the 120 second limit" % name
+            token_note = "pace-report: %s: session read reached the %d second limit" % (aname, SESSION_READ_LIMIT)
             tokens_by_week = {}
+
+    if with_tokens:
+        lines.append(
+            "Token sources: %d session file(s), %d subagent file(s)"
+            % (session_files, subagent_files)
+        )
+        lines.append("")
 
     hdr = [
         "Week",
@@ -533,8 +698,14 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
         else:
             days_s = ""
         hard_s = _fmt_num(row["hardening"]) if row["hardening"] else "0"
-        cells = ["%d-W%02d" % (wk[0], wk[1]), started_s, _fmt_num(row["merged"]) if row["merged"] else "0",
-                 rounds_s, days_s, hard_s]
+        cells = [
+            "%d-W%02d" % (wk[0], wk[1]),
+            started_s,
+            _fmt_num(row["merged"]) if row["merged"] else "0",
+            rounds_s,
+            days_s,
+            hard_s,
+        ]
         if with_tokens:
             tok_m = tokens_by_week.get(wk)
             if tok_m is not None and tok_m > 0:
@@ -550,21 +721,32 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
                 cells.append("")
         lines.append("| " + " | ".join(cells) + " |")
 
-    t_rounds_mean = ""
-    t_rounds_max = ""
-    all_rounds = []
-    for wk in weeks:
-        all_rounds.extend(week_rows[wk]["rounds"])
-    if all_rounds:
-        t_rounds_mean = _fmt_num(sum(all_rounds) / len(all_rounds))
-        t_rounds_max = _fmt_num(max(all_rounds))
+    if untracked:
+        t_started = UNTRACKED_HANDOFF
+        t_rounds = UNTRACKED_HANDOFF
+    else:
+        t_started = _fmt_num(totals["started"])
+        t_rounds_mean = ""
+        t_rounds_max = ""
+        all_rounds = []
+        for wk in weeks:
+            all_rounds.extend(week_rows[wk]["rounds"])
+        if all_rounds:
+            t_rounds_mean = _fmt_num(sum(all_rounds) / len(all_rounds))
+            t_rounds_max = _fmt_num(max(all_rounds))
+        t_rounds = ("%s / %s" % (t_rounds_mean, t_rounds_max)) if t_rounds_mean else ""
     t_days = []
     for wk in weeks:
         t_days.extend(week_rows[wk]["days"])
     t_days_s = _fmt_num(sum(t_days) / len(t_days)) if t_days else ""
-    t_cells = ["Total", _fmt_num(totals["started"]), _fmt_num(totals["merged"]),
-               ("%s / %s" % (t_rounds_mean, t_rounds_max)) if t_rounds_mean else "",
-               t_days_s, _fmt_num(totals["hardening"])]
+    t_cells = [
+        "Total",
+        t_started,
+        _fmt_num(totals["merged"]),
+        t_rounds,
+        t_days_s,
+        _fmt_num(totals["hardening"]),
+    ]
     if with_tokens:
         t_cells.append(_fmt_tokens(totals["tokens"]) if totals["tokens"] else "")
         t_cells.append("")
@@ -597,24 +779,27 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
 
     for ident, rnd in over:
         lifts = _lift_map(ws, common, ident)
-        parts = ["%s: %d rounds" % (ident, rnd)]
+        parts = ["%s: %d rounds" % (_ascii_name(ident), rnd)]
         for r in range(ceiling + 1, rnd + 1):
             lv = lifts.get(r, "unknown")
             parts.append("r%d %s" % (r, lv))
         lines.append("- " + "; ".join(parts))
     for ident, rnd in stage:
         lifts = _lift_map(ws, common, ident)
-        parts = ["%s: %d rounds" % (ident, rnd)]
+        parts = ["%s: %d rounds" % (_ascii_name(ident), rnd)]
         for r in range(ceiling + 1, rnd + 1):
             lv = lifts.get(r, "unknown")
             parts.append("r%d %s" % (r, lv))
         lines.append("- " + "; ".join(parts))
 
-    unknown_starts = [i for i in brief_ids if starts.get(i) is None and not untracked
-                      and (merge_week.get(i) in weeks or merge_week.get(i) is None)]
+    unknown_starts = [
+        i
+        for i in brief_ids
+        if starts.get(i) is None and not untracked and (merge_week.get(i) in weeks or merge_week.get(i) is None)
+    ]
     if unknown_starts and not untracked:
         lines.append("")
-        lines.append("Starts unknown: " + ", ".join(sorted(unknown_starts)))
+        lines.append("Starts unknown: " + ", ".join(sorted(_ascii_name(i) for i in unknown_starts)))
 
     return "\n".join(lines) + "\n", None
 
@@ -640,6 +825,14 @@ def _is_project(root):
     return os.path.isdir(ws) and os.path.isdir(os.path.join(ws, ".git"))
 
 
+def _git_failure_line(kind, cmd, code=None):
+    if kind == "timeout":
+        return "git command timed out after %d seconds: %s" % (GIT_LIMIT, cmd)
+    if kind == "start":
+        return "git command could not start: %s" % cmd
+    return "git command failed (exit %s): %s" % (code, cmd)
+
+
 def main():
     ap = build_parser()
     a = ap.parse_args()
@@ -655,25 +848,37 @@ def main():
     er = _load_evaluate_reports()
     if a.roots:
         roots = [(os.path.basename(os.path.abspath(r)), os.path.abspath(r)) for r in a.roots]
+        for _, root in roots:
+            if not _is_project(root):
+                print(
+                    "pace-report: not a project root (needs Workspace/.git): %s" % root,
+                    file=sys.stderr,
+                )
+                return 2
     else:
         roots = _default_roots(er)
-
-    for _, root in roots:
-        if not _is_project(root):
-            print("pace-report: not a project root (needs Workspace/.git): %s" % root, file=sys.stderr)
-            return 2
 
     weeks = _week_range(weeks_n)
     out_parts = []
     exit_code = 0
     for name, root in roots:
+        aname = _ascii_name(name)
         if not os.path.isdir(root):
-            out_parts.append("# %s\n\n(not present on this computer)\n" % name)
+            out_parts.append("# %s\n\n(not present on this computer)\n" % aname)
             continue
-        text, cmd = _project_section(name, root, weeks, ceiling, a.tokens, home, er)
+        if not _is_project(root):
+            out_parts.append("# %s\n\n(not a project: no Workspace/.git)\n" % aname)
+            continue
+        text, err = _project_section(name, root, weeks, ceiling, a.tokens, home, er)
         if text is None:
-            print("pace-report: %s: git command timed out after %d seconds: %s" % (name, GIT_LIMIT, cmd), file=sys.stderr)
-            out_parts.append("# %s\n\n(git command timed out: %s)\n" % (name, cmd))
+            if len(err) == 3:
+                kind, cmd, code = err
+            else:
+                kind, cmd = err
+                code = None
+            msg = _git_failure_line(kind, cmd, code)
+            print("pace-report: %s: %s" % (aname, msg), file=sys.stderr)
+            out_parts.append("# %s\n\n(%s)\n" % (aname, msg))
             exit_code = 1
             continue
         out_parts.append(text)

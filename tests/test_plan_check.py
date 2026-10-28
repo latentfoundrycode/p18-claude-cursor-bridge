@@ -57,7 +57,7 @@ Scope: src/rec.py
 
 
 def git(repo, *args):
-    p = subprocess.run(["git"] + list(args), cwd=str(repo), capture_output=True, text=True, env=ENV)  # windowless: visible-ok temp-repo git for tests
+    p = subprocess.run(["git"] + list(args), cwd=str(repo), capture_output=True, text=True, env=ENV, timeout=120)
     assert p.returncode == 0, p.stderr
     return p.stdout.strip()
 
@@ -80,7 +80,7 @@ def make(tmp_path, plan=PLAN):
 
 
 def run(repo, *args):
-    p = subprocess.run([sys.executable, PROG, "--base", "main"] + list(args), cwd=str(repo), capture_output=True, text=True, env=ENV)  # windowless: visible-ok plan-check under test
+    p = subprocess.run([sys.executable, PROG, "--base", "main"] + list(args), cwd=str(repo), capture_output=True, text=True, env=ENV, timeout=120)
     return p.returncode, p.stdout + p.stderr
 
 
@@ -125,31 +125,69 @@ F_MERGE = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(task-
 F_ID_RX = re.compile(F_ID)
 
 
-def _former_merged_ids(repo):
-    log = subprocess.run(  # windowless: visible-ok regression read of temp repo
-        ["git", "log", "main", "--format=%s%n%(trailers:key=Merges,valueonly)"],
+def _commit_subject_lines(repo, sha):
+    detail = subprocess.run(
+        ["git", "log", "-1", sha, "--format=%s%n%(trailers:key=Merges,valueonly)"],
         cwd=str(repo),
         capture_output=True,
         text=True,
         env=ENV,
+        timeout=120,
     )
-    assert log.returncode == 0
-    out = set()
-    for line in log.stdout.splitlines():
-        m = F_SUBJECT.match(line)
-        if m:
-            out.update(F_ID_RX.findall(m.group(1)))
-            continue
-        m = F_MERGE.match(line)
-        if m:
-            out.add("TASK-" + m.group(1)[5:])
-            continue
-        m = F_TRAIL.search(line)
-        if m:
-            out.update(F_ID_RX.findall(m.group(1)))
-            continue
-        if re.match(r"^\s*(%s)(\s*,\s*%s)*\s*$" % (F_ID, F_ID), line):
-            out.update(F_ID_RX.findall(line))
+    assert detail.returncode == 0
+    return detail.stdout.splitlines()
+
+
+def _former_merged_ids_per_commit(repo):
+    revs = subprocess.run(
+        ["git", "log", "main", "--format=%H"],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        env=ENV,
+        timeout=120,
+    )
+    assert revs.returncode == 0
+    out = {}
+    for sha in revs.stdout.splitlines():
+        merged = set()
+        for line in _commit_subject_lines(repo, sha):
+            m = F_SUBJECT.match(line)
+            if m:
+                merged.update(F_ID_RX.findall(m.group(1)))
+                continue
+            m = F_MERGE.match(line)
+            if m:
+                merged.add("TASK-" + m.group(1)[5:])
+                continue
+            m = F_TRAIL.search(line)
+            if m:
+                merged.update(F_ID_RX.findall(m.group(1)))
+                continue
+            if re.match(r"^\s*(%s)(\s*,\s*%s)*\s*$" % (F_ID, F_ID), line):
+                merged.update(F_ID_RX.findall(line))
+        out[sha] = merged
+    return out
+
+
+def _new_merged_ids_per_commit(repo):
+    sys.path.insert(0, CB)
+    import bridge_env
+
+    revs = subprocess.run(
+        ["git", "log", "main", "--format=%H"],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        env=ENV,
+        timeout=120,
+    )
+    assert revs.returncode == 0
+    out = {}
+    for sha in revs.stdout.splitlines():
+        out[sha] = bridge_env.squash_merged_ids_from_lines(
+            _commit_subject_lines(repo, sha), bridge_env.PLAN_ID_PATTERN, plan_style=True
+        )
     return out
 
 
@@ -161,18 +199,24 @@ def _load_plan_check():
     return mod
 
 
-def test_r044_iss013_subject_merges_nothing_beside_bare_parenthesis(tmp_path):
+def test_r044_iss013_subject_merges_nothing_beside_bare_parenthesis(tmp_path, monkeypatch):
     """R-044. 9f6ace6's subject merges nothing; (TASK-100, R-027) merges TASK-100."""
     pc = _load_plan_check()
     repo = tmp_path / "r"
     repo.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(repo), env=ENV, check=True)  # windowless: visible-ok temp-repo git for tests
-    iss = subprocess.run(["git", "log", "-1", "--format=%s", "9f6ace6"], cwd=WORKSPACE, capture_output=True, text=True)  # windowless: visible-ok read-only subject
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(repo), env=ENV, check=True, timeout=120)
+    iss = subprocess.run(
+        ["git", "log", "-1", "--format=%s", "9f6ace6"],
+        cwd=WORKSPACE,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
     if iss.returncode != 0:
         pytest.skip("9f6ace6 not in this checkout")
     git(repo, "commit", "-q", "--allow-empty", "-m", "feat(x): ok (TASK-100, R-027) (#1)")
     git(repo, "commit", "-q", "--allow-empty", "-m", iss.stdout.strip())
-    os.chdir(str(repo))
+    monkeypatch.chdir(str(repo))
     assert pc.merged_ids("main") == {"TASK-100"}
 
 
@@ -183,30 +227,43 @@ def test_r044_iss013_subject_merges_nothing_beside_bare_parenthesis(tmp_path):
         "(TASK-031's Scope)",
     ],
 )
-def test_r044_non_bare_parenthesis_merges_nothing(tmp_path, subject):
+def test_r044_non_bare_parenthesis_merges_nothing(tmp_path, subject, monkeypatch):
     """R-044. Non-bare closing parenthesis merges nothing (ISS-013)."""
     pc = _load_plan_check()
     repo = tmp_path / "r"
     repo.mkdir()
     git(repo, "init", "-q", "-b", "main")
     git(repo, "commit", "-q", "--allow-empty", "-m", subject)
-    os.chdir(str(repo))
+    monkeypatch.chdir(str(repo))
     assert pc.merged_ids("main") == set()
 
 
-def test_r044_main_regression_minus_task031():
-    """R-044. Reader on Workspace main equals former rule minus {TASK-031}."""
-    shallow = subprocess.run(  # windowless: visible-ok read-only repo probe
-        ["git", "-C", WORKSPACE, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True
+def test_r044_main_regression_minus_task031(monkeypatch):
+    """R-044. Reader on Workspace main equals former rule minus {TASK-031} per commit."""
+    shallow = subprocess.run(
+        ["git", "-C", WORKSPACE, "rev-parse", "--is-shallow-repository"],
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     if shallow.returncode != 0 or shallow.stdout.strip() == "true":
         pytest.skip("shallow checkout")
-    if subprocess.run(["git", "-C", WORKSPACE, "rev-parse", "--verify", "--quiet", "refs/heads/main"], capture_output=True).returncode != 0:  # windowless: visible-ok read-only repo probe
+    if (
+        subprocess.run(
+            ["git", "-C", WORKSPACE, "rev-parse", "--verify", "--quiet", "refs/heads/main"],
+            capture_output=True,
+            timeout=120,
+        ).returncode
+        != 0
+    ):
         pytest.skip("no local main")
-    pc = _load_plan_check()
-    os.chdir(WORKSPACE)
-    former = _former_merged_ids(WORKSPACE)
-    new = pc.merged_ids("main")
-    assert new is not None
-    assert new - former == set()
-    assert former - new <= {"TASK-031"}
+    monkeypatch.chdir(WORKSPACE)
+    former = _former_merged_ids_per_commit(WORKSPACE)
+    new = _new_merged_ids_per_commit(WORKSPACE)
+    for sha, fset in former.items():
+        nset = new.get(sha, set())
+        if sha.startswith("9f6ace6") or sha == "9f6ace6":
+            assert fset - nset <= {"TASK-031"}, (sha, fset, nset)
+            assert nset - fset == set(), (sha, fset, nset)
+        else:
+            assert nset == fset, (sha, fset, nset)

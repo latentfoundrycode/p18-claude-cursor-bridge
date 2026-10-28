@@ -517,9 +517,41 @@ _PLAN_MERGE_RX = re.compile(
     r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(task-\d{3,}[a-z]?)\b", re.I
 )
 _GRAMMAR_MERGE_RX = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')([a-z0-9-]+)\b", re.I)
-_TRAIL_SUBJECT_RX = re.compile(
-    r"\(([^()]*)\)\s*(?:[-\u2014\u2013]\s*v?[\w.]+\s*)?(?:\(#\d+\))?\s*$"
-)
+def _trail_paren_inner(line):
+    """Closing parenthesis at end of subject; linear in line length (same forms as round 1's regex)."""
+    rest = line.rstrip(" \t\r\n")
+    m = re.search(r"\(#\d+\)$", rest)
+    if m:
+        rest = rest[: m.start()].rstrip(" \t")
+    ver = re.search(r"[-\u2014\u2013][ \t]*v?[\w.]+(?:[ \t]+[\w.]*)?$", rest)
+    if ver:
+        rest = rest[: ver.start()].rstrip(" \t")
+    if not rest.endswith(")"):
+        return None
+    open_i = rest.rfind("(")
+    if open_i < 0:
+        return None
+    inner = rest[open_i + 1 : -1]
+    if "(" in inner or ")" in inner:
+        return None
+    return inner
+
+
+class _TrailMatch(object):
+    __slots__ = ("_inner",)
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def group(self, n):
+        return self._inner
+
+
+def _trail_subject_search(line):
+    inner = _trail_paren_inner(line)
+    if inner is None:
+        return None
+    return _TrailMatch(inner)
 _TRAILER_LINE_TEMPLATE = r"^\s*(%s)(\s*,\s*%s)*\s*$"
 _R_BARE_RX = re.compile(r"R-\d{3,}[a-z]?")
 
@@ -528,22 +560,30 @@ def _is_plan_id_rx(id_rx):
     return id_rx.pattern == PLAN_ID_PATTERN
 
 
+def _parenthesis_bare_item(item, id_rx):
+    """True when item is a bare parenthesis ID (same hyphen-and-digit rule as _subject_leading_ids)."""
+    if not id_rx.fullmatch(item):
+        if _R_BARE_RX.fullmatch(item):
+            return "r"
+        return None
+    if "-" not in item or not any(ch.isdigit() for ch in item):
+        return None
+    return "id"
+
+
 def _parenthesis_merged_ids(inner, id_rx, plan_style):
     """Closing parenthesis form: every comma-separated item must be a bare ID; else merge nothing."""
     items = [part.strip() for part in inner.split(",")]
     if not items or not all(items):
         return None
     for item in items:
-        if id_rx.fullmatch(item):
-            continue
-        if _R_BARE_RX.fullmatch(item):
-            continue
-        return None
+        if _parenthesis_bare_item(item, id_rx) is None:
+            return None
     out = set()
     for item in items:
         if plan_style and _R_BARE_RX.fullmatch(item):
             continue
-        if id_rx.fullmatch(item):
+        if id_rx.fullmatch(item) and _parenthesis_bare_item(item, id_rx) == "id":
             out.add(item)
     return out
 
@@ -587,7 +627,7 @@ def squash_merged_ids_from_lines(lines, id_rx, plan_style=None):
             if mapped:
                 out.add(mapped)
                 continue
-            m = _TRAIL_SUBJECT_RX.search(line)
+            m = _trail_subject_search(line)
             if m:
                 ids = _parenthesis_merged_ids(m.group(1), id_rx, True)
                 if ids is not None:
@@ -604,7 +644,7 @@ def squash_merged_ids_from_lines(lines, id_rx, plan_style=None):
             if subs:
                 out.update(subs)
                 continue
-            m = _TRAIL_SUBJECT_RX.search(line)
+            m = _trail_subject_search(line)
             if m:
                 ids = _parenthesis_merged_ids(m.group(1), id_rx, False)
                 if ids is not None:
