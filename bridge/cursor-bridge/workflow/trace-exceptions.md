@@ -110,3 +110,13 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md Where this sub-file belongs
 - new TASK-030 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The mutation run
 - new TASK-030 bridge/cursor-bridge/workflow/phases/configuration.md The windowless test suite
+- reword TASK-035 bridge/commands/supervisor.md Founding rules
+- reword TASK-035 bridge/commands/supervisor.md The project layout
+- reword TASK-035 bridge/commands/supervisor.md Project state
+- reword TASK-035 bridge/commands/supervisor.md The plan
+- new TASK-035 bridge/cursor-bridge/workflow/phases/planning.md The plan
+- reword TASK-035 bridge/commands/supervisor.md Run parameters — asked once, after the plan is approved, before configuration
+- new TASK-035 bridge/cursor-bridge/workflow/phases/run-parameters.md The procedure
+- reword TASK-035 bridge/commands/supervisor.md 9. Refactoring and optimization pass (at stage close)
+- new TASK-035 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md 9. Refactoring and optimization pass (at stage close)
+- reword TASK-014 bridge/commands/supervisor.md Standing rules

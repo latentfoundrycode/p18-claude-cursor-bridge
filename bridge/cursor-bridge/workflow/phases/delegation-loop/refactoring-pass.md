@@ -74,8 +74,7 @@ around **one gate pass per stage**. **Normative diagrams are constraints on it:*
 The pass never escalates. It never introduces an abstraction for hypothetical reuse, never
 touches a required security, observability, or accessibility control because it "looks
 repetitive", and never changes a public interface other callers use unless every caller is
-inside the diff. At **project end** run one final pass over the whole tree before the User
-Manual is written.
+inside the diff. At **project end** no pass of its own runs: the last stage's close runs this pass, as every stage's close does under the refactoring parameter, and project end adds none, since a merge after project end's strict sync check would void that check.
 
 ### Keeping the pass's position
 

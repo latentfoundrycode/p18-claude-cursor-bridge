@@ -22,7 +22,7 @@ one combined brief (rule 29). The parameters:
    - `run` *(default)* — report the stage close as a notification and **continue into the
      next stage without waiting.** In practice: do not end your turn at a stage close; the
      stage-close report is text in the transcript, and the next action follows in the same
-     turn. Only the escalation list (below) and project end stop the loop.
+     turn. Only the core's escalation list ("Escalate to the user when", `~/.claude/commands/supervisor.md`) and project end stop the loop.
    - `pause` — stop at every stage close with "Stage <name> closed — say *continue*" and
      wait. The owner chooses this when they want to look at each milestone before the next
      begins.

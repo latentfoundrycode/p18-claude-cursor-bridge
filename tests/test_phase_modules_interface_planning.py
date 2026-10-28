@@ -79,8 +79,8 @@ SURVIVAL = {
         "gate waits for the owner;",
         "`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in "
         "flight or a launch has failed: a round is snapshotted and verified as step 8 says, the snapshot's hash "
-        "written to `run/supervisor/in-flight.md` at the launch, and a failed launch is handled as step 3b "
-        "says;",
+        "written to `run/supervisor/in-flight.md` at the launch and each critic's verdict there as it returns, "
+        "both read from that file mid-round, and a failed launch is handled as step 3b says;",
         "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
         "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
         "position\"), until the reflection point is done.",
@@ -204,7 +204,7 @@ def test_r010_the_mockups_file_holds_the_phase_3_procedure_and_not_the_build_con
 def test_r012_each_variant_names_the_artifact_the_module_and_the_plan_cite():
     """R-012 (Review A round 2, convergent with the security re-check): the artifacts interface.md's survival list and
     planning.md cite are named by the variant that writes them, with its approval at the phase's gate, so no module
-    cites a file nothing defines; their bodies follow in TASK-022."""
+    cites a file nothing defines; TASK-022 wrote their bodies."""
     c = flat(module("interface/command-design.md"))
     assert ("Its artifact is `docs/design/COMMANDS.md`, one section per command, and the owner approves it at the phase's "
             "gate (`interface.md`, \"The gate\").") in c

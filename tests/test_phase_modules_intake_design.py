@@ -59,8 +59,8 @@ SURVIVAL = {
         "gate settles;",
         "`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in "
         "flight or a launch has failed: a round is snapshotted and verified as step 8 says, the snapshot's hash "
-        "written to `run/supervisor/in-flight.md` at the launch, and a failed launch is handled as step 3b "
-        "says;",
+        "written to `run/supervisor/in-flight.md` at the launch and each critic's verdict there as it returns, "
+        "both read from that file mid-round, and a failed launch is handled as step 3b says;",
         "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
         "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
         "position\"), until the reflection point is done.",
@@ -163,9 +163,10 @@ def test_r006_the_delivery_kind_is_confirmed_for_every_part_and_recorded():
     the part's, recorded by its key; Review A's should-fix): confirmed for every part, not only installable software,
     by a key from the registry's list, and recorded by the design as a `Delivery kind:` Decisions row."""
     intake = flat(section(module("intake"), "Classifying each part", 3))
-    assert ("confirm with the owner the kind of delivery the part ends in, by its key from the extension-point "
-            "registry's delivery kinds (`installer`, `install-script`, `package`, `web-deployment`, `store-package`, "
-            "`host-installation`), for every part and not only for installable software") in intake
+    assert ("confirm with the owner the kind of delivery the part ends in, by its key from the delivery kinds the "
+            "extension-point registry lists (`~/.claude/cursor-bridge/workflow/extension-points.md`), for every part "
+            "and not only for installable software") in intake
+    assert "`store-package`" not in intake, "intake points at the registry's list, holding no copy of it (TASK-035)"
     registry = read(REGISTRY)
     for kind in ("installer", "install-script", "package", "web-deployment", "store-package", "host-installation"):
         assert "`%s`" % kind in registry, kind

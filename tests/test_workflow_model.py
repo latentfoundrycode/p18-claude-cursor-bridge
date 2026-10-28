@@ -32,7 +32,7 @@ def layer_rows():
 
 
 def test_r007_the_section_is_core_text_between_the_division_of_labour_and_the_layout():
-    """R-007: the model belongs to the core, which is read whole at every start."""
+    """R-007: the model belongs to the core, which is read to its last line at every start."""
     i = TEXT.index(HEADING)
     assert TEXT.index("## The division of labour") < i < TEXT.index("## The project layout")
     assert i > TEXT.index("<!-- digest:end -->"), "the model is core text, not part of the digest"
@@ -56,7 +56,8 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
                         "differs for that sub-type")
     assert holds[4] == "For one trait: what it adds, whatever the product type"
     read_when = [r[2] for r in rows]
-    assert read_when[0] == "Always, whole, at every start and calibration"
+    assert read_when[0] == ("Always, in parts to its last line, each part starting where the last ended, at every start, "
+                            "resume and calibration")
     assert read_when[1] == ("The current phase's module or modules, whole, on entering the phase and at every calibration; "
                             "a module read outside its own phase when \"The phase modules\" says")
     assert read_when[2] == "Its changes to the current phase, whole, alongside the phase's module or modules"
@@ -65,14 +66,15 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
 
 
 def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when_it_applies():
-    """R-007, as carved (TASK-010): the core is read whole at every start, resume and calibration, and with it the
+    """R-007, as carved (TASK-010): the core is read in parts to its last line at every start, resume and calibration
+    (TASK-035, FB-036), and with it the
     current phase's module or modules and the conditional workflows that apply; after a compaction or resume, what
     the session-start hook names (rule 28)."""
     s = flat(model())
     assert "each inheriting everything it does not mention from the layers above it" in s
-    assert ("This file, the core, is read whole at every start, resume and calibration, and with it the current "
-            "phase's module or modules and the conditional workflows that apply; after every compaction or resume you "
-            "read what the session-start hook names before your next action (rule 28)") in s, "the core stays whole; phases and conditionals add"
+    assert ("This file, the core, is read in parts to its last line, each part starting where the last ended, at "
+            "every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you "
+            "read what the session-start hook names before your next action (rule 28)") in s, "the core is read to its end; phases and conditionals add"
     # the exception names where the modules read outside their own phase are listed (PR #52's gate, Review A)
     assert ("You never read a phase you are not in or a conditional workflow that does not apply, except a module "
             "\"The phase modules\" says is read outside its own phase") in s
