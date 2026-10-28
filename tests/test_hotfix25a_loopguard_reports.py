@@ -17,7 +17,7 @@ import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 EVAL = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "evaluate-reports.py")
 BASELINE = os.path.join(HERE, os.pardir, "tools", "compaction-baseline.py")
-TOKEN_USAGE = os.environ.get("TOKEN_USAGE_PY") or r"E:\p18-claude-cursor-bridge\Reports\Maintainer\token-usage.py"   # the maintainer's own script, outside the repository
+TOKEN_USAGE = os.environ.get("TOKEN_USAGE_PY") or ""   # the maintainer's own script, outside the repository, named only by TOKEN_USAGE_PY: no computer path in a commit (rule 54; BUG-031)
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 NOW = time.time()
 
@@ -295,7 +295,7 @@ def test_c9_compaction_baseline_reads_the_workspace_folder(tmp_path):
 
 
 def test_c9_token_usage_reads_the_workspace_folder(tmp_path):
-    """The maintainer's own script, outside the repository: loaded by its absolute path, skipped where it is absent (CI)."""
+    """The maintainer's own script, outside the repository: loaded by its absolute path, skipped where TOKEN_USAGE_PY is unset or names no file (CI)."""
     if not os.path.isfile(TOKEN_USAGE):
         pytest.skip("the maintainer's token-usage.py is not on this computer")
     home, env = fake_home(tmp_path)

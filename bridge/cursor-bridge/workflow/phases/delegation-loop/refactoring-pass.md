@@ -65,7 +65,10 @@ around **one gate pass per stage**. **Normative diagrams are constraints on it:*
    refactoring diff: `diff-reviewer` in refactoring mode (behaviour preservation, every
    caller updated, no smuggled behaviour change), `secret-sentinel`, `security-auditor` or
    `design-auditor` only if the diff touches their surface, CI, and Review B with the
-   explicit question "is this behaviour-preserving?". Merge as one squash. No
+   explicit question "is this behaviour-preserving?". Merge as one squash, the pull request's title
+   starting with every `REFAC-<nnn>` brief ID the branch carries (`REFAC-003 REFAC-004: ...`), as
+   step 8 asks of every title: the squash subject is how the plan check and the pace report know
+   a brief merged, and a title naming the stage alone (`REFAC-B5: ...`) merges none of the branch's briefs. No
    `CHANGES.md` entry — there is no behaviour change to log; the refactoring is noted in
    the Project Summary at the reflection point instead.
 7. **Beyond budget** candidates go to `docs/HARDENING.md` under the stage name, and are

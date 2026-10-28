@@ -137,3 +137,6 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The review ceiling
 - new TASK-034 bridge/cursor-bridge/workflow/phases/reflection.md What must survive a compaction
 - new TASK-034 bridge/cursor-bridge/workflow/phases/reflection.md The procedure
+- reword BUG-031 bridge/commands/supervisor.md The core, in brief
+- reword BUG-031 bridge/commands/supervisor.md Standing rules
+- reword BUG-031 bridge/commands/supervisor.md 9. Refactoring and optimization pass (at stage close)

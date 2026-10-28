@@ -121,6 +121,40 @@ def test_r039_ok_testpaths_checks(tmp_path):
     assert row_for(out + err) == ["  OK       Windowless test suite (checks/conftest.py)"]
 
 
+@pytest.mark.parametrize("carriers", [("a", "b"), ("a",), ("b",), ()])
+def test_bug031_every_testpaths_root_carries_the_default(tmp_path, carriers):
+    """BUG-031 (stage B5's review, round 1; core S1 and tests-text S2, convergent): with two testpaths roots and no
+    Workspace-root conftest.py, the floor is OK only when each root's conftest.py holds the default; one root
+    without it is MISSING, whichever it is, so an "any root" or "first root" reading of the floor fails here.
+    enforces: R-039; Cursor-Project-Configuration.md §2, the windowless-default item ("the Workspace root's
+    `conftest.py`, or else every test root's")"""
+    root = fixture_root(tmp_path)
+    for name in ("a", "b"):
+        (root / name).mkdir(parents=True)
+        (root / name / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+        (root / name / "conftest.py").write_text(minimal_conftest() if name in carriers else "X = 1\n", encoding="utf-8")
+    (root / "pytest.ini").write_text("[pytest]\ntestpaths = a b\n", encoding="utf-8")
+    _, out, err = run_check(tmp_path)
+    if carriers == ("a", "b"):
+        assert row_for(out + err) == ["  OK       Windowless test suite (a/conftest.py)"]
+    else:
+        assert row_for(out + err) == [MISSING_ROW]
+
+
+def test_bug031_the_workspace_root_conftest_stands_for_every_test_root(tmp_path):
+    """BUG-031 (core S1): a Workspace-root conftest.py holding the default makes the floor OK whatever the
+    testpaths roots hold, as pytest loads it for every test below it.
+    enforces: R-039; Cursor-Project-Configuration.md §2, the windowless-default item"""
+    root = fixture_root(tmp_path)
+    (root / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+    for name in ("a", "b"):
+        (root / name).mkdir(parents=True)
+        (root / name / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    (root / "pytest.ini").write_text("[pytest]\ntestpaths = a b\n", encoding="utf-8")
+    _, out, err = run_check(tmp_path)
+    assert row_for(out + err) == ["  OK       Windowless test suite (conftest.py)"]
+
+
 @pytest.mark.parametrize("token", ["windowless_kwargs", "Popen.__init__", "CREATE_NO_WINDOW"])
 def test_r039_missing_one_token_removed(tmp_path, token):
     """R-039: removing one snapshot token yields MISSING."""

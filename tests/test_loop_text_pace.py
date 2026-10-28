@@ -312,7 +312,7 @@ def test_r042_rule_6_states_the_outcomes_and_the_programs():
             "(`review-guard.py`) the Review B rounds (Phase 6, step 7, \"The review ceiling\")") in r
     assert "the owner's number at the plan's gate" in r
     assert ("once the increment's core behaviour is verified, record the long tail of a hard subsystem under the "
-            "by-class line and merge it, and send a late finding outside the five back when it is not that tail.") in r
+            "by-class line and merge it; a late finding then blocks only if it is of the five.") in r
     assert ("At and above it, every finding of an increment's review outside the five goes to `docs/HARDENING.md` "
             "with the increment, and a stage round's findings are disposed of as the reflection module's step 7 "
             "says.") in r
@@ -575,6 +575,52 @@ def test_r044_evaluate_reports_runs_the_pace_report_every_week():
     assert ("then a **Pace** section that reads `pace.md`: per project the week's rows against the weeks before, a "
             "creeping slowdown named the week it starts. An increment over the ceiling whose round used no lift "
             "(`none`), or whose class line a reviewer denied (its Issues entry), is an entry of the evaluation like "
-            "any other. In a week with nothing new the file is written all the same, holding the Pace section and any "
+            "any other; an `unknown` lift is a round no record covers, an entry only when the round was run after "
+            "release B installed. In a week with nothing new the file is written all the same, holding the Pace section and any "
             "entry the owner's messages raised.") in fr
     assert "A Sunday with nothing new writes the Pace section and any entry the owner's messages raised." in fr
+
+
+def test_bug031_a_late_finding_has_one_outcome_in_all_three_homes():
+    """BUG-031 (stage B5's review, round 1; core S4 and tests-text S1, convergent): below the ceiling, once the
+    by-class line is drawn, rule 6 sent "a late finding outside the five back when it is not that tail" while step
+    7's brake said a late finding "blocks the merge only if it is of one of the five"; the three-homes test above
+    checked only the class sentence and passed on the two outcomes. Each home now gives the one outcome: a late
+    finding blocks only if it is of the five.
+    enforces: R-042 (the by-class line; only the five send work back); rule 6; step 7's brake; the policy's
+    re-delegation paragraph"""
+    r = rule(6)
+    assert "a late finding then blocks only if it is of the five." in r
+    assert "send a late finding outside the five back" not in r
+    assert "A late finding blocks the merge only if it is of one of the five **blocking classes**" in brake()
+    p = policy_paragraph("**Re-delegation runs while the code converges")
+    assert "A late finding blocks the merge only if it is of one of the five **blocking classes**" in p
+    for home in (r, brake(), p):
+        assert "outside the five back" not in home and "when it is not that tail" not in home
+
+
+def test_bug031_evaluate_reports_says_what_the_pace_report_counts():
+    """BUG-031 (stage B5's review, round 1; core C4 and Review B C, convergent; programs S3, Review B S2 and
+    tests-mutation-pace S3 on what the report lists): pace-report.py prints a round's lift as `class`, `owner`,
+    `none` or `unknown` (no record of it), counts as increments only the IDs with a tracked brief, and lists a stage
+    review only from the guard's rounds files; /evaluate-reports named three lifts and neither limit.
+    enforces: R-044 (the pace section computed from git and the launcher's and the guard's records, "for every
+    brief's ID"); bridge/cursor-bridge/pace-report.py (`_lift_map`, the over-the-ceiling list)"""
+    t = flat(read(os.path.join(HERE, os.pardir, "bridge", "commands", "evaluate-reports.md")))
+    assert "(a class line, the owner's line, `none`, or `unknown` where no launcher row or guard round records it" in t
+    assert "An increment is an ID with a brief tracked under `handoff/`" in t
+    assert "a stage review is listed only from the review guard's rounds files" in t
+    prog = read(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "pace-report.py"))
+    assert 'lifts.get(r, "unknown")' in prog and 'lifts.setdefault(rnd, "none")' in prog
+
+
+def test_bug031_the_refactoring_pass_title_names_its_briefs():
+    """BUG-031 (stage B5's review, round 1; tests-mutation-pace S3): PR #99's title `REFAC-B5: ...` named the stage, so
+    the squash subject merged no brief and REFAC-003 reads as never merged; step 6 of the pass now asks the title to
+    start with every `REFAC-<nnn>` brief ID, as step 8 asks of every title.
+    enforces: R-044 (merged increments read from the squash subjects); step 8 ("PR titles start with every increment
+    ID the branch carries")"""
+    t = flat(module("delegation-loop/refactoring-pass.md"))
+    assert ("Merge as one squash, the pull request's title starting with every `REFAC-<nnn>` brief ID the branch "
+            "carries (`REFAC-003 REFAC-004: ...`)") in t
+    assert "merges none of the branch's briefs" in t

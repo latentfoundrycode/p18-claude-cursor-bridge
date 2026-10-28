@@ -310,7 +310,7 @@ is implemented and verified, and the findings that keep arriving are all the lon
 genuinely hard subsystem (subprocess teardown, retry/timeout races, kill paths, concurrency
 edges), the supervisor draws a **by-class line**: it records each such finding to
 `docs/HARDENING.md` and merges, rather than re-delegating the tail indefinitely. A late
-finding still blocks the merge if it is of one of the five **blocking classes** — behaviour
+finding blocks the merge only if it is of one of the five **blocking classes** — behaviour
 against the brief or the register, security, data integrity, a defeated safety mechanism the
 increment relies on (a bug in the very timeout or kill path built to protect the run is core,
 not tail), a failing test. The class is the defect, not the operator that exposed it: a

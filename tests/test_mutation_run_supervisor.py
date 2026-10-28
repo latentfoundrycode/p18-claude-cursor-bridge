@@ -1268,3 +1268,35 @@ def test_bug030_the_checkpoint_run_takes_the_new_tests_conftest_files(tmp_path, 
     p = _run(ws, mf, "--checkpoint", sha)
     assert p.returncode == 4, p.stdout + p.stderr
     assert "tests/test_two.py::test_two" in p.stdout and "passing on old code" in p.stdout, p.stdout
+
+
+def test_bug031_a_real_mutation_run_through_the_launchers_driver_kind(tmp_path, home_of_the_tests):
+    """BUG-031 (stage B5's review, round 1; tests-mutation-pace S1): no test launched the real mutation-run.py through
+    `bridge-run.py --kind driver`, the one way step 7 launches it; the driver tests use stand-ins. The installed
+    program (a copy of the sources at ~/.claude/cursor-bridge/ in the tests' home) is launched as step 7 writes it:
+    the mutant is killed (exit 0, its cache line), and the launcher logs a driver run at exit 0 marked healthy.
+    enforces: R-041 (mutation reruns through mutation-run.py); R-039 (the driver kind); delegation-loop/decide.md,
+    "The mutation run" """
+    bridge = home_of_the_tests / ".claude" / "cursor-bridge"
+    bridge.mkdir(parents=True)
+    src = os.path.dirname(os.path.abspath(PROG))
+    for name in ("mutation-run.py", "bridge_env.py"):
+        (bridge / name).write_bytes(open(os.path.join(src, name), "rb").read())
+    ws = _fixture(tmp_path, CALC)
+    (ws / "run" / "launcher").mkdir(parents=True, exist_ok=True)
+    mf = _mutants(ws, "drv", {"mutants": [KILL_CALC]})
+    env = dict(os.environ)
+    env.pop("BRIDGE_RUN_ALLOW_ANY", None)
+    env["HOME"] = env["USERPROFILE"] = str(home_of_the_tests)
+    env["LOCALAPPDATA"] = str(tmp_path / "localappdata")
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+    launcher = os.path.join(src, "bridge-run.py")
+    cmd = [sys.executable, launcher, "--limit", "600", "--kind", "driver", "--", "python",
+           "~/.claude/cursor-bridge/mutation-run.py", "run/supervisor/%s" % mf.name,
+           "--scratch", str(ws.parent.parent / "scratch")]
+    p = subprocess.run(cmd, cwd=str(ws), **test_conftest.windowless_kwargs(
+        {"capture_output": True, "text": True, "timeout": 660, "env": env}))   # above the launcher's --limit, so its tree kill ends first
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert [line["outcome"] for line in _cache_lines(ws, "drv")] == ["killed"]
+    rows = [json.loads(l) for l in (ws / "run" / "launcher" / "runs.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert rows[-1]["kind"] == "driver" and rows[-1]["exit"] == 0 and rows[-1].get("healthy") is True, rows[-1]

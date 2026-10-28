@@ -166,7 +166,10 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # its by-class bullet; step 8's Review B item, both convergence paragraphs and the merge paragraph's names; the
 # stage review's steps 2 to 7; and, labelled by the earlier entries, step 3's brief paragraph (TASK-030), the run
 # parameters' fence and its optional-lines paragraph (TASK-035) and rules 6 and 42 (TASK-015))
-TRACED = "TRACED: 424 passages of baseline 0a186da; 143 in supervisor.md, 231 under workflow/, 0 dropped, 50 excused"
+# (BUG-031: two more move from traced to excused, under BUG-031's own `reword` entries but labelled by the earlier
+# entries that match first: the refactoring pass's step 6, whose title now names its REFAC-<nnn> brief IDs
+# (TASK-035), and rule 39, which retires step 4's old-<nnn> worktree (TASK-015))
+TRACED = "TRACED: 424 passages of baseline 0a186da; 142 in supervisor.md, 230 under workflow/, 0 dropped, 52 excused"
 NOTES = [
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
@@ -198,6 +201,7 @@ NOTES = [
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - **Convergence is a signal.** When two or more reviewers or a",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - A `REJECT` from either reviewer goes back through re-delegat",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - When all four hold the merge is authorised. A pull request t",
+    "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - 6. **One gate pass.** The whole branch goes through step 8 o",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - The pass never escalates. It never introduces an abstraction",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 1. **Intake of the change** (Phase 1, scaled). The session i",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 3. **UI mockups** (Phase 3) **only if the change touches the",
@@ -216,6 +220,7 @@ NOTES = [
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 24. Windowless by default. The user works on the same Window",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 34. A request on a finished project is a change cycle: the s",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 39. Sequential work is branches in one checkout, never a wor",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 42. Every builder run ends with an `Assumed, not verified` l",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 43. Never end a turn while the loop has work unless somethin",
 ]
@@ -223,13 +228,14 @@ NOTES = [
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the fifty passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
-    TASK-015, TASK-017, TASK-030, TASK-034 and TASK-035 declare (three in the core's "Main and conditional workflows", six
+    excused ones exactly the fifty-two passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+    TASK-015, TASK-017, TASK-030, TASK-034, TASK-035 and BUG-031 declare (three in the core's "Main and conditional workflows", six
     standing rules, three under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits),
     one in the design-tooling flow, four in the change cycle, one each in steps 2, 3, 4 and 9, and one each in the
     founding rules, the layout, the plan, the run parameters and the status template, and TASK-034's twenty-four: the
     digest's four paragraphs, step 3b's exception, four in step 7, four in step 8, six in the stage review, two
-    more in the run parameters, rules 6 and 42, and step 3's brief paragraph), so an increment that excuses anything more changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+    more in the run parameters, rules 6 and 42, and step 3's brief paragraph; and BUG-031's two: the refactoring
+    pass's step 6 and rule 39), so an increment that excuses anything more changes this test. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
     have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
