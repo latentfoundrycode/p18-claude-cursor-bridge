@@ -289,7 +289,7 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
 # delegation-loop module held it at origin/main 5bed396 (5,542 characters), moved verbatim. trace-check, which would
 # see a change, has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword updates this
 # with its record
-STEP9_SHA256 = "129cdf7bb84189016b85f48858f60adc5cfc6876f2265bfc6b7435d71db25750"
+STEP9_SHA256 = "b86e3bceb2b8508546e2f1d3a0715558977e7a9587bc2f002b2cb6579f801393"
 
 
 def test_r032_step_9_is_verbatim():
@@ -299,7 +299,7 @@ def test_r032_step_9_is_verbatim():
     import hashlib
     sub = module(SUB)
     step = sub[sub.index("### " + STEP9):sub.index("### Keeping the pass's position")].rstrip()
-    assert len(step) == 6023 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
+    assert len(step) == 6055 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
 
 
 def test_the_refactoring_passs_position_is_written_down():

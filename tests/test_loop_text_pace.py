@@ -602,13 +602,16 @@ def test_bug031_a_late_finding_has_one_outcome_in_all_three_homes():
 def test_bug031_evaluate_reports_says_what_the_pace_report_counts():
     """BUG-031 (stage B5's review, round 1; core C4 and Review B C, convergent; programs S3, Review B S2 and
     tests-mutation-pace S3 on what the report lists): pace-report.py prints a round's lift as `class`, `owner`,
-    `none` or `unknown` (no record of it), counts as increments only the IDs with a tracked brief, and lists a stage
+    `none` or `unknown` (no record of it), counts as increments only the IDs with a tracked brief where anything is
+    tracked under handoff/ (every ID a squash subject names where nothing is), and lists a stage
     review only from the guard's rounds files; /evaluate-reports named three lifts and neither limit.
     enforces: R-044 (the pace section computed from git and the launcher's and the guard's records, "for every
     brief's ID"); bridge/cursor-bridge/pace-report.py (`_lift_map`, the over-the-ceiling list)"""
     t = flat(read(os.path.join(HERE, os.pardir, "bridge", "commands", "evaluate-reports.md")))
     assert "(a class line, the owner's line, `none`, or `unknown` where no launcher row or guard round records it" in t
-    assert "An increment is an ID with a brief tracked under `handoff/`" in t
+    assert "In a project that tracks its briefs under `handoff/`, an increment is an ID with a tracked brief" in t
+    assert ("(in a project that tracks nothing under `handoff/`, every ID a squash subject names is counted merged, and the "
+            "started and rounds cells read `n/a`)") in t
     assert "a stage review is listed only from the review guard's rounds files" in t
     prog = read(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "pace-report.py"))
     assert 'lifts.get(r, "unknown")' in prog and 'lifts.setdefault(rnd, "none")' in prog
@@ -624,3 +627,4 @@ def test_bug031_the_refactoring_pass_title_names_its_briefs():
     assert ("Merge as one squash, the pull request's title starting with every `REFAC-<nnn>` brief ID the branch "
             "carries (`REFAC-003 REFAC-004: ...`)") in t
     assert "merges none of the branch's briefs" in t
+    assert "the squash subject is how the pace report knows a brief merged (the plan check reads only the plan's increments)" in t

@@ -137,7 +137,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("delegation-loop/decide.md", "The mutation run"): (6067, "b88ad0f4ad6e4c64cc5331791c1f00ec54684dbdab456d00aea049c153297264"),
     ("delegation-loop/decide.md", "The review ceiling"): (3621, "229ddf9d643b8be0c4eb050cb0543a7fab7561cf82a9d71ee252788e46c6b536"),
     ("delegation-loop/decide.md", "Where this sub-file belongs"): (436, "9e38cf68a4da72d205ec742fe0d1cbf6f5c6e6bd75a04469b52333775ad19e01"),
-    ("delegation-loop/refactoring-pass.md", "9. Refactoring and optimization pass (at stage close)"): (6023, "129cdf7bb84189016b85f48858f60adc5cfc6876f2265bfc6b7435d71db25750"),
+    ("delegation-loop/refactoring-pass.md", "9. Refactoring and optimization pass (at stage close)"): (6055, "b86e3bceb2b8508546e2f1d3a0715558977e7a9587bc2f002b2cb6579f801393"),
     ("delegation-loop/refactoring-pass.md", "Keeping the pass's position"): (474, "16c05ddcf26b7cfb893f990cc227172f04ef2417dcce816df779b25abd84024b"),
     ("delegation-loop/refactoring-pass.md", "Where this sub-file belongs"): (451, "d5cc03c8c0b31688c8182cc8c13bd6ef7288eb85dcc32c95a7157929cfcb696c"),
     ("design.md", "A part without screens"): (268, "2a16dc74e42feea8823e7d580109fbed8dd2783aae9e58b8ea9fc36058211446"),
