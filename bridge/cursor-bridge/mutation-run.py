@@ -1204,15 +1204,24 @@ def module_file_at_commit(workspace, commit, modname):
 _CONFTEST_LOAD_RX = re.compile(r"ImportError while loading conftest '([^']+)'\.")
 
 
-def _conftest_load_failure_path(err):
+def _stderr_lines(err):
     if isinstance(err, bytes):
         text = err.decode("utf-8", "replace")
     elif err:
         text = err
     else:
         text = ""
+    lines = []
+    for line in text.split("\n"):
+        if line.endswith("\r"):
+            line = line[:-1]
+        lines.append(line)
+    return lines
+
+
+def _conftest_load_failure_path(err):
     abs_path = None
-    for line in text.splitlines():
+    for line in _stderr_lines(err):
         m = _CONFTEST_LOAD_RX.fullmatch(line)
         if m:
             abs_path = m.group(1)
@@ -1220,7 +1229,10 @@ def _conftest_load_failure_path(err):
 
 
 def conftest_changed_by_increment(workspace, commit, rel):
-    if git_try("cat-file", "-e", "%s:%s" % (commit, rel), cwd=workspace) is None:
+    listing = git_try("ls-tree", "-z", commit, "--", rel, cwd=workspace)
+    if listing is None:
+        return False
+    if not listing:
         return True
     wt_path = os.path.join(workspace, rel.replace("/", os.sep))
     if not os.path.isfile(wt_path):
@@ -1232,7 +1244,7 @@ def conftest_changed_by_increment(workspace, commit, rel):
     return wt_hash != commit_hash
 
 
-def copied_conftest_load_failure(copy_root, copied_conftest, workspace, commit, rc, err, out):
+def copied_conftest_load_failure(copy_root, copied_conftest, workspace, commit, rc, err):
     if rc != 4 or not copied_conftest:
         return None
     abs_path = _conftest_load_failure_path(err)
@@ -1292,6 +1304,8 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
     if not test_files:
         return None
     run_env = pytest_env(plugin_dir, copy_root, env)
+    run_env["PY_COLORS"] = "0"
+    run_env.pop("FORCE_COLOR", None)
     cfg = pytest_config_argv(plugin_dir, copy_root)
     argv = [sys.executable, "-m", "pytest", "--collect-only", "-q",
             "-p", PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + test_files
@@ -1303,7 +1317,7 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
     load_fail = None
     if checkpoint and copied_conftest is not None:
         load_fail = copied_conftest_load_failure(
-            copy_root, copied_conftest, workspace, checkpoint_commit, rc, err, out)
+            copy_root, copied_conftest, workspace, checkpoint_commit, rc, err)
     if load_fail:
         _remove_resolution_plugin(plugin_dir)
         return load_fail
@@ -1342,18 +1356,6 @@ def checkpoint_item_conftest_paths(item):
     return conftest_paths(fpart)
 
 
-def checkpoint_test_files_clear_of_conftest(test_files, failed_conftests):
-    if not failed_conftests:
-        return list(test_files)
-    out = []
-    for fpart in test_files:
-        fpart = normalize_rel(fpart)
-        paths = conftest_paths(fpart)
-        if not any(fc in paths for fc in failed_conftests):
-            out.append(fpart)
-    return out
-
-
 def checkpoint_item_blocked_by_conftest(item, failed_conftests):
     if not failed_conftests:
         return None
@@ -1362,13 +1364,6 @@ def checkpoint_item_blocked_by_conftest(item, failed_conftests):
         if cp in failed_conftests:
             return cp
     return None
-
-
-def checkpoint_load_fail_on_run_files(load_fail, run_files):
-    for fpart in run_files:
-        if load_fail in conftest_paths(normalize_rel(fpart)):
-            return True
-    return False
 
 
 def run_mutant_tests(plugin_dir, copy_root, tests, env, timeout_sec, results_path):
@@ -1485,20 +1480,31 @@ def main(argv=None):
                 if fpart not in chk_test_files:
                     chk_test_files.append(fpart)
             failed_conftests = set()
-            run_files = list(chk_test_files)
-            while run_files:
-                load_fail = run_resolution_check(
-                    plugin_dir, copy_root, mutants, run_files, tracked_set, workspace, env, timeout_sec,
-                    checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests,
-                    copied_conftest=copied_conftest)
-                if not load_fail:
-                    break
-                if load_fail in failed_conftests:
-                    raise Refuse("mutation-run: resolution check failed (pytest exit 4)")
-                if not checkpoint_load_fail_on_run_files(load_fail, run_files):
-                    raise Refuse("mutation-run: resolution check failed (pytest exit 4)")
-                failed_conftests.add(load_fail)
-                run_files = checkpoint_test_files_clear_of_conftest(chk_test_files, failed_conftests)
+            rc_kwargs = dict(
+                checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests,
+                copied_conftest=copied_conftest,
+            )
+            load_fail = run_resolution_check(
+                plugin_dir, copy_root, mutants, chk_test_files, tracked_set, workspace, env, timeout_sec,
+                **rc_kwargs)
+            if load_fail:
+                clear_files = []
+                for fpart in chk_test_files:
+                    per_fail = run_resolution_check(
+                        plugin_dir, copy_root, mutants, [fpart], tracked_set, workspace, env, timeout_sec,
+                        **rc_kwargs)
+                    if per_fail:
+                        if per_fail not in conftest_paths(normalize_rel(fpart)):
+                            raise Refuse("mutation-run: resolution check failed (pytest exit 4)")
+                        failed_conftests.add(per_fail)
+                    else:
+                        clear_files.append(fpart)
+                if clear_files:
+                    combined_fail = run_resolution_check(
+                        plugin_dir, copy_root, mutants, clear_files, tracked_set, workspace, env, timeout_sec,
+                        **rc_kwargs)
+                    if combined_fail:
+                        raise Refuse("mutation-run: resolution check failed (pytest exit 4)")
             items = checkpoint_new_test_items(new_tests)
             any_pass = False
             for chk_idx, item in enumerate(items):

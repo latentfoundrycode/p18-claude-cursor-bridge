@@ -899,17 +899,7 @@ def _refac_branch_snapshot_id(id_part, stage):
     return re.fullmatch(GRAMMAR_ID_PATTERN, id_part) is not None
 
 
-def _is_refac_id(id_part, id_rx):
-    if not isinstance(id_part, str):
-        return False
-    if not id_part.startswith("REFAC-"):
-        return False
-    if len(id_part) <= len("REFAC-"):
-        return False
-    return re.fullmatch(id_rx, id_part) is not None
-
-
-def _declared_ids_all_refac(declared, id_rx, branch):
+def _declared_ids_all_refac(declared, branch):
     stage = _refactor_stage(branch)
     if stage is None:
         return False
@@ -937,7 +927,8 @@ def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_ru
     return frozenset()
 
 
-def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx, git_runner=None):
+def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx, git_runner=None,
+                     snapshot=False):
     branch = norm_branch(branch)
     if branch == "main":
         return False, "main"
@@ -948,10 +939,12 @@ def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_l
     if id_part in declared:
         return True, None
     stage = _refactor_stage(branch)
-    if (stage is not None
-            and _declared_ids_all_refac(declared, id_rx, branch)
-            and (_refac_numbered_brief_id(id_part) or _refac_branch_snapshot_id(id_part, stage))):
-        return True, None
+    if stage is not None and _declared_ids_all_refac(declared, branch):
+        if snapshot:
+            if _refac_branch_snapshot_id(id_part, stage):
+                return True, None
+        elif _refac_numbered_brief_id(id_part) or _refac_branch_snapshot_id(id_part, stage):
+            return True, None
     if id_part in owner_lifts:
         return True, "owner"
     if _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=git_runner):
