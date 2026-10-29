@@ -59,6 +59,12 @@ def test_bug034_a_release_of_the_installed_version_with_other_files_is_refused(t
     assert not (target / "cursor-bridge-previous").exists(), "a refused install rotated the kept copy"
 
 
+def test_bug034_the_refusal_holds_under_a_dry_run(tmp_path, program):
+    a, b, target = two_releases_of_one_version(tmp_path, program)
+    rc, out = run(b / "cursor-bridge" / "bridge-install.py", tmp_path, "--target", str(target), "--dry-run")
+    assert rc == 2 and "nothing was changed" in out and "(dry run)" not in out, "a dry run promised an install the real run refuses: " + out
+
+
 def test_bug034_the_same_release_installed_again_is_still_allowed(tmp_path, program):
     a, b, target = two_releases_of_one_version(tmp_path, program)
     rc, out = install_old(tmp_path, a, target)

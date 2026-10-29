@@ -27,6 +27,9 @@ Installing:
      the same version is never written twice, see save_previous), and the kept copy is
      compared with that release's fingerprints: a file that was changed on this computer
      is named, because the way back refuses a copy that is not the release as shipped;
+     a release whose version equals the installed one is installed only when its manifest
+     lists the same files with the same fingerprints, and any other is refused before
+     anything changes, --anyway excepted;
   2. REPLACES the installed release by this one (replace_release): the allow and deny
      rules and the hooks only the replaced release owned leave the target's settings.json,
      the files its manifest listed that this release no longer ships are removed,
@@ -597,6 +600,14 @@ def install(target, dry, anyway=False):
     if inputs is None:
         return 2
     old_version, old_files = manifest_of(target)
+    if old_version and old_version == new_version and not anyway:
+        _, installed_fp = fingerprints_of(target)
+        if installed_fp != fingerprints:
+            diff = sorted(set(installed_fp) | set(fingerprints))
+            differing = [rel for rel in diff if installed_fp.get(rel) != fingerprints.get(rel)]
+            print("bridge-install: the release folder carries version %s, the release installed now, but not its files (%d file(s): %s); a release with other files is stamped with a new version before it is installed, so that the release installed now is kept as the way back; nothing was changed; --anyway installs regardless (the maintainer's rehearsals)." % (
+                new_version, len(differing), few(differing)))
+            return 2
     print("bridge-install: %s -> %s%s" % (RELEASE, target, " (dry run)" if dry else ""))
     if old_version and old_version != new_version:
         kept = os.path.join(target, PREVIOUS, old_version)
