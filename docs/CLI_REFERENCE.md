@@ -107,7 +107,7 @@ Installing:
      is named, because the way back refuses a copy that is not the release as shipped;
      a release whose version equals the installed one is installed only when its manifest
      lists the same files with the same fingerprints, and any other is refused before
-     anything changes, --anyway excepted;
+     anything changes, --anyway excepted, with a warning that no way back was kept;
   2. REPLACES the installed release by this one (replace_release): the allow and deny
      rules and the hooks only the replaced release owned leave the target's settings.json,
      the files its manifest listed that this release no longer ships are removed,

@@ -78,6 +78,14 @@ def test_bug034_the_refusal_holds_under_a_dry_run(tmp_path, program):
     assert rc == 2 and "nothing was changed" in out and "(dry run)" not in out, "a dry run promised an install the real run refuses: " + out
 
 
+def test_bug034_a_dry_run_with_anyway_warns_and_changes_nothing(tmp_path, program):
+    a, b, target = two_releases_of_one_version(tmp_path, program)
+    before = (target / "cursor-bridge" / "old-only.md").read_text(encoding="utf-8")
+    rc, out = run(b / "cursor-bridge" / "bridge-install.py", tmp_path, "--target", str(target), "--dry-run", "--anyway")
+    assert rc == 0 and "(dry run)" in out and "WARNING" in out and "no way back to it was kept" in out, out
+    assert (target / "cursor-bridge" / "old-only.md").read_text(encoding="utf-8") == before, "a dry run changed the installed tree"
+
+
 def test_bug034_the_same_release_installed_again_is_still_allowed(tmp_path, program):
     a, b, target = two_releases_of_one_version(tmp_path, program)
     rc, out = install_old(tmp_path, a, target)
@@ -90,3 +98,15 @@ def test_bug034_anyway_installs_it_for_the_maintainers_rehearsals(tmp_path, prog
     assert rc == 0 and "MATCHES bridge " + OLD_VERSION in out, out
     assert (target / "cursor-bridge" / "old-only.md").read_text(encoding="utf-8") == "changed after the version was stamped\n"
     assert "WARNING" in out and "no way back to it was kept" in out, "--anyway replaced a same-version tree with no way back kept, without a word (the security audit and Review A, convergent): " + out
+    lines = out.splitlines()
+    banner = next(i for i, line in enumerate(lines) if line.startswith("bridge-install: ") and " -> " in line)
+    warning = [i for i, line in enumerate(lines) if line.startswith("  WARNING        the installed " + OLD_VERSION + " was replaced")]
+    assert len(warning) == 1 and warning[0] > banner, "the warning is not one line after the banner: " + out
+    assert "(1 file(s): cursor-bridge/old-only.md)" in lines[warning[0]], "the warning does not name the refusal's differing list: " + lines[warning[0]]
+
+
+def test_bug034_the_same_release_with_anyway_warns_of_nothing(tmp_path, program):
+    a, b, target = two_releases_of_one_version(tmp_path, program)
+    rc, out = run(a / "cursor-bridge" / "bridge-install.py", tmp_path, "--target", str(target), "--anyway")
+    assert rc == 0 and "MATCHES bridge " + OLD_VERSION in out, out
+    assert "no way back to it was kept" not in out, "the identical release, installed again with --anyway, was said to lose its way back: " + out
