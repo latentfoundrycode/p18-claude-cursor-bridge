@@ -293,6 +293,8 @@ def _start_times(ws, common, id_part):
     for row in bridge_env.read_runs_jsonl(ws):
         if row.get("brief") != id_part:
             continue
+        if row.get("slot") == "not free":
+            continue
         t = _parse_run_time(bridge_env._event_time_launcher(row))
         if t:
             times.append(t)
@@ -390,6 +392,8 @@ def _lift_map(ws, common, id_part):
     lifts = {}
     for row in bridge_env.read_runs_jsonl(ws):
         if row.get("brief") != id_part:
+            continue
+        if row.get("slot") == "not free":
             continue
         rnd = row.get("round")
         if rnd is None:

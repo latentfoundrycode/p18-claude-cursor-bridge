@@ -37,3 +37,7 @@ Last accepted, the part moved out at TASK-025 (2026-10-28): before it TASK-034 (
 Last accepted, the part moved out at BUG-030 (2026-10-28): before it stage B5's refactoring pass (PR #99, at its merge): the tests lane's tests/phase_modules.py helpers and run_mr, and REFAC-003; before it TASK-025 (PR #98): release B's acceptance tests
 
 Last accepted, the part moved out at BUG-031 (2026-10-29): before it stage B5's refactoring pass (PR #99, at its merge)
+
+Last accepted, the part moved out at BUG-032 (2026-10-29): before it BUG-030 (PR #100), its program causes
+
+Open issues, the part moved out at BUG-032 (2026-10-29): ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25

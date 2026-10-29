@@ -876,6 +876,41 @@ def _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=None):
     return not exists
 
 
+def _refactor_stage(branch):
+    if not branch.startswith("refactor/"):
+        return None
+    stage = branch[len("refactor/"):]
+    if not stage:
+        return None
+    return stage
+
+
+def _refac_numbered_brief_id(id_part):
+    if not isinstance(id_part, str):
+        return False
+    return re.fullmatch(r"REFAC-[0-9]+", id_part) is not None
+
+
+def _refac_branch_snapshot_id(id_part, stage):
+    if not isinstance(id_part, str) or not stage:
+        return False
+    if id_part != "REFAC-" + stage:
+        return False
+    return re.fullmatch(GRAMMAR_ID_PATTERN, id_part) is not None
+
+
+def _declared_ids_all_refac(declared, branch):
+    stage = _refactor_stage(branch)
+    if stage is None:
+        return False
+    if not declared:
+        return False
+    for d in declared:
+        if not (_refac_numbered_brief_id(d) or _refac_branch_snapshot_id(d, stage)):
+            return False
+    return True
+
+
 def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_runner=None):
     """Active declared ID set on branch after lapse (R3)."""
     branch = norm_branch(branch)
@@ -892,7 +927,8 @@ def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_ru
     return frozenset()
 
 
-def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx, git_runner=None):
+def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx, git_runner=None,
+                     snapshot=False):
     branch = norm_branch(branch)
     if branch == "main":
         return False, "main"
@@ -902,6 +938,13 @@ def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_l
         return True, None
     if id_part in declared:
         return True, None
+    stage = _refactor_stage(branch)
+    if stage is not None and _declared_ids_all_refac(declared, branch):
+        if snapshot:
+            if _refac_branch_snapshot_id(id_part, stage):
+                return True, None
+        elif _refac_numbered_brief_id(id_part) or _refac_branch_snapshot_id(id_part, stage):
+            return True, None
     if id_part in owner_lifts:
         return True, "owner"
     if _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=git_runner):

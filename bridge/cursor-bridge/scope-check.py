@@ -216,6 +216,8 @@ def builder_windows():
             e = json.loads(line)
             if not isinstance(e, dict) or e.get("kind") != "builder":
                 continue
+            if e.get("slot") == "not free":
+                continue
             if e.get("branch") and branch and e.get("branch") != branch:
                 continue                               # another branch's builder (the parallel variant) did not commit here
             start = datetime.datetime.strptime(str(e.get("id", ""))[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()

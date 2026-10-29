@@ -656,7 +656,8 @@ def snapshot_review_refusal(nnn, root, common):
     if br == "HEAD":
         return "review-guard: refused - branch rule: reviews run on a branch, not a detached HEAD"
     ok, why = bridge_env.branch_allows_id(
-        log_folder, common, root, br, id_part, owner_lifts, id_rx, git_runner=git_runner
+        log_folder, common, root, br, id_part, owner_lifts, id_rx, git_runner=git_runner,
+        snapshot=True,
     )
     if not ok:
         if isinstance(why, frozenset):
