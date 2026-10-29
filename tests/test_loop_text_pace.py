@@ -635,8 +635,8 @@ def test_bug031_evaluate_reports_says_what_the_pace_report_counts():
     assert "In a project that tracks any file under `handoff/`, an increment is an ID with a tracked brief" in t
     # BUG-033 (stage B5's review, round 2; BUG-031's Review B, round 3, note): any tracked file under handoff/
     # switches the count to tracked briefs (`_handoff_untracked`), and a report is no brief (`_ids_with_brief`)
-    assert ("a project that tracks only builder reports there (`<ID>-report.md`, `<ID>-r<N>-report.md`, which are "
-            "no briefs) counts no increment at all") in t
+    assert ("a project that tracks only builder reports there (`<ID>-report.md`, `<ID>-r<N>-report.md`, "
+            "`<ID>-r<N><letter>-report.md`, which are no briefs) counts no increment at all") in t
     assert ("(in a project that tracks nothing under `handoff/`, every ID a squash subject names is counted merged, and the "
             "started and rounds cells read `n/a`)") in t
     assert "a stage review is listed only from the review guard's rounds files" in t
@@ -651,7 +651,7 @@ def test_bug033_a_project_tracking_only_reports_under_handoff_counts_no_incremen
     precondition).
     enforces: bridge/commands/evaluate-reports.md, step 1 (the pace section's increments); R-044"""
     pr = program("pace-report")
-    reports = "handoff/BUG-029-report.md\nhandoff/TASK-031-r2-report.md\n"
+    reports = "handoff/BUG-029-report.md\nhandoff/TASK-031-r2-report.md\nhandoff/TASK-031-r2a-report.md\n"
     assert pr._handoff_untracked(reports) is False
     assert pr._ids_with_brief(reports) == set()
     assert pr._ids_with_brief(reports + "handoff/TASK-031.md\n") == {"TASK-031"}
