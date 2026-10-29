@@ -27,6 +27,9 @@ Installing:
      the same version is never written twice, see save_previous), and the kept copy is
      compared with that release's fingerprints: a file that was changed on this computer
      is named, because the way back refuses a copy that is not the release as shipped;
+     a release whose version equals the installed one is installed only when its manifest
+     lists the same files with the same fingerprints, and any other is refused before
+     anything changes, --anyway excepted, with a warning that no way back was kept;
   2. REPLACES the installed release by this one (replace_release): the allow and deny
      rules and the hooks only the replaced release owned leave the target's settings.json,
      the files its manifest listed that this release no longer ships are removed,
@@ -597,7 +600,20 @@ def install(target, dry, anyway=False):
     if inputs is None:
         return 2
     old_version, old_files = manifest_of(target)
+    same_version_differing = None
+    if old_version and old_version == new_version:
+        _, installed_fp = fingerprints_of(target)
+        if installed_fp != fingerprints:
+            diff = sorted(set(installed_fp) | set(fingerprints))
+            same_version_differing = [rel for rel in diff if installed_fp.get(rel) != fingerprints.get(rel)]
+            if not anyway:
+                print("bridge-install: the release folder carries version %s, the release installed now, but not its files (%d file(s): %s); a release with other files is stamped with a new version before it is installed, so that the release installed now is kept as the way back; nothing was changed; --anyway installs regardless (the maintainer's rehearsals)." % (
+                    new_version, len(same_version_differing), few(same_version_differing)))
+                return 2
     print("bridge-install: %s -> %s%s" % (RELEASE, target, " (dry run)" if dry else ""))
+    if same_version_differing is not None:
+        print("  WARNING        the installed %s was replaced by other files of the same version (%d file(s): %s); no way back to it was kept; installed with --anyway." % (
+            new_version, len(same_version_differing), few(same_version_differing)))
     if old_version and old_version != new_version:
         kept = os.path.join(target, PREVIOUS, old_version)
         already_kept = os.path.isdir(kept) and not not_as_released(kept, fingerprints_of(kept)[1])   # a repeated run after an interruption: the way back is saved whole
