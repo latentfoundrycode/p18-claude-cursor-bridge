@@ -671,6 +671,7 @@ def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
     remove_bytecode_from_copy(dest)
+    return copied_conftest
 
 
 def dotted_module_paths(rel):
@@ -1200,6 +1201,32 @@ def module_file_at_commit(workspace, commit, modname):
     return False
 
 
+_CONFTEST_LOAD_RX = re.compile(r"ImportError while loading conftest '([^']+)'", re.MULTILINE)
+
+
+def copied_conftest_load_failure(copy_root, copied_conftest, rc, err, out):
+    if rc != 4 or not copied_conftest:
+        return None
+    parts = []
+    for blob in (out, err):
+        if isinstance(blob, bytes):
+            parts.append(blob.decode("utf-8", "replace"))
+        elif blob:
+            parts.append(blob)
+    text = "".join(parts)
+    m = _CONFTEST_LOAD_RX.search(text)
+    if not m:
+        return None
+    abs_path = m.group(1)
+    try:
+        rel = normalize_rel(os.path.relpath(abs_path, os.path.abspath(copy_root)))
+    except ValueError:
+        return None
+    if rel not in copied_conftest:
+        return None
+    return rel
+
+
 def checkpoint_collect_refused(workspace, commit, rc, err, out, new_tests):
     if rc != 2 or not new_tests:
         return False
@@ -1227,14 +1254,14 @@ def checkpoint_collect_refused(workspace, commit, rc, err, out, new_tests):
 
 
 def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_tracked, workspace, env, timeout_sec,
-                         checkpoint=False, checkpoint_commit=None, new_tests=None):
+                         checkpoint=False, checkpoint_commit=None, new_tests=None, copied_conftest=None):
     mutated_files = [{"file": m["file"]} for m in mutants]
     out_json = write_resolution_plugin(plugin_dir, copy_root, mutated_files, workspace_tracked, workspace)
     if os.path.isfile(out_json):
         os.remove(out_json)
     test_files = sorted(set(test_files))
     if not test_files:
-        return
+        return None
     run_env = pytest_env(plugin_dir, copy_root, env)
     cfg = pytest_config_argv(plugin_dir, copy_root)
     argv = [sys.executable, "-m", "pytest", "--collect-only", "-q",
@@ -1244,6 +1271,11 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
         raise ResolutionTimeout(timeout_sec)
     if checkpoint and checkpoint_collect_refused(workspace, checkpoint_commit, rc, err, out, new_tests):
         raise Refuse("mutation-run: resolution check failed (pytest exit %d)" % rc)
+    load_fail = None
+    if checkpoint and copied_conftest is not None:
+        load_fail = copied_conftest_load_failure(copy_root, copied_conftest, rc, err, out)
+    if load_fail:
+        return load_fail
     if rc not in (0, 2):
         raise Refuse("mutation-run: resolution check failed (pytest exit %d)" % rc)
     if not os.path.isfile(out_json):
@@ -1271,6 +1303,35 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
         p = os.path.join(plugin_dir, name)
         if os.path.isfile(p):
             os.remove(p)
+    return None
+
+
+def checkpoint_item_conftest_paths(item):
+    if "::" in item:
+        fpart = normalize_rel(item.split("::", 1)[0])
+    else:
+        fpart = normalize_rel(item)
+    return conftest_paths(fpart)
+
+
+def checkpoint_test_files_clear_of_conftest(test_files, failed_conftest):
+    if not failed_conftest:
+        return list(test_files)
+    out = []
+    for fpart in test_files:
+        fpart = normalize_rel(fpart)
+        if failed_conftest not in conftest_paths(fpart):
+            out.append(fpart)
+    return out
+
+
+def checkpoint_item_blocked_by_conftest(item, failed_conftest):
+    if not failed_conftest:
+        return None
+    paths = checkpoint_item_conftest_paths(item)
+    if failed_conftest in paths:
+        return failed_conftest
+    return None
 
 
 def run_mutant_tests(plugin_dir, copy_root, tests, env, timeout_sec, results_path):
@@ -1377,7 +1438,7 @@ def main(argv=None):
     try:
         if args.checkpoint:
             validate_tracked_copy(workspace, tracked_list)
-            archive_checkpoint(workspace, args.checkpoint, copy_root, new_tests, untracked)
+            copied_conftest = archive_checkpoint(workspace, args.checkpoint, copy_root, new_tests, untracked)
             chk_test_files = []
             for item in new_tests or []:
                 if "::" in item:
@@ -1386,12 +1447,23 @@ def main(argv=None):
                     fpart = normalize_rel(item)
                 if fpart not in chk_test_files:
                     chk_test_files.append(fpart)
-            run_resolution_check(
+            load_fail = run_resolution_check(
                 plugin_dir, copy_root, mutants, chk_test_files, tracked_set, workspace, env, timeout_sec,
-                checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests)
+                checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests,
+                copied_conftest=copied_conftest)
+            remaining = checkpoint_test_files_clear_of_conftest(chk_test_files, load_fail)
+            if load_fail and remaining:
+                run_resolution_check(
+                    plugin_dir, copy_root, mutants, remaining, tracked_set, workspace, env, timeout_sec,
+                    checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests,
+                    copied_conftest=copied_conftest)
             items = checkpoint_new_test_items(new_tests)
             any_pass = False
             for chk_idx, item in enumerate(items):
+                blocked = checkpoint_item_blocked_by_conftest(item, load_fail)
+                if blocked:
+                    print("%s: not run (%s)" % (item, blocked))
+                    continue
                 chk_results = os.path.join(plugin_dir, "pytest-outcomes-chk-%d.json" % chk_idx)
                 if os.path.isfile(chk_results):
                     os.remove(chk_results)

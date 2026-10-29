@@ -876,6 +876,23 @@ def _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=None):
     return not exists
 
 
+def _is_refac_id(id_part, id_rx):
+    if not id_part.startswith("REFAC-"):
+        return False
+    if len(id_part) <= len("REFAC-"):
+        return False
+    return re.fullmatch(id_rx, id_part) is not None
+
+
+def _declared_ids_all_refac(declared, id_rx):
+    if not declared:
+        return False
+    for d in declared:
+        if not _is_refac_id(d, id_rx):
+            return False
+    return True
+
+
 def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_runner=None):
     """Active declared ID set on branch after lapse (R3)."""
     branch = norm_branch(branch)
@@ -901,6 +918,10 @@ def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_l
     if not declared:
         return True, None
     if id_part in declared:
+        return True, None
+    if (branch.startswith("refactor/")
+            and _declared_ids_all_refac(declared, id_rx)
+            and _is_refac_id(id_part, id_rx)):
         return True, None
     if id_part in owner_lifts:
         return True, "owner"
