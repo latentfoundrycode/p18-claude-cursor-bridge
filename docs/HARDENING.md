@@ -1397,3 +1397,43 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
   - A calibration run while the phase is `changing` (calibrate-bridge.md step 2) re-reads the hook's modules and their conditionals, not the step's module and its conditionals. This is older than BUG-035, and the survival list covers a compaction or a resume.
   - The item's closing words ("which the session-start hook names with this module while the phase is `changing`") partly repeat the new parenthesis, accurately.
   - "the `Workflows:` line" is singular where a project of several parts has one per part, which is calibrate-bridge.md's own wording.
+
+### TASK-026, the release-level review of release B (2026-10-29; two passes, both APPROVE)
+- **The review:** pass 1 on main at 1f5ef8e, then the fixes BUG-034 (PR #105) and BUG-035 (PR #106), then pass 2 on main at a60fe91. Each pass had a fresh-context Claude reviewer and Review B (grok-4.7-medium, the native profile), with scratch profiles only. All four readings APPROVE (install after the stamp). The record is Reports/Reviews/Claude-Cursor Bridge Release B Review.md, outside the Workspace.
+- **The plan's Done when:**
+  - The core is 874 lines and 98,327 characters, the Decisions row's figure, and is readable in parts to its last line.
+  - Every module is within R-032's bound; the largest is delegation-loop.md, 452 lines and 57,217 characters.
+  - §15 condition 4's order holds: review, fix, then stamp and install, which are TASK-027's.
+- **Closed by fixes:** M1 (BUG-035) and M2 (BUG-034), above.
+- **Placed in TASK-027: M3** (pass 1, the Claude reviewer, Should fix, running projects). After the install the guard refuses numeric review names (REVIEW-007), admits letter-suffix names (TASK-012b) as an ID of their own that locks the branch, and counts rounds from 0, so an in-flight TASK-012-r2 or -r3 is refused off the count. It goes into the CHANGELOG's items below and into a new note in calibrate-bridge.md for increments in flight, which pass 1 found the text silent on.
+- **Leads, recorded (pass 1, Consider):**
+  - L1, the digest the hook re-injects is 9,591 of its 9,800 characters (209 left).
+  - L2, delegation-loop.md has 2,783 characters left under R-032's 60,000.
+  - L3, trace-check.py installs but works only inside the bridge's repository (without `--repo`, "not a git work tree", exit 2), and no installed text names it.
+- **A lead, recorded (pass 2, the Claude reviewer, Consider): C-1.**
+  - calibrate-bridge.md step 1's run sheet runs main's installer when the install check finds the tree stale. From the first merge after a stamp, main carries the installed version with other files, so BUG-034's refusal stops it. That refusal names `--anyway` and, unlike its sibling refusals (S4, not-as-stamped, not-merged), does not say "Tell the maintainer".
+  - Nothing is worse than before BUG-034, and a refusal changes nothing.
+  - Two remedies, in two places. The run sheet's half is TASK-027's, which owns calibrate-bridge.md: the run sheet names the release's own folder, or names this refusal and what to do about it. The refusal's half, the sentence "Tell the maintainer, who installs the release from its own folder", is a program change to bridge-install.py, outside TASK-027's Scope. It is a lead for the next increment that edits the installer's messages, with the dry-run tense below (Review A of TASK-026's records). A program change after pass 2 would reach the stamp unreviewed.
+- **A Consider, recorded (pass 2, Review B):** under `--dry-run --anyway` the warning says the release "was replaced" (bridge-install.py, install()). This was already recorded under BUG-034, round 2, as a lead for a later edit of the installer's messages, not TASK-027's. Review B adds that a dry run also prints the "previous ... kept at" line without keeping the copy, and that an identical reinstall prints no such line and does not rotate the kept copy.
+- **For TASK-027 (both passes, both reviewers):**
+  - Stamp before any install: VERSION and the manifest together, through a merged pull request.
+  - The run sheet checks that the installed VERSION differs and that a "previous ... kept at" line is printed, on the real install, not a dry run: a dry run prints that line too without keeping the copy (pass 2, Review B).
+  - The CHANGELOG's new `## <version>` heading comes first, sorts after 2026.10.25a, and carries `**If rolled back**` on its own line.
+  - The "Running projects must" items:
+    - install, restart, and `/calibrate-bridge` before the next increment;
+    - a 2026.10.25a project meets two MISSING floors: the `Workflows:` line until calibration step 4b writes it (until then inventory-check fails too), and, on a project whose suite is pytest, the windowless test suite until step 1b writes the default;
+    - an in-flight increment retakes its Review B snapshot under `<ID>` and reruns Review B;
+    - numeric review names (REVIEW-007) are refused, and letter-suffix names (TASK-012b) lock the branch;
+    - the guard's round count starts at 0, so an in-flight `<ID>-r2` or `-r3` is refused off the count;
+    - briefs are numbered `<ID>-r<N>.md` from then on.
+    These last points (M3) also go into the new note in calibrate-bridge.md for increments in flight.
+  - The "If rolled back" items: rounds-*.json, the scratch folder, the `Workflows:` line, the windowless conftest block, numbered briefs, the new runs.jsonl fields, and the two allow entries and 38 files only release B ships.
+  - Name the conditional workflows the release adds and the phase each takes effect in (Stage B5, TASK-023's lead "When a trait's delegation-loop additions bind on a project already building").
+  - A project whose `Bridge version:` equals the installed version takes calibration's no-delta path.
+  - C-1's run-sheet half, above.
+  - Watch the digest's 209 characters and delegation-loop.md's 2,783 (L1, L2) if the entry's text reaches either file.
+- **Review A of these records:** APPROVE, with three Should fix findings taken.
+  - Pass 2 Review B's Consider had been left out.
+  - C-1's refusal half had been given to TASK-027, whose Scope holds no program.
+  - The two floors' calibration steps were given wrongly as 1b for both; the `Workflows:` line is written at 4b.
+  - Its Considers were taken too: M3's own line, why the round count matters, the archive's moved status text, R-037's wording, and two glosses in the Reports record.
