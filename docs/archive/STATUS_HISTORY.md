@@ -35,3 +35,5 @@ Last accepted, the part moved out at TASK-034 (2026-10-28): before it TASK-035 (
 Last accepted, the part moved out at TASK-025 (2026-10-28): before it TASK-034 (PR #97, at its merge): the loop's text for the code gate's three-round ceiling and the pace report in /evaluate-reports, R-042 to R-044 built, supervisor-authored text and tests (tests/test_loop_text_pace.py; INVENTORY, Features and Decisions)
 
 Last accepted, the part moved out at BUG-030 (2026-10-28): before it stage B5's refactoring pass (PR #99, at its merge): the tests lane's tests/phase_modules.py helpers and run_mr, and REFAC-003; before it TASK-025 (PR #98): release B's acceptance tests
+
+Last accepted, the part moved out at BUG-031 (2026-10-29): before it stage B5's refactoring pass (PR #99, at its merge)

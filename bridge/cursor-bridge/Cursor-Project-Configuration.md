@@ -150,13 +150,17 @@ and fix its own lint/type errors without a human in the loop.
   project's suite whose runner the bridge ships a default for carries it verbatim, as the
   secure-coding rule is carried: for a pytest suite, the fenced block of
   `~/.claude/cursor-bridge/windowless-default.snapshot.md`, which gives every launch the
-  suite makes without creation flags of its own `CREATE_NO_WINDOW`. `cursor-configurator`
-  creates the test root's `conftest.py` from the block only where the test root has none
+  suite makes without creation flags of its own `CREATE_NO_WINDOW`. The block goes into the
+  Workspace root's `conftest.py` where that file exists, or else into every test root's (each
+  `testpaths` root that can be used, `tests/` where none is set or none can be used). `cursor-configurator`
+  creates a test root's `conftest.py` from the block only where that root has none
   (`tests/conftest.py`, with its folder, where the project has no test root yet); where one
   exists it inserts the block once, at the file's end, unless the file already holds its three tokens
   (`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), and leaves every other line as
   it stands. The conformance check's floor `Windowless test suite` checks it: OK where the
-  test root's or the rootdir's `conftest.py` holds the three tokens, MISSING otherwise. A
+  Workspace root's `conftest.py` holds the three tokens, or else every test root's does,
+  MISSING otherwise; a root `conftest.py` without them stands for nothing, and a `testpaths`
+  root can be used when it lies inside the Workspace, is reached through no link and holds no `..`. A
   Node suite (vitest, jest, Playwright, `node --test`) has no default yet: the check gives it
   a NOTE naming its runner and KP-059's mechanism (`detached: false`), recorded in the status
   file. A running project receives the item at calibration, which writes it before the
@@ -449,7 +453,7 @@ this reliable:
 
 1. §1 repo hygiene (`.gitattributes` → renormalise, `.cursorignore`, `.worktreeinclude`,
    `.cursor/rules/workspace-boundary.mdc` + the `boundary-check` hook entry).
-2. §2 feedback loop: admit linter deps under rule 56, commit configs, fix command strings, wire the edit hook **windowless** (idiom in every hook script; `run-hidden.py` on every direct-command entry), handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` running the lint command + `windowless-check.py`; `git config core.hooksPath .githooks`); then write the test suite's windowless default into the test root's `conftest.py` (§2, the windowless-default item) and record a Node suite's NOTE.
+2. §2 feedback loop: admit linter deps under rule 56, commit configs, fix command strings, wire the edit hook **windowless** (idiom in every hook script; `run-hidden.py` on every direct-command entry), handle the empty-target case, and set up the pre-commit lint gate (`.githooks/pre-commit` running the lint command + `windowless-check.py`; `git config core.hooksPath .githooks`); then write the test suite's windowless default into the Workspace root's `conftest.py`, or else every test root's (§2, the windowless-default item) and record a Node suite's NOTE.
 3. §3 Context7 in `~/.cursor/mcp.json` if the project uses third-party libraries.
 4. §4 any other MCP tools the build needs (escalate secrets).
 5. §5 at most one *project-specific* cross-cutting rule, only if warranted; write the

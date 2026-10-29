@@ -300,3 +300,36 @@ def test_r042_refused_brief_names(tmp_path, bad):
     assert "bridge-run: started" not in p.stderr
     assert not (root / "run" / "launcher" / "runs.jsonl").exists()
     assert not marker.exists()
+
+
+def test_bug031_a_refusal_returns_at_once_while_the_slot_is_held(tmp_path):
+    """BUG-031 (stage B5's review, round 1, tests-launcher S2): a builder launch the brief rule refuses ends
+    with exit 125 at once while another process holds heavy.lock, never waiting for the slot; the same
+    environment's accepted launch does wait (the precondition that the slot was held).
+    enforces: R-042 (the launcher's refusals, `bridge-run: refused - `); R-040 (the slot taken only by a
+    run that starts)"""
+    from test_bridge_run_slot import kill_tree, popen_bridge, read_until, start_lock_only
+    import time
+    root = ws(tmp_path)
+    roster(root)
+    plan(root, "TASK-001")
+    git_init(root, "task-001")
+    brief(root, "TASK-001.md")
+    env, marker = _launch_env(tmp_path, root)
+    holder = waiter = None
+    try:
+        holder = start_lock_only(tmp_path, env, hold=60)
+        time.sleep(0.5)
+        t0 = time.monotonic()
+        p = run_launch(root, env, "cursor-agent", "-p", "x")
+        elapsed = time.monotonic() - t0
+        assert p.returncode == 125 and "brief rule" in p.stderr, p.stderr
+        assert "waiting for the slot" not in p.stderr and "bridge-run: started" not in p.stderr
+        assert elapsed < 20, elapsed
+        waiter = popen_bridge(root, env, "--limit", "30", "--", *agent_cmd("Read handoff/TASK-001.md"))
+        lines = read_until(waiter, "bridge-run: waiting for the slot", timeout=30)
+        assert lines[-1].startswith("bridge-run: waiting for the slot held by")
+    finally:
+        kill_tree(waiter)
+        kill_tree(holder)
+    assert not marker.exists()

@@ -50,7 +50,7 @@ SURVIVAL = {
         "`Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with "
         "`docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, "
         "each scaled to the change; its new stages run "
-        "`delegation-loop.md` with its sub-file, and their closes `reflection.md` and `project-end.md`, which the "
+        "`delegation-loop.md` with its sub-files, and their closes `reflection.md` and `project-end.md`, which the "
         "session-start hook names with this module while the phase is `changing`;",
         "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its "
         "date and the step it has reached, and `Awaiting user on:` a gate, or an intake question, that waits for the "

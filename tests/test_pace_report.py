@@ -126,9 +126,17 @@ def test_r044_merge_and_start_weeks(tmp_path):
     p.commit("TASK-501: shipped (#1)", at(2))
     rc, out, _ = pace([p.root], tmp_path)
     assert rc == 0
-    wk = week(2)
-    assert "%d-W%02d" % (wk[0], wk[1]) in out
-    assert "1" in out
+    # BUG-031 (stage B5's review, round 1, tests-mutation-pace S4): the row's cells, not "1" anywhere in the output
+    rows = {}
+    for line in out.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if cells and re.match(r"^\d{4}-W\d{2}$", cells[0]):
+            rows[cells[0]] = cells
+    started, merged = "%d-W%02d" % week(5), "%d-W%02d" % week(2)
+    assert rows[started][1:3] == ["1", "0"], rows[started]
+    assert rows[merged][1:3] == ["0", "1"], rows[merged]
+    assert rows[merged][4] == "21", rows[merged]
+    assert sum(int(r[1]) for r in rows.values()) == 1 and sum(int(r[2]) for r in rows.values()) == 1
 
 
 def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program, monkeypatch):

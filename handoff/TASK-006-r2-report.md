@@ -49,7 +49,7 @@ make-manifest: version 2026.10.11d, 107 files hashed, VERSION + MANIFEST.json wr
 `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` — exit 0
 
 ```
-bridge-check: version 2026.10.11d (2026-10-16 21:17) at E:\p18-claude-cursor-bridge\Workspace\bridge
+bridge-check: version 2026.10.11d (2026-10-16 21:17) at <the Workspace>/bridge
 bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA
 RESULT: SOURCES MATCH bridge 2026.10.11d
 ```

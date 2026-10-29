@@ -121,7 +121,7 @@ The increment's mutants are in its mutants file, `run/supervisor/<id>-mutants.js
 python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json > run/agent/<id>-mutation.out 2>&1
 ```
 
-Its completion wakes you, and the step resumes when it arrives. The program reruns only what changed: a mutant whose keyed inputs (the mutated file's folder, the test folders it runs, the suite's configuration and the mutant itself) are byte-identical since its last kill keeps that kill, and every survived, unapplied or erred mutant runs again. Add `--all` for the full run where a round changed files outside every key.
+Its completion wakes you, and the step resumes when it arrives. The `python` after the `--` is the project's own interpreter, the one its recorded suite command runs, since mutation-run.py runs every mutant's and every checkpoint test's pytest with the interpreter that started it: where the project has a virtual environment it is `.venv/Scripts/python.exe` (`.venv/bin/python` off Windows), which the driver kind accepts; a bare `python` that is not the project's lacks its packages and fails closed. The program reruns only what changed: a mutant whose keyed inputs (the mutated file's folder, the test folders it runs, the suite's configuration and the mutant itself) are byte-identical since its last kill keeps that kill, and every survived, unapplied or erred mutant runs again. Add `--all` for the full run where a round changed files outside every key.
 
 **Before the run, cut the duplicates and estimate the count.** Before the increment's first mutation run, before any `--all` run, and whenever the mutants file has changed since its last estimate:
 

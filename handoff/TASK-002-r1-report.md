@@ -56,7 +56,7 @@ Exit code: 0
 ### 4. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
 
 ```
-bridge-check: version 2026.10.11d (2026-10-11 16:55) at E:\p18-claude-cursor-bridge\Workspace\bridge
+bridge-check: version 2026.10.11d (2026-10-11 16:55) at <the Workspace>/bridge
 bridge-check: 104 OK, 0 STALE, 0 MISSING, 0 EXTRA
 RESULT: SOURCES MATCH bridge 2026.10.11d
 ```

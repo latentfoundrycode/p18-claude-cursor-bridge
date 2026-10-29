@@ -60,11 +60,13 @@ Only the items the supervisor names, drawn from this set:
   **body is the frozen snapshot the supervisor hands you** (the level-filtered slice, plus
   the LLM supplement if named); write it verbatim with the frontmatter from
   `Cursor-File-Formats.md`.
-- The test root's `conftest.py` — the frozen windowless default, for **every** project whose
+- The suite's `conftest.py` — the frozen windowless default, for **every** project whose
   suite is pytest. The **block is the fenced block of
-  `~/.claude/cursor-bridge/windowless-default.snapshot.md`**, written verbatim: create the test
-  root's `conftest.py` from it only where the test root has none (`tests/conftest.py`, with
-  its folder, where the project has no test root yet); where one exists, insert the block
+  `~/.claude/cursor-bridge/windowless-default.snapshot.md`**, written verbatim into the Workspace
+  root's `conftest.py` where that file exists, or else into every test root's (each `testpaths`
+  root that can be used, `tests/` where none is set or none can be used): create a test root's `conftest.py` from it only where that
+  root has none (`tests/conftest.py`, with its folder, where the project has no test root yet);
+  where one exists, insert the block
   once, at the file's end, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`,
   `CREATE_NO_WINDOW`), and leave every other line as it stands. Never regenerate, trim or
   reorder it. A Node suite gets nothing from you here: report its runner, and the supervisor

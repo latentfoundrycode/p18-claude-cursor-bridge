@@ -40,7 +40,7 @@ Working folder: Workspace root.
 
 Exit code: 0.
 
-Relevant output: `bridge-check: version 2026.10.11d (2026-10-17 02:59) at E:\p18-claude-cursor-bridge\Workspace\bridge` then `bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA` and `RESULT: SOURCES MATCH bridge 2026.10.11d`.
+Relevant output: `bridge-check: version 2026.10.11d (2026-10-17 02:59) at <the Workspace>/bridge` then `bridge-check: 107 OK, 0 STALE, 0 MISSING, 0 EXTRA` and `RESULT: SOURCES MATCH bridge 2026.10.11d`.
 
 `git diff -- bridge/cursor-bridge/VERSION` is empty. Git printed `warning: in the working copy of 'bridge/cursor-bridge/VERSION', LF will be replaced by CRLF the next time Git touches it` and listed no VERSION diff.
 

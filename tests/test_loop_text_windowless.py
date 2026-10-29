@@ -215,7 +215,7 @@ def test_r041_every_mutation_run_is_mutation_run_py_through_the_driver_kind():
 
 def test_r041_the_checkpoint_run_is_mutation_run_py_and_each_result_has_its_handling():
     """R-041 (TASK-030): the new tests' run against the checkpoint is `mutation-run.py --checkpoint`, the new tests
-    listed in `new_tests` (a new file by path, a changed file by its new tests' ids) and staged; no old-<nnn> worktree;
+    listed in `new_tests` (a new file by path, a changed file by its new tests' ids) and staged; no worktree of the supervisor's (rule 39);
     exit 4 sends each test passing on the old code back before any reviewer; `not run` is said; exit 3 stops the step,
     never a model failure. The labels are the program's own."""
     s = flat(section(loop(), "The tests before the first reviewer", 4))
@@ -224,9 +224,13 @@ def test_r041_the_checkpoint_run_is_mutation_run_py_and_each_result_has_its_hand
         "by its new tests' ids), stage them (`git add`), and launch `python ~/.claude/cursor-bridge/bridge-run.py "
         "--limit auto --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json "
         "--checkpoint <the increment's checkpoint commit> > run/agent/<id>-checkpoint.out 2>&1` in the background like "
-        "any mutation run.",
-        "The program runs the listed tests on a copy of the tree at that commit, so no worktree of your own is needed "
-        "(rule 39's `old-<nnn>` worktree stays unused).",
+        "any mutation run, the `python` after the `--` being the project's own interpreter as step 7 says "
+        "(`delegation-loop/decide.md`, \"The mutation run\").",
+        "The program runs the listed tests on a copy of the tree at that commit, so no worktree of your own is needed; "
+        "it copies over that tree the listed test files and the working tree's `conftest.py` files on their way (one "
+        "reached through a link refused), and every other file a new test needs that the commit lacks or holds in an "
+        "older form (a fixture's data file, a helper module) is listed in the mutants file's `untracked`, which it "
+        "copies too.",
         "so each test the output marks `passing on old code` goes back to be rewritten before any reviewer reads the "
         "diff.",
         "A test the output marks `not run` (it cannot collect, or ran nothing, on the old code) is neither pass nor "
@@ -383,6 +387,8 @@ def test_r039_the_snapshot_the_texts_name_is_the_one_task_028_ships():
         assert named in body, name
         assert "where one exists" in body and "every other line as it stands" in body, name
         assert "(`tests/conftest.py`, with its folder, where the project has no test root yet)" in body, name
+        assert ("Workspace root's `conftest.py` where that file exists, or else" in body
+                and "every test root's (each `testpaths` root that can be used, `tests/` where none is set or none can be used)" in body), name  # BUG-031
     for name in ("configuration.md", "Cursor-Project-Configuration.md"):
         assert "`Windowless test suite`" in homes[name], name
     assert "see `Cursor-Project-Configuration.md`, windowless-default item" in flat(
@@ -395,9 +401,11 @@ def test_r039_the_configuration_texts_carry_the_item():
     """R-039: configuration.md's section, the configuration guide's §2 item and its order of operations, and the
     configurator's list carry the item, with the floor that checks it and the NOTE a Node suite gets."""
     s = flat(section(module("configuration"), "The windowless test suite", 3))
-    assert ("the configurator creates the test root's `conftest.py` from the block only where the test root has none "
-            "(`tests/conftest.py`, with its folder, where the project has no test root yet), and where one exists "
-            "inserts the block once, at the file's end, unless the file already holds its three tokens") in s
+    assert ("The block goes into the Workspace root's `conftest.py` where that file exists, or else into every test "
+            "root's (each `testpaths` root that can be used, `tests/` where none is set or none can be used): the configurator creates a test root's "
+            "`conftest.py` from the block only where that root has none (`tests/conftest.py`, with its folder, where "
+            "the project has no test root yet), and where one exists inserts the block once, at the file's end, "
+            "unless the file already holds its three tokens") in s
     guide_item = flat(text("cursor-bridge", "Cursor-Project-Configuration.md"))
     assert "exists it inserts the block once, at the file's end, unless the file already holds its three tokens" in (
         guide_item)
@@ -406,16 +414,18 @@ def test_r039_the_configuration_texts_carry_the_item():
     assert "A Node suite has no default yet: the check gives it a NOTE naming its runner and KP-059's mechanism" in s
     guide = text("cursor-bridge", "Cursor-Project-Configuration.md")
     order = flat(guide.split("## Configuration run — order of operations", 1)[1])
-    assert ("then write the test suite's windowless default into the test root's `conftest.py` (§2, the "
-            "windowless-default item) and record a Node suite's NOTE.") in order
+    assert ("then write the test suite's windowless default into the Workspace root's `conftest.py`, or else every "
+            "test root's (§2, the windowless-default item) and record a Node suite's NOTE.") in order
+    assert ("OK where the Workspace root's `conftest.py` holds the three tokens, or else every test root's does, "
+            "MISSING otherwise") in guide_item  # BUG-031: the floor's own rule
     two = flat(guide.split("## 2. The feedback loop", 1)[1].split("\n## ", 1)[0])
     assert "The windowless-default item — the test suite's frozen default." in two
     assert "A running project receives the item at calibration, which writes it before the project resumes" in two
     cfg = flat(text("agents", "cursor-configurator.md").split("## What you write", 1)[1].split("## Hard limits", 1)[0])
-    assert ("The test root's `conftest.py` — the frozen windowless default, for **every** project whose suite is pytest. "
+    assert ("The suite's `conftest.py` — the frozen windowless default, for **every** project whose suite is pytest. "
             "The **block is the fenced block of `~/.claude/cursor-bridge/windowless-default.snapshot.md`**, written "
-            "verbatim") in cfg
-    assert cfg.index("`.cursor/rules/secure-coding.mdc`") < cfg.index("The test root's `conftest.py`")
+            "verbatim into the Workspace root's `conftest.py` where that file exists, or else into every test root's") in cfg
+    assert cfg.index("`.cursor/rules/secure-coding.mdc`") < cfg.index("The suite's `conftest.py`")
 
 
 def test_r039_calibration_writes_the_floor_between_two_suite_runs():
@@ -433,8 +443,10 @@ def test_r039_calibration_writes_the_floor_between_two_suite_runs():
         "the run waits for the computer's one slot). Read the output file when its completion arrives.",
         "Have `cursor-configurator` write the default from `~/.claude/cursor-bridge/windowless-default.snapshot.md` "
         "exactly as configuration writes it (`Cursor-Project-Configuration.md` §2, the windowless-default item): the "
-        "test root's `conftest.py` created from the snapshot's fenced block where the test root has none, or the block "
-        "inserted once at the end of the one that exists, every other line left as it stands.",
+        "block inserted once at the end of the Workspace root's `conftest.py` where that file exists, or else of every "
+        "test root's (each `testpaths` root that can be used, `tests/` where none is set or none can be used), unless the file already holds its three tokens "
+        "(`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), a test root's `conftest.py` created from "
+        "the snapshot's fenced block where that root has none, every other line left as it stands.",
         "Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's "
         "exit status. A before-run that itself ends in pytest's exit 2 to 5 ran no comparable tests and proves "
         "nothing: the write is committed as the calibration's checkpoint and recorded as unverified, whatever the "
@@ -479,3 +491,17 @@ def test_r039_r041_rules_8_and_24_name_the_runs_and_the_default():
             "(`~/.claude/cursor-bridge/windowless-default.snapshot.md`, the pytest `conftest.py` block), written at "
             "configuration and at calibration and checked by the conformance floor `Windowless test suite`; and every "
             "suite and mutation run starts through the launcher, which starts it windowless.") in rule24
+
+
+def test_bug031_the_old_checkpoint_worktree_is_retired_everywhere():
+    """BUG-031 (stage B5's review, round 1; core S2 and tests-text C3, convergent): TASK-030 replaced step 4's
+    `old-<nnn>` worktree with `mutation-run.py --checkpoint`, yet rule 39 and the digest still named it as the one
+    worktree of the supervisor's; neither the core nor the delegation loop names it now, and rule 39 says the
+    checkpoint run needs no worktree of the supervisor's.
+    enforces: R-041 (the new tests run once against the checkpoint's code, through mutation-run.py); rule 39"""
+    core = text("commands", "supervisor.md")
+    assert "old-<nnn>" not in core.replace("release A5's `old-<nnn>` worktree", "")
+    assert "You have no worktree of your own: step 4's run against the checkpoint runs on a copy that " \
+           "`mutation-run.py --checkpoint` makes" in flat(core)
+    assert "never yours but" not in core
+    assert "old-<nnn>" not in loop() and "old-<nnn>" not in decide()

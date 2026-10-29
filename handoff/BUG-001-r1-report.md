@@ -21,7 +21,7 @@ Only the `Socket` step of job `security-floor` and the new install step. The ins
 
 ## Commands
 
-Working folder for every command: `E:\p18-claude-cursor-bridge\Workspace`.
+Working folder for every command: `<the Workspace>`.
 
 ### 1. `python -m pytest tests/test_release_b_ci_floor.py -q`
 
@@ -67,7 +67,7 @@ windowless-check: 29 file(s) scanned, 0 FAIL, 0 NOTE
 Exit code 0.
 
 ```
-bridge-check: version 2026.10.11d (2026-10-12 22:42) at E:\p18-claude-cursor-bridge\Workspace\bridge
+bridge-check: version 2026.10.11d (2026-10-12 22:42) at <the Workspace>/bridge
 bridge-check: 106 OK, 0 STALE, 0 MISSING, 0 EXTRA
 RESULT: SOURCES MATCH bridge 2026.10.11d
 ```
@@ -77,7 +77,7 @@ RESULT: SOURCES MATCH bridge 2026.10.11d
 Exit code 1. The five security-floor lines are OK (Semgrep in the gate, OSV-Scanner in the gate, Socket in the gate, Semgrep bridge rules or Pro engine, CI actions pinned by commit). The exit code is from other floors the checker reports as missing; this change does not touch those rules, hooks, or docs.
 
 ```
-conformance-check: E:\p18-claude-cursor-bridge\Workspace
+conformance-check: <the Workspace>
   OK       Semgrep in the gate
   OK       OSV-Scanner in the gate
   OK       Socket in the gate
