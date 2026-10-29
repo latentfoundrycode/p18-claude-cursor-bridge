@@ -876,7 +876,32 @@ def _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=None):
     return not exists
 
 
+def _refactor_stage(branch):
+    if not branch.startswith("refactor/"):
+        return None
+    stage = branch[len("refactor/"):]
+    if not stage:
+        return None
+    return stage
+
+
+def _refac_numbered_brief_id(id_part):
+    if not isinstance(id_part, str):
+        return False
+    return re.fullmatch(r"REFAC-[0-9]+", id_part) is not None
+
+
+def _refac_branch_snapshot_id(id_part, stage):
+    if not isinstance(id_part, str) or not stage:
+        return False
+    if id_part != "REFAC-" + stage:
+        return False
+    return re.fullmatch(GRAMMAR_ID_PATTERN, id_part) is not None
+
+
 def _is_refac_id(id_part, id_rx):
+    if not isinstance(id_part, str):
+        return False
     if not id_part.startswith("REFAC-"):
         return False
     if len(id_part) <= len("REFAC-"):
@@ -884,11 +909,14 @@ def _is_refac_id(id_part, id_rx):
     return re.fullmatch(id_rx, id_part) is not None
 
 
-def _declared_ids_all_refac(declared, id_rx):
+def _declared_ids_all_refac(declared, id_rx, branch):
+    stage = _refactor_stage(branch)
+    if stage is None:
+        return False
     if not declared:
         return False
     for d in declared:
-        if not _is_refac_id(d, id_rx):
+        if not (_refac_numbered_brief_id(d) or _refac_branch_snapshot_id(d, stage)):
             return False
     return True
 
@@ -919,9 +947,10 @@ def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_l
         return True, None
     if id_part in declared:
         return True, None
-    if (branch.startswith("refactor/")
-            and _declared_ids_all_refac(declared, id_rx)
-            and _is_refac_id(id_part, id_rx)):
+    stage = _refactor_stage(branch)
+    if (stage is not None
+            and _declared_ids_all_refac(declared, id_rx, branch)
+            and (_refac_numbered_brief_id(id_part) or _refac_branch_snapshot_id(id_part, stage))):
         return True, None
     if id_part in owner_lifts:
         return True, "owner"
