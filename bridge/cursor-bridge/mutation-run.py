@@ -1348,24 +1348,6 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
     return None
 
 
-def checkpoint_item_conftest_paths(item):
-    if "::" in item:
-        fpart = normalize_rel(item.split("::", 1)[0])
-    else:
-        fpart = normalize_rel(item)
-    return conftest_paths(fpart)
-
-
-def checkpoint_item_blocked_by_conftest(item, failed_conftests):
-    if not failed_conftests:
-        return None
-    paths = checkpoint_item_conftest_paths(item)
-    for cp in paths:
-        if cp in failed_conftests:
-            return cp
-    return None
-
-
 def run_mutant_tests(plugin_dir, copy_root, tests, env, timeout_sec, results_path):
     if os.path.isfile(results_path):
         os.remove(results_path)
@@ -1479,7 +1461,7 @@ def main(argv=None):
                     fpart = normalize_rel(item)
                 if fpart not in chk_test_files:
                     chk_test_files.append(fpart)
-            failed_conftests = set()
+            file_blocked_conftest = {}
             rc_kwargs = dict(
                 checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests,
                 copied_conftest=copied_conftest,
@@ -1496,7 +1478,7 @@ def main(argv=None):
                     if per_fail:
                         if per_fail not in conftest_paths(normalize_rel(fpart)):
                             raise Refuse("mutation-run: resolution check failed (pytest exit 4)")
-                        failed_conftests.add(per_fail)
+                        file_blocked_conftest[normalize_rel(fpart)] = per_fail
                     else:
                         clear_files.append(fpart)
                 if clear_files:
@@ -1508,7 +1490,11 @@ def main(argv=None):
             items = checkpoint_new_test_items(new_tests)
             any_pass = False
             for chk_idx, item in enumerate(items):
-                blocked = checkpoint_item_blocked_by_conftest(item, failed_conftests)
+                if "::" in item:
+                    item_fpart = normalize_rel(item.split("::", 1)[0])
+                else:
+                    item_fpart = normalize_rel(item)
+                blocked = file_blocked_conftest.get(item_fpart)
                 if blocked:
                     print("%s: not run (%s)" % (item, blocked))
                     continue
