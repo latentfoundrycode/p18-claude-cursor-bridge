@@ -1,0 +1,1378 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index f041ca9..3f2e249 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.25a",
+-  "generated": "2026-10-29 01:45",
++  "generated": "2026-10-29 05:37",
+   "files": {
+     "agents/cursor-configurator.md": "8bcb0ebba97ba25c4f81528c439195619196e7d078c4b0054a206e51fa7c8cd2",
+     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
+@@ -33,7 +33,7 @@
+     "cursor-bridge/bridge-install.py": "c679380382e8bd34a6116c4d0abc8e254326059a8c35929f49b8fd6484a52b6d",
+     "cursor-bridge/bridge-run.py": "dbcfea82523590e997472659b230a5f92356e532a9f4224ffd3251a987f955cf",
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+-    "cursor-bridge/bridge_env.py": "433f2994df952c660b3c7366a9bdab4647ab3a10963b29f8f80d135fc8fc1c3a",
++    "cursor-bridge/bridge_env.py": "c9415a9cd65f79f601de5d0b02abe1e3fb0481badcb83c0f36325fd37ba4b405",
+     "cursor-bridge/completion-check.py": "f584af6a6592c7f748beec212ad2b1752356607529fd60c1acb6507190626134",
+     "cursor-bridge/conformance-check.py": "f5a9f8a0a33bbc693e717379d0190aa6bfedaa00923c4b9c055701c0380b6ca8",
+     "cursor-bridge/cursor-agent.shim": "913f3a0214b76c5a92fca21b8bfe8f9ea63979af412df30dc47509a0accbf8e2",
+@@ -85,17 +85,17 @@
+     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
+     "cursor-bridge/loop-guard.py": "7e53abc536c346a469756ddd43e04a81069aa1289687118ecd1252dede759375",
+     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
+-    "cursor-bridge/mutation-run.py": "5229c5dbf358c996ea04346f17506a2da61d82638109abf7b3c04cd1a7c7c395",
+-    "cursor-bridge/pace-report.py": "7fd2893a040aa7afba9fe3488541eb1950109bd192d0a7b81cf3460a3dc24b07",
++    "cursor-bridge/mutation-run.py": "3489d7778015393029dc9a768f42b3f213e999fad32e9b918c4c10160676569f",
++    "cursor-bridge/pace-report.py": "436ffa6dc8477dcbdfd6f9ec939e792c86f9d0fef099f57ab259633dcb92579b",
+     "cursor-bridge/permission-guard.py": "311d0cf82b7912467393daac88e2ba1202379c1b27e945a4b7ffe44569164490",
+     "cursor-bridge/plan-check.py": "5212b21737d4da78b144ff206595dcbfe1d6145c5e447239177132f7fd33c204",
+     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
+     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
+     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
+-    "cursor-bridge/review-guard.py": "9c22ceb9b2d6b3a977287ba2ca449cce3029b334b30e15a35c393e8412588da6",
++    "cursor-bridge/review-guard.py": "1243f2fd3384b8f71d933d20fe421ac6d1854da6f5167e5186ace8963510dd3c",
+     "cursor-bridge/roster-check.py": "dea99884ac6d57a5f661f272a90e1920c38f8e110d5a261dc7f7bc67e0a01d7c",
+     "cursor-bridge/run-hidden.py": "bcae418e3cca9d7f1be7bf421ce44b879b343613301df4590d9cc45d00f5be5c",
+-    "cursor-bridge/scope-check.py": "c7a3f778c9443d1804702ce02c7402f4b57330dd2efa3e697d801f5204bdaf3f",
++    "cursor-bridge/scope-check.py": "93039ffe48e42fa59bd05a81bf015a8ec9aec07503d8b6d2aef12d563c9087ed",
+     "cursor-bridge/secure-coding.snapshot.md": "3f41667754917ffef6fb47308645356be6a5fd2fc362cc9c3dedf92a9457324e",
+     "cursor-bridge/semgrep-bridge-rules.yml": "924db9d2386c850dafd4e3f829a693dc0fef0d1409ef7f5887302a930c8192ec",
+     "cursor-bridge/session-start.py": "a701ce9f242c5d106cd7e5c5232ac01315ecfc5996b9947551d0e786a64b4122",
+diff --git a/bridge/cursor-bridge/bridge_env.py b/bridge/cursor-bridge/bridge_env.py
+index 0c7dedd..762b23d 100644
+--- a/bridge/cursor-bridge/bridge_env.py
++++ b/bridge/cursor-bridge/bridge_env.py
+@@ -876,6 +876,41 @@ def _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=None):
+     return not exists
+ 
+ 
++def _refactor_stage(branch):
++    if not branch.startswith("refactor/"):
++        return None
++    stage = branch[len("refactor/"):]
++    if not stage:
++        return None
++    return stage
++
++
++def _refac_numbered_brief_id(id_part):
++    if not isinstance(id_part, str):
++        return False
++    return re.fullmatch(r"REFAC-[0-9]+", id_part) is not None
++
++
++def _refac_branch_snapshot_id(id_part, stage):
++    if not isinstance(id_part, str) or not stage:
++        return False
++    if id_part != "REFAC-" + stage:
++        return False
++    return re.fullmatch(GRAMMAR_ID_PATTERN, id_part) is not None
++
++
++def _declared_ids_all_refac(declared, branch):
++    stage = _refactor_stage(branch)
++    if stage is None:
++        return False
++    if not declared:
++        return False
++    for d in declared:
++        if not (_refac_numbered_brief_id(d) or _refac_branch_snapshot_id(d, stage)):
++            return False
++    return True
++
++
+ def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_runner=None):
+     """Active declared ID set on branch after lapse (R3)."""
+     branch = norm_branch(branch)
+@@ -892,7 +927,8 @@ def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_ru
+     return frozenset()
+ 
+ 
+-def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx, git_runner=None):
++def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx, git_runner=None,
++                     snapshot=False):
+     branch = norm_branch(branch)
+     if branch == "main":
+         return False, "main"
+@@ -902,6 +938,13 @@ def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_l
+         return True, None
+     if id_part in declared:
+         return True, None
++    stage = _refactor_stage(branch)
++    if stage is not None and _declared_ids_all_refac(declared, branch):
++        if snapshot:
++            if _refac_branch_snapshot_id(id_part, stage):
++                return True, None
++        elif _refac_numbered_brief_id(id_part) or _refac_branch_snapshot_id(id_part, stage):
++            return True, None
+     if id_part in owner_lifts:
+         return True, "owner"
+     if _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=git_runner):
+diff --git a/bridge/cursor-bridge/mutation-run.py b/bridge/cursor-bridge/mutation-run.py
+index 46860f8..b16b6cb 100644
+--- a/bridge/cursor-bridge/mutation-run.py
++++ b/bridge/cursor-bridge/mutation-run.py
+@@ -671,6 +671,7 @@ def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
+             os.makedirs(os.path.dirname(dst), exist_ok=True)
+             shutil.copy2(src, dst)
+     remove_bytecode_from_copy(dest)
++    return copied_conftest
+ 
+ 
+ def dotted_module_paths(rel):
+@@ -1200,6 +1201,73 @@ def module_file_at_commit(workspace, commit, modname):
+     return False
+ 
+ 
++_CONFTEST_LOAD_RX = re.compile(r"ImportError while loading conftest '([^']+)'\.")
++
++
++def _stderr_lines(err):
++    if isinstance(err, bytes):
++        text = err.decode("utf-8", "replace")
++    elif err:
++        text = err
++    else:
++        text = ""
++    lines = []
++    for line in text.split("\n"):
++        if line.endswith("\r"):
++            line = line[:-1]
++        lines.append(line)
++    return lines
++
++
++def _conftest_load_failure_path(err):
++    abs_path = None
++    for line in _stderr_lines(err):
++        m = _CONFTEST_LOAD_RX.fullmatch(line)
++        if m:
++            abs_path = m.group(1)
++    return abs_path
++
++
++def conftest_changed_by_increment(workspace, commit, rel):
++    listing = git_try("ls-tree", "-z", commit, "--", rel, cwd=workspace)
++    if listing is None:
++        return False
++    if not listing:
++        return True
++    wt_path = os.path.join(workspace, rel.replace("/", os.sep))
++    if not os.path.isfile(wt_path):
++        return False
++    wt_hash = git_try("hash-object", wt_path, cwd=workspace)
++    commit_hash = git_try("rev-parse", "%s:%s" % (commit, rel), cwd=workspace)
++    if wt_hash is None or commit_hash is None:
++        return False
++    return wt_hash != commit_hash
++
++
++def copied_conftest_load_failure(copy_root, copied_conftest, workspace, commit, rc, err):
++    if rc != 4 or not copied_conftest:
++        return None
++    abs_path = _conftest_load_failure_path(err)
++    if not abs_path:
++        return None
++    try:
++        rel = normalize_rel(os.path.relpath(abs_path, os.path.abspath(copy_root)))
++    except ValueError:
++        return None
++    if rel not in copied_conftest:
++        return None
++    if not conftest_changed_by_increment(workspace, commit, rel):
++        return None
++    return rel
++
++
++def _remove_resolution_plugin(plugin_dir):
++    for name in (PLUGIN_NAME,):
++        p = os.path.join(plugin_dir, name)
++        if os.path.isfile(p):
++            os.remove(p)
++
++
+ def checkpoint_collect_refused(workspace, commit, rc, err, out, new_tests):
+     if rc != 2 or not new_tests:
+         return False
+@@ -1227,15 +1295,17 @@ def checkpoint_collect_refused(workspace, commit, rc, err, out, new_tests):
+ 
+ 
+ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_tracked, workspace, env, timeout_sec,
+-                         checkpoint=False, checkpoint_commit=None, new_tests=None):
++                         checkpoint=False, checkpoint_commit=None, new_tests=None, copied_conftest=None):
+     mutated_files = [{"file": m["file"]} for m in mutants]
+     out_json = write_resolution_plugin(plugin_dir, copy_root, mutated_files, workspace_tracked, workspace)
+     if os.path.isfile(out_json):
+         os.remove(out_json)
+     test_files = sorted(set(test_files))
+     if not test_files:
+-        return
++        return None
+     run_env = pytest_env(plugin_dir, copy_root, env)
++    run_env["PY_COLORS"] = "0"
++    run_env.pop("FORCE_COLOR", None)
+     cfg = pytest_config_argv(plugin_dir, copy_root)
+     argv = [sys.executable, "-m", "pytest", "--collect-only", "-q",
+             "-p", PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + test_files
+@@ -1244,6 +1314,13 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
+         raise ResolutionTimeout(timeout_sec)
+     if checkpoint and checkpoint_collect_refused(workspace, checkpoint_commit, rc, err, out, new_tests):
+         raise Refuse("mutation-run: resolution check failed (pytest exit %d)" % rc)
++    load_fail = None
++    if checkpoint and copied_conftest is not None:
++        load_fail = copied_conftest_load_failure(
++            copy_root, copied_conftest, workspace, checkpoint_commit, rc, err)
++    if load_fail:
++        _remove_resolution_plugin(plugin_dir)
++        return load_fail
+     if rc not in (0, 2):
+         raise Refuse("mutation-run: resolution check failed (pytest exit %d)" % rc)
+     if not os.path.isfile(out_json):
+@@ -1267,10 +1344,8 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
+             raise Refuse("mutation-run: module %s resolves outside the copy at %s" % (mod, origin))
+     for t in report.get("loaded_ws", []):
+         raise Refuse("mutation-run: module from Workspace path %s was loaded" % t)
+-    for name in (PLUGIN_NAME,):
+-        p = os.path.join(plugin_dir, name)
+-        if os.path.isfile(p):
+-            os.remove(p)
++    _remove_resolution_plugin(plugin_dir)
++    return None
+ 
+ 
+ def run_mutant_tests(plugin_dir, copy_root, tests, env, timeout_sec, results_path):
+@@ -1377,7 +1452,7 @@ def main(argv=None):
+     try:
+         if args.checkpoint:
+             validate_tracked_copy(workspace, tracked_list)
+-            archive_checkpoint(workspace, args.checkpoint, copy_root, new_tests, untracked)
++            copied_conftest = archive_checkpoint(workspace, args.checkpoint, copy_root, new_tests, untracked)
+             chk_test_files = []
+             for item in new_tests or []:
+                 if "::" in item:
+@@ -1386,12 +1461,43 @@ def main(argv=None):
+                     fpart = normalize_rel(item)
+                 if fpart not in chk_test_files:
+                     chk_test_files.append(fpart)
+-            run_resolution_check(
++            file_blocked_conftest = {}
++            rc_kwargs = dict(
++                checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests,
++                copied_conftest=copied_conftest,
++            )
++            load_fail = run_resolution_check(
+                 plugin_dir, copy_root, mutants, chk_test_files, tracked_set, workspace, env, timeout_sec,
+-                checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests)
++                **rc_kwargs)
++            if load_fail:
++                clear_files = []
++                for fpart in chk_test_files:
++                    per_fail = run_resolution_check(
++                        plugin_dir, copy_root, mutants, [fpart], tracked_set, workspace, env, timeout_sec,
++                        **rc_kwargs)
++                    if per_fail:
++                        if per_fail not in conftest_paths(normalize_rel(fpart)):
++                            raise Refuse("mutation-run: resolution check failed (pytest exit 4)")
++                        file_blocked_conftest[normalize_rel(fpart)] = per_fail
++                    else:
++                        clear_files.append(fpart)
++                if clear_files:
++                    combined_fail = run_resolution_check(
++                        plugin_dir, copy_root, mutants, clear_files, tracked_set, workspace, env, timeout_sec,
++                        **rc_kwargs)
++                    if combined_fail:
++                        raise Refuse("mutation-run: resolution check failed (pytest exit 4)")
+             items = checkpoint_new_test_items(new_tests)
+             any_pass = False
+             for chk_idx, item in enumerate(items):
++                if "::" in item:
++                    item_fpart = normalize_rel(item.split("::", 1)[0])
++                else:
++                    item_fpart = normalize_rel(item)
++                blocked = file_blocked_conftest.get(item_fpart)
++                if blocked:
++                    print("%s: not run (%s)" % (item, blocked))
++                    continue
+                 chk_results = os.path.join(plugin_dir, "pytest-outcomes-chk-%d.json" % chk_idx)
+                 if os.path.isfile(chk_results):
+                     os.remove(chk_results)
+diff --git a/bridge/cursor-bridge/pace-report.py b/bridge/cursor-bridge/pace-report.py
+index 8655827..4e14082 100644
+--- a/bridge/cursor-bridge/pace-report.py
++++ b/bridge/cursor-bridge/pace-report.py
+@@ -293,6 +293,8 @@ def _start_times(ws, common, id_part):
+     for row in bridge_env.read_runs_jsonl(ws):
+         if row.get("brief") != id_part:
+             continue
++        if row.get("slot") == "not free":
++            continue
+         t = _parse_run_time(bridge_env._event_time_launcher(row))
+         if t:
+             times.append(t)
+@@ -391,6 +393,8 @@ def _lift_map(ws, common, id_part):
+     for row in bridge_env.read_runs_jsonl(ws):
+         if row.get("brief") != id_part:
+             continue
++        if row.get("slot") == "not free":
++            continue
+         rnd = row.get("round")
+         if rnd is None:
+             rnd = 1
+diff --git a/bridge/cursor-bridge/review-guard.py b/bridge/cursor-bridge/review-guard.py
+index ce35eca..1e43559 100644
+--- a/bridge/cursor-bridge/review-guard.py
++++ b/bridge/cursor-bridge/review-guard.py
+@@ -656,7 +656,8 @@ def snapshot_review_refusal(nnn, root, common):
+     if br == "HEAD":
+         return "review-guard: refused - branch rule: reviews run on a branch, not a detached HEAD"
+     ok, why = bridge_env.branch_allows_id(
+-        log_folder, common, root, br, id_part, owner_lifts, id_rx, git_runner=git_runner
++        log_folder, common, root, br, id_part, owner_lifts, id_rx, git_runner=git_runner,
++        snapshot=True,
+     )
+     if not ok:
+         if isinstance(why, frozenset):
+diff --git a/bridge/cursor-bridge/scope-check.py b/bridge/cursor-bridge/scope-check.py
+index 0c117ab..45d8129 100644
+--- a/bridge/cursor-bridge/scope-check.py
++++ b/bridge/cursor-bridge/scope-check.py
+@@ -216,6 +216,8 @@ def builder_windows():
+             e = json.loads(line)
+             if not isinstance(e, dict) or e.get("kind") != "builder":
+                 continue
++            if e.get("slot") == "not free":
++                continue
+             if e.get("branch") and branch and e.get("branch") != branch:
+                 continue                               # another branch's builder (the parallel variant) did not commit here
+             start = datetime.datetime.strptime(str(e.get("id", ""))[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index b87c24b..ea09646 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1338,3 +1338,13 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ - **Recorded, not taken (BUG-031's round 2, Review A, Consider):** the placement homes say to write into the Workspace root's conftest.py where it exists, but the floor gives a root conftest.py that is a link no standing, so a configurator following the text would write through the link and the floor would still read MISSING (fails closed; a contrived layout); `_test_root_path_ok` also drops a testpaths root whose own conftest.py is a link, so with `testpaths = a b`, a linked `a/conftest.py` and a carrying `b/conftest.py` the floor reads OK on `b` alone (read from the code, not run: a symbolic link needs a privilege this computer lacks; the program's, a lead for the next increment whose Scope takes conformance-check.py), and §2's "reached through no link" does not name the conftest.py's own link; Cursor-Project-Configuration.md §2's new floor sentence has no text pin (configuration.md's section is pinned by its hash).
+ - **BUG-031's own gate, round 2 (2026-10-29):** Review A APPROVE (its Considers: the new floor test tightened to MISSING_ROW, the link cases recorded above); Review B REJECT on two sentences: evaluate-reports.md's "an increment is an ID with a brief tracked under `handoff/`" held only where a project tracks its briefs (where none is tracked pace-report counts every ID a squash subject names), and refactoring-pass.md named the plan check beside the pace report as reading a REFAC brief's merge, where plan-check.py reads the plan's `TASK-` IDs alone; round 3, the ceiling's last, says both, its pins in tests/test_loop_text_pace.py, tests/test_phase_modules_build.py and tests/test_b3_least_confident.py; its Review A APPROVE, nothing of the five, its notes taken (the untracked case worded as the program reads it, "tracks nothing under `handoff/`", with the `n/a` cells; a stale docstring).
+ - **The path scan missed every backslash drive path (found 2026-10-29, BUG-031's round 3; ISS-018's class):** the pre-push scan `git log -p ... | grep -i -E "...|e:\\p18|..."` never matched a backslash in this shell, so only the user name and the slash forms were ever checked; a scan of main's whole history by run/supervisor/path_scan.py (Python, both separators) finds no user name anywhere and the project's drive folder (no user name) in eleven builder reports of 2026-10-11 to 2026-10-17, scrubbed in BUG-031's round 3 (their history keeps them), in evaluate-reports.py's project table (the lead above) and in this branch's quoted review diffs, removed before the squash. The scan now runs as `python run/supervisor/path_scan.py origin/main..HEAD --names <the account's names>`; an Issues entry at the stage close.
++
++### BUG-032 (stage B5's review, round 2's four program causes; the fix's gate, rounds 1 to 4, the fourth above the ceiling under its Blocking class line; recorded, not taken)
++- **Round 1 (REJECT by Review A, FAIL by the security audit), corrected in round 2:** with two copied conftest.py files failing to load, the second resolution check's answer was thrown away, so the tests behind the second were not named and the tests behind neither lost the check's refusals (both, Blocking); a conftest unchanged since the checkpoint was excused (Review A, Should fix; the audit's advisory; convergent); the excusing line was the first match anywhere in stdout and stderr (the audit); a `refactor/` branch admitted every REFAC name, so the pass's snapshot could be taken again under a fresh name with fresh guard rounds (the audit's advisory; Review A's design note; convergent).
++- **The supervisor's own test was wrong once (round 2's tests, 2026-10-29):** the first spoof test called `pytest.exit` in a test module, which pytest reports as a collection error (exit 2), not a conftest load failure (exit 4); it failed on the code before BUG-032 too. Rewritten, after checking by hand, as a conftest that writes the line to stderr before it fails, which pytest passes through ahead of its own line.
++- **Round 2 (REJECT, FAIL; convergent), corrected in round 3:** a failing conftest still chose the last exact line: it ends its forged line where pytest's begins (Review A) or writes it at exit (the audit), naming another conftest whose tests were then hidden; a git failure excused a conftest (both, Should fix and advisory); numbered REFAC snapshot names never launched opened fresh rounds (the audit, Blocking).
++- **Round 3 (the ceiling's last; REJECT, FAIL; convergent, of the five: behaviour against the brief and a defeated safety mechanism), corrected in round 4 under its Blocking class line:** the single-file runs' conftests went into one shared set and items were blocked by that set, so a clear file under a shared parent conftest was listed `not run` and a new test passing on the old code gave exit 0. The supervisor named the point to both reviewers before they read; round 3's brief miscounted its tests (fifteen for fourteen).
++- **Round 4 (APPROVE, PASS), recorded:** the file part of an item is computed twice in `main`'s checkpoint branch (Review A, Consider: one helper would keep the keys and the lookups together); no round-4 test reports a conftest off the file's way, the refusal that makes "blocked by its own run" mean "blocked by a conftest behind itself" (Review A, Consider; settled by reading, and by rounds 2 and 3's tests indirectly).
++- **A lead, older than BUG-032 (the audit, round 4; reproduced on origin/main):** every run of a checkpoint check uses the one scratch copy, so a new test module imported at collection, or a conftest that fails in a single-file run, can rewrite another listed file or a changed conftest in the copy: a test passing on the old code is then reported failing or `not run`, exit 0. It gives a builder nothing its own test file cannot do; re-extracting the copy per run, or checking the hashes of the listed files and copied conftests before each, would close it.
++- **Recorded, not taken (outside the five, rounds 3 and 4):** the reason a blocked file prints can be forged by code in that file's own run (a test module can name any changed copied conftest on its way; only that file is affected); a `refactor/<stage>` snapshot is still admitted under the branch's declared ID, the first candidate's `REFAC-<nnn>`, a second ceiling for the branch (a multi-ID task branch has the same property); `git ls-tree` resolves the path from the Workspace while `rev-parse <commit>:<path>` resolves from the repository's top, equal because the run refuses a Workspace that is not the top, failing safe otherwise; a whole-file item whose own run gives no results file prints nothing (TASK-031's code; a `::` item prints `not run`).
++- **The colour setting (round 3, accepted):** the resolution check's run sets `PY_COLORS=0` and drops `FORCE_COLOR` so pytest's own line is plain; a conftest that turns colour back on only gets the run refused.
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 4c96f98..430b930 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,10 +3,10 @@ Last updated: 2026-10-29
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at the merge of BUG-031 (PR #101), the second fix of stage B5's review, round 1; next is that review's round 2
+-Last accepted: BUG-031 (PR #101, at its merge): stage B5's review, round 1's text, tests and records; before it BUG-030 (PR #100), its program causes; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-025, TASK-028 to TASK-035, BUG-001 to BUG-031, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Increment: none — this file states the position at the merge of BUG-032 (PR #102), stage B5's review, round 2's first fix; next is BUG-033
++Last accepted: BUG-032 (PR #102, at its merge): stage B5's review, round 2's four program causes (its gate's four rounds: HARDENING); before it BUG-031 (PR #101); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-025, TASK-028 to TASK-035, BUG-001 to BUG-032, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: nothing
+-Next: stage B5's review, round 2, on the whole change to BUG-031's squash; then the demonstration and the reflection items; then stage B6 (TASK-026, TASK-027). Until release B installs at B6, the three-round review ceiling applies by hand (INVENTORY, Decisions) and a builder starts only after a running suite ends (HARDENING, BUG-030). No increment is marked `Parallel: yes`, so builders run one after the other. No pull-request title that is not an increment's names a plan ID inside its closing parenthesis (ISS-013).
++Next: BUG-033 (the round's text, tests and records), then stage B5's review, round 3 (the ceiling's last); then the demonstration and the reflection items; then stage B6 (TASK-026, TASK-027). Until release B installs at B6, the three-round review ceiling applies by hand (INVENTORY, Decisions) and a builder starts only after a running suite ends (HARDENING, BUG-030). No increment is marked `Parallel: yes`, so builders run one after the other. No pull-request title that is not an increment's names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -15,10 +15,10 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); each closed gate's own files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*.py, bug0nn_*.py, stage_b4_scope_r*.py, stage-b4-review-r*.md, and the bug, fix, refactoring and stage-review files of stages B1 to B3; the plan revision maintainer-text's: plan_text_*.py, design_text_file.py, write_review_plantext.py, *-PLAN-TEXT.md, msg-plan-text-*.txt; TASK-030's: task030_*.py; TASK-032's: task032_*.py, task032_*.md; TASK-033's: task033_*.py, task033_*.md; TASK-035's: task035_*.py; TASK-034's: task034_*.py; TASK-025's: task025_*.py); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py, demo_b3.py, demo_b4.py (run with python -X utf8); drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #99, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24; B4 (the first conditional workflows) — closed 2026-10-25: TASK-022 (PR #66), the plan revision (PR #67), TASK-017 to TASK-021 (PRs #68 to #72), BUG-020 (PR #73), REFAC-B4 (PR #74), the stage review's seven rounds fixed by BUG-021 to BUG-027 (PRs #75 to #81), closed at round 7 under the owner's cap; B5 (calibration and acceptance) in progress: HOTFIX-002 (PR #84), TASK-023 (PR #85), TASK-024 (PR #86), BUG-028 (PR #87, ISS-016), TASK-028 (PR #88), TASK-029 (PR #89), BUG-029 (PR #90), TASK-031 (PR #91), the plan revision maintainer-text (PR #92), TASK-030 (PR #93), TASK-032 (PR #94), TASK-033 (PR #95), TASK-035 (PR #96), TASK-034 (PR #97), TASK-025 (PR #98), REFAC-B5 (PR #99), BUG-030 (PR #100), BUG-031 (PR #101). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B4's close, 2026-10-25 (demonstration passed; the installed conformance check, run by the supervisor signed in to gh, 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-014 completed, ISS-015 recorded; Feedback FB-042 to FB-050; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #102, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) — closed 2026-10-19; B3 (the core and phase-module split) — closed 2026-10-24; B4 (the first conditional workflows) — closed 2026-10-25: TASK-022 (PR #66), the plan revision (PR #67), TASK-017 to TASK-021 (PRs #68 to #72), BUG-020 (PR #73), REFAC-B4 (PR #74), the stage review's seven rounds fixed by BUG-021 to BUG-027 (PRs #75 to #81), closed at round 7 under the owner's cap; B5 (calibration and acceptance) in progress: HOTFIX-002 (PR #84), TASK-023 (PR #85), TASK-024 (PR #86), BUG-028 (PR #87, ISS-016), TASK-028 (PR #88), TASK-029 (PR #89), BUG-029 (PR #90), TASK-031 (PR #91), the plan revision maintainer-text (PR #92), TASK-030 (PR #93), TASK-032 (PR #94), TASK-033 (PR #95), TASK-035 (PR #96), TASK-034 (PR #97), TASK-025 (PR #98), REFAC-B5 (PR #99), BUG-030 (PR #100), BUG-031 (PR #101), BUG-032 (PR #102). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B4's close, 2026-10-25 (demonstration passed; the installed conformance check, run by the supervisor signed in to gh, 22 OK / 1 MISSING, the recorded no-diagram-index decision / 5 NOTE; Issues ISS-014 completed, ISS-015 recorded; Feedback FB-042 to FB-050; least confident in HARDENING; Project Summary patched)
+ Deferred increments: none
+-Open issues: ISS-017 recorded, recurred in TASK-033 (TASK-032's builder delivered rounds 1 and 2 incomplete and its round-3 report claimed work it had not done; the supervisor wrote the acceptance tests, 2026-10-28; TASK-033's round-3 report claimed deadline checks the code did not make and two mutation kills that survived, 2026-10-28). ISS-016 fixed by BUG-028 (a review-guard test recorded CPython's POSIX subprocess wait as the guard's sleep, failing PR #86's Linux job once, 2026-10-26). ISS-015 mitigated (stage B4's review ran seven rounds under the owner's decided three-round ceiling, which no program held yet, 2026-10-25; the ceiling applied by hand until TASK-032 to TASK-035 hold it). ISS-014 fixed (the loop guard's cron_next missed a one-shot wake-up in the hour clocks repeat, 2026-10-25; BUG-020, PR #73). ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged; the plan check's rule is TASK-033's). ISS-012 fixed. ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; TASK-029's thirty-minute wait: a launcher run started from the Bash tool waited 34 min 49 s in the slot and reached slot taken, no outside kill (recorded 2026-10-26); the maintainer's record shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
++Open issues: ISS-017 recorded, recurred in TASK-033 (TASK-032's builder delivered rounds 1 and 2 incomplete and its round-3 report claimed work it had not done; the supervisor wrote the acceptance tests, 2026-10-28; TASK-033's round-3 report claimed deadline checks the code did not make and two mutation kills that survived, 2026-10-28). ISS-016 fixed by BUG-028 (a review-guard test recorded CPython's POSIX subprocess wait as the guard's sleep, failing PR #86's Linux job once, 2026-10-26). ISS-015 mitigated (stage B4's review ran seven rounds under the owner's decided three-round ceiling, which no program held yet, 2026-10-25; the ceiling applied by hand until TASK-032 to TASK-035 hold it). ISS-014 fixed (the loop guard's cron_next missed a one-shot wake-up in the hour clocks repeat, 2026-10-25; BUG-020, PR #73). ISS-013 mitigated (BUG-018's pull-request title made the plan check count TASK-031 merged; the plan check's rule is TASK-033's). ISS-012 fixed. ISS-011 open (the owner's computer crashed after a flood of terminal windows while a builder ran the suite, 2026-10-19; cause not confirmed; TASK-029's thirty-minute wait: a launcher run started from the Bash tool waited 34 min 49 s in the slot and reached slot taken, no outside kill (recorded 2026-10-26); the maintainer's record shows 52k launches of session-start.py by run/supervisor/task015_mutants.py; the fix is TASK-028 to TASK-031). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). Earlier: docs/archive/STATUS_HISTORY.md
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+ Bridge version: 2026.10.25a
+ Calibrated: 2026-10-25 from 2026.10.18a to 2026.10.25a — applied: the report cycle's three items until release T writes them (reviewers write nothing under the checkout, a clause of every Review B directive; no plan ID in a title not an increment's; a vendor CLI's banner off and its install without the key, the Socket step already so); the new MISSING, the Layout line's computer path, fixed by HOTFIX-002; no Review B snapshot from before the install was open; the release's building items in force from now; memory notes 11 read, 9 removed (copies of the maintainer's notes); pending: none; not applied (gate passed): none. Earlier calibrations: docs/archive/STATUS_HISTORY.md.
+diff --git a/docs/archive/STATUS_HISTORY.md b/docs/archive/STATUS_HISTORY.md
+index 8392a87..58dd5d7 100644
+--- a/docs/archive/STATUS_HISTORY.md
++++ b/docs/archive/STATUS_HISTORY.md
+@@ -37,3 +37,7 @@ Last accepted, the part moved out at TASK-025 (2026-10-28): before it TASK-034 (
+ Last accepted, the part moved out at BUG-030 (2026-10-28): before it stage B5's refactoring pass (PR #99, at its merge): the tests lane's tests/phase_modules.py helpers and run_mr, and REFAC-003; before it TASK-025 (PR #98): release B's acceptance tests
+ 
+ Last accepted, the part moved out at BUG-031 (2026-10-29): before it stage B5's refactoring pass (PR #99, at its merge)
++
++Last accepted, the part moved out at BUG-032 (2026-10-29): before it BUG-030 (PR #100), its program causes
++
++Open issues, the part moved out at BUG-032 (2026-10-29): ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
+diff --git a/docs/debug/BUG-032.md b/docs/debug/BUG-032.md
+new file mode 100644
+index 0000000..3e7547c
+--- /dev/null
++++ b/docs/debug/BUG-032.md
+@@ -0,0 +1,24 @@
++# BUG-032 — stage B5's review, round 2: four program defects
++
++Found by stage B5's review, round 2 (2026-10-29; Review A in fifteen parts, Review B on the whole change, APPROVE; snapshot STAGE-B5-r2 at b023099, verify OK). Each cause below is read from the program at origin/main 41ead62 and shown by a reproduction test the supervisor wrote first, in tests/test_bug032.py, which fails there for the reason given (run 2026-10-29 on fix/BUG-032 before the brief).
++
++## 1. A checkpoint run is refused when a copied conftest.py imports what the increment adds
++- **Symptom:** `mutation-run.py --checkpoint` exits 2 with `mutation-run: resolution check failed (pytest exit 4)` when a conftest.py on the way to a new test imports a module or a name the increment adds; before BUG-030 the same run went on (tests-mutation-pace, Blocking).
++- **Hypotheses:** (a) the copied conftest.py is not copied where pytest reads it; (b) it is copied, and pytest cannot load it on the checkpoint's code. Discriminating observation: pytest's exit code and line. The run prints `resolution check failed (pytest exit 4)`: pytest's usage-error exit, which it gives when a conftest.py fails to import at startup ("ImportError while loading conftest"), so the file was read and failed to load: (b).
++- **Confirmed cause:** BUG-030's archive_checkpoint copies the working tree's conftest.py files over the checkpoint's (mutation-run.py, the conftest copy); run_resolution_check refuses any pytest exit other than 0 or 2 (`rc not in (0, 2)`), and checkpoint_collect_refused excuses only exit 2, so a conftest.py that cannot load on the old code refuses the whole run, where the tests it guards cannot be run against the checkpoint and are, by step 4's rule for a collection error, `not run`.
++- **Reproduction:** tests/test_bug032.py::test_bug032_a_conftest_importing_what_the_increment_adds_lists_its_tests_not_run (the CALC fixture; the working tree adds demo/newmod.py and a tests/conftest.py that imports it; the new test uses its fixture: exit 2 today, must list the test `not run` and not be refused).
++
++## 2. scope-check.py opens a builder window for a launch that never got the slot
++- **Symptom:** a `supervisor:` test commit made while a builder launch waited for the slot and gave up (exit 123) is counted as drift, though no builder ran (tests-guard C2, tests-launcher C5, launcher C1; convergent).
++- **Confirmed cause:** builder_windows (scope-check.py) takes every `kind: builder` row, a `"slot": "not free"` row included, and since BUG-030 its window runs `waited` + `seconds` + 120 seconds from its `id`; BUG-030 made roster-check's built_by and the launcher's class line skip such a row, which started no command.
++- **Reproduction:** tests/test_bug032.py::test_bug032_a_launch_that_never_got_the_slot_opens_no_builder_window (a started row opens one window, the precondition; a `slot: not free` row opens one today, must open none).
++
++## 3. pace-report.py reads a launch that never got the slot as a launch
++- **Symptom:** a round whose class-line launch ended at 123 and was relaunched without the line reads `class` in the pace report's lift column, and the increment's start is the refused launch's time (tests-launcher C5, launcher C3, briefs-ceiling C2; convergent).
++- **Confirmed cause:** _lift_map and _start_times (pace-report.py) read every row of the ID from runs.jsonl, a `"slot": "not free"` row included.
++- **Reproduction:** tests/test_bug032.py::test_bug032_the_pace_report_reads_a_launch_refused_the_slot_as_no_launch (a refused row with `lift` class before a started row without: `{1: 'class'}` today, must be `{1: 'none'}`; the start must be the started row's).
++
++## 4. The branch rule refuses the refactoring pass's second candidate and its snapshot
++- **Symptom:** on `refactor/<stage>`, after REFAC-003's brief ran, REFAC-004's is refused `branch rule: REFAC-004 is not on this branch (counted: REFAC-003)`; refactoring-pass.md step 4 delegates one REFAC brief per candidate on that one branch, and step 6 takes one gate pass for the whole branch (modules, Blocking; verified by the supervisor in the code and by the test).
++- **Confirmed cause:** bridge_env.branch_allows_id, which bridge-run.py and review-guard.py both call, allows only the IDs the branch's first brief declared (branch_declared_ids) until they merge; a `Merge unit:` line admits only the plan's increment IDs (bridge-run.py), and a REFAC ID is never one; the guard refuses the pass's snapshot under the stage's name for the same reason.
++- **Reproduction:** tests/test_bug032.py::test_bug032_a_refactoring_branch_takes_every_candidates_brief (REFAC-004 refused today on `refactor/B5`, must run; TASK-005 there refused, and REFAC-004 after REFAC-003 on `task-003` refused, the preconditions) and ::test_bug032_the_refactoring_pass_snapshot_is_taken_on_its_branch (a snapshot `REFAC-B5` on that branch must be taken; one of TASK-005 refused, the precondition).
+diff --git a/handoff/BUG-032-r1-report.md b/handoff/BUG-032-r1-report.md
+new file mode 100644
+index 0000000..1342c17
+--- /dev/null
++++ b/handoff/BUG-032-r1-report.md
+@@ -0,0 +1,44 @@
++# BUG-032 round 1 builder report
++
++## test hash before edits
++
++`git hash-object tests/test_bug032.py` → 77e47f08a512dbfbfcf499653851eb14bdc6d8d4
++
++## Files changed
++
++- bridge/cursor-bridge/mutation-run.py
++- bridge/cursor-bridge/scope-check.py
++- bridge/cursor-bridge/pace-report.py
++- bridge/cursor-bridge/bridge_env.py
++
++## Verification
++
++1. `python -m pytest -q -p no:cacheprovider tests/test_bug032.py` — exit 0, `5 passed in 6.16s`
++2. `python -m pytest -q -p no:cacheprovider tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_hotfix25a_guard_scope_invisible.py tests/test_pace_report.py tests/test_task033_supervisor.py tests/test_task033_supervisor_r2.py tests/test_task033_supervisor_r3.py tests/test_task033_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py tests/test_review_guard_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bug030.py` — exit 0, `665 passed, 2 skipped in 808.83s`
++3. `python tools/dump-cli.py --check` — exit 0
++4. `git hash-object tests/test_bug032.py` → 77e47f08a512dbfbfcf499653851eb14bdc6d8d4 (unchanged)
++5. `git status --porcelain`:
++
++```
++ M bridge/cursor-bridge/bridge_env.py
++ M bridge/cursor-bridge/mutation-run.py
++ M bridge/cursor-bridge/pace-report.py
++ M bridge/cursor-bridge/scope-check.py
++?? handoff/BUG-032-r1-report.md
++```
++
++## Summary
++
++BUG-032 fixes four confirmed defects: checkpoint mode no longer refuses the run when a working-tree conftest copied into the archive fails to import on the checkpoint code (those tests are reported `not run` with the conftest path), scope-check and pace-report ignore launcher rows with `"slot": "not free"`, and the branch rule allows any REFAC ID on a `refactor/` branch whose declared IDs are all REFAC IDs.
++
++## Cause fixes
++
++1. **Cause 1:** `copied_conftest_load_failure` detects pytest exit 4 with `ImportError while loading conftest` for a copied conftest; `run_resolution_check` returns instead of refusing, optionally re-runs on unaffected test files, and the checkpoint loop prints `<item>: not run (<conftest>)` and skips pytest for blocked items.
++2. **Cause 2:** `builder_windows` skips rows where `slot == "not free"`.
++3. **Cause 3:** `_start_times` and `_lift_map` skip runs.jsonl rows where `slot == "not free"`.
++4. **Cause 4:** `branch_allows_id` admits any REFAC ID when the branch name starts with `refactor/` and every declared ID on that branch is a REFAC ID.
++
++## Assumed, not verified
++
++- Pytest always reports a copied conftest load failure as exit code 4 with a single `ImportError while loading conftest '<path>'` line in stderr · the brief and one manual collect-only run on Windows · run the same layout on Linux and with other pytest versions.
++- The path in that line is absolute and `os.path.relpath` from the scratch copy root yields the same relative path as `normalize_rel` used when recording `copied_conftest` · observed Windows backslash path under the copy root · confirm when pytest emits a relative path or a different drive letter form.
+diff --git a/handoff/BUG-032-r2-report.md b/handoff/BUG-032-r2-report.md
+new file mode 100644
+index 0000000..625c3e5
+--- /dev/null
++++ b/handoff/BUG-032-r2-report.md
+@@ -0,0 +1,39 @@
++# BUG-032 round 2 report
++
++## Initial test hash
++
++`git hash-object tests/test_bug032.py` before edits: `5e998f6def2cc176ff22c091288e792b0f028fe1`
++
++## Files changed
++
++- `bridge/cursor-bridge/mutation-run.py`
++- `bridge/cursor-bridge/bridge_env.py`
++- `handoff/BUG-032-r2-report.md`
++
++## Summary
++
++Round 2 tightens BUG-032 cause 1 and cause 4: checkpoint mode now loops the resolution check until every excused copied conftest load failure is recorded, excuses only conftest.py files the increment actually changed (via git blob compare), parses pytest's own load-failure line from stderr with per-line full matches (last match wins, fixing CRLF and spoofed stdout lines), removes the resolution plugin on early return, and limits refactoring-branch ID admission to `REFAC-<digits>` briefs and the branch snapshot `REFAC-<stage>` only.
++
++## Corrections
++
++1. **Multiple failing conftests:** The `--checkpoint` branch loops `run_resolution_check` over test files not blocked by already-found failures, accumulates `failed_conftests`, refuses on duplicate or orphan reports, runs the final clear set through the full resolution refusals, and blocks items via the first failed conftest on each item's path.
++2. **Unchanged conftest:** `conftest_changed_by_increment` requires the path to be absent at the checkpoint commit or to differ from that commit's blob; otherwise exit 4 is not excused and the run is refused as before BUG-032.
++3. **Spoofed load line:** `_conftest_load_failure_path` scans stderr lines only, uses `fullmatch` on the exact pytest message, and keeps the last match so a conftest cannot blame another by writing the line first.
++4. **Refactoring branch IDs:** `_refac_numbered_brief_id` and `_refac_branch_snapshot_id` replace the broad `_is_refac_id` gate in `branch_allows_id` and `_declared_ids_all_refac`; non-`str` IDs are rejected.
++
++## Commands run
++
++1. `python -m pytest -q -p no:cacheprovider tests/test_bug032.py` — exit 0 — `9 passed in 20.73s`
++2. `python -m pytest -q -p no:cacheprovider tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_hotfix25a_guard_scope_invisible.py tests/test_pace_report.py tests/test_task033_supervisor.py tests/test_task033_supervisor_r2.py tests/test_task033_supervisor_r3.py tests/test_task033_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py tests/test_review_guard_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bug030.py` — exit 0 — `665 passed, 2 skipped in 804.54s`
++3. `python tools/dump-cli.py --check` — exit 0
++4. `git hash-object tests/test_bug032.py` — `5e998f6def2cc176ff22c091288e792b0f028fe1` (unchanged)
++5. `git status --porcelain`:
++```
++ M bridge/cursor-bridge/bridge_env.py
++ M bridge/cursor-bridge/mutation-run.py
++?? handoff/BUG-032-r2-report.md
++```
++
++## Assumed, not verified
++
++Assumed, not verified: none
+diff --git a/handoff/BUG-032-r2.md b/handoff/BUG-032-r2.md
+new file mode 100644
+index 0000000..4016f06
+--- /dev/null
++++ b/handoff/BUG-032-r2.md
+@@ -0,0 +1,71 @@
++# BUG-032, round 2 — the corrections to round 1's change
++
++## Objective
++Round 1 of `handoff/BUG-032.md` (your change is committed on this branch, its report is `handoff/BUG-032-r1-report.md`) fixed causes 2 and 3 and passed its five reproduction tests, but both reviewers rejected causes 1 and 4: the fix of cause 1 is incomplete when two copied conftest.py files fail to load, excuses a conftest the increment did not change, and trusts the first matching line, which a conftest can write; the fix of cause 4 admits more names than the refactoring pass uses. Read `handoff/BUG-032.md` whole first: its Objective, Context, Constraints and Out of scope still hold, and this brief changes only what it says below. The supervisor wrote four further reproduction tests, appended to `tests/test_bug032.py` under the comment `# Round 2`; each fails on the current code for the reason given and must pass after your change, and the round-1 five must keep passing. Each correction is the minimum that removes its defect; causes 2 and 3 are done and do not change.
++
++1. **A second failing conftest throws away the resolution check (cause 1, Blocking for both reviewers).** In `main`'s `--checkpoint` branch (`bridge/cursor-bridge/mutation-run.py`), after the first `run_resolution_check` returns a failed conftest (`load_fail`), the second call over `remaining` discards its return value. pytest stops at the first conftest.py that fails to load, so one run names only one: when the second call's run also ends on a copied conftest that fails to load, that call returns its path early, before the refusals (a module resolving outside the copy, a module loaded from the Workspace, no report), and nothing ever runs them for the remaining tests; and `checkpoint_item_blocked_by_conftest(item, load_fail)` knows only the first conftest, so a `::` item behind the second prints a bare `not run` and a whole-file item behind it prints nothing at all (its run gives no result data). Reproduction: `tests/test_bug032.py::test_bug032_r2_two_failing_conftests_block_their_tests_and_the_rest_are_judged` (copied `tests/a/conftest.py` and `tests/b/conftest.py` both import a module the increment adds; `tests/a/test_a.py` and `tests/b/test_b.py` are behind them, `tests/c/test_c.py` behind neither passes on the old code: each of the first two must print its `not run (<conftest>)` line naming its own conftest, the third must print `passing on old code`, exit 4).
++2. **An unchanged conftest is excused (cause 1, Review A's Should fix and the security audit's advisory; convergent, so blocking).** `archive_checkpoint`'s `copied_conftest` set records every working-tree conftest.py it copies over the archive, one byte-identical to the checkpoint's own included, so `copied_conftest_load_failure` excuses a conftest the increment did not change; its failure to load is the checkpoint's own, which before BUG-032 refused the run and must still. Reproduction: `::test_bug032_r2_a_conftest_unchanged_since_the_checkpoint_still_refuses` (`tests/conftest.py`, the same at the checkpoint and in the working tree, imports a module only the working tree has: exit 0 with `not run` today, must refuse with exit 2 and `resolution check failed`).
++3. **A conftest can name another conftest (cause 1, the security audit).** `_CONFTEST_LOAD_RX` is searched for in stdout and stderr together, unanchored, and its first match is taken. pytest passes through to its standard error what a conftest.py writes there while it loads, ahead of pytest's own line, so a conftest the increment adds can write `ImportError while loading conftest '<another copied conftest>'.` and then fail to load: the other conftest, which loads, is reported failed and the tests behind it, which would be judged, are listed `not run`. The supervisor saw this with pytest 8 on 2026-10-29: the written line came first, exact, then pytest's own `ImportError while loading conftest '<absolute path of the failing one>'.`, then the traceback, whose lines are indented or begin `E   ` or with a file path. Reproduction: `::test_bug032_r2_a_conftest_that_writes_the_load_failure_line_names_itself` (copied `tests/a/conftest.py` loads and `tests/a/test_a.py` passes on the old code; copied `tests/b/conftest.py` writes the line naming `tests/a/conftest.py` and raises ImportError: today `tests/a/test_a.py` is `not run` and `tests/b/test_b.py` prints nothing, exit 0; it must print `tests/b/test_b.py: not run (tests/b/conftest.py)` and `tests/a/test_a.py::test_old: passing on old code`, exit 4).
++4. **The refactoring branch admits every REFAC name (cause 4, the security audit's advisory and Review A's design note; convergent, so blocking).** `branch_allows_id` (`bridge/cursor-bridge/bridge_env.py`) admits any REFAC ID on a `refactor/` branch whose declared IDs are all REFAC, so the pass's one snapshot can be taken again under another REFAC name with fresh guard rounds (the guard holds its ceiling of rounds per ID), and a brief under any REFAC name can be launched there. The refactoring pass uses exactly two kinds of name on its branch `refactor/<stage>`: a candidate's brief `handoff/REFAC-<nnn>.md`, `<nnn>` digits (refactoring-pass.md step 4), and the one snapshot of the whole branch, `REFAC-<stage>`, `<stage>` being the branch name after `refactor/` (step 6; `refactor/B5` takes `REFAC-B5`). Reproduction: `::test_bug032_r2_a_refactoring_branch_admits_numbered_briefs_and_its_own_snapshot_only` (on `refactor/B5` after `REFAC-003` ran: a brief `REFAC-B5x` and a snapshot `REFAC-B6` are admitted today, must be refused with the branch rule's message; the snapshot `REFAC-B5` must still be taken).
++
++Satisfies: as `handoff/BUG-032.md` — R-041 (corrections 1 to 3) and R-042 (correction 4).
++
++## Scope
++One brief carries one increment's scope; work that needs a second scope is a second brief, never a second section here.
++Files and directories you may create or modify:
++- bridge/cursor-bridge/mutation-run.py
++- bridge/cursor-bridge/bridge_env.py
++- docs/BUILDER_NOTES.md
++- handoff/BUG-032-r2-report.md
++
++Do not modify anything else.
++
++## Out of scope
++- everything `handoff/BUG-032.md` lists under Out of scope, and in addition bridge/cursor-bridge/scope-check.py and bridge/cursor-bridge/pace-report.py (causes 2 and 3 are done)
++- handoff/BUG-032-r1-report.md (round 1's report stays as written)
++- every file under tests/, above all `tests/test_bug032.py` (you read it and run it; you never edit it)
++
++## Context
++All of `handoff/BUG-032.md`'s Context holds (the Workspace root, the development data, the security trust boundaries, the checkpoint step's rule for `not run`). What is on this branch now, from round 1:
++
++- `mutation-run.py`: `archive_checkpoint` returns `copied_conftest`, the set of Workspace-relative paths of the conftest.py files it copied from the working tree. `_CONFTEST_LOAD_RX = re.compile(r"ImportError while loading conftest '([^']+)'", re.MULTILINE)`. `copied_conftest_load_failure(copy_root, copied_conftest, rc, err, out)` returns the relative path when `rc == 4`, the pattern is found in `out` plus `err`, and the path is in `copied_conftest`; else None. `run_resolution_check(..., copied_conftest=None)` calls it after `checkpoint_collect_refused` and returns its path early, before `if rc not in (0, 2)` and the refusals that follow; its normal end removes `PLUGIN_NAME` from `plugin_dir` and returns None (the early return skips that removal). Helpers: `checkpoint_item_conftest_paths(item)`, `checkpoint_test_files_clear_of_conftest(test_files, failed_conftest)`, `checkpoint_item_blocked_by_conftest(item, failed_conftest)`, each taking one conftest path. `main`: the first call's return is `load_fail`; `remaining = checkpoint_test_files_clear_of_conftest(chk_test_files, load_fail)`; `if load_fail and remaining:` a second call whose return is discarded; the item loop prints `"%s: not run (%s)" % (item, blocked)` for a blocked item.
++- `mutation-run.py` helpers for the commit: `git_try(...)` (returns None on failure), used by `module_file_at_commit` as `git_try("cat-file", "-e", "%s:%s" % (commit, rel), cwd=workspace)`.
++- `bridge_env.py`: `_is_refac_id(id_part, id_rx)` (starts with `REFAC-`, longer than it, `re.fullmatch(id_rx, id_part)`), `_declared_ids_all_refac(declared, id_rx)`, and in `branch_allows_id`, after `if id_part in declared`: `if (branch.startswith("refactor/") and _declared_ids_all_refac(declared, id_rx) and _is_refac_id(id_part, id_rx)): return True, None`. `branch` there is already `norm_branch(branch)`.
++- Callers of `branch_allows_id`: `bridge-run.py` passes a brief's ID (a builder or review launch); `review-guard.py` passes the snapshot's ID. Neither caller changes.
++
++## Diagrams
++None, as `handoff/BUG-032.md`.
++
++## Requirements
++1. **Every failing copied conftest is found and named (correction 1).** In the `--checkpoint` branch, run the resolution check over the listed new test files; while it reports an excused conftest (Requirement 2) that failed to load, add it to the set of failed conftests and run the check again over the listed test files whose way (`conftest_paths`) runs through none of the failed conftests, until a run reports none or no test file is left. The last run over the files that are left is the full resolution check with every refusal it has today. Refuse the run (`Refuse`, the `mutation-run: resolution check failed (pytest exit 4)` message, exit 2) when a run reports a conftest already in the set, or when the conftest it reports lies on the way of none of the files that run was given (so the next run would be the same). Every listed item (`checkpoint_new_test_items`) whose way runs through a failed conftest prints `<item>: not run (<that conftest>)`, a whole-file item and a `::` item alike, naming the first failed conftest on its way in root-to-folder order; no pytest run is made for it. Every other item is run and reported as today.
++2. **Only a conftest the increment changed is excused (correction 2).** `copied_conftest_load_failure` excuses a reported conftest only when it is in `copied_conftest` and the increment changed it: the path does not exist at the checkpoint commit, or its working-tree content differs from the commit's blob at that path (for example `git hash-object` of the working-tree file against `git rev-parse <commit>:<path>`, run with `git_try` in the Workspace; any git failure means not excused). A conftest that is the same as the checkpoint's and fails to load refuses the run as before BUG-032 (`resolution check failed (pytest exit 4)`).
++3. **Only pytest's own line names the failed conftest (correction 3).** The failed conftest is read from pytest's standard error only (never stdout), from the **last** line there that is exactly `ImportError while loading conftest '<path>'.` from its first to its last character (anchored at both ends of the line, `re.MULTILINE`); anything else on a line, a prefix such as `Exit: ` included, is no match, and no match means the exit 4 is refused as today. The path must still resolve, relative to the copy's root, to a member of `copied_conftest` that Requirement 2 excuses.
++4. **The early return removes what the normal end removes.** When `run_resolution_check` returns a failed conftest, it first removes `PLUGIN_NAME` from `plugin_dir` exactly as its normal end does (Review A's consider, taken).
++5. **A refactoring branch admits its numbered briefs and its own snapshot name only (correction 4).** On a branch `refactor/<stage>` (after `norm_branch`; `<stage>` non-empty) whose declared IDs are all REFAC IDs, an ID outside the declared set is allowed when it is `REFAC-` followed by one or more ASCII digits only, or when it is exactly `REFAC-<stage>`; and that `REFAC-<stage>` also matches `GRAMMAR_ID_PATTERN` in full. Any other ID there, another `REFAC-` name included, is refused with today's `(False, declared)` result. "All REFAC IDs" for the declared set uses the same two forms. `_is_refac_id` returns False for a value that is not a `str` (Review A's consider, taken). Everything else in `branch_allows_id` is unchanged, as `handoff/BUG-032.md` Requirement 4 states for other branches, the owner's lift and the lapse.
++
++## Acceptance criteria
++- [ ] The nine tests in `tests/test_bug032.py` pass: round 1's five and round 2's four (`test_bug032_r2_two_failing_conftests_block_their_tests_and_the_rest_are_judged`, `test_bug032_r2_a_conftest_unchanged_since_the_checkpoint_still_refuses`, `test_bug032_r2_a_conftest_that_writes_the_load_failure_line_names_itself`, `test_bug032_r2_a_refactoring_branch_admits_numbered_briefs_and_its_own_snapshot_only`).
++- [ ] The test files named in Done step 2 pass whole, with no other change in results.
++- [ ] No file under tests/ is changed or added: `git status --porcelain -- tests` prints nothing, and `git hash-object tests/test_bug032.py` prints the same value at the end as at the start of your run.
++- [ ] Each correction is addressed at its mechanism, as Requirements 1 to 5 state; causes 2 and 3 (scope-check.py, pace-report.py) are untouched.
++- [ ] `python tools/dump-cli.py --check` exits 0.
++- [ ] No new Semgrep high findings; every new output line is ASCII only.
++
++## Constraints
++All of `handoff/BUG-032.md`'s Constraints hold, and in addition:
++- Do not excuse every exit 4, do not read the excusing line from stdout, do not loosen the anchored line, do not drop a copied conftest.py from the copy, do not skip the resolution check for the files that are left.
++- A further pytest run goes through mutation-run.py's existing `run_resolution_check` and `run_process`; a git command goes through `git_try`; nothing else starts a process.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff`, `git log`, `git show` and `git hash-object` only.
++
++## Done
++Your report is the file `handoff/BUG-032-r2-report.md`, which you write as you go — what you did, what you changed, what you ran and what it printed, what you could not do — so that nothing of it is lost when your run ends early.
++
++Before any edit, run from the Workspace root (the folder you were started in) `git hash-object tests/test_bug032.py` and record its output in the report. Then, after your code edits, run from the Workspace root, in this order:
++
++1. `python -m pytest -q -p no:cacheprovider tests/test_bug032.py`
++2. `python -m pytest -q -p no:cacheprovider tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_hotfix25a_guard_scope_invisible.py tests/test_pace_report.py tests/test_task033_supervisor.py tests/test_task033_supervisor_r2.py tests/test_task033_supervisor_r3.py tests/test_task033_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py tests/test_review_guard_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bug030.py`
++3. `python tools/dump-cli.py --check` (if it fails, do not regenerate anything: stop and report it)
++4. `git hash-object tests/test_bug032.py` (must print the value recorded before your edits), then `git status --porcelain` (paste its output)
++
++Record each command and its result (exit code and the summary line) in the report. When you finish, the report holds a list of every file you changed, a one-paragraph summary of what you did, for each of the four corrections one sentence stating how the change addresses it, and a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific.
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/BUG-032-r3-report.md b/handoff/BUG-032-r3-report.md
+new file mode 100644
+index 0000000..06d1e5f
+--- /dev/null
++++ b/handoff/BUG-032-r3-report.md
+@@ -0,0 +1,42 @@
++# BUG-032 round 3 report
++
++## Initial test hash
++
++`git hash-object tests/test_bug032.py` before edits: `ddc6415179feb4d8f940ab9650f373006a10cef0`
++
++## Files changed
++
++- `bridge/cursor-bridge/mutation-run.py`
++- `bridge/cursor-bridge/bridge_env.py`
++- `bridge/cursor-bridge/review-guard.py`
++
++## Commands and results
++
++1. `python -m pytest -q -p no:cacheprovider tests/test_bug032.py` — exit 0, `14 passed in 52.72s`
++2. `python -m pytest -q -p no:cacheprovider tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_hotfix25a_guard_scope_invisible.py tests/test_pace_report.py tests/test_task033_supervisor.py tests/test_task033_supervisor_r2.py tests/test_task033_supervisor_r3.py tests/test_task033_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py tests/test_review_guard_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bug030.py` — exit 0, `665 passed, 2 skipped in 809.24s (0:13:29)`
++3. `python tools/dump-cli.py --check` — exit 0
++4. `git hash-object tests/test_bug032.py` — `ddc6415179feb4d8f940ab9650f373006a10cef0` (unchanged)
++5. `git status --porcelain`:
++```
++ M bridge/cursor-bridge/bridge_env.py
++ M bridge/cursor-bridge/mutation-run.py
++ M bridge/cursor-bridge/review-guard.py
++?? handoff/BUG-032-r3-report.md
++```
++
++## Summary
++
++Round 3 closes four defects in the checkpoint conftest path and the refactoring-branch snapshot rule: checkpoint mode no longer trusts a multi-file pytest run to name failed conftests, instead confirming each test file alone and running a combined resolution check only on clear files; git failures no longer excuse conftests; stderr is split on newlines without `splitlines`, with colour disabled for the resolution-check pytest run; and guard snapshots on `refactor/<stage>` branches accept only `REFAC-<stage>`, not numbered REFAC IDs.
++
++## Requirement mapping
++
++1. **Per-file conftest confirmation:** Replaced the iterative multi-file loop with an initial probe run whose excused conftest is ignored for blocking, per-file resolution checks that populate `failed_conftests` only when the excused path lies on that file's conftest chain, plus a final combined check on clear files; removed `checkpoint_load_fail_on_run_files` and `checkpoint_test_files_clear_of_conftest`.
++2. **Git failure never excuses:** `conftest_changed_by_increment` uses `git_try("ls-tree", "-z", commit, "--", rel)` where `None` means not changed by increment (not excused) and empty output means absent at the commit (excused).
++3. **Plain pytest stderr line:** Added `_stderr_lines` splitting on `"\n"` with one trailing `\r` stripped per line; set `PY_COLORS=0` and drop `FORCE_COLOR` for the resolution-check pytest environment only; dropped the unused `out` argument from `copied_conftest_load_failure`.
++4. **Snapshot stage name only:** `branch_allows_id(..., snapshot=False)` allows numbered REFAC IDs only when `snapshot` is false; `snapshot_review_refusal` passes `snapshot=True`; removed `_is_refac_id` and the unused `id_rx` parameter from `_declared_ids_all_refac`.
++
++## Assumed, not verified
++
++- `git ls-tree -z <commit> -- <rel>` returns empty stdout when `rel` is absent at the commit and non-empty when present, with exit 0 in both cases · the brief specifies this shape and the r3 git test passed · inspect `git ls-tree` on edge paths (symlinks, submodules) if needed.
++- A per-file resolution check that returns no excused conftest has already satisfied every refusal that the combined run over clear files would apply · the brief treats per-file clear plus combined run as equivalent to the old loop's final full check · a case where combined clear files fail for a reason no single-file run caught would show up as the combined-run refusal path.
++- Disabling colour via `PY_COLORS=0` and removing `FORCE_COLOR` is enough that pytest's conftest load line is never wrapped in ANSI codes in this environment · Review A consider item taken without running pytest under forced colour · run resolution check under inherited `FORCE_COLOR=1` and assert the line still fullmatches.
+diff --git a/handoff/BUG-032-r3.md b/handoff/BUG-032-r3.md
+new file mode 100644
+index 0000000..3f8c29d
+--- /dev/null
++++ b/handoff/BUG-032-r3.md
+@@ -0,0 +1,70 @@
++# BUG-032, round 3 — the corrections to round 2's change
++
++## Objective
++Round 2 of `handoff/BUG-032-r2.md` (your change is committed on this branch, its report is `handoff/BUG-032-r2-report.md`) closed corrections 1, 2 and 4 of that brief as written and passed its nine tests, but both reviewers rejected it on one defect, and the security audit on a second. Read `handoff/BUG-032.md` and `handoff/BUG-032-r2.md` whole first: their Objective, Context, Constraints and Out of scope still hold, and this brief changes only what it says below. The supervisor wrote five further reproduction tests, appended to `tests/test_bug032.py` under the comment `# Round 3`; each fails on the current code for the reason given and must pass after your change, and the nine earlier tests must keep passing. This is the last round the ceiling allows: each correction is the minimum that removes its defect.
++
++1. **A conftest that fails to load still chooses which conftest is reported (Review A Blocking = the security audit Blocking; convergent).** Round 2 reads the last line of pytest's standard error that is exactly `ImportError while loading conftest '<path>'.`. A conftest.py the increment adds runs code while pytest loads it, so it controls that line too: it can write the forged line without a newline after its end text (`...'.\nx`), so pytest's own line, which follows, is merged into `xImportError while loading conftest '...'.` and is no exact line; or it can register an `atexit` handler that writes the forged line after pytest's own line and traceback. Writing the forgery only when another conftest's test is in the run (`'test_a' in` an element of `sys.argv`), it names that other conftest, which loads, and the tests behind it are listed `not run`; the second run, without them, then gets the forger's honest failure, so neither of round 2's two refusals fires. No text of a run in which a conftest the increment changed is loaded can be trusted to name another conftest. Reproduction: `tests/test_bug032.py::test_bug032_r3_a_conftest_hides_only_the_tests_behind_itself[merged]` and `[atexit]` (copied `tests/a/conftest.py` loads and `tests/a/test_a.py` passes on the old code; copied `tests/b/conftest.py` forges the line naming `tests/a/conftest.py` and raises ImportError: today both files print `not run`, exit 0; must print `tests/b/test_b.py: not run (tests/b/conftest.py)` and `tests/a/test_a.py::test_old: passing on old code`, exit 4).
++2. **A git failure excuses a conftest (the security audit's advisory and Review A's Should fix; convergent; behaviour against `handoff/BUG-032-r2.md` Requirement 2, "any git failure means not excused").** `conftest_changed_by_increment` reads `git_try("cat-file", "-e", ...)` returning None as "absent at the commit", hence changed, hence excused; `git_try` returns None for any failure. Reproduction: `::test_bug032_r3_a_git_failure_never_excuses_a_conftest` (with `git_try` answering None to everything, the function returns True today, must return False; the precondition: with git answering, an added conftest is True).
++3. **A snapshot can be taken under any numbered REFAC name (the security audit Blocking; the class ruled blocking in round 1, left open by round 2's Requirement 5).** `branch_allows_id` admits `REFAC-<digits>` on `refactor/<stage>` for the guard's snapshot as well as for a launch, so a snapshot `REFAC-999` (never launched) or `REFAC-0003` (another spelling of a launched brief) opens round 1 of a fresh three-round ceiling for the same branch. The pass's one snapshot is `REFAC-<stage>` (refactoring-pass.md step 6); a numbered ID is a candidate's brief, for a launch. Reproduction: `::test_bug032_r3_a_refactoring_branch_snapshot_takes_its_stage_name_only` (on `refactor/B5` after `REFAC-003` and `REFAC-004` launched: snapshots `REFAC-004`, `REFAC-0003` and `REFAC-999` are taken today, must be refused with the branch rule's message; `REFAC-B5` still taken).
++4. **A `::` item behind a failed conftest (Review A's test gap; a pin, it passes today).** `::test_bug032_r3_a_test_behind_a_failing_conftest_named_by_its_nodeid_is_not_run` pins that a `::` item behind a failing copied conftest prints `<item>: not run (<conftest>)`; it must keep passing.
++
++Satisfies: as `handoff/BUG-032.md` — R-041 (corrections 1 and 2) and R-042 (correction 3).
++
++## Scope
++One brief carries one increment's scope; work that needs a second scope is a second brief, never a second section here.
++Files and directories you may create or modify:
++- bridge/cursor-bridge/mutation-run.py
++- bridge/cursor-bridge/bridge_env.py
++- bridge/cursor-bridge/review-guard.py (only the one `branch_allows_id` call in `snapshot_review_refusal`, Requirement 4)
++- docs/BUILDER_NOTES.md
++- handoff/BUG-032-r3-report.md
++
++Do not modify anything else.
++
++## Out of scope
++- everything `handoff/BUG-032.md` and `handoff/BUG-032-r2.md` list under Out of scope, except the one call in review-guard.py that this brief's Scope names; bridge/cursor-bridge/bridge-run.py stays unchanged
++- handoff/BUG-032-r1-report.md and handoff/BUG-032-r2-report.md (the earlier reports stay as written)
++- every file under tests/, above all `tests/test_bug032.py` (you read it and run it; you never edit it)
++
++## Context
++All of the two earlier briefs' Context holds. What is on this branch now, from round 2:
++
++- `mutation-run.py`: `_CONFTEST_LOAD_RX = re.compile(r"ImportError while loading conftest '([^']+)'\.")`; `_conftest_load_failure_path(err)` returns the path of the last `fullmatch` among `text.splitlines()`; `conftest_changed_by_increment(workspace, commit, rel)` (cat-file -e, then `hash-object` of the working-tree path against `rev-parse <commit>:<rel>`); `copied_conftest_load_failure(copy_root, copied_conftest, workspace, commit, rc, err, out)` (rc 4, the stderr path, a member of `copied_conftest`, changed by the increment); `_remove_resolution_plugin(plugin_dir)`; `run_resolution_check(..., copied_conftest=None)` returning the excused conftest early after removing the plugin, else running every refusal and returning None; `checkpoint_item_conftest_paths`, `checkpoint_test_files_clear_of_conftest(test_files, failed_conftests)`, `checkpoint_item_blocked_by_conftest(item, failed_conftests)` (the first failed conftest on the item's way, root to folder), `checkpoint_load_fail_on_run_files(load_fail, run_files)`; and in `main`'s `--checkpoint` branch the `while run_files:` loop collecting `failed_conftests`, with its two `Refuse("mutation-run: resolution check failed (pytest exit 4)")`.
++- How pytest loads conftest.py files at startup (seen with pytest 8): for each file given on the command line, the conftest.py files on that file's way from the root to its folder, and no conftest of another folder; a conftest that raises while it is imported ends the run with exit 4 and pytest's line on standard error. So a run given one test file alone loads only the conftests on that file's way.
++- `bridge_env.py`: `_refactor_stage(branch)`, `_refac_numbered_brief_id(id_part)`, `_refac_branch_snapshot_id(id_part, stage)`, `_is_refac_id(id_part, id_rx)` (no caller since round 2), `_declared_ids_all_refac(declared, id_rx, branch)` (its `id_rx` unused since round 2), and in `branch_allows_id` the rule admitting `REFAC-<digits>` or `REFAC-<stage>` outside the declared set. Its callers: `bridge-run.py` `builder_review_refusal` (a builder or review launch: `bridge_env.branch_allows_id(log_folder, common, ws, br, mid, owner_lifts, id_rx)`) and `review-guard.py` `snapshot_review_refusal` (`bridge_env.branch_allows_id(log_folder, common, root, br, id_part, owner_lifts, id_rx, git_runner=git_runner)`).
++
++## Diagrams
++None, as `handoff/BUG-032.md`.
++
++## Requirements
++1. **A failing conftest is confirmed by each test file alone (correction 1).** In the `--checkpoint` branch, run the resolution check once over all the listed new test files, as today. When it reports no excused conftest, nothing changes. When it reports one, its text is not used to block anything; instead, for each listed test file, in order, run the resolution check over that file alone: when that run reports an excused conftest that is on that file's way (`conftest_paths`), the file is blocked by it; when that run reports none, it has passed every refusal of the resolution check and the file is clear; an excused conftest not on that file's way refuses the run (`mutation-run: resolution check failed (pytest exit 4)`, exit 2). Then, when any file is clear, run the full resolution check once over all the clear files together; an excused conftest reported there refuses the run the same way. Every listed item (`checkpoint_new_test_items`) in a blocked file prints `<item>: not run (<the conftest that blocked its file>)`, a whole-file item and a `::` item alike, with no pytest run for it; every other item is run and reported as today. Round 2's loop, its two refusals and `checkpoint_load_fail_on_run_files` give way to this; remove whatever no longer has a caller. The rule this keeps: a conftest the increment changed can make `not run` only the tests behind itself.
++2. **A git failure never excuses (correction 2).** `conftest_changed_by_increment` tells absence from failure: for example `git_try("ls-tree", "-z", commit, "--", rel)`, where None (git failed) means not excused, empty output means absent at the commit (changed, excused), and output naming the path means present (then the blob comparison as today; any git failure there means not excused). Every git command goes through `git_try`.
++3. **pytest's own line, read plainly.** Split the standard error on `"\n"` (stripping one trailing `"\r"` per line), not with `str.splitlines()`, which also splits on characters a folder name can hold (`\x85`, ` `). In the environment of the resolution check's pytest run only, set `PY_COLORS` to `0` and remove `FORCE_COLOR`, so an inherited colour setting does not wrap pytest's own line in colour codes and refuse every excusable conftest (Review A's consider, taken). Remove the parameter of `copied_conftest_load_failure` that is no longer read (`out`), and its argument at the call.
++4. **A refactoring branch's snapshot takes its stage name only (correction 3).** `branch_allows_id` gains one keyword parameter, `snapshot=False`; `review-guard.py`'s `snapshot_review_refusal` passes `snapshot=True` (its one call; nothing else in review-guard.py changes; bridge-run.py does not change). On `refactor/<stage>` whose declared IDs are all of the two REFAC forms, an ID outside the declared set is allowed for a snapshot only when it is exactly `REFAC-<stage>` (and matches `GRAMMAR_ID_PATTERN` in full); for a launch (`snapshot=False`), when it is `REFAC-<digits>` or exactly `REFAC-<stage>`, as today. An ID in the declared set, the owner's lift and the lapse are unchanged. Remove `_is_refac_id` (no caller) and the unused `id_rx` parameter of `_declared_ids_all_refac`, and its argument at the call.
++
++## Acceptance criteria
++- [ ] The fifteen tests of `tests/test_bug032.py` pass (fourteen functions, one parametrized twice): round 1's five, round 2's four, round 3's (`test_bug032_r3_a_git_failure_never_excuses_a_conftest`, `test_bug032_r3_a_refactoring_branch_snapshot_takes_its_stage_name_only`, `test_bug032_r3_a_conftest_hides_only_the_tests_behind_itself[atexit]` and `[merged]`, `test_bug032_r3_a_test_behind_a_failing_conftest_named_by_its_nodeid_is_not_run`).
++- [ ] The test files named in Done step 2 pass whole, with no other change in results.
++- [ ] No file under tests/ is changed or added: `git status --porcelain -- tests` prints nothing, and `git hash-object tests/test_bug032.py` prints the same value at the end as at the start of your run.
++- [ ] Each correction is addressed at its mechanism, as Requirements 1 to 4 state; scope-check.py, pace-report.py and bridge-run.py are untouched; review-guard.py changes in its one call only.
++- [ ] `python tools/dump-cli.py --check` exits 0.
++- [ ] No new Semgrep high findings; every new output line is ASCII only.
++
++## Constraints
++All of the two earlier briefs' Constraints hold, and in addition:
++- Do not excuse every exit 4, do not read the excusing line from stdout, do not trust the text of a run with more than one test file to block a file, do not drop a copied conftest.py from the copy, do not skip the resolution check for a clear file.
++- A further pytest run goes through mutation-run.py's existing `run_resolution_check` and `run_process`; a git command goes through `git_try`; nothing else starts a process.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff`, `git log`, `git show` and `git hash-object` only.
++
++## Done
++Your report is the file `handoff/BUG-032-r3-report.md`, which you write as you go — what you did, what you changed, what you ran and what it printed, what you could not do — so that nothing of it is lost when your run ends early.
++
++Before any edit, run from the Workspace root (the folder you were started in) `git hash-object tests/test_bug032.py` and record its output in the report. Then, after your code edits, run from the Workspace root, in this order:
++
++1. `python -m pytest -q -p no:cacheprovider tests/test_bug032.py`
++2. `python -m pytest -q -p no:cacheprovider tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_hotfix25a_guard_scope_invisible.py tests/test_pace_report.py tests/test_task033_supervisor.py tests/test_task033_supervisor_r2.py tests/test_task033_supervisor_r3.py tests/test_task033_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py tests/test_review_guard_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bug030.py`
++3. `python tools/dump-cli.py --check` (if it fails, do not regenerate anything: stop and report it)
++4. `git hash-object tests/test_bug032.py` (must print the value recorded before your edits), then `git status --porcelain` (paste its output)
++
++Record each command and its result (exit code and the summary line) in the report. When you finish, the report holds a list of every file you changed, a one-paragraph summary of what you did, for each of the four requirements one sentence stating how the change addresses it, and a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: round 2's report said none and missed that it assumed pytest's own line is always a line of its own.
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/BUG-032-r4-report.md b/handoff/BUG-032-r4-report.md
+new file mode 100644
+index 0000000..fc73608
+--- /dev/null
++++ b/handoff/BUG-032-r4-report.md
+@@ -0,0 +1,31 @@
++# BUG-032 round 4 report
++
++## Initial hash
++
++`git hash-object tests/test_bug032.py` (before edits): `e2a2d8bb7e2b5a59c6448660d3f3d0a97bd527dd`
++
++## Commands run
++
++1. `python -m pytest -q -p no:cacheprovider tests/test_bug032.py` — exit 0 — `17 passed in 74.76s`
++2. `python -m pytest -q -p no:cacheprovider tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_bug030.py` — exit 0 — `166 passed, 2 skipped in 534.03s`
++3. `python tools/dump-cli.py --check` — exit 0
++4. `git hash-object tests/test_bug032.py` — `e2a2d8bb7e2b5a59c6448660d3f3d0a97bd527dd` (unchanged)
++5. `git status --porcelain`:
++```
++ M bridge/cursor-bridge/mutation-run.py
++?? handoff/BUG-032-r4-report.md
++```
++
++## Files changed
++
++- `bridge/cursor-bridge/mutation-run.py`
++
++## Summary
++
++Round 3 stored every conftest path reported by any single-file resolution check in one shared set (`failed_conftests`) and blocked each checkpoint item if any member of that set appeared on the item's conftest path, which wrongly marked clear files under a shared parent conftest as `not run` and could yield exit 0 when a new test passed on the old code. This increment replaces that set with a dict mapping each test file part to the conftest its own single-file run reported, blocks only items whose file part has such an entry, and removes the now-unused `checkpoint_item_blocked_by_conftest` and `checkpoint_item_conftest_paths` helpers.
++
++The change addresses the defect by scoping `not run` to the file whose own resolution check failed, so a shared conftest failure on one file no longer blocks items belonging to another file that cleared its own run and the joint check.
++
++## Assumed, not verified
++
++Assumed, not verified: none
+diff --git a/handoff/BUG-032-r4.md b/handoff/BUG-032-r4.md
+new file mode 100644
+index 0000000..7b1a896
+--- /dev/null
++++ b/handoff/BUG-032-r4.md
+@@ -0,0 +1,58 @@
++# BUG-032, round 4 — a file is blocked only by its own run
++
++Blocking class: behaviour against the brief (handoff/BUG-032-r3.md Requirement 1) and a defeated safety mechanism (the checkpoint run's exit 4 for a new test passing on the old code, R-041); named by Review A and the security audit independently on round 3's change, and reproduced by the supervisor's tests below. This round runs above the three-round ceiling under this line alone: nothing else of the round-3 review is in it.
++
++## Objective
++Round 3 of `handoff/BUG-032-r3.md` (your change is committed on this branch, its report is `handoff/BUG-032-r3-report.md`) met Requirements 2, 3 and 4 of that brief; both reviewers rejected Requirement 1 on one defect. Read `handoff/BUG-032.md`, `handoff/BUG-032-r2.md` and `handoff/BUG-032-r3.md` whole first: their Objective, Context, Constraints and Out of scope still hold, and this brief changes only what it says below.
++
++**The defect.** In `main`'s `--checkpoint` branch (`bridge/cursor-bridge/mutation-run.py`), the single-file runs add the conftest each reports to one shared set, `failed_conftests`, and the item loop blocks every item by `checkpoint_item_blocked_by_conftest(item, failed_conftests)`, the first conftest of that whole set on the item's way, not by what that item's own file's run reported. So when the run of one file reports a conftest that lies on a shared path (`tests/conftest.py`, a root `conftest.py`), every other file under it is listed `not run`, even a file whose own run and the joint run were clear; a new test passing on the old code then gives exit 0. The run of a file can report a shared conftest by a forged line from a failing conftest beside it, by the shared conftest failing only in a run that holds that file, or by a test module that lifts pytest's output capture, writes the line and exits 4. Reproduction: `tests/test_bug032.py::test_bug032_r4_a_clear_file_is_judged_beside_a_blocked_one[forged]`, `[argv]` and `[module]` (`tests/conftest.py`, added by the increment, is the shared parent of `tests/a/test_a.py`, passing on the old code, and `tests/b/test_b.py`: today both print `not run (tests/conftest.py)`, exit 0; `tests/b/test_b.py` must print its `not run` line and `tests/a/test_a.py::test_old: passing on old code`, exit 4). The fourteen earlier tests of the file (thirteen functions, round 3's forgery test parametrized twice; round 3's brief miscounted them as fifteen) must keep passing.
++
++Satisfies: R-041, as `handoff/BUG-032.md`.
++
++## Scope
++One brief carries one increment's scope; work that needs a second scope is a second brief, never a second section here.
++Files and directories you may create or modify:
++- bridge/cursor-bridge/mutation-run.py
++- docs/BUILDER_NOTES.md
++- handoff/BUG-032-r4-report.md
++
++Do not modify anything else.
++
++## Out of scope
++- everything the three earlier briefs list under Out of scope; bridge/cursor-bridge/bridge_env.py and bridge/cursor-bridge/review-guard.py stay as round 3 left them
++- handoff/BUG-032-r1-report.md, -r2-report.md and -r3-report.md (the earlier reports stay as written)
++- every file under tests/, above all `tests/test_bug032.py` (you read it and run it; you never edit it)
++- the round-3 reviewers' findings outside this brief's Blocking class line (the supervisor records them in docs/HARDENING.md): the reason a blocked file prints, the snapshot under a refactoring branch's declared ID, the ls-tree working folder, a whole-file item whose run gives no results file
++
++## Context
++What is on this branch now, from round 3, in `main`'s `--checkpoint` branch: `failed_conftests = set()`; `rc_kwargs`; the first `run_resolution_check` over `chk_test_files`; when it returns a conftest, for each `fpart` of `chk_test_files` a single-file `run_resolution_check(..., [fpart], ...)` whose result `per_fail` either refuses (not on the file's way), is added to `failed_conftests`, or leaves the file in `clear_files`; the joint check over `clear_files`; then the item loop, which for each item calls `blocked = checkpoint_item_blocked_by_conftest(item, failed_conftests)` and prints `"%s: not run (%s)" % (item, blocked)`. `checkpoint_item_blocked_by_conftest` and `checkpoint_item_conftest_paths` have no other caller. The item's file part is computed in the same branch as for `chk_test_files` (`normalize_rel(item.split("::", 1)[0])` for a `::` item, `normalize_rel(item)` for a whole file).
++
++## Diagrams
++None, as `handoff/BUG-032.md`.
++
++## Requirements
++1. **A file is blocked only by its own run.** Keep, per listed test file, the conftest its own single-file run reported (for example a dict from the file part to that conftest, filled where `per_fail` is recorded today). In the item loop, an item is blocked, and prints `<item>: not run (<the conftest its own file's run reported>)` with no pytest run, only when its own file part was blocked; every item of every other file is run and reported as today, a whole-file item and a `::` item alike. Everything else of round 3's procedure stays as it is: the first run over all files, the single-file runs and their refusal of a conftest off the file's way, the joint check over the clear files and its refusal. Remove `failed_conftests`, `checkpoint_item_blocked_by_conftest` and `checkpoint_item_conftest_paths` when nothing calls them any more.
++
++## Acceptance criteria
++- [ ] The seventeen tests of `tests/test_bug032.py` pass (fourteen functions, two of them parametrized: round 3's forgery test twice, round 4's test three times), the three of `test_bug032_r4_a_clear_file_is_judged_beside_a_blocked_one` among them.
++- [ ] The test files named in Done step 2 pass whole, with no other change in results.
++- [ ] No file under tests/ is changed or added: `git status --porcelain -- tests` prints nothing, and `git hash-object tests/test_bug032.py` prints the same value at the end as at the start of your run.
++- [ ] The defect is addressed at its mechanism, as Requirement 1 states; only bridge/cursor-bridge/mutation-run.py changes.
++- [ ] `python tools/dump-cli.py --check` exits 0.
++- [ ] No new Semgrep high findings; every new output line is ASCII only.
++
++## Constraints
++All of the three earlier briefs' Constraints hold. In addition: do not trust any run's text to block a file other than the one that run was given alone; do not change anything outside Requirement 1.
++
++## Done
++Your report is the file `handoff/BUG-032-r4-report.md`, which you write as you go — what you did, what you changed, what you ran and what it printed, what you could not do — so that nothing of it is lost when your run ends early.
++
++Before any edit, run from the Workspace root (the folder you were started in) `git hash-object tests/test_bug032.py` and record its output in the report. Then, after your code edits, run from the Workspace root, in this order:
++
++1. `python -m pytest -q -p no:cacheprovider tests/test_bug032.py`
++2. `python -m pytest -q -p no:cacheprovider tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_bug030.py`
++3. `python tools/dump-cli.py --check` (if it fails, do not regenerate anything: stop and report it)
++4. `git hash-object tests/test_bug032.py` (must print the value recorded before your edits), then `git status --porcelain` (paste its output)
++
++Record each command and its result (exit code and the summary line) in the report. When you finish, the report holds a list of every file you changed, a one-paragraph summary of what you did, one sentence stating how the change addresses the defect, and a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific.
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/BUG-032.md b/handoff/BUG-032.md
+new file mode 100644
+index 0000000..c2f461c
+--- /dev/null
++++ b/handoff/BUG-032.md
+@@ -0,0 +1,138 @@
++# BUG-032 — stage B5's review, round 2: four confirmed program defects
++
++## Objective
++Fix the following confirmed defect — repair the named cause, nothing else. This is a group of four confirmed causes found by stage B5's review, round 2, each read from the program at origin/main 41ead62 and shown by a reproduction test the supervisor wrote first, in `tests/test_bug032.py` (five tests; all five fail on the current code for the reason given and must pass after your change). The source of truth is `docs/debug/BUG-032.md` (read it whole before you start); each cause, its evidence and its reproduction tests are carried below. Each fix is the minimum that removes its cause; nothing else changes "while you are there".
++
++1. **A checkpoint run is refused when a copied conftest.py imports what the increment adds.** Root cause: BUG-030's `archive_checkpoint` (`bridge/cursor-bridge/mutation-run.py`) copies the working tree's conftest.py files on the way to each new test over the checkpoint's archive; `run_resolution_check` refuses any pytest exit other than 0 or 2 (`if rc not in (0, 2): raise Refuse("mutation-run: resolution check failed (pytest exit %d)" % rc)`), and `checkpoint_collect_refused` excuses only exit 2, so a copied conftest.py that cannot load on the old code refuses the whole run, where the tests it guards cannot be run against the checkpoint and are, by the checkpoint step's rule for a collection error, `not run`. Evidence: the run prints `mutation-run: resolution check failed (pytest exit 4)`; exit 4 is pytest's usage-error exit, which it gives when a conftest.py fails to import at startup ("ImportError while loading conftest"), so the copied file was read and failed to load. Reproduction: `tests/test_bug032.py::test_bug032_a_conftest_importing_what_the_increment_adds_lists_its_tests_not_run` (the working tree adds `demo/newmod.py` and a `tests/conftest.py` that imports it; the new test `tests/test_six.py` uses its fixture: exit 2 today, must list the test `not run` and not be refused).
++2. **scope-check.py opens a builder window for a launch that never got the slot.** Root cause: `builder_windows` (`bridge/cursor-bridge/scope-check.py`) takes every `kind: builder` row, a `"slot": "not free"` row included (the launcher's exit-123 row of a launch that waited and gave up, which started no command), and its window runs `waited` + `seconds` + 120 seconds from its `id`; BUG-030 made `roster-check.py` `built_by` and `bridge-run.py`'s `class_used` skip such a row. Reproduction: `tests/test_bug032.py::test_bug032_a_launch_that_never_got_the_slot_opens_no_builder_window` (a started row opens one window, the precondition; a `slot: not free` row opens one today, must open none).
++3. **pace-report.py reads a launch that never got the slot as a launch.** Root cause: `_lift_map` and `_start_times` (`bridge/cursor-bridge/pace-report.py`) read every row of the ID from `runs.jsonl`, a `"slot": "not free"` row included, so a refused launch's `lift` becomes its round's lift and its time the increment's start. Reproduction: `tests/test_bug032.py::test_bug032_the_pace_report_reads_a_launch_refused_the_slot_as_no_launch` (a refused row with `lift` class before a started row without: `{1: 'class'}` today, must be `{1: 'none'}`; the start must be the started row's).
++4. **The branch rule refuses the refactoring pass's second candidate and its snapshot.** Root cause: `bridge_env.branch_allows_id` (`bridge/cursor-bridge/bridge_env.py`), which `bridge-run.py` and `review-guard.py` both call, allows only the IDs the branch's first brief declared (`branch_declared_ids`) until they merge; a `Merge unit:` line admits only the plan's increment IDs (bridge-run.py), and a REFAC ID is never one; the stage-close refactoring pass cuts one branch `refactor/<stage>` and delegates one `handoff/REFAC-<nnn>.md` per candidate on it (refactoring-pass.md step 4), then takes one snapshot of the whole branch named `REFAC-<stage>` (step 6), so the second REFAC brief is refused (`branch rule: REFAC-004 is not on this branch (counted: REFAC-003)`) and the guard refuses the snapshot for the same reason. Reproduction: `tests/test_bug032.py::test_bug032_a_refactoring_branch_takes_every_candidates_brief` (REFAC-004 refused today on `refactor/B5`, must run; TASK-005 there refused, and REFAC-004 after REFAC-003 on `task-003` refused, the preconditions) and `::test_bug032_the_refactoring_pass_snapshot_is_taken_on_its_branch` (a snapshot `REFAC-B5` on that branch must be taken; one of TASK-005 refused, the precondition).
++
++Satisfies: R-040 — one heavy job at a time on the computer, through the launcher's machine-wide slot (cause 2: a launch refused the slot runs nothing); R-041 — mutation reruns run through `mutation-run.py`, the new tests run once against the checkpoint's code (cause 1); R-042 — the code gate's round ceiling held by programs, the branch rule refusing a brief or a snapshot under an ID outside the branch's set (cause 4); R-044 — the pace section computed by `pace-report.py` from git and the launcher's and the guard's records, its started cell and lift column (cause 3).
++
++## Scope
++One brief carries one increment's scope; work that needs a second scope is a second brief, never a second section here.
++Files and directories you may create or modify:
++- bridge/cursor-bridge/mutation-run.py
++- bridge/cursor-bridge/scope-check.py
++- bridge/cursor-bridge/pace-report.py
++- bridge/cursor-bridge/bridge_env.py
++- docs/BUILDER_NOTES.md
++- handoff/BUG-032-r1-report.md
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration
++- docs/ and handoff/, except the files the Scope section names (the supervisor writes the records, including docs/debug/BUG-032.md, docs/HARDENING.md and docs/CHANGES.md)
++- every file under tests/, above all `tests/test_bug032.py` (you read it and run it; you never edit it) and the test files named in Done
++- bridge/cursor-bridge/MANIFEST.json and bridge/cursor-bridge/VERSION: no test or check you run reads them; the supervisor regenerates the manifest after your change. Do not run `tools/make-manifest.py`.
++- docs/cli-reference.json and docs/CLI_REFERENCE.md: no program's command line changes
++- bridge/cursor-bridge/bridge-run.py, bridge/cursor-bridge/review-guard.py and bridge/cursor-bridge/roster-check.py: cause 4 is fixed inside bridge_env.py, which both callers already use; a second copy of the rule in either caller is not allowed
++- every text file: bridge/cursor-bridge/commands/, bridge/cursor-bridge/workflow/*.md, the Known-Pitfalls text, every CHANGELOG
++- the round's other findings (BUG-033's and the supervisor's)
++
++## Context
++All paths are relative to the Workspace root (the folder you were started in). The programs live in `bridge/cursor-bridge/`; the tests load them by file path (the `program("<name>")` fixture in tests/conftest.py, or a subprocess of the program file).
++
++- **Development data** (docs/INVENTORY.md, Decisions): "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: run only the commands named in Done, which work on the sources under `bridge/` and on `tmp_path` fixtures; never run the installer, never touch `~/.claude` or `~/.cursor-bridge`, never run a program against a real project's `run/` folder. The launcher tests isolate the slot's state under a lab home through their own environment.
++- **Security:** ASVS level 2 (docs/INVENTORY.md: "The builder's secure-coding rule is ASVS level 2"). `.cursor/rules/secure-coding.mdc` is in force. Trust boundaries this change touches: the launcher's run log `run/launcher/runs.jsonl` (rows are data, read defensively: a field of the wrong type is skipped, never trusted); mutation-run's scratch copy (files copied from the working tree into the copy, links refused on the paths it copies: `link_on_path`, `validate_tracked_copy`, the conftest copy's own `Refuse("mutation-run: %r is reached through a link" % cp)`); the branch rule (a refusal both the launcher and the guard depend on: widening it beyond what Requirement 4 states is a defeated safety mechanism).
++- No docs/DESIGN.md exists in this repository; the design decisions this brief relies on are stated here and in docs/debug/BUG-032.md. The checkpoint step's rule (bridge/cursor-bridge/workflow/phases/delegation-loop.md): "A test the output marks `not run` (it cannot collect, or ran nothing, on the old code) is neither pass nor fail, and is said."
++
++Existing code, as at HEAD (origin/main 41ead62):
++
++- `mutation-run.py`, `def archive_checkpoint(workspace, commit, dest, new_tests, untracked):` extracts `git archive` of the commit into `dest`, copies each listed new test file, then for each `cp in conftest_paths(fpart)` copies the working tree's conftest.py over the archive (refusing a link on its path) and records it in a local `copied_conftest` set; then `.env`, the `untracked` paths, `remove_bytecode_from_copy(dest)`. Keep this copy and its link refusal exactly as they are.
++- `mutation-run.py`, `def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_tracked, workspace, env, timeout_sec, checkpoint=False, checkpoint_commit=None, new_tests=None):` runs `python -m pytest --collect-only -q -p <plugin> -p no:cacheprovider <cfg> <test_files>` in the copy, then:
++  ```python
++  if checkpoint and checkpoint_collect_refused(workspace, checkpoint_commit, rc, err, out, new_tests):
++      raise Refuse("mutation-run: resolution check failed (pytest exit %d)" % rc)
++  if rc not in (0, 2):
++      raise Refuse("mutation-run: resolution check failed (pytest exit %d)" % rc)
++  if not os.path.isfile(out_json):
++      raise Refuse("mutation-run: resolution check produced no report")
++  ```
++  followed by the refusals of a module resolving outside the copy and of a module loaded from the Workspace. `def checkpoint_collect_refused(workspace, commit, rc, err, out, new_tests):` returns False unless `rc == 2`, and True when a `No module named '<m>'` names a module that exists at the commit.
++- `mutation-run.py`, `main`, the `--checkpoint` branch: `validate_tracked_copy`, `archive_checkpoint`, `run_resolution_check(... checkpoint=True, checkpoint_commit=args.checkpoint, new_tests=new_tests)` over the listed new test files, then for each item of `checkpoint_new_test_items(new_tests)` one pytest run in the copy; it prints `"%s: %s" % (nodeid, label)` per test (`checkpoint_label_for_test`: `passing on old code`, `failing`, `not run`) or `"%s: not run" % item`, and `return 4 if any_pass else 0`. Note: when an item's run gives no result data (`timed or data is None`), today a `::` item is printed `not run` and a whole-file item (the reproduction test lists `tests/test_six.py` as a file) is printed nothing at all. Exit codes 0 to 4 and their meanings (module docstring and `build_parser`'s description) do not change. Do not change `classify_outcome` or `checkpoint_label_for_test`.
++- `scope-check.py`, `def builder_windows():` loops over the rows of `run/launcher/runs.jsonl` read from the current folder; skips a row that is not a dict or whose `kind` is not `builder`, and one of another branch; parses `start` from `id`; appends `(start, start + float(waited) + float(seconds) + 120)`; returns None when the log cannot be read. The skips BUG-030 added elsewhere, for reference: `roster-check.py` `built_by`: `if e.get("slot") == "not free": continue`; `bridge-run.py` `builder_review_refusal`: the same test before `class_used.add(...)`.
++- `pace-report.py`, `def _start_times(ws, common, id_part):` takes `_parse_run_time(bridge_env._event_time_launcher(row))` from every `bridge_env.read_runs_jsonl(ws)` row whose `brief` is the ID, then the guard's rounds (non-seeded) from `bridge_env._read_rounds_files(common)`, and returns the minimum or None. `def _lift_map(ws, common, id_part):` builds `{round: "class" | "owner" | "none"}` from the same rows (a `lift` of class or owner sets the round; `lift is None` sets `none` by `setdefault`), then from the guard's rounds. Only the runs.jsonl part of each changes.
++- `bridge_env.py`:
++  ```python
++  GRAMMAR_ID_PATTERN = r"[A-Z][A-Za-z0-9-]*"
++
++  def branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_runner=None):
++      """Active declared ID set on branch after lapse (R3)."""
++
++  def branch_allows_id(log_folder, common, worktree_root, branch, id_part, owner_lifts, id_rx, git_runner=None):
++      branch = norm_branch(branch)
++      if branch == "main":
++          return False, "main"
++      declared = branch_declared_ids(log_folder, common, worktree_root, branch, id_rx, git_runner=git_runner)
++      git_folder = worktree_root or log_folder
++      if not declared:
++          return True, None
++      if id_part in declared:
++          return True, None
++      if id_part in owner_lifts:
++          return True, "owner"
++      if _claim_lapsed(git_folder, branch, declared, id_rx, git_runner=git_runner):
++          return True, "lapsed"
++      return False, declared
++  ```
++  `norm_branch` strips a leading `refs/heads/` only. Callers: `bridge-run.py` `builder_review_refusal` (`ok, why = bridge_env.branch_allows_id(log_folder, common, ws, br, mid, owner_lifts, id_rx)` for each declared ID; a refusal whose `why` is a frozenset prints `branch rule: %s is not on this branch (counted: %s)`), and `review-guard.py` `snapshot_review_refusal` (the same call with `git_runner`, the same message under `review-guard: refused - `). The callers' messages and their handling of `why` stay as they are. `branch_declared_ids` reads every launcher row, a `"slot": "not free"` row included: a 123 row's branch claim stands, pinned by `tests/test_task032_supervisor_launcher.py::test_bug030_a_launch_that_never_got_the_slot_still_claims_its_branch`; leave it so.
++
++Tests that pin what stays (they pass today and must keep passing): `tests/test_mutation_run_supervisor.py::test_bug030_the_checkpoint_run_takes_the_new_tests_conftest_files` (a new test whose fixture is in a copied conftest that loads: `passing on old code`, exit 4), `::test_bug030_r2_a_linked_untracked_conftest_is_refused` and `::test_bug030_r2_the_conftest_copy_asks_the_link_check` (the conftest copy's link refusal), `::test_task031_req8_a_module_the_increment_adds_does_not_refuse_the_checkpoint_run` (a collection error: `not run`, exit 0); `tests/test_hotfix25a_guard_scope_invisible.py` (the builder windows); `tests/test_task032_supervisor_launcher.py` and `tests/test_task032_supervisor_guard.py` (the branch rule on other branches, the owner's lift, the lapse, the 123 row's claim).
++
++## Diagrams
++None: the build plan's increments these programs come from (TASK-031, TASK-032, TASK-033, the 2026.10.25a hotfix) carry `Diagrams: none`.
++
++## Requirements
++1. **Cause 1 (mutation-run.py, `--checkpoint` mode):** when a conftest.py the run copied from the working tree into the checkpoint copy (BUG-030's copy) cannot be loaded on the checkpoint's code — pytest ends at startup with its usage-error exit 4, its output reporting an ImportError while loading that conftest — the run is not refused: every listed new test whose way (the conftest.py files from the root to its folder, as `conftest_paths` gives them) runs through that conftest.py is reported `not run` on its own line in the program's existing `<item or nodeid>: not run` form, the line also naming the conftest.py that failed to load (its path relative to the Workspace, ASCII only), as a collection error is reported `not run`; the other listed new tests are judged as today, the resolution check's refusals (a module resolving outside the copy, a module loaded from the Workspace, no report) included. A whole-file item behind such a conftest prints its `not run` line too. Unchanged: the conftest copy and its link refusal; every other refusal of the resolution check, an exit 4 or any other exit that is not that case included (a conftest that came from the checkpoint's own archive and fails to load still refuses as today); `checkpoint_collect_refused`'s exit-2 rule; exit 4 for a listed test that passes on the old code; a `not run` test is never counted as passing; when every listed test is `not run` the run exits 0.
++2. **Cause 2 (scope-check.py `builder_windows`):** a row with `"slot": "not free"` opens no window, as `roster-check.py` `built_by` and `bridge-run.py`'s `class_used` already skip it. Nothing else in the window changes (start, end, the branch filter, the fallbacks, None on an unreadable log).
++3. **Cause 3 (pace-report.py `_lift_map` and `_start_times`):** a `runs.jsonl` row with `"slot": "not free"` is skipped by both: it gives no lift and no start. Nothing else in either function or in pace-report.py changes; the guard's rounds are read as today.
++4. **Cause 4 (bridge_env.py `branch_allows_id`):** on a branch whose name (after `norm_branch`) starts with `refactor/`, when every ID the branch declared (`branch_declared_ids`, non-empty) is a REFAC ID — `REFAC-` followed by one or more characters, the whole ID matching `GRAMMAR_ID_PATTERN` in full (so `REFAC-003`, `REFAC-004` and `REFAC-B5` are REFAC IDs, `REFAC-` alone is not) — any REFAC ID is of the branch's set and is allowed: a further REFAC brief's launch (bridge-run.py) and a guard snapshot under a REFAC name (review-guard.py; the pass's one snapshot takes `REFAC-<stage>`, for example `REFAC-B5`). Any other ID on such a branch is refused as today, with the same `(False, declared)` result so both callers' messages still name the counted IDs. On every other branch, and on a `refactor/` branch whose declared set holds a non-REFAC ID, the rule is unchanged. The owner's lift line (`owner_lifts`) and the lapse rule (`_claim_lapsed`) keep working as today. The rule lives once in bridge_env.py, reached by both callers through `branch_allows_id` (a cleaner placement inside bridge_env.py that both callers use is fine); no copy of it in bridge-run.py or review-guard.py. `branch_declared_ids`' result and its callers are unchanged.
++
++## Acceptance criteria
++- [ ] The five reproduction tests in `tests/test_bug032.py` pass: `test_bug032_a_conftest_importing_what_the_increment_adds_lists_its_tests_not_run`, `test_bug032_a_launch_that_never_got_the_slot_opens_no_builder_window`, `test_bug032_the_pace_report_reads_a_launch_refused_the_slot_as_no_launch`, `test_bug032_a_refactoring_branch_takes_every_candidates_brief`, `test_bug032_the_refactoring_pass_snapshot_is_taken_on_its_branch`.
++- [ ] The test files named in Done step 2 pass whole, the pins named in Context among them, with no other change in results (the full suite is the supervisor's).
++- [ ] No file under tests/ is changed or added: `git status --porcelain -- tests` prints nothing (the supervisor committed tests/test_bug032.py before your run), and `git hash-object tests/test_bug032.py` prints the same value at the end as at the start of your run.
++- [ ] Each named cause is addressed at its mechanism: (1) the resolution check no longer refuses the run when the exit-4 startup failure is a copied conftest.py failing to load on the checkpoint's code, and the tests behind it are listed `not run` with the conftest named, every other refusal kept; (2) `builder_windows` skips the `slot: "not free"` row; (3) `_lift_map` and `_start_times` skip the `slot: "not free"` row; (4) `branch_allows_id` admits a REFAC ID on a `refactor/` branch whose declared IDs are all REFAC IDs, and nothing else beyond today's rule.
++- [ ] `python tools/dump-cli.py --check` exits 0 (no command line changed).
++- [ ] Every requirement under "Satisfies" is fully met for these causes, with no stand-in or placeholder; the trace to the requirement IDs is carried by the supervisor's reproduction tests (their docstrings cite R-040, R-041, R-042 and R-044), so you add no test.
++- [ ] No new Semgrep high findings; every new output line is ASCII only.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
++- If the brief, the rules, or the tooling got in your way — an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason — append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python — `0` on other platforms; `windowsHide: true` in Node). Capturing output does not prevent the window. A window is allowed only when it serves the user (they watch it or type into it); then write the reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path. If cause 1's fix starts a further pytest process, it goes through mutation-run.py's existing `run_process`, which already does this.
++- Never start a server, a watcher or a daemon that outlives a test: a test that needs the product running starts it through the test framework's own fixture and stops it there. A server left running keeps your run from ending (plan 10.3, release A2).
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. A development build uses the development data the design names (the inventory's `Development data` decision, quoted in Context) and refuses the installed product's data; if the brief does not say where the development data is, stop and report it (rule 55).
++- A value the brief marks as **the owner's** (a threshold, a price, a limit, a default, a wording) is fixed: none is changed here. The review ceiling of three, the window's 120 s slack, the launcher's exits 123, 124, 125 and mutation-run's exits 0 to 4 stay as they are; do not change them or the tests that pin them, and report it if the work seems to need a change (rule 52).
++- Follow existing conventions in the files you touch (ASCII-only output, the `mutation-run: ` prefix and the `<item>: not run` line form, the defensive reading of runs.jsonl rows).
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff`, `git log` and `git hash-object` only.
++- Numbers from text, a file, a reply or an environment variable are parsed with the language's own parser, never by slicing or splitting a string. Here: pytest's exit code is the process's integer return code; no number is read from pytest's text output.
++- An increment that starts a process meets every point of this checklist: the process is windowless (above); it is stopped in a `finally` or a fixture's teardown, and its whole tree with it; nothing it started outlives the test or the command; a browser launched on Windows is launched attached; its output pipes are closed or drained. Cause 1's fix may start a pytest run through `run_process` and nothing else.
++- Every verification command the Done section asks you to run is written there in full, with its working folder; run exactly those. Do not run the full suite: it is the supervisor's.
++- Prefer reuse over new code — existing helpers (`conftest_paths`, the `copied_conftest` set the copy already builds, `run_process`, the existing `not run` print), the standard library — and write the minimum that meets the acceptance criteria. This never overrides a security requirement stated above.
++- Do not fix by suppressing the symptom — no retry, broad `try/except`, widened tolerance, added `sleep`, or null-check that hides a wrong value. For cause 1 in particular: do not excuse every exit 4, do not drop the copied conftest.py from the copy, do not skip the resolution check for the tests that are not behind the failing conftest.
++- Do not edit the reproduction tests, or any test file.
++- Do not leave any `DEBUG-BUG-` line or stray print.
++- **If you believe the real cause of any of the four is different from the one named, stop, do not change code for that cause, and report why in your summary** — the supervisor will re-diagnose.
++- Do not add an entry to any CHANGELOG or `docs/CHANGES.md`.
++
++## Done
++Your report is the file `handoff/BUG-032-r1-report.md`, which you write as you go — what you did, what you changed, what you ran and what it printed, what you could not do — so that nothing of it is lost when your run ends early.
++
++Before any edit, run from the Workspace root (the folder you were started in) `git hash-object tests/test_bug032.py` and record its output in the report. Then, after your code edits, run from the Workspace root, in this order:
++
++1. `python -m pytest -q -p no:cacheprovider tests/test_bug032.py`
++2. `python -m pytest -q -p no:cacheprovider tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_hotfix25a_guard_scope_invisible.py tests/test_pace_report.py tests/test_task033_supervisor.py tests/test_task033_supervisor_r2.py tests/test_task033_supervisor_r3.py tests/test_task033_supervisor_r4.py tests/test_task032_supervisor_launcher.py tests/test_task032_supervisor_guard.py tests/test_review_guard_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bug030.py`
++3. `python tools/dump-cli.py --check` (if it fails, do not regenerate anything: stop and report it, since no command line should have changed)
++4. `git hash-object tests/test_bug032.py` (must print the value recorded before your edits), then `git status --porcelain` (paste its output)
++
++Record each command and its result (exit code and the summary line) in the report. When you finish, the report holds a list of every file you changed, a one-paragraph summary of what you did, for each of the four causes one sentence stating how the change addresses the named cause, and a section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — for example the form of pytest's output that names the conftest that failed to load, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_bug032.py b/tests/test_bug032.py
+new file mode 100644
+index 0000000..e2a2d8b
+--- /dev/null
++++ b/tests/test_bug032.py
+@@ -0,0 +1,389 @@
++"""BUG-032: stage B5's review, round 2 (docs/HARDENING.md, "Stage B5's review, round 2"): the reproduction tests the
++supervisor wrote before the fix brief, each failing on main at BUG-031's squash (41ead62) and naming the finding it
++reproduces."""
++import json
++
++import pytest
++
++from test_mutation_run_supervisor import CALC, _fixture, _git, _mutants, _run, _write
++from test_task032_supervisor_launcher import (Lab, _guard_ready, assert_ran, assert_refused, build, guard_snapshot,
++                                              launch, write_brief)
++
++SLOT_NOT_FREE = {"kind": "builder", "head": "cursor-agent", "model": "composer-2.5", "seconds": 0, "exit": 123,
++                 "waited": 1500, "slot": "not free"}
++
++
++def _rows(folder, rows):
++    path = folder / "run" / "launcher" / "runs.jsonl"
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
++
++
++def test_bug032_a_conftest_importing_what_the_increment_adds_lists_its_tests_not_run(tmp_path):
++    """Stage B5's review, round 2, tests-mutation-pace Blocking: BUG-030 copies the working tree's conftest.py files
++    on the way to each new test into the checkpoint copy; one that imports a module the increment adds cannot load
++    on the checkpoint's code, so pytest ends at startup (exit 4) and the resolution check refused the whole run
++    (exit 2, `resolution check failed`), where before BUG-030 the run went on. A conftest that imports the code
++    under test is ordinary; the tests it guards cannot be run against the checkpoint, so they are listed `not run`
++    with the reason, as a collection error is, and the run is not refused.
++    enforces: R-041 (the new tests run once against the checkpoint's code); handoff/TASK-031.md Requirement 8
++    (every listed test reported passing, failing or `not run`); docs/INVENTORY.md, Decisions, the by-class line
++    (a refusal of ordinary work on an ordinary layout is a false result and blocks)"""
++    ws = _fixture(tmp_path, CALC)
++    sha = _git(ws, "rev-parse", "HEAD")
++    _write(ws, "demo/newmod.py", "def triple(x):\n    return 3 * x\n")
++    _write(ws, "tests/conftest.py", "import pytest\n\nfrom demo.newmod import triple\n\n\n@pytest.fixture\n"
++           "def six():\n    return triple(2)\n")
++    _write(ws, "tests/test_six.py", "def test_six(six):\n    assert six == 6\n")
++    _git(ws, "add", "-A")
++    mf = _mutants(ws, "ckimp", {"mutants": [], "new_tests": ["tests/test_six.py"]})
++    p = _run(ws, mf, "--checkpoint", sha)
++    out = p.stdout + p.stderr
++    assert "resolution check failed" not in out, out
++    assert p.returncode != 2, out
++    assert "tests/test_six.py" in p.stdout and "not run" in p.stdout, out
++
++
++def test_bug032_a_launch_that_never_got_the_slot_opens_no_builder_window(program, tmp_path, monkeypatch):
++    """Stage B5's review, round 2 (tests-guard C2, tests-launcher C5, launcher C1; convergent): a builder launch that
++    waited for the heavy slot and gave up (exit 123, `"slot": "not free"`) started no builder, as BUG-030 made
++    roster-check's built_by and the launcher's class line read it; scope-check's builder windows read it as a run of
++    `waited` + 120 seconds, so a `supervisor:` test commit made while no builder ran was reported as drift. Such a
++    row opens no window; a row of a run that started still does (the precondition).
++    enforces: R-040 (a launch refused the slot runs nothing); hotfix 2026.10.25a C6 (the `supervisor:` test commits);
++    handoff/BUG-030.md (a `slot: not free` row is no builder run)"""
++    sc = program("scope-check")
++    ws = _fixture(tmp_path, CALC)
++    monkeypatch.chdir(ws)
++    started = dict(SLOT_NOT_FREE, id="2026-01-01T00:00:00Z", exit=0, seconds=600)
++    started.pop("slot")
++    _rows(ws, [started])
++    assert len(sc.builder_windows()) == 1, "the precondition: a run that started opens its window"
++    _rows(ws, [dict(SLOT_NOT_FREE, id="2026-01-01T00:00:00Z")])
++    assert sc.builder_windows() == [], sc.builder_windows()
++
++
++def test_bug032_the_pace_report_reads_a_launch_refused_the_slot_as_no_launch(program, tmp_path):
++    """Stage B5's review, round 2 (tests-launcher C5, launcher C3, briefs-ceiling C2; convergent): BUG-030 ruled that a
++    launch that never got the slot spends no class line and is no builder run; the pace report still took such a
++    row's `lift` as its round's lift and its time as the increment's start. A round whose only launch with the class
++    line never got the slot, relaunched without it, reads `none`; the start is the first launch that started.
++    enforces: R-044 (the pace report's started cell and lift column); handoff/BUG-030.md (a `slot: not free` row
++    spends no class line); docs/INVENTORY.md, Decisions, TASK-033's settled points (an increment's start is its first
++    builder launch)"""
++    pr = program("pace-report")
++    ws = tmp_path / "ws"
++    common = tmp_path / "common"
++    common.mkdir()
++    refused = dict(SLOT_NOT_FREE, id="2026-01-01T00:00:00Z", brief="TASK-007", round=1, lift="class",
++                   brief_name="TASK-007")
++    ran = dict(SLOT_NOT_FREE, id="2026-01-02T00:00:00Z", brief="TASK-007", round=1, lift=None, brief_name="TASK-007",
++               exit=0, seconds=600, waited=0)
++    ran.pop("slot")
++    _rows(ws, [ran])
++    alone = pr._start_times(str(ws), str(common), "TASK-007")
++    assert alone is not None and pr._lift_map(str(ws), str(common), "TASK-007") == {1: "none"}, "the precondition"
++    _rows(ws, [refused, ran])
++    assert pr._lift_map(str(ws), str(common), "TASK-007") == {1: "none"}
++    assert pr._start_times(str(ws), str(common), "TASK-007") == alone
++
++
++def test_bug032_a_refactoring_branch_takes_every_candidates_brief(tmp_path):
++    """Stage B5's review, round 2, modules Blocking: the stage-close refactoring pass cuts one branch
++    `refactor/<stage>` and delegates one brief `handoff/REFAC-<nnn>.md` per candidate (refactoring-pass.md step 4;
++    step 6's pull-request title names them all); the launcher's branch rule (TASK-032) counted the IDs of the
++    branch's first brief, so the second candidate's brief was refused on its own branch, and a `Merge unit:` line
++    admits only the plan's increment IDs. On a `refactor/` branch every REFAC brief is of the branch's set; a brief
++    under any other ID is refused there as before, and on another branch the rule is unchanged (the preconditions).
++    enforces: bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md steps 4 and 6; R-042 (the
++    branch rule refuses a brief under an ID outside the branch's set)"""
++    lab = Lab(tmp_path, branch="refactor/B5")
++    for name in ("REFAC-003", "REFAC-004", "TASK-005"):
++        write_brief(lab.root, name)
++    assert_ran(launch(lab, build("REFAC-003")))
++    assert_ran(launch(lab, build("REFAC-004")))
++    assert "REFAC-00" in assert_refused(launch(lab, build("TASK-005")))
++    other = Lab(tmp_path / "other", branch="task-003")
++    for name in ("REFAC-003", "REFAC-004"):
++        write_brief(other.root, name)
++    assert_ran(launch(other, build("REFAC-003")))
++    assert "REFAC-003" in assert_refused(launch(other, build("REFAC-004")))
++
++
++def test_bug032_the_refactoring_pass_snapshot_is_taken_on_its_branch(tmp_path):
++    """Stage B5's review, round 2, modules Blocking, the guard's half: the pass's one gate pass takes one snapshot of
++    the whole branch, named by the stage (`REFAC-<stage>`, as refactoring-pass.md step 6 names it), on a branch whose
++    builder launches were REFAC briefs; the guard's branch rule, the launcher's, refused it as an ID outside the
++    branch's set. A snapshot of a TASK ID there is still refused (the precondition).
++    enforces: bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md step 6; R-042 (the guard
++    refuses a snapshot under an ID outside the branch's set)"""
++    lab = Lab(tmp_path, branch="refactor/B5")
++    for name in ("REFAC-003", "REFAC-004"):
++        write_brief(lab.root, name)
++        assert_ran(launch(lab, build(name)))
++    _guard_ready(lab)
++    rc, out = guard_snapshot(lab.root, "TASK-005")
++    assert rc != 0 and "branch rule" in out, out
++    rc, out = guard_snapshot(lab.root, "REFAC-B5")
++    assert rc == 0, out
++
++
++# Round 2 (handoff/BUG-032-r2.md): the blocking findings of Review A and the security audit on round 1's change.
++
++NEWMOD = "def triple(x):\n    return 3 * x\n"
++IMPORTING_CONFTEST = ("import pytest\n\nfrom demo.newmod import triple\n\n\n@pytest.fixture\n"
++                      "def six():\n    return triple(2)\n")
++USES_SIX = "def test_six(six):\n    assert six == 6\n"
++PASSES_ON_OLD = "from demo.calc import add\n\n\ndef test_old():\n    assert add(1, 2) == 3\n"
++
++
++def test_bug032_r2_two_failing_conftests_block_their_tests_and_the_rest_are_judged(tmp_path):
++    """BUG-032 round 2 (Review A Blocking 1 = security Blocking; convergent): pytest stops at the first conftest.py
++    that fails to load, so one run reports one; round 1 excused the first, then threw away the second check's
++    answer, so the tests behind the second conftest printed a bare `not run` (a whole-file item nothing) and the
++    tests behind neither were run with no resolution check. Each copied conftest that fails to load is found and
++    named on the `not run` line of every listed test behind it, whole-file items included, and a test behind
++    neither is judged as today: one passing on the old code gives exit 4.
++    enforces: handoff/BUG-032.md Requirement 1 ("a whole-file item behind such a conftest prints its `not run` line
++    too"; "the other listed new tests are judged as today, the resolution check's refusals included"); R-041"""
++    ws = _fixture(tmp_path, CALC)
++    sha = _git(ws, "rev-parse", "HEAD")
++    _write(ws, "demo/newmod.py", NEWMOD)
++    for sub in ("a", "b"):
++        _write(ws, "tests/%s/conftest.py" % sub, IMPORTING_CONFTEST)
++        _write(ws, "tests/%s/test_%s.py" % (sub, sub), USES_SIX)
++    _write(ws, "tests/c/test_c.py", PASSES_ON_OLD)
++    _git(ws, "add", "-A")
++    mf = _mutants(ws, "cktwo", {"mutants": [], "new_tests": ["tests/a/test_a.py", "tests/b/test_b.py",
++                                                            "tests/c/test_c.py"]})
++    p = _run(ws, mf, "--checkpoint", sha)
++    out = p.stdout + p.stderr
++    lines = p.stdout.splitlines()
++    for sub in ("a", "b"):
++        assert any(l.startswith("tests/%s/test_%s.py: not run" % (sub, sub)) and "tests/%s/conftest.py" % sub in l
++                   for l in lines), out
++    assert "tests/c/test_c.py::test_old: passing on old code" in p.stdout, out
++    assert p.returncode == 4, out
++
++
++def test_bug032_r2_a_conftest_unchanged_since_the_checkpoint_still_refuses(tmp_path):
++    """BUG-032 round 2 (Review A Should fix = security advisory; convergent): BUG-030's copy records every working-tree
++    conftest.py on the way, one byte-identical to the checkpoint's included, so round 1 excused a conftest the
++    increment did not change, whose failure to load is the checkpoint's own (here it imports a module the
++    checkpoint lacks), and printed `not run` with exit 0. Only a copied conftest absent at the commit or differing
++    from its blob there is excused; an unchanged one that fails to load refuses the run as before BUG-032.
++    enforces: handoff/BUG-032.md Requirement 1 ("a conftest that came from the checkpoint's own archive and fails to
++    load still refuses as today")"""
++    files = dict(CALC)
++    files["tests/conftest.py"] = IMPORTING_CONFTEST
++    ws = _fixture(tmp_path, files)
++    sha = _git(ws, "rev-parse", "HEAD")
++    _write(ws, "demo/newmod.py", NEWMOD)
++    _write(ws, "tests/test_six.py", USES_SIX)
++    _git(ws, "add", "-A")
++    mf = _mutants(ws, "cksame", {"mutants": [], "new_tests": ["tests/test_six.py"]})
++    p = _run(ws, mf, "--checkpoint", sha)
++    out = p.stdout + p.stderr
++    assert p.returncode == 2 and "resolution check failed" in out, out
++
++
++def test_bug032_r2_a_conftest_that_writes_the_load_failure_line_names_itself(tmp_path):
++    """BUG-032 round 2 (the security audit, Blocking route and advisory): the excuse took the first `ImportError while
++    loading conftest '<path>'` anywhere in stdout and stderr, so a conftest.py the increment adds can write that
++    line naming another conftest before it fails to load (pytest passes what a conftest writes at startup through,
++    ahead of its own line; seen with pytest 8 on 2026-10-29), and the tests behind the named one, which load and
++    would be judged, are listed `not run` instead. pytest's own line is the last line of its standard error that
++    is exactly that text (the traceback after it is indented or prefixed); the conftest it names is the one that
++    failed. Here the failing conftest's test is `not run` and the other's, passing on the old code, gives exit 4.
++    enforces: handoff/BUG-032.md Requirement 1 ("the other listed new tests are judged as today"); the brief's
++    Context, the working tree as untrusted input"""
++    ws = _fixture(tmp_path, CALC)
++    sha = _git(ws, "rev-parse", "HEAD")
++    _write(ws, "tests/a/conftest.py", "import pytest\n\n\n@pytest.fixture\ndef one():\n    return 1\n")
++    _write(ws, "tests/a/test_a.py", PASSES_ON_OLD)
++    _write(ws, "tests/b/conftest.py",
++           "import os\nimport sys\n\nsys.stderr.write(\"ImportError while loading conftest '%s'.\\n\" % os.path.join("
++           "os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'a', 'conftest.py'))\n"
++           "raise ImportError('no such thing')\n")
++    _write(ws, "tests/b/test_b.py", USES_SIX)
++    _git(ws, "add", "-A")
++    mf = _mutants(ws, "ckspoof", {"mutants": [], "new_tests": ["tests/a/test_a.py", "tests/b/test_b.py"]})
++    p = _run(ws, mf, "--checkpoint", sha)
++    out = p.stdout + p.stderr
++    lines = p.stdout.splitlines()
++    assert any(l.startswith("tests/b/test_b.py: not run") and "tests/b/conftest.py" in l for l in lines), out
++    assert "tests/a/test_a.py::test_old: passing on old code" in p.stdout, out
++    assert p.returncode == 4, out
++
++
++def test_bug032_r2_a_refactoring_branch_admits_numbered_briefs_and_its_own_snapshot_only(tmp_path):
++    """BUG-032 round 2 (the security audit's advisory = Review A's design note; convergent): round 1 admitted any REFAC
++    ID on a `refactor/` branch whose IDs are all REFAC, so the pass's one snapshot could be taken again under any
++    other REFAC name with fresh guard rounds, escaping the ceiling the guard holds per ID. Beyond the branch's
++    declared IDs, a `refactor/<stage>` branch admits a candidate's brief `REFAC-<digits>` and one snapshot name,
++    `REFAC-<stage>`; another REFAC name is refused there.
++    enforces: R-042 (the guard's ceiling per ID; the branch rule refusing an ID outside the branch's set);
++    bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md steps 4 and 6"""
++    lab = Lab(tmp_path, branch="refactor/B5")
++    for name in ("REFAC-003", "REFAC-B5x"):
++        write_brief(lab.root, name)
++    assert_ran(launch(lab, build("REFAC-003")))
++    assert "REFAC-003" in assert_refused(launch(lab, build("REFAC-B5x")))
++    _guard_ready(lab)
++    rc, out = guard_snapshot(lab.root, "REFAC-B6")
++    assert rc != 0 and "branch rule" in out, out
++    rc, out = guard_snapshot(lab.root, "REFAC-B5")
++    assert rc == 0, out
++
++
++# Round 3 (handoff/BUG-032-r3.md): the security audit's findings on round 2's change, taken.
++
++
++def test_bug032_r3_a_git_failure_never_excuses_a_conftest(program, tmp_path, monkeypatch):
++    """BUG-032 round 3 (the security audit, advisory; behaviour against handoff/BUG-032-r2.md Requirement 2, "any git
++    failure means not excused"): conftest_changed_by_increment read a failed `git cat-file -e` as the path being
++    absent at the checkpoint, and so as changed by the increment, so any git failure excused the conftest. A git
++    command that fails tells nothing: the conftest is not excused (the precondition: a conftest the increment added,
++    absent at the commit, is excused when git answers).
++    enforces: handoff/BUG-032-r2.md Requirement 2"""
++    mr = program("mutation-run")
++    ws = _fixture(tmp_path, CALC)
++    sha = _git(ws, "rev-parse", "HEAD")
++    _write(ws, "tests/conftest.py", IMPORTING_CONFTEST)
++    assert mr.conftest_changed_by_increment(str(ws), sha, "tests/conftest.py") is True, "the precondition"
++    monkeypatch.setattr(mr, "git_try", lambda *a, **k: None)
++    assert mr.conftest_changed_by_increment(str(ws), sha, "tests/conftest.py") is False
++
++
++def test_bug032_r3_a_refactoring_branch_snapshot_takes_its_stage_name_only(tmp_path):
++    """BUG-032 round 3 (the security audit, Blocking; the class ruled blocking in round 1): round 2 admitted every
++    `REFAC-<digits>` ID on `refactor/<stage>` for a snapshot as well as for a launch, so a snapshot under a numbered
++    name never launched (`REFAC-999`) or another spelling of one that was (`REFAC-0003`) opened round 1 of a fresh
++    ceiling for the same branch. The pass takes one snapshot, `REFAC-<stage>` (refactoring-pass.md step 6); a
++    numbered ID outside the branch's declared IDs is a candidate's brief, admitted for a launch only. The
++    preconditions: the numbered brief still launches, and `REFAC-B5` is still taken.
++    enforces: R-042 (the guard's ceiling per ID; the branch rule); refactoring-pass.md steps 4 and 6"""
++    lab = Lab(tmp_path, branch="refactor/B5")
++    for name in ("REFAC-003", "REFAC-004"):
++        write_brief(lab.root, name)
++        assert_ran(launch(lab, build(name)))
++    _guard_ready(lab)
++    for name in ("REFAC-004", "REFAC-0003", "REFAC-999"):
++        rc, out = guard_snapshot(lab.root, name)
++        assert rc != 0 and "branch rule" in out, (name, out)
++    rc, out = guard_snapshot(lab.root, "REFAC-B5")
++    assert rc == 0, out
++
++
++FORGERS = {
++    # Review A, round 2: the forged line ends where pytest's own begins, so pytest's line is no exact line.
++    "merged": ("import os\nimport sys\n\nif any('test_a' in a for a in sys.argv):\n"
++               "    sys.stderr.write(\"ImportError while loading conftest '%s'.\\nx\" % os.path.join("
++               "os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'a', 'conftest.py'))\n"
++               "raise ImportError('no such thing')\n"),
++    # The security audit, round 2: the forged line is written after pytest's own, at interpreter exit.
++    "atexit": ("import atexit\nimport os\nimport sys\n\nif any('test_a' in a for a in sys.argv):\n"
++               "    atexit.register(lambda: sys.stderr.write(\"ImportError while loading conftest '%s'.\\n\" % "
++               "os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'a', 'conftest.py')))\n"
++               "raise ImportError('no such thing')\n"),
++}
++
++
++@pytest.mark.parametrize("forger", sorted(FORGERS))
++def test_bug032_r3_a_conftest_hides_only_the_tests_behind_itself(tmp_path, forger):
++    """BUG-032 round 3 (Review A Blocking = the security audit Blocking; convergent): round 2 took the last line of
++    pytest's standard error that is exactly `ImportError while loading conftest '<path>'.`, and a conftest that fails
++    to load still chooses that line: it ends its forged line where pytest's own begins (the two merge, so pytest's
++    is no exact line), or writes it at interpreter exit, after pytest's; written only when another conftest's test is
++    in the run, the forgery names that conftest, which loads, and hides its tests. The text of a run in which a
++    conftest the increment changed is loaded is never trusted to name another: a conftest found failing is confirmed
++    by a run of each test file alone, in which only the conftests on that file's way load, so a changed conftest can
++    make `not run` only the tests behind itself, as it could by failing honestly. Here `tests/a/test_a.py` passes on
++    the old code (exit 4) and `tests/b/test_b.py`, behind the forger, is `not run`.
++    enforces: handoff/BUG-032.md Requirement 1 ("the other listed new tests are judged as today"); handoff/BUG-032-r3.md
++    Requirement 1"""
++    ws = _fixture(tmp_path, CALC)
++    sha = _git(ws, "rev-parse", "HEAD")
++    _write(ws, "tests/a/conftest.py", "import pytest\n\n\n@pytest.fixture\ndef one():\n    return 1\n")
++    _write(ws, "tests/a/test_a.py", PASSES_ON_OLD)
++    _write(ws, "tests/b/conftest.py", FORGERS[forger])
++    _write(ws, "tests/b/test_b.py", USES_SIX)
++    _git(ws, "add", "-A")
++    mf = _mutants(ws, "ckforge" + forger, {"mutants": [], "new_tests": ["tests/a/test_a.py", "tests/b/test_b.py"]})
++    p = _run(ws, mf, "--checkpoint", sha)
++    out = p.stdout + p.stderr
++    lines = p.stdout.splitlines()
++    assert any(l.startswith("tests/b/test_b.py: not run") and "tests/b/conftest.py" in l for l in lines), out
++    assert "tests/a/test_a.py::test_old: passing on old code" in p.stdout, out
++    assert p.returncode == 4, out
++
++
++def test_bug032_r3_a_test_behind_a_failing_conftest_named_by_its_nodeid_is_not_run(tmp_path):
++    """BUG-032 round 3 (Review A's test gap, round 2): every earlier test lists whole files; a `::` item behind a copied
++    conftest that fails to load prints its own `not run (<conftest>)` line and makes no pytest run, and a test behind
++    no failed conftest is judged as today.
++    enforces: handoff/BUG-032.md Requirement 1 ("every listed new test ... is reported `not run` on its own line")"""
++    ws = _fixture(tmp_path, CALC)
++    sha = _git(ws, "rev-parse", "HEAD")
++    _write(ws, "demo/newmod.py", NEWMOD)
++    _write(ws, "tests/b/conftest.py", IMPORTING_CONFTEST)
++    _write(ws, "tests/b/test_b.py", USES_SIX)
++    _write(ws, "tests/c/test_c.py", PASSES_ON_OLD)
++    _git(ws, "add", "-A")
++    mf = _mutants(ws, "cknode", {"mutants": [], "new_tests": ["tests/b/test_b.py::test_six", "tests/c/test_c.py"]})
++    p = _run(ws, mf, "--checkpoint", sha)
++    out = p.stdout + p.stderr
++    assert "tests/b/test_b.py::test_six: not run (tests/b/conftest.py)" in p.stdout, out
++    assert "tests/c/test_c.py::test_old: passing on old code" in p.stdout, out
++    assert p.returncode == 4, out
++
++
++# Round 4 (handoff/BUG-032-r4.md), above the ceiling under its Blocking class line: the security audit's finding.
++
++LOADS = "import pytest\n\n\n@pytest.fixture\ndef one():\n    return 1\n"
++ROOT_LINE = ("\"ImportError while loading conftest '%s'.\\n\" % os.path.join(os.path.dirname(os.path.dirname("
++             "os.path.abspath(__file__))), 'conftest.py')")
++SHARED_PARENT = {
++    # A conftest beside the clear file's forges the shared parent's name, at exit, then fails.
++    "forged": {"tests/conftest.py": LOADS,
++               "tests/b/conftest.py": ("import atexit\nimport os\nimport sys\n\natexit.register(lambda: "
++                                       "sys.stderr.write(" + ROOT_LINE + "))\nraise ImportError('no such thing')\n"),
++               "tests/b/test_b.py": USES_SIX},
++    # The shared parent fails only in a run that holds the other file.
++    "argv": {"tests/conftest.py": ("import sys\n\nimport pytest\n\nif any(a.endswith('test_b.py') for a in sys.argv):\n"
++                                   "    raise ImportError('no such thing')\n\n\n@pytest.fixture\ndef one():\n"
++                                   "    return 1\n"),
++             "tests/b/test_b.py": USES_SIX},
++    # No conftest fails: a test module lifts pytest's capture, writes the parent's name and ends the run with exit 4.
++    "module": {"tests/conftest.py": LOADS,
++               "tests/b/test_b.py": ("import gc\nimport os\nimport sys\n\nfrom _pytest.capture import CaptureManager\n\n"
++                                     "for o in gc.get_objects():\n    if isinstance(o, CaptureManager):\n"
++                                     "        o.suspend_global_capture()\nsys.stderr.write(" + ROOT_LINE +
++                                     ")\nsys.stderr.flush()\nos._exit(4)\n")},
++}
++
++
++@pytest.mark.parametrize("shape", sorted(SHARED_PARENT))
++def test_bug032_r4_a_clear_file_is_judged_beside_a_blocked_one(tmp_path, shape):
++    """BUG-032 round 4 (the security audit, round 3, Blocking: behaviour against handoff/BUG-032-r3.md Requirement 1 and a
++    defeated safety mechanism, exit 4): round 3 kept the conftests its single-file runs reported in one set and
++    blocked every item by the first conftest of that set on its way, so a file whose own run was clear was listed
++    `not run` when it shares a parent conftest with a blocked file, and a new test passing on the old code gave
++    exit 0. Here `tests/conftest.py`, added by the increment, is the shared parent of `tests/a/test_a.py` (passing on
++    the old code) and `tests/b/test_b.py`; the run of `tests/b/test_b.py` alone reports the parent, by a forged line
++    from a failing conftest beside it, by the parent failing only in a run that holds it, or by a test module that
++    writes the line and exits 4. A file is blocked only by its own run's report: b is `not run`, a is judged, exit 4.
++    enforces: handoff/BUG-032-r3.md Requirement 1 ("every other item is run and reported as today"; "a conftest the
++    increment changed can make `not run` only the tests behind itself"); R-041"""
++    ws = _fixture(tmp_path, CALC)
++    sha = _git(ws, "rev-parse", "HEAD")
++    _write(ws, "tests/a/test_a.py", PASSES_ON_OLD)
++    for path, text in SHARED_PARENT[shape].items():
++        _write(ws, path, text)
++    _git(ws, "add", "-A")
++    mf = _mutants(ws, "ckshare" + shape, {"mutants": [], "new_tests": ["tests/a/test_a.py", "tests/b/test_b.py"]})
++    p = _run(ws, mf, "--checkpoint", sha)
++    out = p.stdout + p.stderr
++    assert any(l.startswith("tests/b/test_b.py: not run") for l in p.stdout.splitlines()), out
++    assert "tests/a/test_a.py::test_old: passing on old code" in p.stdout, out
++    assert p.returncode == 4, out
