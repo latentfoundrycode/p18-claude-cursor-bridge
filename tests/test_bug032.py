@@ -3,6 +3,8 @@ supervisor wrote before the fix brief, each failing on main at BUG-031's squash 
 reproduces."""
 import json
 
+import pytest
+
 from test_mutation_run_supervisor import CALC, _fixture, _git, _mutants, _run, _write
 from test_task032_supervisor_launcher import (Lab, _guard_ready, assert_ran, assert_refused, build, guard_snapshot,
                                               launch, write_brief)
@@ -232,3 +234,105 @@ def test_bug032_r2_a_refactoring_branch_admits_numbered_briefs_and_its_own_snaps
     assert rc != 0 and "branch rule" in out, out
     rc, out = guard_snapshot(lab.root, "REFAC-B5")
     assert rc == 0, out
+
+
+# Round 3 (handoff/BUG-032-r3.md): the security audit's findings on round 2's change, taken.
+
+
+def test_bug032_r3_a_git_failure_never_excuses_a_conftest(program, tmp_path, monkeypatch):
+    """BUG-032 round 3 (the security audit, advisory; behaviour against handoff/BUG-032-r2.md Requirement 2, "any git
+    failure means not excused"): conftest_changed_by_increment read a failed `git cat-file -e` as the path being
+    absent at the checkpoint, and so as changed by the increment, so any git failure excused the conftest. A git
+    command that fails tells nothing: the conftest is not excused (the precondition: a conftest the increment added,
+    absent at the commit, is excused when git answers).
+    enforces: handoff/BUG-032-r2.md Requirement 2"""
+    mr = program("mutation-run")
+    ws = _fixture(tmp_path, CALC)
+    sha = _git(ws, "rev-parse", "HEAD")
+    _write(ws, "tests/conftest.py", IMPORTING_CONFTEST)
+    assert mr.conftest_changed_by_increment(str(ws), sha, "tests/conftest.py") is True, "the precondition"
+    monkeypatch.setattr(mr, "git_try", lambda *a, **k: None)
+    assert mr.conftest_changed_by_increment(str(ws), sha, "tests/conftest.py") is False
+
+
+def test_bug032_r3_a_refactoring_branch_snapshot_takes_its_stage_name_only(tmp_path):
+    """BUG-032 round 3 (the security audit, Blocking; the class ruled blocking in round 1): round 2 admitted every
+    `REFAC-<digits>` ID on `refactor/<stage>` for a snapshot as well as for a launch, so a snapshot under a numbered
+    name never launched (`REFAC-999`) or another spelling of one that was (`REFAC-0003`) opened round 1 of a fresh
+    ceiling for the same branch. The pass takes one snapshot, `REFAC-<stage>` (refactoring-pass.md step 6); a
+    numbered ID outside the branch's declared IDs is a candidate's brief, admitted for a launch only. The
+    preconditions: the numbered brief still launches, and `REFAC-B5` is still taken.
+    enforces: R-042 (the guard's ceiling per ID; the branch rule); refactoring-pass.md steps 4 and 6"""
+    lab = Lab(tmp_path, branch="refactor/B5")
+    for name in ("REFAC-003", "REFAC-004"):
+        write_brief(lab.root, name)
+        assert_ran(launch(lab, build(name)))
+    _guard_ready(lab)
+    for name in ("REFAC-004", "REFAC-0003", "REFAC-999"):
+        rc, out = guard_snapshot(lab.root, name)
+        assert rc != 0 and "branch rule" in out, (name, out)
+    rc, out = guard_snapshot(lab.root, "REFAC-B5")
+    assert rc == 0, out
+
+
+FORGERS = {
+    # Review A, round 2: the forged line ends where pytest's own begins, so pytest's line is no exact line.
+    "merged": ("import os\nimport sys\n\nif any('test_a' in a for a in sys.argv):\n"
+               "    sys.stderr.write(\"ImportError while loading conftest '%s'.\\nx\" % os.path.join("
+               "os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'a', 'conftest.py'))\n"
+               "raise ImportError('no such thing')\n"),
+    # The security audit, round 2: the forged line is written after pytest's own, at interpreter exit.
+    "atexit": ("import atexit\nimport os\nimport sys\n\nif any('test_a' in a for a in sys.argv):\n"
+               "    atexit.register(lambda: sys.stderr.write(\"ImportError while loading conftest '%s'.\\n\" % "
+               "os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'a', 'conftest.py')))\n"
+               "raise ImportError('no such thing')\n"),
+}
+
+
+@pytest.mark.parametrize("forger", sorted(FORGERS))
+def test_bug032_r3_a_conftest_hides_only_the_tests_behind_itself(tmp_path, forger):
+    """BUG-032 round 3 (Review A Blocking = the security audit Blocking; convergent): round 2 took the last line of
+    pytest's standard error that is exactly `ImportError while loading conftest '<path>'.`, and a conftest that fails
+    to load still chooses that line: it ends its forged line where pytest's own begins (the two merge, so pytest's
+    is no exact line), or writes it at interpreter exit, after pytest's; written only when another conftest's test is
+    in the run, the forgery names that conftest, which loads, and hides its tests. The text of a run in which a
+    conftest the increment changed is loaded is never trusted to name another: a conftest found failing is confirmed
+    by a run of each test file alone, in which only the conftests on that file's way load, so a changed conftest can
+    make `not run` only the tests behind itself, as it could by failing honestly. Here `tests/a/test_a.py` passes on
+    the old code (exit 4) and `tests/b/test_b.py`, behind the forger, is `not run`.
+    enforces: handoff/BUG-032.md Requirement 1 ("the other listed new tests are judged as today"); handoff/BUG-032-r3.md
+    Requirement 1"""
+    ws = _fixture(tmp_path, CALC)
+    sha = _git(ws, "rev-parse", "HEAD")
+    _write(ws, "tests/a/conftest.py", "import pytest\n\n\n@pytest.fixture\ndef one():\n    return 1\n")
+    _write(ws, "tests/a/test_a.py", PASSES_ON_OLD)
+    _write(ws, "tests/b/conftest.py", FORGERS[forger])
+    _write(ws, "tests/b/test_b.py", USES_SIX)
+    _git(ws, "add", "-A")
+    mf = _mutants(ws, "ckforge" + forger, {"mutants": [], "new_tests": ["tests/a/test_a.py", "tests/b/test_b.py"]})
+    p = _run(ws, mf, "--checkpoint", sha)
+    out = p.stdout + p.stderr
+    lines = p.stdout.splitlines()
+    assert any(l.startswith("tests/b/test_b.py: not run") and "tests/b/conftest.py" in l for l in lines), out
+    assert "tests/a/test_a.py::test_old: passing on old code" in p.stdout, out
+    assert p.returncode == 4, out
+
+
+def test_bug032_r3_a_test_behind_a_failing_conftest_named_by_its_nodeid_is_not_run(tmp_path):
+    """BUG-032 round 3 (Review A's test gap, round 2): every earlier test lists whole files; a `::` item behind a copied
+    conftest that fails to load prints its own `not run (<conftest>)` line and makes no pytest run, and a test behind
+    no failed conftest is judged as today.
+    enforces: handoff/BUG-032.md Requirement 1 ("every listed new test ... is reported `not run` on its own line")"""
+    ws = _fixture(tmp_path, CALC)
+    sha = _git(ws, "rev-parse", "HEAD")
+    _write(ws, "demo/newmod.py", NEWMOD)
+    _write(ws, "tests/b/conftest.py", IMPORTING_CONFTEST)
+    _write(ws, "tests/b/test_b.py", USES_SIX)
+    _write(ws, "tests/c/test_c.py", PASSES_ON_OLD)
+    _git(ws, "add", "-A")
+    mf = _mutants(ws, "cknode", {"mutants": [], "new_tests": ["tests/b/test_b.py::test_six", "tests/c/test_c.py"]})
+    p = _run(ws, mf, "--checkpoint", sha)
+    out = p.stdout + p.stderr
+    assert "tests/b/test_b.py::test_six: not run (tests/b/conftest.py)" in p.stdout, out
+    assert "tests/c/test_c.py::test_old: passing on old code" in p.stdout, out
+    assert p.returncode == 4, out
