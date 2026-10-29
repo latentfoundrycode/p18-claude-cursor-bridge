@@ -152,14 +152,15 @@ and fix its own lint/type errors without a human in the loop.
   `~/.claude/cursor-bridge/windowless-default.snapshot.md`, which gives every launch the
   suite makes without creation flags of its own `CREATE_NO_WINDOW`. The block goes into the
   Workspace root's `conftest.py` where that file exists, or else into every test root's (each
-  `testpaths` root, `tests/` where none is set). `cursor-configurator`
+  `testpaths` root that can be used, `tests/` where none is set or none can be used). `cursor-configurator`
   creates a test root's `conftest.py` from the block only where that root has none
   (`tests/conftest.py`, with its folder, where the project has no test root yet); where one
   exists it inserts the block once, at the file's end, unless the file already holds its three tokens
   (`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), and leaves every other line as
   it stands. The conformance check's floor `Windowless test suite` checks it: OK where the
   Workspace root's `conftest.py` holds the three tokens, or else every test root's does,
-  MISSING otherwise. A
+  MISSING otherwise; a root `conftest.py` without them stands for nothing, and a `testpaths`
+  root can be used when it lies inside the Workspace, is reached through no link and holds no `..`. A
   Node suite (vitest, jest, Playwright, `node --test`) has no default yet: the check gives it
   a NOTE naming its runner and KP-059's mechanism (`detached: false`), recorded in the status
   file. A running project receives the item at calibration, which writes it before the

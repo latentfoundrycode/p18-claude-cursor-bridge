@@ -388,7 +388,7 @@ def test_r039_the_snapshot_the_texts_name_is_the_one_task_028_ships():
         assert "where one exists" in body and "every other line as it stands" in body, name
         assert "(`tests/conftest.py`, with its folder, where the project has no test root yet)" in body, name
         assert ("Workspace root's `conftest.py` where that file exists, or else" in body
-                and "every test root's (each `testpaths` root, `tests/` where none is set)" in body), name  # BUG-031
+                and "every test root's (each `testpaths` root that can be used, `tests/` where none is set or none can be used)" in body), name  # BUG-031
     for name in ("configuration.md", "Cursor-Project-Configuration.md"):
         assert "`Windowless test suite`" in homes[name], name
     assert "see `Cursor-Project-Configuration.md`, windowless-default item" in flat(
@@ -402,7 +402,7 @@ def test_r039_the_configuration_texts_carry_the_item():
     configurator's list carry the item, with the floor that checks it and the NOTE a Node suite gets."""
     s = flat(section(module("configuration"), "The windowless test suite", 3))
     assert ("The block goes into the Workspace root's `conftest.py` where that file exists, or else into every test "
-            "root's (each `testpaths` root, `tests/` where none is set): the configurator creates a test root's "
+            "root's (each `testpaths` root that can be used, `tests/` where none is set or none can be used): the configurator creates a test root's "
             "`conftest.py` from the block only where that root has none (`tests/conftest.py`, with its folder, where "
             "the project has no test root yet), and where one exists inserts the block once, at the file's end, "
             "unless the file already holds its three tokens") in s
@@ -444,7 +444,7 @@ def test_r039_calibration_writes_the_floor_between_two_suite_runs():
         "Have `cursor-configurator` write the default from `~/.claude/cursor-bridge/windowless-default.snapshot.md` "
         "exactly as configuration writes it (`Cursor-Project-Configuration.md` §2, the windowless-default item): the "
         "block inserted once at the end of the Workspace root's `conftest.py` where that file exists, or else of every "
-        "test root's (each `testpaths` root, `tests/` where none is set), unless the file already holds its three tokens "
+        "test root's (each `testpaths` root that can be used, `tests/` where none is set or none can be used), unless the file already holds its three tokens "
         "(`windowless_kwargs`, `Popen.__init__`, `CREATE_NO_WINDOW`), a test root's `conftest.py` created from "
         "the snapshot's fenced block where that root has none, every other line left as it stands.",
         "Compare the two reports: their failed and erred test ids, the number of tests each collected, and each run's "

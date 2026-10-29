@@ -120,7 +120,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("change-cycle.md", "What must survive a compaction"): (1834, "978712588641f35af440b4b933153e8e99ccb5275202e0119ca9ca14a5bb5249"),
     ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
     ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
-    ("configuration.md", "The windowless test suite"): (1379, "71587613258817066e44b43ed24944337971d6cc70a6e97b701c7a42663771bd"),
+    ("configuration.md", "The windowless test suite"): (1619, "366fe102a526c7cde4e71c69e3793217a54b718edf13fb4e71c50d2873c697f0"),
     ("configuration.md", "What must survive a compaction"): (963, "338b5c4e338a41c95c7b9b2e1a110ed4e1473a8ad4ed04298359f8b21fd0984a"),
     ("delegation-loop.md", "2. Package the brief"): (964, "5394e345e8d43f10f2f9d98db2d5b092b96d0deea6e2dd75a4d3bb47b45e7e2e"),
     ("delegation-loop.md", "3. Delegate to Cursor"): (7521, "fb5f8cbe4b249ee91da4271b9ca02b2565e545e4580a5b0bbb6976f8aba8cf57"),

@@ -64,7 +64,7 @@ Only the items the supervisor names, drawn from this set:
   suite is pytest. The **block is the fenced block of
   `~/.claude/cursor-bridge/windowless-default.snapshot.md`**, written verbatim into the Workspace
   root's `conftest.py` where that file exists, or else into every test root's (each `testpaths`
-  root, `tests/` where none is set): create a test root's `conftest.py` from it only where that
+  root that can be used, `tests/` where none is set or none can be used): create a test root's `conftest.py` from it only where that
   root has none (`tests/conftest.py`, with its folder, where the project has no test root yet);
   where one exists, insert the block
   once, at the file's end, unless the file already holds its three tokens (`windowless_kwargs`, `Popen.__init__`,

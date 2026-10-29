@@ -820,3 +820,28 @@ def test_r039_dotdot_entry_spellings_dropped(tmp_path, entry):
     rc, out, err = run_check(tmp_path)
     assert rc == 1 and "Traceback" not in err
     assert row_for(out + err) == [MISSING_ROW]
+
+
+def test_bug031_r2_a_root_conftest_without_the_default_stands_for_nothing(tmp_path):
+    """BUG-031 round 2 (Review B, round 1): a Workspace-root conftest.py that lacks the three tokens does not stand for
+    the test roots, nor does it hide them: with both testpaths roots carrying the default the floor is OK on the
+    roots, and with one root bare it is MISSING, the root file holding none of the tokens.
+    enforces: R-039; Cursor-Project-Configuration.md §2, the floor ("a root conftest.py without them stands for
+    nothing"); configuration.md, the windowless test suite's floor sentence"""
+    for carriers, ok in ((("a", "b"), True), (("a",), False)):
+        base = tmp_path / ("-".join(carriers))
+        base.mkdir()
+        root = fixture_root(base)
+        (root / "conftest.py").write_text("import os\n", encoding="utf-8")
+        for name in ("a", "b"):
+            (root / name).mkdir(parents=True)
+            (root / name / "test_x.py").write_text("def test_x(): pass\n", encoding="utf-8")
+            if name in carriers:
+                (root / name / "conftest.py").write_text(minimal_conftest(), encoding="utf-8")
+        (root / "pytest.ini").write_text("[pytest]\ntestpaths = a b\n", encoding="utf-8")
+        _, out, err = run_check(base)
+        rows = row_for(out + err)
+        if ok:
+            assert rows == ["  OK       Windowless test suite (a/conftest.py)"], rows
+        else:
+            assert rows == [MISSING_ROW], rows
