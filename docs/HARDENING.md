@@ -1417,7 +1417,7 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
 - **A Consider, recorded (pass 2, Review B):** under `--dry-run --anyway` the warning says the release "was replaced" (bridge-install.py, install()). This was already recorded under BUG-034, round 2, as a lead for a later edit of the installer's messages, not TASK-027's. Review B adds that a dry run also prints the "previous ... kept at" line without keeping the copy, and that an identical reinstall prints no such line and does not rotate the kept copy.
 - **For TASK-027 (both passes, both reviewers):**
   - Stamp before any install: VERSION and the manifest together, through a merged pull request.
-  - The run sheet checks that the installed VERSION differs and that a "previous ... kept at" line is printed, on the real install, not a dry run: a dry run prints that line too without keeping the copy (pass 2, Review B).
+  - The run sheet checks that the installed VERSION differs and that a "previous ... kept at" line is printed, on the real install, not a dry run: a dry run prints that line too without keeping the copy. The line appears only when the version changes: an identical reinstall prints none and does not rotate the kept copy, so a run sheet run twice shows the line the first time only (pass 2, Review B).
   - The CHANGELOG's new `## <version>` heading comes first, sorts after 2026.10.25a, and carries `**If rolled back**` on its own line.
   - The "Running projects must" items:
     - install, restart, and `/calibrate-bridge` before the next increment;
@@ -1437,3 +1437,4 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
   - C-1's refusal half had been given to TASK-027, whose Scope holds no program.
   - The two floors' calibration steps were given wrongly as 1b for both; the `Workflows:` line is written at 4b.
   - Its Considers were taken too: M3's own line, why the round count matters, the archive's moved status text, R-037's wording, and two glosses in the Reports record.
+- **Review B of these records, round 1 (REJECT), corrected in round 2:** the list for TASK-027 did not carry pass 2 Review B's run-sheet constraint that the "previous ... kept at" line appears only on a version change. Review B measured the core, the modules and the 38 files only release B ships, and found the rest true to the four reports.
