@@ -1,0 +1,133 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index b3385b2..4b0025c 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.10.25a",
+-  "generated": "2026-10-29 20:05",
++  "generated": "2026-10-29 21:28",
+   "files": {
+     "agents/cursor-configurator.md": "8bcb0ebba97ba25c4f81528c439195619196e7d078c4b0054a206e51fa7c8cd2",
+     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
+@@ -111,7 +111,7 @@
+     "cursor-bridge/workflow-check.py": "ff87680ca972eb50abbda822443420f7c650b5fee9e8b607cdf9e6fcf27c9d73",
+     "cursor-bridge/workflow/extension-points.md": "b3973253f2bdf38fe9f329f1a0fb13604a221453c1d7f7bdfbd227013c0592d0",
+     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
+-    "cursor-bridge/workflow/phases/change-cycle.md": "992a32d4041600eb54a7a59e7929e31a17ec817996dfc99f5a2359c43aebc411",
++    "cursor-bridge/workflow/phases/change-cycle.md": "7983a331f18fdaca7a9ebafcfcd5a422007f73b0f010dab84ffc34e8667c7e86",
+     "cursor-bridge/workflow/phases/configuration.md": "b14ecaccb184683649fabba82db77743e5b26cd9509d48b1f4e71da2196c054d",
+     "cursor-bridge/workflow/phases/delegation-loop.md": "770de5a46aca6d0cf82e5e442f644f701ea3510090a668ee53fa8ee13f1d262b",
+     "cursor-bridge/workflow/phases/delegation-loop/decide.md": "edbdc407586a0ad281d2a96b9b5c32ff8722952ea33eeb0aff86cb189a32d839",
+diff --git a/bridge/cursor-bridge/workflow/phases/change-cycle.md b/bridge/cursor-bridge/workflow/phases/change-cycle.md
+index 911943a..cd7c5cf 100644
+--- a/bridge/cursor-bridge/workflow/phases/change-cycle.md
++++ b/bridge/cursor-bridge/workflow/phases/change-cycle.md
+@@ -4,7 +4,7 @@
+ 
+ After a compaction or a resume in a change cycle, read these before your next action:
+ 
+-- this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its `Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with `docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, each scaled to the change; its new stages run `delegation-loop.md` with its sub-files, and their closes `reflection.md` and `project-end.md`, which the session-start hook names with this module while the phase is `changing`;
++- this module, whole, and the module of the step the change has reached, whole, with the conditional workflows the `Workflows:` line names that touch that module, each whole (while the phase is `changing`, the session-start hook names only those that touch this module, `delegation-loop.md`, `reflection.md` or `project-end.md`): its intake runs `intake.md`'s procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its `Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with `docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, each scaled to the change; its new stages run `delegation-loop.md` with its sub-files, and their closes `reflection.md` and `project-end.md`, which the session-start hook names with this module while the phase is `changing`;
+ - `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its date and the step it has reached, and `Awaiting user on:` a gate, or an intake question, that waits for the owner; the inventory's Features answer a request already satisfied, and its Decisions name one the change reverses (item 1);
+ - `docs/REQUIREMENTS.md`, with the failures `completion-check.py --mode done` printed at item 1: each is a gap in the previous delivery, reported to the owner first and planned ahead of the request unless the owner defers it;
+ - the change's records as far as they are written, whole: its `Change: <name>` section of `docs/DESIGN.md`, its record in `docs/DESIGN_CRITIQUE.md` under the change's subject and under `<the change's name>-plan`, the interface artifacts it amends, and its stages in `docs/BUILD_PLAN.md`;
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 51a46ce..3233926 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1388,3 +1388,12 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ - **Review A's noted test gaps, taken as the supervisor's tests:** the rehearsals test now pins one warning line after the banner, with the refusal's count and file list, and test_bug034_the_same_release_with_anyway_warns_of_nothing pins that the identical release installed again with --anyway gets no warning.
+ - **Recorded from round 1 (Review A, Consider):** the refusal says "the release folder" without its path; `fingerprints_of` reads the target's manifest again after `manifest_of` has read it; the docstring's precision about `settings.json` and the `generated` field; a same-version manifest with an empty files list is now refused, which is the safe direction.
+ - **The audit's advisories (rounds 1 and 2):** the target manifest's paths are printed unescaped in the refusal and now in the warning. That manifest is in the owner's own `~/.claude`, so only someone who can already write there controls them. `save_previous` uses the installed version as a path part unchecked, which is older code with the same reach. The warning prints before `replace_release`, so a replacement that failed partway has already said "was replaced" (Review A, noted; the S4 warning's order).
++
++### BUG-035 (TASK-026's first pass, M1; supervisor text; the gate's round 1; recorded, not taken)
++- **Round 1 (Review A APPROVE, Should fix 1), taken:** the new test's `enforces:` line cited R-027 (calibration) for the hook's table, which is R-005's. Corrected before the commit.
++- **Round 1 (Review B REJECT), corrected in round 2:** this record's first lead placed the core's sentence under "Main and conditional workflows"; it stands in "The phase modules". Review B ran the hook against a temporary install with three `Workflows:` lines and confirmed that the survival list's new text is true and closes the finding.
++- **Recorded (Review A, Consider):**
++  - The core's sentence that a module running another phase's procedure reads that phase's module whole (bridge/commands/supervisor.md, "The phase modules", the paragraph "Modules read outside their own phase") does not add "with the conditional workflows that touch it". The change cycle's own survival list now says so, and the core's "the conditional workflows that apply" (in "Main and conditional workflows") covers it, so this is a lead for the next increment that edits that passage.
++  - A calibration run while the phase is `changing` (calibrate-bridge.md step 2) re-reads the hook's modules and their conditionals, not the step's module and its conditionals. This is older than BUG-035, and the survival list covers a compaction or a resume.
++  - The item's closing words ("which the session-start hook names with this module while the phase is `changing`") partly repeat the new parenthesis, accurately.
++  - "the `Workflows:` line" is singular where a project of several parts has one per part, which is calibrate-bridge.md's own wording.
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 03b9b8c..9884bb3 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,10 +3,10 @@ Last updated: 2026-10-29
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none — this file states the position at the merge of BUG-034 (PR #105); next is BUG-035, then TASK-026's second pass
+-Last accepted: BUG-034 (PR #105, at its merge): the installer refuses a release that carries the installed version but other files, and --anyway installs it with a warning that no way back was kept (TASK-026's first pass, M2); before it stage B5's close records (PR #104): the stage review's round 3 (APPROVE at the ceiling), the demonstration, the reflection and least confident; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-025, TASK-028 to TASK-035, BUG-001 to BUG-034, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Increment: none — this file states the position at the merge of BUG-035 (PR #106); next is TASK-026's second pass
++Last accepted: BUG-035 (PR #106, at its merge): a change cycle's compaction-survival list names the conditional workflows that touch the module of the step the change has reached (TASK-026's first pass, M1); before it BUG-034 (PR #105): the installer refuses a release that carries the installed version but other files, and --anyway installs it with a warning that no way back was kept (M2); stage B5's close records (PR #104); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-025, TASK-028 to TASK-035, BUG-001 to BUG-035, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: nothing
+-Next: stage B6, release B's install: TASK-026's first pass (a fresh-context Claude reviewer and Review B, both APPROVE) found two fixes: BUG-034, merged, and BUG-035 next (supervisor text: change-cycle.md's survival list names the conditional workflows that touch the module, M1); then TASK-026's second pass on both fixes and its records pull request; then TASK-027, which stamps the release and installs it by R-038's pause and switch (the owner's run sheet; an increment in flight at the install with no report file is seeded by hand: HARDENING, Stage B5's review, round 3). Until release B installs, the three-round review ceiling applies by hand (INVENTORY, Decisions), and a builder starts only after a running suite ends, one test run at a time (HARDENING, BUG-030; the installed launcher has no slot). No pull-request title that is not an increment's names a plan ID inside its closing parenthesis (ISS-013). A class line reads `Blocking class: <class> - <finding>`, the class word first.
++Next: stage B6, release B's install: TASK-026's first pass (a fresh-context Claude reviewer and Review B, both APPROVE) found two fixes, BUG-034 and BUG-035, both merged; next its second pass on both fixes, then its records pull request; then TASK-027, which stamps the release and installs it by R-038's pause and switch (the owner's run sheet; an increment in flight at the install with no report file is seeded by hand: HARDENING, Stage B5's review, round 3). Until release B installs, the three-round review ceiling applies by hand (INVENTORY, Decisions), and a builder starts only after a running suite ends, one test run at a time (HARDENING, BUG-030; the installed launcher has no slot). No pull-request title that is not an increment's names a plan ID inside its closing parenthesis (ISS-013). A class line reads `Blocking class: <class> - <finding>`, the class word first.
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -15,7 +15,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); each closed gate's own files (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*.py, bug0nn_*.py, stage_b4_scope_r*.py, stage-b4-review-r*.md, and the bug, fix, refactoring and stage-review files of stages B1 to B3; the plan revision maintainer-text's: plan_text_*.py, design_text_file.py, write_review_plantext.py, *-PLAN-TEXT.md, msg-plan-text-*.txt; TASK-030's: task030_*.py; TASK-032's: task032_*.py, task032_*.md; TASK-033's: task033_*.py, task033_*.md; TASK-035's: task035_*.py; TASK-034's: task034_*.py; TASK-025's: task025_*.py); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); b5close_docs.py and b5close_records.py (stage B5's); the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py to demo_b5.py (run with python -X utf8); drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #105, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Remote sync: main at the merge of PR #106, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+ Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) closed 2026-10-19; B3 (the core and phase-module split) 2026-10-24; B4 (the first conditional workflows) 2026-10-25; B5 (calibration and acceptance) closed 2026-10-29: HOTFIX-002, TASK-023 to TASK-025, TASK-028 to TASK-035, the plan revision maintainer-text, BUG-028 to BUG-033 and REFAC-B5 (PRs #84 to #103), the stage review closed at round 3, the first at the ceiling (HARDENING, Stage B5); B6 (release B's install) next. The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B5's close, 2026-10-29 (demonstration passed, 14 checks; the installed conformance check 21 OK / 1 MISSING, the recorded no-diagram-index decision / 6 NOTE; Issues ISS-017 and ISS-018 completed, ISS-019 added and completed, ISS-011 and ISS-015 updated; Feedback FB-051 to FB-062; least confident in HARDENING; Project Summary patched)
+ Deferred increments: none
+ Open issues: ISS-011 open (the window flood of 2026-10-19; its fix merged in stage B5, TASK-028 to TASK-031; closed after release B installs at B6 if no flood recurs). ISS-015 mitigated (the ceiling by hand until release B installs; its programs merged, TASK-030 and TASK-032 to TASK-035). ISS-013 mitigated (BUG-018's title; the plan check's rule is TASK-033's). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-016 fixed (BUG-028); ISS-017 to ISS-019 completed at stage B5's close. Earlier: docs/archive/STATUS_HISTORY.md
+diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
+index b430273..a2862cc 100644
+--- a/tests/test_b3_least_confident.py
++++ b/tests/test_b3_least_confident.py
+@@ -117,7 +117,7 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
+ # exception; an increment that adds an entry adds its section's pin.
+ EXCUSED_MODULE_SECTIONS = {
+     ("change-cycle.md", "The procedure"): (6772, "dcef638691afd09a52d40d5faab5a5501be74de54396ccb2ac71b0c98291b42f"),
+-    ("change-cycle.md", "What must survive a compaction"): (1834, "978712588641f35af440b4b933153e8e99ccb5275202e0119ca9ca14a5bb5249"),
++    ("change-cycle.md", "What must survive a compaction"): (2084, "4f007ec186e0d5a5f5f0314caaca28faa523e62a93302a1611545446284091e9"),
+     ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
+     ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
+     ("configuration.md", "The windowless test suite"): (1619, "366fe102a526c7cde4e71c69e3793217a54b718edf13fb4e71c50d2873c697f0"),
+diff --git a/tests/test_phase_modules_close.py b/tests/test_phase_modules_close.py
+index d5e203e..09009b4 100644
+--- a/tests/test_phase_modules_close.py
++++ b/tests/test_phase_modules_close.py
+@@ -45,7 +45,9 @@ INTRO = {
+ 
+ SURVIVAL = {
+     "change-cycle": [
+-        "this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s "
++        "this module, whole, and the module of the step the change has reached, whole, with the conditional workflows the "
++        "`Workflows:` line names that touch that module, each whole (while the phase is `changing`, the session-start hook "
++        "names only those that touch this module, `delegation-loop.md`, `reflection.md` or `project-end.md`): its intake runs `intake.md`'s "
+         "procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its "
+         "`Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with "
+         "`docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, "
+@@ -397,3 +399,26 @@ def test_each_excused_variant_section_is_pinned(rel, title):
+                (re.match(r"^- (?:new|reword) \S+ (\S+\.md) (.+)$", l) for l in read(EXCEPTIONS).split("\n"))
+                if m and m.group(1).startswith(prefix + "interface/")]
+     assert sorted(entries) == sorted("%s %s" % k for k in EXCUSED_SECTIONS), entries
++
++
++def test_bug035_a_change_cycle_reads_the_conditional_workflows_of_the_step_it_has_reached():
++    """BUG-035 (TASK-026's release-level review, pass 1, M1): while the phase is `changing` the session-start hook names
++    the change cycle's own modules only, so after a compaction in a change's intake, design or interface step the
++    conditional workflows touching that step's module (claude-code-extension.md at design, local-service.md at the
++    interface, local-web-app.md and own-computer.md at intake) were never named. The survival list says to read them,
++    and its parenthesis names the modules the hook does name, which are the hook's own table.
++
++    enforces: change-cycle.md "What must survive a compaction"; docs/REQUIREMENTS.md R-004 (what must survive a
++    compaction), R-005 (the hook names the phase's modules and the conditional workflows that touch them)."""
++    import importlib.util
++    spec = importlib.util.spec_from_file_location("session_start_for_bug035", os.path.join(CB, "session-start.py"))
++    mod = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(mod)
++    text = flat(section(module("change-cycle"), "What must survive a compaction", 3))
++    clause = "the module of the step the change has reached, whole, with the conditional workflows the `Workflows:` line names that touch that module, each whole"
++    assert clause in text, "the change cycle's survival list does not name the step's conditional workflows"
++    hook = mod.PHASE_MODULES["changing"]
++    named = text[text.index(clause):].split("):", 1)[0]
++    assert hook[0] == "change-cycle" and all("`%s.md`" % key in named for key in hook[1:]), (hook, named)
++    for step in ("intake", "design", "interface"):
++        assert step not in hook, "the hook now names %s.md while changing; the parenthesis is no longer true" % step
