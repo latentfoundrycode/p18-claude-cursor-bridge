@@ -336,3 +336,54 @@ def test_bug032_r3_a_test_behind_a_failing_conftest_named_by_its_nodeid_is_not_r
     assert "tests/b/test_b.py::test_six: not run (tests/b/conftest.py)" in p.stdout, out
     assert "tests/c/test_c.py::test_old: passing on old code" in p.stdout, out
     assert p.returncode == 4, out
+
+
+# Round 4 (handoff/BUG-032-r4.md), above the ceiling under its Blocking class line: the security audit's finding.
+
+LOADS = "import pytest\n\n\n@pytest.fixture\ndef one():\n    return 1\n"
+ROOT_LINE = ("\"ImportError while loading conftest '%s'.\\n\" % os.path.join(os.path.dirname(os.path.dirname("
+             "os.path.abspath(__file__))), 'conftest.py')")
+SHARED_PARENT = {
+    # A conftest beside the clear file's forges the shared parent's name, at exit, then fails.
+    "forged": {"tests/conftest.py": LOADS,
+               "tests/b/conftest.py": ("import atexit\nimport os\nimport sys\n\natexit.register(lambda: "
+                                       "sys.stderr.write(" + ROOT_LINE + "))\nraise ImportError('no such thing')\n"),
+               "tests/b/test_b.py": USES_SIX},
+    # The shared parent fails only in a run that holds the other file.
+    "argv": {"tests/conftest.py": ("import sys\n\nimport pytest\n\nif any(a.endswith('test_b.py') for a in sys.argv):\n"
+                                   "    raise ImportError('no such thing')\n\n\n@pytest.fixture\ndef one():\n"
+                                   "    return 1\n"),
+             "tests/b/test_b.py": USES_SIX},
+    # No conftest fails: a test module lifts pytest's capture, writes the parent's name and ends the run with exit 4.
+    "module": {"tests/conftest.py": LOADS,
+               "tests/b/test_b.py": ("import gc\nimport os\nimport sys\n\nfrom _pytest.capture import CaptureManager\n\n"
+                                     "for o in gc.get_objects():\n    if isinstance(o, CaptureManager):\n"
+                                     "        o.suspend_global_capture()\nsys.stderr.write(" + ROOT_LINE +
+                                     ")\nsys.stderr.flush()\nos._exit(4)\n")},
+}
+
+
+@pytest.mark.parametrize("shape", sorted(SHARED_PARENT))
+def test_bug032_r4_a_clear_file_is_judged_beside_a_blocked_one(tmp_path, shape):
+    """BUG-032 round 4 (the security audit, round 3, Blocking: behaviour against handoff/BUG-032-r3.md Requirement 1 and a
+    defeated safety mechanism, exit 4): round 3 kept the conftests its single-file runs reported in one set and
+    blocked every item by the first conftest of that set on its way, so a file whose own run was clear was listed
+    `not run` when it shares a parent conftest with a blocked file, and a new test passing on the old code gave
+    exit 0. Here `tests/conftest.py`, added by the increment, is the shared parent of `tests/a/test_a.py` (passing on
+    the old code) and `tests/b/test_b.py`; the run of `tests/b/test_b.py` alone reports the parent, by a forged line
+    from a failing conftest beside it, by the parent failing only in a run that holds it, or by a test module that
+    writes the line and exits 4. A file is blocked only by its own run's report: b is `not run`, a is judged, exit 4.
+    enforces: handoff/BUG-032-r3.md Requirement 1 ("every other item is run and reported as today"; "a conftest the
+    increment changed can make `not run` only the tests behind itself"); R-041"""
+    ws = _fixture(tmp_path, CALC)
+    sha = _git(ws, "rev-parse", "HEAD")
+    _write(ws, "tests/a/test_a.py", PASSES_ON_OLD)
+    for path, text in SHARED_PARENT[shape].items():
+        _write(ws, path, text)
+    _git(ws, "add", "-A")
+    mf = _mutants(ws, "ckshare" + shape, {"mutants": [], "new_tests": ["tests/a/test_a.py", "tests/b/test_b.py"]})
+    p = _run(ws, mf, "--checkpoint", sha)
+    out = p.stdout + p.stderr
+    assert any(l.startswith("tests/b/test_b.py: not run") for l in p.stdout.splitlines()), out
+    assert "tests/a/test_a.py::test_old: passing on old code" in p.stdout, out
+    assert p.returncode == 4, out
