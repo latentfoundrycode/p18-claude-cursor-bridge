@@ -45,7 +45,9 @@ INTRO = {
 
 SURVIVAL = {
     "change-cycle": [
-        "this module, whole, and the module of the step the change has reached, whole: its intake runs `intake.md`'s "
+        "this module, whole, and the module of the step the change has reached, whole, with the conditional workflows the "
+        "`Workflows:` line names that touch that module, each whole (while the phase is `changing`, the session-start hook "
+        "names only those that touch this module, `delegation-loop.md`, `reflection.md` or `project-end.md`): its intake runs `intake.md`'s "
         "procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its "
         "`Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with "
         "`docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, "
@@ -397,3 +399,26 @@ def test_each_excused_variant_section_is_pinned(rel, title):
                (re.match(r"^- (?:new|reword) \S+ (\S+\.md) (.+)$", l) for l in read(EXCEPTIONS).split("\n"))
                if m and m.group(1).startswith(prefix + "interface/")]
     assert sorted(entries) == sorted("%s %s" % k for k in EXCUSED_SECTIONS), entries
+
+
+def test_bug035_a_change_cycle_reads_the_conditional_workflows_of_the_step_it_has_reached():
+    """BUG-035 (TASK-026's release-level review, pass 1, M1): while the phase is `changing` the session-start hook names
+    the change cycle's own modules only, so after a compaction in a change's intake, design or interface step the
+    conditional workflows touching that step's module (claude-code-extension.md at design, local-service.md at the
+    interface, local-web-app.md and own-computer.md at intake) were never named. The survival list says to read them,
+    and its parenthesis names the modules the hook does name, which are the hook's own table.
+
+    enforces: change-cycle.md "What must survive a compaction"; docs/REQUIREMENTS.md R-004 (what must survive a
+    compaction), R-005 (the hook names the phase's modules and the conditional workflows that touch them)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("session_start_for_bug035", os.path.join(CB, "session-start.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    text = flat(section(module("change-cycle"), "What must survive a compaction", 3))
+    clause = "the module of the step the change has reached, whole, with the conditional workflows the `Workflows:` line names that touch that module, each whole"
+    assert clause in text, "the change cycle's survival list does not name the step's conditional workflows"
+    hook = mod.PHASE_MODULES["changing"]
+    named = text[text.index(clause):].split("):", 1)[0]
+    assert hook[0] == "change-cycle" and all("`%s.md`" % key in named for key in hook[1:]), (hook, named)
+    for step in ("intake", "design", "interface"):
+        assert step not in hook, "the hook now names %s.md while changing; the parenthesis is no longer true" % step
