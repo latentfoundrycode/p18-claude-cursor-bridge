@@ -1,6 +1,6 @@
 # Status history
 
-Lines moved out of docs/PROJECT_STATUS.md to keep it under its cap (inventory-check.py), newest first, each word for word as it stood.
+Lines moved out of docs/PROJECT_STATUS.md to keep it under its cap (inventory-check.py), oldest first, each word for word as it stood.
 
 ## Moved 2026-10-25 (HOTFIX-002, the calibration to 2026.10.25a)
 
@@ -41,3 +41,7 @@ Last accepted, the part moved out at BUG-031 (2026-10-29): before it stage B5's 
 Last accepted, the part moved out at BUG-032 (2026-10-29): before it BUG-030 (PR #100), its program causes
 
 Open issues, the part moved out at BUG-032 (2026-10-29): ISS-009, ISS-007, ISS-008 fixed and ISS-005 closed 2026-10-19; ISS-002 fixed 2026-10-13; ISS-006 fixed in 6743b25
+
+Open issues, the part moved out at BUG-033 (2026-10-29): ISS-016 fixed by BUG-028 (a review-guard test recorded CPython's POSIX subprocess wait as the guard's sleep, failing PR #86's Linux job once, 2026-10-26). ISS-014 fixed (the loop guard's cron_next missed a one-shot wake-up in the hour clocks repeat, 2026-10-25; BUG-020, PR #73). ISS-012 fixed.
+
+Last accepted, the part moved out at BUG-033 (2026-10-29): before it BUG-031 (PR #101)
