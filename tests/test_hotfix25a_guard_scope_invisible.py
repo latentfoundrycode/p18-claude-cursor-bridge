@@ -200,20 +200,6 @@ def test_the_fixture_records_the_guards_sleeps_and_no_others(ready):
     assert mod.time.strftime is time.strftime and mod.time.gmtime is time.gmtime
 
 
-def test_the_fixture_records_the_guards_sleeps_and_no_others(ready):
-    """ISS-016 (BUG-028): only review-guard's own time.sleep is recorded. A sleep elsewhere in the
-    process is not the guard's: on POSIX, CPython's subprocess wait polls a child that has not exited
-    yet through time.sleep with a first delay of 1 ms, which made the lagging-head test record
-    [0.001, 15, 15] on Linux CI (PR #86). The guard's other uses of time stay the real module's."""
-    import time
-    mod, head, sleeps, answers = ready
-    time.sleep(0)
-    assert sleeps == []
-    mod.time.sleep(15)
-    assert sleeps == [15]
-    assert mod.time.strftime is time.strftime and mod.time.gmtime is time.gmtime
-
-
 # ---------------------------------------------------------------- scope-check.py
 
 def drift_list(out):

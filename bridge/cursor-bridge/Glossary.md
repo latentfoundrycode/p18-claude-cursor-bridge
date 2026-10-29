@@ -34,7 +34,7 @@ One term per thing. The supervisor, the subagents, and every brief use these ter
 | **Free implementation space** | Everything the brief and the normative diagrams leave to the builder. Reviewers do not fail a choice made inside it. |
 | **Design regression** | Code drifting from a normative diagram without an objection. A review `REJECT`. |
 | **Repo ignorance** | The builder's partial view of the project. Answered by the brief and its diagram slices, never by giving the builder control of the plan. |
-| **Parallel increments** | Ready increments marked `Parallel: yes` with disjoint scopes whose **builders** run at the same time (run parameter `Parallel increments: on`), each builder in its own worktree. The supervisor never works inside a worktree: it processes each finished branch in its own checkout, one at a time, through the same gate. One writer per checkout. |
+| **Parallel increments** | Ready increments marked `Parallel: yes` with disjoint scopes whose **builders** are prepared and launched together (run parameter `Parallel increments: on`), each builder in its own worktree; the launcher's one heavy slot (R-040) builds them one after the other. The supervisor never works inside a worktree: it processes each finished branch in its own checkout, one at a time, through the same gate. One writer per checkout. |
 
 ## Main and conditional workflows
 

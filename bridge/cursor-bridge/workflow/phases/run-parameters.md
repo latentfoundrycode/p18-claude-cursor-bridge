@@ -50,9 +50,9 @@ one combined brief (rule 29). The parameters:
      rehearsal of the installer's logic; the delivery's proof is the owner's run from their
      terminal by a run sheet (KP-055, release A5).
    - `ci-only` — only on a `windows-latest` CI runner; nothing is ever installed here.
-5. **Parallel increments** — whether independent increments the plan marks `Parallel: yes` may have their builders run at the same time (Phase 6 step 3, "Parallel increments").
+5. **Parallel increments** — whether independent increments the plan marks `Parallel: yes` may have their builders prepared and launched together, each in its own worktree; the launcher's one heavy slot (R-040) still builds them one after the other (Phase 6 step 3, "Parallel increments").
    - `off` *(default)* — one builder at a time.
-   - `on` — ready independent increments are built at once, each builder in its own worktree; reviews, tests, and merges stay one at a time. It saves elapsed time on plans with many independent increments. Say the price plainly: a builder in a worktree cannot run the project's tests, so its first delivery may need one more round; and this mode has not yet run on a real project, so its first use is a trial.
+   - `on` — ready independent increments are prepared and launched together, each builder in its own worktree; the launcher's one heavy slot builds them one after the other, and reviews, tests, and merges stay one at a time. The builds do not overlap, so it saves little elapsed time on this computer. Say the price plainly: a builder in a worktree cannot run the project's tests, so its first delivery may need one more round; and this mode has not yet run on a real project, so its first use is a trial.
 
 Record the answers in **`docs/RUN_PARAMETERS.md`**, which you read at every resume and
 before every stage close and merge:

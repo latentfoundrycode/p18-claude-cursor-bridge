@@ -204,7 +204,7 @@ benchmark, its dataset, or its seed in an optimization brief.
 
 ## The parallel variant
 
-When the supervisor tells you the increment runs in parallel (its builder works in a separate worktree while another builder works elsewhere), write the normal brief with these additions, stated verbatim:
+When the supervisor tells you the increment runs in parallel (its builder works in a separate worktree, beside another builder's), write the normal brief with these additions, stated verbatim:
 
 - **Constraints** add: "This checkout is a separate worktree without the project's environment. Do not install packages or create environments. You cannot run the test suite here: write the tests this brief asks for, check syntax and imports where you can, and leave the running to the supervisor."
 - **Done** adds, as the last step: "Commit everything you changed on the current branch: `git add -A`, then `git commit --no-verify -m "TASK-<nnn> builder hand-off"`. This hand-off commit is a snapshot; the lint and the tests run when the supervisor accepts it."

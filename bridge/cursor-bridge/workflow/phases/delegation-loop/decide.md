@@ -60,7 +60,9 @@ make and record. Judge it like this:
   increment's PR branch) and merge. A late finding blocks the merge only if it is of one of
   the five **blocking classes** — behaviour against the brief or the register, security, data
   integrity, a defeated safety mechanism this increment relies on (a bug in the very timeout or
-  kill path built to protect the run is core, not tail), a failing test. The class is the
+  kill path built to protect the run is core, not tail), a failing test. Below the ceiling, a
+  late finding two or more reviewers or auditors name blocks too, unless it shows a class already recorded under the
+  by-class line (step 8, "Convergence is a signal"). The class is the
   defect, not the operator that exposed it: a further mutant, input or operator family that
   shows a class already recorded in `docs/HARDENING.md` under the by-class line for the
   increment or the stage is that class and never a new one, while a defect of one of the five blocks

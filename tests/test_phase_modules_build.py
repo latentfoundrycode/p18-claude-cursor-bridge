@@ -234,8 +234,10 @@ def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
 # characters at origin/main 02f0ab5, sha256 70a1aacaca66592b...), its mutation run added after it under a heading of its own;
 # TASK-034 reworded its Iterate and Re-delegate bullets (a new numbered brief), the root-cause-first paragraph's fix
 # brief (`<ID>-r<N>` inside a gate, BUG after a merge) and the brake's by-class bullet (the five classes, the class
-# the defect, for the increment or the stage), and added "The review ceiling" between the step and the mutation run (R-042)
-STEP7_SHA256 = "dcf588e45b134ec855bfc9da83ab356d4ab82b15f294426c849e35c01f9ae261"
+# the defect, for the increment or the stage), and added "The review ceiling" between the step and the mutation run (R-042);
+# BUG-033 (stage B5's review, round 2) added to the brake's by-class bullet the convergence exception below the
+# ceiling, naming two or more reviewers or auditors (7,832 characters; at TASK-034 7,641, sha256 dcf588e45b134ec8...)
+STEP7_SHA256 = "b9497aeec8f3a0b301c6430789874982dc4a8c7d051c167f26633c00857b43b7"
 
 
 def test_r032_step_7_is_verbatim():
@@ -244,7 +246,7 @@ def test_r032_step_7_is_verbatim():
     import hashlib
     sub = module(DECIDE)
     step = sub[sub.index("### " + STEP7):sub.index("#### The review ceiling")].rstrip()
-    assert len(step) == 7641 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
+    assert len(step) == 7832 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
 
 
 def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
@@ -284,22 +286,25 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
                 assert p not in flat(text), (rel, p)
 
 
-# sha256 of step 9 as TASK-035 leaves it (from its heading to its last line, LF, trailing whitespace stripped; 5,695
-# characters): the project-end sentence reworded under its `reword` and `new` entries; before it the step as the
-# delegation-loop module held it at origin/main 5bed396 (5,542 characters), moved verbatim. trace-check, which would
-# see a change, has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword updates this
-# with its record
-STEP9_SHA256 = "b86e3bceb2b8508546e2f1d3a0715558977e7a9587bc2f002b2cb6579f801393"
+# sha256 of step 9 as BUG-033 leaves it (from its heading to its last line, LF, trailing whitespace stripped; 6,474
+# characters): steps 4 and 6 name the branch rule BUG-032 gave a refactoring branch (every REFAC-<nnn> brief, the
+# REFAC-<stage> snapshot). Before it: BUG-031 reworded step 6's title sentence (6,055 characters, sha256
+# b86e3bceb2b8508546e2f1d3...); TASK-035 the project-end sentence under its `reword` and `new` entries (5,695); the
+# step as the delegation-loop module held it at origin/main 5bed396 (5,542 characters), moved verbatim. trace-check,
+# which would see a change, has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword
+# updates this with its record
+STEP9_SHA256 = "57bbd058bcf569f984c2e6bdf1881e64e69eb223bcd6294935b6152cdea5b94c"
 
 
 def test_r032_step_9_is_verbatim():
     """R-032 (Review A, round 1, C1): the sub-file's step 9 is the module's step 9 as it was before the split, character
     for character, but the project-end sentence TASK-035 rewords (R-003; INVENTORY, Decisions: project end adds no
-    pass of its own) and step 6's title sentence BUG-031 rewords (the title names the pass's REFAC-<nnn> brief IDs)."""
+    pass of its own), step 6's title sentence BUG-031 rewords (the title names the pass's REFAC-<nnn> brief IDs) and
+    the branch rule steps 4 and 6 name since BUG-033 (BUG-032's REFAC rule)."""
     import hashlib
     sub = module(SUB)
     step = sub[sub.index("### " + STEP9):sub.index("### Keeping the pass's position")].rstrip()
-    assert len(step) == 6055 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
+    assert len(step) == 6474 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
 
 
 def test_the_refactoring_passs_position_is_written_down():

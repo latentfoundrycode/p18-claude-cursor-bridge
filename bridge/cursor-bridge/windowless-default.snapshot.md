@@ -1,6 +1,6 @@
 # Windowless pytest suite default
 
-This fenced block is the bridge's frozen windowless default for a project's test-root `conftest.py`. It comes from FIX-001 (supervisor standing rule 24, KP-014) and satisfies R-039: every project's pytest suite whose runner the bridge ships a default for carries this block verbatim (see `Cursor-Project-Configuration.md`, windowless-default item). Copy the block below into the rootdir `conftest.py` or into each `testpaths` root's `conftest.py` without change.
+This fenced block is the bridge's frozen windowless default for a project's test-root `conftest.py`. It comes from FIX-001 (supervisor standing rule 24, KP-014) and satisfies R-039: every project's pytest suite whose runner the bridge ships a default for carries this block verbatim (see `Cursor-Project-Configuration.md`, windowless-default item). Copy the block below, without change, into the Workspace root's `conftest.py` where that file exists, or else into every test root's `conftest.py` (each `testpaths` root that can be used, `tests/` where none is set or none can be used): the floor's rule as `Cursor-Project-Configuration.md` states it.
 
 ```python
 import subprocess
