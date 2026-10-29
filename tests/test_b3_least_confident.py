@@ -117,7 +117,7 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
 # exception; an increment that adds an entry adds its section's pin.
 EXCUSED_MODULE_SECTIONS = {
     ("change-cycle.md", "The procedure"): (6772, "dcef638691afd09a52d40d5faab5a5501be74de54396ccb2ac71b0c98291b42f"),
-    ("change-cycle.md", "What must survive a compaction"): (1834, "978712588641f35af440b4b933153e8e99ccb5275202e0119ca9ca14a5bb5249"),
+    ("change-cycle.md", "What must survive a compaction"): (2084, "4f007ec186e0d5a5f5f0314caaca28faa523e62a93302a1611545446284091e9"),
     ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
     ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
     ("configuration.md", "The windowless test suite"): (1619, "366fe102a526c7cde4e71c69e3793217a54b718edf13fb4e71c50d2873c697f0"),

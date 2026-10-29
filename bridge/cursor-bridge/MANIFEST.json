@@ -1,6 +1,6 @@
 {
   "version": "2026.10.25a",
-  "generated": "2026-10-29 20:05",
+  "generated": "2026-10-29 21:28",
   "files": {
     "agents/cursor-configurator.md": "8bcb0ebba97ba25c4f81528c439195619196e7d078c4b0054a206e51fa7c8cd2",
     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
@@ -111,7 +111,7 @@
     "cursor-bridge/workflow-check.py": "ff87680ca972eb50abbda822443420f7c650b5fee9e8b607cdf9e6fcf27c9d73",
     "cursor-bridge/workflow/extension-points.md": "b3973253f2bdf38fe9f329f1a0fb13604a221453c1d7f7bdfbd227013c0592d0",
     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
-    "cursor-bridge/workflow/phases/change-cycle.md": "992a32d4041600eb54a7a59e7929e31a17ec817996dfc99f5a2359c43aebc411",
+    "cursor-bridge/workflow/phases/change-cycle.md": "7983a331f18fdaca7a9ebafcfcd5a422007f73b0f010dab84ffc34e8667c7e86",
     "cursor-bridge/workflow/phases/configuration.md": "b14ecaccb184683649fabba82db77743e5b26cd9509d48b1f4e71da2196c054d",
     "cursor-bridge/workflow/phases/delegation-loop.md": "770de5a46aca6d0cf82e5e442f644f701ea3510090a668ee53fa8ee13f1d262b",
     "cursor-bridge/workflow/phases/delegation-loop/decide.md": "edbdc407586a0ad281d2a96b9b5c32ff8722952ea33eeb0aff86cb189a32d839",
