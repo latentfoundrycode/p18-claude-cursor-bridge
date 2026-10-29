@@ -49,14 +49,27 @@ def two_releases_of_one_version(tmp_path, program):
 
 def test_bug034_a_release_of_the_installed_version_with_other_files_is_refused(tmp_path, program):
     a, b, target = two_releases_of_one_version(tmp_path, program)
+    kept = target / "cursor-bridge-previous" / "2025.01.01a"
+    kept.mkdir(parents=True)
+    (kept / "marker.txt").write_text("an older way back\n", encoding="utf-8")
     before = (target / "cursor-bridge" / "old-only.md").read_text(encoding="utf-8")
     manifest_before = (target / "cursor-bridge" / "MANIFEST.json").read_text(encoding="utf-8")
     rc, out = run(b / "cursor-bridge" / "bridge-install.py", tmp_path, "--target", str(target))
     assert rc == 2, "a release carrying the installed version but other files was installed, with no way back kept: " + out
-    assert "nothing was changed" in out and OLD_VERSION in out, out
+    assert "but not its files" in out and "nothing was changed" in out and OLD_VERSION in out, "not this refusal: " + out
     assert (target / "cursor-bridge" / "old-only.md").read_text(encoding="utf-8") == before, "the installed file changed although the install was refused"
     assert (target / "cursor-bridge" / "MANIFEST.json").read_text(encoding="utf-8") == manifest_before, "the installed manifest changed although the install was refused"
-    assert not (target / "cursor-bridge-previous").exists(), "a refused install rotated the kept copy"
+    assert sorted(p.name for p in (target / "cursor-bridge-previous").iterdir()) == ["2025.01.01a"], "a refused install rotated the kept copy"
+    assert (kept / "marker.txt").read_text(encoding="utf-8") == "an older way back\n", "a refused install changed the kept copy"
+
+
+def test_bug034_a_file_listed_in_one_manifest_only_is_named(tmp_path, program):
+    a, b, target = two_releases_of_one_version(tmp_path, program)
+    (b / "cursor-bridge" / "new-only.md").write_text("in the release folder only\n", encoding="utf-8")
+    restamp(b, program)
+    rc, out = run(b / "cursor-bridge" / "bridge-install.py", tmp_path, "--target", str(target))
+    assert rc == 2 and "but not its files" in out and "2 file(s)" in out and "cursor-bridge/new-only.md" in out, out
+    assert not (target / "cursor-bridge" / "new-only.md").exists()
 
 
 def test_bug034_the_refusal_holds_under_a_dry_run(tmp_path, program):
@@ -76,3 +89,4 @@ def test_bug034_anyway_installs_it_for_the_maintainers_rehearsals(tmp_path, prog
     rc, out = run(b / "cursor-bridge" / "bridge-install.py", tmp_path, "--target", str(target), "--anyway")
     assert rc == 0 and "MATCHES bridge " + OLD_VERSION in out, out
     assert (target / "cursor-bridge" / "old-only.md").read_text(encoding="utf-8") == "changed after the version was stamped\n"
+    assert "WARNING" in out and "no way back to it was kept" in out, "--anyway replaced a same-version tree with no way back kept, without a word (the security audit and Review A, convergent): " + out
