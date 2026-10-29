@@ -313,7 +313,9 @@ edges), the supervisor draws a **by-class line**: it records each such finding t
 finding blocks the merge only if it is of one of the five **blocking classes** — behaviour
 against the brief or the register, security, data integrity, a defeated safety mechanism the
 increment relies on (a bug in the very timeout or kill path built to protect the run is core,
-not tail), a failing test. The class is the defect, not the operator that exposed it: a
+not tail), a failing test. Below the ceiling, a late finding two or more reviewers or auditors name blocks too,
+unless it shows a class already recorded under the by-class line ("Convergence is a signal",
+below). The class is the defect, not the operator that exposed it: a
 further mutant, input or operator family that shows a class already recorded in
 `docs/HARDENING.md` under the by-class line for the increment or the stage is that class and
 never a new one, while a defect of one of the five blocks whatever was recorded before.

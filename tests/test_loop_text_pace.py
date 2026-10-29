@@ -312,7 +312,9 @@ def test_r042_rule_6_states_the_outcomes_and_the_programs():
             "(`review-guard.py`) the Review B rounds (Phase 6, step 7, \"The review ceiling\")") in r
     assert "the owner's number at the plan's gate" in r
     assert ("once the increment's core behaviour is verified, record the long tail of a hard subsystem under the "
-            "by-class line and merge it; a late finding then blocks only if it is of the five.") in r
+            "by-class line and merge it; a late finding then blocks only if it is of the five, or if two or more "
+            "reviewers or auditors name it and it shows no class already recorded under that line (the convergence "
+            "rule).") in r
     assert ("At and above it, every finding of an increment's review outside the five goes to `docs/HARDENING.md` "
             "with the increment, and a stage round's findings are disposed of as the reflection module's step 7 "
             "says.") in r
@@ -586,17 +588,38 @@ def test_bug031_a_late_finding_has_one_outcome_in_all_three_homes():
     by-class line is drawn, rule 6 sent "a late finding outside the five back when it is not that tail" while step
     7's brake said a late finding "blocks the merge only if it is of one of the five"; the three-homes test above
     checked only the class sentence and passed on the two outcomes. Each home now gives the one outcome: a late
-    finding blocks only if it is of the five.
+    finding blocks only if it is of the five (or, below the ceiling, if two reviewers name it: the test after this).
     enforces: R-042 (the by-class line; only the five send work back); rule 6; step 7's brake; the policy's
     re-delegation paragraph"""
     r = rule(6)
-    assert "a late finding then blocks only if it is of the five." in r
+    assert "a late finding then blocks only if it is of the five," in r
     assert "send a late finding outside the five back" not in r
     assert "A late finding blocks the merge only if it is of one of the five **blocking classes**" in brake()
     p = policy_paragraph("**Re-delegation runs while the code converges")
     assert "A late finding blocks the merge only if it is of one of the five **blocking classes**" in p
     for home in (r, brake(), p):
         assert "outside the five back" not in home and "when it is not that tail" not in home
+
+
+def test_bug033_a_late_finding_two_reviewers_name_blocks_below_the_ceiling_in_every_home():
+    """BUG-033 (stage B5's review, round 2; core S1 and modules C2, convergent): below the ceiling, the three homes of
+    the late-finding sentence said a late finding blocks "only if it is of the five", while the convergence rule (the
+    policy's and step 8's "Convergence is a signal") makes a finding two reviewers name blocking whatever its grade,
+    outside a class already recorded under the by-class line: a convergent late finding outside the five had two
+    outcomes. Each of the three homes names the exception, and both convergence paragraphs keep the rule it points to.
+    enforces: R-042 (the by-class line; the convergence rule below the ceiling); rule 6; step 7's brake; the policy's
+    re-delegation and convergence paragraphs; step 8's convergence paragraph"""
+    r = rule(6)
+    assert ("a late finding then blocks only if it is of the five, or if two or more reviewers or auditors name it and "
+            "it shows no class already recorded under that line (the convergence rule).") in r
+    assert ("Below the ceiling, a late finding two or more reviewers or auditors name blocks too, unless it shows a "
+            "class already recorded under the by-class line (step 8, \"Convergence is a signal\").") in brake()
+    p = policy_paragraph("**Re-delegation runs while the code converges")
+    assert ("Below the ceiling, a late finding two or more reviewers or auditors name blocks too, unless it shows a "
+            "class already recorded under the by-class line (\"Convergence is a signal\", below).") in p
+    for name, home in (("policy", convergence_in(policy())), ("loop", convergence_in(step8()))):
+        assert ("Below the ceiling, two reviewers' agreement makes a finding blocking whatever its grade, with one "
+                "exception: a class already recorded under the by-class line for that increment or that stage") in home, name
 
 
 def test_bug031_evaluate_reports_says_what_the_pace_report_counts():
@@ -609,12 +632,30 @@ def test_bug031_evaluate_reports_says_what_the_pace_report_counts():
     brief's ID"); bridge/cursor-bridge/pace-report.py (`_lift_map`, the over-the-ceiling list)"""
     t = flat(read(os.path.join(HERE, os.pardir, "bridge", "commands", "evaluate-reports.md")))
     assert "(a class line, the owner's line, `none`, or `unknown` where no launcher row or guard round records it" in t
-    assert "In a project that tracks its briefs under `handoff/`, an increment is an ID with a tracked brief" in t
+    assert "In a project that tracks any file under `handoff/`, an increment is an ID with a tracked brief" in t
+    # BUG-033 (stage B5's review, round 2; BUG-031's Review B, round 3, note): any tracked file under handoff/
+    # switches the count to tracked briefs (`_handoff_untracked`), and a report is no brief (`_ids_with_brief`)
+    assert ("a project that tracks only builder reports there (`<ID>-report.md`, `<ID>-r<N>-report.md`, "
+            "`<ID>-r<N><letter>-report.md`, which are no briefs) counts no increment at all") in t
     assert ("(in a project that tracks nothing under `handoff/`, every ID a squash subject names is counted merged, and the "
             "started and rounds cells read `n/a`)") in t
     assert "a stage review is listed only from the review guard's rounds files" in t
     prog = read(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "pace-report.py"))
     assert 'lifts.get(r, "unknown")' in prog and 'lifts.setdefault(rnd, "none")' in prog
+
+
+def test_bug033_a_project_tracking_only_reports_under_handoff_counts_no_increment(program):
+    """BUG-033 (stage B5's review, round 2; BUG-031's Review B, round 3, note): what evaluate-reports.md now says of a
+    project that tracks only builder reports under handoff/ is what pace-report.py does: any tracked file there
+    switches the count to tracked briefs, and a report is no brief, so no ID is counted; a tracked brief is (the
+    precondition).
+    enforces: bridge/commands/evaluate-reports.md, step 1 (the pace section's increments); R-044"""
+    pr = program("pace-report")
+    reports = "handoff/BUG-029-report.md\nhandoff/TASK-031-r2-report.md\nhandoff/TASK-031-r2a-report.md\n"
+    assert pr._handoff_untracked(reports) is False
+    assert pr._ids_with_brief(reports) == set()
+    assert pr._ids_with_brief(reports + "handoff/TASK-031.md\n") == {"TASK-031"}
+    assert pr._handoff_untracked("") is True
 
 
 def test_bug031_the_refactoring_pass_title_names_its_briefs():
