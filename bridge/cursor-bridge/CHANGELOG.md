@@ -15,6 +15,25 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.30b
+
+**A fix of release B's review guard, found by its trial** (BUG-036; the trial project, the TDP, 2026-10-30, its ISS-016): an increment begun under 2026.10.30a had its first Review B counted as one round more than every builder round it had run, so three builder rounds before the first Review B left it no name below the ceiling. One program; against 2026.10.30a, no file new or removed.
+
+**What changed**
+- **The guard counts Review B rounds only** (`review-guard.py`; BUG-036): where an ID has no `rounds-<ID>.json`, its first snapshot seeds the record from a tracked `handoff/<ID>-r<N>-report.md` (a letter after `<N>` included) only for a round that release B's launcher (2026.10.30a or later) did not log, that is a round with no `run/launcher/runs.jsonl` builder row whose `brief` is the ID and whose `round` is `<N>`. Under 2026.10.30a every builder round wrote such a report, and the seed counted each as a replied Review B round (`reply` 0): one builder round made the first snapshot `<ID>-r2` (`round 1 is reviewed: write <ID>-r2`), three made it `<ID>-r4`, above the ceiling. An increment begun under release B now seeds nothing from its reports, and its first Review B is round 1; an increment built before release B and in flight at its install seeds as before; the letter snapshots, the refusals and the seeded entries' shape are unchanged. A missing launcher log seeds every report, as before.
+
+**Running projects must**
+- *(all phases)* Install with every project paused, restart, run `/calibrate-bridge` before the next increment, then `bridge-check.py`. Paused means no builder, review, CI watch or suite running and everything committed; the bridge's own checkout is switched to `main` for the install (R-038, calibration's step 1). On the real install the installed `VERSION` reads 2026.10.30b and the installer printed `previous 2026.10.30a kept at ...`.
+- *(building, changing)* Nothing to rewrite. A `rounds-<ID>.json` that exists, written by the guard or by hand, is read as it stands: the fix changes only the seed of an ID that has none. An ID with no record whose builder rounds ran under 2026.10.30a needs no hand seed any more; its first snapshot is `<ID>` or `<ID>-r1`. A record the 2026.10.30a guard wrote with `seeded` rounds that no Review B replied to (an ID whose first snapshot followed the guard's own `round 1 is reviewed: write <ID>-r2`) is set right by hand before its next snapshot as 2026.10.30a's entry says: its hash copy removed first, then the record written with one entry per replied round. Where the ID's rounds are above the ceiling by the launcher's count, the take-the-larger rule of `delegation-loop/decide.md` ("The review ceiling") still decides what sends work back.
+
+**If rolled back**
+- *(building, changing)* The 2026.10.30a guard returns with its seed. Before the first snapshot of an ID that has no `rounds-<ID>.json` and whose builder rounds ran under release B, write the record by hand as 2026.10.30a's entry says, `{"id": "<ID>", "rounds": []}` where no Review B has replied, so the first Review B is round 1. Records written meanwhile stand.
+
+**Field acceptance**
+- On the trial project, the TDP: the first increment after the install that ran one or more builder rounds before its first Review B takes that snapshot as `<ID>` or `<ID>-r1` with no hand seed, and its `rounds-<ID>.json` shows round 1 unseeded. Then reAngle and the video factory calibrate when they resume, on the owner's word, from 2026.10.25a through both entries.
+
+---
+
 ## 2026.10.30a
 
 **Release B, the restructuring** (the Restructuring Plan's release B, built on the bridge's own branches from 2026-10-11 and reviewed whole by a fresh context in two passes, both APPROVE, TASK-026): the supervisor's instructions split into a core read at every start and ten phase modules read whole in their phase, the hook naming the current phase's files after every compaction; conditional workflows for three product types, their sub-types and seven traits, chosen per part by a `Workflows:` line the workflow check holds; the code gate's three-round ceiling and numbered briefs held by the launcher and the review guard; one heavy job at a time on the computer, every launch windowless, and the suite's windowless default written into every pytest project; mutation reruns that skip what is unchanged; a pace report; calibration that applies conditional workflows by phase. Text and programs; against the 2026.10.25a installed from its hotfix, the release every project calibrated to (106 files, the core whole), 38 files new and two allow entries new.

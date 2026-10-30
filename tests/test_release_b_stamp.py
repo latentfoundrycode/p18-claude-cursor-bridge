@@ -6,13 +6,15 @@ projects must" items, the windowless default among them; the install run sheet r
 docs/REQUIREMENTS.md R-037 (the stamp: VERSION, a regenerated MANIFEST, a CHANGELOG entry with its "if rolled back"
 notes) and R-038 (the install mechanics settled by the owner, recorded in INVENTORY's Decisions row, and reflected
 in the install run sheet); docs/HARDENING.md, TASK-026's "For TASK-027" list (the new heading first, sorting after
-2026.10.25a, `**If rolled back**` on its own line; C-1's run-sheet half). Supervisor-written; no builder run.
+2026.10.25a, `**If rolled back**` on its own line; C-1's run-sheet half). Supervisor-written; no builder run. Release B's
+entry is read by its heading, 2026.10.30a, since BUG-036's fix release (2026.10.30b) stands above it; VERSION and the
+manifest are checked against the newest heading.
 
 - test_r037_version_changelog_and_manifest_agree enforces: VERSION is the newest CHANGELOG heading, the version
   make-manifest.py stamps, and MANIFEST.json's version, with the manifest's fingerprints of VERSION and CHANGELOG.md
   those of the files as they stand (the manifest regenerated after the entry was written).
-- test_r037_the_new_version_sorts_after_2026_10_25a enforces: the new heading comes first, directly above 2026.10.25a,
-  and sorts after every other heading as the installer compares versions (as text).
+- test_r037_the_new_version_sorts_after_2026_10_25a enforces: release B's heading stands directly above 2026.10.25a,
+  and the newest heading, VERSION's, sorts after every other heading as the installer compares versions (as text).
 - test_r037_the_entry_has_its_three_parts_and_its_rolled_back_items_reach_the_installer enforces: the entry holds
   What changed, Running projects must, If rolled back and Field acceptance, each on a line of its own, in that order,
   and bridge-install.py's rolled_back_note reads this entry's own If rolled back items for a rollback to 2026.10.25a.
@@ -46,6 +48,7 @@ CALIBRATE = os.path.join(BRIDGE, "commands", "calibrate-bridge.md")
 STEP1 = "1. Verify the install — deterministically"
 STEP4 = "4. Apply the delta by phase — reopen nothing"
 PREVIOUS = "2026.10.25a"
+RELEASE_B = "2026.10.30a"
 GLOSSARY_PHASES = ("intake", "design", "mockups", "planning", "configuration", "building", "done", "changing")
 PARTS = ("**What changed**", "**Running projects must**", "**If rolled back**", "**Field acceptance**")
 
@@ -71,10 +74,10 @@ def headings():
     return re.findall(r"^## (\d{4}\.\d{2}\.\d{2}[a-z]?)[ \t]*$", read(CHANGELOG), re.M)
 
 
-def entry():
-    """The newest entry: from its heading to the `---` that closes it."""
+def entry(v=RELEASE_B):
+    """Release B's entry (or version v's): from its heading to the `---` that closes it."""
     text = read(CHANGELOG)
-    start = text.index("\n## " + headings()[0] + "\n")
+    start = text.index("\n## " + v + "\n")
     end = text.index("\n---\n", start)
     return text[start + 1:end]
 
@@ -101,8 +104,9 @@ def test_r037_version_changelog_and_manifest_agree():
 def test_r037_the_new_version_sorts_after_2026_10_25a():
     found = headings()
     assert len(found) == len(set(found)), "one entry per release"
-    assert found[1] == PREVIOUS, "R-037: the new entry stands first, directly above %s" % PREVIOUS
-    assert found[0] > PREVIOUS and all(found[0] > other for other in found[1:]), "R-037: the new version sorts last"
+    assert found.index(RELEASE_B) + 1 == found.index(PREVIOUS), "R-037: release B's entry stands directly above %s" % PREVIOUS
+    assert RELEASE_B > PREVIOUS, "R-037: release B sorts after %s" % PREVIOUS
+    assert found[0] == version() and all(found[0] > other for other in found[1:]), "R-037: the newest version sorts last"
 
 
 def test_r037_the_entry_has_its_three_parts_and_its_rolled_back_items_reach_the_installer():
@@ -116,7 +120,7 @@ def test_r037_the_entry_has_its_three_parts_and_its_rolled_back_items_reach_the_
     assert "release B" in lines[2], "R-037: the lead names release B"
     inst = load(INSTALL, "bridge_install_for_stamp")
     note, found = inst.rolled_back_note(CHANGELOG, version(), PREVIOUS)
-    assert found and "## " + version() in note, "R-037: a rollback to %s writes this entry's items" % PREVIOUS
+    assert found and "## " + RELEASE_B in note, "R-037: a rollback to %s writes this entry's items" % PREVIOUS
     assert "This release's entry names nothing to restore." not in note
     for item in [l for l in part(body, "**If rolled back**") if l.startswith("- ")]:
         assert item in note, "R-037: the installer's ROLLED-BACK.md holds every If rolled back item"
