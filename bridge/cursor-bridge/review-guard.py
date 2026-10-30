@@ -511,18 +511,36 @@ def _letter_snapshot_rounds(common, root, id_part):
     return count, base_branch if count else None
 
 
+def _release_b_builder_rounds(common, root, id_part):
+    log_folder = bridge_env.launcher_log_folder(common, root)
+    logged = set()
+    for row in bridge_env.read_runs_jsonl(log_folder):
+        if row.get("kind") != "builder":
+            continue
+        if row.get("brief") != id_part:
+            continue
+        rnd = row.get("round")
+        if isinstance(rnd, int) and not isinstance(rnd, bool):
+            logged.add(rnd)
+    return logged
+
+
 def _report_file_rounds(root, common, id_part):
+    # a report counts only for a round with no release-B builder row
     try:
         out = run_git(["ls-files", "handoff/"], root, common)
     except RuntimeError:
         return 0
+    logged = _release_b_builder_rounds(common, root, id_part)
     lines = out.splitlines()
     pat = re.compile(r"^handoff/%s-r(\d+)[a-z]?-report\.md$" % re.escape(id_part))
     best = 0
     for line in lines:
         m = pat.match(line.replace("\\", "/"))
         if m:
-            best = max(best, int(m.group(1)))
+            n = int(m.group(1))
+            if n not in logged:
+                best = max(best, n)
     return best
 
 
