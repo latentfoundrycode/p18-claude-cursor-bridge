@@ -1,0 +1,386 @@
+diff --git a/bridge/commands/calibrate-bridge.md b/bridge/commands/calibrate-bridge.md
+index 1f95b09..a3f852c 100644
+--- a/bridge/commands/calibrate-bridge.md
++++ b/bridge/commands/calibrate-bridge.md
+@@ -36,7 +36,7 @@ to a half-copied tree would leave the project on a mixture of two releases.
+ 
+ **Where the bridge's repository is being built on a branch by its own supervisor**, the run sheet pauses that work before the install (R-038): no builder, review, CI watch or suite running in it and everything committed; then its checkout is switched to `main`, the first of the three commands, and the release is installed from it. An urgent install in the middle of that build uses the maintainer's separate clone of the repository instead.
+ 
+-The run sheet checks the install on the real run, never a dry run, which marks its first line `(dry run)`, prints the `previous <version> kept at` line while keeping nothing, and ends before the check: the installed `VERSION` differs from the one before, and the installer printed a `previous <version> kept at` line, which appears only when the version changes (the same release installed again prints none). If the installer refuses with `the release folder carries version <version>, the release installed now, but not its files`, `main` has moved past the release's stamp: the owner never passes `--anyway`, which is for the maintainer's rehearsals, and tells the maintainer.
++The run sheet checks the install on the real run, never a dry run, which marks its first line `(dry run)`, prints the `previous` line while keeping nothing, and ends before the check. Every install's check is the installer's exit 0 with the line it prints last, `RESULT: INSTALLED TREE MATCHES bridge <the release's version>` (the installer runs `bridge-check.py` itself). An install over an older release installed whole also changes the installed `VERSION` and prints the installer's `previous` line, `previous <version> kept at <folder>` with the spaces that align its columns; the same release installed again changes neither and prints none; and a repeat after an interrupted install prints that line or none, as far as the first run got. If the installer refuses with `the release folder carries version <version>, the release installed now, but not its files`, `main` has moved past the release's stamp: the owner never passes `--anyway`, which is for the maintainer's rehearsals, and tells the maintainer.
+ 
+ `settings.json` is compared by its bridge-owned entries, never by its bytes, so the owner's own keys in it never fail the check (KP-030). Never ask the owner to remove a key the bridge does not own, and never offer the release's file as a replacement for theirs; `bridge-install.py` merges.
+ 
+@@ -167,8 +167,9 @@ Rules while applying **Now** items:
+ - A new field that carries an owner setting (the refactoring dial, a term classification)
+   gets the release's **default**, and the report tells the owner in one line what was
+   defaulted and how to change it. It does not become a question that stalls the loop.
+-- An increment currently delegated or under review finishes under the brief and rules it
+-  started with. The next brief is packaged under the new templates.
++- An increment currently delegated or under review finishes under the brief it started
++  with; its review follows the installed guard, as the next item says. The next brief is
++  packaged under the new templates.
+ - An increment in flight whose Review B snapshot or review rounds were taken under the older release follows the items the release's entry names for it: the names the installed review guard reads, how it counts the rounds already run, and how the next brief is named. Before that increment's next snapshot, the report lists its ID with the rounds its records show and the count the installed guard will take, and a difference is set right as the entry says.
+ - A Documents file whose creation trigger has already passed (a Project Summary on a project
+   past Phase 2) is created at the **next reflection point**, not now, unless the owner asks —
+diff --git a/bridge/cursor-bridge/CHANGELOG.md b/bridge/cursor-bridge/CHANGELOG.md
+index 9b1acb0..12cff9b 100644
+--- a/bridge/cursor-bridge/CHANGELOG.md
++++ b/bridge/cursor-bridge/CHANGELOG.md
+@@ -15,12 +15,30 @@ project must show before the other projects resume.
+ 
+ ---
+ 
++## 2026.10.30c
++
++**Text corrections from release B's stage review** (BUG-037; stage B6's review, round 1): the run sheet's install check, one sentence of 2026.10.30b's entry on an increment in flight at the install, and step 4's sentence on an increment under review. No program changed; against 2026.10.30b, no file new or removed.
++
++**What changed**
++- **The run sheet's install check** (`commands/calibrate-bridge.md`, step 1): every install's check is the installer's exit 0 with the line it prints last, `RESULT: INSTALLED TREE MATCHES bridge <the release's version>`. The two signs it gave for every install, `VERSION` changed and the `previous` line printed, are what an install over an older release installed whole also shows: the same release installed again shows neither, and a repeat after an interrupted install prints the `previous` line or none, as far as the first run got (the installer reads the installed `MANIFEST.json`'s version, which the first run may or may not have replaced). The `previous` line is named as the installer prints it, `previous <version> kept at <folder>` with the spaces that align its columns.
++- **2026.10.30b's entry** said that an increment built before release B and in flight at its install "seeds as before". The guard seeds rounds 1 to the highest round release B's launcher did not log: rounds 1 and 2 run before the install and round 3 after it seed rounds 1 and 2, and the next snapshot is `<ID>-r3`. The entry now says so. 2026.10.30a's in-flight item (the highest `<N>` of a tracked report) describes 2026.10.30a's guard: a project calibrating from 2026.10.25a reads it with 2026.10.30b's change.
++- **Step 4's increment under review** (`commands/calibrate-bridge.md`): it finishes under the brief it started with, and its review follows the installed guard, as the next item says.
++
++**Running projects must**
++- *(all phases)* Install with every project paused, restart, run `/calibrate-bridge` before the next increment, then `bridge-check.py`, as 2026.10.30b's entry says. On the real install the installer ends 0 with `RESULT: INSTALLED TREE MATCHES bridge 2026.10.30c`; over 2026.10.30b installed whole it also printed its `previous` line, `previous 2026.10.30b kept at <folder>`. The installer keeps one release as the way back, so 2026.10.30a's kept copy is removed then and the way back is 2026.10.30b.
++- *(building, changing)* Nothing to rewrite: no program changed, and the guard counts rounds as under 2026.10.30b.
++
++**If rolled back**
++- *(all phases)* Nothing to restore: no program changed. 2026.10.30b's texts return, its run sheet's install check among them: every install's check is the installer's exit 0 with its `RESULT: INSTALLED TREE MATCHES` line, whatever that text says of the `previous` line.
++
++---
++
+ ## 2026.10.30b
+ 
+ **A fix of release B's review guard, found by its trial** (BUG-036; the trial project, the TDP, 2026-10-30, its ISS-016): an increment begun under 2026.10.30a had its first Review B counted as one round more than every builder round it had run, so three builder rounds before the first Review B left it no name below the ceiling. One program; against 2026.10.30a, no file new or removed.
+ 
+ **What changed**
+-- **The guard counts Review B rounds only** (`review-guard.py`; BUG-036): where an ID has no `rounds-<ID>.json`, its first snapshot seeds the record from a tracked `handoff/<ID>-r<N>-report.md` (a letter after `<N>` included) only for a round that release B's launcher (2026.10.30a or later) did not log, that is a round with no `run/launcher/runs.jsonl` builder row whose `brief` is the ID and whose `round` is `<N>`. Under 2026.10.30a every builder round wrote such a report, and the seed counted each as a replied Review B round (`reply` 0): one builder round made the first snapshot `<ID>-r2` (`round 1 is reviewed: write <ID>-r2`), three made it `<ID>-r4`, above the ceiling. An increment begun under release B now seeds nothing from its reports, and its first Review B is round 1; an increment built before release B and in flight at its install seeds as before; the letter snapshots, the refusals and the seeded entries' shape are unchanged. A missing launcher log seeds every report, as before.
++- **The guard counts Review B rounds only** (`review-guard.py`; BUG-036): where an ID has no `rounds-<ID>.json`, its first snapshot seeds the record from a tracked `handoff/<ID>-r<N>-report.md` (a letter after `<N>` included) only for a round that release B's launcher (2026.10.30a or later) did not log, that is a round with no `run/launcher/runs.jsonl` builder row whose `brief` is the ID and whose `round` is `<N>`. Under 2026.10.30a every builder round wrote such a report, and the seed counted each as a replied Review B round (`reply` 0): one builder round made the first snapshot `<ID>-r2` (`round 1 is reviewed: write <ID>-r2`), three made it `<ID>-r4`, above the ceiling. An increment begun under release B now seeds nothing from its reports, and its first Review B is round 1; an increment built before release B and in flight at its install seeds rounds 1 to the highest round the launcher did not log (rounds 1 and 2 run before the install and round 3 after it seed rounds 1 and 2, and its next snapshot is `<ID>-r3`; corrected by 2026.10.30c); the letter snapshots, the refusals and the seeded entries' shape are unchanged. A missing launcher log seeds every report, as before.
+ 
+ **Running projects must**
+ - *(all phases)* Install with every project paused, restart, run `/calibrate-bridge` before the next increment, then `bridge-check.py`. Paused means no builder, review, CI watch or suite running and everything committed; the bridge's own checkout is switched to `main` for the install (R-038, calibration's step 1). On the real install the installed `VERSION` reads 2026.10.30b and the installer printed `previous 2026.10.30a kept at ...`.
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index e05df64..dff6527 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+-  "version": "2026.10.30b",
+-  "generated": "2026-10-30 14:10",
++  "version": "2026.10.30c",
++  "generated": "2026-10-31 00:03",
+   "files": {
+     "agents/cursor-configurator.md": "8bcb0ebba97ba25c4f81528c439195619196e7d078c4b0054a206e51fa7c8cd2",
+     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
+@@ -12,10 +12,10 @@
+     "agents/security-auditor.md": "09c1cc89a9e73f0a578891590cd148817cb5bb9a0ead77e7456c28d32c760d0c",
+     "agents/spec-packager.md": "fba6860ca9f945e154e2b6d0b7adae3bcbc14c9869b2b626769cea0340a25626",
+     "agents/test-runner.md": "abbaa2acc5252dc9357906a4e06fb9a3d49078659c54645fd85068a905c25d36",
+-    "commands/calibrate-bridge.md": "cf4c6ad94e98bd82fc4fae0ea37a175a5cae15b7fc05baad5c0b7dcd0bcba571",
++    "commands/calibrate-bridge.md": "15cb7e817017c022672a1b4ef9dd80f6ba261f872d4e7c5e527b3d7974dd8a29",
+     "commands/evaluate-reports.md": "0845cf7b6d5bf49c847202a670201b79cbf4dc1b819c8c828fe07cb2ddc0499d",
+     "commands/supervisor.md": "6cfbc9c7113b82e1d1d6b52a0c09f4a0a3116b959e2498f3643c2015cd3773ed",
+-    "cursor-bridge/CHANGELOG.md": "62b83ff30a83278e3ab6a7925706351e778e2f8f1dfe2e9e329714b409adc00c",
++    "cursor-bridge/CHANGELOG.md": "8607f8b4acf9eb1e46ebd75e429d8b2e70308a27d69c9da33fc9297809f0835e",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "d76f5b10bcf60d87d38d89e05e7cc821afeaa6b2fb90a3dbcccb14c4741c6460",
+     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
+@@ -26,7 +26,7 @@
+     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
+     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
+     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
+-    "cursor-bridge/VERSION": "5cd8230279ad890f2326da500ad77f238caa2d4b386f434a4e7baa359c0b85d8",
++    "cursor-bridge/VERSION": "bedae7d3a7cc4c33f61ede66e6502ff3a7ba0421dd74740fc32dd35fb60e54ee",
+     "cursor-bridge/bench-check.py": "ea34fa87a1f3383cd34600f48a817a23b6fc0cd4ad461a77b796baf05ef2643e",
+     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
+     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
+diff --git a/bridge/cursor-bridge/VERSION b/bridge/cursor-bridge/VERSION
+index c3792a1..48d9f4e 100644
+--- a/bridge/cursor-bridge/VERSION
++++ b/bridge/cursor-bridge/VERSION
+@@ -1 +1 @@
+-2026.10.30b
++2026.10.30c
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 469b828..cd30273 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1470,3 +1470,9 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ 
+ ### The calibration to 2026.10.30b (2026-10-30)
+ - **The roster check sends a signed-out tool to buy usage** (ISS-020): with Cursor's command-line tool signed out, both native probes answered `Authentication required. Please run 'agent login' first`, and `roster-check.py` printed `FAIL  no usable profile - the owner must buy usage, flip other_pool, or add a native profile`. The supervisor recorded no model failure and the owner signed in again by run sheet; both models then answered. Check: the check names a sign-in failure as such and advises a new sign-in by `cursor-agent login` (the command the bridge's shim runs; the tool's own message names it `agent login`), never usage, at the next release that changes `roster-check.py`.
++
++### BUG-037, stage B6's review, round 1 (2026-10-30; supervisor text and tests, stamped 2026.10.30c)
++- The round (snapshot STAGE-B6-r1, fe75f0c, hash 3f66ffda1f8a3f79, verify OK; stage/B6 deleted): Review A in four parts (bridge, tests, records, briefs) APPROVE, three Should fix; Review B APPROVE, one Should fix, 167 of the stage's tests passing. Convergent: calibrate-bridge.md step 1's install check, named by Review A's bridge part (its two signs fail on a same-version repeat) and its tests part (the line it names is printed with the spaces that align its columns). By the reflection module's arm (b), one fix increment, and the stage closes at its merge with no further stage round.
++- The fix's Review A (before its snapshot, no round): REJECT, one Blocking, taken: the first text gave a repair its own signs and called it what a `NOT CALIBRATED` result after an interrupted install usually needs, but the installer reads the installed `MANIFEST.json`'s version, so a run killed before it replaced that file repeats as an install over the older release, `previous` line and `VERSION` change included, and one killed after it repeats with neither; the text now gives every install one check, the installer's exit 0 with its last line `RESULT: INSTALLED TREE MATCHES bridge <version>`, and tests/test_bug037.py kills a run before and after the manifest. Its Should fix taken too (the seed is rounds 1 to the highest round the launcher did not log, not only the unlogged ones), and two of its considers (the line's column spaces asserted raw; the same-release test checks its own precondition). The suite's conformance test of this file (test_r027_r033_bridge_own_status_file) holds `Bridge version:` to the release folder's `VERSION`, so the line moved with the stamp, as at PR #110.
++- Taken: the convergent finding (step 1's one check, with the signs of an install over an older release, of the same release again and of a repeat; tests/test_bug037.py runs each against the installer); Review B's (2026.10.30b's "seeds as before" for an increment in flight at its install, corrected in place and named in 2026.10.30c's entry); the tests part's Should fix (the owner's three commands asserted as written, `anyway` once in step 1) and its considers (test_bug036's newest-heading pin made relative, BUG-035's parenthesis checked as a set, BUG-034's message); the bridge part's step 4 wording; the records part's Should fix (INVENTORY's ceiling row names tests/test_bug036.py and BUG-036). 2026.10.30c's entry has an If rolled back item: the installer's note for a rollback past it otherwise reads that its entry names nothing to restore (test_r037's check).
++- Recorded, not taken (the close records or release T): the bridge part's (a) the way back reaches one release (installing 2026.10.30b removed 2026.10.25a's copy; 2026.10.30c's entry names it), (b) 2026.10.30a's entry credits BUG-035 to `session-start.py` (its commit changed change-cycle.md), (c) 2026.10.30a's Field acceptance names reAngle (released text, superseded by 2026.10.30b's); the briefs part's (a) a builder run stopped before the launcher writes its row leaves a report with no row and over-seeds that round, the class of BUG-036's lost-log lead and the likelier way in, (b) BUG-036's two m5 lines disagree (a `--kind test` launch naming a brief logs `brief`), (c) BUG-034's brief's "144 files differ" (106 and 140, as above, stand); Review B's consider, one missing higher row pulling logged lower rounds into the seed (`_seed_rounds` seeds 1 to the highest unlogged report), the same class; the records part's considers, to the close records.
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 38f1de5..c346058 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -39,7 +39,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | One heavy job at a time | A run of kind builder, driver or test takes the computer's one slot before its command starts: an exclusive lock on `~/.cursor-bridge/heavy.lock` (one byte on Windows, the whole file elsewhere) (from USERPROFILE/HOME, never LOCALAPPDATA), held for the launcher's life and released by the operating system when it ends; the holder's record (kind, run id, pid, creation time, start, limit) published beside it by mkstemp and os.replace, read only as a regular file of at most 4,096 bytes, strict UTF-8, every field checked, live only while a process with that pid and creation time runs (on Windows WaitForSingleObject alone); a waiter prints `waiting for the slot held by <kind> <run id> since <start>, ends by <end>` (or `unknown`) once a minute, its bound fixed once from the first live record (never under its own kind's default, never over the builder's cap plus 120 s), on time.monotonic(), then `slot taken` or 123 with `slot not free` (the log's `"slot": "not free"`, which --healthy refuses; `waited` apart from `seconds`); a review or watch run takes none, `--kind watch` only for gh pr checks and `--kind review` only for a cursor-agent command (a named test suite or a gh pr checks watch refused); a lock error other than contention is a 125 refusal; BRIDGE_RUN_SLOT_SCALE (test-only) honoured only beside BRIDGE_RUN_ALLOW_ANY=1; the loop guard counts a heavy launch 14,400 + 120 + 60 s longer; after the wait the launcher reads the brief again (BUG-030); a `"slot": "not free"` row is no builder run anywhere: roster-check's built_by and the launcher's class line (BUG-030), scope-check's builder windows and the pace report's lift and start (BUG-032), while its branch claim stands; a builder window counts the slot wait (BUG-030) | bridge/cursor-bridge/bridge-run.py; bridge/cursor-bridge/loop-guard.py; bridge/cursor-bridge/roster-check.py; bridge/cursor-bridge/scope-check.py | tests/test_bridge_run_slot.py; tests/test_loop_guard.py (test_r040_); tests/test_a4_followups.py; tests/test_bug030.py; tests/test_bug032.py; tests/test_hotfix25a_roster_launcher.py; tests/test_hotfix25a_guard_scope_invisible.py | release B (TASK-029; BUG-030, BUG-032) |
+ | Mutation reruns that skip what is unchanged | `python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json [--all] [--checkpoint <commit>] [--scratch <folder>] [--mutant-timeout <seconds>]`, run from the Workspace's top: the mutants file (JSON: `mutants`, each with `id`, `file`, `pairs` of `old`/`new`, `tests`, `expect_fail` and an optional `expect: "survive <reason>"`; `new_tests`; `untracked`) is checked whole first, each field's type included, every path relative, tracked in the index, with no `..` or `.` component, none ending in a dot or a space or holding a colon, not `.git`, an `untracked` entry not reaching the Workspace's `.git` by any name (compared by file identity), and no link from the Workspace down; a `--scratch` in the extended, device or UNC form, or one that is, holds or lies in the Workspace by file identity, is refused; the copy (the tracked files, the root `.env`, the listed untracked paths) is built under `~/.cursor-bridge/scratch/<project>/mutation-run-<id>/` and removed at the end; one collection with a plugin of the program refuses a mutated module resolving outside the copy (or, in a normal run, nowhere) and any module loaded from the Workspace; each mutant is applied to its file's original bytes in the file's own newlines and its tests run windowless, each test's outcome recorded by a plugin of the program into a file of that run's own (MUTATION_PYTEST_RESULTS), never read from pytest's terminal text, with `-c` naming the copy root's pytest configuration found as pytest 9 finds it (pytest.toml, .pytest.toml, pytest.ini, .pytest.ini, then pyproject.toml, tox.ini, setup.cfg holding a pytest section), or an empty file where there is none, and `--rootdir` at the copy, so no configuration above the copy is read, bounded by `--mutant-timeout` (default 900 s; the tree ended at the bound, and run_process returns after bounded waits whatever holds the pipes; a pytest still alive then ends the run with exit 3, no further mutant run); killed means an expected test failed and nothing else failed, erred or failed to collect, error is a crash, a timeout, a missing outcome record or id, a collection error, a test error or an unexpected failure; each outcome is a flushed line of `run/supervisor/mutation-cache/<id>.jsonl` (refused when it is a link or has another hard link) keyed by a length-framed sha256, read from the copy before any mutant runs, of the mutated file's folder, the test files' folders (the root for a root-level file), the conftest.py files on their way, the root's files of the configuration names above and the mutant itself, and a kept kill skips the mutant until a keyed byte changes (`--all` runs all); a killed `expect: survive` mutant is not counted killed; exit 3 on any error or an internal error, else 1 (a survivor, a mutant not applied, a killed `expect: survive`), else 0, 2 for a refusal; `--checkpoint` runs only the listed new tests on `git archive <commit>` (every member name checked, a regular file or folder inside the copy) with the working tree's new test files, a new test id in a file the commit already holds allowed, each test of a listed file, parametrized id or class id judged by its own id, exit 4 when one passes there, `not run` for one that cannot collect, the working tree's conftest.py files on the way to each listed test copied with it (one reached through a link refused, BUG-030); a project file at the copy's top level named like one of the seven modules the run itself imports (pytest, _pytest, pluggy, py, iniconfig, tomllib, tomli), in any importable suffix, refuses the run (exit 2), every child runs with PYTHONDONTWRITEBYTECODE=1 and the copy's `__pycache__` folders are removed (rounds 10 to 14); a tomllib or bridge_env that cannot be imported exits 3, the line naming each module (BUG-030); a copied conftest.py on the way to a listed test that cannot load, absent at the checkpoint or differing from its blob there, is judged per file, a clear file beside it still run and a pass there exit 4, while an unchanged one that cannot load still refuses (exit 2) and a git failure never excuses one (BUG-032) | bridge/cursor-bridge/mutation-run.py | tests/test_mutation_run.py; tests/test_mutation_run_supervisor.py; tests/test_bug030.py; tests/test_bug032.py | release B (TASK-031; BUG-030, BUG-032) |
+ | The loop's text for windowless runs, the slot and the mutation run | The delegation loop's step 3 states the heavy launch's duration once (the kind's cap plus the slot wait's bound plus the reporting minute: 28,980 s for a builder or a mutation run, 18,180 s for a test suite), the Bash tool's `timeout` on every heavy launch and its wake-timer; step 3b handles the slot's exit 123 (a wake-timer until the holder's `ends by`, one relaunch, twice more, then the owner; `held by unknown` at once, a second naming `heavy.lock`), a waiter killed from outside and a mutation run cut short (relaunched once, from its cache), none a model failure; step 4 defines a suite (the recorded command, or more than the increment's own test files), runs every suite through the launcher in the background for `test-runner` to read, keeps the mutants and criterion tests the supervisor's in `run/supervisor/<id>-mutants.json`, defines a driver (a program under run/supervisor/ or a mutation-run.py run), launches every mutation run with `--kind driver`, and runs the new tests against the checkpoint with `mutation-run.py --checkpoint` instead of the old-<nnn> worktree; step 7, moved verbatim into the sub-file delegation-loop/decide.md to keep the module within its bound, launches the mutation run on every pass once Review A and the auditors accept and before step 8's snapshot, after cutting the file's duplicates and estimating its process count on in-flight.md, exit 1 handled by the ceiling; the survival list keeps the verdicts in in-flight.md; the windowless default is a configuration item (configuration.md, the configuration guide's §2 and order of operations, cursor-configurator.md) and is written at calibration between two suite runs, reverted on a failure only after the write; rules 8 and 24 name the driver kind and the default; test-runner.md, diff-reviewer.md, spec-packager.md and KP-053, KP-056 and KP-061 say the same; since BUG-031 rule 39 and the digest retire step 4's old-<nnn> worktree, the mutation run's `python` is the project's own interpreter, the run-parameters line names the driver kind, and the windowless default goes into the Workspace root's conftest.py where that file exists, or else into every test root's | bridge/cursor-bridge/workflow/phases/delegation-loop.md; .../delegation-loop/decide.md; .../configuration.md; bridge/commands/supervisor.md; bridge/commands/calibrate-bridge.md; bridge/agents/test-runner.md, cursor-configurator.md, diff-reviewer.md, spec-packager.md; bridge/cursor-bridge/Known-Pitfalls.md; bridge/cursor-bridge/Cursor-Project-Configuration.md | tests/test_loop_text_windowless.py; tests/test_phase_modules_build.py; tests/test_session_start_module.py; tests/test_conformance_windowless.py (test_bug031_) | release B (TASK-030; BUG-031) |
+-| The code-review ceiling held by the launcher and the guard | `bridge_env.py` holds the one copy of the ceiling (`REVIEW_ROUNDS = 3`), the five blocking classes, the name grammar (`<ID>` or `<ID>-r<N>`), the readers of the `Blocking class:` line and of the owner's `Review rounds above the ceiling:` line, the branch rule read from both records and the squash-subject reader; the launcher has every builder launch name exactly one brief `handoff/<ID>[-r<N>].md` (read from the `--workspace` folder, else its own), logs `brief`, `round`, `brief_sha256` and `lift` in runs.jsonl and never the prompt, and refuses (exit 125) a brief revised after a completed run, a builder launch on `main`, a detached HEAD or outside git, a brief under an ID outside the branch's declared set (one ID, or a `Merge unit:` line's, the claim lapsing when they merge on `main`), and a fourth round without a class line in the brief or the owner's line (`bridge-run: refused - review ceiling: `), an identical-bytes relaunch adding no round and a class line lifting one round; a `--kind review` launch naming a brief or on the roster's builder model is refused; the guard counts each ID's rounds in `.git/bridge/rounds-<ID>.json`, a round spent when its reply arrived (written by `verify`, or read from the `.err` file of an unverified run unless `verify` flagged it), seeds an increment in flight from its letter snapshots and report files (a report only for a round release B's launcher did not log, BUG-036), and refuses a reviewed round on another tree, an `<N>` off the count, a snapshot under an ID outside the branch's set and a fourth round without a class line in `run/review/SCOPE-<ID>.md` or the owner's line (`review-guard: refused - review ceiling: `); `DESIGN-` names are not counted; the permission guard refuses a `cursor-agent` started around the launcher whose arguments name `handoff/` or `run/review/`; the design ceiling's refusal points at design.md; a report (`<ID>-report.md`, `<ID>-r<N>-report.md`, `<ID>-r<N><letter>-report.md`) is no brief, and the guard's review inputs match an ID at its boundaries (BUG-030); on `refactor/<stage>` whose declared IDs are REFAC IDs, the branch rule admits every `REFAC-<nnn>` brief for a launch and `REFAC-<stage>` alone for the guard's snapshot (BUG-032) | bridge/cursor-bridge/bridge_env.py; bridge-run.py; review-guard.py; permission-guard.py | tests/test_bridge_run_review_ceiling.py; tests/test_review_guard_ceiling.py; tests/test_task032_supervisor_launcher.py; tests/test_task032_supervisor_guard.py; tests/test_task032_supervisor_r4.py; tests/test_permission_guard.py; tests/test_bridge_run_design_ceiling.py; tests/test_bug030.py; tests/test_bug032.py | release B (TASK-032; BUG-030, BUG-032) |
++| The code-review ceiling held by the launcher and the guard | `bridge_env.py` holds the one copy of the ceiling (`REVIEW_ROUNDS = 3`), the five blocking classes, the name grammar (`<ID>` or `<ID>-r<N>`), the readers of the `Blocking class:` line and of the owner's `Review rounds above the ceiling:` line, the branch rule read from both records and the squash-subject reader; the launcher has every builder launch name exactly one brief `handoff/<ID>[-r<N>].md` (read from the `--workspace` folder, else its own), logs `brief`, `round`, `brief_sha256` and `lift` in runs.jsonl and never the prompt, and refuses (exit 125) a brief revised after a completed run, a builder launch on `main`, a detached HEAD or outside git, a brief under an ID outside the branch's declared set (one ID, or a `Merge unit:` line's, the claim lapsing when they merge on `main`), and a fourth round without a class line in the brief or the owner's line (`bridge-run: refused - review ceiling: `), an identical-bytes relaunch adding no round and a class line lifting one round; a `--kind review` launch naming a brief or on the roster's builder model is refused; the guard counts each ID's rounds in `.git/bridge/rounds-<ID>.json`, a round spent when its reply arrived (written by `verify`, or read from the `.err` file of an unverified run unless `verify` flagged it), seeds an increment in flight from its letter snapshots and report files (a report only for a round release B's launcher did not log, BUG-036), and refuses a reviewed round on another tree, an `<N>` off the count, a snapshot under an ID outside the branch's set and a fourth round without a class line in `run/review/SCOPE-<ID>.md` or the owner's line (`review-guard: refused - review ceiling: `); `DESIGN-` names are not counted; the permission guard refuses a `cursor-agent` started around the launcher whose arguments name `handoff/` or `run/review/`; the design ceiling's refusal points at design.md; a report (`<ID>-report.md`, `<ID>-r<N>-report.md`, `<ID>-r<N><letter>-report.md`) is no brief, and the guard's review inputs match an ID at its boundaries (BUG-030); on `refactor/<stage>` whose declared IDs are REFAC IDs, the branch rule admits every `REFAC-<nnn>` brief for a launch and `REFAC-<stage>` alone for the guard's snapshot (BUG-032) | bridge/cursor-bridge/bridge_env.py; bridge-run.py; review-guard.py; permission-guard.py | tests/test_bridge_run_review_ceiling.py; tests/test_review_guard_ceiling.py; tests/test_task032_supervisor_launcher.py; tests/test_task032_supervisor_guard.py; tests/test_task032_supervisor_r4.py; tests/test_permission_guard.py; tests/test_bridge_run_design_ceiling.py; tests/test_bug030.py; tests/test_bug032.py; tests/test_bug036.py | release B (TASK-032; BUG-030, BUG-032, BUG-036) |
+ | One reading of a squash subject, and the pace report | `bridge_env.py` holds the one reader of a squash subject, imported by plan-check.py and pace-report.py: its closing-parenthesis form merges an increment only when each comma-separated item is a bare ID (the one helper: the item fully matches the pattern and holds a hyphen and a digit), `R-nnn` bare under either pattern and merging itself only under the grammar's, a linear parse with no regex backtracking, the two form orders of round 1 kept (ISS-013); plan-check.py's git call bounded; `python ~/.claude/cursor-bridge/pace-report.py [<project root>...] [--weeks <n>] [--ceiling <n>] [--tokens] [--home <folder>]` prints, read-only and ASCII, one section per project (with none given, the roots evaluate-reports.py names, a missing or non-project default root a named line, a given one exit 2): per ISO week (UTC) increments started (the first launcher row or guard round of an ID with a tracked brief, else unknown), merged (each commit of `refs/heads/main` read as bytes, split on NUL and newline only, a commit counted in its earliest merging week, a far-future or unreadable time skipped), rounds mean and maximum (the largest of the report files, the `.err` files under the letter rule asked of the tracked briefs, and the guard's count; a merged increment with no reading left out), days from start to merge (never negative), `docs/HARDENING.md` lines landing on `main`, and with `--tokens` the project's tokens from its session and subagent transcripts (a `Token sources:` line of counts, never keys; one usage per message id at its greatest total; malformed lines skipped; every line read with a size of at most LINE_CAP + 1, 64 MiB, an over-cap line drained in chunks with the deadline checked at each; the walk by os.scandir, following no link, inside the 120-second limit, which ends the read with an empty cell and the project named); under the table the increments and stage reviews over the ceiling with each round's lift; every git command with a 120-second limit, the file monitor and the untracked cache off, GIT_NO_LAZY_FETCH and GIT_OPTIONAL_LOCKS set and the inherited GIT_DIR and kin removed, a failure failing that project in its own words (exit 1 at the end); no bytecode and no file written; an ID counts only with a tracked brief, a report being no brief (BUG-030), and a launch refused the slot gives no start and no lift (BUG-032) | bridge/cursor-bridge/bridge_env.py; bridge/cursor-bridge/plan-check.py; bridge/cursor-bridge/pace-report.py; docs/cli-reference.json; docs/CLI_REFERENCE.md | tests/test_pace_report.py; tests/test_plan_check.py; tests/test_task033_supervisor.py; tests/test_task033_supervisor_r2.py; tests/test_task033_supervisor_r3.py; tests/test_task033_supervisor_r4.py; tests/test_dump_cli.py; tests/test_bug030.py; tests/test_bug032.py | release B (TASK-033; BUG-030, BUG-032) |
+ | The loop's text for the review ceiling and the pace report | Every re-delegation and every fix inside a gate writes a new numbered brief, `handoff/<ID>-r<N>.md`, never a revision in place, `BUG-<nnn>` the brief of a defect found after a merge (step 3, step 7, spec-packager's fix variant, diff-reviewer's fix mode and the policy's fix-diff check keyed on the fix variant's Objective, SKILL.md, KP-009); step 7's "The review ceiling" (delegation-loop/decide.md) states what a round is, the guard's count the gate reads, the five blocking classes, that at and above three rounds only those send work back and every other finding goes to docs/HARDENING.md with the increment, the `Blocking class:` line written into the brief and into `run/review/SCOPE-<ID>.md` and confirmed or denied by the reviewers, a denial a breach that withholds the merge, the owner's `Review rounds above the ceiling:` line, and the two programs' refusals as stops, not failures (step 3b's exception); step 8 commits the SCOPE file before `review-guard.py snapshot <ID>-r<N>` and names the round's diff and assumptions file, `verify`, `premerge` and the `.err` file by the round, so the guard's empty-input check reads them (KP-067), the directive's fifth clause at or above the ceiling; the stage review takes `STAGE-<name>-r<N>` for its snapshot and its diff, its own SCOPE file and step 7's arms below and above the ceiling; rule 6 (core and digest), the policy's re-delegation paragraph and step 7's brake name the five and say the class is the defect, not the operator that exposed it; both convergence paragraphs say the rule grades a finding's certainty, never its class, and its bearing; diff-reviewer, security-auditor and design-auditor grade by the five first at or above the ceiling; every refusal of the launcher and the guard is a stop (step 3b); run-parameters.md documents the owner's line and its gloss reads `n/a (nothing installs)`; KP-062 names its twin; /evaluate-reports runs `pace-report.py --tokens` into pace.md on every run and writes a Pace section, with only the entries the owner's messages raised in a week with nothing new | bridge/commands/supervisor.md; bridge/commands/evaluate-reports.md; bridge/cursor-bridge/workflow/phases/delegation-loop.md; .../delegation-loop/decide.md; .../reflection.md; .../run-parameters.md; bridge/cursor-bridge/Merge-Verification-Policy.md; bridge/cursor-bridge/Known-Pitfalls.md; bridge/agents/diff-reviewer.md, security-auditor.md, design-auditor.md, spec-packager.md; bridge/skills/root-cause-first/SKILL.md | tests/test_loop_text_pace.py; tests/test_core_carve.py; tests/test_phase_modules_build.py; tests/test_phase_modules_close.py; tests/test_allowlist.py; tests/test_session_start.py; tests/test_b3_least_confident.py | release B (TASK-034) |
+ | Release B's acceptance tests | The traceability check run over the finished split, green with nothing dropped, each of the baseline's 424 passages in exactly one home or excused by its `reword`, the homes being the core, the ten phase modules with their sub-files and variants, and TASK-017's four trait files (skipped where the baseline commit is absent, as in CI); a sample project for each written type and sub-type, and a local web app with every written trait, walked from intake to configuration through the session-start hook on a copy of bridge/, the files it names for each phase equal to those computed from the core's phase table, the modules' `Sub-files:` and `Variants:` lines, the registry, the open list and each conditional file's change headings; the four running projects' committed fixtures classified as the Decision 6 row records §6.3, the workflow check and the calibration grades clean, the bridge's own status file carrying its fixture's line | bridge/cursor-bridge/trace-check.py; session-start.py; workflow-check.py; conformance-check.py (calibration_workflows_grades); tests/fixtures/workflows/ | tests/test_trace_full_split.py; tests/test_reads_only_applicable.py; tests/test_running_projects_classify.py | release B (TASK-025) |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index e370f6d..ad628f8 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,10 +3,10 @@ Last updated: 2026-10-30
+ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+-Increment: none (this project calibrated to the installed 2026.10.30b on 2026-10-30; the TDP's check of the fix and stage B6's close follow, under Next)
+-Last accepted: the calibration to 2026.10.30b (PR #111, at its merge): this project calibrated to the installed fix release, the trial's results in R-031, R-037 and HARDENING; before it BUG-036 (PR #110), the guard's seed fixed and stamped 2026.10.30b; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-026, TASK-027's stamp, TASK-028 to TASK-035, BUG-001 to BUG-036, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+-Awaiting user on: the TDP's report of 2026.10.30b's field check, its first increment after its install (the owner's word of 2026-10-30: wait for it before stage B6's close); the TDP resumes on the owner's word
+-Next: when the TDP reports its first increment after the install snapshotted as `<ID>` or `<ID>-r1` with no hand seed and its rounds record showing round 1 unseeded, 2026.10.30b's field acceptance is met (R-037); then stage B6's close: the owner's dated deferral of reAngle's and the video factory's calibrations (R-031, R-037, TASK-027's Done when; both paused until the bridge's planned work is done, the owner's word of 2026-10-30), the stage review, the demonstration (the trial on the TDP in place of reAngle), the reflection items with ISS-011, ISS-015 and ISS-020 completed; then project end, where host extension's delivery applies by the `Delivery kind:` row; then release T (its design work on Fable 5.1, the owner switching), B2, the progress graph and W. The programs hold the ceiling and the slot; host extension's test-checks bind (a brief records the `claude --version` it tests on, or that the session has none on PATH). No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013). A class line reads `Blocking class: <class> - <finding>`.
++Increment: none (BUG-037, stage B6's review fix, merged; stage B6's close follows, under Next)
++Last accepted: BUG-037 (PR #112, at its merge): stage B6's review, round 1 (every reviewer approving; one convergent finding, the run sheet's install check), fixed by text and tests and stamped 2026.10.30c; before it the calibration to 2026.10.30b (PR #111); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-026, TASK-027's stamp, TASK-028 to TASK-035, BUG-001 to BUG-037, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Awaiting user on: the owner's dated deferral of reAngle's and the video factory's calibrations (R-031, R-037), asked 2026-10-30; the TDP resumes on the owner's word
++Next: stage B6's close (the owner's "Yes, begin now", 2026-10-30; the TDP's TASK-158 first Review B, 2026.10.30b's field check, recorded when it comes): its review closed by BUG-037 with no further round (arm (b)); the owner's dated deferral of reAngle's and the video factory's calibrations (TASK-027's Done when), awaited; the demonstration (the trial on the TDP in place of reAngle); the reflection items with ISS-011, ISS-015 and ISS-020 completed; then project end, 2026.10.30c installed by host extension's delivery (Install into the host); then release T (its design work on Fable 5.1, the owner switching), B2, the progress graph and W. The programs hold the ceiling and the slot; a brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013). A class line reads `Blocking class: <class> - <finding>`.
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -15,14 +15,14 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); each closed gate's own files, named by its ID (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*, bug0nn_*, cal30b_*.py, the stage reviews' stage_b<n>_* and stage-b<n>-*, the fix and refactoring passes' fix*, refac_* and refactor*, the plan revision maintainer-text's plan_text_*.py, design_text_file.py and *-PLAN-TEXT.md); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); b5close_docs.py and b5close_records.py (stage B5's); the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py to demo_b5.py (run with python -X utf8); drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #111, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+-Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) closed 2026-10-19; B3 (the core and phase-module split) 2026-10-24; B4 (the first conditional workflows) 2026-10-25; B5 (calibration and acceptance) closed 2026-10-29: HOTFIX-002, TASK-023 to TASK-025, TASK-028 to TASK-035, the plan revision maintainer-text, BUG-028 to BUG-033 and REFAC-B5 (PRs #84 to #103), the stage review closed at round 3, the first at the ceiling (HARDENING, Stage B5); B6 (release B's install) in hand: TASK-026 and TASK-027's stamp merged, release B installed on 2026-10-30, its trial on the TDP (the owner's choice) found BUG-036, fixed by 2026.10.30b (PR #110), installed and this project calibrated to it on 2026-10-30 (PR #111). The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B5's close, 2026-10-29 (demonstration passed, 14 checks; the installed conformance check 21 OK / 1 MISSING, the recorded no-diagram-index decision / 6 NOTE; Issues ISS-017 and ISS-018 completed, ISS-019 added and completed, ISS-011 and ISS-015 updated; Feedback FB-051 to FB-062; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #112, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
++Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) closed 2026-10-19; B3 (the core and phase-module split) 2026-10-24; B4 (the first conditional workflows) 2026-10-25; B5 (calibration and acceptance) closed 2026-10-29: HOTFIX-002, TASK-023 to TASK-025, TASK-028 to TASK-035, the plan revision maintainer-text, BUG-028 to BUG-033 and REFAC-B5 (PRs #84 to #103), the stage review closed at round 3, the first at the ceiling (HARDENING, Stage B5); B6 (release B's install) in hand: TASK-026 and TASK-027's stamp merged, release B installed on 2026-10-30, its trial on the TDP (the owner's choice) found BUG-036, fixed by 2026.10.30b (PR #110), installed and this project calibrated to it on 2026-10-30 (PR #111); the stage review's round 1 approved by every reviewer, its convergent finding fixed by BUG-037 (PR #112), stamped 2026.10.30c. The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B5's close, 2026-10-29 (demonstration passed, 14 checks; the installed conformance check 21 OK / 1 MISSING, the recorded no-diagram-index decision / 6 NOTE; Issues ISS-017 and ISS-018 completed, ISS-019 added and completed, ISS-011 and ISS-015 updated; Feedback FB-051 to FB-062; least confident in HARDENING; Project Summary patched)
+ Deferred increments: none
+ Open issues: ISS-020: Cursor's command-line sign-in restored by the owner on 2026-10-30; the roster check's usage advice for it to release T (HARDENING). ISS-011 open (the window flood of 2026-10-19; closed at stage B6's close if no flood recurs under release B). ISS-015 fixed (since the install the programs hold the ceiling; its entry completed at stage B6's close). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). Earlier: docs/archive/STATUS_HISTORY.md
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+-Bridge version: 2026.10.30b
++Bridge version: 2026.10.30c
+ Calibrated: 2026-10-30 from 2026.10.30a to 2026.10.30b, by the no-delta path (the version line moved with the stamp, PR #110; the entry's items applied by hand) — applied: bridge-check 147 OK on the installed tree, 2026.10.30a kept as the way back; the core in parts to its end, the building modules with their sub-files, host-extension, claude-code-extension, installable, the merge policy, configuration, pitfalls, delivery, the diagram conventions, the glossary and the skills re-read; roster native, once the owner had signed Cursor's command-line tool in again (ISS-020); memory notes 3 read, 1 reduced; conformance as below; no increment in flight and no seeded round record, so nothing set right; project.json's bridge version; pending: as below; not applied (gate passed): none. Earlier calibrations: docs/archive/STATUS_HISTORY.md.
+-Calibration pending: on the TDP, 2026.10.30b's field acceptance at its first increment after its install; reAngle and the video factory calibrate when they resume, from 2026.10.25a through both entries; at project end, host extension's `project-end.delivery` for host-installation (Install into the host), by the `Delivery kind:` row; at the next design phase or change cycle, host extension's and Claude Code extension's `design.sections` and installable's intake, design and planning additions (2026.10.30a; never backwards).
++Calibration pending: 2026.10.30c (BUG-037, text only) at project end's install, this project by the no-delta path (the version line moved with the stamp, PR #112) and the TDP calibrating to it; reAngle and the video factory calibrate when they resume, from 2026.10.25a through every entry; at project end, host extension's `project-end.delivery` for host-installation (Install into the host), by the `Delivery kind:` row; at the next design phase or change cycle, host extension's and Claude Code extension's `design.sections` and installable's intake, design and planning additions (2026.10.30a; never backwards).
+ Conformance notes (2026-10-30, the calibration to 2026.10.30b: 23 OK, 1 MISSING, 7 NOTE, the seventh project.json's bridge version, set right in PR #111): the diagram index is MISSING (No diagram index is a recorded decision); NOTE the repository is public; NOTE the boundary-check hook is configured, not engaging (ISS-010; the launcher's BOUNDARY lines are the detection, as expected); NOTE the design exists under other names (DESIGN_CRITIQUE.md), for the diagram retrofit; NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, this project's reviewed at calibration step 2b and the maintainer session's own left to the maintainer
+ Run parameters: see docs/RUN_PARAMETERS.md (the one record; the owner's four answers fixed by test_r001_run_parameters_owner_values)
+ 
+diff --git a/docs/archive/STATUS_HISTORY.md b/docs/archive/STATUS_HISTORY.md
+index 1953f7b..7e2ff76 100644
+--- a/docs/archive/STATUS_HISTORY.md
++++ b/docs/archive/STATUS_HISTORY.md
+@@ -73,3 +73,10 @@ Open issues, the line as it stood before the calibration to 2026.10.30a: ISS-011
+ - Calibrated: 2026-10-30 from 2026.10.25a to 2026.10.30a, by the no-delta path (the version line moved with the stamp, PR #108; the no-delta path runs no step 4, so the entry's items were applied by hand, its last item) — applied: bridge-check 147 OK on the installed tree; the core and the building modules with their sub-files re-read, with host-extension, claude-code-extension and installable; roster native; memory notes 3 read, 0 removed; conformance as below, the windowless floor OK; no increment in flight, so no round seeded; the ceiling and the slot held by the programs, the by-hand rules retired; host extension's test-checks from the next brief; the `Delivery kind:` row and project.json written; pending: as below; not applied (gate passed): none. Earlier calibrations: docs/archive/STATUS_HISTORY.md.
+ - Calibration pending: the calibration to 2026.10.30b after the owner's install, its step 4 by hand since the version line moved with the stamp (PR #110); at project end, host extension's `project-end.delivery` for host-installation (Install into the host), by the `Delivery kind:` row; at the next design phase or change cycle, host extension's and Claude Code extension's `design.sections` and installable's intake, design and planning additions (2026.10.30a; never backwards).
+ - Conformance notes (2026-10-30, the calibration to 2026.10.30a: 23 OK, 1 MISSING, 6 NOTE, the same MISSING and NOTEs as at stage B5's close): the diagram index is MISSING (No diagram index is a recorded decision); NOTE the repository is public; NOTE the boundary-check hook is configured, not engaging (ISS-010; the launcher's BOUNDARY lines are the detection, as expected); NOTE the design exists under other names (DESIGN_CRITIQUE.md), for the diagram retrofit; NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, this project's reviewed at calibration step 2b and the maintainer session's own left to the maintainer
++
++## Moved out 2026-10-30 (BUG-037, PR #112)
++- Increment: none (this project calibrated to the installed 2026.10.30b on 2026-10-30; the TDP's check of the fix and stage B6's close follow, under Next)
++- Last accepted: the calibration to 2026.10.30b (PR #111, at its merge): this project calibrated to the installed fix release, the trial's results in R-031, R-037 and HARDENING; before it BUG-036 (PR #110), the guard's seed fixed and stamped 2026.10.30b; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-026, TASK-027's stamp, TASK-028 to TASK-035, BUG-001 to BUG-036, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++- Awaiting user on: the TDP's report of 2026.10.30b's field check, its first increment after its install (the owner's word of 2026-10-30: wait for it before stage B6's close); the TDP resumes on the owner's word
++- Next: when the TDP reports its first increment after the install snapshotted as `<ID>` or `<ID>-r1` with no hand seed and its rounds record showing round 1 unseeded, 2026.10.30b's field acceptance is met (R-037); then stage B6's close: the owner's dated deferral of reAngle's and the video factory's calibrations (R-031, R-037, TASK-027's Done when; both paused until the bridge's planned work is done, the owner's word of 2026-10-30), the stage review, the demonstration (the trial on the TDP in place of reAngle), the reflection items with ISS-011, ISS-015 and ISS-020 completed; then project end, where host extension's delivery applies by the `Delivery kind:` row; then release T (its design work on Fable 5.1, the owner switching), B2, the progress graph and W. The programs hold the ceiling and the slot; host extension's test-checks bind (a brief records the `claude --version` it tests on, or that the session has none on PATH). No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013). A class line reads `Blocking class: <class> - <finding>`.
++- Calibration pending: on the TDP, 2026.10.30b's field acceptance at its first increment after its install; reAngle and the video factory calibrate when they resume, from 2026.10.25a through both entries; at project end, host extension's `project-end.delivery` for host-installation (Install into the host), by the `Delivery kind:` row; at the next design phase or change cycle, host extension's and Claude Code extension's `design.sections` and installable's intake, design and planning additions (2026.10.30a; never backwards).
+diff --git a/tests/test_bug034.py b/tests/test_bug034.py
+index 79ae966..a9ba64d 100644
+--- a/tests/test_bug034.py
++++ b/tests/test_bug034.py
+@@ -101,7 +101,7 @@ def test_bug034_anyway_installs_it_for_the_maintainers_rehearsals(tmp_path, prog
+     lines = out.splitlines()
+     banner = next(i for i, line in enumerate(lines) if line.startswith("bridge-install: ") and " -> " in line)
+     warning = [i for i, line in enumerate(lines) if line.startswith("  WARNING        the installed " + OLD_VERSION + " was replaced")]
+-    assert len(warning) == 1 and warning[0] > banner, "the warning is not one line after the banner: " + out
++    assert len(warning) == 1 and warning[0] > banner, "not exactly one warning line, after the banner: " + out
+     assert "(1 file(s): cursor-bridge/old-only.md)" in lines[warning[0]], "the warning does not name the refusal's differing list: " + lines[warning[0]]
+ 
+ 
+diff --git a/tests/test_bug036.py b/tests/test_bug036.py
+index 303d781..4d6308f 100644
+--- a/tests/test_bug036.py
++++ b/tests/test_bug036.py
+@@ -122,7 +122,8 @@ def test_bug036_the_fix_release_entry_stands_above_release_b_with_its_four_parts
+     Field acceptance, each on a line of its own, in order, every item phase-marked; it names the seed's rule and the
+     hand seed a rollback needs; and bridge-install.py's rolled_back_note for a rollback to 2026.10.30a holds its items."""
+     found = S.headings()
+-    assert found[0] == FIX_RELEASE == S.version() and found[1] == S.RELEASE_B, found[:3]
++    assert found.index(FIX_RELEASE) + 1 == found.index(S.RELEASE_B), found[:3]
++    assert found[0] == S.version() and FIX_RELEASE <= found[0], "the fix release, or a later one, is VERSION's: %s" % found[:3]
+     body = S.entry(FIX_RELEASE)
+     lines = body.split("\n")
+     at = [lines.index(p) for p in S.PARTS]
+diff --git a/tests/test_bug037.py b/tests/test_bug037.py
+new file mode 100644
+index 0000000..c5bc558
+--- /dev/null
++++ b/tests/test_bug037.py
+@@ -0,0 +1,133 @@
++"""BUG-037 (stage B6's review, round 1): the run sheet's install check against what the installer prints (R-038).
++
++Written by the supervisor; no builder run. calibrate-bridge.md's step 1 checked every install by two signs, `VERSION`
++changed and a `previous <version> kept at` line printed. The installer prints that line with the spaces that align its
++columns (`previous       <version> kept at <folder>`), and only when the installed MANIFEST.json's version differs
++from the release's: the same release installed again prints none, and a repeat after an interrupted install prints it
++or not, as far as the first run got (Review A of BUG-037: a run killed before it replaced cursor-bridge/MANIFEST.json
++leaves the older version there). The run sheet now gives every install one check, the installer's exit 0 with the
++line it prints last, `RESULT: INSTALLED TREE MATCHES bridge <the release's version>`, and names the two signs as what
++an install over an older release installed whole also shows. The installs are test_rollback.py's, imported, so the
++fixtures are the same; LOCALAPPDATA points at a temporary folder in every run.
++
++- test_bug037_every_install_ends_on_the_check_the_run_sheet_names enforces: step 1's one check, the installer's last
++  line on an install over an older release.
++- test_bug037_a_whole_install_over_an_older_release_prints_the_previous_line_as_named enforces: step 1's signs of
++  that install, and the installer's line reading as step 1 names it, its columns aligned by spaces.
++- test_bug037_the_same_release_again_changes_nothing_the_signs_name enforces: step 1's clause for the same release
++  installed again, `VERSION` unchanged and no `previous` line, the check passing.
++- test_bug037_a_repeat_after_an_interrupted_install_prints_the_line_or_none enforces: step 1's clause for a repeat,
++  a run killed before and after cursor-bridge/MANIFEST.json is replaced, each repeat ending on the one check.
++- test_bug037_the_fix_release_entry_stands_above_2026_10_30b enforces: bridge/cursor-bridge/CHANGELOG.md's header
++  (each entry's parts, every item phase-marked, the If rolled back items reaching the installer's note) for
++  2026.10.30c, and 2026.10.30b's corrected sentence on an increment in flight at its install.
++"""
++import os
++import re
++
++import pytest
++
++import test_release_b_stamp as S
++from test_rollback import (NEW_VERSION, OLD_VERSION, RELEASE, install_new, install_old, installed_old_then_new,  # noqa: F401 (fixtures)
++                           load_installer, old_release, version_of)
++
++FIX_RELEASE = "2026.10.30c"
++CHECK = ("Every install's check is the installer's exit 0 with the line it prints last, `RESULT: INSTALLED TREE "
++         "MATCHES bridge <the release's version>` (the installer runs `bridge-check.py` itself).")
++SIGNS = ("An install over an older release installed whole also changes the installed `VERSION` and prints the "
++         "installer's `previous` line, `previous <version> kept at <folder>` with the spaces that align its columns;")
++AGAIN = "the same release installed again changes neither and prints none;"
++REPEAT = "and a repeat after an interrupted install prints that line or none, as far as the first run got."
++MANIFEST_DST = os.path.join("cursor-bridge", "MANIFEST.json")
++
++
++def step1():
++    return S.flat(S.section(S.read(S.CALIBRATE), S.STEP1, 2))
++
++
++def raw_previous(out):
++    return [line for line in out.splitlines() if line.split()[:1] == ["previous"]]
++
++
++def ends_on_the_check(rc, out):
++    return rc == 0 and out.strip().splitlines()[-1] == "RESULT: INSTALLED TREE MATCHES bridge " + NEW_VERSION
++
++
++def test_bug037_every_install_ends_on_the_check_the_run_sheet_names(installed_old_then_new):
++    assert CHECK in step1(), "R-038: step 1's one check"
++    _, out = installed_old_then_new
++    assert ends_on_the_check(0, out), out
++
++
++def test_bug037_a_whole_install_over_an_older_release_prints_the_previous_line_as_named(installed_old_then_new):
++    assert SIGNS in step1(), "R-038: step 1's signs of an install over an older release"
++    target, out = installed_old_then_new
++    lines = raw_previous(out)
++    assert len(lines) == 1, out
++    assert re.match(r"\s*previous {2,}\S+ kept at ", lines[0]), "the installer's columns: " + lines[0]
++    m = re.fullmatch(r"previous (\S+) kept at (.+)", " ".join(lines[0].split()))
++    assert m and m.group(1) == OLD_VERSION, "the line does not read `previous <version> kept at <folder>`: " + lines[0]
++    assert version_of(target) == NEW_VERSION != OLD_VERSION
++
++
++def test_bug037_the_same_release_again_changes_nothing_the_signs_name(tmp_path, installed_old_then_new):
++    assert AGAIN in step1(), "R-038: step 1's clause for the same release installed again"
++    target, first = installed_old_then_new
++    assert raw_previous(first), "the first install printed the line this test expects gone: " + first
++    rc, out = install_new(tmp_path, target)
++    assert ends_on_the_check(rc, out), out
++    assert version_of(target) == NEW_VERSION and raw_previous(out) == [], out
++
++
++@pytest.mark.parametrize("killed", ["before the manifest", "after the manifest"])
++def test_bug037_a_repeat_after_an_interrupted_install_prints_the_line_or_none(tmp_path, old_release, monkeypatch, killed):
++    assert REPEAT in step1(), "R-038: step 1's clause for a repeat after an interrupted install"
++    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "localappdata"))
++    target = tmp_path / ".claude"
++    assert install_old(tmp_path, old_release, target)[0] == 0
++    bi = load_installer(RELEASE)
++    real, state = bi.shutil.copyfile, {"manifest": False, "killed": False}
++
++    def copyfile(src, dst, **kwargs):
++        d = str(dst)
++        if "cursor-bridge-previous" not in d:                  # the release's own copy, not the keeping of the older one
++            at_manifest = d.endswith(MANIFEST_DST)
++            if (killed == "before the manifest" and at_manifest) or (killed == "after the manifest" and state["manifest"]):
++                state["killed"] = True
++                raise OSError("killed %s" % killed)
++            state["manifest"] = state["manifest"] or at_manifest
++        return real(src, dst, **kwargs)
++    with monkeypatch.context() as m:
++        m.setattr(bi.shutil, "copyfile", copyfile)
++        with pytest.raises(OSError):
++            bi.install(str(target), False, anyway=True)
++    assert state["killed"], killed
++    rc, out = install_new(tmp_path, target)
++    assert ends_on_the_check(rc, out), out
++    expected = [OLD_VERSION] if killed == "before the manifest" else []
++    assert [line.split()[1] for line in raw_previous(out)] == expected, out
++
++
++def test_bug037_the_fix_release_entry_stands_above_2026_10_30b():
++    found = S.headings()
++    assert found.index(FIX_RELEASE) + 1 == found.index("2026.10.30b"), found[:3]
++    assert found[0] == S.version() and FIX_RELEASE <= found[0], found[:3]
++    body = S.entry(FIX_RELEASE)
++    lines = body.split("\n")
++    at = [lines.index(p) for p in S.PARTS[:3]]
++    assert at == sorted(at), at
++    for p in S.PARTS[:3]:
++        assert body.count(p) == 1 and [l for l in S.part(body, p) if l.startswith("- ")], p
++    S.marks_are_phases([l for l in S.part(body, "**Running projects must**") if l.strip()])
++    rolled = [l for l in S.part(body, "**If rolled back**") if l.startswith("- ")]
++    S.marks_are_phases(rolled)
++    note, ok = S.load(S.INSTALL, "bridge_install_for_bug037").rolled_back_note(S.CHANGELOG, FIX_RELEASE, "2026.10.30b")
++    assert ok and all(item in note for item in rolled), note[:200]
++    joined = S.flat(body)
++    for words in ("BUG-037", "No program changed", "`previous <version> kept at <folder>`",
++                  "`RESULT: INSTALLED TREE MATCHES bridge <the release's version>`",
++                  "`/calibrate-bridge` before the next increment", "the way back is 2026.10.30b"):
++        assert words in joined, words
++    fixed = S.flat(S.entry("2026.10.30b"))
++    assert "seeds as before;" not in fixed, "2026.10.30b's sentence on an increment in flight at its install"
++    assert "seeds rounds 1 to the highest round the launcher did not log" in fixed
+diff --git a/tests/test_phase_modules_close.py b/tests/test_phase_modules_close.py
+index 09009b4..050db6b 100644
+--- a/tests/test_phase_modules_close.py
++++ b/tests/test_phase_modules_close.py
+@@ -419,6 +419,6 @@ def test_bug035_a_change_cycle_reads_the_conditional_workflows_of_the_step_it_ha
+     assert clause in text, "the change cycle's survival list does not name the step's conditional workflows"
+     hook = mod.PHASE_MODULES["changing"]
+     named = text[text.index(clause):].split("):", 1)[0]
+-    assert hook[0] == "change-cycle" and all("`%s.md`" % key in named for key in hook[1:]), (hook, named)
++    assert hook[0] == "change-cycle" and set(re.findall(r"`([\w-]+)\.md`", named)) == set(hook[1:]), (hook, named)
+     for step in ("intake", "design", "interface"):
+         assert step not in hook, "the hook now names %s.md while changing; the parenthesis is no longer true" % step
+diff --git a/tests/test_release_b_stamp.py b/tests/test_release_b_stamp.py
+index 39ed210..2134fde 100644
+--- a/tests/test_release_b_stamp.py
++++ b/tests/test_release_b_stamp.py
+@@ -24,7 +24,8 @@ manifest are checked against the newest heading.
+ - test_r038_the_run_sheet_says_pause_and_switch enforces: step 1's run sheet pauses the bridge's own build and
+   switches its checkout to main before the install.
+ - test_r038_the_run_sheet_tells_the_maintainer_and_never_passes_anyway enforces: C-1's run-sheet half, the
+-  installer's same-version refusal named, `--anyway` never passed by the owner, the maintainer told.
++  installer's same-version refusal named, `--anyway` never passed by the owner, the maintainer told; the owner's
++  three commands as written, `--anyway` in none of them (BUG-037).
+ - test_r037_step_4_sends_an_increment_in_flight_to_the_entry enforces: step 4's rule for an increment whose snapshot
+   or rounds were taken under the older release (TASK-026, M3).
+ """
+@@ -166,6 +167,10 @@ def test_r038_the_run_sheet_tells_the_maintainer_and_never_passes_anyway():
+             "now, but not its files`, `main` has moved past the release's stamp: the owner never passes "
+             "`--anyway`, which is for the maintainer's rehearsals, and tells the maintainer.") in s1, "C-1"
+     assert "never a dry run" in s1, "the install is checked on the real run"
++    commands = ("three commands — `git -C <the bridge's repository> switch main`, `git -C <the bridge's repository> "
++                "pull --ff-only`, then `python <the bridge's repository>/bridge/cursor-bridge/bridge-install.py`, which")
++    assert commands in s1, "the owner's three commands, as written, the installer's with no flag (BUG-037)"
++    assert s1.count("anyway") == 1, "`--anyway` named in step 1 only in the refusal's sentence, never in a command (BUG-037)"
+ 
+ 
+ def test_r037_step_4_sends_an_increment_in_flight_to_the_entry():
