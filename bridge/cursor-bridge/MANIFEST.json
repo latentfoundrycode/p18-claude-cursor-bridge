@@ -1,6 +1,6 @@
 {
   "version": "2026.10.30a",
-  "generated": "2026-10-30 01:49",
+  "generated": "2026-10-30 02:19",
   "files": {
     "agents/cursor-configurator.md": "8bcb0ebba97ba25c4f81528c439195619196e7d078c4b0054a206e51fa7c8cd2",
     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
@@ -15,7 +15,7 @@
     "commands/calibrate-bridge.md": "cf4c6ad94e98bd82fc4fae0ea37a175a5cae15b7fc05baad5c0b7dcd0bcba571",
     "commands/evaluate-reports.md": "0845cf7b6d5bf49c847202a670201b79cbf4dc1b819c8c828fe07cb2ddc0499d",
     "commands/supervisor.md": "6cfbc9c7113b82e1d1d6b52a0c09f4a0a3116b959e2498f3643c2015cd3773ed",
-    "cursor-bridge/CHANGELOG.md": "15083df8c15895e202f09ea4d0f5b22dc89731abf05df6e81e0bda6bf9812b9c",
+    "cursor-bridge/CHANGELOG.md": "51acc1f5d527fef434b8d1655a5b0eac3b5a2f42e9afe6b866485f42ba2cbe48",
     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
     "cursor-bridge/Cursor-Project-Configuration.md": "d76f5b10bcf60d87d38d89e05e7cc821afeaa6b2fb90a3dbcccb14c4741c6460",
     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
