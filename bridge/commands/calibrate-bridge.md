@@ -36,7 +36,7 @@ to a half-copied tree would leave the project on a mixture of two releases.
 
 **Where the bridge's repository is being built on a branch by its own supervisor**, the run sheet pauses that work before the install (R-038): no builder, review, CI watch or suite running in it and everything committed; then its checkout is switched to `main`, the first of the three commands, and the release is installed from it. An urgent install in the middle of that build uses the maintainer's separate clone of the repository instead.
 
-The run sheet checks the install on the real run, never a dry run, which marks its first line `(dry run)`, prints the `previous <version> kept at` line while keeping nothing, and ends before the check: the installed `VERSION` differs from the one before, and the installer printed a `previous <version> kept at` line, which appears only when the version changes (the same release installed again prints none). If the installer refuses with `the release folder carries version <version>, the release installed now, but not its files`, `main` has moved past the release's stamp: the owner never passes `--anyway`, which is for the maintainer's rehearsals, and tells the maintainer.
+The run sheet checks the install on the real run, never a dry run, which marks its first line `(dry run)`, prints the `previous` line while keeping nothing, and ends before the check. Every install's check is the installer's exit 0 with the line it prints last, `RESULT: INSTALLED TREE MATCHES bridge <the release's version>` (the installer runs `bridge-check.py` itself). An install over an older release installed whole also changes the installed `VERSION` and prints the installer's `previous` line, `previous <version> kept at <folder>` with the spaces that align its columns; the same release installed again changes neither and prints none; and a repeat after an interrupted install prints that line or none, as far as the first run got. If the installer refuses with `the release folder carries version <version>, the release installed now, but not its files`, `main` has moved past the release's stamp: the owner never passes `--anyway`, which is for the maintainer's rehearsals, and tells the maintainer.
 
 `settings.json` is compared by its bridge-owned entries, never by its bytes, so the owner's own keys in it never fail the check (KP-030). Never ask the owner to remove a key the bridge does not own, and never offer the release's file as a replacement for theirs; `bridge-install.py` merges.
 
@@ -167,8 +167,9 @@ Rules while applying **Now** items:
 - A new field that carries an owner setting (the refactoring dial, a term classification)
   gets the release's **default**, and the report tells the owner in one line what was
   defaulted and how to change it. It does not become a question that stalls the loop.
-- An increment currently delegated or under review finishes under the brief and rules it
-  started with. The next brief is packaged under the new templates.
+- An increment currently delegated or under review finishes under the brief it started
+  with; its review follows the installed guard, as the next item says. The next brief is
+  packaged under the new templates.
 - An increment in flight whose Review B snapshot or review rounds were taken under the older release follows the items the release's entry names for it: the names the installed review guard reads, how it counts the rounds already run, and how the next brief is named. Before that increment's next snapshot, the report lists its ID with the rounds its records show and the count the installed guard will take, and a difference is set right as the entry says.
 - A Documents file whose creation trigger has already passed (a Project Summary on a project
   past Phase 2) is created at the **next reflection point**, not now, unless the owner asks —

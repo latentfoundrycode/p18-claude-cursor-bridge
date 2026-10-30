@@ -122,7 +122,8 @@ def test_bug036_the_fix_release_entry_stands_above_release_b_with_its_four_parts
     Field acceptance, each on a line of its own, in order, every item phase-marked; it names the seed's rule and the
     hand seed a rollback needs; and bridge-install.py's rolled_back_note for a rollback to 2026.10.30a holds its items."""
     found = S.headings()
-    assert found[0] == FIX_RELEASE == S.version() and found[1] == S.RELEASE_B, found[:3]
+    assert found.index(FIX_RELEASE) + 1 == found.index(S.RELEASE_B), found[:3]
+    assert found[0] == S.version() and FIX_RELEASE <= found[0], "the fix release, or a later one, is VERSION's: %s" % found[:3]
     body = S.entry(FIX_RELEASE)
     lines = body.split("\n")
     at = [lines.index(p) for p in S.PARTS]

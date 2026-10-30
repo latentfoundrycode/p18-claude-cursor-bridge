@@ -15,12 +15,30 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.30c
+
+**Text corrections from release B's stage review** (BUG-037; stage B6's review, round 1): the run sheet's install check, one sentence of 2026.10.30b's entry on an increment in flight at the install, and step 4's sentence on an increment under review. No program changed; against 2026.10.30b, no file new or removed.
+
+**What changed**
+- **The run sheet's install check** (`commands/calibrate-bridge.md`, step 1): every install's check is the installer's exit 0 with the line it prints last, `RESULT: INSTALLED TREE MATCHES bridge <the release's version>`. The two signs it gave for every install, `VERSION` changed and the `previous` line printed, are what an install over an older release installed whole also shows: the same release installed again shows neither, and a repeat after an interrupted install prints the `previous` line or none, as far as the first run got (the installer reads the installed `MANIFEST.json`'s version, which the first run may or may not have replaced). The `previous` line is named as the installer prints it, `previous <version> kept at <folder>` with the spaces that align its columns.
+- **2026.10.30b's entry** said that an increment built before release B and in flight at its install "seeds as before". The guard seeds rounds 1 to the highest round release B's launcher did not log: rounds 1 and 2 run before the install and round 3 after it seed rounds 1 and 2, and the next snapshot is `<ID>-r3`. The entry now says so. 2026.10.30a's in-flight item (the highest `<N>` of a tracked report) describes 2026.10.30a's guard: a project calibrating from 2026.10.25a reads it with 2026.10.30b's change.
+- **Step 4's increment under review** (`commands/calibrate-bridge.md`): it finishes under the brief it started with, and its review follows the installed guard, as the next item says.
+
+**Running projects must**
+- *(all phases)* Install with every project paused, restart, run `/calibrate-bridge` before the next increment, then `bridge-check.py`, as 2026.10.30b's entry says. On the real install the installer ends 0 with `RESULT: INSTALLED TREE MATCHES bridge 2026.10.30c`; over 2026.10.30b installed whole it also printed its `previous` line, `previous 2026.10.30b kept at <folder>`. The installer keeps one release as the way back, so 2026.10.30a's kept copy is removed then and the way back is 2026.10.30b.
+- *(building, changing)* Nothing to rewrite: no program changed, and the guard counts rounds as under 2026.10.30b.
+
+**If rolled back**
+- *(all phases)* Nothing to restore: no program changed. 2026.10.30b's texts return, its run sheet's install check among them: every install's check is the installer's exit 0 with its `RESULT: INSTALLED TREE MATCHES` line, whatever that text says of the `previous` line.
+
+---
+
 ## 2026.10.30b
 
 **A fix of release B's review guard, found by its trial** (BUG-036; the trial project, the TDP, 2026-10-30, its ISS-016): an increment begun under 2026.10.30a had its first Review B counted as one round more than every builder round it had run, so three builder rounds before the first Review B left it no name below the ceiling. One program; against 2026.10.30a, no file new or removed.
 
 **What changed**
-- **The guard counts Review B rounds only** (`review-guard.py`; BUG-036): where an ID has no `rounds-<ID>.json`, its first snapshot seeds the record from a tracked `handoff/<ID>-r<N>-report.md` (a letter after `<N>` included) only for a round that release B's launcher (2026.10.30a or later) did not log, that is a round with no `run/launcher/runs.jsonl` builder row whose `brief` is the ID and whose `round` is `<N>`. Under 2026.10.30a every builder round wrote such a report, and the seed counted each as a replied Review B round (`reply` 0): one builder round made the first snapshot `<ID>-r2` (`round 1 is reviewed: write <ID>-r2`), three made it `<ID>-r4`, above the ceiling. An increment begun under release B now seeds nothing from its reports, and its first Review B is round 1; an increment built before release B and in flight at its install seeds as before; the letter snapshots, the refusals and the seeded entries' shape are unchanged. A missing launcher log seeds every report, as before.
+- **The guard counts Review B rounds only** (`review-guard.py`; BUG-036): where an ID has no `rounds-<ID>.json`, its first snapshot seeds the record from a tracked `handoff/<ID>-r<N>-report.md` (a letter after `<N>` included) only for a round that release B's launcher (2026.10.30a or later) did not log, that is a round with no `run/launcher/runs.jsonl` builder row whose `brief` is the ID and whose `round` is `<N>`. Under 2026.10.30a every builder round wrote such a report, and the seed counted each as a replied Review B round (`reply` 0): one builder round made the first snapshot `<ID>-r2` (`round 1 is reviewed: write <ID>-r2`), three made it `<ID>-r4`, above the ceiling. An increment begun under release B now seeds nothing from its reports, and its first Review B is round 1; an increment built before release B and in flight at its install seeds rounds 1 to the highest round the launcher did not log (rounds 1 and 2 run before the install and round 3 after it seed rounds 1 and 2, and its next snapshot is `<ID>-r3`; corrected by 2026.10.30c); the letter snapshots, the refusals and the seeded entries' shape are unchanged. A missing launcher log seeds every report, as before.
 
 **Running projects must**
 - *(all phases)* Install with every project paused, restart, run `/calibrate-bridge` before the next increment, then `bridge-check.py`. Paused means no builder, review, CI watch or suite running and everything committed; the bridge's own checkout is switched to `main` for the install (R-038, calibration's step 1). On the real install the installed `VERSION` reads 2026.10.30b and the installer printed `previous 2026.10.30a kept at ...`.

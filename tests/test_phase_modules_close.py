@@ -419,6 +419,6 @@ def test_bug035_a_change_cycle_reads_the_conditional_workflows_of_the_step_it_ha
     assert clause in text, "the change cycle's survival list does not name the step's conditional workflows"
     hook = mod.PHASE_MODULES["changing"]
     named = text[text.index(clause):].split("):", 1)[0]
-    assert hook[0] == "change-cycle" and all("`%s.md`" % key in named for key in hook[1:]), (hook, named)
+    assert hook[0] == "change-cycle" and set(re.findall(r"`([\w-]+)\.md`", named)) == set(hook[1:]), (hook, named)
     for step in ("intake", "design", "interface"):
         assert step not in hook, "the hook now names %s.md while changing; the parenthesis is no longer true" % step

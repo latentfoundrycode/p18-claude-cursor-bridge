@@ -101,7 +101,7 @@ def test_bug034_anyway_installs_it_for_the_maintainers_rehearsals(tmp_path, prog
     lines = out.splitlines()
     banner = next(i for i, line in enumerate(lines) if line.startswith("bridge-install: ") and " -> " in line)
     warning = [i for i, line in enumerate(lines) if line.startswith("  WARNING        the installed " + OLD_VERSION + " was replaced")]
-    assert len(warning) == 1 and warning[0] > banner, "the warning is not one line after the banner: " + out
+    assert len(warning) == 1 and warning[0] > banner, "not exactly one warning line, after the banner: " + out
     assert "(1 file(s): cursor-bridge/old-only.md)" in lines[warning[0]], "the warning does not name the refusal's differing list: " + lines[warning[0]]
 
 
