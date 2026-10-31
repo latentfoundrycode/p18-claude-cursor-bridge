@@ -26,14 +26,13 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
               the requirement ID (a comment, docstring, or test name) - that is the trace.
 --only R-001,R-002  limits every check to those IDs (an older project brought under the
               register part by part, or one stage's requirements; release A4).
-  STAND-IN    shipped (non-test) code shows a user-visible stand-in: a feature said to arrive
-              later (a later stage, version, release or update); phrasing that something will
-              land soon; wording that a capability is not ready yet (implemented behavior
-              missing, available or supported status lacking, not built, or work still
-              outstanding); a notice that a page is still being built (a construction notice);
-              an identifier with Placeholder followed by View, Page, Screen, Tab, Panel or
-              Section; or a call of the todo or unimplemented macro (Rust), with or without
-              arguments.
+  STAND-IN    shipped (non-test) code shows a user-visible stand-in, in any of these forms:
+              arrive or arrives, then in a later stage, version, release or update; the word
+              coming directly followed by soon; not and yet before implemented, available,
+              built or supported; not, implemented and yet in a row; to be and implemented
+              in a row; under and construction in a row; an identifier ending in Placeholder
+              plus one of View, Page, Screen, Tab, Panel or Section; a call of the todo or
+              unimplemented macro (Rust), with or without arguments.
               Allowed only on a line that names the ID of an owner-deferred requirement.
 Notes never fail: TODO/FIXME counts and NotImplementedError sites (often legitimate
 abstract methods) in shipped code.
