@@ -117,12 +117,13 @@ def test_bug036_the_earlier_launchers_builder_rows_still_seed(tmp_path):
 
 def test_bug036_the_fix_release_entry_stands_above_release_b_with_its_four_parts():
     """R-042. enforces: bridge/cursor-bridge/CHANGELOG.md's header ("Each entry has three parts ... A release with new
-    mechanisms also names its field acceptance"): the fix release 2026.10.30b is VERSION's and the newest heading,
-    directly above release B's 2026.10.30a; its entry holds What changed, Running projects must, If rolled back and
+    mechanisms also names its field acceptance"): the fix release 2026.10.30b stands directly above release B's
+    2026.10.30a, and VERSION is the newest heading, 2026.10.30b's or a later release's; its entry holds What changed, Running projects must, If rolled back and
     Field acceptance, each on a line of its own, in order, every item phase-marked; it names the seed's rule and the
     hand seed a rollback needs; and bridge-install.py's rolled_back_note for a rollback to 2026.10.30a holds its items."""
     found = S.headings()
-    assert found[0] == FIX_RELEASE == S.version() and found[1] == S.RELEASE_B, found[:3]
+    assert found.index(FIX_RELEASE) + 1 == found.index(S.RELEASE_B), found[:3]
+    assert found[0] == S.version() and FIX_RELEASE <= found[0], "the fix release, or a later one, is VERSION's: %s" % found[:3]
     body = S.entry(FIX_RELEASE)
     lines = body.split("\n")
     at = [lines.index(p) for p in S.PARTS]

@@ -24,7 +24,8 @@ manifest are checked against the newest heading.
 - test_r038_the_run_sheet_says_pause_and_switch enforces: step 1's run sheet pauses the bridge's own build and
   switches its checkout to main before the install.
 - test_r038_the_run_sheet_tells_the_maintainer_and_never_passes_anyway enforces: C-1's run-sheet half, the
-  installer's same-version refusal named, `--anyway` never passed by the owner, the maintainer told.
+  installer's same-version refusal named, `--anyway` never passed by the owner, the maintainer told; the owner's
+  three commands as written, `--anyway` in none of them (BUG-037).
 - test_r037_step_4_sends_an_increment_in_flight_to_the_entry enforces: step 4's rule for an increment whose snapshot
   or rounds were taken under the older release (TASK-026, M3).
 """
@@ -166,6 +167,10 @@ def test_r038_the_run_sheet_tells_the_maintainer_and_never_passes_anyway():
             "now, but not its files`, `main` has moved past the release's stamp: the owner never passes "
             "`--anyway`, which is for the maintainer's rehearsals, and tells the maintainer.") in s1, "C-1"
     assert "never a dry run" in s1, "the install is checked on the real run"
+    commands = ("three commands — `git -C <the bridge's repository> switch main`, `git -C <the bridge's repository> "
+                "pull --ff-only`, then `python <the bridge's repository>/bridge/cursor-bridge/bridge-install.py`, which")
+    assert commands in s1, "the owner's three commands, as written, the installer's with no flag (BUG-037)"
+    assert s1.count("anyway") == 1, "`--anyway` named in step 1 only in the refusal's sentence, never in a command (BUG-037)"
 
 
 def test_r037_step_4_sends_an_increment_in_flight_to_the_entry():
