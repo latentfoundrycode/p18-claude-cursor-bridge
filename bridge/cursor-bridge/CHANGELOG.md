@@ -29,7 +29,7 @@ project must show before the other projects resume.
 - *(building, changing)* Nothing to rewrite: no program changed, and the guard counts rounds as under 2026.10.30b.
 
 **If rolled back**
-- *(all phases)* Nothing to restore: no program changed. 2026.10.30b's texts return, its run sheet's install check among them: every install's check is the installer's exit 0 with its `RESULT: INSTALLED TREE MATCHES` line, whatever that text says of the `previous` line.
+- *(all phases)* Nothing to restore: no program changed. 2026.10.30b's texts return, its run sheet's install check among them, which again gives every install the two signs, `VERSION` changed and the `previous` line printed. The installer still ends on its `RESULT: INSTALLED TREE MATCHES bridge <version>` line: an install that exits 0 on that line is installed, with or without the two signs.
 
 ---
 
