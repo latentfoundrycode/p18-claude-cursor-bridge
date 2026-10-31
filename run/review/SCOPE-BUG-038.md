@@ -26,4 +26,7 @@ docs/BUILDER_NOTES.md (round 1's dated line); handoff/BUG-038.md, -r2.md, -r3.md
 - The 2026.10.30d entry true to the change (one program, its docstring only; against 2026.10.30c no file new or removed; the If rolled back item).
 - The records agree with each other and with the change; no key and no computer path or user name in a tracked file (rule 54).
 
-Later releases (T, B2, the progress graph, W) and project end's own items are later work, not this increment's defect. This is the increment's Review B round 1, below the guard's ceiling.
+## Round 2
+Review B's round 1 approved, with one Should fix and one Consider. The Should fix is taken in the commit after "BUG-038: Review B's files": docs/PROJECT_STATUS.md's `Remote sync:` line now names PR #114's merge, as `Last accepted` does (it still named PR #113). The Consider (the paragraph does not say the scan ignores case, that "coming" has no word boundary, or that "not" and "yet" are adjacent) is already recorded, not taken, in docs/HARDENING.md's BUG-038 section. Check the one line against round 1's finding and that nothing else moved.
+
+Later releases (T, B2, the progress graph, W) and project end's own items are later work, not this increment's defect. This is the increment's Review B round 2, below the guard's ceiling.
