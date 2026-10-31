@@ -26,9 +26,11 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
               the requirement ID (a comment, docstring, or test name) - that is the trace.
 --only R-001,R-002  limits every check to those IDs (an older project brought under the
               register part by part, or one stage's requirements; release A4).
-  STAND-IN    shipped (non-test) code shows a user-visible stand-in: "arrives in a later
-              stage", "coming soon", "not yet implemented/available", "under construction",
-              a *Placeholder{View,Page,Screen,Tab,Panel} component, todo!()/unimplemented!().
+  STAND-IN    shipped (non-test) code shows a user-visible stand-in: a feature deferred to a
+              later release or version; phrasing that something will come soon; behavior that is
+              not implemented or still unavailable; copy saying the product is under active
+              construction; a named placeholder component suffix (View, Page, Screen, Tab, Panel,
+              Section); or Rust code calling the todo or unimplemented macros with arguments.
               Allowed only on a line that names the ID of an owner-deferred requirement.
 Notes never fail: TODO/FIXME counts and NotImplementedError sites (often legitimate
 abstract methods) in shipped code.

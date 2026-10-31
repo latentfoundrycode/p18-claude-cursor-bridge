@@ -71,23 +71,38 @@ def test_bug038_the_completion_check_finds_no_stand_in_in_its_own_source(tmp_pat
 
 
 def test_bug038_a_stand_in_elsewhere_is_still_found(tmp_path):
-    """Preservation: each kind of stand-in the docstring names, in another shipped file, still fails at done."""
-    planted = ("# arrives in a later stage\n", "MSG = 'coming soon'\n", "# not yet implemented\n",
-               "TITLE = 'under construction'\n", "class SettingsPlaceholderView: pass\n")
-    r = _repo(tmp_path, {os.path.join("src", "screen.py"): "".join(planted)})
-    rc, out = _run(r, r / SHIPPED)
-    found = [l for l in out.splitlines() if l.startswith("STAND-IN: src/screen.py:")]
+    """Preservation: each kind of stand-in the docstring names, in another shipped file beside the program, still
+    fails at done, and so does one added to the program's own source: the fix is the docstring's wording, not a
+    scan that skips the bridge's folder or the program's file."""
+    planted = ('"""Settings: arrives in a later stage."""\n', "MSG = 'coming soon'\n", "# not yet implemented\n",
+               "TITLE = 'under construction'\n", "class SettingsPlaceholderView: pass\n",
+               "class AboutPlaceholderSection: pass\n", "# todo!()\n")
+    beside = os.path.join("bridge", "cursor-bridge", "screen.py")
+    source = open(C.PROG, encoding="utf-8").read()
+    if not source.endswith("\n"):
+        source += "\n"
+    own = source + "# coming soon\n"
+    r = _repo(tmp_path, {beside: "".join(planted), SHIPPED: own})
+    rc, out = _run(r, C.PROG)
+    lines = out.splitlines()
+    found = [l for l in lines if l.startswith("STAND-IN: bridge/cursor-bridge/screen.py:")]
     assert rc == 1 and len(found) == len(planted), out
-    assert not [l for l in out.splitlines() if l.startswith("STAND-IN: ") and "completion-check.py" in l], out
+    in_own = [l for l in lines if l.startswith("STAND-IN: bridge/cursor-bridge/completion-check.py:")]
+    last = own.count("\n")
+    assert in_own == ["STAND-IN: bridge/cursor-bridge/completion-check.py:%d: # coming soon" % last], out
 
 
 def test_bug038_the_docstring_still_names_each_kind_it_scans_for():
     """The fix keeps the program's own account of what a stand-in is: the STAND-IN paragraph of its docstring
     still names each kind (a feature said to come later or soon, one not yet implemented or available, one under
-    construction, a placeholder component, Rust's todo and unimplemented macros), in words its scan does not match."""
+    construction, a placeholder component with each of its six suffixes, Rust's todo and unimplemented macros), in
+    words its scan does not match, and ends on the owner-deferred sentence unchanged."""
     text = open(C.PROG, encoding="utf-8").read()
-    doc = text[:text.index('"""', 3)]
+    start = text.index('"""')                       # after the shebang line
+    doc = text[start:text.index('"""', start + 3)]
     para = doc[doc.index("STAND-IN"):doc.index("Notes never fail")].lower()
     for words in ("later", "soon", "implemented", "available", "construction", "placeholder", "todo", "unimplemented",
-                  "owner-deferred"):
+                  "view", "page", "screen", "tab", "panel", "section"):
         assert words in para, words
+    sentence = "Allowed only on a line that names the ID of an owner-deferred requirement."
+    assert doc[doc.index("STAND-IN"):doc.index("Notes never fail")].rstrip().endswith(sentence)
