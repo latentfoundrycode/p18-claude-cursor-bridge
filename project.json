@@ -4,9 +4,9 @@
   "kind": "private",
   "version": "2026.10.30d",
   "state": {
-    "phase": "building",
-    "stage": "B1 to B6 closed (B6, release B's install, on 2026-10-31); next project end, once the owner answers the deferral of reAngle's and the video factory's calibrations",
-    "bridge": "2026.10.30b",
+    "phase": "done",
+    "stage": "B1 to B6 closed; project end 2026-10-31 (release B complete, 2026.10.30d); next release T on the owner's word",
+    "bridge": "2026.10.30d",
     "updated": "2026-10-31"
   }
 }
