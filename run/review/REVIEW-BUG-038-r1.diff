@@ -1,0 +1,921 @@
+diff --git a/bridge/cursor-bridge/CHANGELOG.md b/bridge/cursor-bridge/CHANGELOG.md
+index afc4a64..e80ef0a 100644
+--- a/bridge/cursor-bridge/CHANGELOG.md
++++ b/bridge/cursor-bridge/CHANGELOG.md
+@@ -15,6 +15,22 @@ project must show before the other projects resume.
+ 
+ ---
+ 
++## 2026.10.30d
++
++**A fix of the completion check, found at the bridge's own project end** (BUG-038; 2026-10-31): `completion-check.py --mode done` reported two lines of its own docstring as stand-ins, so a project that ships the program as tracked code, the bridge's own repository, could never pass its project end. One program, its docstring only; against 2026.10.30c, no file new or removed.
++
++**What changed**
++- **The completion check's STAND-IN paragraph** (`completion-check.py`; BUG-038): the docstring named the stand-ins the scan looks for in the scan's own phrases, and the scan, which reads every shipped code file line by line, found them in the program itself. The paragraph now names each form by its words and their order (the word coming directly followed by soon, under and construction in a row, an identifier ending in Placeholder plus one of six suffixes, and so on), adds the `Section` suffix the scan already matched, and keeps its owner-deferred sentence; no line of the program matches the scan. The scan, its patterns, its exit codes and its output are unchanged.
++
++**Running projects must**
++- *(all phases)* Install with every project paused, restart, run `/calibrate-bridge` before the next increment, then `bridge-check.py`, as 2026.10.30b's entry says. On the real install the installer ends 0 with `RESULT: INSTALLED TREE MATCHES bridge 2026.10.30d`; over an older release installed whole it also printed its `previous` line, `previous <that release> kept at <folder>` (over 2026.10.30b, `previous 2026.10.30b`). The installer keeps one release as the way back.
++- *(all phases)* Nothing to rewrite: the scan is unchanged, so the completion check reports the same for every project that does not ship the program itself.
++
++**If rolled back**
++- *(all phases)* Nothing to restore. The older docstring returns, and a project that ships the program as tracked code (the bridge's own repository) again sees its two STAND-IN lines at `--mode done`.
++
++---
++
+ ## 2026.10.30c
+ 
+ **Text corrections from release B's stage review** (BUG-037; stage B6's review, round 1): the run sheet's install check, one sentence of 2026.10.30b's entry on an increment in flight at the install, and step 4's sentence on an increment under review. No program changed; against 2026.10.30b, no file new or removed.
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 4d2beec..d8f6f09 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+-  "version": "2026.10.30c",
+-  "generated": "2026-10-31 01:09",
++  "version": "2026.10.30d",
++  "generated": "2026-10-31 05:10",
+   "files": {
+     "agents/cursor-configurator.md": "8bcb0ebba97ba25c4f81528c439195619196e7d078c4b0054a206e51fa7c8cd2",
+     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
+@@ -15,7 +15,7 @@
+     "commands/calibrate-bridge.md": "bfbfa9675c88b946c3d5ce39681f090301a9a9ed5d1c5564be434ceb5431df98",
+     "commands/evaluate-reports.md": "0845cf7b6d5bf49c847202a670201b79cbf4dc1b819c8c828fe07cb2ddc0499d",
+     "commands/supervisor.md": "6cfbc9c7113b82e1d1d6b52a0c09f4a0a3116b959e2498f3643c2015cd3773ed",
+-    "cursor-bridge/CHANGELOG.md": "632edd5c0b33696494400108d97cb310f41ac820206fa4a11a5567634c2ff850",
++    "cursor-bridge/CHANGELOG.md": "226fa3ac3824b60045ec63a399bf9ca137940b9dad4e71fd5bb3a78c01cbfa24",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "d76f5b10bcf60d87d38d89e05e7cc821afeaa6b2fb90a3dbcccb14c4741c6460",
+     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
+@@ -26,7 +26,7 @@
+     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
+     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
+     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
+-    "cursor-bridge/VERSION": "bedae7d3a7cc4c33f61ede66e6502ff3a7ba0421dd74740fc32dd35fb60e54ee",
++    "cursor-bridge/VERSION": "096f829856c1cc734c8a5b7d015de3fe469b75f2e45fa7c21fed30f3b0e3726e",
+     "cursor-bridge/bench-check.py": "ea34fa87a1f3383cd34600f48a817a23b6fc0cd4ad461a77b796baf05ef2643e",
+     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
+     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
+@@ -34,7 +34,7 @@
+     "cursor-bridge/bridge-run.py": "dbcfea82523590e997472659b230a5f92356e532a9f4224ffd3251a987f955cf",
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+     "cursor-bridge/bridge_env.py": "c9415a9cd65f79f601de5d0b02abe1e3fb0481badcb83c0f36325fd37ba4b405",
+-    "cursor-bridge/completion-check.py": "f584af6a6592c7f748beec212ad2b1752356607529fd60c1acb6507190626134",
++    "cursor-bridge/completion-check.py": "de97b528392fe0e3ac0c62e17132bbb0964fe7f898aac8e449172a59d01822ba",
+     "cursor-bridge/conformance-check.py": "f5a9f8a0a33bbc693e717379d0190aa6bfedaa00923c4b9c055701c0380b6ca8",
+     "cursor-bridge/cursor-agent.shim": "913f3a0214b76c5a92fca21b8bfe8f9ea63979af412df30dc47509a0accbf8e2",
+     "cursor-bridge/design-seeds/airbnb/DESIGN.md": "add34130d67209ad105346d60fe2b290728b9711683969db4b7760e29477a5fe",
+diff --git a/bridge/cursor-bridge/VERSION b/bridge/cursor-bridge/VERSION
+index 48d9f4e..d19fe6d 100644
+--- a/bridge/cursor-bridge/VERSION
++++ b/bridge/cursor-bridge/VERSION
+@@ -1 +1 @@
+-2026.10.30c
++2026.10.30d
+diff --git a/bridge/cursor-bridge/completion-check.py b/bridge/cursor-bridge/completion-check.py
+index 1b2cf02..fc0a620 100644
+--- a/bridge/cursor-bridge/completion-check.py
++++ b/bridge/cursor-bridge/completion-check.py
+@@ -26,9 +26,13 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
+               the requirement ID (a comment, docstring, or test name) - that is the trace.
+ --only R-001,R-002  limits every check to those IDs (an older project brought under the
+               register part by part, or one stage's requirements; release A4).
+-  STAND-IN    shipped (non-test) code shows a user-visible stand-in: "arrives in a later
+-              stage", "coming soon", "not yet implemented/available", "under construction",
+-              a *Placeholder{View,Page,Screen,Tab,Panel} component, todo!()/unimplemented!().
++  STAND-IN    shipped (non-test) code shows a user-visible stand-in, in any of these forms:
++              arrive or arrives, then in a later stage, version, release or update; the word
++              coming directly followed by soon; not and yet before implemented, available,
++              built or supported; not, implemented and yet in a row; to be and implemented
++              in a row; under and construction in a row; an identifier ending in Placeholder
++              plus one of View, Page, Screen, Tab, Panel or Section; a call of the todo or
++              unimplemented macro (Rust), with or without arguments.
+               Allowed only on a line that names the ID of an owner-deferred requirement.
+ Notes never fail: TODO/FIXME counts and NotImplementedError sites (often legitimate
+ abstract methods) in shipped code.
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index e5c12bf..60612cc 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -35,3 +35,5 @@
+ 2026-10-26 TASK-031-r5: `test_fix001_no_test_starts_a_program_around_the_default` fails on the round-4 supervisor reproduction strings in `tests/test_mutation_run_supervisor.py` (`creationflags=NO_WINDOW` without the `CREATE_NO_WINDOW` substring); that file is out of scope for r5, so verification step 3 cannot pass here until those embedded literals are fixed elsewhere.
+ 
+ 2026-10-27 TASK-031-r11: on Python 3.12, only an empty `PYTHONPATH` entry puts the working folder on `sys.path`; round 11's `find_spec` check still refused ordinary layouts when another copy of the project package was on `PYTHONPATH`, which round 12 replaced with a fixed list of names pytest imports for configuration.
++
++2026-10-31 BUG-038-r1: `tests/test_bug038.py` test 3 uses `text[:text.index('"""', 3)]`, which on `completion-check.py` (shebang then opening `"""` on line 2) slices only the shebang line, so `STAND-IN` is never in `doc` and the test fails before and after the docstring fix; keyword checks pass with `ast.get_docstring`-style extraction.
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 3e7f17c..da235d3 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1491,6 +1491,11 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ - run/supervisor/demo_b6.py, 18 checks, PASSED (run/agent/demo-b6.out): the release-level review's record outside the Workspace, both passes by both reviewers approving, named in R-037; `bridge-check.py --sources` SOURCES MATCH 2026.10.30c and the stamp's tests (9 passed); the run sheet's pause, switch and three commands (2 passed); the installer's one check, its `previous` line, a repeat after a kill, the same-version refusal and the rollback (49 passed); the installed tree INSTALLED TREE MATCHES bridge 2026.10.30b, its VERSION 2026.10.30b; the TDP's status file on 2026.10.30b with its Calibrated line, its `Workflows:` line passing `workflow-check.py`, its increments merged under release B (PRs #207 to #210, BUG-004's among them), its six builder rows carrying `brief`, `round` and `brief_sha256`, the last TASK-158's round 3; this repository's tests/test_bug036.py on BUG-004's conditions (6 passed); this project's conformance with only the two MISSING its records expect, the inventory and completion checks OK. The script ran through the launcher's driver kind, taking the slot (`PYTHONUTF8=1` in place of `-X utf8`, an option the driver kind refuses; FB-065); its first run went directly with `# wake`.
+ 
+ ### Least confident (stage close, 2026-10-31)
+-1. **2026.10.30b in the field.** The guard's fix is proven by tests and by the TDP's probe in a scratch copy, never yet by a first Review B on a real increment under it. Check: the TDP's TASK-158 first snapshot is admitted as `TASK-158` or `TASK-158-r1` with no hand seed, and its `rounds-TASK-158.json` shows round 1 unseeded; recorded in R-037 when the TDP reports it.
++1. **2026.10.30b in the field.** The guard's fix is proven by tests and by the TDP's probe in a scratch copy, never yet by a first Review B on a real increment under it. Check: the TDP's TASK-158 first snapshot is admitted as `TASK-158` or `TASK-158-r1` with no hand seed, and its `rounds-TASK-158.json` shows round 1 unseeded; recorded in R-037 when the TDP reports it. Settled 2026-10-31 (the TDP supervisor's report, rule 57): before TASK-158's snapshot no `rounds-TASK-158.json` existed while its branch held five builder reports and five numbered briefs, two under `Blocking class:` lines; `snapshot TASK-158-r1` (03:44:38Z) wrote one round, round 1 with no reply and no lift, nothing seeded; `verify` printed OK with the snapshot hash equal and set the reply; the launcher counted the five builder rounds and took rounds 4 and 5 on their class lines. The TDP noted that its Review B approved but denied the SCOPE file's class line by judging it against the fixed code (the line named round 4's defect in the present tense); it voided the round as decide.md says and re-ran with the line naming round 4's code: a Feedback item for project end (a sentence saying a class line is judged against the round it lifted).
+ 2. **reAngle's and the video factory's path through three entries.** Both are calibrated to 2026.10.25a and will calibrate through 2026.10.30a, 2026.10.30b and 2026.10.30c at once, the in-flight items of 2026.10.30a read with 2026.10.30b's change; no project has taken more than one entry at a time under release B, and the way back on this computer no longer reaches 2026.10.25a (FB-067). Check: the first of the two to resume lists each entry's items it applied and the guard's count for every ID in flight, and its suite before and after the windowless write, in its Calibrated line.
+ 3. **The command reference the User Manual renders.** Project end writes the manual's command reference from docs/cli-reference.json, never from memory; `tools/dump-cli.py --check` holds the reference to the programs it lists, but whether every program a run sheet tells the owner to run (`bridge-install.py` with `--rollback` and `--dry-run`, `bridge-check.py`, `roster-check.py`, the calibration's checks) is among them has not been checked. Check: at project end, before the manual is written, every command the run sheets in bridge/commands/calibrate-bridge.md and the setup guide name is matched with a reference entry, a missing one added to the reference first (through the gate).
++
++### BUG-038, the completion check's own docstring (2026-10-31; found by project end's completion check; stamped 2026.10.30d)
++- The cause, proven by the failure: `completion-check.py --mode done` on the bridge printed STAND-IN for lines 30 and 31 of the program, its docstring quoting the phrases `STANDIN_RX` matches; the bridge ships the program as tracked code, so its project end could not pass. The fix: the docstring's STAND-IN paragraph names each form by its words and their order, adds the `Section` suffix the scan already matched, and keeps the owner-deferred sentence; the scan unchanged. tests/test_bug038.py (supervisor): tests 1 and 2 fail on the checkpoint 43f3a03; test 2 plants each kind beside the program and one in its own source, so a skip of `bridge/`, of the program's file or of docstrings fails; test 3 holds the paragraph's words and its last sentence. Mutation run 4 killed of 4.
++- The gate's builder rounds 1 to 3 (the launcher's count; the guard's Review B rounds counted apart): Review A rejected rounds 1 and 2 on the wording alone (round 1: the macro clause's "with arguments" excluded the bare `todo!()`, and four clauses named phrases the scan misses or claimed more than it matches; round 2: "will land soon" and a not-ready-yet clause without its "yet"); round 3's brief gave the paragraph whole, checked by the supervisor against the scan line by line and joined, and Review A approved it. The builder's round-1 report found the supervisor's test 3 reading only the shebang line, fixed before Review A.
++- Recorded, not taken (Review A, round 3, Consider): "not and yet before implemented, ..." lacks the "in a row" its neighbours carry, though the words must be adjacent; the paragraph does not say matching ignores case, nor that "coming" needs no word boundary (`upcoming soon` matches). A reader is not misled about what is flagged.
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 2587d23..f90d53b 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -4,9 +4,9 @@ Phase: building
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: none
+ Increment: none (stage B6 closed on 2026-10-31, the plan's last stage; project end follows, under Next)
+-Last accepted: Records: stage B6's close (PR #113, at its merge): the reflection's records (HARDENING's Stage B6 section with its least confident items, the plan's trial named as the TDP, R-031's and R-037's evidence (the TDP's probe of 2026.10.30b), INVENTORY's decisions and rows); before it BUG-037 (PR #112), the stage review's fix, stamped 2026.10.30c; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-035 (TASK-027's stamp and records), BUG-001 to BUG-037, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Last accepted: BUG-038 (PR #114, at its merge): the completion check finds no stand-in in its own docstring (completion-check.py's STAND-IN paragraph names each form by its words and their order; tests/test_bug038.py), found by project end's completion check, stamped 2026.10.30d; before it stage B6's close's records (PR #113); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-035 (TASK-027's stamp and records), BUG-001 to BUG-038, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: the owner's dated deferral of reAngle's and the video factory's calibrations (R-031, R-037), asked 2026-10-30; project end's completion check waits on it; the TDP resumes on the owner's word
+-Next: project end (project-end.md), once the deferral is answered: completion-check --mode done (R-031 and R-037 built, or deferred by the owner with a date), diagram-check --mode done, sync-check --strict; the User Manual with its Install, upgrade, uninstall chapter and the command reference from docs/cli-reference.json; host extension's delivery, Install into the host (2026.10.30c by run sheet, then this project and the TDP calibrate); the promotion pass; then Phase: done. TASK-027's "owner-dated deferral at B6" is recorded there, before the completion check. The TDP's TASK-158 first Review B, 2026.10.30b's field check, is recorded when it comes (R-037). Then release T (its design work on Fable 5.1, the owner switching), B2, the progress graph and W. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: project end (project-end.md), once the deferral is answered: completion-check --mode done (R-031 and R-037 built, or deferred by the owner with a date; its own docstring no longer flagged, BUG-038), diagram-check --mode done, sync-check --strict; the User Manual with its Install, upgrade, uninstall chapter and the command reference from docs/cli-reference.json (HARDENING, Stage B6, least confident 3 first); host extension's delivery, Install into the host (2026.10.30d by run sheet, then this project and the TDP calibrate); the promotion pass; then Phase: done. TASK-027's "owner-dated deferral at B6" is recorded there, before the completion check. 2026.10.30b's field check passed at the TDP's TASK-158 first Review B (2026-10-31, R-037). Then release T (its design work on Fable 5.1, the owner switching), B2, the progress graph and W. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -18,12 +18,12 @@ Delegated gates: none
+ Remote sync: main at the merge of PR #113, in sync with origin/main at that merge; local main is fast-forwarded after every merge (sync-check.py --apply)
+ Stage: B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). Last reflection: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
+ Deferred increments: none
+-Open issues: ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-011 and ISS-015 fixed; ISS-020 completed (worked around; the roster check's sign-in advice to release T, HARDENING); ISS-021 fixed by 2026.10.30b (its field check to come, HARDENING, Stage B6, least confident 1); ISS-022 fixed (stage B6's close). Earlier: docs/archive/STATUS_HISTORY.md
++Open issues: ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-011 and ISS-015 fixed; ISS-020 completed (worked around; the roster check's sign-in advice to release T, HARDENING); ISS-021 fixed by 2026.10.30b, its field check passed at the TDP's TASK-158 first Review B (2026-10-31); ISS-022 fixed (stage B6's close). Earlier: docs/archive/STATUS_HISTORY.md
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+-Bridge version: 2026.10.30c
++Bridge version: 2026.10.30d
+ Calibrated: 2026-10-30 from 2026.10.30a to 2026.10.30b, by the no-delta path (the version line moved with the stamp, PR #110; the entry's items applied by hand) — applied: bridge-check 147 OK on the installed tree, 2026.10.30a kept as the way back; the core in parts to its end, the building modules with their sub-files, host-extension, claude-code-extension, installable, the merge policy, configuration, pitfalls, delivery, the diagram conventions, the glossary and the skills re-read; roster native, once the owner had signed Cursor's command-line tool in again (ISS-020); memory notes 3 read, 1 reduced; conformance as below; no increment in flight and no seeded round record, so nothing set right; project.json's bridge version; pending: as below; not applied (gate passed): none. Earlier calibrations: docs/archive/STATUS_HISTORY.md.
+-Calibration pending: 2026.10.30c (BUG-037, text only) at project end's install, this project by the no-delta path (the version line moved with the stamp, PR #112) and the TDP calibrating to it; reAngle and the video factory calibrate when they resume, from 2026.10.25a through every entry; at project end, host extension's `project-end.delivery` for host-installation (Install into the host), by the `Delivery kind:` row; at the next design phase or change cycle, host extension's and Claude Code extension's `design.sections` and installable's intake, design and planning additions (2026.10.30a; never backwards).
+-Conformance notes (2026-10-31, stage B6's close, on the installed 2026.10.30b: 22 OK, 2 MISSING, 6 NOTE): MISSING the diagram index (No diagram index is a recorded decision); MISSING the calibration to the installed bridge, since the version line moved with 2026.10.30c's stamp (PR #112) and that release is installed at project end; NOTE the repository is public; NOTE the boundary-check hook is configured, not engaging (ISS-010; the launcher's BOUNDARY lines are the detection); NOTE the design exists under other names (DESIGN_CRITIQUE.md), for the diagram retrofit; NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, two lines: this project's, reviewed at calibration step 2b, and the maintainer session's, left to the maintainer
++Calibration pending: 2026.10.30c (BUG-037) and 2026.10.30d (BUG-038), text only, at project end's install, this project by the no-delta path (the version line moved with each stamp, PRs #112 and #114) and the TDP calibrating to them; reAngle and the video factory calibrate when they resume, from 2026.10.25a through every entry; at project end, host extension's `project-end.delivery` for host-installation (Install into the host), by the `Delivery kind:` row; at the next design phase or change cycle, host extension's and Claude Code extension's `design.sections` and installable's intake, design and planning additions (2026.10.30a; never backwards).
++Conformance notes (2026-10-31, stage B6's close, on the installed 2026.10.30b: 22 OK, 2 MISSING, 6 NOTE): MISSING the diagram index (No diagram index is a recorded decision); MISSING the calibration to the installed bridge, since the version line moved with 2026.10.30c's and 2026.10.30d's stamps (PRs #112 and #114), installed at project end; NOTE the repository is public; NOTE the boundary-check hook is configured, not engaging (ISS-010; the launcher's BOUNDARY lines are the detection); NOTE the design exists under other names (DESIGN_CRITIQUE.md), for the diagram retrofit; NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, two lines: this project's, reviewed at calibration step 2b, and the maintainer session's, left to the maintainer
+ Run parameters: see docs/RUN_PARAMETERS.md (the one record; the owner's four answers fixed by test_r001_run_parameters_owner_values)
+ 
+ ## How this file is written (ISS-009)
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 97fb9f1..a993b1d 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -40,7 +40,7 @@ Drawn from the Restructuring Plan's release B (§16), its scope and "Accepted wh
+ | R-034 | Trait additions from several conditional workflows are applied together in a stated order. | DESIGN §6.5 | built | tests/test_workflow_model.py (TASK-003) |
+ | R-035 | Traits are proposed at intake and settled at the design gate; a product type's default traits are proposals settled at the same gate. | DESIGN §6.3 | built | tests/test_phase_modules_intake_design.py (test_r035_traits_are_proposed_at_intake_and_settled_at_the_design_gate; TASK-011); tests/test_traits_existing.py (test_r035_a_plan_critique_carries_the_traits_lenses_and_a_trait_added_at_the_gate_is_asked_and_written; TASK-017) |
+ | R-036 | A new or defined-but-unwritten trait is handled by writing its extra handling into the project's design, flagging it at the design gate (where the owner may still pause), and putting it to the promotion pass at project end. | DESIGN §6.7 | built | the design and the gate: tests/test_phase_modules_intake_design.py (test_r036_; TASK-011, the `Flagged trait:` row); the promotion pass, which reads the inventory's `Flagged trait:` rows and proposes each trait: tests/test_phase_modules_close.py (test_r036_; TASK-014) |
+-| R-037 | Release B is delivered: a release-level review by a fresh context (one pass, fixes, a second pass); the stamp (VERSION, a regenerated MANIFEST, a CHANGELOG entry with its "if rolled back" notes); the projects paused; `bridge-install.py` run; `bridge-check.py` green on the installed tree; the trial project (the TDP, the owner's choice of 2026-10-30 in place of reAngle) calibrated and resumed; field acceptance met; the others resumed. | DESIGN §15 conditions 4–5; §16 | planned | partial: the release-level review, both passes and the fixes (TASK-026; the record is Reports/Reviews/Claude-Cursor Bridge Release B Review.md, outside the Workspace), a same-version release with other files refused before it can replace the installed release with no way back (BUG-034, tests/test_bug034.py); the stamp (VERSION, MANIFEST.json, the CHANGELOG entry 2026.10.30a; tests/test_release_b_stamp.py, the test_r037_ tests; TASK-027, PR #108), this checkout paused and switched to `main`, the install, and `bridge-check.py` green on the installed tree (147 OK, 2026-10-30); the trial on the TDP, whose first finding, BUG-036, is fixed and stamped 2026.10.30b (tests/test_bug036.py, PR #110), installed with `bridge-check.py` green on it (147 OK) and this checkout calibrated to it (PR #111); release B's field acceptance on the TDP met on 2026-10-30 (R-031's evidence; points 1 and 3 under the hand seed); 2026.10.30b probed by the TDP's supervisor in a scratch copy on BUG-004's exact conditions, round 1 taken unseeded (2026-10-30; INVENTORY, Decisions, the owner's "Yes, begin now"); 2026.10.30c stamped (BUG-037, PR #112; tests/test_bug037.py), installed at project end; 2026.10.30b's own field check at the TDP's TASK-158 first Review B, and the resumes, are TASK-027's, to come |
++| R-037 | Release B is delivered: a release-level review by a fresh context (one pass, fixes, a second pass); the stamp (VERSION, a regenerated MANIFEST, a CHANGELOG entry with its "if rolled back" notes); the projects paused; `bridge-install.py` run; `bridge-check.py` green on the installed tree; the trial project (the TDP, the owner's choice of 2026-10-30 in place of reAngle) calibrated and resumed; field acceptance met; the others resumed. | DESIGN §15 conditions 4–5; §16 | planned | partial: the release-level review, both passes and the fixes (TASK-026; the record is Reports/Reviews/Claude-Cursor Bridge Release B Review.md, outside the Workspace), a same-version release with other files refused before it can replace the installed release with no way back (BUG-034, tests/test_bug034.py); the stamp (VERSION, MANIFEST.json, the CHANGELOG entry 2026.10.30a; tests/test_release_b_stamp.py, the test_r037_ tests; TASK-027, PR #108), this checkout paused and switched to `main`, the install, and `bridge-check.py` green on the installed tree (147 OK, 2026-10-30); the trial on the TDP, whose first finding, BUG-036, is fixed and stamped 2026.10.30b (tests/test_bug036.py, PR #110), installed with `bridge-check.py` green on it (147 OK) and this checkout calibrated to it (PR #111); release B's field acceptance on the TDP met on 2026-10-30 (R-031's evidence; points 1 and 3 under the hand seed); 2026.10.30b probed by the TDP's supervisor in a scratch copy on BUG-004's exact conditions, round 1 taken unseeded (2026-10-30; INVENTORY, Decisions, the owner's "Yes, begin now"); 2026.10.30c stamped (BUG-037, PR #112; tests/test_bug037.py) and 2026.10.30d (BUG-038, PR #114; tests/test_bug038.py), installed at project end; 2026.10.30b's own field check met at the TDP's TASK-158 first Review B (2026-10-31: snapshot TASK-158-r1 taken as round 1 with nothing seeded, five builder reports on the branch and no rounds record before it; HARDENING, Stage B6, least confident 1); the resumes are TASK-027's, to come |
+ | R-038 | The install mechanics while the supervisor builds on branches (installing from a second checkout that holds only `main`, or pausing and switching this checkout) are settled by the owner, recorded, and reflected in the install run sheet. | DESIGN §16 / A1a "settled at release B's intake" | built | the owner's settlement, INVENTORY Decisions, the R-038 row (2026-10-11: pause and switch this checkout to `main` at stage B6); the run sheet, bridge/commands/calibrate-bridge.md step 1, pinned by tests/test_release_b_stamp.py (the test_r038_ tests; TASK-027, PR #108); release B installed by it on 2026-10-30 |
+ | R-039 | Windowless launches are enforced by the bridge for every project, never by a per-project fix: every heavy run of the loop — a builder, a project's test suite, a mutation run — starts through the launcher (`bridge-run.py`) in the background, which starts it with no window so that every process it creates inherits that unless it detaches itself (KP-059's browser helper, which is why the Node default is deferred) (a suite is never run in the foreground: the launcher's completion wakes the supervisor and `test-runner` reads the output file); and every project's test suite whose runner the bridge ships a default for carries the bridge's frozen windowless default (FIX-001's `tests/conftest.py` default, shipped as a snapshot like the secure-coding rule; pytest in release B, the Node runners' default deferred: INVENTORY, Deferred), written at configuration, reported by the conformance check as a floor at every calibration and reflection point, and written into a running project by the calibration itself, before the project resumes. | the owner's decision of 2026-10-20 (ISS-011): "I'd rather have the solution implemented in the bridge … and afterwards installed and calibrated, than fixing it in each session"; rule 24; KP-014 | built | the bridge's half: tests/test_bridge_run_driver.py (the launcher's driver kind, its refusals, ceiling and health, and a driver's grandchild with a console and no window) and tests/test_conformance_windowless.py (the snapshot equal to tests/conftest.py's block, the floor `Windowless test suite` OK, MISSING and its NOTEs; TASK-028); the loop's text (every suite and mutation run through the launcher), the configuration item and the calibration's write between two suite runs: tests/test_loop_text_windowless.py (test_r039_; TASK-030) |
+ | R-040 | One heavy job at a time on the computer: a builder run, a test suite and a mutation run each hold one machine-wide slot in the launcher while they run — an exclusive lock on a file under the bridge's state folder in the owner's home (`~/.cursor-bridge/`, where the agent home already lives), which every session and the owner's own programs see alike, released by the operating system the instant the holder ends — a second heavy run waiting for it, saying what it waits for, as long as the holder's own ceiling allows and never counting the wait against its own; a review and a CI watch take none (Review B's test runs during its review, which the owner chose to keep executing, are the one heavy run outside the slot, by this decision). | the owner's decision of 2026-10-20 (ISS-011): "There definitely needs to be a rate limit on the tests that necessitate evoking a terminal" | built | tests/test_bridge_run_slot.py (test_r040_; TASK-029); tests/test_loop_guard.py (test_r040_heavy_launch_count_includes_slot_wait, test_r040_pending_from_hook_heavy_edges); tests/test_a4_followups.py (the stop test's heavy.lock under the tests' home); the loop's text, the heavy launch's duration stated once and the slot's exits in step 3b: tests/test_loop_text_windowless.py (test_r040_; TASK-030); a launch refused the slot is no builder run, and a builder window counts the wait: tests/test_hotfix25a_roster_launcher.py, tests/test_hotfix25a_guard_scope_invisible.py (BUG-030's window and slot tests), tests/test_task032_supervisor_launcher.py (test_bug030_; BUG-030), tests/test_bug032.py (BUG-032) |
+diff --git a/docs/archive/STATUS_HISTORY.md b/docs/archive/STATUS_HISTORY.md
+index afa6722..c51286c 100644
+--- a/docs/archive/STATUS_HISTORY.md
++++ b/docs/archive/STATUS_HISTORY.md
+@@ -89,3 +89,8 @@ Open issues, the line as it stood before the calibration to 2026.10.30a: ISS-011
+ - Stage: B1 (supervised-project bootstrap) and B2 (conditional-workflow framework) closed 2026-10-19; B3 (the core and phase-module split) 2026-10-24; B4 (the first conditional workflows) 2026-10-25; B5 (calibration and acceptance) closed 2026-10-29: HOTFIX-002, TASK-023 to TASK-025, TASK-028 to TASK-035, the plan revision maintainer-text, BUG-028 to BUG-033 and REFAC-B5 (PRs #84 to #103), the stage review closed at round 3, the first at the ceiling (HARDENING, Stage B5); B6 (release B's install) in hand: TASK-026 and TASK-027's stamp merged, release B installed on 2026-10-30, its trial on the TDP (the owner's choice) found BUG-036, fixed by 2026.10.30b (PR #110), installed and this project calibrated to it on 2026-10-30 (PR #111); the stage review's round 1 approved by every reviewer, its convergent finding fixed by BUG-037 (PR #112), stamped 2026.10.30c. The owner's answer to stage B4's traits question (2026-10-25): No, the bridge stays classified installable alone (INVENTORY, Decisions). Last reflection: stage B5's close, 2026-10-29 (demonstration passed, 14 checks; the installed conformance check 21 OK / 1 MISSING, the recorded no-diagram-index decision / 6 NOTE; Issues ISS-017 and ISS-018 completed, ISS-019 added and completed, ISS-011 and ISS-015 updated; Feedback FB-051 to FB-062; least confident in HARDENING; Project Summary patched)
+ - Open issues: ISS-020: Cursor's command-line sign-in restored by the owner on 2026-10-30; the roster check's usage advice for it to release T (HARDENING). ISS-011 open (the window flood of 2026-10-19; closed at stage B6's close if no flood recurs under release B). ISS-015 fixed (since the install the programs hold the ceiling; its entry completed at stage B6's close). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). Earlier: docs/archive/STATUS_HISTORY.md
+ - Conformance notes (2026-10-30, the calibration to 2026.10.30b: 23 OK, 1 MISSING, 7 NOTE, the seventh project.json's bridge version, set right in PR #111): the diagram index is MISSING (No diagram index is a recorded decision); NOTE the repository is public; NOTE the boundary-check hook is configured, not engaging (ISS-010; the launcher's BOUNDARY lines are the detection, as expected); NOTE the design exists under other names (DESIGN_CRITIQUE.md), for the diagram retrofit; NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, this project's reviewed at calibration step 2b and the maintainer session's own left to the maintainer
++
++## Moved out 2026-10-31 (BUG-038, PR #114)
++- Last accepted: Records: stage B6's close (PR #113, at its merge): the reflection's records (HARDENING's Stage B6 section with its least confident items, the plan's trial named as the TDP, R-031's and R-037's evidence (the TDP's probe of 2026.10.30b), INVENTORY's decisions and rows); before it BUG-037 (PR #112), the stage review's fix, stamped 2026.10.30c; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-035 (TASK-027's stamp and records), BUG-001 to BUG-037, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++- Next: project end (project-end.md), once the deferral is answered: completion-check --mode done (R-031 and R-037 built, or deferred by the owner with a date), diagram-check --mode done, sync-check --strict; the User Manual with its Install, upgrade, uninstall chapter and the command reference from docs/cli-reference.json; host extension's delivery, Install into the host (2026.10.30c by run sheet, then this project and the TDP calibrate); the promotion pass; then Phase: done. TASK-027's "owner-dated deferral at B6" is recorded there, before the completion check. The TDP's TASK-158 first Review B, 2026.10.30b's field check, is recorded when it comes (R-037). Then release T (its design work on Fable 5.1, the owner switching), B2, the progress graph and W. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++- Calibration pending: 2026.10.30c (BUG-037, text only) at project end's install, this project by the no-delta path (the version line moved with the stamp, PR #112) and the TDP calibrating to it; reAngle and the video factory calibrate when they resume, from 2026.10.25a through every entry; at project end, host extension's `project-end.delivery` for host-installation (Install into the host), by the `Delivery kind:` row; at the next design phase or change cycle, host extension's and Claude Code extension's `design.sections` and installable's intake, design and planning additions (2026.10.30a; never backwards).
+diff --git a/handoff/BUG-038-r1-report.md b/handoff/BUG-038-r1-report.md
+new file mode 100644
+index 0000000..1077d38
+--- /dev/null
++++ b/handoff/BUG-038-r1-report.md
+@@ -0,0 +1,125 @@
++# BUG-038 builder report (round 1)
++
++## Initial git status
++
++Command: `git status --porcelain` from Workspace root (before any edit).
++
++Output: (empty)
++
++Note: the brief expected `tests/test_bug038.py` as untracked; on this tree it is already committed and the working tree was clean.
++
++## Pre-edit verification
++
++Command: `python tools/dump-cli.py --help`
++
++Output includes: `--check     compare committed reference files without writing` (compare-only mode).
++
++Command: `PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider tests/test_bug038.py tests/test_completion_check.py`
++
++Exit code: 1. Summary: `3 failed, 3 passed in 1.85s`.
++
++- `test_bug038_the_completion_check_finds_no_stand_in_in_its_own_source` — failed at `assert "STAND-IN" not in out` (STAND-IN on completion-check.py lines 30–31).
++- `test_bug038_a_stand_in_elsewhere_is_still_found` — failed at `assert not [l for l in out.splitlines() if l.startswith("STAND-IN: ") and "completion-check.py" in l]`.
++- `test_bug038_the_docstring_still_names_each_kind_it_scans_for` — failed at `para = doc[doc.index("STAND-IN"):...]` with `ValueError: substring not found` (the test’s `doc = text[:text.index('"""', 3)]` slice is only the shebang line because the opening `"""` is the first match after index 3).
++
++The brief stated tests 1–2 fail and test 3 passes before edit; on this tree all three failed.
++
++## Files changed
++
++- `bridge/cursor-bridge/completion-check.py` (STAND-IN docstring paragraph only, lines 29–33 after edit)
++- `docs/BUILDER_NOTES.md` (one dated line on test 3 doc extraction vs shebang)
++- `handoff/BUG-038-r1-report.md` (this file)
++
++## What changed
++
++Reworded the `--mode done` STAND-IN paragraph in the module docstring so each line avoids `STANDIN_RX` while still describing the same stand-in kinds (including Section on placeholder suffixes) and keeping the closing sentence byte-identical.
++
++New paragraph (STAND-IN block):
++
++```
++  STAND-IN    shipped (non-test) code shows a user-visible stand-in: a feature deferred to a
++              later release or version; phrasing that something will come soon; behavior that is
++              not implemented or still unavailable; copy saying the product is under active
++              construction; a named placeholder component suffix (View, Page, Screen, Tab, Panel,
++              Section); or Rust code calling the todo or unimplemented macros with arguments.
++              Allowed only on a line that names the ID of an owner-deferred requirement.
++```
++
++The named cause is addressed because the line-by-line stand-in scan no longer matches its own docstring text; tests 1 and 2 now pass.
++
++## Commands run (post-edit, Workspace root)
++
++### Done step 1 (before step 2 in brief order; step 3 repeats)
++
++```
++$env:PYTHONDONTWRITEBYTECODE = "1"; python -c "import importlib.util as u; ..."
++```
++
++(bash equivalent run)
++
++Output:
++
++```
++[]
++matches: 0
++```
++
++Exit code: 0
++
++### Done step 2
++
++```
++PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider tests/test_bug038.py tests/test_completion_check.py
++```
++
++Exit code: 1. Summary: `1 failed, 5 passed in 1.93s`.
++
++Failed: `test_bug038_the_docstring_still_names_each_kind_it_scans_for` at `doc.index("STAND-IN")` — `ValueError: substring not found` (same shebang/`text.index('"""', 3)` slice issue as pre-edit).
++
++### Done step 3 (repeat step 1)
++
++Output:
++
++```
++[]
++matches: 0
++```
++
++### Done step 4
++
++```
++PYTHONDONTWRITEBYTECODE=1 python tools/dump-cli.py --check
++```
++
++Exit code: 0
++
++### Done step 5
++
++```
++git diff --quiet HEAD -- tests/
++```
++
++Exit code: 0
++
++```
++git status --porcelain
++ M bridge/cursor-bridge/completion-check.py
++```
++
++```
++git diff --stat
++ bridge/cursor-bridge/completion-check.py | 8 +++++---
++ 1 file changed, 5 insertions(+), 3 deletions(-)
++```
++
++(`git diff bridge/cursor-bridge/completion-check.py` — only the STAND-IN paragraph hunk, as recorded in shell output above.)
++
++## Summary
++
++Reworded the STAND-IN paragraph in `completion-check.py` so no source line matches `STANDIN_RX`, fixing the self-match that blocked `--mode done` on the shipped completion check; `matches: 0`, tests 1–2 and all of `test_completion_check.py` pass, and `dump-cli.py --check` passes. Test 3 still fails because `text[:text.index('"""', 3)]` does not include the module docstring when a shebang precedes the opening triple quote; the paragraph content satisfies test 3’s keyword checks when the docstring is extracted normally (e.g. `ast.get_docstring`).
++
++## Assumed, not verified
++
++- The brief’s claim that test 3 passes before edit on the supervisor tree · this workspace run showed test 3 failing pre-edit for the same doc-slice reason · a supervisor re-run on their host would confirm whether their tree differs.
++- That rewording “under active construction” and “come soon” (not “coming soon”) is clear enough for readers · the brief asked for plain words naming each scan kind · a doc review would confirm.
++- That omitting explicit prose for regex branches such as `to be implemented` and `not yet built/supported` is acceptable because the paragraph still describes the same stand-in families in other words · requirement 2 lists those patterns · supervisor judgment on the docstring requirement.
+diff --git a/handoff/BUG-038-r2-report.md b/handoff/BUG-038-r2-report.md
+new file mode 100644
+index 0000000..e9bde8b
+--- /dev/null
++++ b/handoff/BUG-038-r2-report.md
+@@ -0,0 +1,98 @@
++# BUG-038 round 2 report
++
++## Initial git status
++
++```
++```
++
++(empty; `git status --porcelain` printed nothing)
++
++## Verification commands
++
++### Done step 1
++
++```
++[]
++matches: 0
++```
++
++### Done step 2
++
++```
++......                                                                   [100%]
++6 passed in 1.78s
++```
++
++### Done step 3 (widest line in STAND-IN paragraph)
++
++```
++widest: 94
++```
++
++### Done step 4
++
++```
++exit:0
++```
++
++(`python tools/dump-cli.py --check`)
++
++### Done step 5
++
++```
++tests_diff_exit:0
++ M bridge/cursor-bridge/completion-check.py
++?? handoff/BUG-038-r2-report.md
++ bridge/cursor-bridge/completion-check.py | 13 ++++++++-----
++ 1 file changed, 8 insertions(+), 5 deletions(-)
++diff --git a/bridge/cursor-bridge/completion-check.py b/bridge/cursor-bridge/completion-check.py
++index 78be819..86592fc 100644
++--- a/bridge/cursor-bridge/completion-check.py
+++++ b/bridge/cursor-bridge/completion-check.py
++@@ -26,11 +26,14 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
++               the requirement ID (a comment, docstring, or test name) - that is the trace.
++ --only R-001,R-002  limits every check to those IDs (an older project brought under the
++               register part by part, or one stage's requirements; release A4).
++-  STAND-IN    shipped (non-test) code shows a user-visible stand-in: a feature deferred to a
++-              later release or version; phrasing that something will come soon; behavior that is
++-              not implemented or still unavailable; copy saying the product is under active
++-              construction; a named placeholder component suffix (View, Page, Screen, Tab, Panel,
++-              Section); or Rust code calling the todo or unimplemented macros with arguments.
+++  STAND-IN    shipped (non-test) code shows a user-visible stand-in: a feature said to arrive
+++              later (a later stage, version, release or update); phrasing that something will
+++              land soon; wording that a capability is not ready yet (implemented behavior
+++              missing, available or supported status lacking, not built, or work still
+++              outstanding); a notice that a page is still being built (a construction notice);
+++              an identifier with Placeholder followed by View, Page, Screen, Tab, Panel or
+++              Section; or a call of the todo or unimplemented macro (Rust), with or without
+++              arguments.
++               Allowed only on a line that names the ID of an owner-deferred requirement.
++ Notes never fail: TODO/FIXME counts and NotImplementedError sites (often legitimate
++ abstract methods) in shipped code.
++```
++
++## Files changed
++
++- `bridge/cursor-bridge/completion-check.py` (module docstring STAND-IN paragraph only)
++- `handoff/BUG-038-r2-report.md` (this file)
++
++## Summary
++
++Round 2 reworded only the STAND-IN paragraph in `bridge/cursor-bridge/completion-check.py` so each clause truthfully describes its `STANDIN_RX` branch while no line matches the scan, keeping the owner-deferred closing sentence byte-identical. The new paragraph reads: `STAND-IN    shipped (non-test) code shows a user-visible stand-in: a feature said to arrive later (a later stage, version, release or update); phrasing that something will land soon; wording that a capability is not ready yet (implemented behavior missing, available or supported status lacking, not built, or work still outstanding); a notice that a page is still being built (a construction notice); an identifier with Placeholder followed by View, Page, Screen, Tab, Panel or Section; or a call of the todo or unimplemented macro (Rust), with or without arguments. Allowed only on a line that names the ID of an owner-deferred requirement.`
++
++## Review A findings (1–6)
++
++1. **todo/unimplemented macros:** The clause now says `a call of the todo or unimplemented macro (Rust), with or without arguments`, matching the branch that hits the macro name, `!`, and `(` regardless of what follows, in any listed code file type.
++2. **Under construction:** Replaced the false example with `a notice that a page is still being built (a construction notice)`, which names the kind without writing `under construction` or `under active construction`.
++3. **Later arrival:** Replaced `deferred to a later release or version` with `a feature said to arrive later (a later stage, version, release or update)`, listing all four scan alternatives and avoiding the word `deferred`.
++4. **Coming soon and not-yet kinds:** `will come soon` became `will land soon` (keeps `soon` without `coming soon`); the not-yet / not-implemented-yet / to-be-implemented kinds are described as `wording that a capability is not ready yet (implemented behavior missing, available or supported status lacking, not built, or work still outstanding)` without placing a matched phrase on any single line.
++5. **Placeholder suffix:** Replaced the vague suffix list with `an identifier with Placeholder followed by View, Page, Screen, Tab, Panel or Section`, aligned with the regex (word ending in Placeholder immediately followed by one of the six suffixes).
++6. **Line width:** Wrapped so the widest line in the paragraph is 94 characters (`widest: 94`).
++
++## Named cause
++
++The program’s docstring no longer contains literal or line-local text that `STANDIN_RX` matches, so `--mode done` does not report the completion check’s own STAND-IN paragraph as a stand-in while the scan and patterns stay unchanged.
++
++## Assumed, not verified
++
++Assumed, not verified: none
+diff --git a/handoff/BUG-038-r2.md b/handoff/BUG-038-r2.md
+new file mode 100644
+index 0000000..409db04
+--- /dev/null
++++ b/handoff/BUG-038-r2.md
+@@ -0,0 +1,72 @@
++# BUG-038, round 2: the STAND-IN paragraph says what the scan matches
++
++## Objective
++Fix the following confirmed defect: repair the named cause and nothing else. Cause, unchanged from `handoff/BUG-038.md` (read it whole first; everything it says holds unless this brief says otherwise): the module docstring of `bridge/cursor-bridge/completion-check.py` quoted the phrases its line-by-line scan `STANDIN_RX` matches, so the bridge's own `completion-check.py --mode done` reported the program's docstring as a stand-in. Round 1 reworded the paragraph so that no line matches (the cause is repaired: `matches: 0`), but Review A rejected the new wording because some clauses now describe the scan wrongly, and the brief makes this paragraph the design. This round corrects the wording only. Evidence: Review A, round 1 (quoted under Requirements). Reproduction: `tests/test_bug038.py`, the supervisor's, strengthened after round 1 (read it whole; never edit it): test 2 now also plants a docstring line, a `Section` suffix and a `todo!()` beside the program, and test 3 checks each of the six suffixes and that the paragraph ends on the owner-deferred sentence unchanged. All three pass on the round-1 text; they must still pass on yours.
++
++Satisfies: none. A defect fix to the bridge's own tooling.
++
++## Scope
++One brief carries one increment's scope; work that needs a second scope is a second brief, never a second section here.
++Files and directories you may create or modify:
++- bridge/cursor-bridge/completion-check.py (the module docstring's STAND-IN paragraph only: lines 29-34 as committed, from the line starting `  STAND-IN` to the line before `Notes never fail`)
++- docs/BUILDER_NOTES.md
++- handoff/BUG-038-r2-report.md
++
++Do not modify anything else.
++
++## Out of scope
++Everything `handoff/BUG-038.md` puts out of scope, unchanged: every file under tests/, docs/cli-reference.json and docs/CLI_REFERENCE.md (generated; `python tools/dump-cli.py --check` must still pass without regenerating), MANIFEST.json, VERSION and CHANGELOG.md, `STANDIN_RX` and every other constant, function, output line and docstring line outside the paragraph, the installed bridge. Also out of scope: handoff/BUG-038-r1-report.md (round 1's report stays as it is).
++
++## Context
++All paths are relative to the Workspace root (the folder you were started in). The Context of `handoff/BUG-038.md` holds, the development-data rule included: never run `completion-check.py` against this Workspace or a real checkout; the tests run it in `tmp_path` repositories.
++
++The scan, unchanged (completion-check.py, lines 51-59; `re.I`, so case is ignored):
++
++```python
++STANDIN_RX = re.compile(
++    r"arrives?\s+in\s+a\s+later\s+(stage|version|release|update)"
++    r"|coming\s+soon"
++    r"|not\s+yet\s+(implemented|available|built|supported)"
++    r"|\bnot\s+implemented\s+yet\b"
++    r"|under\s+construction"
++    r"|to\s+be\s+implemented"
++    r"|\b\w*Placeholder(View|Page|Screen|Tab|Panel|Section)\b"
++    r"|\btodo!\s*\(|\bunimplemented!\s*\(", re.I)
++```
++
++## Requirements
++Every requirement of `handoff/BUG-038.md` holds (no line matches `STANDIN_RX`; each kind named; the last sentence `Allowed only on a line that names the ID of an owner-deferred requirement.` kept byte-identical and last; the label, indent and layout; no evasion). In addition, each clause of the paragraph describes its branch of the scan truthfully: it neither excludes text the branch matches nor names, as an example, text the branch does not match. Review A's findings on the round-1 text, each to be corrected:
++
++1. (Blocking) "calling the todo or unimplemented macros with arguments": the branch matches the macro name, `!` and the opening parenthesis whatever follows, so the bare `todo!()` is matched, and in any shipped code file (the scan reads every file type the program lists, not Rust files only). Say "with or without arguments" or drop the qualifier.
++2. "copy saying the product is under active construction": "under active construction" is not matched by the branch; the clause's own example must not be a phrase the scan misses. Describe the kind without imitating the phrase, for example a notice that a page is still being built (a construction notice).
++3. "a feature deferred to a later release or version": the branch names a later stage, version, release or update, and "deferred" collides with the owner-deferred allowance in the next sentence. Name all four (stage, version, release, update) and say the feature is said to arrive later, without the word deferred.
++4. "will come soon": the branch matches "coming soon" only; and "not implemented or still unavailable": the branches need "yet" (not yet implemented, available, built or supported; not implemented yet) or "to be implemented". Name the kind with its qualifier, without writing a matched phrase: for example, wording that says something is not ready yet (not yet implemented, available, built or supported, or still to be implemented), each candidate line checked against the scan.
++5. (Consider) "a named placeholder component suffix (View, ...)": say what the branch matches: an identifier holding Placeholder directly followed by View, Page, Screen, Tab, Panel or Section.
++6. (Consider) width: no line of the paragraph is wider than 94 characters, the widest prose line of the docstring.
++
++These wordings were checked by Review A not to match the scan; you may use them or your own, each line checked: "a call of the todo or unimplemented macro (Rust), with or without arguments"; "a notice that a page is still being built (a construction notice)"; "a feature said to arrive later (a later stage, version, release or update)"; "an identifier with Placeholder followed by View, Page, Screen, Tab, Panel or Section". The words in requirement 4's example are not checked: "not yet implemented" matches; write the qualifier so that no line holds a matched phrase.
++
++## Acceptance criteria
++- [ ] `tests/test_bug038.py` passes, 3 of 3, and `tests/test_completion_check.py` passes unchanged (Done step 2).
++- [ ] Done step 1 prints `matches: 0`.
++- [ ] Done step 3 prints `widest: <n>` with n at most 94.
++- [ ] `python tools/dump-cli.py --check` exits 0 with no regeneration.
++- [ ] `git diff --stat HEAD` shows only `bridge/cursor-bridge/completion-check.py`, `docs/BUILDER_NOTES.md` (if you appended) and `handoff/BUG-038-r2-report.md`; in completion-check.py only lines inside the STAND-IN paragraph change.
++- [ ] `git diff --quiet HEAD -- tests/` exits 0.
++- [ ] Each of findings 1 to 6 is addressed; the report quotes the new paragraph and says, finding by finding, how.
++
++## Constraints
++Every constraint of `handoff/BUG-038.md` holds: no dependencies; nothing read or written outside the Workspace; one dated line to `docs/BUILDER_NOTES.md` for anything that got in your way; ASCII only; no symptom suppression (no skip of the program's file, the `bridge/` folder or docstrings; `SKIP_PATH`, `TEST_PATH`, `CODE_EXT` and `STANDIN_RX` unchanged; no owner-deferred ID added to excuse the paragraph); no test edited; no `DEBUG-BUG-` line or print; no CHANGELOG or `docs/CHANGES.md` entry; the git commands `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d` and `worktree` are not yours to run. Do not run the full suite, `tests/test_rollback.py` or `tests/test_core_carve.py::test_r003_the_modules_install_from_the_manifest` (they fail until the supervisor restamps). If you believe the real cause is different from the one named, stop, change nothing, and say why in your summary.
++
++## Done
++Your report is the file `handoff/BUG-038-r2-report.md`, which you write as you go. Before any edit, run `git status --porcelain` from the Workspace root and record its output (it should print nothing). After your edit, run these from the Workspace root, in PowerShell, in this order, and paste each output into the report:
++
++1. `$env:PYTHONDONTWRITEBYTECODE = "1"; python -c "import importlib.util as u; p='bridge/cursor-bridge/completion-check.py'; s=u.spec_from_file_location('cc', p); m=u.module_from_spec(s); s.loader.exec_module(m); hits=[(n, l) for n, l in enumerate(open(p, encoding='utf-8').read().splitlines(), 1) if m.STANDIN_RX.search(l)]; print(hits); print('matches:', len(hits))"`
++2. `$env:PYTHONDONTWRITEBYTECODE = "1"; python -m pytest -q -p no:cacheprovider tests/test_bug038.py tests/test_completion_check.py`
++3. `python -c "t=open('bridge/cursor-bridge/completion-check.py', encoding='utf-8').read(); s=t.index('  STAND-IN'); e=t.index('Notes never fail'); print('widest:', max(len(l) for l in t[s:e].splitlines()))"`
++4. `$env:PYTHONDONTWRITEBYTECODE = "1"; python tools/dump-cli.py --check` (must exit 0)
++5. `git diff --quiet HEAD -- tests/` (must exit 0), then `git status --porcelain`, `git diff --stat HEAD` and `git diff HEAD -- bridge/cursor-bridge/completion-check.py`, run after the report and any BUILDER_NOTES line are written, so their output shows every file you changed.
++
++When you finish, the report holds: every file you changed; a one-paragraph summary with the new paragraph quoted; finding by finding (1 to 6), how it is addressed; one sentence on how the change keeps the named cause repaired; and a section headed exactly `Assumed, not verified` (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`).
++
++Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/BUG-038-r3-report.md b/handoff/BUG-038-r3-report.md
+new file mode 100644
+index 0000000..71a891b
+--- /dev/null
++++ b/handoff/BUG-038-r3-report.md
+@@ -0,0 +1,100 @@
++# BUG-038 round 3 report
++
++## Initial git status
++
++```
++```
++
++(empty; `git status --porcelain` printed nothing)
++
++## Verification commands
++
++### Done step 1
++
++```
++[]
++matches: 0
++```
++
++### Done step 2
++
++```
++......                                                                   [100%]
++6 passed in 1.82s
++```
++
++### Done step 3 (widest line in STAND-IN paragraph)
++
++```
++widest: 92
++```
++
++### Done step 4
++
++```
++exit:0
++```
++
++(`python tools/dump-cli.py --check`)
++
++### Done step 5
++
++```
++tests_diff_exit:0
++ M bridge/cursor-bridge/completion-check.py
++?? handoff/BUG-038-r3-report.md
++ bridge/cursor-bridge/completion-check.py | 15 +++++++--------
++ 1 file changed, 7 insertions(+), 8 deletions(-)
++diff --git a/bridge/cursor-bridge/completion-check.py b/bridge/cursor-bridge/completion-check.py
++index 86592fc..fc0a620 100644
++--- a/bridge/cursor-bridge/completion-check.py
+++++ b/bridge/cursor-bridge/completion-check.py
++@@ -26,14 +26,13 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
++               the requirement ID (a comment, docstring, or test name) - that is the trace.
++ --only R-001,R-002  limits every check to those IDs (an older project brought under the
++               register part by part, or one stage's requirements; release A4).
++-  STAND-IN    shipped (non-test) code shows a user-visible stand-in: a feature said to arrive
++-              later (a later stage, version, release or update); phrasing that something will
++-              land soon; wording that a capability is not ready yet (implemented behavior
++-              missing, available or supported status lacking, not built, or work still
++-              outstanding); a notice that a page is still being built (a construction notice);
++-              an identifier with Placeholder followed by View, Page, Screen, Tab, Panel or
++-              Section; or a call of the todo or unimplemented macro (Rust), with or without
++-              arguments.
+++  STAND-IN    shipped (non-test) code shows a user-visible stand-in, in any of these forms:
+++              arrive or arrives, then in a later stage, version, release or update; the word
+++              coming directly followed by soon; not and yet before implemented, available,
+++              built or supported; not, implemented and yet in a row; to be and implemented
+++              in a row; under and construction in a row; an identifier ending in Placeholder
+++              plus one of View, Page, Screen, Tab, Panel or Section; a call of the todo or
+++              unimplemented macro (Rust), with or without arguments.
++               Allowed only on a line that names the ID of an owner-deferred requirement.
++ Notes never fail: TODO/FIXME counts and NotImplementedError sites (often legitimate
++ abstract methods) in shipped code.
++```
++
++## Files changed
++
++- `bridge/cursor-bridge/completion-check.py` (module docstring STAND-IN paragraph only)
++- `handoff/BUG-038-r3-report.md` (this file)
++
++## New paragraph (quoted)
++
++```
++  STAND-IN    shipped (non-test) code shows a user-visible stand-in, in any of these forms:
++              arrive or arrives, then in a later stage, version, release or update; the word
++              coming directly followed by soon; not and yet before implemented, available,
++              built or supported; not, implemented and yet in a row; to be and implemented
++              in a row; under and construction in a row; an identifier ending in Placeholder
++              plus one of View, Page, Screen, Tab, Panel or Section; a call of the todo or
++              unimplemented macro (Rust), with or without arguments.
++              Allowed only on a line that names the ID of an owner-deferred requirement.
++```
++
++## Summary
++
++Round 3 replaced the STAND-IN docstring paragraph with supervisor-checked wording that describes each `STANDIN_RX` branch without embedding matched phrases, fixing Review A's round-2 objections about "will land soon" and missing "yet" qualifiers while keeping `matches: 0` and the owner-deferred closing sentence unchanged.
++
++## Assumed, not verified
++
++Assumed, not verified: none
+diff --git a/handoff/BUG-038-r3.md b/handoff/BUG-038-r3.md
+new file mode 100644
+index 0000000..9eb424a
+--- /dev/null
++++ b/handoff/BUG-038-r3.md
+@@ -0,0 +1,56 @@
++# BUG-038, round 3: the STAND-IN paragraph, given whole
++
++## Objective
++Fix the following confirmed defect: repair the named cause and nothing else. Cause, unchanged from `handoff/BUG-038.md` (read it, and `handoff/BUG-038-r2.md`, whole first; everything they say holds unless this brief says otherwise): the module docstring of `bridge/cursor-bridge/completion-check.py` quoted the phrases its line-by-line scan `STANDIN_RX` matches. Rounds 1 and 2 repaired the cause (no line matches), but Review A rejected round 2's wording because two clauses still describe the scan wrongly: "phrasing that something will land soon" names as its example a phrase the branch `coming\s+soon` does not match, and the not-ready-yet clause drops the "yet" the branches need ("not built", "implemented behavior missing"). This round replaces the paragraph with the text below, which the supervisor checked against `STANDIN_RX` line by line and with its lines joined (no match), against the width bound (widest 92) and against `tests/test_bug038.py`'s word checks. Reproduction: `tests/test_bug038.py`, the supervisor's; never edit it.
++
++Satisfies: none. A defect fix to the bridge's own tooling.
++
++## Scope
++One brief carries one increment's scope; work that needs a second scope is a second brief, never a second section here.
++Files and directories you may create or modify:
++- bridge/cursor-bridge/completion-check.py (the module docstring's STAND-IN paragraph only: from the line starting `  STAND-IN` to the line before `Notes never fail`, lines 29-37 as committed)
++- docs/BUILDER_NOTES.md
++- handoff/BUG-038-r3-report.md
++
++Do not modify anything else.
++
++## Out of scope
++Everything `handoff/BUG-038.md` and `handoff/BUG-038-r2.md` put out of scope, unchanged, and handoff/BUG-038-r1-report.md and handoff/BUG-038-r2-report.md (earlier rounds' reports stay as they are).
++
++## Context
++All paths are relative to the Workspace root (the folder you were started in). The Context of `handoff/BUG-038.md` holds, the development-data rule included.
++
++## Requirements
++1. Replace the paragraph, from its line starting `  STAND-IN` through its last line `              Allowed only on a line that names the ID of an owner-deferred requirement.`, with exactly these eight lines (two spaces before `STAND-IN`, four spaces after it, fourteen spaces before every continuation line, ASCII only, the file's own line endings):
++
++```
++  STAND-IN    shipped (non-test) code shows a user-visible stand-in, in any of these forms:
++              arrive or arrives, then in a later stage, version, release or update; the word
++              coming directly followed by soon; not and yet before implemented, available,
++              built or supported; not, implemented and yet in a row; to be and implemented
++              in a row; under and construction in a row; an identifier ending in Placeholder
++              plus one of View, Page, Screen, Tab, Panel or Section; a call of the todo or
++              unimplemented macro (Rust), with or without arguments.
++              Allowed only on a line that names the ID of an owner-deferred requirement.
++```
++
++2. Nothing else in the file changes: the line before the paragraph (`              register part by part, ...`) and the line after it (`Notes never fail: ...`) stay as they are.
++3. If any check of Done fails with this text, stop, do not reword it, and report the failing output: the supervisor re-checks the text.
++
++## Acceptance criteria
++- [ ] `tests/test_bug038.py` passes, 3 of 3, and `tests/test_completion_check.py` passes unchanged (Done step 2).
++- [ ] Done step 1 prints `matches: 0`.
++- [ ] Done step 3 prints `widest: 92`.
++- [ ] `python tools/dump-cli.py --check` exits 0 with no regeneration.
++- [ ] `git diff --stat HEAD` shows only `bridge/cursor-bridge/completion-check.py`, `docs/BUILDER_NOTES.md` (if you appended) and `handoff/BUG-038-r3-report.md`; in completion-check.py only the paragraph's lines change, and they equal Requirement 1's eight lines.
++- [ ] `git diff --quiet HEAD -- tests/` exits 0.
++
++## Constraints
++Every constraint of `handoff/BUG-038.md` and `handoff/BUG-038-r2.md` holds (no dependencies; nothing outside the Workspace; no symptom suppression; no test edited; the listed git commands not yours; not the full suite, `tests/test_rollback.py` or `tests/test_core_carve.py::test_r003_the_modules_install_from_the_manifest`). If you believe the real cause is different from the one named, stop, change nothing, and say why in your summary.
++
++## Done
++Your report is the file `handoff/BUG-038-r3-report.md`, which you write as you go. Before any edit, run `git status --porcelain` from the Workspace root and record its output (it should print nothing). After your edit, run Done steps 1 to 5 of `handoff/BUG-038-r2.md`, from the Workspace root, in PowerShell, in that order, and paste each output into the report; step 5 runs after the report and any BUILDER_NOTES line are written.
++
++When you finish, the report holds: every file you changed; the new paragraph quoted; and a section headed exactly `Assumed, not verified` (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`).
++
++Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/BUG-038.md b/handoff/BUG-038.md
+new file mode 100644
+index 0000000..eedf95b
+--- /dev/null
++++ b/handoff/BUG-038.md
+@@ -0,0 +1,126 @@
++# BUG-038: the completion check reports its own docstring as a stand-in
++
++## Objective
++Fix the following confirmed defect: repair the named cause and nothing else. Cause: the module docstring of `bridge/cursor-bridge/completion-check.py` has a STAND-IN paragraph (lines 29-32) that quotes the phrases its stand-in scan `STANDIN_RX` (lines 49-57) matches. The bridge ships this program as tracked, non-test code, so in `--mode done` the scan reads its own description as a stand-in, and the bridge's own project end can never pass. Evidence: at project end on the bridge itself (2026-10-31), the installed `completion-check.py --mode done` failed with two STAND-IN lines, `bridge/cursor-bridge/completion-check.py:30` and `:31`. Both are lines of that docstring paragraph. Line 30 (`stage", "coming soon", "not yet implemented/available", "under construction",`) matches `coming\s+soon`, `not\s+yet\s+(implemented|...)` and `under\s+construction`. Line 31 (`a *Placeholder{View,Page,Screen,Tab,Panel} component, todo!()/unimplemented!().`) matches `\btodo!\s*\(` and `\bunimplemented!\s*\(`. The scan works line by line (`for n, line in enumerate(text.splitlines(), 1): if STANDIN_RX.search(line):`, lines 191-195). The fix: reword only that docstring paragraph so that no line of the program matches `STANDIN_RX`, while the paragraph still names every kind of stand-in the scan looks for. Reproduction: `tests/test_bug038.py`, written by the supervisor before your run. Read the file whole before you start. It imports its helpers from `tests/test_completion_check.py`. On the current tree, `test_bug038_the_completion_check_finds_no_stand_in_in_its_own_source` and `test_bug038_a_stand_in_elsewhere_is_still_found` fail and must pass. `test_bug038_the_docstring_still_names_each_kind_it_scans_for` passes and must keep passing: it guards what the docstring means.
++
++Satisfies: none. This is a defect fix to the bridge's own tooling. No requirement in docs/REQUIREMENTS.md is added or changed.
++
++## Scope
++One brief carries one increment's scope; work that needs a second scope is a second brief, never a second section here.
++Files and directories you may create or modify:
++- bridge/cursor-bridge/completion-check.py (the module docstring's STAND-IN paragraph only, lines 29-32 at HEAD)
++- docs/BUILDER_NOTES.md
++- handoff/BUG-038-r1-report.md
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration
++- docs/ and handoff/, except the files the Scope section names
++- docs/cli-reference.json and docs/CLI_REFERENCE.md. They are generated, and the docstring is not part of them. `tools/dump-cli.py` takes `completion-check.py` from its parser (`"source": "argparse"` in docs/cli-reference.json, because the program has a top-level `build_parser()`), not from its module docstring. `python tools/dump-cli.py --check` must therefore pass without regenerating. If it fails after your edit, stop and report it. Do not run `python tools/dump-cli.py` without `--check`, and never edit these files by hand.
++- every file under tests/. Above all, `tests/test_bug038.py` is the supervisor's reproduction and is never edited.
++- bridge/cursor-bridge/MANIFEST.json, bridge/cursor-bridge/VERSION and bridge/cursor-bridge/CHANGELOG.md: the stamp is the supervisor's step after your run. Do not run `tools/make-manifest.py`.
++- in completion-check.py: `STANDIN_RX`, `NOTE_RX`, every other constant, every function, the argparse parser and its description, every output line, and every docstring line outside the STAND-IN paragraph (lines 1-28 and 33-36 at HEAD stay byte-identical).
++- the installed bridge, and any copy of the program outside this Workspace
++
++## Context
++All paths are relative to the Workspace root (the folder you were started in).
++
++- **Development data** (docs/INVENTORY.md, Decisions): "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you this means: never run `completion-check.py` against this Workspace or any real checkout, and never touch the installed bridge. The tests build throwaway git repositories under pytest's `tmp_path` and run the program there. Run only the commands named in Done.
++- **Security:** ASVS level 2 (docs/INVENTORY.md: "The builder's secure-coding rule is ASVS level 2"). `.cursor/rules/secure-coding.mdc` is in force. This change edits documentation text inside one program. It adds no input, no path handling and no process.
++- There is no docs/DESIGN.md that bears on this. The design is the docstring itself, `STANDIN_RX`, and `tests/test_bug038.py`'s docstrings.
++- **Host:** no behaviour of this change depends on the host. The program is a one-shot command run from the shell.
++
++The paragraph to reword, as at HEAD on branch bug-038 (lines 29-33; line 33 is the next paragraph, which stays):
++
++```
++  STAND-IN    shipped (non-test) code shows a user-visible stand-in: "arrives in a later
++              stage", "coming soon", "not yet implemented/available", "under construction",
++              a *Placeholder{View,Page,Screen,Tab,Panel} component, todo!()/unimplemented!().
++              Allowed only on a line that names the ID of an owner-deferred requirement.
++Notes never fail: TODO/FIXME counts and NotImplementedError sites (often legitimate
++```
++
++The scan the paragraph describes (lines 49-57, unchanged by you). Note `re.I`: matching ignores case.
++
++```python
++STANDIN_RX = re.compile(
++    r"arrives?\s+in\s+a\s+later\s+(stage|version|release|update)"
++    r"|coming\s+soon"
++    r"|not\s+yet\s+(implemented|available|built|supported)"
++    r"|\bnot\s+implemented\s+yet\b"
++    r"|under\s+construction"
++    r"|to\s+be\s+implemented"
++    r"|\b\w*Placeholder(View|Page|Screen|Tab|Panel|Section)\b"
++    r"|\btodo!\s*\(|\bunimplemented!\s*\(", re.I)
++```
++
++How test 3 reads the paragraph (`tests/test_bug038.py`): `doc = text[:text.index('"""', 3)]`, `para = doc[doc.index("STAND-IN"):doc.index("Notes never fail")].lower()`. The paragraph therefore still starts at the first occurrence of the exact text `STAND-IN` in the docstring and ends before `Notes never fail`. Lowercased, it contains each of: `later`, `soon`, `implemented`, `available`, `construction`, `placeholder`, `todo`, `unimplemented`, `owner-deferred`.
++
++Other tests load `STANDIN_RX` from this file by import (`tests/test_interface_text.py`, `tests/test_phase_modules_interface_planning.py`). They are unaffected as long as `STANDIN_RX` is unchanged.
++
++## Diagrams
++None: no diagram covers the completion check (there is no docs/diagrams/ folder).
++
++## Requirements
++1. No line of `bridge/cursor-bridge/completion-check.py` matches `STANDIN_RX` (searched line by line, as the program's scan does).
++2. The STAND-IN paragraph still names each kind of stand-in the scan looks for, in plain words a reader understands: a feature said to arrive later or to come soon; one not yet implemented or not yet available; one under construction; a placeholder component with the suffix View, Page, Screen, Tab, Panel or Section (Section is new: the scan already matches it, but the docstring did not list it); and Rust's `todo` and `unimplemented` macros.
++3. The paragraph keeps its last sentence unchanged: `Allowed only on a line that names the ID of an owner-deferred requirement.`
++4. The paragraph keeps its label `STAND-IN` and its place under `--mode done`, and follows the docstring's existing layout: the two-space indent, the label column, continuation lines aligned under the text, lines no wider than the docstring's other lines, ASCII only.
++5. Requirement 1 is met by wording, not by evasion. Do not split a matched phrase across a line break (the HEAD text already does this with "arrives in a later" / "stage"). Do not misspell words, add stray punctuation inside a phrase, or use escapes or non-ASCII look-alikes. Watch the forms that match even when quoted or described: "coming soon", "not yet implemented", "not yet available", "not implemented yet", "to be implemented", "under construction", "arrive(s) in a later stage/version/release/update", a word ending in `Placeholder` directly followed by one of the six suffixes (e.g. `PlaceholderView`), and a macro name directly followed by `!` and `(`.
++
++## Acceptance criteria
++- [ ] `tests/test_bug038.py` passes, 3 of 3, and `tests/test_completion_check.py` passes unchanged (Done step 2).
++- [ ] The one-line check of Done step 3 prints `matches: 0`.
++- [ ] `python tools/dump-cli.py --check` exits 0 with no regeneration.
++- [ ] The cause is addressed at its mechanism: the program's own source no longer contains text its line-by-line scan matches. The scan itself (`STANDIN_RX` and lines 175-206) is unchanged, so a stand-in in any other shipped file is still found (test 2).
++- [ ] `git diff --stat` shows only `bridge/cursor-bridge/completion-check.py`, `docs/BUILDER_NOTES.md` (if you appended) and `handoff/BUG-038-r1-report.md`. In completion-check.py the diff touches only lines inside the STAND-IN paragraph (lines 29-32 at HEAD).
++- [ ] `git diff --quiet HEAD -- tests/` exits 0, and `tests/test_bug038.py` is byte-identical to the file you found (it is untracked: do not edit, move or delete it).
++- [ ] No stand-in, placeholder, "coming soon" or "arrives in a later stage" text is added anywhere. "Satisfies" is none, so no requirement-ID trace is due. The reproduction's trace is in the supervisor's test docstrings, and you add no test.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks. (The docstring is not Markdown: it keeps its own wrapped layout, Requirement 4.)
++- This change talks to no external service.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms; `windowsHide: true` in Node). Capturing output does not prevent the window. A window is allowed only when it serves the user (they watch it or type into it); then write the reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path. This change launches no process.
++- Never start a server, a watcher or a daemon that outlives a test: a test that needs the product running starts it through the test framework's own fixture and stops it there. A server left running keeps your run from ending (plan 10.3, release A2).
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. A development build uses the development data the design names (the inventory's `Development data` decision, quoted in Context) and refuses the installed product's data. You never run `completion-check.py` yourself except through the tests, which run it in `tmp_path` repositories. The check of Done step 3 only imports the module to read `STANDIN_RX`.
++- No value in this change is marked as the owner's. Do not change the scan's patterns, the exit codes (0 OK, 1 failure) or any output text.
++- Follow the existing conventions of the docstring you touch (Requirement 4).
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff` and `git log` only.
++- Numbers from text, a file, a reply or an environment variable are parsed with the language's own parser, never by slicing or splitting a string. This change reads no number.
++- An increment that starts a process meets every point of this checklist: the process is windowless (above); it is stopped in a `finally` or a fixture's teardown, and its whole tree with it; nothing it started outlives the test or the command; a browser launched on Windows is launched attached; its output pipes are closed or drained. This change starts none.
++- Every verification command is written in Done in full, with its working folder. Run exactly those, with pytest run directly. Do not run the full suite (about 25 minutes): it is the supervisor's step. Do not run `tests/test_rollback.py` or `tests/test_core_carve.py::test_r003_the_modules_install_from_the_manifest`. They refuse a release folder whose files differ from its MANIFEST.json, so they fail on any edit until the supervisor restamps. That failure is expected and is not yours to fix.
++- Prefer reuse over new code. Write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force).
++- Do not fix by suppressing the symptom: do not make the scan skip its own file, the `bridge/` folder or docstrings; do not change `SKIP_PATH`, `TEST_PATH` or `CODE_EXT`; do not add an owner-deferred ID to the paragraph to excuse it.
++- Do not edit the reproduction tests, or any test file.
++- Do not leave any `DEBUG-BUG-` line or stray print.
++- **If you believe the real cause is different from the one named, stop, do not change code, and report why in your summary.** The supervisor will re-diagnose.
++- Do not add an entry to any CHANGELOG or `docs/CHANGES.md`.
++
++## Done
++Your report is the file `handoff/BUG-038-r1-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, what you could not do. That way nothing of it is lost when your run ends early.
++
++Before any edit, run `git status --porcelain` from the Workspace root (the folder you were started in) and record its output in the report. It should show `tests/test_bug038.py` as untracked or committed, and nothing else changed. Then run step 2 below, and record that tests 1 and 2 of `tests/test_bug038.py` fail and test 3 passes before your edit. Also run `python tools/dump-cli.py --help` once and record that `--check` is its compare-only mode. After your edit, run these from the Workspace root, in PowerShell, in this order:
++
++1. `$env:PYTHONDONTWRITEBYTECODE = "1"; python -c "import importlib.util as u; p='bridge/cursor-bridge/completion-check.py'; s=u.spec_from_file_location('cc', p); m=u.module_from_spec(s); s.loader.exec_module(m); hits=[(n, l) for n, l in enumerate(open(p, encoding='utf-8').read().splitlines(), 1) if m.STANDIN_RX.search(l)]; print(hits); print('matches:', len(hits))"`
++2. `$env:PYTHONDONTWRITEBYTECODE = "1"; python -m pytest -q -p no:cacheprovider tests/test_bug038.py tests/test_completion_check.py`
++3. Step 1 again. Its last line must be `matches: 0`. Paste both of its output lines into the report.
++4. `$env:PYTHONDONTWRITEBYTECODE = "1"; python tools/dump-cli.py --check` (must exit 0)
++5. `git diff --quiet HEAD -- tests/` (must exit 0), then `git status --porcelain`, `git diff --stat` and `git diff bridge/cursor-bridge/completion-check.py` (paste all three outputs).
++
++Record each command and its result (exit code, pytest's summary line, the check's output) in the report. If a test fails, record its name and its first assertion line. Do not change the test, and do not run anything beyond these commands.
++
++When you finish, the report holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did, with the new paragraph quoted;
++- one sentence stating how the change addresses the named cause;
++- a section headed exactly `Assumed, not verified`.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: a wording you judged clear to a reader though the brief did not fix it; whether a line you kept near a pattern still reads well. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/project.json b/project.json
+index fcaeb63..c6f78d2 100644
+--- a/project.json
++++ b/project.json
+@@ -2,7 +2,7 @@
+   "name": "Claude-Cursor Bridge",
+   "purpose": "A governance framework under which a Claude supervisor designs, plans, briefs, and reviews software that a headless Cursor builder implements, merged only through a verified cross-family gate.",
+   "kind": "private",
+-  "version": "2026.10.30c",
++  "version": "2026.10.30d",
+   "state": {
+     "phase": "building",
+     "stage": "B1 to B6 closed (B6, release B's install, on 2026-10-31); next project end, once the owner answers the deferral of reAngle's and the video factory's calibrations",
+diff --git a/tests/test_bug038.py b/tests/test_bug038.py
+new file mode 100644
+index 0000000..ed9233e
+--- /dev/null
++++ b/tests/test_bug038.py
+@@ -0,0 +1,108 @@
++"""Supervisor-side reproduction tests of BUG-038; written by the supervisor; the builder reads and runs them, never edits them.
++
++Project end on the bridge itself (2026-10-31): `completion-check.py --mode done` failed with two STAND-IN lines, both in
++the program's own docstring, which quotes the phrases its stand-in scan looks for ("coming soon", "not yet
++implemented", "under construction", a Placeholder component, todo!()). The bridge ships the program as tracked code,
++so the scan finds its own description of what it scans for, and the bridge's project end cannot pass. The check must
++still find every stand-in in the other shipped files.
++
++enforces: ~/.claude/cursor-bridge/workflow/phases/project-end.md ("Prove the product is complete": `completion-check.py
++--mode done` prints `RESULT: OK` ... no stand-in in shipped code) and completion-check.py's own docstring (STAND-IN:
++"shipped (non-test) code shows a user-visible stand-in"). The helpers are tests/test_completion_check.py's.
++"""
++import os
++import shutil
++import subprocess
++import sys
++
++import test_completion_check as C
++
++REGISTER = """| ID | Requirement | Source | Status | Evidence |
++|---|---|---|---|---|
++| R-001 | parse the file | owner | built | tests/test_parse.py |
++"""
++PLAN = """# Plan
++
++## Stage 1
++Demonstration: the parser runs.
++
++### TASK-001 — parser
++Satisfies: R-001
++Scope: src/parse.py
++"""
++SHIPPED = os.path.join("bridge", "cursor-bridge", "completion-check.py")
++
++
++def _repo(tmp_path, extra=None):
++    """A scratch project complete but for what `extra` adds, shipping a tracked copy of the completion check as the
++    bridge does, and running that copy."""
++    r = tmp_path / "ws"
++    (r / "docs").mkdir(parents=True)
++    (r / "tests").mkdir()
++    (r / "src").mkdir()
++    (r / "bridge" / "cursor-bridge").mkdir(parents=True)
++    (r / "docs" / "REQUIREMENTS.md").write_text(REGISTER, encoding="utf-8")
++    (r / "docs" / "BUILD_PLAN.md").write_text(PLAN, encoding="utf-8")
++    (r / "tests" / "test_parse.py").write_text("def test_r001():  # R-001\n    assert True\n", encoding="utf-8")
++    (r / "src" / "parse.py").write_text("X = 1\n", encoding="utf-8")
++    shutil.copyfile(C.PROG, str(r / SHIPPED))
++    for rel, text in (extra or {}).items():
++        (r / rel).write_text(text, encoding="utf-8")
++    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(r), check=True, env=C.ENV)
++    subprocess.run(["git", "add", "-A"], cwd=str(r), check=True, env=C.ENV)
++    subprocess.run(["git", "commit", "-q", "-m", "scratch"], cwd=str(r), check=True, env=C.ENV)
++    return r
++
++
++def _run(repo, program):
++    p = subprocess.run([sys.executable, "-B", str(program), "--mode", "done"], cwd=str(repo), capture_output=True, text=True,
++                       env=C.ENV, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
++    return p.returncode, p.stdout + p.stderr
++
++
++def test_bug038_the_completion_check_finds_no_stand_in_in_its_own_source(tmp_path):
++    """The reproduction: a complete project that ships the completion check passes at done, run by the shipped copy
++    and by the release folder's program alike (the bridge runs the installed one on its own tree)."""
++    r = _repo(tmp_path)
++    for program in (r / SHIPPED, C.PROG):
++        rc, out = _run(r, program)
++        assert "STAND-IN" not in out, "the check reports its own source as a stand-in: " + out
++        assert rc == 0 and "RESULT: OK" in out, out
++
++
++def test_bug038_a_stand_in_elsewhere_is_still_found(tmp_path):
++    """Preservation: each kind of stand-in the docstring names, in another shipped file beside the program, still
++    fails at done, and so does one added to the program's own source: the fix is the docstring's wording, not a
++    scan that skips the bridge's folder or the program's file."""
++    planted = ('"""Settings: arrives in a later stage."""\n', "MSG = 'coming soon'\n", "# not yet implemented\n",
++               "TITLE = 'under construction'\n", "class SettingsPlaceholderView: pass\n",
++               "class AboutPlaceholderSection: pass\n", "# todo!()\n")
++    beside = os.path.join("bridge", "cursor-bridge", "screen.py")
++    source = open(C.PROG, encoding="utf-8").read()
++    if not source.endswith("\n"):
++        source += "\n"
++    own = source + "# coming soon\n"
++    r = _repo(tmp_path, {beside: "".join(planted), SHIPPED: own})
++    rc, out = _run(r, C.PROG)
++    lines = out.splitlines()
++    found = [l for l in lines if l.startswith("STAND-IN: bridge/cursor-bridge/screen.py:")]
++    assert rc == 1 and len(found) == len(planted), out
++    in_own = [l for l in lines if l.startswith("STAND-IN: bridge/cursor-bridge/completion-check.py:")]
++    last = own.count("\n")
++    assert in_own == ["STAND-IN: bridge/cursor-bridge/completion-check.py:%d: # coming soon" % last], out
++
++
++def test_bug038_the_docstring_still_names_each_kind_it_scans_for():
++    """The fix keeps the program's own account of what a stand-in is: the STAND-IN paragraph of its docstring
++    still names each kind (a feature said to come later or soon, one not yet implemented or available, one under
++    construction, a placeholder component with each of its six suffixes, Rust's todo and unimplemented macros), in
++    words its scan does not match, and ends on the owner-deferred sentence unchanged."""
++    text = open(C.PROG, encoding="utf-8").read()
++    start = text.index('"""')                       # after the shebang line
++    doc = text[start:text.index('"""', start + 3)]
++    para = doc[doc.index("STAND-IN"):doc.index("Notes never fail")].lower()
++    for words in ("later", "soon", "implemented", "available", "construction", "placeholder", "todo", "unimplemented",
++                  "view", "page", "screen", "tab", "panel", "section"):
++        assert words in para, words
++    sentence = "Allowed only on a line that names the ID of an owner-deferred requirement."
++    assert doc[doc.index("STAND-IN"):doc.index("Notes never fail")].rstrip().endswith(sentence)
