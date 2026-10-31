@@ -2,7 +2,7 @@
   "name": "Claude-Cursor Bridge",
   "purpose": "A governance framework under which a Claude supervisor designs, plans, briefs, and reviews software that a headless Cursor builder implements, merged only through a verified cross-family gate.",
   "kind": "private",
-  "version": "2026.10.30c",
+  "version": "2026.10.30d",
   "state": {
     "phase": "building",
     "stage": "B1 to B6 closed (B6, release B's install, on 2026-10-31); next project end, once the owner answers the deferral of reAngle's and the video factory's calibrations",
