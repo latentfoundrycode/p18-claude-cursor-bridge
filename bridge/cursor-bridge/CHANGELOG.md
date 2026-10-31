@@ -15,6 +15,22 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.10.30d
+
+**A fix of the completion check, found at the bridge's own project end** (BUG-038; 2026-10-31): `completion-check.py --mode done` reported two lines of its own docstring as stand-ins, so a project that ships the program as tracked code, the bridge's own repository, could never pass its project end. One program, its docstring only; against 2026.10.30c, no file new or removed.
+
+**What changed**
+- **The completion check's STAND-IN paragraph** (`completion-check.py`; BUG-038): the docstring named the stand-ins the scan looks for in the scan's own phrases, and the scan, which reads every shipped code file line by line, found them in the program itself. The paragraph now names each form by its words and their order (the word coming directly followed by soon, under and construction in a row, an identifier ending in Placeholder plus one of six suffixes, and so on), adds the `Section` suffix the scan already matched, and keeps its owner-deferred sentence; no line of the program matches the scan. The scan, its patterns, its exit codes and its output are unchanged.
+
+**Running projects must**
+- *(all phases)* Install with every project paused, restart, run `/calibrate-bridge` before the next increment, then `bridge-check.py`, as 2026.10.30b's entry says. On the real install the installer ends 0 with `RESULT: INSTALLED TREE MATCHES bridge 2026.10.30d`; over an older release installed whole it also printed its `previous` line, `previous <that release> kept at <folder>` (over 2026.10.30b, `previous 2026.10.30b`). The installer keeps one release as the way back.
+- *(all phases)* Nothing to rewrite: the scan is unchanged, so the completion check reports the same for every project that does not ship the program itself.
+
+**If rolled back**
+- *(all phases)* Nothing to restore. The older docstring returns, and a project that ships the program as tracked code (the bridge's own repository) again sees its two STAND-IN lines at `--mode done`.
+
+---
+
 ## 2026.10.30c
 
 **Text corrections from release B's stage review** (BUG-037; stage B6's review, round 1): the run sheet's install check, one sentence of 2026.10.30b's entry on an increment in flight at the install, and step 4's sentence on an increment under review. No program changed; against 2026.10.30b, no file new or removed.
