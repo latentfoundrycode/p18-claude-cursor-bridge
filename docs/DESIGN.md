@@ -105,7 +105,7 @@ None for the owner. For the maintainer, named in the CHANGELOG entry: a conforma
 
 ### Who decided (rule 51)
 
-The owner: release T's timing (2026-10-25, D4), the weekly scan and Dependabot (2026-10-28), the scope's Option A and the intake confirmation (2026-11-01). The maintainer: the items of 2026-10-18 and 2026-10-25 under the escalation rule. The supervisor: the classification settled / to write / moot, the rows R-045 to R-056, the retrofit's selection, the workflow's shape, the stripped suite and driver launches (D-004's objection, round 1), the frozen block's lockfile fill-in and the local delete's allow rule (round 4).
+The owner: release T's timing (2026-10-25, D4), the weekly scan and Dependabot (2026-10-28), the scope's Option A and the intake confirmation (2026-11-01). The maintainer: the items of 2026-10-18 and 2026-10-25 under the escalation rule. The supervisor: the classification settled / to write / moot, the rows R-045 to R-056, the retrofit's selection, the workflow's shape, the stripped suite and driver launches (D-004's objection, round 1), the frozen block's lockfile fill-in and the local delete's allow rule (round 4). The design gate: approved by the owner on 2026-11-01 ("Approve"; the traits confirmed as they stand), the critique's five round files removed in the commit that records it.
 
 ### Version
 

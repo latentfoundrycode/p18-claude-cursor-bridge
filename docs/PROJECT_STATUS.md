@@ -1,8 +1,8 @@
 # Project Status
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 Phase: changing
 Workflows: Host Extension Development → Claude Code Extension; traits: Installable
-Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups (the plan's Release T), the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A; intake-notes.md); step 2, the design revision: docs/DESIGN.md "Change: release T", the host section, the retrofit's diagrams, the two-critic loop (subject release-t), then the gate
+Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); step 4, the plan addendum (subject release-t-plan), then its gate, then Opus 5.5
 Increment: none (project end, 2026-10-31: release B complete, Claude-Cursor Bridge 2026.10.30d)
 Last accepted: project end's records (PR #115, at its merge): completion-check --mode done OK (42 built, 2 deferred: R-031 and R-037, deferred - owner 2026-10-31), docs/diagrams/INDEX.md with every kind omitted (diagram-check --mode done OK), the calibration to 2026.10.30d, HARDENING's project end and INVENTORY's Deferred and Decisions rows; the User Manual, ISS-023, FB-069, FB-070 and the Proposed bridge changes in Documents; before it BUG-038 (PR #114); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-035 (TASK-027's stamp and records), BUG-001 to BUG-038, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
 Awaiting user on: nothing (the design revision runs; its gate next)
