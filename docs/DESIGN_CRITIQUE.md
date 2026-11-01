@@ -732,6 +732,6 @@ What is criticised: the two stages change-cycle.md's item 4 appends to docs/BUIL
 
 **Resolution**: none due — the confirming read left nothing Blocking and nothing non-convergent (the ceiling's and the confirming read's findings each fixed in one pass).
 
-**The gate** (2026-11-01, the owner, in this session's chat): "Approve" — the plan addendum as critiqued (stages T1 and T2, TASK-036 to TASK-045, the three constraints); "Confirm" — the record as it stands (52 findings over five reads: 47 fixed, 5 accepted with their reasons, no resolution round due). The `run/review/DESIGN-release-t-plan-*` files are removed in the commit that records it.
+**The gate** (2026-11-01, the owner, in this session's chat): "Approve" — the plan addendum as critiqued (stages T1 and T2, TASK-036 to TASK-045, the three constraints); "Confirm" — the record as it stands (83 findings over five reads, each critic's counted per round as the Rounds entries above give them: 78 fixed, 5 accepted with their reasons, no resolution round due; first written, and put to the owner, as 52 findings with 47 fixed, a miscount Review A of the pull request found and the supervisor corrected the same day, the round entries unchanged). The `run/review/DESIGN-release-t-plan-*` files are removed in the commit that records it.
 
 **Gate**: passed 2026-11-01 (the paragraph above).
