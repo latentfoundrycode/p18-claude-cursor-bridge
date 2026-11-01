@@ -701,6 +701,18 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 
 **The gate** (2026-11-01, the owner, in this session's chat): "Approve" — the design revision as critiqued (R-042 revised, R-045 to R-056, D-001 to D-004); the traits confirmed as they stand (installable; delivery kind host-installation). The `run/review/DESIGN-release-t-*` files are removed in the commit that records it; the plan addendum follows under the subject `release-t-plan`.
 
+**Resolution**: none due — nothing Blocking and nothing non-convergent after the confirming read (round 5).
+
+**Gate**: passed 2026-11-01 (the paragraph above).
+
+## Subject: release-t-plan (release T's plan addendum: stages T1 and T2, TASK-036 to TASK-045; 2026-11-01)
+
+What is criticised: the two stages change-cycle.md's item 4 appends to docs/BUILD_PLAN.md for release T (the addendum's constraints, stage T1's five text increments, stage T2's weekly workflow, BUG-039 as TASK-043, the retrofit's tests and the stamp), read against the approved design (docs/DESIGN.md, "Change: release T"), the register's rows R-042 as revised and R-045 to R-056, the four diagrams and their deviations file, with the plan-critic's build-plan lenses and the trait installable's `planning.critic-lenses` addition (the packaging stage lens, not applicable to the kind host-installation, and the command-reference lens). The critics: `plan-critic` (Fable 5.1) and Review B (grok-4.7-medium, the native profile) in design mode, each reading `run/review/DESIGN-release-t-plan-<round>.md`. Four rounds at the most, then a confirming read if the text changed, then one resolution round for what is still open, then the gate (design.md, "The procedure").
+
+**Accepted** (finding, critic, round, the reason):
+
+**Rounds** (round, kind, the commit its file was built from, critic, Blocking / Should fix / Consider, what was fixed):
+
 **Resolution**: (not yet due)
 
 **Gate**: (pending)
