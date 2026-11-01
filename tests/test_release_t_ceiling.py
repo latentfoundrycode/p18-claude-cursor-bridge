@@ -55,7 +55,7 @@ RULE36 = 'two reviewers naming the same defect make it certain, and blocking onl
 DESIGN = os.path.join(PHASES, "design.md")
 P3_LONG = ("against the code of the round it lifted as that round's builder found it %s the commit that round's builder "
            "was launched on, its brief's commit (for a round of your own fix, with no builder run, the head the previous "
-           "round's snapshot recorded), which you name beside the line in the brief and in the SCOPE file %s never "
+           "round's snapshot recorded), which you name beside the line at step 4 and in the SCOPE file, the brief carrying the line alone %s never "
            "against the fixed code under review" % (EM, EM))
 P3_SHORT = "against the code of the round it lifted, never against the fixed code under review"
 AGENT_PARA = ("**The threat model, the class and the count.** The supervisor gives you the project's threat model with "

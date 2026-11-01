@@ -140,7 +140,7 @@ def test_r042_the_class_line_the_text_gives_is_the_one_the_programs_read():
     assert ("The reviewers are told of the line and confirm or deny it against the code of the round it lifted as "
             "that round's builder found it " + chr(0x2014) + " the commit that round's builder was launched on, its "
             "brief's commit (for a round of your own fix, with no builder run, the head the previous round's "
-            "snapshot recorded), which you name beside the line in the brief and in the SCOPE file " + chr(0x2014)
+            "snapshot recorded), which you name beside the line at step 4 and in the SCOPE file, the brief carrying the line alone " + chr(0x2014)
             + " never against the "
             "fixed code under review: a reviewer's denial voids the round's result "
             "and withholds the merge as GATE-INTEGRITY does, and the breach is recorded in `docs/HARDENING.md` under "
