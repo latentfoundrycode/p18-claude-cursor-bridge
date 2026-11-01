@@ -85,8 +85,9 @@ def test_r054_t27_kp066_to_kp070_and_the_kp058_addendum():
     assert_entry(kp, 70, "A wall-clock schedule walked in naive local time never revisits the hour that repeats when "
                          "summer time ends",
                  "a schedule walk iterates over instants and converts each to wall time")
-    assert ("- **Addendum (2026-11-01):** a test that runs a program with working-folder defaults reads the live state "
-            "of the folder it runs from") in entry(kp, 58), "KP-058's addendum (ISS-006)"
+    assert_entry(kp, 58, "A module reloaded in a test, and a log handler left behind, corrupted later tests",
+                 "- **Addendum (2026-11-01):** a test that runs a program with working-folder defaults reads the live "
+                 "state of the folder it runs from")
 
 
 def test_r054_t13_kp052_corrected():
@@ -119,9 +120,13 @@ def test_r054_kp038_narrowed_and_d004_first_deviation_closed():
     through APPDATA or LOCALAPPDATA is, until a probed release redirects them. D-004 draws the edge so, and
     DEVIATIONS.md no longer lists it (the design corrected to the code, conventions section 8's second case)."""
     kp = read(KP)
+    assert_entry(kp, 38, "cursor-agent imports Claude Code's hooks from `~/.claude/settings.json` and, under Git Bash, "
+                         "denies every tool call with them",
+                 "the owner's stores under the profile root (`.ssh`, `.aws`, `.docker` and the like) are no longer found "
+                 "by default; a store a tool reaches through `APPDATA` or `LOCALAPPDATA` still is")
     body = entry(kp, 38)
-    assert ("the owner's stores under the profile root (`.ssh`, `.aws`, `.docker` and the like) are no longer found "
-            "by default; a store a tool reaches through `APPDATA` or `LOCALAPPDATA` still is") in body
+    for clause in ("until a probed release redirects them", "a program item for the maintainer"):
+        assert clause in body, clause
     assert "`.docker` and other stores are no longer found by default" not in body, "the over-wide sentence is gone"
     d004 = read(D004)
     assert "(DEVIATIONS; KP-038 narrowed)" not in d004, "the edge no longer marks a deviation"
