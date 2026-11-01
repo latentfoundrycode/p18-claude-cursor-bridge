@@ -31,8 +31,8 @@ EM = chr(0x2014)
 THREAT = ("What a defect of the five is for the project is bounded by its threat model, recorded in "
           "`docs/INVENTORY.md` (Decisions) with its reason and what would reopen it and given to the reviewers "
           "with the diff, for the parts the model names: a finding in those parts outside it is recorded, not "
-          "blocking, whatever its label and however many reviewers name it, and where the inventory records no "
-          "threat model for what the diff changes, the five stand unbounded.")
+          "blocking, whatever its label and however many reviewers name it, and where the inventory records none "
+          "for the part a finding is in, the five stand unbounded.")
 MEMBER = ("Within it, a finding is a member of a blocking class when it reproduces as a regression or a false result on "
           "an ordinary, realistic project layout, a reviewer's label alone never deciding: one that needs a contrived "
           "setup goes to `docs/HARDENING.md` with the increment, and a security finding is judged instead by whether "
@@ -53,20 +53,22 @@ OUTSIDE = ("A finding outside the threat model `docs/INVENTORY.md` (Decisions) r
 RULE6 = 'a late finding then blocks only if it is of the five, within the threat model `docs/INVENTORY.md` records for the part it is in (outside it a finding is recorded, not blocking; where none is recorded, the five stand unbounded), its class shown by reproduction on an ordinary, realistic layout, a label alone never deciding (a security finding by whether untrusted input can reach it), two reviewers naming the same defect making it certain, never blocking of itself (the convergence rule).'
 RULE36 = 'two reviewers naming the same defect make it certain, and blocking only where it is of the five (rule 6).'
 DESIGN = os.path.join(PHASES, "design.md")
-P3_LONG = ("against the code of the round it lifted as that round's builder found it %s the tree the guard's snapshot of "
-           "the round before it recorded, whose commit you name beside the line in the SCOPE file %s never against the "
-           "fixed code under review" % (EM, EM))
+P3_LONG = ("against the code of the round it lifted as that round's builder found it %s the commit that round's builder "
+           "was launched on, its brief's commit (for a round of your own fix, with no builder run, the head the previous "
+           "round's snapshot recorded), which you name beside the line in the brief and in the SCOPE file %s never "
+           "against the fixed code under review" % (EM, EM))
 P3_SHORT = "against the code of the round it lifted, never against the fixed code under review"
 AGENT_PARA = ("**The threat model, the class and the count.** The supervisor gives you the project's threat model with "
               "the diff (`docs/INVENTORY.md`, Decisions; at merge in the SCOPE file too) for the parts it names: a finding in "
-              "those parts outside it is recorded, not blocking, whatever its label, and where none is recorded for what "
-              "the diff changes, the five stand unbounded. Within it, a finding is of a blocking class only when it reproduces as a "
+              "those parts outside it is recorded, not blocking, whatever its label, and where none is recorded for the part "
+              "a finding is in, the five stand unbounded. Within it, a finding is of a blocking class only when it reproduces as a "
               "regression or a false result on an ordinary, realistic project layout, a label alone never deciding; one "
               "that needs a contrived setup goes to `docs/HARDENING.md`, and a security finding is judged instead by "
               "whether untrusted input can reach it. Another reviewer naming the same defect makes your finding certain, "
               "never blocking of itself: it blocks only where its content is of the five. Confirm or deny a `Blocking "
-              "class:` line against the code of the round it lifted as that round's builder found it (the commit the SCOPE "
-              "file names beside the line), never against the fixed code under review. Compare every count a builder's report or the accept commit's message gives with "
+              "class:` line against the code of the round it lifted as that round's builder found it (the commit the "
+              "supervisor names beside the line: with the brief's line at step 4, in the SCOPE file at merge), never "
+              "against the fixed code under review. Compare every count a builder's report or the accept commit's message gives with "
               "the output line it quotes: a count with no line, or one its line does not show, is a finding.")
 
 
@@ -190,10 +192,16 @@ def test_r050_p3_the_class_line_against_the_round_it_lifted():
     assert ("or denies the round's `Blocking class:` line where it has one, %s; a denial is a breach" % P3_SHORT) in redelegation()
     for name in REVIEWERS:
         assert ("Confirm or deny a `Blocking class:` line against the code of the round it lifted as that round's "
-                "builder found it (the commit the SCOPE file names beside the line), never against the fixed code under "
+                "builder found it (the commit the supervisor names beside the line: with the brief's line at step 4, "
+                "in the SCOPE file at merge), never against the fixed code under "
                 "review.") in agent_paragraph(name), name
     assert ("and, at a round above the ceiling, that round's `Blocking class:` line with, beside it, the commit that "
-            "round's builder started from (the head the previous round's snapshot recorded).") in m
+            "round's builder was launched on, its brief's commit (for a round of your own fix, with no builder run, "
+            "the head the previous round's snapshot recorded).") in m
+    assert "the tree the guard's snapshot of the round before it recorded" not in ceiling()
+    assert ("From the guard's count at three or more, tell them the round is at or above the ceiling, and at a round "
+            "above it give them the brief's `Blocking class:` line with the commit beside it (step 7, \"The review "
+            "ceiling\").") in loop_step("### 4. Inspect", "### 5. Scan")
 
 
 def test_r050_t20_the_recorded_threat_model_bounds_the_five():
@@ -216,7 +224,8 @@ def test_r050_t20_the_recorded_threat_model_bounds_the_five():
     assert ("where the increment ends, which tests the supervisor wrote and the project's threat model are in "
             "`run/review/SCOPE-<ID>.md`, read it") in m
     assert ("holds the brief's Scope and Out of scope sections quoted, the project's threat model as "
-            "`docs/INVENTORY.md`'s Decisions record it, the tests,") in m
+            "`docs/INVENTORY.md`'s Decisions record it for what the diff changes, or that none is recorded, the "
+            "tests,") in m
     assert ("where the supervisor wrote the brief's Scope and Out of scope, the project's threat model from "
             "`docs/INVENTORY.md`'s Decisions, the tests it wrote") in flat(read(POLICY))
     for name in REVIEWERS:
@@ -224,7 +233,7 @@ def test_r050_t20_the_recorded_threat_model_bounds_the_five():
         assert AGENT_PARA in p, name
         assert ("The supervisor gives you the project's threat model with the diff (`docs/INVENTORY.md`, Decisions; "
                 "at merge in the SCOPE file too) for the parts it names: a finding in those parts outside it is "
-                "recorded, not blocking, whatever its label, and where none is recorded for what the diff changes, the "
+                "recorded, not blocking, whatever its label, and where none is recorded for the part a finding is in, the "
                 "five stand unbounded.") in p
 
 

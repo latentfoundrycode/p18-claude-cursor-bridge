@@ -48,10 +48,10 @@ instead. In short, a branch merges to `main` only when **all** hold:
    first line of the `.err` file. The launch carries the Bash tool's `timeout` at the review
    cap (`7200000`, step 3). The SCOPE file, `run/review/SCOPE-<ID>.md`, written and committed
    before the snapshot (above) and removed with `git rm` with the diff, holds the brief's Scope
-   and Out of scope sections quoted, the project's threat model as `docs/INVENTORY.md`'s Decisions record it, the tests, the mutants file (`run/supervisor/<ID>-mutants.json`) and any mutation driver you wrote, each test with the paragraph it enforces, and the
+   and Out of scope sections quoted, the project's threat model as `docs/INVENTORY.md`'s Decisions record it for what the diff changes, or that none is recorded, the tests, the mutants file (`run/supervisor/<ID>-mutants.json`) and any mutation driver you wrote, each test with the paragraph it enforces, and the
    bookkeeping and record files in the diff that are expected (`docs/BUILDER_NOTES.md`, the
    builder's report `handoff/TASK-<nnn>-r<N>-report.md`, the records you committed,
-   `run/review/`), and, at a round above the ceiling, that round's `Blocking class:` line with, beside it, the commit that round's builder started from (the head the previous round's snapshot recorded). Nothing of this goes inline through the shell,
+   `run/review/`), and, at a round above the ceiling, that round's `Blocking class:` line with, beside it, the commit that round's builder was launched on, its brief's commit (for a round of your own fix, with no builder run, the head the previous round's snapshot recorded). Nothing of this goes inline through the shell,
    which mangles quoted text (KP-009). Give a **directive** prompt ("the diff is already at
    `<path>`; read it; do not ask for it") with five short clauses (release A5; where a reviewer writes, release T): where the
    increment ends, which tests the supervisor wrote and the project's threat model are in `run/review/SCOPE-<ID>.md`,

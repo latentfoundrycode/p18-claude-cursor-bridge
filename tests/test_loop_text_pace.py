@@ -138,8 +138,10 @@ def test_r042_the_class_line_the_text_gives_is_the_one_the_programs_read():
             "`run/review/SCOPE-<ID>.md` before the snapshot, where the guard reads it; a line lifts the one round it "
             "was written for.") in c
     assert ("The reviewers are told of the line and confirm or deny it against the code of the round it lifted as "
-            "that round's builder found it " + chr(0x2014) + " the tree the guard's snapshot of the round before it "
-            "recorded, whose commit you name beside the line in the SCOPE file " + chr(0x2014) + " never against the "
+            "that round's builder found it " + chr(0x2014) + " the commit that round's builder was launched on, its "
+            "brief's commit (for a round of your own fix, with no builder run, the head the previous round's "
+            "snapshot recorded), which you name beside the line in the brief and in the SCOPE file " + chr(0x2014)
+            + " never against the "
             "fixed code under review: a reviewer's denial voids the round's result "
             "and withholds the merge as GATE-INTEGRITY does, and the breach is recorded in `docs/HARDENING.md` under "
             "the increment and as an issue.") in c
@@ -407,7 +409,8 @@ def test_r042_step_8_commits_the_scope_file_before_the_round_named_snapshot():
     assert "\"<directive prompt>\" 2> run/review/REVIEW-<ID>-r<N>.err`" in s
     assert "**Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`" in s
     assert ("and, at a round above the ceiling, that round's `Blocking class:` line with, beside it, the commit "
-            "that round's builder started from (the head the previous round's snapshot recorded).") in s
+            "that round's builder was launched on, its brief's commit (for a round of your own fix, with no builder "
+            "run, the head the previous round's snapshot recorded).") in s
     assert ("(at a round at or above the ceiling, the guard's count at three or more, a sixth clause: grade every "
             "finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line "
             "where it has one, against the code of the round it lifted, never against the fixed code under review)") in s

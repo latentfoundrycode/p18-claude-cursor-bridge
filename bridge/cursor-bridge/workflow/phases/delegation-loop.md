@@ -271,7 +271,7 @@ brief has no `## Scope` — a `spec-packager` defect; fix the brief, do not proc
 #### The reviewers
 
 Delegate the diff to **diff-reviewer**, naming the tests you wrote and the paragraph each
-enforces, so it judges them against the paragraph and does not take them for the builder's. Give it, and each auditor below, the project's threat model as `docs/INVENTORY.md`'s Decisions record it for what the diff changes, or say that none is recorded.
+enforces, so it judges them against the paragraph and does not take them for the builder's. Give it, and each auditor below, the project's threat model as `docs/INVENTORY.md`'s Decisions record it for what the diff changes, or say that none is recorded. From the guard's count at three or more, tell them the round is at or above the ceiling, and at a round above it give them the brief's `Blocking class:` line with the commit beside it (step 7, "The review ceiling").
 You are asking two questions: does this implement the brief, and is it sound? A diff that does something better than the
 brief asked for is still a deviation — flag it rather than silently accepting it.
 File-level drift is already settled by the scope check before it reads; `diff-reviewer`'s
