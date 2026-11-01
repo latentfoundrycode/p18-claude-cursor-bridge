@@ -127,8 +127,11 @@ def test_r048_d11_a_turn_ending_on_a_run_names_its_limit():
             "all in UTC) and given on the computer's clock, read from `date` (KP-039), so the owner knows when a "
             "running delegation is late.") in rule(43)
     assert ("A heavy run still waiting for the slot has no `slot taken` line yet: the report says it waits and "
-            "gives the waiting line's `ends by` time, on the computer's clock, as the earliest its command can "
-            "start.") in rule(43)
+            "gives the waiting line's `ends by` time (UTC, the latest the run holding the slot keeps it), "
+            "converted to the computer's clock as above, as the latest its command starts when it is next for "
+            "the slot, its own limit counting from its `slot taken`; a waiting line naming the holder `unknown` "
+            "carries no time, and the report gives none.") in rule(43)
+    assert "as the earliest its command can start" not in rule(43)
 
 
 def test_r048_d10_a_vendor_console_from_documentation_fetched_at_the_time():
