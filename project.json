@@ -4,9 +4,9 @@
   "kind": "private",
   "version": "2026.10.30d",
   "state": {
-    "phase": "done",
-    "stage": "B1 to B6 closed; project end 2026-10-31 (release B complete, 2026.10.30d); next release T on the owner's word",
+    "phase": "changing",
+    "stage": "release T: stage T1, TASK-036 next (design and plan gates passed 2026-11-01); release B complete 2026-10-31",
     "bridge": "2026.10.30d",
-    "updated": "2026-10-31"
+    "updated": "2026-11-01"
   }
 }
