@@ -126,6 +126,9 @@ def test_r048_d11_a_turn_ending_on_a_run_names_its_limit():
             "file (the `slot taken` time for a heavy run, else the `started` time, plus the `limit` line's seconds, "
             "all in UTC) and given on the computer's clock, read from `date` (KP-039), so the owner knows when a "
             "running delegation is late.") in rule(43)
+    assert ("A heavy run still waiting for the slot has no `slot taken` line yet: the report says it waits and "
+            "gives the waiting line's `ends by` time, on the computer's clock, as the earliest its command can "
+            "start.") in rule(43)
 
 
 def test_r048_d10_a_vendor_console_from_documentation_fetched_at_the_time():
@@ -194,5 +197,10 @@ def test_r053_p20_the_all_omitted_index_and_the_minimum_sets_binding():
             "with its reason in the Why column. The minimum set binds every project whose code has components (more "
             "than one module a builder edits); such a project omits a kind of it only with its reason recorded in the "
             "index's Why column and in its inventory's Decisions. The calibration's retrofit reads the same rows: a "
-            "kind omitted with its recorded reason is covered, and one omitted without it is a retrofit item.") in \
+            "kind omitted with its reason recorded in both places is covered, and any other omitted kind is a "
+            "retrofit item.") in \
         flat(section(read(CONVENTIONS), "8. As-built diagrams and the retrofit (release A3, plan 8.7)"))
+    assert ("a state machine wherever the Issues file records a failure of state; a kind of it the project's "
+            "diagram index omits with its reason recorded in the index's Why column and in its inventory's "
+            "Decisions counting as selected, `Diagram-Planning-Conventions.md` §8) and write "
+            "`docs/diagrams/RETROFIT.md` naming the kinds it lacks") in flat(read(CALIBRATE))

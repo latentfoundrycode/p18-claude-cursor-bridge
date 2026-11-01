@@ -156,7 +156,7 @@ Rules while applying **Now** items:
 - **The diagram coverage** (release A3, plan 8.7): compare the project's selected diagrams
   with the minimum set (the Level 1 functional workflows or use cases; the component diagram
   with its element map; the entity diagram where data is stored; a state machine wherever the
-  Issues file records a failure of state) and write `docs/diagrams/RETROFIT.md` naming the
+  Issues file records a failure of state; a kind of it the project's diagram index omits with its reason recorded in the index's Why column and in its inventory's Decisions counting as selected, `Diagram-Planning-Conventions.md` §8) and write `docs/diagrams/RETROFIT.md` naming the
   kinds it lacks, each a retrofit item for the project's next stage close, to be drawn as
   built by `diagram-specialist` (its as-built variant) with every discrepancy listed in
   `docs/diagrams/DEVIATIONS.md`; a project whose set is complete writes nothing. Calibration
