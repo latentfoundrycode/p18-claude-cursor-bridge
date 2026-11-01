@@ -6,7 +6,7 @@ Notes:
 
 - `SECRET:` marks a flow carrying a secret or credential; `UNTRUSTED:` one carrying what another vendor's agent wrote or chose. `--x` is withheld by the code; a dotted edge is reachable only by a deliberate act the bridge does not prevent (KP-032: not a sandbox; the agents run as the owner's Windows user).
 - **Stripped environment** (`bridge_env.stripped_env`; the shim applies the same test). Withheld: `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GIT_ASKPASS`, `SSH_ASKPASS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0`, every name `SECRET_LIKE` matches (whole-word TOKEN or SECRET, PASSWORD, PASSWD, PASSPHRASE, CREDENTIAL, API, ACCESS or PRIVATE KEY, a `_KEY` or `_KEYS` ending) but `CURSOR_*` and `GIT_CONFIG_KEY_*`. Set: `GH_CONFIG_DIR` (the empty folder), `GIT_TERMINAL_PROMPT=0`, `GIT_CONFIG_GLOBAL` (the bridge's gitconfig: includes `~/.gitconfig`, resets the helper list), `GIT_CONFIG_PARAMETERS='credential.helper='` (read after the checkout's `.git/config`), `HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH` (the agent home), `HF_HUB_CACHE`, `TORCH_HOME`, `PUPPETEER_CACHE_DIR` (the owner's caches, where present). Passed: the rest. An unusable agent home refuses the run (exit 125).
-- `bridge-run.py` strips for `cursor-agent` and with `--strip`; a test, driver or watch run gets the owner's environment. `--key-file` is refused with `cursor-agent` and a driver.
+- `bridge-run.py` strips for `cursor-agent` and with `--strip`; as built, a test, driver or watch run without the flag gets the owner's environment. The design has the loop's suite and driver launches carry `--strip`, the driver with its scratch folder named (R-052); the edge into the suite is drawn so, the as-built default a deviation (`docs/diagrams/DEVIATIONS.md`). `--key-file` is refused with `cursor-agent` and a driver.
 - The guard's records lie in the checkout's `.git`; the sha256 copy outside it finds a rewritten snapshot. Both are in the owner's profile, which the agents' user can reach.
 - `p_dependency_scan` is designed (docs/DESIGN.md, "The weekly dependency scan", R-052), not yet in the tree.
 
@@ -108,7 +108,7 @@ ext_user_env -->|"SECRET: whole environment, tokens and keys included"| p_superv
 p_supervisor -->|"each Bash or PowerShell command"| p_permission_guard
 p_permission_guard -->|"deny: admin or API merge, force-push, worktree remove, chains, no-verify, agent around the shim, merge without premerge record"| p_supervisor
 ds_guard_records -->|"premerge record"| p_permission_guard
-p_supervisor -->|"SECRET: owner's gh and git login: push, PR, merge with --match-head-commit"| ext_github
+p_supervisor -->|"SECRET: owner's gh and git login: push, PR, merge with --match-head-commit; the maintainer's Sunday evaluation reads workflow runs and Dependabot alerts (GET)"| ext_github
 p_supervisor -->|"briefs, checkpoints, nothing during a review"| ds_checkout
 ds_run_outputs -->|"UNTRUSTED: builder note, Review B verdict"| p_supervisor
 
@@ -124,14 +124,14 @@ p_supervisor -->|"SECRET: owner environment"| p_cursor_agent_shim
 p_cursor_agent_shim -->|"stripped environment"| p_builder
 p_supervisor --> p_roster_check
 p_roster_check -->|"SECRET: environment to strip"| p_bridge_env
-p_roster_check -->|"probe run, stripped environment"| tb_agents
+p_roster_check -->|"probe run, one word, stripped environment"| p_builder & p_review_b
 p_bridge_run -->|"kind, limit, seconds, exit, model, branch, boundary, never the prompt"| ds_runs_log
 ds_runs_log -->|"learned limits, last builder model"| p_bridge_run
 ds_guard_records -->|"rounds for the ceiling"| p_bridge_run
 p_bridge_run <-->|"heavy slot, holder"| ds_heavy_lock
 p_bridge_run -->|"listing before and after"| ext_beside_workspace
 ext_key_file -->|"SECRET: NAME=value to the child only, not to cursor-agent or a driver"| p_bridge_run
-p_bridge_run -->|"SECRET: owner environment and key values, not stripped"| p_test_suite
+p_bridge_run -->|"stripped environment with --strip (R-052), key values by --key-file; as built the default is the owner environment, DEVIATIONS"| p_test_suite
 ds_checkout -->|"UNTRUSTED: code and tests the builder wrote"| p_test_suite
 p_bridge_run -->|"SECRET: owner's gh login, CI watch"| ext_github
 
@@ -150,7 +150,8 @@ ds_checkout -->|"UNTRUSTED: .cursor hook wiring"| p_shell_guard
 p_builder & p_review_b --x|"withheld: gh login, token, credential helper, prompt"| ext_github
 p_builder & p_review_b --x|"no .claude in the home: hooks not imported"| ext_claude_home
 p_builder & p_review_b -.->|"deliberate only"| ext_credential_store
-p_builder & p_review_b -.->|"deliberate only, not found by default"| ext_owner_profile
+p_builder & p_review_b -.->|"deliberate only, not found by default: the profile root's stores (~/.gitconfig, ~/.ssh, ~/.aws)"| ext_owner_profile
+p_builder & p_review_b -->|"found by default: ~/AppData through APPDATA and LOCALAPPDATA, left the owner's (DEVIATIONS; KP-038 narrowed)"| ext_owner_profile
 p_builder & p_review_b -.->|"UNTRUSTED: write, reported after as BOUNDARY"| ext_beside_workspace
 p_review_b -.->|"deliberate only: same user"| ds_review_hashes
 
