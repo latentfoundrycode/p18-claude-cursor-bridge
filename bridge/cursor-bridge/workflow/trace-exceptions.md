@@ -166,6 +166,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop.md What must survive a compaction
 - new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop.md 3b. A model fails mid-step — switch automatically, restart the step, never wait
 - new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop.md The tests before the first reviewer
+- new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop.md The reviewers
 - new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop.md 5. Scan
 - new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md 7. Decide (accept the increment)
 - new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The review ceiling

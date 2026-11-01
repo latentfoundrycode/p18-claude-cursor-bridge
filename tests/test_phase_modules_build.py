@@ -244,8 +244,8 @@ def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
 # ceiling, naming two or more reviewers or auditors (7,832 characters, sha256 b9497aeec8f3a0b3...; at TASK-034 7,641,
 # sha256 dcf588e45b134ec8...); TASK-039 (release T) gave the Accept bullet P11's quoted counts and T10's records-only
 # commit, and the brake's by-class bullet T20's threat model, P2's membership and P1's convergent late finding
-# (8,794 characters)
-STEP7_SHA256 = "a12c0c4b59fcf09f311a44434edf6394a4bdf816ac2c5226371c92a21df44aca"
+# (8,941 characters; 8,794 before Review A's round 1 bounded the threat model to the parts it names)
+STEP7_SHA256 = "42e239d4aad2c3f262ff645c40ae9ce8c9b27c154564a403f746534f45835f0c"
 
 
 def test_r032_step_7_is_verbatim():
@@ -254,7 +254,7 @@ def test_r032_step_7_is_verbatim():
     import hashlib
     sub = module(DECIDE)
     step = sub[sub.index("### " + STEP7):sub.index("#### The review ceiling")].rstrip()
-    assert len(step) == 8794 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
+    assert len(step) == 8941 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
 
 
 def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():

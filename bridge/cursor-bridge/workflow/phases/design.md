@@ -112,7 +112,7 @@ resolution round or its gate, the report escalating it to the owner.
   still open after its last resolution round does not stop it. The critique record lists what is
   open, with both critics' grades and the settlement.
 
-The convergence rule of step 8 (two reviewers naming the same defect makes it blocking) belongs
+The convergence rule of step 8 (two reviewers naming the same defect make it certain, and blocking only where it is of the five blocking classes) belongs
 to the code gate, not to this loop: a finding both critics name keeps the grade its content
 earns and never adds a round.
 
