@@ -81,9 +81,16 @@ def test_r047_t1_a_plan_addendum_from_round_1_is_one_subject_with_the_design():
 def test_r047_t3_the_records_definitions():
     """T3: "the commit its file was built from" is the subject's head when the file was assembled; a round in which
     one critic delivered is a critique round, the other recorded "not run (reason)" (design.md, the record)."""
+    procedure = flat(section(read(DESIGN), "The procedure"))
     assert ("The commit its file was built from is the subject's head when the round's file was assembled; a round "
             "in which one critic delivered is a critique round, the other critic's row reading "
-            "`not run (<the reason>)`.") in flat(section(read(DESIGN), "The procedure"))
+            "`not run (<the reason>)`.") in procedure
+    # Review A, round 1, B1: the failed-launch paragraph agrees: Review B's row, not the round, is not run
+    assert ("makes the design wait (below), Review B's row recorded as `not run (<the reason>)`. A round counts "
+            "against the four once either critic delivered in it (the record's definitions, below); a round in which "
+            "neither delivered is never run and spends none of the four.") in procedure
+    assert "If that launch fails too, Review B's row stays `not run (<the reason>)` and the subject goes on" in procedure
+    assert "the round recorded as not run" not in procedure and "the round stays not run" not in procedure
 
 
 def test_r047_t7_the_snapshot_id_and_the_err_name_together():
@@ -100,9 +107,12 @@ def test_r047_t26_the_pause_before_planning_work_with_a_push_notification():
     them and names the model to set, with a push notification when the owner has Remote Control on; the change
     cycle's item 2 says the same for a change's design."""
     assert ("A plan revision mid-build and a change's design are planning work: you pause before each, name the "
-            "model to set, and, where the owner has Remote Control on, send a push notification (`PushNotification`) "
-            "carrying that line, since the owner may be away from the screen; the work starts on the owner's word "
-            "that the model is set.") in rule(48)
+            "model to set (Fable 5.1, as for a design revision), and, where the owner has Remote Control on, send a "
+            "push notification (`PushNotification`) carrying that line, since the owner may be away from the screen; "
+            "the work starts on the owner's word that the model is set.") in rule(48)
+    # Review A, round 1, S1: the rule's "nothing else waits" names planning work's exception
+    assert ("report leads with the switch and nothing else waits on it, save planning work (below), which waits "
+            "for the switch.") in rule(48)
     assert ("Pause before it: a change's design is planning work (rule 48), so you stop, the report naming the "
             "model to set, Fable 5.1, with a push notification (`PushNotification`) carrying that line where the "
             "owner has Remote Control on; the design starts on the owner's word that the model is set.") in \
@@ -112,8 +122,10 @@ def test_r047_t26_the_pause_before_planning_work_with_a_push_notification():
 def test_r048_d11_a_turn_ending_on_a_run_names_its_limit():
     """D11 (rule 43): a turn that ends on a builder or reviewer run names the run's limit in the report."""
     assert ("A turn that ends on a builder or reviewer run names the run's limit in the report (\"the builder runs "
-            "until 19:16 at the latest\"), its start and limit read from the launcher's first lines in the run's "
-            "`.err` or output file, so the owner knows when a running delegation is late.") in rule(43)
+            "until 19:16 at the latest\"), its end worked out from the launcher's lines in the run's `.err` or output "
+            "file (the `slot taken` time for a heavy run, else the `started` time, plus the `limit` line's seconds, "
+            "all in UTC) and given on the computer's clock, read from `date` (KP-039), so the owner knows when a "
+            "running delegation is late.") in rule(43)
 
 
 def test_r048_d10_a_vendor_console_from_documentation_fetched_at_the_time():
@@ -180,6 +192,7 @@ def test_r053_p20_the_all_omitted_index_and_the_minimum_sets_binding():
     reads the same rows."""
     assert ("**A project that draws no architecture** records it as a diagram index with every kind omitted, each "
             "with its reason in the Why column. The minimum set binds every project whose code has components (more "
-            "than one module a builder edits); a project that omits it records why in the index's Why column and in "
-            "its inventory's Decisions. The calibration's retrofit reads the same rows.") in \
+            "than one module a builder edits); such a project omits a kind of it only with its reason recorded in the "
+            "index's Why column and in its inventory's Decisions. The calibration's retrofit reads the same rows: a "
+            "kind omitted with its recorded reason is covered, and one omitted without it is a retrofit item.") in \
         flat(section(read(CONVENTIONS), "8. As-built diagrams and the retrofit (release A3, plan 8.7)"))

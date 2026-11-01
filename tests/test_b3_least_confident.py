@@ -144,7 +144,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("design.md", "Extension points"): (761, "0084dfd13bf170a046f673a2312ed9580521c8be2a0a428b167b06aca65ffeb1"),
     ("design.md", "The delivery kind"): (494, "6b32868830fa9a36639468c4485c247450ad5d9337993b315eaed2480bf51dd5"),
     ("design.md", "The gate"): (3276, "811efda0ecdbcc72898697ee0027efe24d7e9a09c5263ab4919bb976cd5c8768"),
-    ("design.md", "The procedure"): (16344, "a67c2906067fe1115f75142d8e8f81757c6c43a4582e93c4b980cb8bb6090ebc"),
+    ("design.md", "The procedure"): (16524, "2b487b372616cbef7a956339f404b7cdd57719aed1c05a93e6779bb22a085d0d"),
     ("design.md", "Traits at the design gate"): (3403, "653036f6b84c11afd94a9900be1477d23e9b839bc1c9e2eb933a0d03860a617b"),
     ("design.md", "What must survive a compaction"): (1906, "c02f83be92ac4da84e33cffdcafd0117448fae2be656e6685b11e1a6e4d11f9e"),
     ("intake.md", "Classifying each part"): (3506, "e1c84b276fbe04b3d5b331daa6b65c04dfd5101550786fd874e49b8477150192"),

@@ -81,10 +81,10 @@ names nothing from the file) spends no round and follows step 3b, every failed l
 a first failure is exit 4, and the same file runs once more; a second is exit 3, which marks the
 model and re-resolves, and the same file runs once more on the profile it gives, under its
 number (a connection error or a hit limit keeps step 3b's exit 4 or 5 and no mark). A third
-failure, an exit 5, or no usable profile makes the design wait (below), the round recorded as
-not run. A round never run spends none of the four. The wait ends when the roster returns
+failure, an exit 5, or no usable profile makes the design wait (below), Review B's row recorded as
+`not run (<the reason>)`. A round counts against the four once either critic delivered in it (the record's definitions, below); a round in which neither delivered is never run and spends none of the four. The wait ends when the roster returns
 (rule 38) or on the owner's word; then the same file runs once under its number, with no
-re-runs. If that launch fails too, the round stays not run and the subject goes on to its
+re-runs. If that launch fails too, Review B's row stays `not run (<the reason>)` and the subject goes on to its
 resolution round or its gate, the report escalating it to the owner.
 
 - **The confirming read.** When the critique ends and the text changed after either critic last
