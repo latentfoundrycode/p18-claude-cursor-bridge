@@ -93,7 +93,8 @@ def test_r005_the_table_maps_every_template_phase_value():
 POINTED = {
     "interface": ["interface/mockups.md", "interface/command-design.md", "interface/contract-design.md",
                   "interface/playable-prototype.md"],
-    "delegation-loop": ["delegation-loop/decide.md", "delegation-loop/refactoring-pass.md"],
+    "delegation-loop": ["delegation-loop/decide.md", "delegation-loop/refactoring-pass.md",
+                        "delegation-loop/merge.md"],
 }
 IFACE = [P + "interface.md"] + [P + f for f in POINTED["interface"]]
 LOOP = [P + "delegation-loop.md"] + [P + f for f in POINTED["delegation-loop"]]

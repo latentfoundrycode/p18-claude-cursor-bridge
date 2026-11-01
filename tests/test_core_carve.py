@@ -169,7 +169,7 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # (BUG-031: two more move from traced to excused, under BUG-031's own `reword` entries but labelled by the earlier
 # entries that match first: the refactoring pass's step 6, whose title now names its REFAC-<nnn> brief IDs
 # (TASK-035), and rule 39, which retires step 4's old-<nnn> worktree (TASK-015))
-TRACED = "TRACED: 424 passages of baseline 0a186da; 139 in supervisor.md, 222 under workflow/, 0 dropped, 63 excused"
+TRACED = "TRACED: 424 passages of baseline 0a186da; 139 in supervisor.md, 219 under workflow/, 0 dropped, 66 excused"
 NOTES = [
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
@@ -181,6 +181,7 @@ NOTES = [
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: The project layout - You work in `Workspace/`; `Documents/` is its sibling (`../D",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - For every **performance or cost budget** the design names th",
+    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - ```bash\\x0apython ~/.claude/cursor-bridge/bridge-run.py --limit",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - It answers in the critic's grades (Blocking, Should fix, Con",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **The loop stops by what was found, and after four rounds at",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - `docs/DESIGN_CRITIQUE.md` has three parts, one block per sub",
@@ -206,7 +207,9 @@ NOTES = [
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - 3. **Review B** \\u2014 a **cross-family**, non-Anthropic verifier",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - **Convergence is a signal.** When two or more reviewers or a",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - A `REJECT` from either reviewer goes back through re-delegat",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - **PR titles start with every increment ID the branch carries",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - When all four hold the merge is authorised. A pull request t",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - **After every merge, mark the increment's runs healthy and b",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - 4. **One branch, many small commits.** Cut `refactor/<stage>",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - 6. **One gate pass.** The whole branch goes through step 8 o",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - The pass never escalates. It never introduces an abstraction",
@@ -239,7 +242,7 @@ NOTES = [
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the sixty-three passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+    excused ones exactly the sixty-six passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
     TASK-015, TASK-017, TASK-030, TASK-034, TASK-035 and BUG-031 declare (three in the core's "Main and conditional workflows", six
     standing rules, three under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits),
     one in the design-tooling flow, four in the change cycle, one each in steps 2, 3, 4 and 9, and one each in the
@@ -248,7 +251,7 @@ def test_r003_the_carve_traces_with_exactly_its_excuses():
     more in the run parameters, rules 6 and 42, and step 3's brief paragraph; BUG-031's two: the refactoring
     pass's step 6 and rule 39; and five passages BUG-033 reworded, which those entries excuse: the refactoring
     pass's step 4 and the run parameters' Parallel increments item and its `on` option, under TASK-035's, step 3's
-    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's), so an increment that excuses anything more changes this test. It
+    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's; and three passages TASK-038 reworded, which those entries excuse: the design critique's launch block under "Phase 2 \u2014 Design", and step 8's title paragraph and its after-merge paragraph, under TASK-012's and TASK-034's), so an increment that excuses anything more changes this test. It
     needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))

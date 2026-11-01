@@ -557,6 +557,7 @@ def pointers_part(status, source):
     for conv in PHASE_CONVENTIONS.get(phase, []):
         out.append("  - and %s, whole" % conv)
     out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")
+    out.append("The status file reads as at its last merge (ISS-009): where run/supervisor/in-flight.md exists, read its last entries first, the live position between merges.")
     if source == "forked from another session":
         out.append("This session is a COPY; the original may still be the supervisor. Do not continue the loop unless the owner says this session is the supervisor now.")
     elif waiting:

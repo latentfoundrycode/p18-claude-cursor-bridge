@@ -98,7 +98,7 @@ def reflection():
 
 
 def step8():
-    return section(loop(), STEP8, 3)
+    return section(module("delegation-loop/merge.md"), STEP8, 3)
 
 
 def convergence_in(t):
@@ -387,7 +387,7 @@ def test_r042_step_8_commits_the_scope_file_before_the_round_named_snapshot():
     assert "\"<directive prompt>\" 2> run/review/REVIEW-<ID>-r<N>.err`" in s
     assert "**Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`" in s
     assert "and, at a round above the ceiling, that round's `Blocking class:` line." in s
-    assert ("(at a round at or above the ceiling, the guard's count at three or more, a fifth clause: grade every "
+    assert ("(at a round at or above the ceiling, the guard's count at three or more, a sixth clause: grade every "
             "finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line "
             "where it has one)") in s
     assert ("`git diff <merge-base>...HEAD > run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot below "
@@ -398,8 +398,8 @@ def test_r042_step_8_commits_the_scope_file_before_the_round_named_snapshot():
             "inputs, and refuses empty, the files under `run/review/` whose names hold it (KP-067); the SCOPE file, "
             "which it reads by `<ID>`, is not among them, so confirm yourself that it is not empty.") in s
     assert ("stopping only on non-convergence per step 7's brake, and at and above the ceiling only for a finding of "
-            "one of the five blocking classes.") in f(loop())
-    assert "`python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took" in f(loop())
+            "one of the five blocking classes.") in f(step8())
+    assert "`python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took" in f(step8())
     surv = f(section(loop(), "What must survive a compaction", 3))
     assert ("(the round's `REVIEW-<ID>-r<N>.diff`, `ASSUMPTIONS-<ID>-r<N>.md` and `REVIEW-<ID>-r<N>.err`, whose first "
             "line is the launch time `pr-activity-check.py` needs, and the increment's `SCOPE-<ID>.md`), whole, with "
