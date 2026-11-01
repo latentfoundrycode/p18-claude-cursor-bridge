@@ -5,7 +5,7 @@
   "version": "2026.10.30d",
   "state": {
     "phase": "changing",
-    "stage": "release T: stage T1, TASK-037 next (TASK-036 merged; design and plan gates passed 2026-11-01); release B complete 2026-10-31",
+    "stage": "release T: stage T1, TASK-038 next (TASK-036 and TASK-037 merged; design and plan gates passed 2026-11-01); release B complete 2026-10-31",
     "bridge": "2026.10.30d",
     "updated": "2026-11-01"
   }

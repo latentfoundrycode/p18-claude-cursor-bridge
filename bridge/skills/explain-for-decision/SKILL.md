@@ -296,6 +296,7 @@ PowerShell). Say whether the window must be opened *as administrator*.
   step 2 printed `not found`:"**.
 - A GUI step is written the same way: the exact click path, each click its own step
   ("Settings → Secrets and variables → Actions → *New repository secret*").
+- A step that sends the owner into a vendor's console (a dashboard, a settings or billing page) is written from the vendor's documentation, fetched at the time, with the exact path to the field or figure; never from memory, and the owner is never sent to look for a figure the sheet has not located.
 
 **4. Under every command — what to expect and what to watch for.**
 

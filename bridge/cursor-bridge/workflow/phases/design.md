@@ -59,7 +59,9 @@ python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- curso
 It answers in the critic's grades (Blocking, Should fix, Consider), each finding naming the
 diagram, section or requirement it concerns. Snapshot before and `verify` after it, as for a
 code review; a reply that names nothing from the file is a failed launch, not a verdict. Then
-fix what both found; what you accept with a reason goes on the list and is settled.
+fix what both found; what you accept with a reason goes on the list and is settled. The snapshot's id is the round file's name, `DESIGN-<subject>-<round>` (`review-guard.py snapshot DESIGN-<subject>-<round>`, then `verify` under the same id), and the `.err` file's name follows from it, `run/review/REVIEW-DESIGN-<subject>-<round>.err`, as the command above writes it.
+
+**A worked scenario for money and stored data** is a lens of both critics: a rule about money or stored data is read against one worked scenario before it reaches code review (a retry after a lost reply, a dry run, a benchmark, an approved live smoke, two users on one account), each step naming the store it reads and writes; `plan-critic` carries the lens, and Review B's file copies it with the rest of its sections.
 
 **The loop stops by what was found, and after four rounds at the most.** Another round follows
 only on a Blocking finding, or a Should-fix finding you did not accept with a reason; a critic
@@ -70,7 +72,7 @@ starts the next. **Four rounds per subject is the owner's ceiling, whatever the 
 find.** The subjects are the design, the plan and each change: a change cycle's design revision
 (the change's name), its plan addendum (`<the change's name>-plan`), and a scoped revision
 mid-build, which is a change named as `docs/DESIGN.md`'s Change section names it; a subject is
-never renamed or split to start its count again. A subject is one token of lower-case letters,
+never renamed or split to start its count again. A plan addendum whose increments stood in the design's review file from round 1 is no subject of its own: it is criticised and gated with the design as one subject, under the design's token, and the subject's block heading in `docs/DESIGN_CRITIQUE.md` names both. A subject is one token of lower-case letters,
 digits and hyphens: for a change, chosen from its name when the Change section is written (the
 Azure monthly allowance is `azure-allowance`, its plan addendum `azure-allowance-plan`),
 distinct from `design`, `plan`, every other subject and every other `<token>-plan`, and
@@ -79,10 +81,10 @@ names nothing from the file) spends no round and follows step 3b, every failed l
 a first failure is exit 4, and the same file runs once more; a second is exit 3, which marks the
 model and re-resolves, and the same file runs once more on the profile it gives, under its
 number (a connection error or a hit limit keeps step 3b's exit 4 or 5 and no mark). A third
-failure, an exit 5, or no usable profile makes the design wait (below), the round recorded as
-not run. A round never run spends none of the four. The wait ends when the roster returns
+failure, an exit 5, or no usable profile makes the design wait (below), Review B's row recorded as
+`not run (<the reason>)`. A round counts against the four once either critic delivered in it (the record's definitions, below); a round in which neither delivered is never run and spends none of the four. The wait ends when the roster returns
 (rule 38) or on the owner's word; then the same file runs once under its number, with no
-re-runs. If that launch fails too, the round stays not run and the subject goes on to its
+re-runs. If that launch fails too, Review B's row stays `not run (<the reason>)` and the subject goes on to its
 resolution round or its gate, the report escalating it to the owner.
 
 - **The confirming read.** When the critique ends and the text changed after either critic last
@@ -163,7 +165,7 @@ the confirming read and the resolution round; under the owner's line, up to `<ro
 round, the reason), **Rounds** (round, its kind: critique, confirming read, resolution, not run
 or refused; the commit its file was built from; critic; the counts of Blocking, Should fix and
 Consider; what was fixed), **Resolution** (the
-question, what was settled, how). The `run/review/DESIGN-*` files are
+question, what was settled, how). The commit its file was built from is the subject's head when the round's file was assembled; a round in which one critic delivered is a critique round, the other critic's row reading `not run (<the reason>)`. The `run/review/DESIGN-*` files are
 removed with `git rm` in the commit that passes the gate, as step 8 removes the review files.
 When no roster profile is usable at intake (Cursor not signed in, both pools exhausted), the
 design waits and the report says so, as rule 38's failure path does; `plan-critic` alone is

@@ -169,7 +169,7 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # (BUG-031: two more move from traced to excused, under BUG-031's own `reword` entries but labelled by the earlier
 # entries that match first: the refactoring pass's step 6, whose title now names its REFAC-<nnn> brief IDs
 # (TASK-035), and rule 39, which retires step 4's old-<nnn> worktree (TASK-015))
-TRACED = "TRACED: 424 passages of baseline 0a186da; 141 in supervisor.md, 226 under workflow/, 0 dropped, 57 excused"
+TRACED = "TRACED: 424 passages of baseline 0a186da; 139 in supervisor.md, 222 under workflow/, 0 dropped, 63 excused"
 NOTES = [
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
@@ -181,6 +181,9 @@ NOTES = [
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: The project layout - You work in `Workspace/`; `Documents/` is its sibling (`../D",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - For every **performance or cost budget** the design names th",
+    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - It answers in the critic's grades (Blocking, Should fix, Con",
+    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **The loop stops by what was found, and after four rounds at",
+    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - `docs/DESIGN_CRITIQUE.md` has three parts, one block per sub",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - Also for a UI-bearing project, add an **\"Observability & Ver",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: The design-tooling flow - Save the mockup files under `docs/mockups/` (one file per sc",
@@ -208,6 +211,7 @@ NOTES = [
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - 6. **One gate pass.** The whole branch goes through step 8 o",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - The pass never escalates. It never introduces an abstraction",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 1. **Intake of the change** (Phase 1, scaled). The session i",
+    "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 2. **Design revision** (Phase 2, scaled). Append a dated **C",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 3. **UI mockups** (Phase 3) **only if the change touches the",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 7. **Project end again.** The close of the addendum's last s",
     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - The gates of a change cycle are the same approvals the origi",
@@ -220,6 +224,7 @@ NOTES = [
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Project state - ```markdown\\x0a# Project Status\\x0aLast updated: <timestamp>\\x0aPhase",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 6. Judge re-delegation by defect class, not a round count. N",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 8. Never chain shell commands with `&&`, `|`, or `;`, and ne",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 12. Every report to the user leads with the one decision the",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 13. Design correctness \\u2014 accessibility and interface MUSTs, ",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 24. Windowless by default. The user works on the same Window",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
@@ -228,12 +233,13 @@ NOTES = [
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 42. Every builder run ends with an `Assumed, not verified` l",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 43. Never end a turn while the loop has work unless somethin",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 46. The build plan is explicit. Every increment states its p",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 48. **The session's model follows the phase, and the switch ",
 ]
 
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the fifty-seven passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+    excused ones exactly the sixty-three passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
     TASK-015, TASK-017, TASK-030, TASK-034, TASK-035 and BUG-031 declare (three in the core's "Main and conditional workflows", six
     standing rules, three under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits),
     one in the design-tooling flow, four in the change cycle, one each in steps 2, 3, 4 and 9, and one each in the
@@ -242,7 +248,7 @@ def test_r003_the_carve_traces_with_exactly_its_excuses():
     more in the run parameters, rules 6 and 42, and step 3's brief paragraph; BUG-031's two: the refactoring
     pass's step 6 and rule 39; and five passages BUG-033 reworded, which those entries excuse: the refactoring
     pass's step 4 and the run parameters' Parallel increments item and its `on` option, under TASK-035's, step 3's
-    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's), so an increment that excuses anything more changes this test. It
+    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's), so an increment that excuses anything more changes this test. It
     needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))

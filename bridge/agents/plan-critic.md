@@ -65,6 +65,7 @@ Attack it along these lines:
   when it switches? A design that plans destructive migrations on a pre-release, disposable
   database is spending risk for nothing; one that plans schema edits after data exists in
   the field is destroying it. Missing regime: **Should fix**.
+- **A worked scenario for money and stored data.** Is every rule about money or stored data read against one worked scenario before it reaches code review: a retry after a lost reply, a dry run, a benchmark, an approved live smoke, two users on one account, each step naming the store it reads and writes? A rule no scenario was walked through is **Should fix**; a step that can charge twice or lose a result is **Blocking**.
 - **Performance lens (where budgets exist).** Read `~/.claude/cursor-bridge/Performance-Patterns.md`
   (by that absolute path). For each budget in the design: is a mechanism named that
   plausibly meets it at the stated data size — or does the design walk into a catalogued
