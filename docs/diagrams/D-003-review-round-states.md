@@ -58,7 +58,7 @@ stateDiagram-v2
         snapshot_taken --> resnapshotted : snapshot nnn again after a commit, before any reply
         resnapshotted --> resnapshotted : snapshot nnn again before any reply
         no_verdict --> resnapshotted : snapshot nnn again, no reply counted
-        flagged_gate_integrity --> resnapshotted : snapshot nnn again, no reply counted, round N not spent (the design; as built not, the rebuilt entry drops flagged_launch, DEVIATIONS)
+        flagged_gate_integrity --> resnapshotted : snapshot nnn again, no reply counted, round N not spent (the design; as built not, the rebuilt entry drops flagged_launch, DEVIATIONS.md, BUG-039)
         reply_arrived --> resnapshotted : snapshot nnn again on the tree it reviewed
         verified_ok --> resnapshotted : snapshot nnn again on the reviewed tree, or with no reply counted
         reply_arrived --> reply_arrived : snapshot nnn on a changed tree refused 125, round N is reviewed, write ID-r(N+1)
