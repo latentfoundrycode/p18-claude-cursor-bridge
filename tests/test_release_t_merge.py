@@ -127,10 +127,11 @@ def test_r045_p4_the_merged_branch_deleted_and_the_armed_form_skipped():
 def test_r045_t11_t17_the_status_file_as_at_the_merge():
     """T11 and T17: the status file as at the merge, the live position in in-flight.md, an overtaken pull request
     rewritten and re-reviewed (rule 43, the template, the hook's text, step 8)."""
-    assert flat("write it in `run/supervisor/in-flight.md`, where the live position between merges lives: the status file a pull request carries reads as at that pull request's merge, its `In flight:` line `none` (ISS-009, KP-069), and a resume reads `in-flight.md`'s last entries first") in rule(43)
+    assert flat("write it in `run/supervisor/in-flight.md` (where the live position between merges lives: the status file a pull request carries reads as at that pull request's merge, its `In flight:` line `none`, ISS-009 and KP-069; a resume reads `in-flight.md`'s last entries first) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> \"<the agent>\"`") in rule(43)
     assert flat(" A pull request whose status file another pull request's merge overtook has the file rewritten as at its own merge and `main` merged into it, a new head the reviews read again (the delegation loop's step 8).") in rule(43)
     assert "copied to the status file after `verify`" not in rule(43)
-    assert 'In flight: <none (the file a pull request carries reads as at its merge; between merges the live position is in run/supervisor/in-flight.md) | TASK-nnn in <checkout> since <time>;' in read(CORE)
+    assert "\n" + 'In flight: none (the file a pull request carries reads as at its merge; between merges the live position is written in run/supervisor/in-flight.md, rule 43: TASK-nnn in <checkout> since <time>, one line per parallel increment; <agent> in the background since <HH:MM>, ceiling <HH:MM>)' + "\n" in read(CORE)
+    assert "| TASK-nnn in <checkout>" not in read(CORE)
     hook = read(HOOK)
     first = hook.index('out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")')
     assert hook.index('out.append(' + '"The status file reads as at its last merge (ISS-009): where run/supervisor/in-flight.md exists, read its last entries first, the live position between merges."' + ')') > first
