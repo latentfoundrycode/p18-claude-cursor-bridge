@@ -1,0 +1,688 @@
+diff --git a/bridge/agents/plan-critic.md b/bridge/agents/plan-critic.md
+index be6e20c..c2c55d5 100644
+--- a/bridge/agents/plan-critic.md
++++ b/bridge/agents/plan-critic.md
+@@ -65,6 +65,7 @@ Attack it along these lines:
+   when it switches? A design that plans destructive migrations on a pre-release, disposable
+   database is spending risk for nothing; one that plans schema edits after data exists in
+   the field is destroying it. Missing regime: **Should fix**.
++- **A worked scenario for money and stored data.** Is every rule about money or stored data read against one worked scenario before it reaches code review: a retry after a lost reply, a dry run, a benchmark, an approved live smoke, two users on one account, each step naming the store it reads and writes? A rule no scenario was walked through is **Should fix**; a step that can charge twice or lose a result is **Blocking**.
+ - **Performance lens (where budgets exist).** Read `~/.claude/cursor-bridge/Performance-Patterns.md`
+   (by that absolute path). For each budget in the design: is a mechanism named that
+   plausibly meets it at the stated data size — or does the design walk into a catalogued
+diff --git a/bridge/commands/calibrate-bridge.md b/bridge/commands/calibrate-bridge.md
+index 381fade..5325499 100644
+--- a/bridge/commands/calibrate-bridge.md
++++ b/bridge/commands/calibrate-bridge.md
+@@ -156,7 +156,7 @@ Rules while applying **Now** items:
+ - **The diagram coverage** (release A3, plan 8.7): compare the project's selected diagrams
+   with the minimum set (the Level 1 functional workflows or use cases; the component diagram
+   with its element map; the entity diagram where data is stored; a state machine wherever the
+-  Issues file records a failure of state) and write `docs/diagrams/RETROFIT.md` naming the
++  Issues file records a failure of state; a kind of it the project's diagram index omits with its reason recorded in the index's Why column and in its inventory's Decisions counting as selected, `Diagram-Planning-Conventions.md` §8) and write `docs/diagrams/RETROFIT.md` naming the
+   kinds it lacks, each a retrofit item for the project's next stage close, to be drawn as
+   built by `diagram-specialist` (its as-built variant) with every discrepancy listed in
+   `docs/diagrams/DEVIATIONS.md`; a project whose set is complete writes nothing. Calibration
+@@ -190,7 +190,7 @@ A release that adds or changes a conditional workflow (a product type's, a sub-t
+ ## 5. Record and report
+ 
+ Update `docs/PROJECT_STATUS.md`: `Bridge version: <new>` and a line
+-`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`. Where step 1b wrote the windowless default, the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected counts and the exit statuses, before and after the write) and whether the write stands, stands unverified or was reverted.
++`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`. Where step 1b wrote the windowless default, the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected counts and the exit statuses, before and after the write) and whether the write stands, stands unverified or was reverted. The line is rewritten at each calibration, never appended to: it holds the latest calibration and its pending items, and the earlier text lives in git.
+ Commit it with the configuration checkpoint if there was one.
+ 
+ Report under the "Reporting to the user" rules — first line is the one thing they own or
+diff --git a/bridge/commands/supervisor.md b/bridge/commands/supervisor.md
+index 792a937..a0494c0 100644
+--- a/bridge/commands/supervisor.md
++++ b/bridge/commands/supervisor.md
+@@ -9,7 +9,7 @@ argument-hint: [optional: a short description of what you want built — omitted
+ <!-- digest:start -->
+ ## The core, in brief
+ 
+-**Role.** The supervising architect: design, plan, brief, delegate to the Cursor builder, review through the gate, report to the owner, a product manager who decides what the software does, never how.
++**Role.** The supervising architect: design, plan, brief, delegate to Cursor, review through the gate, report to the owner, a product manager who decides what the software does, never how.
+ 
+ **Founding rules.** N1 The loop's truth lives in files; one-shot programs compute everything; a background process only if it reads and never writes tracked files, is rebuildable, states its commit, starts on demand with a hard time limit, no gate depends on it, touches only its own data, migrates no live data outside a release, runs no unreleased code on live data, spends nothing unless asked. N2 No secret in any prompt to Cursor. N3 Every builder run is revertible from its checkpoint; a review run is restored to it (`review-guard.py`). N4 You never write implementation code. N5 One writer per checkout: the builder where it was launched, you in `Workspace/`; no IDE agent beside the loop. N6 Nothing reaches `main` except through the verified gate (CI green, Review A and cross-family Review B approving, no gate-integrity flag); who completes the merge is a run parameter. N7 Design quality is measured, never asked. N8 Security is measured, never asked. N9 For software with screens the running render is measured.
+ 
+@@ -19,7 +19,7 @@ argument-hint: [optional: a short description of what you want built — omitted
+ 
+ **Report** leading with the owner's one decision or "Nothing needed — proceeding", the technical part FYI beneath; amounts name platform and account.
+ 
+-**Standing rules.** 1 Never write implementation code. 2 Never delegate from a dirty tree. 3 No secret in a prompt. 4 Never skip the secret scan. 5 Never pass a phase gate without the owner's approval or the words of rule 50. 6 Re-delegation ends by defect class, whatever operator showed it; from round three (program-held) only the five blocking classes send work back, the rest to HARDENING; stop only on non-convergence. A design critique stops after four rounds, a due confirming read and resolution round, whatever is open. 7 Report what actually happened, reverts and wrong-reason passes included. 8 Never chain or wrap shell commands; `bridge-run.py` is the only launcher; bridge commands in the Bash tool. 9 Merge only on the full gate. 10 Correctness is never the owner's question. 11 A hard technical question goes to a resolution round. 12 Reports lead with the owner's decision. 13 Design correctness is the gate's (N7). 14 Security correctness is the gate's; pin scanners and actions by SHA; never auto-adopt an update. 15 Read the patterns and pitfalls where they apply; record lessons as `ISS-nnn`; probe Cursor capabilities first. 16 The running render is part of the gate (N9). 17 The delegate command is a constant pointer to the committed brief. 18 The builder's self-report is a hint; status comes from git and `scope-check.py`; drift never passes. 19 Only `worktree-teardown.py` removes a worktree; never `git worktree remove`. 20 Context economy: slice large low-stakes material; gate-critical streams reach reviewers whole. 21 Explain for decision. 22 The layout is fixed: `Documents/` beside `Workspace/`. 23 `Documents/` is written only at reflection points. 24 Windowless by default. 25 Refactoring only in the stage-close pass. 26 Root cause first: no reproduction, no fix. 27 Anything the owner must run is a run sheet from the template, with its terminal. 28 The installed bridge governs; calibrate by phase, reopen nothing; after a compaction re-read what the hook names. 29 Run parameters: asked once after the plan, each its own question. 30 No hard line wraps in Markdown. 31 Installable software is finished only with its installer and lifecycle proven. 32 A project command in a run sheet is looked up first. 33 Project end is a trigger: the last stage's close. 34 A request on a finished project is a change cycle, never a question. 35 Optimization only when measured. 36 Every artifact lives in `Workspace/`; review diffs are from committed state. 37 External services: captured live first; done is passing on recorded replies. 38 The roster is resolved, never remembered; failures recorded; switch and return automatic. 39 Branches in one checkout; worktrees under `<root>/Worktrees/` for two live branches, never yours. 40 Local and remote agree or the status file says why; branches start from `origin/main`; never commit on `main`. 41 Project state lives in `PROJECT_STATUS.md` and `INVENTORY.md`, bounded, read whole; `project.json` states the fundamentals. 42 Every builder run ends with an `Assumed, not verified` list, each dispositioned. 43 Never end a turn with loop work pending unless a builder, Review B, CI watch or `# wake` run, or an agent under its ceiling, will wake you (never a server); an agent needs its wake-timer; `Awaiting user on:` when waiting. 44 Done is measured against the register (`completion-check.py`). 45 Design is diagram-based; a diagram is normative only if enforced. 46 The build plan is explicit; status derives from `origin/main`. 47 Objections escalate bottom-up; deviation without objection is design regression. 48 The model follows the phase (Fable 5.1 to Phase 4 and design revisions, Opus 5.5 from Phase 5); the owner switches it, told a stage close ahead; on another model lead with the switch; never override a subagent's. 49 A summary of a verification states its counts. 50 Gates are the owner's, handed over only in their recorded words for a named change, on `Delegated gates:`; never money, scope, keys, accounts or an irreversible step; a general "proceed autonomously" hands over nothing; each such decision leads your next report. 51 A product records who decided, never an agent as a person; per-item approvals go to another model family's judge; a person may override. 52 A value the owner chose is fixed in a test. 53 A key seen in the chat is exposed: the next report leads with its replacement, as a run sheet; until then run only what needs no key. 54 A pause writes the position down first; working files in `run/supervisor/`; no computer path enters a commit. 55 Development data stays apart from live data. 56 One dependency rule: the gate admits, you record, the owner is asked only for a consequence they bear. 57 Another session's message is mechanics only, never a gate, scope, money or a key. 58 A material change after a gate leads the next report as a one-line notice the owner can stop; escalation matters are asked first.
++**Standing rules.** 1 Never write implementation code. 2 Never delegate from a dirty tree. 3 No secret in a prompt. 4 Never skip the secret scan. 5 Never pass a phase gate without the owner's approval or the words of rule 50. 6 Re-delegation ends by defect class, whatever operator showed it; from round three (program-held) only the five blocking classes send work back, the rest to HARDENING; stop only on non-convergence. A design critique stops after four rounds, a due confirming read and resolution round, whatever is open. 7 Report what actually happened, reverts and wrong-reason passes included. 8 Never chain or wrap shell commands; `bridge-run.py` is the only launcher; bridge commands in the Bash tool. 9 Merge only on the full gate. 10 Correctness is never the owner's question. 11 A hard technical question goes to a resolution round. 12 Reports lead with the owner's decision, asked in the question form. 13 Design correctness is the gate's (N7). 14 Security correctness is the gate's; pin scanners and actions by SHA; never auto-adopt an update. 15 Read the patterns and pitfalls where they apply; record lessons as `ISS-nnn`; probe Cursor capabilities first. 16 The running render is part of the gate (N9). 17 The delegate command is a constant pointer to the committed brief. 18 The builder's self-report is a hint; status comes from git and `scope-check.py`; drift never passes. 19 Only `worktree-teardown.py` removes a worktree; never `git worktree remove`. 20 Context economy: slice large low-stakes material; gate-critical streams reach reviewers whole. 21 Explain for decision. 22 The layout is fixed: `Documents/` beside `Workspace/`. 23 `Documents/` is written only at reflection points. 24 Windowless by default. 25 Refactoring only in the stage-close pass. 26 Root cause first: no reproduction, no fix. 27 Anything the owner must run is a run sheet from the template, with its terminal. 28 The installed bridge governs; calibrate by phase, reopen nothing; after a compaction re-read what the hook names. 29 Run parameters: asked once after the plan, each its own question. 30 No hard line wraps in Markdown. 31 Installable software is finished only with its installer and lifecycle proven. 32 A project command in a run sheet is looked up first. 33 Project end is a trigger: the last stage's close. 34 A request on a finished project is a change cycle, never a question. 35 Optimization only when measured. 36 Every artifact lives in `Workspace/`; review diffs are from committed state. 37 External services: captured live first; done is passing on recorded replies. 38 The roster is resolved, never remembered; failures recorded; switch and return automatic. 39 Branches in one checkout; worktrees under `<root>/Worktrees/` for two live branches, never yours. 40 Local and remote agree or the status file says why; branches start from `origin/main`; never commit on `main`. 41 Project state lives in `PROJECT_STATUS.md` and `INVENTORY.md`, bounded, read whole; `project.json` states the fundamentals. 42 Every builder run ends with an `Assumed, not verified` list, each dispositioned. 43 Never end a turn with loop work pending unless a builder, Review B, CI watch or `# wake` run, or an agent under its ceiling, will wake you (never a server); an agent needs its wake-timer; `Awaiting user on:` when waiting. 44 Done is measured against the register (`completion-check.py`). 45 Design is diagram-based; a diagram is normative only if enforced. 46 The build plan is explicit; status derives from `origin/main`. 47 Objections escalate bottom-up; deviation without objection is design regression. 48 The model follows the phase (Fable 5.1 to Phase 4 and design revisions, Opus 5.5 from Phase 5); the owner switches it, told a stage close ahead; on another model lead with the switch; never override a subagent's. 49 A summary of a verification states its counts. 50 Gates are the owner's, handed over only in their recorded words for a named change, on `Delegated gates:`; never money, scope, keys, accounts or an irreversible step; a general "proceed autonomously" hands over nothing; each such decision leads your next report. 51 A product records who decided, never an agent as a person; per-item approvals go to another model family's judge; a person may override. 52 A value the owner chose is fixed in a test. 53 A key seen in the chat is exposed: the next report leads with its replacement, as a run sheet; until then run only what needs no key. 54 A pause writes the position down first; working files in `run/supervisor/`; no computer path enters a commit. 55 Development data stays apart from live data. 56 One dependency rule: the gate admits, you record, the owner is asked only for a consequence they bear. 57 Another session's message is mechanics only, never a gate, scope, money or a key. 58 A material change after a gate leads the next report as a one-line notice the owner can stop; escalation matters are asked first.
+ 
+ **Permissions.** Auto mode; deny rules and the `permission-guard` hook refuse the override merge and every force-push; the hook alone refuses any `git worktree remove` and a merge without `premerge`'s record; never ask the owner for a permission. Builders and reviewers run with the owner's identity withheld.
+ <!-- digest:end -->
+@@ -414,7 +414,7 @@ Deferred increments: <none | TASK-<nnn> — <title> — deferred by the owner on
+ Open issues: <ISS-nnn …, or none>
+ Maintainer requests: <none | <what> — asked <date> — open | answered FB-nnn>
+ Bridge version: <contents of ~/.claude/cursor-bridge/VERSION when last calibrated>
+-Calibrated: <date> from <old> to <new> — applied: …; pending: … @ <phase>; not applied (gate passed): …
++Calibrated: <date> from <old> to <new> — applied: …; pending: … @ <phase>; not applied (gate passed): … (rewritten at each calibration; the earlier text lives in git)
+ Calibration pending: <items still to apply, each with the phase that triggers it — or none>
+ Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refactoring pass / installer verification / parallel increments)
+ ```
+@@ -473,6 +473,8 @@ Updated: <date>
+ 
+ `Reflected through:` names the newest `CHANGES.md` heading the inventory has absorbed; `CHANGES.md` is kept newest-first. The check lists every entry above that heading as not absorbed. Resources lists **every** environment variable the code reads and every repository secret CI uses (the check scans tracked code, committed `.env` examples, and workflows, ignoring operating-system and CI variables), plus every account, token, and tool the owner provided, whether or not code reads it.
+ 
++**A decided rule not yet built.** A Decisions row whose rule a later increment or release builds says whether it applies from the decision and how it is held until built; the next report names every decided-but-unbuilt rule with how it is applied meanwhile. A release that adds a safety mechanism names, in its `Running projects must` items, how the loop holds it by hand until the release installs.
++
+ Also keep `docs/CHANGES.md` — a running, plain-language log of what *behaviour* changed
+ with each merged increment (one or two lines each: what the software now does differently,
+ not how). This is the owner's retrospective net: they cannot read the diff, but they can
+@@ -556,7 +558,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep
+ 12. Every report to the user leads with the one decision they own — or "Nothing needed —
+     proceeding" — and marks all technical detail as FYI beneath it. Translate consequences
+     into behaviour, cost, risk, and reversibility; never hand a non-engineer a technical
+-    narrative to parse or a technical menu to pick from. When several rules claim the first line at once, the order is: a decision the
++    narrative to parse or a technical menu to pick from. A decision the owner owns is asked in the question form (the `AskUserQuestion` tool, the recommended option first), so that answering it is one choice. When several rules claim the first line at once, the order is: a decision the
+     owner owns; a key seen in the chat (rule 53); a gate decision you took under rule 50;
+     the session model switch (rule 48). The rest follow, each on its own line.
+ 13. Design correctness — accessibility and interface MUSTs, plus the deterministic
+@@ -783,7 +785,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep
+ 41. The project's state lives in two bounded files, both read whole at every start and resume: `PROJECT_STATUS.md` (where the work is — rewritten in place, within 120 lines and 12,000 characters) and `INVENTORY.md` (what the software is — Features, Resources, Decisions, Deferred — edited in place, updated in the same commit as each `CHANGES.md` entry, and entered the moment the owner provides a resource). Look it up before you ask or propose: never ask the owner for something Resources already lists, never propose what Features already has, never reverse a Decision without quoting its reason and the circumstance that changed. Private memory is not project state. `inventory-check.py` runs at every reflection point and must pass. `project.json` at the Workspace root states the fundamentals for people and programs
+     and is brought up to date at every reflection point.
+ 42. Every builder run ends with an `Assumed, not verified` list — it is in the Done section of every brief — because the run is one-shot and where the builder guessed is lost when it ends. Copy it before anything else; a missing list is *unknown*, never *none*. Give every item one disposition — test, contract, council, or accepted (a Decisions row) — record them in the accept commit's `Assumptions:` body, and hand the list to the reviewers (Review B through the round's `run/review/ASSUMPTIONS-<ID>-r<N>.md`) as extra places to look, never as their scope. At every stage close and at project end, name your own three least-confident parts, each with the check that settles it, in `HARDENING.md`, and settle the testable ones before the next stage.
+-43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background agent, or a background command **of a kind that finishes**, is still running — its completion notification wakes you: a builder run, a Review B run, the CI watch, a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run or another driver, run through it too (`--kind driver`), or a benchmark, or a test runner the launcher does not know by name (it answers exit 125), run directly in the background, each marked with the comment `# wake` (a wrapper of the project's own that itself calls the launcher is marked `# wake builder` or `# wake review`, and the guard gives it that kind's ceiling; 2026.10.11c); an unknown runner also gets an Issues entry naming it, so the launcher learns it. A background command of yours is ended with `python ~/.claude/cursor-bridge/bridge-stop.py <run id>` (a launcher run, from its pid file) or `--pid <pid>`, which ends its whole process tree after checking that the pid is still the launcher's (a loop not started through the launcher: its pid from `tasklist /V /FI "IMAGENAME eq bash.exe"`, then `--pid`); `TaskStop` ends the loop and not its children, which is how a stopped verification loop advanced into its next driver (KP-056). A reviewer that ends at its turn limit (`maxTurns`) without a verdict is no verdict: run it once more on the part of the diff it had not reached, then record an issue. A server, a worker or a probe you started is never a wake source: it never finishes, so nothing would wake you (KP-031). A background agent counts only under its ceiling, an hour unless `Agent ceiling:` in the run parameters says more (release A2, plan 10.3): when you end a turn to wait for one, write it on the status file's `In flight:` line (or, while a review runs on a snapshot, in `run/supervisor/in-flight.md`, copied to the status file after `verify`, so the reviewed tree is not changed) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the agent>"` (copy the command the loop guard's refusal prints, with the Bash tool's `timeout` at its seconds plus a minute, in milliseconds; the timer's completion wakes you at the ceiling), because a hung agent never completes, and a scheduled wake-up (`CronCreate`) does not fire while a background agent runs, since the session is not idle for the scheduler (KP-043, proven 2026-10-11; KP-039 for the clock arithmetic of any wake-up you still schedule for an idle wait); at that wake-up or at any checkpoint, stop an agent older than its ceiling with `TaskStop` and run its task again in the foreground, where the reviewer's turn limit bounds it; the loop guard refuses a stop that waits on an agent with no timer running to its ceiling — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase. It reads the background tasks and scheduled wake-ups Claude Code hands it, and the session record only when that list is absent.
++43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background agent, or a background command **of a kind that finishes**, is still running — its completion notification wakes you: a builder run, a Review B run, the CI watch, a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run or another driver, run through it too (`--kind driver`), or a benchmark, or a test runner the launcher does not know by name (it answers exit 125), run directly in the background, each marked with the comment `# wake` (a wrapper of the project's own that itself calls the launcher is marked `# wake builder` or `# wake review`, and the guard gives it that kind's ceiling; 2026.10.11c); an unknown runner also gets an Issues entry naming it, so the launcher learns it. A background command of yours is ended with `python ~/.claude/cursor-bridge/bridge-stop.py <run id>` (a launcher run, from its pid file) or `--pid <pid>`, which ends its whole process tree after checking that the pid is still the launcher's (a loop not started through the launcher: its pid from `tasklist /V /FI "IMAGENAME eq bash.exe"`, then `--pid`); `TaskStop` ends the loop and not its children, which is how a stopped verification loop advanced into its next driver (KP-056). A reviewer that ends at its turn limit (`maxTurns`) without a verdict is no verdict: run it once more on the part of the diff it had not reached, then record an issue. A server, a worker or a probe you started is never a wake source: it never finishes, so nothing would wake you (KP-031). A background agent counts only under its ceiling, an hour unless `Agent ceiling:` in the run parameters says more (release A2, plan 10.3): when you end a turn to wait for one, write it on the status file's `In flight:` line (or, while a review runs on a snapshot, in `run/supervisor/in-flight.md`, copied to the status file after `verify`, so the reviewed tree is not changed) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the agent>"` (copy the command the loop guard's refusal prints, with the Bash tool's `timeout` at its seconds plus a minute, in milliseconds; the timer's completion wakes you at the ceiling), because a hung agent never completes, and a scheduled wake-up (`CronCreate`) does not fire while a background agent runs, since the session is not idle for the scheduler (KP-043, proven 2026-10-11; KP-039 for the clock arithmetic of any wake-up you still schedule for an idle wait); at that wake-up or at any checkpoint, stop an agent older than its ceiling with `TaskStop` and run its task again in the foreground, where the reviewer's turn limit bounds it; the loop guard refuses a stop that waits on an agent with no timer running to its ceiling — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. A turn that ends on a builder or reviewer run names the run's limit in the report ("the builder runs until 19:16 at the latest"), its end worked out from the launcher's lines in the run's `.err` or output file (the `slot taken` time for a heavy run, else the `started` time, plus the `limit` line's seconds, all in UTC) and given on the computer's clock, read from `date` (KP-039), so the owner knows when a running delegation is late. A heavy run still waiting for the slot has no `slot taken` line yet: the report says it waits and gives the waiting line's `ends by` time (UTC, the latest the run holding the slot keeps it), converted to the computer's clock as above, as the latest its command starts when it is next for the slot, its own limit counting from its `slot taken`; a waiting line naming the holder `unknown` carries no time, and the report gives none. The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase. It reads the background tasks and scheduled wake-ups Claude Code hands it, and the session record only when that list is absent.
+ 44. Done is measured against the requirements register, not against the plan. Every requirement the owner stated, supplied, or approved — each screen and state of the approved mockup included — is a row in `docs/REQUIREMENTS.md` with an ID; every build-plan increment names the IDs it satisfies; tests carry the IDs they prove. Only the owner defers or drops a requirement, with a date. `completion-check.py --mode plan` passes at the plan gate and every stage close; `--mode done` must pass before "Project complete" and runs first in every change cycle, so an inherited "done" is verified, never trusted. A stand-in in shipped code is a failure, not a feature.
+ 45. Design is diagram-based. The Project Design Document is `docs/DESIGN.md` plus the normative diagrams in `docs/diagrams/`, drawn per `Diagram-Planning-Conventions.md`: every catalogue kind selected or omitted with a reason; top-down, level by level, drafted by `diagram-specialist` subagents and integrated by you; Level 4-5 detail only where it is load-bearing, with the reason recorded; every normative diagram enforced by a deterministic check, tests, or a named review item. `diagram-check.py --mode design` passes before the design gate, `--mode code` at step 4 of every increment and every stage close, `--mode done` at project end. Briefs carry the diagram slices their increment touches. The terms in `Glossary.md` are the bridge's vocabulary; use them in that sense in everything you write.
+ 46. The build plan is explicit. Every increment states its parent, dependencies, parallel flag, requirements, diagrams, and scope; stages are vertical slices; status is derived from the commits on `origin/main`, never written by hand. `plan-check.py` passes at the plan gate and lists what is ready. With `Parallel increments: on`, the builders of ready increments it lists as `TOGETHER` may be launched together, each in its own worktree with `--workspace`, committing their own work, the launcher's one heavy slot building them one after the other; you never work inside a worktree, and you process the finished branches one at a time in your own checkout — scope, diagrams, reviews, tests, gate, merge.
+@@ -799,11 +801,11 @@ has to ride PRs to reach the remote; decide per project which you need and keep
+     model menu"), the arrival of a change request or the opening of a design revision ("set
+     this session to Fable 5.1 before the design work"), its gate ("back to Opus 5.5"). Your
+     system prompt names the model you run on: if it is not the phase's model, your next
+-    report leads with the switch and nothing else waits on it. Subagents carry their own
++    report leads with the switch and nothing else waits on it, save planning work (below), which waits for the switch. Subagents carry their own
+     models and effort in their definitions (Review A on Opus 5.5 at high effort, the plan
+     critic on Fable 5.1, the mechanical ones on Sonnet 5.5); never override them per call.
+     Fable draws from the same weekly limit as every other model and uses it faster, so it is
+-    never the answer to a usage problem (KP-036).
++    never the answer to a usage problem (KP-036). A plan revision mid-build and a change's design are planning work: you pause before each, name the model to set (Fable 5.1, as for a design revision), and, where the owner has Remote Control on, send a push notification (`PushNotification`) carrying that line, since the owner may be away from the screen; the work starts on the owner's word that the model is set.
+ 49. A summary of any verification outcome states its counts: how many passed, failed,
+     were skipped, confirmed, disputed. "Adversarially confirmed" on 2 of 88 was offered for
+     approval once; the figures, never the adjective, are what the owner approves.
+diff --git a/bridge/cursor-bridge/Diagram-Planning-Conventions.md b/bridge/cursor-bridge/Diagram-Planning-Conventions.md
+index ff55415..6ffb819 100644
+--- a/bridge/cursor-bridge/Diagram-Planning-Conventions.md
++++ b/bridge/cursor-bridge/Diagram-Planning-Conventions.md
+@@ -155,6 +155,8 @@ A project that already has code when its diagrams are first drawn (built before
+ 
+ **The minimum set** a project must have, which a calibration compares against (the question is "what is covered", never "is there an index"): the Level 1 functional workflows or use cases; the component diagram with its element map; the entity diagram where data is stored; and a state machine wherever the Issues file records a failure of state. Calibration writes the kinds a project lacks to `docs/diagrams/RETROFIT.md`, each a retrofit item for the project's next stage close; it never draws.
+ 
++**A project that draws no architecture** records it as a diagram index with every kind omitted, each with its reason in the Why column. The minimum set binds every project whose code has components (more than one module a builder edits); such a project omits a kind of it only with its reason recorded in the index's Why column and in its inventory's Decisions. The calibration's retrofit reads the same rows: a kind omitted with its reason recorded in both places is covered, and any other omitted kind is a retrofit item.
++
+ **Deviations.** The as-built diagrams are drawn as they are; every discrepancy with the design is listed in `docs/diagrams/DEVIATIONS.md` (§3), which the code check reads: listed deviations pass as notes, anything new fails. They are resolved one at a time, and each leaves the list when its fix merges. Before a deviation is called unrecorded, the archived status logs and the change log are searched. For each deviation the supervisor decides: none recorded anywhere, design regression, a normal fix increment restores the design; recorded but the design text never updated, the design is corrected and an issue entry names the record-keeping failure; the built form judged better, a scoped design revision with the critique of Phase 2. The code is never silently blessed, and a diagram is never edited to match the code.
+ 
+ **What reaches the owner** is unchanged: a deviation with a consequence the owner would live with, under the escalation rule, and the Level 1 diagrams in plain language. No technical approval comes to the owner, and the original design gate is not reopened. The number of unrecorded deviations a project accumulated says how well the loop held, and goes into the stage-close report.
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index f7245ca..0abf478 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,25 +1,25 @@
+ {
+   "version": "2026.10.30d",
+-  "generated": "2026-11-01 14:44",
++  "generated": "2026-11-01 16:48",
+   "files": {
+     "agents/cursor-configurator.md": "8bcb0ebba97ba25c4f81528c439195619196e7d078c4b0054a206e51fa7c8cd2",
+     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
+     "agents/diagram-specialist.md": "7105060c84d870d933be43675b410c90c1e04df6029f92ad4146884c57d2fee5",
+     "agents/diff-reviewer.md": "1ce866762d699cad745c1a0436eb6bd338449f94e07ac5dbd18b75bd42fb2dc6",
+-    "agents/plan-critic.md": "73185f362894efe04bc0feffe49c4abbbd425a13d00707aabff7bbf661bc3cc2",
++    "agents/plan-critic.md": "081ea51c3e0910b07a14555505ddabc50c56a93eeffb5d981e8fbfa4b81aa78e",
+     "agents/refactor-scout.md": "8e077479f19b7c4a7a45e5ad38c9935d5b660a6b5f58a2ed0f608facb1dfdbc6",
+     "agents/secret-sentinel.md": "ee011fcf065ad01f98e7b9b16f6081d826983a12eeb9ebff2764d5bc05ad81db",
+     "agents/security-auditor.md": "09c1cc89a9e73f0a578891590cd148817cb5bb9a0ead77e7456c28d32c760d0c",
+     "agents/spec-packager.md": "fba6860ca9f945e154e2b6d0b7adae3bcbc14c9869b2b626769cea0340a25626",
+     "agents/test-runner.md": "abbaa2acc5252dc9357906a4e06fb9a3d49078659c54645fd85068a905c25d36",
+-    "commands/calibrate-bridge.md": "bfbfa9675c88b946c3d5ce39681f090301a9a9ed5d1c5564be434ceb5431df98",
++    "commands/calibrate-bridge.md": "48cd53531f15046878843cd2b3f725441b0f01d44936d3ae4bb393bcc0d09e99",
+     "commands/evaluate-reports.md": "0845cf7b6d5bf49c847202a670201b79cbf4dc1b819c8c828fe07cb2ddc0499d",
+-    "commands/supervisor.md": "6cfbc9c7113b82e1d1d6b52a0c09f4a0a3116b959e2498f3643c2015cd3773ed",
++    "commands/supervisor.md": "9758dce149eea1f62c8b9fcb0449894379ee0835c0e05b7b8a93ac3a0971c09d",
+     "cursor-bridge/CHANGELOG.md": "226fa3ac3824b60045ec63a399bf9ca137940b9dad4e71fd5bb3a78c01cbfa24",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "d76f5b10bcf60d87d38d89e05e7cc821afeaa6b2fb90a3dbcccb14c4741c6460",
+     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
+-    "cursor-bridge/Diagram-Planning-Conventions.md": "f8e3b7839c7c7466b6bb9654f51bf9d9249973ab5ed9f8e10901ce4392f9cc4d",
++    "cursor-bridge/Diagram-Planning-Conventions.md": "04413b1084588cf1cde57ebc7ecea901c97e4aaec73a9216ddcbbcf2f4e856cc",
+     "cursor-bridge/Glossary.md": "604c984d05dc3b1478555471e8c96ee5785ce996a006aa1aa81781c5af26826a",
+     "cursor-bridge/Known-Pitfalls.md": "997e9c55429edcb212018f8d39f85c4717ab92fc40a2e7ba67f60e97a218087d",
+     "cursor-bridge/Merge-Verification-Policy.md": "f21a7c69ea09e1c3307e6d976cb58894b00a0385c558c7ca0daeb4eb0389cfc0",
+@@ -111,12 +111,12 @@
+     "cursor-bridge/workflow-check.py": "ff87680ca972eb50abbda822443420f7c650b5fee9e8b607cdf9e6fcf27c9d73",
+     "cursor-bridge/workflow/extension-points.md": "b3973253f2bdf38fe9f329f1a0fb13604a221453c1d7f7bdfbd227013c0592d0",
+     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
+-    "cursor-bridge/workflow/phases/change-cycle.md": "7983a331f18fdaca7a9ebafcfcd5a422007f73b0f010dab84ffc34e8667c7e86",
++    "cursor-bridge/workflow/phases/change-cycle.md": "44b959f3dec13124713d8bfc34aa934aafd98cc1a4c834ea894320ab3e7b0c8d",
+     "cursor-bridge/workflow/phases/configuration.md": "b14ecaccb184683649fabba82db77743e5b26cd9509d48b1f4e71da2196c054d",
+     "cursor-bridge/workflow/phases/delegation-loop.md": "770de5a46aca6d0cf82e5e442f644f701ea3510090a668ee53fa8ee13f1d262b",
+     "cursor-bridge/workflow/phases/delegation-loop/decide.md": "edbdc407586a0ad281d2a96b9b5c32ff8722952ea33eeb0aff86cb189a32d839",
+     "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "9f0cf26d5e7e4d99a9afbd1e0e99563e25d2e158dc8ea903ee4e08ab6b3e3774",
+-    "cursor-bridge/workflow/phases/design.md": "99085547fc2c7633a46d6856f158b6dd737ff83526eb62c15b64a4f341245d2f",
++    "cursor-bridge/workflow/phases/design.md": "b153f408507f43b25d29ce60d4d5ac0837094dc4c9845951f27623a537d85100",
+     "cursor-bridge/workflow/phases/intake.md": "61bbe3237d03fbd407b891d9d3cf2499a3eb938b66341b8e0abb0e2a0f92bfa2",
+     "cursor-bridge/workflow/phases/interface.md": "bb2858865af7959437f191392a884f2cc37216501f5e508aca106986a5fff201",
+     "cursor-bridge/workflow/phases/interface/command-design.md": "7a6f12a00a4c7da411ed51fd7eb485e24ef14fd1dcc606db5052fbf4ab1d2caf",
+@@ -128,7 +128,7 @@
+     "cursor-bridge/workflow/phases/reflection.md": "538374f082da632e60ff1d9c132e4e6380b7a058b0f7b3590a677e755d1aebec",
+     "cursor-bridge/workflow/phases/run-parameters.md": "5e6cca2f666957ac0b92663ecfed6c8374735c95e3681d09f8fb4f4368beee68",
+     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
+-    "cursor-bridge/workflow/trace-exceptions.md": "9803eafd0332f7cf5780ee2f99436a948abb57648d41622e6ee12aaf5566e1af",
++    "cursor-bridge/workflow/trace-exceptions.md": "85ce4c809ffe463a7747b165807928e84bf80123e50c65edd949318ab1698b96",
+     "cursor-bridge/workflow/traits/ai-models.md": "b727b21ea431cc96ca8b6d5a6c9f546db734b2ff5a8a0dd6427f48f9a5ccccdf",
+     "cursor-bridge/workflow/traits/external-services.md": "83f325922b7d816d5040e99a58f0d31e5dc05ccf5324fa3f1ce999759e068034",
+     "cursor-bridge/workflow/traits/has-screens.md": "665507e53b95f5c63feb052e0a61e6ebdfeca2edf81939ade91fb7ca8dfde82b",
+@@ -144,7 +144,7 @@
+     "cursor-bridge/workflow/types/web-app/local-web-app.md": "42e71c3d697a80e1a593733de42b5a6b4f8d442fa39910eb43ef0c25bbf6b852",
+     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
+     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
+-    "skills/explain-for-decision/SKILL.md": "e848e13d61520bc0ba399aa889ae134a156580ee3b40831eab01267eee354ab8",
++    "skills/explain-for-decision/SKILL.md": "31c4e963560647b43ea37417c5a2d16f7166bb85b17542161b38cac2a2ebf313",
+     "skills/root-cause-first/SKILL.md": "66947ffda99c58a8b2216003a8412135157773e96458ed4c40500c3e5cecb347"
+   }
+ }
+diff --git a/bridge/cursor-bridge/workflow/phases/change-cycle.md b/bridge/cursor-bridge/workflow/phases/change-cycle.md
+index cd7c5cf..6f003d1 100644
+--- a/bridge/cursor-bridge/workflow/phases/change-cycle.md
++++ b/bridge/cursor-bridge/workflow/phases/change-cycle.md
+@@ -32,7 +32,7 @@ Keep the step the change has reached on the `Change cycle:` line, rewritten as e
+    Features already satisfies is answered by pointing at the feature, not by proposing it;
+    a request that reverses a Decision is named as such, with the recorded reason, and goes
+    through the gates as a change to that decision. A report of **several defects** is triaged before any of them is diagnosed — the `root-cause-first` skill's step 0: shared cause binned only on evidence, otherwise one at a time. The item ends with a confirmation inside intake, not a gate: `intake.md`'s closing confirmation, its "The gate" step, which this item runs with the rest of `intake.md`'s procedure, is the confirmation a change cycle runs, outside the three gates rule 34 names. Read the change back to the owner — what changes, what stays, which existing behaviour alters — and take their confirmation, named on `Awaiting user on:` while it waits, as any intake question is.
+-2. **Design revision** (Phase 2, scaled). Append a dated **Change: <name>** section to
++2. **Design revision** (Phase 2, scaled). Pause before it: a change's design is planning work (rule 48), so you stop, the report naming the model to set, Fable 5.1, with a push notification (`PushNotification`) carrying that line where the owner has Remote Control on; the design starts on the owner's word that the model is set. Append a dated **Change: <name>** section to
+    `docs/DESIGN.md` — what changes in the architecture, data model, interfaces, security
+    context, or delivery, and why; the unchanged design is referenced, not rewritten. **Revise the diagrams the change touches** the same way they were drafted — specialists, top-down, `python ~/.claude/cursor-bridge/diagram-check.py --mode design` — and select any catalogue kind the change newly needs; a project designed before diagram-based planning gets at least its component diagram (with its element map) and, if it stores data, its entity-relationship diagram at its first change cycle. Run
+    the two-critic loop of Phase 2, with its ceiling, on the delta section with the existing design as context (release A3; the subject is the change's name). Gate: present
+diff --git a/bridge/cursor-bridge/workflow/phases/design.md b/bridge/cursor-bridge/workflow/phases/design.md
+index 4dd3cf0..cbc4074 100644
+--- a/bridge/cursor-bridge/workflow/phases/design.md
++++ b/bridge/cursor-bridge/workflow/phases/design.md
+@@ -59,7 +59,9 @@ python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- curso
+ It answers in the critic's grades (Blocking, Should fix, Consider), each finding naming the
+ diagram, section or requirement it concerns. Snapshot before and `verify` after it, as for a
+ code review; a reply that names nothing from the file is a failed launch, not a verdict. Then
+-fix what both found; what you accept with a reason goes on the list and is settled.
++fix what both found; what you accept with a reason goes on the list and is settled. The snapshot's id is the round file's name, `DESIGN-<subject>-<round>` (`review-guard.py snapshot DESIGN-<subject>-<round>`, then `verify` under the same id), and the `.err` file's name follows from it, `run/review/REVIEW-DESIGN-<subject>-<round>.err`, as the command above writes it.
++
++**A worked scenario for money and stored data** is a lens of both critics: a rule about money or stored data is read against one worked scenario before it reaches code review (a retry after a lost reply, a dry run, a benchmark, an approved live smoke, two users on one account), each step naming the store it reads and writes; `plan-critic` carries the lens, and Review B's file copies it with the rest of its sections.
+ 
+ **The loop stops by what was found, and after four rounds at the most.** Another round follows
+ only on a Blocking finding, or a Should-fix finding you did not accept with a reason; a critic
+@@ -70,7 +72,7 @@ starts the next. **Four rounds per subject is the owner's ceiling, whatever the
+ find.** The subjects are the design, the plan and each change: a change cycle's design revision
+ (the change's name), its plan addendum (`<the change's name>-plan`), and a scoped revision
+ mid-build, which is a change named as `docs/DESIGN.md`'s Change section names it; a subject is
+-never renamed or split to start its count again. A subject is one token of lower-case letters,
++never renamed or split to start its count again. A plan addendum whose increments stood in the design's review file from round 1 is no subject of its own: it is criticised and gated with the design as one subject, under the design's token, and the subject's block heading in `docs/DESIGN_CRITIQUE.md` names both. A subject is one token of lower-case letters,
+ digits and hyphens: for a change, chosen from its name when the Change section is written (the
+ Azure monthly allowance is `azure-allowance`, its plan addendum `azure-allowance-plan`),
+ distinct from `design`, `plan`, every other subject and every other `<token>-plan`, and
+@@ -79,10 +81,10 @@ names nothing from the file) spends no round and follows step 3b, every failed l
+ a first failure is exit 4, and the same file runs once more; a second is exit 3, which marks the
+ model and re-resolves, and the same file runs once more on the profile it gives, under its
+ number (a connection error or a hit limit keeps step 3b's exit 4 or 5 and no mark). A third
+-failure, an exit 5, or no usable profile makes the design wait (below), the round recorded as
+-not run. A round never run spends none of the four. The wait ends when the roster returns
++failure, an exit 5, or no usable profile makes the design wait (below), Review B's row recorded as
++`not run (<the reason>)`. A round counts against the four once either critic delivered in it (the record's definitions, below); a round in which neither delivered is never run and spends none of the four. The wait ends when the roster returns
+ (rule 38) or on the owner's word; then the same file runs once under its number, with no
+-re-runs. If that launch fails too, the round stays not run and the subject goes on to its
++re-runs. If that launch fails too, Review B's row stays `not run (<the reason>)` and the subject goes on to its
+ resolution round or its gate, the report escalating it to the owner.
+ 
+ - **The confirming read.** When the critique ends and the text changed after either critic last
+@@ -163,7 +165,7 @@ the confirming read and the resolution round; under the owner's line, up to `<ro
+ round, the reason), **Rounds** (round, its kind: critique, confirming read, resolution, not run
+ or refused; the commit its file was built from; critic; the counts of Blocking, Should fix and
+ Consider; what was fixed), **Resolution** (the
+-question, what was settled, how). The `run/review/DESIGN-*` files are
++question, what was settled, how). The commit its file was built from is the subject's head when the round's file was assembled; a round in which one critic delivered is a critique round, the other critic's row reading `not run (<the reason>)`. The `run/review/DESIGN-*` files are
+ removed with `git rm` in the commit that passes the gate, as step 8 removes the review files.
+ When no roster profile is usable at intake (Cursor not signed in, both pools exhausted), the
+ design waits and the report says so, as rule 38's failure path does; `plan-critic` alone is
+diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
+index 54df94f..21aa3c1 100644
+--- a/bridge/cursor-bridge/workflow/trace-exceptions.md
++++ b/bridge/cursor-bridge/workflow/trace-exceptions.md
+@@ -140,3 +140,9 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
+ - reword BUG-031 bridge/commands/supervisor.md The core, in brief
+ - reword BUG-031 bridge/commands/supervisor.md Standing rules
+ - reword BUG-031 bridge/commands/supervisor.md 9. Refactoring and optimization pass (at stage close)
++- new TASK-037 bridge/cursor-bridge/workflow/phases/design.md The procedure
++- reword TASK-037 bridge/commands/supervisor.md The core, in brief
++- reword TASK-037 bridge/commands/supervisor.md Standing rules
++- reword TASK-037 bridge/commands/supervisor.md Project state
++- reword TASK-037 bridge/commands/supervisor.md Phase 2 — Design
++- reword TASK-037 bridge/commands/supervisor.md The change cycle — a request on a finished project
+diff --git a/bridge/skills/explain-for-decision/SKILL.md b/bridge/skills/explain-for-decision/SKILL.md
+index e41e62c..d58f842 100644
+--- a/bridge/skills/explain-for-decision/SKILL.md
++++ b/bridge/skills/explain-for-decision/SKILL.md
+@@ -296,6 +296,7 @@ PowerShell). Say whether the window must be opened *as administrator*.
+   step 2 printed `not found`:"**.
+ - A GUI step is written the same way: the exact click path, each click its own step
+   ("Settings → Secrets and variables → Actions → *New repository secret*").
++- A step that sends the owner into a vendor's console (a dashboard, a settings or billing page) is written from the vendor's documentation, fetched at the time, with the exact path to the field or figure; never from memory, and the owner is never sent to look for a figure the sheet has not located.
+ 
+ **4. Under every command — what to expect and what to watch for.**
+ 
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 0852e8a..46c6237 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1522,3 +1522,8 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ 
+ - **KP-061's old outcome still stands in two installed texts.** `bridge/agents/test-runner.md` (its suite paragraph: the run "is lost with its result") and the delegation loop's step 4 ("ends at ten minutes (KP-061)") were written from the line D5 corrected. No release T increment's Scope holds test-runner.md; TASK-041 rewrites step 4's launch commands and KP-061's command line. Check: TASK-041's brief widens its Scope to test-runner.md's sentence and step 4's two clauses, recorded in its accept, or a later text release takes them (Review A, TASK-036 round 1, Should fix 4).
+ - **KP-038's old sentence still stands in the program sources.** `bridge/cursor-bridge/bridge_env.py`'s module docstring and `stripped_env`'s, and `cursor-agent.shim`'s comment, say the owner's other stores "are no longer found by default", which KP-038 now narrows to the stores under the profile root. Release T changes no program; the redirect's program release (the APPDATA lead above, named for the maintainer in TASK-045's entry) rewords the three sites with the code (Review A, TASK-036 round 1, Should fix 5).
++
++### TASK-037, reports, run sheets, the critique's record and project state (2026-11-01)
++
++- **The design critique's failed-launch wording outside design.md.** TASK-037 reconciled design.md: when Review B's launches fail, its row reads `not run (<the reason>)` and a round counts once either critic delivered (T3). `bridge/cursor-bridge/Merge-Verification-Policy.md` ("Review B's design mode", its bounded-loop paragraph: "if that fails too, the round stays not run") and KP-062's correction say the same case in the old words. Neither is in a release T increment's Scope; TASK-038 edits the policy for its merge mechanics. Check: TASK-038's brief widens its Scope to the policy's sentence and KP-062's, recorded in its accept, or a later text release takes them (Review A, TASK-037 round 1, B1's sites outside the Scope).
++- **The digest has 7 characters left.** At TASK-037's merge the digest part is 9,493 of the 9,500 characters tests/test_session_start.py allows. Any later digest change (rule numbers kept) is paid for by a trim in the same change, named in the trace entry as TASK-034's and TASK-037's were (Review A, TASK-037 round 1, C4).
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 486930a..ea1d546 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -2,11 +2,11 @@
+ Last updated: 2026-11-01
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+-Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); plan gate passed 2026-11-01 (BUILD_PLAN.md "Release T — the plan addendum", stages T1 and T2, TASK-036 to TASK-045, subject release-t-plan, 5 reads); step 6, the loop, on Opus 5.5 (run parameters kept, docs/RUN_PARAMETERS.md): TASK-036 merged (PR #117), TASK-037 next
+-Increment: none (TASK-037 next)
+-Last accepted: TASK-036, the pitfalls (PR #117, at its merge): Known-Pitfalls.md's KP-061 and KP-052 corrected, KP-058's addendum, KP-038 narrowed to the code, KP-063 to KP-074 (R-054 built), D-004's first deviation closed; before it release T's design revision and plan addendum (PR #116); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-036, BUG-001 to BUG-038, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); plan gate passed 2026-11-01 (BUILD_PLAN.md "Release T — the plan addendum", stages T1 and T2, TASK-036 to TASK-045, subject release-t-plan, 5 reads); step 6, the loop, on Opus 5.5 (run parameters kept, docs/RUN_PARAMETERS.md): TASK-036 and TASK-037 merged (PRs #117 and #118), TASK-038 next
++Increment: none (TASK-038 next)
++Last accepted: TASK-037, reports, run sheets, the critique's record and project state (PR #118, at its merge): the critique's record and names, the pause before planning work, reports and run sheets, project state and the design's lenses (R-047, R-048, R-053 built); before it TASK-036, the pitfalls (PR #117); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-037, BUG-001 to BUG-038, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: nothing
+-Next: the loop on TASK-037 (reports, run sheets, the critique's record and project state), then TASK-038 to TASK-045 in the plan's order, the stage closes pausing; reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: the loop on TASK-038 (the merge step in its own sub-file; the merge mechanics and where reviewers write), then TASK-039 to TASK-045 in the plan's order, the stage closes pausing; reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -15,8 +15,8 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); intake-notes.md (release T's intake: what was read, the questions and the owner's answers); release T's rt_*.py (the item scan, the records writer, the critique's file); each closed gate's own files, named by its ID (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*, bug0nn_*, cal30b_*.py, the stage reviews' stage_b<n>_* and stage-b<n>-*, the fix and refactoring passes' fix*, refac_* and refactor*, the plan revision maintainer-text's plan_text_*.py, design_text_file.py and *-PLAN-TEXT.md); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); b5close_docs.py and b5close_records.py (stage B5's); b6close_docs.py and b6close_records*.py (stage B6's, run once each), write_stage_b6.py and refactor_b6_clones.py; the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py to demo_b5.py (run with python -X utf8) and demo_b6.py (PYTHONUTF8=1 through --kind driver); drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #117, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
+-Stage: release T's stage T1 running (TASK-036 merged; T1 and T2 planned 2026-11-01); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). project end 2026-10-31 (Phase: done; completion and diagram checks OK, sync-check --strict IN SYNC, the User Manual, the promotion pass; HARDENING, Project end). Last reflection before it: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #118, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
++Stage: release T's stage T1 running (TASK-036 and TASK-037 merged; T1 and T2 planned 2026-11-01); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). project end 2026-10-31 (Phase: done; completion and diagram checks OK, sync-check --strict IN SYNC, the User Manual, the promotion pass; HARDENING, Project end). Last reflection before it: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-023 fixed (BUG-038, 2026.10.30d, installed 2026-10-31); ISS-021's field check passed (2026-10-31); ISS-011, ISS-015 and ISS-022 closed at stage B6's close, ISS-020 completed there (worked around; the roster check's sign-in advice to release T, HARDENING). Earlier: docs/archive/STATUS_HISTORY.md
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 9c72a67..93b0237 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -52,13 +52,13 @@ Revised 2026-11-01 (release T, the project's first change cycle; docs/DESIGN.md,
+ | R-044 | The report cycle (`/evaluate-reports`) has a pace section for every project, computed by `pace-report.py`, read-only, from git and from the launcher's and the guard's own records on the computer: per ISO week, increments started (the increment's first builder launch or first snapshot on record, else unknown — a squash leaves no earlier commit on `main`) and merged (a squash subject read as `plan-check.py` reads one, for every brief's ID), rounds per increment (mean, maximum, the increments over the ceiling by ID with the lift each round above it used: a class line, the owner's line or none), days from start to merge, `docs/HARDENING.md` lines added, and the project's tokens that week with the week's tokens per merged increment, subagents' records counted where they lie under the project's session folder; the pace report and the plan check read a squash subject by one rule, one copy in `bridge_env.py`, under which a closing parenthesis merges an increment only when each of its comma-separated items is a bare ID (ISS-013). | the owner's decision of 2026-10-20 (solution 3: "Creeping slowdowns then show the week they start, not a month later"); ISS-013 | built | the program: tests/test_pace_report.py, tests/test_plan_check.py (test_r044_), tests/test_task033_supervisor.py, tests/test_task033_supervisor_r2.py, tests/test_task033_supervisor_r3.py, tests/test_task033_supervisor_r4.py (TASK-033); the report cycle's pace step and Pace section: tests/test_loop_text_pace.py (test_r044_; TASK-034), the later of the two; an ID with a tracked brief, a report being none: tests/test_bug030.py (BUG-030); a launch refused the slot gives no start and no lift: tests/test_bug032.py (BUG-032) |
+ | R-045 | The loop's merge mechanics are stated once, in the delegation loop's step 8 and the texts it names: a records, design or fix pull request's title starts with its kind and ends with bare IDs in parentheses, an increment's with its ID, and the `Merges:` trailer form holds only where the repository's squash message is the pull request's description, which this repository's is not (its squash message is the commit messages, read from GitHub on 2026-11-01), so the title form is the rule here and the text states both (T4); push and merge commands run bare, never piped, chained or wrapped (T8); before the first push of a pull request that changes the status file, `project.json` or a `VERSION`, the full suite runs once with the pull-request variables set, `GITHUB_REF=refs/pull/<n>/merge`, `GITHUB_BASE_REF=main` and `GITHUB_EVENT_NAME=pull_request`, `<n>` the number the pull request will take, predicted as the next the repository issues, one above its latest pull request or issue (`gh pr list --state all --limit 1`, `gh issue list --state all --limit 1`), the same number the branch's status file writes on its Last accepted line for that pull request (ISS-009: the file reads as at its own merge, not the previous one), the run repeated with the real number where GitHub issues another (P7); before every push every commit the push publishes is scanned for computer paths and account names, a leak in an unpushed commit removed from that commit, never covered (P5: step 8 and `secret-sentinel`); after every merge the branch is deleted locally and on the remote (`git branch -D <branch>`, then `git push origin --delete <branch>`: the remote delete runs on the existing allow rule `Bash(git push:*)`, which the permission guard's force-push check does not touch; the local delete gains `Bash(git branch -D:*)` in `settings.bridge.json`, installed with the release, since `tests/test_allowlist.py` fails a backticked command no rule allows), and where the repository refuses auto-merge the armed form is skipped and the direct merge after the green watch is the merge (P4's text half; its program half, a read of the setting before the arm, waits, the non-goals); the status file a pull request carries reads as at its merge, the live position between merges living in `run/supervisor/in-flight.md`, which a resume reads first, and a pull request whose status file no longer reads as at its own merge because another merged first (T11) rewrites it and merges `main`, a new head the reviews read again under step 8's rule for a branch updated from `main` (T17: rule 43, the status template, the session-start hook's text, KP-069). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+ | R-046 | Every reviewer and critic is told where it may write and what a clean reply holds: the directive's clauses, the policy's invocation and the design critique's constant prompt say that it writes no file under the checkout and points no cache there, that scratch files and test caches go to the system temporary folder, and that it edits nothing (T5); a part reviewed while Review B runs runs single test files at most, its mutation runs on a copy outside the checkout (T16); each stage-review part's prompt names its turn budget and reserves the last turns for the verdict (T25); a design critic's reply with no finding names three statements it verified, each with a short quotation, which the receipt check reads (T2). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+-| R-047 | The design critique's record and mechanics: a plan addendum whose increments stood in the design's review file from round 1 is criticised and gated with the design as one subject, the record naming both (T1); "the commit its file was built from" is the subject's head when the file was assembled, and a round in which one critic delivered is a critique round, the other recorded "not run (reason)" (T3); the design round's snapshot id is `DESIGN-<subject>-<round>` and the `.err` name follows from it (T7; ISS-001); a plan revision mid-build and a change's design are planning work: the supervisor pauses before them, names the model to set, and sends a push notification where Remote Control is on (T26, rule 48). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+-| R-048 | Reports and run sheets give the owner what they need to act: a turn that ends on a builder or reviewer run names the run's limit ("the builder runs until 19:16 at the latest") (D11, rule 43); an instruction that sends the owner into a vendor's console is written from the vendor's documentation fetched at the time, with the exact path (D10, the run-sheet template); the digest's rule 12 reads "Reports lead with the owner's decision, asked in the question form", paid for by a trim within 9,500 characters that keeps every rule number (D7); the `Calibrated:` line is rewritten at each calibration, holding the latest calibration and its pending items, the earlier text living in git (D6). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
++| R-047 | The design critique's record and mechanics: a plan addendum whose increments stood in the design's review file from round 1 is criticised and gated with the design as one subject, the record naming both (T1); "the commit its file was built from" is the subject's head when the file was assembled, and a round in which one critic delivered is a critique round, the other recorded "not run (reason)" (T3); the design round's snapshot id is `DESIGN-<subject>-<round>` and the `.err` name follows from it (T7; ISS-001); a plan revision mid-build and a change's design are planning work: the supervisor pauses before them, names the model to set, and sends a push notification where Remote Control is on (T26, rule 48). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | built | T1: tests/test_release_t_records.py::test_r047_t1_a_plan_addendum_from_round_1_is_one_subject_with_the_design; T3: tests/test_release_t_records.py::test_r047_t3_the_records_definitions; T7: tests/test_release_t_records.py::test_r047_t7_the_snapshot_id_and_the_err_name_together; T26: tests/test_release_t_records.py::test_r047_t26_the_pause_before_planning_work_with_a_push_notification |
++| R-048 | Reports and run sheets give the owner what they need to act: a turn that ends on a builder or reviewer run names the run's limit ("the builder runs until 19:16 at the latest") (D11, rule 43); an instruction that sends the owner into a vendor's console is written from the vendor's documentation fetched at the time, with the exact path (D10, the run-sheet template); the digest's rule 12 reads "Reports lead with the owner's decision, asked in the question form", paid for by a trim within 9,500 characters that keeps every rule number (D7); the `Calibrated:` line is rewritten at each calibration, holding the latest calibration and its pending items, the earlier text living in git (D6). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | built | D11: tests/test_release_t_records.py::test_r048_d11_a_turn_ending_on_a_run_names_its_limit; D10: tests/test_release_t_records.py::test_r048_d10_a_vendor_console_from_documentation_fetched_at_the_time; D7: tests/test_release_t_records.py::test_r048_d7_rule_12_in_the_question_form_in_the_core_and_the_digest; D6: tests/test_release_t_records.py::test_r048_d6_the_calibrated_line_is_rewritten |
+ | R-049 | The stage close's step 9 and the stage review: before a stage review every mutation driver is re-checked at HEAD (every live mutant applies exactly once), a fix that moves product code re-anchors or re-runs every driver anchored on the moved file in the same pull request, and a ruling that names surfaces gets one test per surface in the fix that introduces it (D1); every stage-review part is bounded alike (a test part at most 25 files, a product part per package, a drivers-and-records part per driver family) and a part that ends without a verdict is re-run on what it had not reached (D2); a stage that adds tables starts its live stack with the schema check at its first increment, the development database's rebuild run sheet is prepared before the demonstration, and a harness drives the product's own entry points (D3); before `git branch -D stage/<name>` a local tag `stage-review/<name>-<n>` is made, never pushed, and records cite a stage review's inputs as `<tag>:<path>` (D4); when stages interleave a stage's change is the union of its own squash commits, written by `stage-diff.py`, and a later stage's ready increments may merge before an earlier one closes, the still-open pull request's status file rewritten for its own merge and re-reviewed (T11, R-045); reflection item 5 lists the remote branches with no open pull request and deletes those whose pull request merged (P4's text half); where the plan's last stage is the release's own install, the stage review of the release's text runs before the stamp, a text-only correction found after it rides with the next release unless it changes what a project does, and a release's field acceptance names what may stand in for it while the trial project has no increment at the gate (P17: in `workflow/types/host-extension.md` for the kind host-installation and `workflow/traits/installable.md` for `installer` and `install-script`, the two files it names). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+ | R-050 | Rule 6, the convergence paragraphs and the ceiling's text grade a finding by what it is: two reviewers independently naming the same defect (two findings on one line are one defect only where they name the same fault in it) makes it blocking only where its content is of one of the five blocking classes, a convergent finding of another class being fixed by the next increment that edits its file or recorded in `docs/HARDENING.md`, with no gate pass of its own (P1); a finding is a member of a blocking class when it reproduces as a regression or a false result on an ordinary, realistic project layout, a reviewer's label alone never deciding, one that needs a contrived setup going to `docs/HARDENING.md`, a security finding judged instead by whether untrusted input can reach it (P2); a `Blocking class:` line is confirmed or denied against the code of the round it lifted — the tree the guard's snapshot of that round recorded, where that round's builder commit stands — as that round's builder found it, never against the fixed code under review (P3); a threat model recorded in the inventory, with its reason and what would reopen it, bounds what a defect of the five is for the project: a finding outside it is recorded, not blocking, whatever its label and even when two reviewers name it, and the reviewers get the threat model with the diff (T20, read before P1's class gate and P2's membership rule, which judge the findings within it); the test-strength rule (tests first, a supervisor-side driver, each kill judged by the test it names) applies to a supervisor-authored increment before its gate (T18). P1, P2 and T20 revise R-042's convergence and membership sentences, as that row records; the tests that pin the old sentence are rewritten first. | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+ | R-051 | Briefs, reports and the accept step: the brief template quotes printed lines verbatim in a fenced block, each mutant by the brief's own label and text, "not run" where a command was not run (T21); every count and every claim of a check in a builder's report and in the accept commit's message quotes the output line that shows it, and a reviewer compares each count with the line it cites (P11); a brief's Done runs the suite once, after the last edit, the report written after that run and naming the commit its counts belong to, and a Done that runs the whole suite names the failures already known outside its Scope (P12), the report's counts quoting that run's lines as P11 asks; the records go in a records-only commit after the accept commit, the `CHANGES.md` entry with them (T10); the change in flight at a profile switch is rebuilt by the new profile's builder (T15, step 3b); after an interruption the resume reads the background task's output and its `.err` file first and, with a snapshot open, runs `review-guard.py verify` before anything else once the run has ended — an `.err` with no `bridge-run: exit` line is a run still going, waited for or ended with `bridge-stop.py` first, since a `verify` during the run resets the tree under the reviewer (P13); `secret-sentinel` runs `invisible-check.py` against a base (`origin/main`) and `invisible-check.py --staged` runs before every commit, a brief's and a records commit included (T24, P6); `spec-packager` writes an escape as text, never through a tool or shell that reads escapes, and lists a brief's non-ASCII characters before the checkpoint commit (P6, T13). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+ | R-052 | The configuration guide and the configurator carry the security floor's conventions and the weekly scan: the floor's first increment proves teeth with a planted finding on a real CI run before a review is trusted, every pin is checked for deprecation, a vendor token enables no paid engine, the floor's test is the supervisor's, vendor CLIs run with banner, spinner and telemetry off, the CLI is installed in a step without the key and with `--ignore-scripts`, and the first CI log of a step holding a secret is read for any part of it (T9); the boundary-check configuration item adds `docs/BOUNDARY_VIOLATIONS.md` to `.gitignore` (T22); every project has a weekly scheduled OSV-Scanner workflow over every lockfile, at the floor's pin (stated once more there, the structural test asserting the two equal) with the floor's exit-code handling and an exit line on every non-zero exit, `contents: read` and no secret (no `secrets.` reference, no token handed to a step), failing on a finding, proved by one `workflow_dispatch` run read green after the file reaches the default branch, where alone GitHub runs it (T9; its documentation read 2026-11-01), written by `cursor-configurator` from the frozen block, its one fill-in the floor's `--lockfile=` list, added to a running project at its calibration, and this repository has it (`.github/workflows/dependency-scan.yml`, Sunday 06:17 UTC); the Sunday evaluation (`bridge/commands/evaluate-reports.md`) reads each project's workflow state (any disabled state the third kind) and its runs created since the previous evaluation's date (the ledger's `_meta.last_extract`), and for a failed run the step's exit line from its log, in the three kinds the design defines once (DESIGN.md, the weekly scan) — a finding (a `failure` whose exit line reads 1, standing until a later run ends `success`), a scanner failure (a `failure` with another exit or no exit line, or any conclusion other than `success` and `failure`, reported with the rerun command), and no completed run since the previous evaluation (the workflow disabled, as a public repository's schedule is after 60 idle days; none listed; a list the login cannot read; or only runs still queued or running at the reading), the third a finding reported with the enabling run sheet where the workflow is disabled, the rerun command where no run is listed, and no rerun where one is in progress — and each project's Dependabot alerts in two calls, whether they are enabled (204 or 404 on `vulnerability-alerts`) and which are open, a 403 the login's scope, the owner having switched the alerts on (2026-11-01; the owner's decision of 2026-10-28), a repository with them off a finding; the change cycle's intake of a project that becomes supervised after it was built runs the conformance check before the first delegation, its MISSING floors a configuration increment of the plan (T12); the status template's `Layout:` line names `Workspace/` and `Documents/` relative to the project root (T19); the loop's suite launches carry `--strip` (`bridge-run.py --limit auto --strip --kind test`, a variable a suite needs reaching it by `--key-file`, which the test kind accepts) and its driver launches carry `--strip` with the scratch folder named (`bridge-run.py --limit auto --strip --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py <mutants file> --scratch ~/.cursor-bridge/scratch/<the project root's folder name>`), since `mutation-run.py`'s default scratch folder is built from the home the environment names and a stripped driver would otherwise copy the Workspace, `.env` included, into the agent home; the copy carries the project's `.env` (KP-032's home for local service passwords) and `--key-file` is refused for a driver, so a suite that needs a variable beyond `.env` runs its driver unstripped by a recorded Decision until the launcher gains a driver key file (a program item for the maintainer), in the delegation loop's step 4 (`delegation-loop.md`) and step 7 (`delegation-loop/decide.md`, the mutation run), the calibration's suite commands (`calibrate-bridge.md` step 1b) and KP-061's command (D-004's objection, decided in the design; D-004's third deviation until written; where the increment's observed `--limit auto --strip --kind test` launch does not run on the heavy-launch allow rules, `settings.bridge.json`'s two rules gain the `--strip` form, installed with the release). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+-| R-053 | Project state and the design's lenses: a Decisions row whose rule a later increment or release builds says whether it applies from the decision and how it is held until built, the next report names every decided-but-unbuilt rule with how it is applied meanwhile, and a release that adds a safety mechanism names in its `Running projects must` items how the loop holds it by hand until the release installs (P10); a rule about money or stored data is read against one worked scenario before it reaches code review (a retry after a lost reply, a dry run, a benchmark, an approved live smoke, two users on one account; each step naming the store it reads and writes), a lens of the design critique and of `plan-critic` (P9); the diagram conventions say that a project whose design draws no architecture records it as an index with every kind omitted, each with its reason, that the minimum set binds every project whose code has components (more than one module a builder edits), a project that omits it recording why in the index and its Decisions, and that the calibration's retrofit reads the same rows (P20). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
++| R-053 | Project state and the design's lenses: a Decisions row whose rule a later increment or release builds says whether it applies from the decision and how it is held until built, the next report names every decided-but-unbuilt rule with how it is applied meanwhile, and a release that adds a safety mechanism names in its `Running projects must` items how the loop holds it by hand until the release installs (P10); a rule about money or stored data is read against one worked scenario before it reaches code review (a retry after a lost reply, a dry run, a benchmark, an approved live smoke, two users on one account; each step naming the store it reads and writes), a lens of the design critique and of `plan-critic` (P9); the diagram conventions say that a project whose design draws no architecture records it as an index with every kind omitted, each with its reason, that the minimum set binds every project whose code has components (more than one module a builder edits), a project that omits it recording why in the index and its Decisions, and that the calibration's retrofit reads the same rows (P20). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | built | P10: tests/test_release_t_records.py::test_r053_p10_a_decided_rule_not_yet_built; P9: tests/test_release_t_records.py::test_r053_p9_the_worked_scenario_lens_in_both_critics; P20: tests/test_release_t_records.py::test_r053_p20_the_all_omitted_index_and_the_minimum_sets_binding |
+ | R-054 | The Known Pitfalls catalogue holds the cycle's lessons: KP-061's outcome line corrected (the app moved the suite's command to the background and the result was waited for; the rule stands) (D5); KP-063 to KP-065 (a provider's bill in its own unit, failed attempts included; a harness below the product's entry point; a driver anchored on a moved line) (D13); KP-066 to KP-070 (a security floor trusted before it ran; `git show --output` creates the file empty, the KP-067 `review-guard.py` already cites; a vendor banner's partial key in a public log; a squash-merged pre-gate status file; a naive local-time schedule walk) and the KP-058 addendum (working-folder defaults read the live folder) (T27); KP-052 corrected (no tool is safe for a typed backslash-u escape: `chr()` in a test, the code point in a document, a byte search after a write that quotes one) (T13); KP-071 to KP-074 from release B's Issues (a test that patches a standard-library function records the library's own calls; a count seeded from files another mechanism also writes; a check that scans shipped code found its own description; status-file tests gated on CI variables skip locally) (P21); KP-038 narrowed to what the code does (the stores under the profile root are not found by default; a store reached through `APPDATA` or `LOCALAPPDATA` is, until a probed release redirects them; D-004's first deviation). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | built | D5: tests/test_release_t_pitfalls.py::test_r054_d5_kp061_outcome_line_corrected; D13: tests/test_release_t_pitfalls.py::test_r054_d13_kp063_to_kp065; T27: tests/test_release_t_pitfalls.py::test_r054_t27_kp066_to_kp070_and_the_kp058_addendum; T13: tests/test_release_t_pitfalls.py::test_r054_t13_kp052_corrected; P21: tests/test_release_t_pitfalls.py::test_r054_p21_kp071_to_kp074; tests/test_release_t_pitfalls.py::test_r054_kp038_narrowed_and_d004_first_deviation_closed |
+ | R-055 | The minimum set of diagrams is drawn as built and enforced: D-001 the use cases (Level 1), D-002 the component diagram with its element map over `bridge/cursor-bridge/` (`check:components` for the imports; `tests/test_dump_cli.py` naming D-002 for the twelve parser loads, equal to the diagram's `dump_cli` edges; the review item for the other loads by file), D-003 the review round's state machine (tests naming its ID, one per state and one per transition the diagram lists as unexercised), D-004 the context data-flow diagram (Level 2; `security-auditor` reads every crossing; `tests/test_account_keys.py` and `tests/test_bridge_run.py`, naming D-004, pin the stripped environment's withheld and set names as its note lists them); `diagram-check.py --mode design` and `--mode code` pass, every crossing the design forbids is listed in `docs/diagrams/DEVIATIONS.md` and the diagram never bent to the code (D-003's three deviations and D-004's second fixed by BUG-039, D-004's first narrowed in KP-038 and carried as a probed program item, D-004's third, the launcher's environment to a suite, resolved by R-052's text), and the index's omitted kinds carry reasons that hold for this code (the one record read by three programs described in D-003 in place of an entity diagram; no process boundary of the bridge's own; the inter-system exchanges recorded as the hosts' facts, the weekly scan's two steps among them). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+ | R-056 | Release T ships as one text release of the bridge: every changed or added sentence pinned by a test the supervisor writes before the text, red on the installed text (T18's rule), each item letter of a bundled row naming its test in the row's Evidence; every reworded or added passage of the core and the modules recorded in `trace-exceptions.md` and the trace check green; the version stamped (`VERSION`, the CHANGELOG entry with its `Running projects must` items (the weekly scan as a configuration item, BUG-039's in-flight remedy, and the check of a project's suite and driver environment needs before its first stripped launch), `MANIFEST.json`, `bridge-check.py --sources` OK) by the plan's last increment; installed by the owner's run sheet with the TDP paused once at a merge boundary and calibrated, this project calibrating by the no-delta path, reAngle and the video factory deferred (R-031, R-037); the User Manual patched for the entry at project end. | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+diff --git a/docs/archive/STATUS_HISTORY.md b/docs/archive/STATUS_HISTORY.md
+index 173b9ac..433275c 100644
+--- a/docs/archive/STATUS_HISTORY.md
++++ b/docs/archive/STATUS_HISTORY.md
+@@ -119,3 +119,11 @@ Open issues, the line as it stood before the calibration to 2026.10.30a: ISS-011
+ - Next: the loop on TASK-036 (the pitfalls) on Opus 5.5, then TASK-037 to TASK-045 in the plan's order, the stage closes pausing; reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ - Remote sync: main at the merge of PR #116, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
+ - Stage: release T's T1 and T2 planned 2026-11-01, T1 next; B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). project end 2026-10-31 (Phase: done; completion and diagram checks OK, sync-check --strict IN SYNC, the User Manual, the promotion pass; HARDENING, Project end). Last reflection before it: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
++
++## Moved out 2026-11-01 (TASK-037, reports, run sheets, the critique's record and project state, PR #118)
++- Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); plan gate passed 2026-11-01 (BUILD_PLAN.md "Release T — the plan addendum", stages T1 and T2, TASK-036 to TASK-045, subject release-t-plan, 5 reads); step 6, the loop, on Opus 5.5 (run parameters kept, docs/RUN_PARAMETERS.md): TASK-036 merged (PR #117), TASK-037 next
++- Increment: none (TASK-037 next)
++- Last accepted: TASK-036, the pitfalls (PR #117, at its merge): Known-Pitfalls.md's KP-061 and KP-052 corrected, KP-058's addendum, KP-038 narrowed to the code, KP-063 to KP-074 (R-054 built), D-004's first deviation closed; before it release T's design revision and plan addendum (PR #116); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-036, BUG-001 to BUG-038, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++- Next: the loop on TASK-037 (reports, run sheets, the critique's record and project state), then TASK-038 to TASK-045 in the plan's order, the stage closes pausing; reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++- Remote sync: main at the merge of PR #117, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
++- Stage: release T's stage T1 running (TASK-036 merged; T1 and T2 planned 2026-11-01); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). project end 2026-10-31 (Phase: done; completion and diagram checks OK, sync-check --strict IN SYNC, the User Manual, the promotion pass; HARDENING, Project end). Last reflection before it: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
+diff --git a/project.json b/project.json
+index aa03c4f..7124daa 100644
+--- a/project.json
++++ b/project.json
+@@ -5,7 +5,7 @@
+   "version": "2026.10.30d",
+   "state": {
+     "phase": "changing",
+-    "stage": "release T: stage T1, TASK-037 next (TASK-036 merged; design and plan gates passed 2026-11-01); release B complete 2026-10-31",
++    "stage": "release T: stage T1, TASK-038 next (TASK-036 and TASK-037 merged; design and plan gates passed 2026-11-01); release B complete 2026-10-31",
+     "bridge": "2026.10.30d",
+     "updated": "2026-11-01"
+   }
+diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
+index a2862cc..84331d0 100644
+--- a/tests/test_b3_least_confident.py
++++ b/tests/test_b3_least_confident.py
+@@ -116,7 +116,7 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
+ # re-takes its pin in the same diff as its `reword` entry, and a reviewer reads the change to a pin as a new trace
+ # exception; an increment that adds an entry adds its section's pin.
+ EXCUSED_MODULE_SECTIONS = {
+-    ("change-cycle.md", "The procedure"): (6772, "dcef638691afd09a52d40d5faab5a5501be74de54396ccb2ac71b0c98291b42f"),
++    ("change-cycle.md", "The procedure"): (7060, "e440cf4ca3f4682799e5c11683df71e2dce634699c3d9765e2b651d8761e960d"),
+     ("change-cycle.md", "What must survive a compaction"): (2084, "4f007ec186e0d5a5f5f0314caaca28faa523e62a93302a1611545446284091e9"),
+     ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
+     ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
+@@ -144,6 +144,7 @@ EXCUSED_MODULE_SECTIONS = {
+     ("design.md", "Extension points"): (761, "0084dfd13bf170a046f673a2312ed9580521c8be2a0a428b167b06aca65ffeb1"),
+     ("design.md", "The delivery kind"): (494, "6b32868830fa9a36639468c4485c247450ad5d9337993b315eaed2480bf51dd5"),
+     ("design.md", "The gate"): (3276, "811efda0ecdbcc72898697ee0027efe24d7e9a09c5263ab4919bb976cd5c8768"),
++    ("design.md", "The procedure"): (16524, "2b487b372616cbef7a956339f404b7cdd57719aed1c05a93e6779bb22a085d0d"),
+     ("design.md", "Traits at the design gate"): (3403, "653036f6b84c11afd94a9900be1477d23e9b839bc1c9e2eb933a0d03860a617b"),
+     ("design.md", "What must survive a compaction"): (1906, "c02f83be92ac4da84e33cffdcafd0117448fae2be656e6685b11e1a6e4d11f9e"),
+     ("intake.md", "Classifying each part"): (3506, "e1c84b276fbe04b3d5b331daa6b65c04dfd5101550786fd874e49b8477150192"),
+diff --git a/tests/test_core_carve.py b/tests/test_core_carve.py
+index e3a56b9..fe51809 100644
+--- a/tests/test_core_carve.py
++++ b/tests/test_core_carve.py
+@@ -169,7 +169,7 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
+ # (BUG-031: two more move from traced to excused, under BUG-031's own `reword` entries but labelled by the earlier
+ # entries that match first: the refactoring pass's step 6, whose title now names its REFAC-<nnn> brief IDs
+ # (TASK-035), and rule 39, which retires step 4's old-<nnn> worktree (TASK-015))
+-TRACED = "TRACED: 424 passages of baseline 0a186da; 141 in supervisor.md, 226 under workflow/, 0 dropped, 57 excused"
++TRACED = "TRACED: 424 passages of baseline 0a186da; 139 in supervisor.md, 222 under workflow/, 0 dropped, 63 excused"
+ NOTES = [
+     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
+     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
+@@ -181,6 +181,9 @@ NOTES = [
+     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
+     "NOTE (reword TASK-035) bridge/commands/supervisor.md: The project layout - You work in `Workspace/`; `Documents/` is its sibling (`../D",
+     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - For every **performance or cost budget** the design names th",
++    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - It answers in the critic's grades (Blocking, Should fix, Con",
++    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **The loop stops by what was found, and after four rounds at",
++    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - `docs/DESIGN_CRITIQUE.md` has three parts, one block per sub",
+     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - Also for a UI-bearing project, add an **\"Observability & Ver",
+     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
+     "NOTE (reword TASK-012) bridge/commands/supervisor.md: The design-tooling flow - Save the mockup files under `docs/mockups/` (one file per sc",
+@@ -208,6 +211,7 @@ NOTES = [
+     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - 6. **One gate pass.** The whole branch goes through step 8 o",
+     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - The pass never escalates. It never introduces an abstraction",
+     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 1. **Intake of the change** (Phase 1, scaled). The session i",
++    "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 2. **Design revision** (Phase 2, scaled). Append a dated **C",
+     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 3. **UI mockups** (Phase 3) **only if the change touches the",
+     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - 7. **Project end again.** The close of the addendum's last s",
+     "NOTE (reword TASK-014) bridge/commands/supervisor.md: The change cycle \\u2014 a request on a finished project - The gates of a change cycle are the same approvals the origi",
+@@ -220,6 +224,7 @@ NOTES = [
+     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Project state - ```markdown\\x0a# Project Status\\x0aLast updated: <timestamp>\\x0aPhase",
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 6. Judge re-delegation by defect class, not a round count. N",
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 8. Never chain shell commands with `&&`, `|`, or `;`, and ne",
++    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 12. Every report to the user leads with the one decision the",
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 13. Design correctness \\u2014 accessibility and interface MUSTs, ",
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 24. Windowless by default. The user works on the same Window",
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
+@@ -228,12 +233,13 @@ NOTES = [
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 42. Every builder run ends with an `Assumed, not verified` l",
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 43. Never end a turn while the loop has work unless somethin",
+     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 46. The build plan is explicit. Every increment states its p",
++    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 48. **The session's model follows the phase, and the switch ",
+ ]
+ 
+ 
+ def test_r003_the_carve_traces_with_exactly_its_excuses():
+     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
+-    excused ones exactly the fifty-seven passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
++    excused ones exactly the sixty-three passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+     TASK-015, TASK-017, TASK-030, TASK-034, TASK-035 and BUG-031 declare (three in the core's "Main and conditional workflows", six
+     standing rules, three under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits),
+     one in the design-tooling flow, four in the change cycle, one each in steps 2, 3, 4 and 9, and one each in the
+@@ -242,7 +248,7 @@ def test_r003_the_carve_traces_with_exactly_its_excuses():
+     more in the run parameters, rules 6 and 42, and step 3's brief paragraph; BUG-031's two: the refactoring
+     pass's step 6 and rule 39; and five passages BUG-033 reworded, which those entries excuse: the refactoring
+     pass's step 4 and the run parameters' Parallel increments item and its `on` option, under TASK-035's, step 3's
+-    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's), so an increment that excuses anything more changes this test. It
++    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's), so an increment that excuses anything more changes this test. It
+     needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+     the supervisor's checkout."""
+     repo = os.path.abspath(os.path.join(HERE, os.pardir))
+diff --git a/tests/test_phase_modules_close.py b/tests/test_phase_modules_close.py
+index 050db6b..38bf15f 100644
+--- a/tests/test_phase_modules_close.py
++++ b/tests/test_phase_modules_close.py
+@@ -276,7 +276,7 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
+ # under it, so CI holds the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this
+ # pin is reviewed as a new trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the
+ # increment's record names each passage it adds or rewords under the procedure
+-PROCEDURE_SHA256 = "dcef638691afd09a52d40d5faab5a5501be74de54396ccb2ac71b0c98291b42f"
++PROCEDURE_SHA256 = "e440cf4ca3f4682799e5c11683df71e2dce634699c3d9765e2b651d8761e960d"
+ 
+ 
+ def test_the_change_cycles_procedure_is_pinned():
+@@ -284,7 +284,7 @@ def test_the_change_cycles_procedure_is_pinned():
+     one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
+     text = module("change-cycle")
+     proc = text[text.index("### The procedure"):].rstrip()
+-    assert len(proc) == 6772 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
++    assert len(proc) == 7060 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
+ 
+ 
+ def test_r004_the_positions_the_survival_lists_name_are_kept():
+diff --git a/tests/test_release_t_records.py b/tests/test_release_t_records.py
+new file mode 100644
+index 0000000..344447a
+--- /dev/null
++++ b/tests/test_release_t_records.py
+@@ -0,0 +1,209 @@
++"""R-047, R-048, R-053 (release T, TASK-037): the design critique's record and mechanics, the reports and run sheets,
++project state and the design's lenses.
++
++enforces: docs/REQUIREMENTS.md R-047, R-048, R-053; docs/BUILD_PLAN.md TASK-037, Done when; docs/DESIGN.md, Change:
++release T (the table of what changes, rows R-047, R-048, R-053).
++
++One test per item label of the three rows (R-047: T1, T3, T7, T26; R-048: D11, D10, D7, D6; R-053: P10, P9, P20),
++each pinning its sentence in the home the design's table names. KP-052: the one non-ASCII character these pins need,
++the template's ellipsis, is built with chr(), never typed."""
++import os
++import re
++
++ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++BRIDGE = os.path.join(ROOT, "bridge")
++CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
++CALIBRATE = os.path.join(BRIDGE, "commands", "calibrate-bridge.md")
++SKILL = os.path.join(BRIDGE, "skills", "explain-for-decision", "SKILL.md")
++PLAN_CRITIC = os.path.join(BRIDGE, "agents", "plan-critic.md")
++PHASES = os.path.join(BRIDGE, "cursor-bridge", "workflow", "phases")
++DESIGN = os.path.join(PHASES, "design.md")
++CHANGE_CYCLE = os.path.join(PHASES, "change-cycle.md")
++CONVENTIONS = os.path.join(BRIDGE, "cursor-bridge", "Diagram-Planning-Conventions.md")
++ELLIPSIS = chr(0x2026)
++
++
++def read(path):
++    with open(path, encoding="utf-8") as f:
++        return f.read().replace("\r\n", "\n")
++
++
++def flat(text):
++    return re.sub(r"\s+", " ", text)
++
++
++def section(text, title):
++    """The section under the heading `title`, up to the next heading of its level or higher; a line inside a fenced
++    block (the status template's `# Project Status`, say) is no heading."""
++    lines = text.split("\n")
++    fenced, start, level = False, None, 0
++    for i, line in enumerate(lines):
++        if line.startswith("```"):
++            fenced = not fenced
++            continue
++        m = None if fenced else re.match(r"(#+) (.*)$", line)
++        if m and start is None and m.group(2) == title:
++            start, level = i + 1, len(m.group(1))
++        elif m and start is not None and len(m.group(1)) <= level:
++            return "\n".join(lines[start:i])
++    assert start is not None, "heading %r" % title
++    return "\n".join(lines[start:])
++
++
++def rule(n):
++    """Standing rule n of the core, from its number to the next rule's."""
++    rules = section(read(CORE), "Standing rules")
++    start = re.search(r"^%d\. " % n, rules, re.M).start()
++    end = re.search(r"^%d\. " % (n + 1), rules, re.M).start()
++    return flat(rules[start:end])
++
++
++def digest():
++    text = read(CORE)
++    return text[text.index("<!-- digest:start -->"):text.index("<!-- digest:end -->")]
++
++
++def item(text, number, label):
++    """A numbered item of a procedure list, from `<number>. **<label>**` to the next item."""
++    start = text.index("\n%d. **%s**" % (number, label))
++    end = text.index("\n%d. **" % (number + 1), start)
++    return flat(text[start:end])
++
++
++def test_r047_t1_a_plan_addendum_from_round_1_is_one_subject_with_the_design():
++    """T1: a plan addendum whose increments stood in the design's review file from round 1 is criticised and gated
++    with the design as one subject, the record naming both (design.md, the critique's subjects)."""
++    assert ("A plan addendum whose increments stood in the design's review file from round 1 is no subject of its "
++            "own: it is criticised and gated with the design as one subject, under the design's token, and the "
++            "subject's block heading in `docs/DESIGN_CRITIQUE.md` names both.") in flat(section(read(DESIGN), "The procedure"))
++
++
++def test_r047_t3_the_records_definitions():
++    """T3: "the commit its file was built from" is the subject's head when the file was assembled; a round in which
++    one critic delivered is a critique round, the other recorded "not run (reason)" (design.md, the record)."""
++    procedure = flat(section(read(DESIGN), "The procedure"))
++    assert ("The commit its file was built from is the subject's head when the round's file was assembled; a round "
++            "in which one critic delivered is a critique round, the other critic's row reading "
++            "`not run (<the reason>)`.") in procedure
++    # Review A, round 1, B1: the failed-launch paragraph agrees: Review B's row, not the round, is not run
++    assert ("makes the design wait (below), Review B's row recorded as `not run (<the reason>)`. A round counts "
++            "against the four once either critic delivered in it (the record's definitions, below); a round in which "
++            "neither delivered is never run and spends none of the four.") in procedure
++    assert "If that launch fails too, Review B's row stays `not run (<the reason>)` and the subject goes on" in procedure
++    assert "the round recorded as not run" not in procedure and "the round stays not run" not in procedure
++
++
++def test_r047_t7_the_snapshot_id_and_the_err_name_together():
++    """T7: the design round's snapshot id is `DESIGN-<subject>-<round>` and the `.err` name follows from it."""
++    procedure = flat(section(read(DESIGN), "The procedure"))
++    assert ("The snapshot's id is the round file's name, `DESIGN-<subject>-<round>` (`review-guard.py snapshot "
++            "DESIGN-<subject>-<round>`, then `verify` under the same id), and the `.err` file's name follows from "
++            "it, `run/review/REVIEW-DESIGN-<subject>-<round>.err`, as the command above writes it.") in procedure
++    assert "2> run/review/REVIEW-DESIGN-<subject>-<round>.err" in procedure
++
++
++def test_r047_t26_the_pause_before_planning_work_with_a_push_notification():
++    """T26 (rule 48): a plan revision mid-build and a change's design are planning work; the supervisor pauses before
++    them and names the model to set, with a push notification when the owner has Remote Control on; the change
++    cycle's item 2 says the same for a change's design."""
++    assert ("A plan revision mid-build and a change's design are planning work: you pause before each, name the "
++            "model to set (Fable 5.1, as for a design revision), and, where the owner has Remote Control on, send a "
++            "push notification (`PushNotification`) carrying that line, since the owner may be away from the screen; "
++            "the work starts on the owner's word that the model is set.") in rule(48)
++    # Review A, round 1, S1: the rule's "nothing else waits" names planning work's exception
++    assert ("report leads with the switch and nothing else waits on it, save planning work (below), which waits "
++            "for the switch.") in rule(48)
++    assert ("Pause before it: a change's design is planning work (rule 48), so you stop, the report naming the "
++            "model to set, Fable 5.1, with a push notification (`PushNotification`) carrying that line where the "
++            "owner has Remote Control on; the design starts on the owner's word that the model is set.") in \
++        item(read(CHANGE_CYCLE), 2, "Design revision")
++
++
++def test_r048_d11_a_turn_ending_on_a_run_names_its_limit():
++    """D11 (rule 43): a turn that ends on a builder or reviewer run names the run's limit in the report."""
++    assert ("A turn that ends on a builder or reviewer run names the run's limit in the report (\"the builder runs "
++            "until 19:16 at the latest\"), its end worked out from the launcher's lines in the run's `.err` or output "
++            "file (the `slot taken` time for a heavy run, else the `started` time, plus the `limit` line's seconds, "
++            "all in UTC) and given on the computer's clock, read from `date` (KP-039), so the owner knows when a "
++            "running delegation is late.") in rule(43)
++    assert ("A heavy run still waiting for the slot has no `slot taken` line yet: the report says it waits and "
++            "gives the waiting line's `ends by` time (UTC, the latest the run holding the slot keeps it), "
++            "converted to the computer's clock as above, as the latest its command starts when it is next for "
++            "the slot, its own limit counting from its `slot taken`; a waiting line naming the holder `unknown` "
++            "carries no time, and the report gives none.") in rule(43)
++    assert "as the earliest its command can start" not in rule(43)
++
++
++def test_r048_d10_a_vendor_console_from_documentation_fetched_at_the_time():
++    """D10 (the run-sheet template): an instruction that sends the owner into a vendor's console is written from the
++    vendor's documentation fetched at the time, with the exact path."""
++    sheet = flat(section(read(SKILL), "Handing the user something to run " + chr(0x2014) + " the run sheet"))
++    assert ("- A step that sends the owner into a vendor's console (a dashboard, a settings or billing page) is "
++            "written from the vendor's documentation, fetched at the time, with the exact path to the field or "
++            "figure; never from memory, and the owner is never sent to look for a figure the sheet has not "
++            "located.") in sheet
++
++
++def test_r048_d7_rule_12_in_the_question_form_in_the_core_and_the_digest():
++    """D7: the digest's rule 12 reads "Reports lead with the owner's decision, asked in the question form", and the
++    core's rule 12 says what the question form is; the digest's cap and its rule numbers are
++    tests/test_session_start.py's."""
++    assert "12 Reports lead with the owner's decision, asked in the question form. 13 " in digest()
++    assert ("A decision the owner owns is asked in the question form (the `AskUserQuestion` tool, the recommended "
++            "option first), so that answering it is one choice.") in rule(12)
++
++
++def test_r048_d6_the_calibrated_line_is_rewritten():
++    """D6: the `Calibrated:` line is rewritten at each calibration, holding the latest calibration and its pending
++    items, the earlier text living in git (calibrate-bridge.md step 5 and the status template)."""
++    assert ("The line is rewritten at each calibration, never appended to: it holds the latest calibration and its "
++            "pending items, and the earlier text lives in git.") in flat(section(read(CALIBRATE), "5. Record and report"))
++    template = section(read(CORE), "Project state")
++    fence = template[template.index("```markdown\n"):template.index("\n```\n", template.index("```markdown\n"))]
++    line = [l for l in fence.split("\n") if l.startswith("Calibrated: ")]
++    assert line == ["Calibrated: <date> from <old> to <new> " + chr(0x2014) + " applied: %s; pending: %s @ <phase>; "
++                    "not applied (gate passed): %s (rewritten at each calibration; the earlier text lives in git)"
++                    % (ELLIPSIS, ELLIPSIS, ELLIPSIS)]
++
++
++def test_r053_p10_a_decided_rule_not_yet_built():
++    """P10 ("Project state"): a Decisions row whose rule a later increment or release builds says whether it applies
++    from the decision and how it is held until built; the next report names every decided-but-unbuilt rule; a release
++    that adds a safety mechanism says in its Running projects items how the loop holds it by hand."""
++    assert ("**A decided rule not yet built.** A Decisions row whose rule a later increment or release builds says "
++            "whether it applies from the decision and how it is held until built; the next report names every "
++            "decided-but-unbuilt rule with how it is applied meanwhile. A release that adds a safety mechanism "
++            "names, in its `Running projects must` items, how the loop holds it by hand until the release "
++            "installs.") in flat(section(read(CORE), "Project state"))
++
++
++def test_r053_p9_the_worked_scenario_lens_in_both_critics():
++    """P9: a rule about money or stored data is read against one worked scenario before it reaches code review, a
++    lens of the design critique (design.md) and of plan-critic."""
++    assert ("**A worked scenario for money and stored data** is a lens of both critics: a rule about money or stored "
++            "data is read against one worked scenario before it reaches code review (a retry after a lost reply, a "
++            "dry run, a benchmark, an approved live smoke, two users on one account), each step naming the store it "
++            "reads and writes; `plan-critic` carries the lens, and Review B's file copies it with the rest of its "
++            "sections.") in flat(section(read(DESIGN), "The procedure"))
++    assert ("- **A worked scenario for money and stored data.** Is every rule about money or stored data read "
++            "against one worked scenario before it reaches code review: a retry after a lost reply, a dry run, a "
++            "benchmark, an approved live smoke, two users on one account, each step naming the store it reads and "
++            "writes? A rule no scenario was walked through is **Should fix**; a step that can charge twice or lose "
++            "a result is **Blocking**.") in flat(section(read(PLAN_CRITIC), "When reviewing a design document"))
++
++
++def test_r053_p20_the_all_omitted_index_and_the_minimum_sets_binding():
++    """P20 (the conventions' section 8): a project whose design draws no architecture records it as an index with
++    every kind omitted; the minimum set binds every project whose code has components; the calibration's retrofit
++    reads the same rows."""
++    assert ("**A project that draws no architecture** records it as a diagram index with every kind omitted, each "
++            "with its reason in the Why column. The minimum set binds every project whose code has components (more "
++            "than one module a builder edits); such a project omits a kind of it only with its reason recorded in the "
++            "index's Why column and in its inventory's Decisions. The calibration's retrofit reads the same rows: a "
++            "kind omitted with its reason recorded in both places is covered, and any other omitted kind is a "
++            "retrofit item.") in \
++        flat(section(read(CONVENTIONS), "8. As-built diagrams and the retrofit (release A3, plan 8.7)"))
++    assert ("a state machine wherever the Issues file records a failure of state; a kind of it the project's "
++            "diagram index omits with its reason recorded in the index's Why column and in its inventory's "
++            "Decisions counting as selected, `Diagram-Planning-Conventions.md` §8) and write "
++            "`docs/diagrams/RETROFIT.md` naming the kinds it lacks") in flat(read(CALIBRATE))
