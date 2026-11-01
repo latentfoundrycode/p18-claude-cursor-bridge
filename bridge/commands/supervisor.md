@@ -522,8 +522,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
    (Phase 6, step 7, "The review ceiling"). Below it, new, legitimate, now-fixed concerns
    each round are the gate working; keep going; once the increment's core behaviour is
    verified, record the long tail of a hard subsystem under the by-class line and merge it;
-   a late finding then blocks only if it is of the five, or if two or more reviewers or
-   auditors name it and it shows no class already recorded under that line (the convergence rule). At and above it,
+   a late finding then blocks only if it is of the five, two reviewers naming the same defect making it certain, never blocking of itself (the convergence rule); its class is shown by reproduction on an ordinary, realistic layout, a label alone never deciding (a security finding by whether untrusted input can reach it), within the threat model `docs/INVENTORY.md` records, a finding outside which is recorded, not blocking. At and above it,
    every finding of an increment's review outside the five goes to `docs/HARDENING.md` with the
    increment, and a stage round's findings are disposed of as the reflection module's step 7
    says. Stop only on true non-convergence (same defect twice, a regressing fix). Resolve reviewer splits yourself, favouring established invariants; convene a

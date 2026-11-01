@@ -152,7 +152,7 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   what caught it; you mutate by hand in your own run and no script of it lands in the diff:
   the mutation run itself (the supervisor's mutants file, applied by the bridge's
   `mutation-run.py` on a scratch copy of the Workspace) is the supervisor's side's, written after your run with the criterion
-  tests, and a fix brief after a driver run asks you for the code fix only.
+  tests, and a fix brief after a driver run asks you for the code fix only. Where the Done section runs the whole suite, this bullet names the failures already known outside the Scope, each by its test id, so that you report them as known and fix none of them.
 - Prefer reuse over new code — existing helpers, the standard library, native platform
   features, already-installed dependencies — and write the minimum that meets the
   acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a
@@ -165,6 +165,7 @@ what you did, what you changed, what you ran and what it printed, what you could
 so that nothing of it is lost when your run ends early. When you finish, it holds a list of
 every file you changed, a one-paragraph summary of what you did, and a section headed
 exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
+Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. Each mutation is listed by this brief's own label and text, with what caught it. A command you did not run is written `not run`, never described as run. Run the suite once, after your last edit, and write the report's results after that run, naming the commit its counts belong to (`git rev-parse HEAD`) and that the working tree then held your uncommitted changes (`git status --short`).
 Your last message is the summary and the report file's path, and nothing follows it: the
 supervisor reads only the last message, and a message printed earlier and then followed by
 more work is lost.
@@ -284,6 +285,8 @@ undefined/NaN/`[object Object]`/untranslated-key rendered; no `console.error`). 
 instrumentation and reachability are **product code the builder implements** — the brief
 specifies them; the observability *tests* that verify them are the supervisor's, not the
 builder's. Cite the `docs/DESIGN.md` Observability section.
+
+**Escapes as text; non-ASCII listed.** Write an escape sequence or a backtick as the characters you mean, through the file-writing tool, never through a tool or a shell that reads escapes (a here-document, an inline command): a shell reads a backslash sequence as the real character, a right-to-left override among them (KP-052). Before the supervisor's checkpoint commit, list in your report back every non-ASCII character the brief holds, by line and code point, so that each is checked.
 
 ## Output
 

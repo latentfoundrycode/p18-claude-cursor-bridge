@@ -87,7 +87,7 @@ diffs, and a log line or captured state can carry a secret the diff never did. R
 never the value. (Screenshots you cannot grep — the guard there is test-mode synthetic data +
 the gitignored ephemeral artifacts dir + the `secure-coding.mdc` "never log secrets" rule.)
 
-**Invisible characters.** Run `python ~/.claude/cursor-bridge/invisible-check.py` from the Workspace root (release A4): it lists every zero-width, bidirectional-control or soft-hyphen character in the changed files by file, line and code point. Each is a FAIL unless the line is a user-facing string that needs it (a right-to-left word), and then the brief must have asked for it; such a character hides a token from your eye and from every grep below, and can reorder what a reviewer reads.
+**Invisible characters.** Run `python ~/.claude/cursor-bridge/invisible-check.py origin/main` from the Workspace root (release A4; against `origin/main`, so every commit of the branch is read, not only what is uncommitted): it lists every zero-width, bidirectional-control or soft-hyphen character in the changed files by file, line and code point. Each is a FAIL unless the line is a user-facing string that needs it (a right-to-left word), and then the brief must have asked for it; such a character hides a token from your eye and from every grep below, and can reorder what a reviewer reads.
 
 **Merge-conflict markers.** `git grep -n '^<<<<<<<\|^>>>>>>>'` must print nothing; a crashed resolver once left them and the commit went through (KP-060).
 
