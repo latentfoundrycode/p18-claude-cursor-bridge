@@ -70,6 +70,7 @@ flowchart LR
     actor_owner --> uc_calibrate
     actor_owner --> uc_change_cycle
     actor_owner --> uc_report_cycle
+    actor_owner --> uc_weekly_scan
 
     actor_supervisor --> uc_workflows
     actor_supervisor --> uc_resume

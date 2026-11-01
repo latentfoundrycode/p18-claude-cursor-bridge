@@ -6,7 +6,7 @@ Notes:
 
 - `SECRET:` marks a flow carrying a secret or credential; `UNTRUSTED:` one carrying what another vendor's agent wrote or chose. `--x` is withheld by the code; a dotted edge is reachable only by a deliberate act the bridge does not prevent (KP-032: not a sandbox; the agents run as the owner's Windows user).
 - **Stripped environment** (`bridge_env.stripped_env`; the shim applies the same test). Withheld: `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GIT_ASKPASS`, `SSH_ASKPASS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0`, every name `SECRET_LIKE` matches (whole-word TOKEN or SECRET, PASSWORD, PASSWD, PASSPHRASE, CREDENTIAL, API, ACCESS or PRIVATE KEY, a `_KEY` or `_KEYS` ending) but `CURSOR_*` and `GIT_CONFIG_KEY_*`. Set: `GH_CONFIG_DIR` (the empty folder), `GIT_TERMINAL_PROMPT=0`, `GIT_CONFIG_GLOBAL` (the bridge's gitconfig: includes `~/.gitconfig`, resets the helper list), `GIT_CONFIG_PARAMETERS='credential.helper='` (read after the checkout's `.git/config`), `HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH` (the agent home), `HF_HUB_CACHE`, `TORCH_HOME`, `PUPPETEER_CACHE_DIR` (the owner's caches, where present). Passed: the rest. An unusable agent home refuses the run (exit 125).
-- `bridge-run.py` strips for `cursor-agent` and with `--strip`; as built, a test, driver or watch run without the flag gets the owner's environment. The design has the loop's suite and driver launches carry `--strip`, the driver with its scratch folder named (R-052); the edge into the suite is drawn so, the as-built default a deviation (`docs/diagrams/DEVIATIONS.md`). `--key-file` is refused with `cursor-agent` and a driver.
+- `bridge-run.py` strips for `cursor-agent` and with `--strip`; as built, a test, driver or watch run without the flag gets the owner's environment. The design has the loop's suite and driver launches carry `--strip`, the driver with its scratch folder named (R-052); the edge into the suite is drawn so, the as-built default a deviation (`docs/diagrams/DEVIATIONS.md`). `--key-file` is refused with `cursor-agent` and a driver; a driver's copy carries the project's `.env`. A watch run (`gh pr checks`) runs no builder-written code and keeps the owner environment by design.
 - The guard's records lie in the checkout's `.git`; the sha256 copy outside it finds a rewritten snapshot. Both are in the owner's profile, which the agents' user can reach.
 - `p_dependency_scan` is designed (docs/DESIGN.md, "The weekly dependency scan", R-052), not yet in the tree.
 
@@ -21,7 +21,7 @@ Notes:
 | p_review_guard | bridge/cursor-bridge/review-guard.py |
 | p_pr_activity_check | bridge/cursor-bridge/pr-activity-check.py |
 | p_bridge_install | bridge/cursor-bridge/bridge-install.py |
-| p_test_suite | a project's tests under bridge-run.py, kind test |
+| p_test_suite | a project's suite or mutation run under bridge-run.py, kind test or driver |
 | p_builder | cursor-agent, builder run |
 | p_review_b | cursor-agent, review run |
 | p_shell_guard | bridge/cursor-bridge/shell-guard.py (.cursor/hooks/ copy) |
@@ -74,7 +74,7 @@ p_roster_check("roster-check probe")
 p_review_guard("review-guard")
 p_pr_activity_check("pr-activity-check")
 p_bridge_install("bridge-install")
-p_test_suite("Test suite run")
+p_test_suite("Suite or mutation run")
 ds_review_hashes[("review-hashes")]
 ds_heavy_lock[("heavy.lock")]
 ds_bridge_gitconfig[("bridge gitconfig")]
@@ -131,7 +131,7 @@ ds_guard_records -->|"rounds for the ceiling"| p_bridge_run
 p_bridge_run <-->|"heavy slot, holder"| ds_heavy_lock
 p_bridge_run -->|"listing before and after"| ext_beside_workspace
 ext_key_file -->|"SECRET: NAME=value to the child only, not to cursor-agent or a driver"| p_bridge_run
-p_bridge_run -->|"stripped environment with --strip (R-052), key values by --key-file; as built the default is the owner environment, DEVIATIONS"| p_test_suite
+p_bridge_run -->|"SECRET: stripped environment (--strip, R-052), a suite's key values by --key-file, a driver's from the project's .env in its scratch copy; as built the default is the owner environment (DEVIATIONS)"| p_test_suite
 ds_checkout -->|"UNTRUSTED: code and tests the builder wrote"| p_test_suite
 p_bridge_run -->|"SECRET: owner's gh login, CI watch"| ext_github
 
