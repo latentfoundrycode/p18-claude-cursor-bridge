@@ -1,15 +1,15 @@
 # D-001 — use-case: the bridge's actors and the goals it serves
 
-Level 1. Refines nothing. Drawn at release T (docs/DESIGN.md, "Change: release T", "Architecture — the retrofit's diagrams") as the retrofit of release B: the inputs are the requirements register (docs/REQUIREMENTS.md, R-001 to R-056) and the core's division of labour (bridge/commands/supervisor.md), not the code. The system is the bridge's own workflow as a supervised project; the phases are subgraphs inside the system boundary `sys_bridge`, and the actors stand outside it.
+Level 1. Refines nothing. Drawn at release T (docs/DESIGN.md, "Change: release T", "Architecture — the retrofit's diagrams") as the retrofit of release B: the inputs are the requirements register (docs/REQUIREMENTS.md, R-001 to R-056) and the core's division of labour (bridge/commands/supervisor.md, "The roles": the owner, the supervisor, the Cursor builder, the supervisor's specialists, Review B, the maintainer, GitHub), not the code. The system is the bridge's own workflow as a supervised project; the phases are subgraphs inside the system boundary `sys_bridge`, and the actors stand outside it.
 
-Each use case names the requirement IDs it serves; an edge joins an actor to a use case it takes part in. Enforced by the requirement trace (`completion-check.py`, every named ID built or owner-deferred) and by `plan-critic`'s review (every use case traced to the register). R-031 and R-037 are owner-deferred (2026-10-31) and drawn under the use cases they belong to.
+Each use case names the requirement IDs it serves; an edge joins an actor to a use case it takes part in. Enforced by `plan-critic`'s review (every use case traced to the register by the IDs in its node); `completion-check.py` traces the register itself, not this diagram. R-031 and R-037 are owner-deferred (2026-10-31) and drawn under the use cases they belong to.
 
 ```mermaid
 flowchart LR
     actor_owner(["Owner, a product manager"])
     actor_supervisor(["Supervisor session in Claude Code"])
     actor_builder(["Cursor builder, cursor-agent"])
-    actor_review_a(["The Claude reviewers: Review A, the auditors, plan-critic"])
+    actor_specialists(["The supervisor's specialists, its subagents: plan-critic, spec-packager, diff-reviewer, the auditors, refactor-scout, test-runner, secret-sentinel, diagram-specialist, cursor-configurator"])
     actor_review_b(["Review B, cross-family through cursor-agent"])
     actor_maintainer(["Maintainer session"])
     actor_github(["GitHub, CI and the merge"])
@@ -96,9 +96,14 @@ flowchart LR
     actor_builder --> uc_build
     actor_builder --> uc_stage_close
 
-    actor_review_a --> uc_design_critique
-    actor_review_a --> uc_review_a
-    actor_review_a --> uc_stage_close
+    actor_specialists --> uc_design
+    actor_specialists --> uc_design_critique
+    actor_specialists --> uc_plan
+    actor_specialists --> uc_configure
+    actor_specialists --> uc_brief
+    actor_specialists --> uc_inspect
+    actor_specialists --> uc_review_a
+    actor_specialists --> uc_stage_close
 
     actor_review_b --> uc_design_critique
     actor_review_b --> uc_review_b

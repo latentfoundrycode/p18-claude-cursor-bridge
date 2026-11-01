@@ -1,6 +1,6 @@
 # D-003 component-state: the Review B round of an increment
 
-Level 3, refines D-002 (`review_guard` = `bridge/cursor-bridge/review-guard.py`, `bridge_run` = `bridge/cursor-bridge/bridge-run.py`; the ceiling's constant `REVIEW_ROUNDS = 3` and the grammar readers live in `bridge/cursor-bridge/bridge_env.py`). Realizes R-042, R-055. Drawn as built (conventions §8) from the code of 2026.10.30d.
+Level 3, refines D-002 (`review_guard` = `bridge/cursor-bridge/review-guard.py`, `bridge_run` = `bridge/cursor-bridge/bridge-run.py`; the ceiling's constant `REVIEW_ROUNDS = 3` and the grammar readers live in `bridge/cursor-bridge/bridge_env.py`). Realizes R-042, R-055. Drawn from the code of 2026.10.30d (conventions §8), the design's transition kept where the code deviates: one deviation, listed in `docs/diagrams/DEVIATIONS.md` (the four early GATE-INTEGRITY returns of `verify`, which leave the launch unvoided; BUG-039).
 
 **Subject.** One Review B round `N` of one increment `ID`, named `nnn` = `ID` or `ID-r1` for round 1 and `ID-rN` after it, as `review_guard` holds it in `<git common dir>/bridge/rounds-ID.json` (each round: `round`, `name`, `branch`, `tree`, `time`, `lift`, `lift_line`, `reply`, and `seeded` for a seeded one; the record's hash copy beside the snapshot hash copies outside the checkout), in the snapshot `review-nnn.json`, in the verified mark `verified-nnn.json` and in the pre-merge record `premerge/<head>`, and as `bridge_run` writes it in `run/review/REVIEW-nnn.err` (first line `bridge-run: started <UTC>Z`, last line `bridge-run: exit <code>`) and in its `run/launcher/runs.jsonl` row (kind `review`, no `brief` and no `round`). A `DESIGN-` name passes the grammar and has no rounds record; it is not drawn.
 
@@ -18,12 +18,12 @@ Level 3, refines D-002 (`review_guard` = `bridge/cursor-bridge/review-guard.py`,
 | `review_launched` | `REVIEW-nnn.err` with the started line and no exit line yet; Review B running, no slot | bridge_run | partly: ceiling writes the launcher's two `.err` lines by hand; no test runs the launch or its `runs.jsonl` row (OPEN POINT) |
 | `reply_arrived` | `.err` ends `bridge-run: exit 0`, launched at or after the round's snapshot; the review row logged with exit 0; round `N` counts as replied | bridge_run, review_guard | partly: ceiling (the hand-written exit 0 read by `verify`); the re-snapshot's reading of the `.err` by neither (OPEN POINT) |
 | `no_verdict` | `.err` ends a non-zero exit (124 at the limit); no reply | bridge_run | neither (OPEN POINT) |
-| `verified_ok` | tree restored, `.err` kept; with exit 0 after the snapshot, `reply` 0 written (round spent); `verified-nnn.json` written | review_guard | `tests/test_review_guard_ceiling.py` (`verify` returns 0 for rounds 1 to 3) |
+| `verified_ok` | tree restored, `.err` kept, `verified-nnn.json` written; two arms: with exit 0 launched after the snapshot, `reply` 0 written (round spent) and the mark is one `premerge` accepts; with no launch, no exit yet or a failed exit, `reply` stays null and the mark is one `premerge` refuses | review_guard | the spent arm: `tests/test_review_guard_ceiling.py` (`verify` returns 0 for rounds 1 to 3); the failed-exit mark: `tests/test_review_guard.py`; the no-launch and no-exit arms by neither (OPEN POINT) |
 | `flagged_gate_integrity` | verify exit 1, no mark, no reply; after restoring, the launch voided as `flagged_launch` | review_guard | neither (OPEN POINT) |
 | `resnapshotted` | round `N` taken again: `tree` new, `time`, `reply` and lifts kept, marks cleared | review_guard | neither (OPEN POINT) |
 | `premerged` | the mark read and matched, the head confirmed, `premerge/<head>` written | review_guard | neither (OPEN POINT) |
 
-Transitions no enforcing test exercises yet: the owner's-line lift; the refusal `round N is reviewed: write ID-r(N+1)` (bug036 asserts only its absence); a class line already recorded; the launch refusals of `bridge_run`. `tests/test_review_guard.py` already exercises the verify flags, a failed review run and premerge, but is not in D-003's `Enforced by`.
+Transitions no enforcing test exercises yet, each one test of the addendum's test increment (R-055): the owner's-line lift; the refusal `round N is reviewed: write ID-r(N+1)` (bug036 asserts only its absence); the changed-tree refusal; a class line already recorded; the launch refusals of `bridge_run`; the `verified_ok` arms marked above. `tests/test_review_guard.py` exercises the verify flags, a failed review run and premerge and is in D-003's `Enforced by`.
 
 Not drawn (free space or other diagrams): the builder rounds' own ceiling in `bridge_run` (`launcher_effective_round`, the brief rule); the design critique's `DESIGN-` rounds; the content checks of `verify` beyond the outcome each one leads to.
 
@@ -64,9 +64,8 @@ stateDiagram-v2
         verified_ok --> verified_ok : snapshot nnn on a changed tree refused 125, round N is reviewed, write ID-r(N+1)
         verified_ok --> verified_ok : premerge refused, CANNOT CHECK 2 (no mark, a mark of another snapshot, no launch after the snapshot, exit not 0, dirty tree, gh failure) or GATE-INTEGRITY 1 (the head not descended from the reviewed head, a change outside run/review, the pull request head still different after 90 seconds)
         verified_ok --> premerged : premerge nnn with the pull request OK, mark matched, clean tree, head descends and differs only under run/review, the pull request head equal, premerge record for the head written
-        premerged --> [*] : gh pr merge squash with match-head-commit, the permission guard reads the premerge record
+        premerged --> [*] : merged, gh pr merge squash with match-head-commit, the permission guard reads the premerge record
     }
     round_open --> round_open : snapshot ID-r(N+1) admitted, round N+1 opened at snapshot_taken, the ID's verified marks cleared, when N+1 is at most REVIEW_ROUNDS 3, or above it with the owner's line covering N+1 (lift owner) or a Blocking class line in SCOPE-ID.md no other round recorded (lift class)
     round_open --> round_open : snapshot refused 125 and nothing written, ID-r(N+2) or further off the count, ID-r(N+1) above REVIEW_ROUNDS 3 with no lift (the review ceiling), or a Blocking class line already recorded for another round
-    round_open --> [*] : merged
 ```
