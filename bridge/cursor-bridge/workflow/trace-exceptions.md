@@ -132,7 +132,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md What must survive a compaction
 - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 3. Delegate to Cursor
 - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 3b. A model fails mid-step — switch automatically, restart the step, never wait
-- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 8. Merge (the verified gate)
+- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)
 - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md 7. Decide (accept the increment)
 - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The review ceiling
 - new TASK-034 bridge/cursor-bridge/workflow/phases/reflection.md What must survive a compaction
@@ -146,3 +146,13 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - reword TASK-037 bridge/commands/supervisor.md Project state
 - reword TASK-037 bridge/commands/supervisor.md Phase 2 — Design
 - reword TASK-037 bridge/commands/supervisor.md The change cycle — a request on a finished project
+- new TASK-038 bridge/cursor-bridge/workflow/phases/delegation-loop.md 8. Merge — in a sub-file
+- new TASK-038 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md Where this sub-file belongs
+- reword TASK-038 bridge/commands/supervisor.md Phase 2 — Design
+- reword TASK-038 bridge/commands/supervisor.md 8. Merge (the verified gate)
+- reword TASK-038 bridge/commands/supervisor.md Reflection points — stage close, phase gates, project end
+- reword TASK-038 bridge/commands/supervisor.md Standing rules
+- reword TASK-038 bridge/commands/supervisor.md Project state
+- new TASK-038 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)
+- new TASK-038 bridge/cursor-bridge/workflow/phases/design.md The procedure
+- new TASK-038 bridge/commands/supervisor.md The phase modules

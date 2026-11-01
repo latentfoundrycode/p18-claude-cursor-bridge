@@ -46,6 +46,8 @@ folder (`C:\Users\<name>\...`, `/c/Users/<name>/...`, `/home/<name>/...`,
 user name into a history that may be published, and it points at folders that exist on one
 computer only (rule 54). A path in an example or a comment counts.
 
+**Before a push, every commit it publishes.** When the supervisor asks before a push, scan every commit the push publishes (`git log -p <the base>..HEAD`), not only the staged diff, for those paths and for the account names the supervisor gives you: a commit not yet pushed is rewritten to remove the leak, never covered by a later commit, so report each by its commit and line (P5).
+
 **Protected paths.** Report any change to: `.env` or `.env.*`, `secrets/`,
 `*.pem`, `*.key`, `*.p12`, `*.pfx`, `id_rsa`, `.npmrc`, `.pypirc`, `.aws/`,
 `.ssh/`, `.git/`, `.github/workflows/`, `.gitignore`, and anything the task brief
