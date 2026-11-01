@@ -146,3 +146,6 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - reword TASK-037 bridge/commands/supervisor.md Project state
 - reword TASK-037 bridge/commands/supervisor.md Phase 2 — Design
 - reword TASK-037 bridge/commands/supervisor.md The change cycle — a request on a finished project
+- new TASK-038 bridge/cursor-bridge/workflow/phases/delegation-loop.md 8. Merge — in a sub-file
+- new TASK-038 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md Where this sub-file belongs
+- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)

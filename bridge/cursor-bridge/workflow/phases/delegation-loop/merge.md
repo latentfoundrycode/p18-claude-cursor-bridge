@@ -1,0 +1,104 @@
+## The merge (Phase 6, step 8)
+
+### Where this sub-file belongs
+
+This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 8, the verified gate, which runs for every increment after step 7, the decision (`delegation-loop/decide.md`): the review files, Review B on the guard's snapshot, the pull request, the CI watch, the merge and what follows it. It stands in a file of its own to keep the module within its size bound.
+
+### 8. Merge (the verified gate)
+
+Do not decide merge-worthiness by reading the diff for the user, and never ask the user
+whether the code is correct — they cannot judge it, and a check they cannot perform is
+not a check. Apply the gate in `~/.claude/cursor-bridge/Merge-Verification-Policy.md`
+instead. In short, a branch merges to `main` only when **all** hold:
+
+1. the required CI check is green (the real test suite ran and passed);
+2. **Review A** — the `diff-reviewer` subagent (pinned to a strong model) returns
+   APPROVE on the cumulative diff;
+3. **Review B** — a **cross-family**, non-Anthropic verifier returns APPROVE on the same
+   diff, invoked with execution per the policy, on a committed checkpoint that
+   `review-guard.py` snapshots before the launch and verifies and restores after it. **Write the diff to a committed file inside the
+   workspace and have Review B read it from that file — never pass it inline through the
+   shell** (inline heredocs mangle or drop the diff, and a reviewer that received no diff can
+   still emit an APPROVE-shaped reply). Two rules make that file whole and reachable:
+   (a) **generate it only from committed state** — `git status --porcelain` must print
+   nothing first, then `git diff <merge-base>...HEAD > run/review/REVIEW-<ID>-r<N>.diff`, named as the round's
+   snapshot below is, the earlier round's diff and assumptions file removed with `git rm` and committed
+   first, so that no round's diff carries another's; a diff
+   taken from the working tree silently omits every untracked new file (KP-017);
+   (b) **the file lives inside `Workspace/`** at `run/review/`, committed on the increment's
+   branch and removed with `git rm` before the merge — never in a temp folder outside the
+   project, which the Workspace boundary rightly blocks (KP-016); (c) **the branch's assumption lists travel with it** — write `run/review/ASSUMPTIONS-<ID>-r<N>.md` from the `Assumptions:` sections of the branch's commit messages (`git log <merge-base>..HEAD --format=%B`), commit it beside the diff, remove it with the diff before the merge, and name both files in the prompt: the list as extra places to look, never as the review's scope. Launch it exactly as the policy shows. **First** write `run/review/SCOPE-<ID>.md` (below) and commit it beside the diff: the guard reads it at the snapshot, its `Blocking class:` line included (step 7, "The review ceiling"). **Then** `python ~/.claude/cursor-bridge/review-guard.py snapshot <ID>-r<N>`, `<ID>` the increment's ID (`TASK-<nnn>`) and `<N>` the round it opens: one more than the rounds the guard has counted for the increment, or the same `<N>` again to re-run a failed launch on the same tree; the round's diff and assumptions file carry the snapshot's name, since the guard lists as the review's inputs, and refuses empty, the files under `run/review/` whose names hold it (KP-067); the SCOPE file, which it reads by `<ID>`, is not among them, so confirm yourself that it is not empty. It refuses a tree that is not clean (commit everything of yours first), a round off its count and a round above the ceiling with no lift, and records HEAD, the branch, every ref, the stash list, the repository's configuration and the ignored entries. **Then** the launcher, **in the background** (`run_in_background`; its completion is what wakes you, rule 43):
+   `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<ID>-r<N>.err`
+   (`--force` lets the reviewer **run the tests and build its own reproductions**, which is
+   where its strongest findings have come from — the owner's decision of 2026-10-04 after
+   a read-only mode was tried and found weaker; the launcher withholds the owner's
+   identity and ends the run at the limit; a review that runs a large suite can take most
+   of the hour). **While it runs, nothing of yours writes to the checkout**: no builder, no
+   `test-runner` (it would share the checkout, the databases, the ports and the caches with
+   the reviewer's own run), no commit, and no writing subagent either — no `spec-packager`
+   (the next brief waits for `verify`; one once wrote `handoff/` during a Review B run and
+   the guard flagged GATE-INTEGRITY, reAngle ISS-014), no `diagram-specialist`, no
+   `cursor-configurator`, nothing that writes under the checkout, your own status-file edits
+   included (`run/supervisor/in-flight.md` exists for those, rule 43); besides that file, the launcher's own `run/review/REVIEW-<ID>-r<N>.err` is
+   the one file written meanwhile, and the guard keeps it; read-only subagents
+   (`security-auditor`, a Review A on another branch's committed diff) may run.
+   **Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`: it reads `.git/config`, the active hooks folder (`core.hooksPath`, `.githooks` on every project today) and `.git/hooks` first, as files, without git — a `core.fsmonitor` line or a hook left there would run the reviewer's program with your identity on your next git command, and a change there stops the guard before it runs any git command of its own; every git command it then runs has the repository's hooks and file monitor switched off. It checks HEAD, the branch, the local refs and the stashes, puts the branch and every moved or added local ref back, restores the tree with `git reset --hard` and `git clean -fd` (keeping the `.err` file, whose first line — the launch time — it prints), lists what it removed, and compares every ignored file (cache folders apart): a change under `docs/`, `handoff/` or `run/review/`, or to `.env*`, is a flag even where the project gitignores those files; any other is listed as left behind. `GATE-INTEGRITY` — a commit, a moved HEAD, a new or moved ref or stash, a changed configuration, hook, record or `.env` — opens the flag (condition 4) and an issue; the tree is back at the checkpoint, the merge is not. It prints the snapshot file's hash, which must equal the one `snapshot` printed (a reviewer could rewrite the snapshot). What the guard cannot see is said in its header and KP-032: the contents of cache folders, anything outside the checkout, a reviewer that reaches for the credential store on purpose. **Note the
+   launch time in UTC** — the
+   launcher prints `bridge-run: started <time>Z` as its first stderr line, so it is the
+   first line of the `.err` file. The launch carries the Bash tool's `timeout` at the review
+   cap (`7200000`, step 3). The SCOPE file, `run/review/SCOPE-<ID>.md`, written and committed
+   before the snapshot (above) and removed with `git rm` with the diff, holds the brief's Scope
+   and Out of scope sections quoted, the tests, the mutants file (`run/supervisor/<ID>-mutants.json`) and any mutation driver you wrote, each test with the paragraph it enforces, and the
+   bookkeeping and record files in the diff that are expected (`docs/BUILDER_NOTES.md`, the
+   builder's report `handoff/TASK-<nnn>-r<N>-report.md`, the records you committed,
+   `run/review/`), and, at a round above the ceiling, that round's `Blocking class:` line. Nothing of this goes inline through the shell,
+   which mangles quoted text (KP-009). Give a **directive** prompt ("the diff is already at
+   `<path>`; read it; do not ask for it") with four short clauses (release A5): where the
+   increment ends and which tests the supervisor wrote are in `run/review/SCOPE-<ID>.md`,
+   read it (at a round at or above the ceiling, the guard's count at three or more, a fifth clause: grade every
+   finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line where
+   it has one); design for later increments is not this diff's defect (a reviewer once reviewed
+   design for later increments for nine rounds on one of them); verify a claim about a build
+   by building it, never by reasoning; reply with APPROVE, REJECT or ESCALATE-INTENT and the
+   reasons. A reply that does not name something specific from the diff — or that asks for
+   the diff, errors on trust, or carries none of the three verdicts — is a failed launch,
+   not a verdict: re-run once, then the roster's failure path (step 3b). Confirm receipt before trusting the verdict; with the guard's `OK`
+   in hand, **`python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <that launch time>` printing `OK`**: it lists what was written to the pull request since the launch and flags anything written as the owner (KP-032). `GATE-INTEGRITY` opens a gate-integrity flag (condition 4) and an issue; `CANNOT VERIFY` is not `OK`;
+4. no gate-integrity flag is open — the diff does not weaken tests, assertions, or CI, and
+   the builder's model family differs from both reviewers'.
+
+**Convergence is a signal.** When two or more reviewers or auditors independently name the
+same line or the same defect, treat it as blocking even if each alone marked it advisory:
+decorrelated reviewers agreeing is the strongest evidence the loop produces. This is the code
+gate's rule; a design critique's two critics are bounded by its ceiling instead (Phase 2). The
+rule grades a finding's certainty, never its class. Below the ceiling, two reviewers' agreement
+makes a finding blocking whatever its grade, with one exception: a class already recorded under
+the by-class line for that increment or that stage — two reviewers naming a further mutant,
+input or operator family of it name that class, which stays recorded and starts no round, and no
+class of the five is ever on that line. Past the ceiling — the guard's count of rounds opened
+for the increment or the stage at three or more — a convergent finding outside the five goes to
+`docs/HARDENING.md`, marked convergent (step 7, "The review ceiling").
+
+A `REJECT` from either reviewer goes back through re-delegation (step 7), not to the user
+— continue while concerns converge and get fixed, stopping only on non-convergence per
+step 7's brake, and at and above the ceiling only for a finding of one of the five blocking classes. A **split** verdict (one reviewer blocks, the other approves) you resolve
+yourself, favouring the project's established invariants; escalate it only if it turns on
+intent. An `ESCALATE-INTENT` verdict, and only that, surfaces to the user — as a plain
+intent question, never a correctness one.
+
+**PR titles start with every increment ID the branch carries** (`TASK-012 TASK-013: settings key store`): the squash commit takes the title, and that subject on `origin/main` is how `plan-check.py` knows an increment is merged.
+
+When all four hold the merge is authorised. A pull request that changes only records (`docs/`, the inventory, a design text) takes the same round: snapshot, Review B, `verify`, then `premerge`; `premerge` refuses a head whose snapshot has no verified mark, so there is no shorter way (release A1b). **Check `docs/RUN_PARAMETERS.md` first:** under
+`Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
+conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
+auto-merge. Under either authority, remove the review files with `git rm`, commit (that commit removes the review files and nothing else: a records edit in it is a change outside `run/review/`, which `premerge` refuses as GATE-INTEGRITY; the records move after the merge), push, and run `python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took: `OK` means the head about to merge descends from the head the reviews approved, differs from it only under `run/review/`, and is the pull request's head on GitHub; it prints the merge command, `gh pr merge <n> --squash --match-head-commit <sha>`, which refuses to merge any other head. A head that does not descend from the reviewed one, or a change outside `run/review/`, is a gate-integrity flag. A branch updated from `main` on GitHub ("Update branch") is a new head: the reviews run again on it — a re-review, not a flag. Under `supervisor` (the default), arm `gh pr merge <n> --squash --auto --match-head-commit <sha>` (the sha `premerge` printed and recorded) and watch the
+required `gate` check — **with one background command, never by ending your turn**: run `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast` in the background with the tool's `timeout` at the watch cap (`7200000`, step 3; `run_in_background`). Its completion notification is what wakes you; nothing else will. The launcher ends a watch that outlives an hour (exit 124: look at the pull request's checks yourself, then start a new watch); never prefix the command with anything else (`sleep`, `cd`, `timeout`): the rules match the command as written, and a wrapped command matches nothing. If it returns at once reporting no checks, CI has not registered the push yet: wait for the first check to appear (`gh pr checks <n>` once, a minute after the push), then start the same watch again; and when any watch ends green, confirm that the green run's head is the pushed head (`gh pr view <n> --json statusCheckRollup,headRefOid`) before `premerge` — a watch started right after a push once reported the previous commit's run (KP-051). The desktop app's CI monitor ("Auto-fix pull requests", `<ci-monitor-event>`) reports only problems — a failed check, a review comment — and **never a green gate**, so waiting for it after a green run waits forever (KP-028). Registering the PR with it is fine and its autofix of a failure is welcome, but it is never your wake-up. The owner authorises and requires this watch: it is one blocking command per PR, not a polling loop — never `sleep` loops, repeated status checks, or scheduled wake-ups for this. **While it runs, keep building:** if the next increment's Scope does not overlap the pending PR's files, start it now from `origin/main`; if it does overlap, prepare what does not depend on the merge (the next brief, reviews, docs), and only then end your turn — the watch will wake you. When the watch completes green (and the PR is mergeable), **complete the squash
+directly with `gh pr merge <n> --squash --match-head-commit <sha>`** (the sha `premerge` printed) rather than waiting on GitHub's auto-merge queue,
+which routinely lags by minutes. This is safe — branch protection enforces the required
+check regardless of who triggers the merge, so a direct merge cannot bypass CI; the armed
+`--auto` is only a safety net if the session ends first. Never complete a merge before the
+required check is green or before both reviews APPROVE. No human correctness click is
+involved; the merge is reversible, so a rare behavioural miss is caught retrospectively via
+the change log, not by a gate the user cannot operate. If the watch completes red, the failure is a defect like any other: diagnose, re-delegate, re-run the gate — never merge around it.
+
+**After every merge, mark the increment's runs healthy and bring local `main` along.** `python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id>` for the builder run and for Review B, the id being the launch time on the first line of each `.err` file, given whole (a test run that passed is marked by the launcher itself): a healthy run is what the launcher learns a ceiling from, and a run never marked never raises one (release A2). Then `git switch main`, then `python ~/.claude/cursor-bridge/sync-check.py --apply`; it must end IN SYNC or FAST-FORWARDED before anything else happens, and the next branch starts from there. Under `Merge authority: owner`, do the same at the first resume after the owner has merged. A worktree the merged branch had is torn down now (rule 39).
