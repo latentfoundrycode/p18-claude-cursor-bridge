@@ -116,7 +116,7 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
 # re-takes its pin in the same diff as its `reword` entry, and a reviewer reads the change to a pin as a new trace
 # exception; an increment that adds an entry adds its section's pin.
 EXCUSED_MODULE_SECTIONS = {
-    ("change-cycle.md", "The procedure"): (6772, "dcef638691afd09a52d40d5faab5a5501be74de54396ccb2ac71b0c98291b42f"),
+    ("change-cycle.md", "The procedure"): (7060, "e440cf4ca3f4682799e5c11683df71e2dce634699c3d9765e2b651d8761e960d"),
     ("change-cycle.md", "What must survive a compaction"): (2084, "4f007ec186e0d5a5f5f0314caaca28faa523e62a93302a1611545446284091e9"),
     ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
     ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
@@ -144,6 +144,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("design.md", "Extension points"): (761, "0084dfd13bf170a046f673a2312ed9580521c8be2a0a428b167b06aca65ffeb1"),
     ("design.md", "The delivery kind"): (494, "6b32868830fa9a36639468c4485c247450ad5d9337993b315eaed2480bf51dd5"),
     ("design.md", "The gate"): (3276, "811efda0ecdbcc72898697ee0027efe24d7e9a09c5263ab4919bb976cd5c8768"),
+    ("design.md", "The procedure"): (16344, "a67c2906067fe1115f75142d8e8f81757c6c43a4582e93c4b980cb8bb6090ebc"),
     ("design.md", "Traits at the design gate"): (3403, "653036f6b84c11afd94a9900be1477d23e9b839bc1c9e2eb933a0d03860a617b"),
     ("design.md", "What must survive a compaction"): (1906, "c02f83be92ac4da84e33cffdcafd0117448fae2be656e6685b11e1a6e4d11f9e"),
     ("intake.md", "Classifying each part"): (3506, "e1c84b276fbe04b3d5b331daa6b65c04dfd5101550786fd874e49b8477150192"),

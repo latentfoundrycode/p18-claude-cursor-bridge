@@ -190,7 +190,7 @@ A release that adds or changes a conditional workflow (a product type's, a sub-t
 ## 5. Record and report
 
 Update `docs/PROJECT_STATUS.md`: `Bridge version: <new>` and a line
-`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`. Where step 1b wrote the windowless default, the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected counts and the exit statuses, before and after the write) and whether the write stands, stands unverified or was reverted.
+`Calibrated: <date> from <old> to <new> — applied: <items>; pending: <items @ phase>; not applied (gate passed): <items>`. Where step 1b wrote the windowless default, the line also names the two suite runs' results (item 4's comparison: the failed and erred ids, the collected counts and the exit statuses, before and after the write) and whether the write stands, stands unverified or was reverted. The line is rewritten at each calibration, never appended to: it holds the latest calibration and its pending items, and the earlier text lives in git.
 Commit it with the configuration checkpoint if there was one.
 
 Report under the "Reporting to the user" rules — first line is the one thing they own or

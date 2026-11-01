@@ -140,3 +140,9 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - reword BUG-031 bridge/commands/supervisor.md The core, in brief
 - reword BUG-031 bridge/commands/supervisor.md Standing rules
 - reword BUG-031 bridge/commands/supervisor.md 9. Refactoring and optimization pass (at stage close)
+- new TASK-037 bridge/cursor-bridge/workflow/phases/design.md The procedure
+- reword TASK-037 bridge/commands/supervisor.md The core, in brief
+- reword TASK-037 bridge/commands/supervisor.md Standing rules
+- reword TASK-037 bridge/commands/supervisor.md Project state
+- reword TASK-037 bridge/commands/supervisor.md Phase 2 — Design
+- reword TASK-037 bridge/commands/supervisor.md The change cycle — a request on a finished project

@@ -276,7 +276,7 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
 # under it, so CI holds the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this
 # pin is reviewed as a new trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the
 # increment's record names each passage it adds or rewords under the procedure
-PROCEDURE_SHA256 = "dcef638691afd09a52d40d5faab5a5501be74de54396ccb2ac71b0c98291b42f"
+PROCEDURE_SHA256 = "e440cf4ca3f4682799e5c11683df71e2dce634699c3d9765e2b651d8761e960d"
 
 
 def test_the_change_cycles_procedure_is_pinned():
@@ -284,7 +284,7 @@ def test_the_change_cycles_procedure_is_pinned():
     one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
     text = module("change-cycle")
     proc = text[text.index("### The procedure"):].rstrip()
-    assert len(proc) == 6772 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
+    assert len(proc) == 7060 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
 
 
 def test_r004_the_positions_the_survival_lists_name_are_kept():
