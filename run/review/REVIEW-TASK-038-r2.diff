@@ -1,0 +1,1029 @@
+diff --git a/bridge/agents/diff-reviewer.md b/bridge/agents/diff-reviewer.md
+index 9b770f4..e825827 100644
+--- a/bridge/agents/diff-reviewer.md
++++ b/bridge/agents/diff-reviewer.md
+@@ -12,6 +12,8 @@ You review code you did not write, against the brief that commissioned it. You n
+ edit anything. If you find yourself wanting to fix something, describe the fix
+ instead.
+ 
++You write no file under the checkout and point no cache there: a scratch file or a test cache goes to the system temporary folder (pytest run with `-p no:cacheprovider`), so the tree is as you found it.
++
+ You search only inside the project's `Workspace/`, or the worktree the supervisor names, never the home folder, another project or the whole disk; your turns are limited (`maxTurns`), so work from the diff and the files it names outward (release A2).
+ 
+ You never leave anything of yours running when you end: no background command, and never a polling loop (`until … sleep`, `while … sleep`) on a file or a task's output — wait for a command with the tool's own timeout, and report what did not finish. A loop left behind runs on after you, and the supervisor's loop guard has to find it (KP-042).
+@@ -187,6 +189,8 @@ channel at all).
+ which the supervisor rules on; what used to be "pass with findings" is an `APPROVE` with
+ those sections filled.
+ 
++An `APPROVE` with no finding in any section names, under NOTED, three statements of the diff you verified, each with a short quotation and the file and line it stands at, so the supervisor can see the diff was read; a clean reply with none is read as no review.
++
+ `REJECT` means the diff should not be committed as-is. Use it when a requirement is
+ unmet, the scope was violated, or there is a defect that will cause incorrect
+ behaviour. Do not soften a `REJECT` because the work is mostly good.
+diff --git a/bridge/agents/secret-sentinel.md b/bridge/agents/secret-sentinel.md
+index d19d0be..ce860c6 100644
+--- a/bridge/agents/secret-sentinel.md
++++ b/bridge/agents/secret-sentinel.md
+@@ -46,6 +46,8 @@ folder (`C:\Users\<name>\...`, `/c/Users/<name>/...`, `/home/<name>/...`,
+ user name into a history that may be published, and it points at folders that exist on one
+ computer only (rule 54). A path in an example or a comment counts.
+ 
++**Before a push, every commit it publishes.** When the supervisor asks before a push, scan every commit the push publishes (`git log -p <the base>..HEAD`), not only the staged diff, for those paths and for the account names the supervisor gives you: a commit not yet pushed is rewritten to remove the leak, never covered by a later commit, so report each by its commit and line (P5).
++
+ **Protected paths.** Report any change to: `.env` or `.env.*`, `secrets/`,
+ `*.pem`, `*.key`, `*.p12`, `*.pfx`, `id_rsa`, `.npmrc`, `.pypirc`, `.aws/`,
+ `.ssh/`, `.git/`, `.github/workflows/`, `.gitignore`, and anything the task brief
+diff --git a/bridge/commands/supervisor.md b/bridge/commands/supervisor.md
+index a0494c0..35e76a2 100644
+--- a/bridge/commands/supervisor.md
++++ b/bridge/commands/supervisor.md
+@@ -223,7 +223,7 @@ Each phase's procedure is a module of its own, a file under `~/.claude/cursor-br
+ | Reflection points | `~/.claude/cursor-bridge/workflow/phases/reflection.md` |
+ | Project end | `~/.claude/cursor-bridge/workflow/phases/project-end.md` |
+ 
+-Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`. A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 7 is in `delegation-loop/decide.md` and its step 9 in `delegation-loop/refactoring-pass.md`.
++Each module keeps the headings it had in this file (`Phase 6 — The delegation loop`, its step 8, and so on), so a rule or a document that cites a phase or a step by its heading finds it in its module; the one exception is the interface module, whose heading names the phase (`Phase 3 — Interface`) since its mockups became one of its variants, kept in `interface/mockups.md`. A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 7 is in `delegation-loop/decide.md`, its step 8 in `delegation-loop/merge.md` and its step 9 in `delegation-loop/refactoring-pass.md`.
+ 
+ All 58 standing rules stay in this file, the phase-specific ones (29, 31 and 33) included: the digest cites them by number, and a rule moved to a module would leave a number the digest names pointing at nothing.
+ 
+@@ -405,7 +405,7 @@ Terms fixed: <term — the sense fixed with the user — Established | Risky; on
+ Software name: <the name that names the Documents set>
+ Layout: Workspace=<resolved path>  Documents=<resolved path>
+ Worktrees: <none | <name> — branch <branch> — since <date> — <why two branches had to be live>>
+-In flight: <none | TASK-nnn in <checkout> since <time>; one line per parallel increment | <agent> in the background since <HH:MM>, ceiling <HH:MM>>
++In flight: none (the file a pull request carries reads as at its merge; between merges the live position is written in run/supervisor/in-flight.md, rule 43: TASK-nnn in <checkout> since <time>, one line per parallel increment; <agent> in the background since <HH:MM>, ceiling <HH:MM>)
+ Working files: <none | run/supervisor/ — what is there (helper scripts, notes), one line>
+ Delegated gates: <none | "<the owner's words>" (<date>) for <the named change or cycle>>
+ Remote sync: <in sync at <date> | NO REMOTE | OFFLINE since <date> | UNPUBLISHED — first push pending>
+@@ -785,7 +785,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep
+ 41. The project's state lives in two bounded files, both read whole at every start and resume: `PROJECT_STATUS.md` (where the work is — rewritten in place, within 120 lines and 12,000 characters) and `INVENTORY.md` (what the software is — Features, Resources, Decisions, Deferred — edited in place, updated in the same commit as each `CHANGES.md` entry, and entered the moment the owner provides a resource). Look it up before you ask or propose: never ask the owner for something Resources already lists, never propose what Features already has, never reverse a Decision without quoting its reason and the circumstance that changed. Private memory is not project state. `inventory-check.py` runs at every reflection point and must pass. `project.json` at the Workspace root states the fundamentals for people and programs
+     and is brought up to date at every reflection point.
+ 42. Every builder run ends with an `Assumed, not verified` list — it is in the Done section of every brief — because the run is one-shot and where the builder guessed is lost when it ends. Copy it before anything else; a missing list is *unknown*, never *none*. Give every item one disposition — test, contract, council, or accepted (a Decisions row) — record them in the accept commit's `Assumptions:` body, and hand the list to the reviewers (Review B through the round's `run/review/ASSUMPTIONS-<ID>-r<N>.md`) as extra places to look, never as their scope. At every stage close and at project end, name your own three least-confident parts, each with the check that settles it, in `HARDENING.md`, and settle the testable ones before the next stage.
+-43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background agent, or a background command **of a kind that finishes**, is still running — its completion notification wakes you: a builder run, a Review B run, the CI watch, a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run or another driver, run through it too (`--kind driver`), or a benchmark, or a test runner the launcher does not know by name (it answers exit 125), run directly in the background, each marked with the comment `# wake` (a wrapper of the project's own that itself calls the launcher is marked `# wake builder` or `# wake review`, and the guard gives it that kind's ceiling; 2026.10.11c); an unknown runner also gets an Issues entry naming it, so the launcher learns it. A background command of yours is ended with `python ~/.claude/cursor-bridge/bridge-stop.py <run id>` (a launcher run, from its pid file) or `--pid <pid>`, which ends its whole process tree after checking that the pid is still the launcher's (a loop not started through the launcher: its pid from `tasklist /V /FI "IMAGENAME eq bash.exe"`, then `--pid`); `TaskStop` ends the loop and not its children, which is how a stopped verification loop advanced into its next driver (KP-056). A reviewer that ends at its turn limit (`maxTurns`) without a verdict is no verdict: run it once more on the part of the diff it had not reached, then record an issue. A server, a worker or a probe you started is never a wake source: it never finishes, so nothing would wake you (KP-031). A background agent counts only under its ceiling, an hour unless `Agent ceiling:` in the run parameters says more (release A2, plan 10.3): when you end a turn to wait for one, write it on the status file's `In flight:` line (or, while a review runs on a snapshot, in `run/supervisor/in-flight.md`, copied to the status file after `verify`, so the reviewed tree is not changed) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the agent>"` (copy the command the loop guard's refusal prints, with the Bash tool's `timeout` at its seconds plus a minute, in milliseconds; the timer's completion wakes you at the ceiling), because a hung agent never completes, and a scheduled wake-up (`CronCreate`) does not fire while a background agent runs, since the session is not idle for the scheduler (KP-043, proven 2026-10-11; KP-039 for the clock arithmetic of any wake-up you still schedule for an idle wait); at that wake-up or at any checkpoint, stop an agent older than its ceiling with `TaskStop` and run its task again in the foreground, where the reviewer's turn limit bounds it; the loop guard refuses a stop that waits on an agent with no timer running to its ceiling — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. A turn that ends on a builder or reviewer run names the run's limit in the report ("the builder runs until 19:16 at the latest"), its end worked out from the launcher's lines in the run's `.err` or output file (the `slot taken` time for a heavy run, else the `started` time, plus the `limit` line's seconds, all in UTC) and given on the computer's clock, read from `date` (KP-039), so the owner knows when a running delegation is late. A heavy run still waiting for the slot has no `slot taken` line yet: the report says it waits and gives the waiting line's `ends by` time (UTC, the latest the run holding the slot keeps it), converted to the computer's clock as above, as the latest its command starts when it is next for the slot, its own limit counting from its `slot taken`; a waiting line naming the holder `unknown` carries no time, and the report gives none. The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase. It reads the background tasks and scheduled wake-ups Claude Code hands it, and the session record only when that list is absent.
++43. Never end a turn while the loop has work unless something will wake you. During `building` or `changing`, a turn may end only when (a) a background agent, or a background command **of a kind that finishes**, is still running — its completion notification wakes you: a builder run, a Review B run, the CI watch, a test suite you await, run through the launcher (`--limit auto --kind test`), or a mutation run or another driver, run through it too (`--kind driver`), or a benchmark, or a test runner the launcher does not know by name (it answers exit 125), run directly in the background, each marked with the comment `# wake` (a wrapper of the project's own that itself calls the launcher is marked `# wake builder` or `# wake review`, and the guard gives it that kind's ceiling; 2026.10.11c); an unknown runner also gets an Issues entry naming it, so the launcher learns it. A background command of yours is ended with `python ~/.claude/cursor-bridge/bridge-stop.py <run id>` (a launcher run, from its pid file) or `--pid <pid>`, which ends its whole process tree after checking that the pid is still the launcher's (a loop not started through the launcher: its pid from `tasklist /V /FI "IMAGENAME eq bash.exe"`, then `--pid`); `TaskStop` ends the loop and not its children, which is how a stopped verification loop advanced into its next driver (KP-056). A reviewer that ends at its turn limit (`maxTurns`) without a verdict is no verdict: run it once more on the part of the diff it had not reached, then record an issue. A server, a worker or a probe you started is never a wake source: it never finishes, so nothing would wake you (KP-031). A background agent counts only under its ceiling, an hour unless `Agent ceiling:` in the run parameters says more (release A2, plan 10.3): when you end a turn to wait for one, write it in `run/supervisor/in-flight.md` (where the live position between merges lives: the status file a pull request carries reads as at that pull request's merge, its `In flight:` line `none`, ISS-009 and KP-069; a resume reads `in-flight.md`'s last entries first) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> "<the agent>"` (copy the command the loop guard's refusal prints, with the Bash tool's `timeout` at its seconds plus a minute, in milliseconds; the timer's completion wakes you at the ceiling), because a hung agent never completes, and a scheduled wake-up (`CronCreate`) does not fire while a background agent runs, since the session is not idle for the scheduler (KP-043, proven 2026-10-11; KP-039 for the clock arithmetic of any wake-up you still schedule for an idle wait); at that wake-up or at any checkpoint, stop an agent older than its ceiling with `TaskStop` and run its task again in the foreground, where the reviewer's turn limit bounds it; the loop guard refuses a stop that waits on an agent with no timer running to its ceiling — or (b) you are waiting for the owner, and the `Awaiting user on:` line of `PROJECT_STATUS.md` says so: an escalation, a gate, a pause the owner asked for, a stage pause. Waiting for CI is (a): one background `gh pr checks <n> --watch --required --fail-fast`; the desktop app's CI monitor never reports a green gate. Clear `Awaiting user on:` to `nothing` the moment the owner answers. A turn that ends on a builder or reviewer run names the run's limit in the report ("the builder runs until 19:16 at the latest"), its end worked out from the launcher's lines in the run's `.err` or output file (the `slot taken` time for a heavy run, else the `started` time, plus the `limit` line's seconds, all in UTC) and given on the computer's clock, read from `date` (KP-039), so the owner knows when a running delegation is late. A heavy run still waiting for the slot has no `slot taken` line yet: the report says it waits and gives the waiting line's `ends by` time (UTC, the latest the run holding the slot keeps it), converted to the computer's clock as above, as the latest its command starts when it is next for the slot, its own limit counting from its `slot taken`; a waiting line naming the holder `unknown` carries no time, and the report gives none. A pull request whose status file another pull request's merge overtook has the file rewritten as at its own merge and `main` merged into it, a new head the reviews read again (the delegation loop's step 8). The `loop-guard` Stop hook enforces this: when the status file says the loop is running, nobody is being waited on, and nothing is pending, it refuses the stop once with the reason; it never blocks twice in a row, outside a bridge Workspace, or in any other phase. It reads the background tasks and scheduled wake-ups Claude Code hands it, and the session record only when that list is absent.
+ 44. Done is measured against the requirements register, not against the plan. Every requirement the owner stated, supplied, or approved — each screen and state of the approved mockup included — is a row in `docs/REQUIREMENTS.md` with an ID; every build-plan increment names the IDs it satisfies; tests carry the IDs they prove. Only the owner defers or drops a requirement, with a date. `completion-check.py --mode plan` passes at the plan gate and every stage close; `--mode done` must pass before "Project complete" and runs first in every change cycle, so an inherited "done" is verified, never trusted. A stand-in in shipped code is a failure, not a feature.
+ 45. Design is diagram-based. The Project Design Document is `docs/DESIGN.md` plus the normative diagrams in `docs/diagrams/`, drawn per `Diagram-Planning-Conventions.md`: every catalogue kind selected or omitted with a reason; top-down, level by level, drafted by `diagram-specialist` subagents and integrated by you; Level 4-5 detail only where it is load-bearing, with the reason recorded; every normative diagram enforced by a deterministic check, tests, or a named review item. `diagram-check.py --mode design` passes before the design gate, `--mode code` at step 4 of every increment and every stage close, `--mode done` at project end. Briefs carry the diagram slices their increment touches. The terms in `Glossary.md` are the bridge's vocabulary; use them in that sense in everything you write.
+ 46. The build plan is explicit. Every increment states its parent, dependencies, parallel flag, requirements, diagrams, and scope; stages are vertical slices; status is derived from the commits on `origin/main`, never written by hand. `plan-check.py` passes at the plan gate and lists what is ready. With `Parallel increments: on`, the builders of ready increments it lists as `TOGETHER` may be launched together, each in its own worktree with `--workspace`, committing their own work, the launcher's one heavy slot building them one after the other; you never work inside a worktree, and you process the finished branches one at a time in your own checkout — scope, diagrams, reviews, tests, gate, merge.
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 0abf478..2c00039 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,20 +1,20 @@
+ {
+   "version": "2026.10.30d",
+-  "generated": "2026-11-01 16:48",
++  "generated": "2026-11-01 21:15",
+   "files": {
+     "agents/cursor-configurator.md": "8bcb0ebba97ba25c4f81528c439195619196e7d078c4b0054a206e51fa7c8cd2",
+     "agents/design-auditor.md": "884616eb6e73043cd4423b7d6db1f4ac0ac4620e45d3fd6939f2ceffed140ea4",
+     "agents/diagram-specialist.md": "7105060c84d870d933be43675b410c90c1e04df6029f92ad4146884c57d2fee5",
+-    "agents/diff-reviewer.md": "1ce866762d699cad745c1a0436eb6bd338449f94e07ac5dbd18b75bd42fb2dc6",
++    "agents/diff-reviewer.md": "6b50939d662d0990c4bf76aff982ee69d564f95b71ad080ac9d86008c3d673ad",
+     "agents/plan-critic.md": "081ea51c3e0910b07a14555505ddabc50c56a93eeffb5d981e8fbfa4b81aa78e",
+     "agents/refactor-scout.md": "8e077479f19b7c4a7a45e5ad38c9935d5b660a6b5f58a2ed0f608facb1dfdbc6",
+-    "agents/secret-sentinel.md": "ee011fcf065ad01f98e7b9b16f6081d826983a12eeb9ebff2764d5bc05ad81db",
++    "agents/secret-sentinel.md": "148228ad552066af2b5a7a90ec7f728f37fecf9e0eec5a1a3161e3e35872e2f0",
+     "agents/security-auditor.md": "09c1cc89a9e73f0a578891590cd148817cb5bb9a0ead77e7456c28d32c760d0c",
+     "agents/spec-packager.md": "fba6860ca9f945e154e2b6d0b7adae3bcbc14c9869b2b626769cea0340a25626",
+     "agents/test-runner.md": "abbaa2acc5252dc9357906a4e06fb9a3d49078659c54645fd85068a905c25d36",
+     "commands/calibrate-bridge.md": "48cd53531f15046878843cd2b3f725441b0f01d44936d3ae4bb393bcc0d09e99",
+     "commands/evaluate-reports.md": "0845cf7b6d5bf49c847202a670201b79cbf4dc1b819c8c828fe07cb2ddc0499d",
+-    "commands/supervisor.md": "9758dce149eea1f62c8b9fcb0449894379ee0835c0e05b7b8a93ac3a0971c09d",
++    "commands/supervisor.md": "8f8e15bc50da06e8586e4a5f6c1286a7a6be08100f7dc325e5686ce41011c959",
+     "cursor-bridge/CHANGELOG.md": "226fa3ac3824b60045ec63a399bf9ca137940b9dad4e71fd5bb3a78c01cbfa24",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "d76f5b10bcf60d87d38d89e05e7cc821afeaa6b2fb90a3dbcccb14c4741c6460",
+@@ -22,7 +22,7 @@
+     "cursor-bridge/Diagram-Planning-Conventions.md": "04413b1084588cf1cde57ebc7ecea901c97e4aaec73a9216ddcbbcf2f4e856cc",
+     "cursor-bridge/Glossary.md": "604c984d05dc3b1478555471e8c96ee5785ce996a006aa1aa81781c5af26826a",
+     "cursor-bridge/Known-Pitfalls.md": "997e9c55429edcb212018f8d39f85c4717ab92fc40a2e7ba67f60e97a218087d",
+-    "cursor-bridge/Merge-Verification-Policy.md": "f21a7c69ea09e1c3307e6d976cb58894b00a0385c558c7ca0daeb4eb0389cfc0",
++    "cursor-bridge/Merge-Verification-Policy.md": "17fca1109ac60d184d03125f8def207c252d4d623598ded5043ffb36529bb9f4",
+     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
+     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
+     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
+@@ -98,8 +98,8 @@
+     "cursor-bridge/scope-check.py": "93039ffe48e42fa59bd05a81bf015a8ec9aec07503d8b6d2aef12d563c9087ed",
+     "cursor-bridge/secure-coding.snapshot.md": "3f41667754917ffef6fb47308645356be6a5fd2fc362cc9c3dedf92a9457324e",
+     "cursor-bridge/semgrep-bridge-rules.yml": "924db9d2386c850dafd4e3f829a693dc0fef0d1409ef7f5887302a930c8192ec",
+-    "cursor-bridge/session-start.py": "a701ce9f242c5d106cd7e5c5232ac01315ecfc5996b9947551d0e786a64b4122",
+-    "cursor-bridge/settings.bridge.json": "11c2ca359c2d179910e4e5998c9d4776f0b57e4918763276bdd2be05040db15e",
++    "cursor-bridge/session-start.py": "c51be8764e0bab11b2b6f899e02a18fbe6b6b181c4a60392f55f1721f60a7df6",
++    "cursor-bridge/settings.bridge.json": "b8297250a22efcbb9454ccc42773e622b1e3ebeeab6a67471dd9bf1a2ccda75f",
+     "cursor-bridge/shell-guard.py": "6abdc15bd149afdf1561997512b75253a154f58ddb05355577b4ebbcec36c67b",
+     "cursor-bridge/stage-diff.py": "167685045331b10e550679eb28fd51e7d829603310bde841bafb3a1cdd9a1ecc",
+     "cursor-bridge/sync-check.py": "41d4e74931b150bba23a67a1a024b640f95673a490b3a6522af3f9d6ff43e0de",
+@@ -113,10 +113,11 @@
+     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
+     "cursor-bridge/workflow/phases/change-cycle.md": "44b959f3dec13124713d8bfc34aa934aafd98cc1a4c834ea894320ab3e7b0c8d",
+     "cursor-bridge/workflow/phases/configuration.md": "b14ecaccb184683649fabba82db77743e5b26cd9509d48b1f4e71da2196c054d",
+-    "cursor-bridge/workflow/phases/delegation-loop.md": "770de5a46aca6d0cf82e5e442f644f701ea3510090a668ee53fa8ee13f1d262b",
++    "cursor-bridge/workflow/phases/delegation-loop.md": "db89bc797e11ef5ebcc383c740b587f470ca3bf6b3e28ac5d60729b7aaffb3f8",
+     "cursor-bridge/workflow/phases/delegation-loop/decide.md": "edbdc407586a0ad281d2a96b9b5c32ff8722952ea33eeb0aff86cb189a32d839",
++    "cursor-bridge/workflow/phases/delegation-loop/merge.md": "2f7745398b0309540412269b79d60a47f9ff2008749489d85b132a98d426a1b5",
+     "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "9f0cf26d5e7e4d99a9afbd1e0e99563e25d2e158dc8ea903ee4e08ab6b3e3774",
+-    "cursor-bridge/workflow/phases/design.md": "b153f408507f43b25d29ce60d4d5ac0837094dc4c9845951f27623a537d85100",
++    "cursor-bridge/workflow/phases/design.md": "5ce436ac6b93395f3e9ce9695d7eae79e562bfee82923ea81601a96f624d60f8",
+     "cursor-bridge/workflow/phases/intake.md": "61bbe3237d03fbd407b891d9d3cf2499a3eb938b66341b8e0abb0e2a0f92bfa2",
+     "cursor-bridge/workflow/phases/interface.md": "bb2858865af7959437f191392a884f2cc37216501f5e508aca106986a5fff201",
+     "cursor-bridge/workflow/phases/interface/command-design.md": "7a6f12a00a4c7da411ed51fd7eb485e24ef14fd1dcc606db5052fbf4ab1d2caf",
+@@ -125,10 +126,10 @@
+     "cursor-bridge/workflow/phases/interface/playable-prototype.md": "92e933746c522bb37fc71a5172a873cb7cbea3abe6ebc45c9df03c458476542c",
+     "cursor-bridge/workflow/phases/planning.md": "7ee59c24ed2d34c3cd7c9a92baa1c8c1d3a327ec61a10246aa9bbeaa58dfdaee",
+     "cursor-bridge/workflow/phases/project-end.md": "332eb6a723dc0bfb9458d36a12823ae0089f17b78787049eff9d9179c072168b",
+-    "cursor-bridge/workflow/phases/reflection.md": "538374f082da632e60ff1d9c132e4e6380b7a058b0f7b3590a677e755d1aebec",
++    "cursor-bridge/workflow/phases/reflection.md": "657470821fd82f1030eb538755f62f5ac5c4cf8d9d551eb07baa50e89ec908ec",
+     "cursor-bridge/workflow/phases/run-parameters.md": "5e6cca2f666957ac0b92663ecfed6c8374735c95e3681d09f8fb4f4368beee68",
+     "cursor-bridge/workflow/trace-baseline.txt": "d991ee52c3e528e817ad6691271970ec8ec1f31303b4cf150c512ec1b5ca49ad",
+-    "cursor-bridge/workflow/trace-exceptions.md": "85ce4c809ffe463a7747b165807928e84bf80123e50c65edd949318ab1698b96",
++    "cursor-bridge/workflow/trace-exceptions.md": "6bc7da2e6c5ebc1b813aa2297f6fb1b0c24e7c2d38557135c2f8a1b38d16b55b",
+     "cursor-bridge/workflow/traits/ai-models.md": "b727b21ea431cc96ca8b6d5a6c9f546db734b2ff5a8a0dd6427f48f9a5ccccdf",
+     "cursor-bridge/workflow/traits/external-services.md": "83f325922b7d816d5040e99a58f0d31e5dc05ccf5324fa3f1ce999759e068034",
+     "cursor-bridge/workflow/traits/has-screens.md": "665507e53b95f5c63feb052e0a61e6ebdfeca2edf81939ade91fb7ca8dfde82b",
+diff --git a/bridge/cursor-bridge/Merge-Verification-Policy.md b/bridge/cursor-bridge/Merge-Verification-Policy.md
+index bbf053c..293390c 100644
+--- a/bridge/cursor-bridge/Merge-Verification-Policy.md
++++ b/bridge/cursor-bridge/Merge-Verification-Policy.md
+@@ -414,12 +414,12 @@ ordinary re-delegation loop as a fresh finding.
+ Before the design gate, and again for a plan, a change cycle's design revision and a scoped revision, the cross-family reviewer reads the design as one of two critics (`~/.claude/cursor-bridge/workflow/phases/design.md`, Phase 2). The supervisor commits the design text, the diagrams, the requirements register, `docs/DESIGN_CRITIQUE.md` (the accepted list and the earlier grades, so that the reviewer does not raise what is settled) and the critic's lenses (copied from `plan-critic`'s sections, so the reviewer needs nothing outside the Workspace) to `run/review/DESIGN-<subject>-<round>.md` (`<subject>`: `design`, `plan`, the change's name, or `<the change's name>-plan`) with `git add -f`, snapshots with `review-guard.py snapshot DESIGN-<subject>-<round>`, and launches the reviewer **read-only, with the workspace trusted**, through the launcher:
+ 
+ ```bash
+-python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --mode=ask --trust --model <review_b from docs/ROSTER.resolved.json> "The text to criticise is already written to run/review/DESIGN-<subject>-<round>.md, with the lenses, the grades to answer in, and the record of what was accepted so far. Read that file whole; do not ask for it; the findings it lists as accepted are settled, do not raise them again; answer with your findings in its grades, each naming the diagram, section or requirement it concerns, then the counts per grade, and nothing else." 2> run/review/REVIEW-DESIGN-<subject>-<round>.err
++python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --mode=ask --trust --model <review_b from docs/ROSTER.resolved.json> "The text to criticise is already written to run/review/DESIGN-<subject>-<round>.md, with the lenses, the grades to answer in, and the record of what was accepted so far. Read that file whole; do not ask for it; the findings it lists as accepted are settled, do not raise them again; answer with your findings in its grades, each naming the diagram, section or requirement it concerns, then the counts per grade, and nothing else; where you find nothing, name instead three statements of the file you verified, each with a short quotation from it. Write no file under the checkout, point no cache there, and edit nothing." 2> run/review/REVIEW-DESIGN-<subject>-<round>.err
+ ```
+ 
+ It answers in the critic's grades, Blocking, Should fix and Consider, each finding naming the diagram, section or requirement it concerns, and ends with the counts per grade. A reply that names nothing from the file is a failed launch, not a verdict, as for a code review. `review-guard.py verify DESIGN-<subject>-<round>` afterwards proves the reviewer read only. The record of every round lives in `docs/DESIGN_CRITIQUE.md`, each critic's grades apart; a design resolution round runs the same read-only command on `run/review/DESIGN-<subject>-R1.md` (`R2` under the owner's line) holding every open question and both positions on each, never the code review's `--force` form. The `run/review/DESIGN-*` files are removed with `git rm` in the commit that passes the gate. The installed test that forbids the read-only mode in a reviewer command applies to code reviews, which must execute; a design review must carry `--mode=ask --trust`.
+ 
+-**The loop is bounded** (`~/.claude/cursor-bridge/workflow/phases/design.md`, Phase 2): at most four rounds per subject, a non-convergent finding starting none; then, if the text changed after a critic last read it, one confirming read by both, whose file opens by saying so and holds the diff since each critic's last read, labelled by critic, and which no critique round follows; then one resolution round, `DESIGN-<subject>-R1.md`, holding every question still Blocking or non-convergent, whose file opens with *answer every open question in this file; raise no new finding; your reply answers each question in place of findings, with no counts*, which takes the place of the launch command's request for findings, grades and counts, and whose Review B reply the supervisor writes to `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for `plan-critic`; then the gate, whatever is still open. A subject is one token of lower-case letters, digits and hyphens, distinct from every other subject. A failed launch follows the delegation loop's step 3b (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`), every one recorded: the first (exit 4) runs once more on the same file, the second (exit 3) marks the model and runs once on the re-resolved profile; then the design waits for the roster or the owner's word, and the file runs once more under its number with no re-runs; if that fails too, the round stays not run and the subject goes on to its resolution round or its gate. `bridge-run.py` refuses, with exit 125 and a message beginning `bridge-run: refused - design ceiling: `, a `cursor-agent` launch naming, anywhere and with either separator, a `run/review/DESIGN-<name>.md` whose round (the name's last hyphen-separated part: a positive integer without a leading zero, or `R` and one; 1 to 5 and `R1` allowed) is above five, is `R2` or later, or cannot be read, a name holding anything but lower-case letters, digits, hyphens and the round's `R` being one that cannot. A line `Design rounds above five: <subject> <rounds> (<their words>, <date>)` in `docs/RUN_PARAMETERS.md`, written only on the owner's own words, allows that subject rounds up to `<rounds>` and `R2`, and nothing beyond: the same shape once more, critique rounds up to `<rounds>` minus one, a confirming read at `<rounds>` at the most, then the next resolution round if anything is open. `<rounds>` is a round number: the last numbered round run, a resolution round not counted, plus the more rounds the owner names, or five more when they name none, never below six; a subject is lifted once, its first well-formed line standing and a later one ignored. A refusal is neither a failed review nor a model's failure. The convergence rule of the code gate does not apply to a design critique.
++**The loop is bounded** (`~/.claude/cursor-bridge/workflow/phases/design.md`, Phase 2): at most four rounds per subject, a non-convergent finding starting none; then, if the text changed after a critic last read it, one confirming read by both, whose file opens by saying so and holds the diff since each critic's last read, labelled by critic, and which no critique round follows; then one resolution round, `DESIGN-<subject>-R1.md`, holding every question still Blocking or non-convergent, whose file opens with *answer every open question in this file; raise no new finding; your reply answers each question in place of findings, with no counts*, which takes the place of the launch command's request for findings, grades and counts, and whose Review B reply the supervisor writes to `run/review/REVIEW-DESIGN-<subject>-R<n>.md` for `plan-critic`; then the gate, whatever is still open. A subject is one token of lower-case letters, digits and hyphens, distinct from every other subject. A failed launch follows the delegation loop's step 3b (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`), every one recorded: the first (exit 4) runs once more on the same file, the second (exit 3) marks the model and runs once on the re-resolved profile; then the design waits for the roster or the owner's word, and the file runs once more under its number with no re-runs; if that fails too, Review B's row stays `not run (<the reason>)` and the subject goes on to its resolution round or its gate. `bridge-run.py` refuses, with exit 125 and a message beginning `bridge-run: refused - design ceiling: `, a `cursor-agent` launch naming, anywhere and with either separator, a `run/review/DESIGN-<name>.md` whose round (the name's last hyphen-separated part: a positive integer without a leading zero, or `R` and one; 1 to 5 and `R1` allowed) is above five, is `R2` or later, or cannot be read, a name holding anything but lower-case letters, digits, hyphens and the round's `R` being one that cannot. A line `Design rounds above five: <subject> <rounds> (<their words>, <date>)` in `docs/RUN_PARAMETERS.md`, written only on the owner's own words, allows that subject rounds up to `<rounds>` and `R2`, and nothing beyond: the same shape once more, critique rounds up to `<rounds>` minus one, a confirming read at `<rounds>` at the most, then the next resolution round if anything is open. `<rounds>` is a round number: the last numbered round run, a resolution round not counted, plus the more rounds the owner names, or five more when they name none, never below six; a subject is lifted once, its first well-formed line standing and a later one ignored. A refusal is neither a failed review nor a model's failure. The convergence rule of the code gate does not apply to a design critique.
+ 
+ ## Who completes the merge — the `Merge authority` run parameter
+ 
+@@ -539,13 +539,13 @@ Two options for reaching it:
+   the diff before the snapshot, where the supervisor wrote the brief's Scope and Out of scope, the tests it wrote
+   first with the paragraph each enforces, and the bookkeeping files in the diff that are
+   expected (`docs/BUILDER_NOTES.md`, the builder's report file under `handoff/`); the prompt itself says only that design for later increments is not this diff's
+-  defect, that a claim about a build is verified by building it, that at a round at or above the
++  defect, that a claim about a build is verified by building it, that the reviewer writes no file under the checkout and points no cache there, its scratch files and test caches going to the system temporary folder, and edits nothing, that at a round at or above the
+   ceiling every finding is graded by the five blocking classes first and the SCOPE file's
+   `Blocking class:` line, where it has one, confirmed or denied, and that the reply is one of
+-  the three verdicts (release A5; `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 8, has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
++  the three verdicts (release A5; `~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`, step 8, has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
+   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
+   real failure that has happened — the file path avoids it.) Confirm from its reply that it
+-  actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<ID>-r<N>.md` — the branch's builder assumption lists with their dispositions (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 8) — as extra places to look, never as its scope. Per the roster above, Review B is
++  actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<ID>-r<N>.md` — the branch's builder assumption lists with their dispositions (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`, step 8) — as extra places to look, never as its scope. Per the roster above, Review B is
+   **GPT-5.6 Sol** while the builder is Grok 4.7 (full profile), or **Grok 4.7** while the builder is Composer 2.5 (native profile) — a genuine third family either way; the ids in use are always the ones in `docs/ROSTER.resolved.json`.
+   (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
+   builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
+@@ -620,6 +620,8 @@ Prefer the default unless the builder is already using the only non-Anthropic fa
+ Cursor plan offers (in which case use the API option to get a genuinely different family
+ for Review B).
+ 
++**The merge's own commands.** Pushes and the merge run bare (`git push`, `gh pr merge <n> --squash --match-head-commit <sha>`), never piped, chained or wrapped: the allow rules and the permission guard read a command as written (rule 8, T8). A pull request's title starts with every increment ID it merges; one that merges none starts with its kind and ends with its bare requirement or issue IDs in parentheses, never a plan increment's ID there (ISS-013), and the `Merges:` trailer form holds only where the repository's squash message is the pull request's description (T4; the delegation loop's step 8, `~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`).
++
+ ---
+ 
+ ## One-line summary
+diff --git a/bridge/cursor-bridge/session-start.py b/bridge/cursor-bridge/session-start.py
+index 3ff01e3..fd48494 100644
+--- a/bridge/cursor-bridge/session-start.py
++++ b/bridge/cursor-bridge/session-start.py
+@@ -557,6 +557,7 @@ def pointers_part(status, source):
+     for conv in PHASE_CONVENTIONS.get(phase, []):
+         out.append("  - and %s, whole" % conv)
+     out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")
++    out.append("The status file reads as at its last merge (ISS-009): where run/supervisor/in-flight.md exists, read its last entries first, the live position between merges.")
+     if source == "forked from another session":
+         out.append("This session is a COPY; the original may still be the supervisor. Do not continue the loop unless the owner says this session is the supervisor now.")
+     elif waiting:
+diff --git a/bridge/cursor-bridge/settings.bridge.json b/bridge/cursor-bridge/settings.bridge.json
+index 38393ef..43e5c77 100644
+--- a/bridge/cursor-bridge/settings.bridge.json
++++ b/bridge/cursor-bridge/settings.bridge.json
+@@ -19,6 +19,7 @@
+       "Bash(git fetch:*)",
+       "Bash(git switch:*)",
+       "Bash(git branch -D stage/*)",
++      "Bash(git branch -D:*)",
+       "Bash(git rm:*)",
+       "Bash(git revert:*)",
+       "Bash(git reset --hard:*)",
+@@ -32,6 +33,8 @@
+       "Bash(gh pr merge:*)",
+       "Bash(gh pr checks:*)",
+       "Bash(gh pr view:*)",
++      "Bash(gh pr list:*)",
++      "Bash(gh issue list:*)",
+       "Bash(npx impeccable@*)",
+       "Bash(npx --yes impeccable@*)",
+       "Bash(semgrep:*)",
+diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop.md b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
+index 18d6f5f..71388c6 100644
+--- a/bridge/cursor-bridge/workflow/phases/delegation-loop.md
++++ b/bridge/cursor-bridge/workflow/phases/delegation-loop.md
+@@ -15,9 +15,9 @@ After a compaction or a resume in this phase, read these before your next action
+ 
+ ### The procedure
+ 
+-Steps 1 to 8 below run for every increment, step 7 in a sub-file of this module; step 9, the refactoring and optimization pass at a stage's close, is in another. Each sub-file is read whole with the module wherever the module is read:
++Steps 1 to 8 below run for every increment, steps 7 and 8 in sub-files of this module; step 9, the refactoring and optimization pass at a stage's close, is in another. Each sub-file is read whole with the module wherever the module is read:
+ 
+-Sub-files: delegation-loop/decide.md; delegation-loop/refactoring-pass.md
++Sub-files: delegation-loop/decide.md; delegation-loop/refactoring-pass.md; delegation-loop/merge.md
+ 
+ For each increment, in order:
+ 
+@@ -344,104 +344,9 @@ The tests already ran in step 4, before the first reviewer, the ones you wrote f
+ 
+ Step 7, the decision on the increment with the mutation run its last pass launches, stands in the sub-file `delegation-loop/decide.md` ("The procedure" names it), read whole with this module; step 8 follows it.
+ 
+-### 8. Merge (the verified gate)
+-
+-Do not decide merge-worthiness by reading the diff for the user, and never ask the user
+-whether the code is correct — they cannot judge it, and a check they cannot perform is
+-not a check. Apply the gate in `~/.claude/cursor-bridge/Merge-Verification-Policy.md`
+-instead. In short, a branch merges to `main` only when **all** hold:
+-
+-1. the required CI check is green (the real test suite ran and passed);
+-2. **Review A** — the `diff-reviewer` subagent (pinned to a strong model) returns
+-   APPROVE on the cumulative diff;
+-3. **Review B** — a **cross-family**, non-Anthropic verifier returns APPROVE on the same
+-   diff, invoked with execution per the policy, on a committed checkpoint that
+-   `review-guard.py` snapshots before the launch and verifies and restores after it. **Write the diff to a committed file inside the
+-   workspace and have Review B read it from that file — never pass it inline through the
+-   shell** (inline heredocs mangle or drop the diff, and a reviewer that received no diff can
+-   still emit an APPROVE-shaped reply). Two rules make that file whole and reachable:
+-   (a) **generate it only from committed state** — `git status --porcelain` must print
+-   nothing first, then `git diff <merge-base>...HEAD > run/review/REVIEW-<ID>-r<N>.diff`, named as the round's
+-   snapshot below is, the earlier round's diff and assumptions file removed with `git rm` and committed
+-   first, so that no round's diff carries another's; a diff
+-   taken from the working tree silently omits every untracked new file (KP-017);
+-   (b) **the file lives inside `Workspace/`** at `run/review/`, committed on the increment's
+-   branch and removed with `git rm` before the merge — never in a temp folder outside the
+-   project, which the Workspace boundary rightly blocks (KP-016); (c) **the branch's assumption lists travel with it** — write `run/review/ASSUMPTIONS-<ID>-r<N>.md` from the `Assumptions:` sections of the branch's commit messages (`git log <merge-base>..HEAD --format=%B`), commit it beside the diff, remove it with the diff before the merge, and name both files in the prompt: the list as extra places to look, never as the review's scope. Launch it exactly as the policy shows. **First** write `run/review/SCOPE-<ID>.md` (below) and commit it beside the diff: the guard reads it at the snapshot, its `Blocking class:` line included (step 7, "The review ceiling"). **Then** `python ~/.claude/cursor-bridge/review-guard.py snapshot <ID>-r<N>`, `<ID>` the increment's ID (`TASK-<nnn>`) and `<N>` the round it opens: one more than the rounds the guard has counted for the increment, or the same `<N>` again to re-run a failed launch on the same tree; the round's diff and assumptions file carry the snapshot's name, since the guard lists as the review's inputs, and refuses empty, the files under `run/review/` whose names hold it (KP-067); the SCOPE file, which it reads by `<ID>`, is not among them, so confirm yourself that it is not empty. It refuses a tree that is not clean (commit everything of yours first), a round off its count and a round above the ceiling with no lift, and records HEAD, the branch, every ref, the stash list, the repository's configuration and the ignored entries. **Then** the launcher, **in the background** (`run_in_background`; its completion is what wakes you, rule 43):
+-   `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<ID>-r<N>.err`
+-   (`--force` lets the reviewer **run the tests and build its own reproductions**, which is
+-   where its strongest findings have come from — the owner's decision of 2026-10-04 after
+-   a read-only mode was tried and found weaker; the launcher withholds the owner's
+-   identity and ends the run at the limit; a review that runs a large suite can take most
+-   of the hour). **While it runs, nothing of yours writes to the checkout**: no builder, no
+-   `test-runner` (it would share the checkout, the databases, the ports and the caches with
+-   the reviewer's own run), no commit, and no writing subagent either — no `spec-packager`
+-   (the next brief waits for `verify`; one once wrote `handoff/` during a Review B run and
+-   the guard flagged GATE-INTEGRITY, reAngle ISS-014), no `diagram-specialist`, no
+-   `cursor-configurator`, nothing that writes under the checkout, your own status-file edits
+-   included (`run/supervisor/in-flight.md` exists for those, rule 43); besides that file, the launcher's own `run/review/REVIEW-<ID>-r<N>.err` is
+-   the one file written meanwhile, and the guard keeps it; read-only subagents
+-   (`security-auditor`, a Review A on another branch's committed diff) may run.
+-   **Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`: it reads `.git/config`, the active hooks folder (`core.hooksPath`, `.githooks` on every project today) and `.git/hooks` first, as files, without git — a `core.fsmonitor` line or a hook left there would run the reviewer's program with your identity on your next git command, and a change there stops the guard before it runs any git command of its own; every git command it then runs has the repository's hooks and file monitor switched off. It checks HEAD, the branch, the local refs and the stashes, puts the branch and every moved or added local ref back, restores the tree with `git reset --hard` and `git clean -fd` (keeping the `.err` file, whose first line — the launch time — it prints), lists what it removed, and compares every ignored file (cache folders apart): a change under `docs/`, `handoff/` or `run/review/`, or to `.env*`, is a flag even where the project gitignores those files; any other is listed as left behind. `GATE-INTEGRITY` — a commit, a moved HEAD, a new or moved ref or stash, a changed configuration, hook, record or `.env` — opens the flag (condition 4) and an issue; the tree is back at the checkpoint, the merge is not. It prints the snapshot file's hash, which must equal the one `snapshot` printed (a reviewer could rewrite the snapshot). What the guard cannot see is said in its header and KP-032: the contents of cache folders, anything outside the checkout, a reviewer that reaches for the credential store on purpose. **Note the
+-   launch time in UTC** — the
+-   launcher prints `bridge-run: started <time>Z` as its first stderr line, so it is the
+-   first line of the `.err` file. The launch carries the Bash tool's `timeout` at the review
+-   cap (`7200000`, step 3). The SCOPE file, `run/review/SCOPE-<ID>.md`, written and committed
+-   before the snapshot (above) and removed with `git rm` with the diff, holds the brief's Scope
+-   and Out of scope sections quoted, the tests, the mutants file (`run/supervisor/<ID>-mutants.json`) and any mutation driver you wrote, each test with the paragraph it enforces, and the
+-   bookkeeping and record files in the diff that are expected (`docs/BUILDER_NOTES.md`, the
+-   builder's report `handoff/TASK-<nnn>-r<N>-report.md`, the records you committed,
+-   `run/review/`), and, at a round above the ceiling, that round's `Blocking class:` line. Nothing of this goes inline through the shell,
+-   which mangles quoted text (KP-009). Give a **directive** prompt ("the diff is already at
+-   `<path>`; read it; do not ask for it") with four short clauses (release A5): where the
+-   increment ends and which tests the supervisor wrote are in `run/review/SCOPE-<ID>.md`,
+-   read it (at a round at or above the ceiling, the guard's count at three or more, a fifth clause: grade every
+-   finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line where
+-   it has one); design for later increments is not this diff's defect (a reviewer once reviewed
+-   design for later increments for nine rounds on one of them); verify a claim about a build
+-   by building it, never by reasoning; reply with APPROVE, REJECT or ESCALATE-INTENT and the
+-   reasons. A reply that does not name something specific from the diff — or that asks for
+-   the diff, errors on trust, or carries none of the three verdicts — is a failed launch,
+-   not a verdict: re-run once, then the roster's failure path (step 3b). Confirm receipt before trusting the verdict; with the guard's `OK`
+-   in hand, **`python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <that launch time>` printing `OK`**: it lists what was written to the pull request since the launch and flags anything written as the owner (KP-032). `GATE-INTEGRITY` opens a gate-integrity flag (condition 4) and an issue; `CANNOT VERIFY` is not `OK`;
+-4. no gate-integrity flag is open — the diff does not weaken tests, assertions, or CI, and
+-   the builder's model family differs from both reviewers'.
+-
+-**Convergence is a signal.** When two or more reviewers or auditors independently name the
+-same line or the same defect, treat it as blocking even if each alone marked it advisory:
+-decorrelated reviewers agreeing is the strongest evidence the loop produces. This is the code
+-gate's rule; a design critique's two critics are bounded by its ceiling instead (Phase 2). The
+-rule grades a finding's certainty, never its class. Below the ceiling, two reviewers' agreement
+-makes a finding blocking whatever its grade, with one exception: a class already recorded under
+-the by-class line for that increment or that stage — two reviewers naming a further mutant,
+-input or operator family of it name that class, which stays recorded and starts no round, and no
+-class of the five is ever on that line. Past the ceiling — the guard's count of rounds opened
+-for the increment or the stage at three or more — a convergent finding outside the five goes to
+-`docs/HARDENING.md`, marked convergent (step 7, "The review ceiling").
+-
+-A `REJECT` from either reviewer goes back through re-delegation (step 7), not to the user
+-— continue while concerns converge and get fixed, stopping only on non-convergence per
+-step 7's brake, and at and above the ceiling only for a finding of one of the five blocking classes. A **split** verdict (one reviewer blocks, the other approves) you resolve
+-yourself, favouring the project's established invariants; escalate it only if it turns on
+-intent. An `ESCALATE-INTENT` verdict, and only that, surfaces to the user — as a plain
+-intent question, never a correctness one.
+-
+-**PR titles start with every increment ID the branch carries** (`TASK-012 TASK-013: settings key store`): the squash commit takes the title, and that subject on `origin/main` is how `plan-check.py` knows an increment is merged.
+-
+-When all four hold the merge is authorised. A pull request that changes only records (`docs/`, the inventory, a design text) takes the same round: snapshot, Review B, `verify`, then `premerge`; `premerge` refuses a head whose snapshot has no verified mark, so there is no shorter way (release A1b). **Check `docs/RUN_PARAMETERS.md` first:** under
+-`Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
+-conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
+-auto-merge. Under either authority, remove the review files with `git rm`, commit (that commit removes the review files and nothing else: a records edit in it is a change outside `run/review/`, which `premerge` refuses as GATE-INTEGRITY; the records move after the merge), push, and run `python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took: `OK` means the head about to merge descends from the head the reviews approved, differs from it only under `run/review/`, and is the pull request's head on GitHub; it prints the merge command, `gh pr merge <n> --squash --match-head-commit <sha>`, which refuses to merge any other head. A head that does not descend from the reviewed one, or a change outside `run/review/`, is a gate-integrity flag. A branch updated from `main` on GitHub ("Update branch") is a new head: the reviews run again on it — a re-review, not a flag. Under `supervisor` (the default), arm `gh pr merge <n> --squash --auto --match-head-commit <sha>` (the sha `premerge` printed and recorded) and watch the
+-required `gate` check — **with one background command, never by ending your turn**: run `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast` in the background with the tool's `timeout` at the watch cap (`7200000`, step 3; `run_in_background`). Its completion notification is what wakes you; nothing else will. The launcher ends a watch that outlives an hour (exit 124: look at the pull request's checks yourself, then start a new watch); never prefix the command with anything else (`sleep`, `cd`, `timeout`): the rules match the command as written, and a wrapped command matches nothing. If it returns at once reporting no checks, CI has not registered the push yet: wait for the first check to appear (`gh pr checks <n>` once, a minute after the push), then start the same watch again; and when any watch ends green, confirm that the green run's head is the pushed head (`gh pr view <n> --json statusCheckRollup,headRefOid`) before `premerge` — a watch started right after a push once reported the previous commit's run (KP-051). The desktop app's CI monitor ("Auto-fix pull requests", `<ci-monitor-event>`) reports only problems — a failed check, a review comment — and **never a green gate**, so waiting for it after a green run waits forever (KP-028). Registering the PR with it is fine and its autofix of a failure is welcome, but it is never your wake-up. The owner authorises and requires this watch: it is one blocking command per PR, not a polling loop — never `sleep` loops, repeated status checks, or scheduled wake-ups for this. **While it runs, keep building:** if the next increment's Scope does not overlap the pending PR's files, start it now from `origin/main`; if it does overlap, prepare what does not depend on the merge (the next brief, reviews, docs), and only then end your turn — the watch will wake you. When the watch completes green (and the PR is mergeable), **complete the squash
+-directly with `gh pr merge <n> --squash --match-head-commit <sha>`** (the sha `premerge` printed) rather than waiting on GitHub's auto-merge queue,
+-which routinely lags by minutes. This is safe — branch protection enforces the required
+-check regardless of who triggers the merge, so a direct merge cannot bypass CI; the armed
+-`--auto` is only a safety net if the session ends first. Never complete a merge before the
+-required check is green or before both reviews APPROVE. No human correctness click is
+-involved; the merge is reversible, so a rare behavioural miss is caught retrospectively via
+-the change log, not by a gate the user cannot operate. If the watch completes red, the failure is a defect like any other: diagnose, re-delegate, re-run the gate — never merge around it.
+-
+-**After every merge, mark the increment's runs healthy and bring local `main` along.** `python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id>` for the builder run and for Review B, the id being the launch time on the first line of each `.err` file, given whole (a test run that passed is marked by the launcher itself): a healthy run is what the launcher learns a ceiling from, and a run never marked never raises one (release A2). Then `git switch main`, then `python ~/.claude/cursor-bridge/sync-check.py --apply`; it must end IN SYNC or FAST-FORWARDED before anything else happens, and the next branch starts from there. Under `Merge authority: owner`, do the same at the first resume after the owner has merged. A worktree the merged branch had is torn down now (rule 39).
++### 8. Merge — in a sub-file
++
++Step 8, the verified gate, from the review files and Review B's snapshot to the merge and the healthy marks after it, stands in the sub-file `delegation-loop/merge.md` ("The procedure" names it), read whole with this module.
+ 
+ ## Extension points
+ 
+diff --git a/bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md b/bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md
+new file mode 100644
+index 0000000..0af851b
+--- /dev/null
++++ b/bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md
+@@ -0,0 +1,106 @@
++## The merge (Phase 6, step 8)
++
++### Where this sub-file belongs
++
++This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 8, the verified gate, which runs for every increment after step 7, the decision (`delegation-loop/decide.md`): the review files, Review B on the guard's snapshot, the pull request, the CI watch, the merge and what follows it. It stands in a file of its own to keep the module within its size bound.
++
++### 8. Merge (the verified gate)
++
++Do not decide merge-worthiness by reading the diff for the user, and never ask the user
++whether the code is correct — they cannot judge it, and a check they cannot perform is
++not a check. Apply the gate in `~/.claude/cursor-bridge/Merge-Verification-Policy.md`
++instead. In short, a branch merges to `main` only when **all** hold:
++
++1. the required CI check is green (the real test suite ran and passed);
++2. **Review A** — the `diff-reviewer` subagent (pinned to a strong model) returns
++   APPROVE on the cumulative diff;
++3. **Review B** — a **cross-family**, non-Anthropic verifier returns APPROVE on the same
++   diff, invoked with execution per the policy, on a committed checkpoint that
++   `review-guard.py` snapshots before the launch and verifies and restores after it. **Write the diff to a committed file inside the
++   workspace and have Review B read it from that file — never pass it inline through the
++   shell** (inline heredocs mangle or drop the diff, and a reviewer that received no diff can
++   still emit an APPROVE-shaped reply). Two rules make that file whole and reachable:
++   (a) **generate it only from committed state** — `git status --porcelain` must print
++   nothing first, then `git diff <merge-base>...HEAD > run/review/REVIEW-<ID>-r<N>.diff`, named as the round's
++   snapshot below is, the earlier round's diff and assumptions file removed with `git rm` and committed
++   first, so that no round's diff carries another's; a diff
++   taken from the working tree silently omits every untracked new file (KP-017);
++   (b) **the file lives inside `Workspace/`** at `run/review/`, committed on the increment's
++   branch and removed with `git rm` before the merge — never in a temp folder outside the
++   project, which the Workspace boundary rightly blocks (KP-016); (c) **the branch's assumption lists travel with it** — write `run/review/ASSUMPTIONS-<ID>-r<N>.md` from the `Assumptions:` sections of the branch's commit messages (`git log <merge-base>..HEAD --format=%B`), commit it beside the diff, remove it with the diff before the merge, and name both files in the prompt: the list as extra places to look, never as the review's scope. Launch it exactly as the policy shows. **First** write `run/review/SCOPE-<ID>.md` (below) and commit it beside the diff: the guard reads it at the snapshot, its `Blocking class:` line included (step 7, "The review ceiling"). **Then** `python ~/.claude/cursor-bridge/review-guard.py snapshot <ID>-r<N>`, `<ID>` the increment's ID (`TASK-<nnn>`) and `<N>` the round it opens: one more than the rounds the guard has counted for the increment, or the same `<N>` again to re-run a failed launch on the same tree; the round's diff and assumptions file carry the snapshot's name, since the guard lists as the review's inputs, and refuses empty, the files under `run/review/` whose names hold it (KP-067); the SCOPE file, which it reads by `<ID>`, is not among them, so confirm yourself that it is not empty. It refuses a tree that is not clean (commit everything of yours first), a round off its count and a round above the ceiling with no lift, and records HEAD, the branch, every ref, the stash list, the repository's configuration and the ignored entries. **Then** the launcher, **in the background** (`run_in_background`; its completion is what wakes you, rule 43):
++   `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<directive prompt>" 2> run/review/REVIEW-<ID>-r<N>.err`
++   (`--force` lets the reviewer **run the tests and build its own reproductions**, which is
++   where its strongest findings have come from — the owner's decision of 2026-10-04 after
++   a read-only mode was tried and found weaker; the launcher withholds the owner's
++   identity and ends the run at the limit; a review that runs a large suite can take most
++   of the hour). **While it runs, nothing of yours writes to the checkout**: no builder, no
++   `test-runner` (it would share the checkout, the databases, the ports and the caches with
++   the reviewer's own run), no commit, and no writing subagent either — no `spec-packager`
++   (the next brief waits for `verify`; one once wrote `handoff/` during a Review B run and
++   the guard flagged GATE-INTEGRITY, reAngle ISS-014), no `diagram-specialist`, no
++   `cursor-configurator`, nothing that writes under the checkout, your own status-file edits
++   included (`run/supervisor/in-flight.md` exists for those, rule 43); besides that file, the launcher's own `run/review/REVIEW-<ID>-r<N>.err` is
++   the one file written meanwhile, and the guard keeps it; read-only subagents
++   (`security-auditor`, a Review A on another branch's committed diff) may run, each running single test files at most, never the suite, and any mutation run on a copy outside the checkout, as `mutation-run.py` makes one, since the reviewer's own run shares the checkout's databases, ports and caches (T16).
++   **Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`: it reads `.git/config`, the active hooks folder (`core.hooksPath`, `.githooks` on every project today) and `.git/hooks` first, as files, without git — a `core.fsmonitor` line or a hook left there would run the reviewer's program with your identity on your next git command, and a change there stops the guard before it runs any git command of its own; every git command it then runs has the repository's hooks and file monitor switched off. It checks HEAD, the branch, the local refs and the stashes, puts the branch and every moved or added local ref back, restores the tree with `git reset --hard` and `git clean -fd` (keeping the `.err` file, whose first line — the launch time — it prints), lists what it removed, and compares every ignored file (cache folders apart): a change under `docs/`, `handoff/` or `run/review/`, or to `.env*`, is a flag even where the project gitignores those files; any other is listed as left behind. `GATE-INTEGRITY` — a commit, a moved HEAD, a new or moved ref or stash, a changed configuration, hook, record or `.env` — opens the flag (condition 4) and an issue; the tree is back at the checkpoint, the merge is not. It prints the snapshot file's hash, which must equal the one `snapshot` printed (a reviewer could rewrite the snapshot). What the guard cannot see is said in its header and KP-032: the contents of cache folders, anything outside the checkout, a reviewer that reaches for the credential store on purpose. **Note the
++   launch time in UTC** — the
++   launcher prints `bridge-run: started <time>Z` as its first stderr line, so it is the
++   first line of the `.err` file. The launch carries the Bash tool's `timeout` at the review
++   cap (`7200000`, step 3). The SCOPE file, `run/review/SCOPE-<ID>.md`, written and committed
++   before the snapshot (above) and removed with `git rm` with the diff, holds the brief's Scope
++   and Out of scope sections quoted, the tests, the mutants file (`run/supervisor/<ID>-mutants.json`) and any mutation driver you wrote, each test with the paragraph it enforces, and the
++   bookkeeping and record files in the diff that are expected (`docs/BUILDER_NOTES.md`, the
++   builder's report `handoff/TASK-<nnn>-r<N>-report.md`, the records you committed,
++   `run/review/`), and, at a round above the ceiling, that round's `Blocking class:` line. Nothing of this goes inline through the shell,
++   which mangles quoted text (KP-009). Give a **directive** prompt ("the diff is already at
++   `<path>`; read it; do not ask for it") with five short clauses (release A5; where a reviewer writes, release T): where the
++   increment ends and which tests the supervisor wrote are in `run/review/SCOPE-<ID>.md`,
++   read it (at a round at or above the ceiling, the guard's count at three or more, a sixth clause: grade every
++   finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line where
++   it has one); design for later increments is not this diff's defect (a reviewer once reviewed
++   design for later increments for nine rounds on one of them); verify a claim about a build
++   by building it, never by reasoning; write no file under the checkout and point no cache there, scratch files and test caches going to the system temporary folder, and edit nothing (what `verify` restores was still written, and a write under `docs/`, `handoff/` or `run/review/` is a flag); reply with APPROVE, REJECT or ESCALATE-INTENT and the
++   reasons. A reply that does not name something specific from the diff — or that asks for
++   the diff, errors on trust, or carries none of the three verdicts — is a failed launch,
++   not a verdict: re-run once, then the roster's failure path (step 3b). Confirm receipt before trusting the verdict; with the guard's `OK`
++   in hand, **`python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <that launch time>` printing `OK`**: it lists what was written to the pull request since the launch and flags anything written as the owner (KP-032). `GATE-INTEGRITY` opens a gate-integrity flag (condition 4) and an issue; `CANNOT VERIFY` is not `OK`;
++4. no gate-integrity flag is open — the diff does not weaken tests, assertions, or CI, and
++   the builder's model family differs from both reviewers'.
++
++**Convergence is a signal.** When two or more reviewers or auditors independently name the
++same line or the same defect, treat it as blocking even if each alone marked it advisory:
++decorrelated reviewers agreeing is the strongest evidence the loop produces. This is the code
++gate's rule; a design critique's two critics are bounded by its ceiling instead (Phase 2). The
++rule grades a finding's certainty, never its class. Below the ceiling, two reviewers' agreement
++makes a finding blocking whatever its grade, with one exception: a class already recorded under
++the by-class line for that increment or that stage — two reviewers naming a further mutant,
++input or operator family of it name that class, which stays recorded and starts no round, and no
++class of the five is ever on that line. Past the ceiling — the guard's count of rounds opened
++for the increment or the stage at three or more — a convergent finding outside the five goes to
++`docs/HARDENING.md`, marked convergent (step 7, "The review ceiling").
++
++A `REJECT` from either reviewer goes back through re-delegation (step 7), not to the user
++— continue while concerns converge and get fixed, stopping only on non-convergence per
++step 7's brake, and at and above the ceiling only for a finding of one of the five blocking classes. A **split** verdict (one reviewer blocks, the other approves) you resolve
++yourself, favouring the project's established invariants; escalate it only if it turns on
++intent. An `ESCALATE-INTENT` verdict, and only that, surfaces to the user — as a plain
++intent question, never a correctness one.
++
++**Before every push, and before the first push of a status-file change.** Every commit the push publishes (`origin/<the base>..HEAD`) is read for computer paths and account names first, `secret-sentinel` scanning those commits on request: a leak in a commit not yet pushed is removed from that commit, by rewriting it before the push, never covered by a later commit (P5). And before the first push of a pull request that changes the status file, `project.json` or a `VERSION`, the full suite runs once with the pull request's variables set, as CI runs it on the pull request's merge: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --key-file <a file outside the Workspace> --kind test -- python -m pytest -q tests`, its output to `run/agent/<ID>-suite.out`, in the background under the heavy launch's `timeout` (`delegation-loop.md`, step 3), the key file holding the three lines `GITHUB_REF=refs/pull/<n>/merge`, `GITHUB_BASE_REF=main` and `GITHUB_EVENT_NAME=pull_request` (the launcher applies a file of `NAME=value` lines; an environment prefix before `python` would match no allow rule). `<n>` is the number the pull request will take, predicted as the next the repository issues, one above its latest pull request or issue (`gh pr list --state all --limit 1`, `gh issue list --state all --limit 1`), the number the branch's status file writes on its Last accepted line for that pull request (ISS-009); where GitHub issues another, the status file takes the real number and the run is repeated with it (P7).
++
++**PR titles start with every increment ID the branch carries** (`TASK-012 TASK-013: settings key store`): the squash commit takes the title, and that subject on `origin/main` is how `plan-check.py` knows an increment is merged. A pull request that merges no increment (records, a design, a fix of the records) starts its title with its kind (`Records:`, `Design:`) and ends it with the bare requirement or issue IDs it carries in parentheses, the one form every squash setting keeps, never a plan increment's ID there, which the squash reader would take as merged (ISS-013). The `Merges:` trailer form holds only where the repository's squash message is the pull request's description: where it is the commit messages, GitHub's default and the bridge's own repository's (read 2026-11-01), the trailer never reaches `main`, so the title form is the rule (T4).
++
++When all four hold the merge is authorised. A pull request that changes only records (`docs/`, the inventory, a design text) takes the same round: snapshot, Review B, `verify`, then `premerge`; `premerge` refuses a head whose snapshot has no verified mark, so there is no shorter way (release A1b). **Check `docs/RUN_PARAMETERS.md` first:** under
++`Merge authority: owner`, stop here with **READY TO MERGE** — the PR link, the four
++conditions with their evidence, and a one-line run sheet to merge — and wait; never arm
++auto-merge. Under either authority, remove the review files with `git rm`, commit (that commit removes the review files and nothing else: a records edit in it is a change outside `run/review/`, which `premerge` refuses as GATE-INTEGRITY; the records move after the merge), push, and run `python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took: `OK` means the head about to merge descends from the head the reviews approved, differs from it only under `run/review/`, and is the pull request's head on GitHub; it prints the merge command, `gh pr merge <n> --squash --match-head-commit <sha>`, which refuses to merge any other head. A head that does not descend from the reviewed one, or a change outside `run/review/`, is a gate-integrity flag. A branch updated from `main` on GitHub ("Update branch") is a new head: the reviews run again on it — a re-review, not a flag. So is a pull request whose status file another pull request's merge overtook: the file a pull request carries reads as at that pull request's merge (ISS-009, KP-069), so where another merged first the branch rewrites it as at its own merge and merges `main`, and the reviews read the new head again (T11, T17). Under `supervisor` (the default), arm `gh pr merge <n> --squash --auto --match-head-commit <sha>` (the sha `premerge` printed and recorded), or, where the repository refuses auto-merge (its `allow_auto_merge` setting off), skip the armed form, the direct merge after the green watch being the merge, and watch the
++required `gate` check — **with one background command, never by ending your turn**: run `python ~/.claude/cursor-bridge/bridge-run.py --limit 3600 -- gh pr checks <n> --watch --required --fail-fast` in the background with the tool's `timeout` at the watch cap (`7200000`, step 3; `run_in_background`). Its completion notification is what wakes you; nothing else will. The launcher ends a watch that outlives an hour (exit 124: look at the pull request's checks yourself, then start a new watch); never prefix the command with anything else (`sleep`, `cd`, `timeout`): the rules match the command as written, and a wrapped command matches nothing. The same holds for every push and for the merge: `git push` and `gh pr merge` run bare, never piped, chained or wrapped (rule 8, T8). If it returns at once reporting no checks, CI has not registered the push yet: wait for the first check to appear (`gh pr checks <n>` once, a minute after the push), then start the same watch again; and when any watch ends green, confirm that the green run's head is the pushed head (`gh pr view <n> --json statusCheckRollup,headRefOid`) before `premerge` — a watch started right after a push once reported the previous commit's run (KP-051). The desktop app's CI monitor ("Auto-fix pull requests", `<ci-monitor-event>`) reports only problems — a failed check, a review comment — and **never a green gate**, so waiting for it after a green run waits forever (KP-028). Registering the PR with it is fine and its autofix of a failure is welcome, but it is never your wake-up. The owner authorises and requires this watch: it is one blocking command per PR, not a polling loop — never `sleep` loops, repeated status checks, or scheduled wake-ups for this. **While it runs, keep building:** if the next increment's Scope does not overlap the pending PR's files, start it now from `origin/main`; if it does overlap, prepare what does not depend on the merge (the next brief, reviews, docs), and only then end your turn — the watch will wake you. When the watch completes green (and the PR is mergeable), **complete the squash
++directly with `gh pr merge <n> --squash --match-head-commit <sha>`** (the sha `premerge` printed) rather than waiting on GitHub's auto-merge queue,
++which routinely lags by minutes. This is safe — branch protection enforces the required
++check regardless of who triggers the merge, so a direct merge cannot bypass CI; the armed
++`--auto` is only a safety net if the session ends first. Never complete a merge before the
++required check is green or before both reviews APPROVE. No human correctness click is
++involved; the merge is reversible, so a rare behavioural miss is caught retrospectively via
++the change log, not by a gate the user cannot operate. If the watch completes red, the failure is a defect like any other: diagnose, re-delegate, re-run the gate — never merge around it.
++
++**After every merge, mark the increment's runs healthy and bring local `main` along.** `python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id>` for the builder run and for Review B, the id being the launch time on the first line of each `.err` file, given whole (a test run that passed is marked by the launcher itself): a healthy run is what the launcher learns a ceiling from, and a run never marked never raises one (release A2). Then `git switch main`, then `python ~/.claude/cursor-bridge/sync-check.py --apply`; it must end IN SYNC or FAST-FORWARDED before anything else happens, and the next branch starts from there. Under `Merge authority: owner`, do the same at the first resume after the owner has merged. A worktree the merged branch had is torn down now (rule 39). Then delete the merged branch, locally and on the remote, each command bare: `git branch -D <branch>`, then `git push origin --delete <branch>` (P4).
+diff --git a/bridge/cursor-bridge/workflow/phases/design.md b/bridge/cursor-bridge/workflow/phases/design.md
+index cbc4074..1b9c8ca 100644
+--- a/bridge/cursor-bridge/workflow/phases/design.md
++++ b/bridge/cursor-bridge/workflow/phases/design.md
+@@ -53,12 +53,12 @@ needs nothing outside the Workspace) to `run/review/DESIGN-<subject>-<round>.md`
+ never overwrites the design's), `git add -f` it, then launch, exactly:
+ 
+ ```bash
+-python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --mode=ask --trust --model <review_b from docs/ROSTER.resolved.json> "The text to criticise is already written to run/review/DESIGN-<subject>-<round>.md, with the lenses, the grades to answer in, and the record of what was accepted so far. Read that file whole; do not ask for it; the findings it lists as accepted are settled, do not raise them again; answer with your findings in its grades, each naming the diagram, section or requirement it concerns, then the counts per grade, and nothing else." 2> run/review/REVIEW-DESIGN-<subject>-<round>.err
++python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --mode=ask --trust --model <review_b from docs/ROSTER.resolved.json> "The text to criticise is already written to run/review/DESIGN-<subject>-<round>.md, with the lenses, the grades to answer in, and the record of what was accepted so far. Read that file whole; do not ask for it; the findings it lists as accepted are settled, do not raise them again; answer with your findings in its grades, each naming the diagram, section or requirement it concerns, then the counts per grade, and nothing else; where you find nothing, name instead three statements of the file you verified, each with a short quotation from it. Write no file under the checkout, point no cache there, and edit nothing." 2> run/review/REVIEW-DESIGN-<subject>-<round>.err
+ ```
+ 
+ It answers in the critic's grades (Blocking, Should fix, Consider), each finding naming the
+ diagram, section or requirement it concerns. Snapshot before and `verify` after it, as for a
+-code review; a reply that names nothing from the file is a failed launch, not a verdict. Then
++code review; a reply that names nothing from the file is a failed launch, not a verdict. A reply with no finding names three statements of the file it verified, each with a short quotation, and the check reads them against the file: fewer than three, or a quotation the file does not hold, is a failed launch too (T2). Then
+ fix what both found; what you accept with a reason goes on the list and is settled. The snapshot's id is the round file's name, `DESIGN-<subject>-<round>` (`review-guard.py snapshot DESIGN-<subject>-<round>`, then `verify` under the same id), and the `.err` file's name follows from it, `run/review/REVIEW-DESIGN-<subject>-<round>.err`, as the command above writes it.
+ 
+ **A worked scenario for money and stored data** is a lens of both critics: a rule about money or stored data is read against one worked scenario before it reaches code review (a retry after a lost reply, a dry run, a benchmark, an approved live smoke, two users on one account), each step naming the store it reads and writes; `plan-critic` carries the lens, and Review B's file copies it with the rest of its sections.
+diff --git a/bridge/cursor-bridge/workflow/phases/reflection.md b/bridge/cursor-bridge/workflow/phases/reflection.md
+index d7ce331..1e567b3 100644
+--- a/bridge/cursor-bridge/workflow/phases/reflection.md
++++ b/bridge/cursor-bridge/workflow/phases/reflection.md
+@@ -30,7 +30,7 @@ At every reflection point, run `python ~/.claude/cursor-bridge/conformance-check
+ 1. From a clean tree on `main` in sync with `origin/main`: `git switch -c stage/<name> origin/main`.
+ 2. Write the stage's whole change from committed state: `git diff <the stage's first checkpoint commit> origin/main > run/review/STAGE-<name>-r<N>.diff`, `<N>` the round step 3 opens; write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the earlier rounds' dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7); then `git add -f` both and commit them on the stage branch.
+ 3. `python ~/.claude/cursor-bridge/review-guard.py snapshot STAGE-<name>-r<N>`, `<N>` the round it opens: one more than the rounds the guard has counted for the stage; the round's diff and its parts carry the snapshot's name, since the guard lists as the review's inputs, and refuses empty, the files under `run/review/` whose names hold it (KP-067); the SCOPE file, which it reads by the stage's name, is not among them, so confirm yourself that it is not empty.
+-4. Review A: `diff-reviewer` on `run/review/STAGE-<name>-r<N>.diff`, told the stage's briefs and that it reads a stage, not an increment. A stage diff too large for one reading is written in parts from the same committed state (`git diff <the first checkpoint> origin/main -- <paths> > run/review/STAGE-<name>-r<N>-<part>.diff`, committed with the whole), each part a `diff-reviewer` call of its own and the test files' part at most 25 files (counted by `git diff --name-only <the first checkpoint> origin/main -- <the test folders>`): a 79-file part once ended at the reviewer's turn limit without a verdict (reAngle, stage 3b), and a part that ends without a verdict is run again on what it had not reached (rule 43).
++4. Review A: `diff-reviewer` on `run/review/STAGE-<name>-r<N>.diff`, told the stage's briefs and that it reads a stage, not an increment. A stage diff too large for one reading is written in parts from the same committed state (`git diff <the first checkpoint> origin/main -- <paths> > run/review/STAGE-<name>-r<N>-<part>.diff`, committed with the whole), each part a `diff-reviewer` call of its own and the test files' part at most 25 files (counted by `git diff --name-only <the first checkpoint> origin/main -- <the test folders>`): a 79-file part once ended at the reviewer's turn limit without a verdict (reAngle, stage 3b), and a part that ends without a verdict is run again on what it had not reached (rule 43). Each part's prompt names its turn budget (the reviewer's `maxTurns`) and keeps the last turns for the verdict, so a part that runs short still answers (T25); a part read while Review B runs (step 5) runs single test files at most, never the suite, and any mutation run on a copy outside the checkout, so it shares nothing of the checkout with the reviewer's own run (T16).
+ 5. Review B in the background, with execution, exactly as step 8 launches it: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <review_b from docs/ROSTER.resolved.json> "<the directive prompt, naming run/review/STAGE-<name>-r<N>.diff and the stage>" 2> run/review/REVIEW-STAGE-<name>-r<N>.err`; you write nothing to the checkout meanwhile but `run/supervisor/in-flight.md` (rule 43), where the position and each verdict go.
+ 6. `python ~/.claude/cursor-bridge/review-guard.py verify STAGE-<name>-r<N>` must print `OK`; a GATE-INTEGRITY flag is handled as in step 8.
+ 7. Decide the round, the ceiling read against the guard's count of rounds opened for the stage (with three opened, the next round is above it). Every arm that starts a fix does step 8 first (back on `main`, the stage branch deleted), and an arm that opens a new stage round runs it from step 1, on the new whole change, only after that fix has merged.
+diff --git a/bridge/cursor-bridge/workflow/trace-exceptions.md b/bridge/cursor-bridge/workflow/trace-exceptions.md
+index 21aa3c1..91995af 100644
+--- a/bridge/cursor-bridge/workflow/trace-exceptions.md
++++ b/bridge/cursor-bridge/workflow/trace-exceptions.md
+@@ -132,7 +132,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
+ - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md What must survive a compaction
+ - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 3. Delegate to Cursor
+ - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 3b. A model fails mid-step — switch automatically, restart the step, never wait
+-- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop.md 8. Merge (the verified gate)
++- new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)
+ - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md 7. Decide (accept the increment)
+ - new TASK-034 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The review ceiling
+ - new TASK-034 bridge/cursor-bridge/workflow/phases/reflection.md What must survive a compaction
+@@ -146,3 +146,13 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
+ - reword TASK-037 bridge/commands/supervisor.md Project state
+ - reword TASK-037 bridge/commands/supervisor.md Phase 2 — Design
+ - reword TASK-037 bridge/commands/supervisor.md The change cycle — a request on a finished project
++- new TASK-038 bridge/cursor-bridge/workflow/phases/delegation-loop.md 8. Merge — in a sub-file
++- new TASK-038 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md Where this sub-file belongs
++- reword TASK-038 bridge/commands/supervisor.md Phase 2 — Design
++- reword TASK-038 bridge/commands/supervisor.md 8. Merge (the verified gate)
++- reword TASK-038 bridge/commands/supervisor.md Reflection points — stage close, phase gates, project end
++- reword TASK-038 bridge/commands/supervisor.md Standing rules
++- reword TASK-038 bridge/commands/supervisor.md Project state
++- new TASK-038 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)
++- new TASK-038 bridge/cursor-bridge/workflow/phases/design.md The procedure
++- new TASK-038 bridge/commands/supervisor.md The phase modules
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 46c6237..2e89959 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1527,3 +1527,11 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ 
+ - **The design critique's failed-launch wording outside design.md.** TASK-037 reconciled design.md: when Review B's launches fail, its row reads `not run (<the reason>)` and a round counts once either critic delivered (T3). `bridge/cursor-bridge/Merge-Verification-Policy.md` ("Review B's design mode", its bounded-loop paragraph: "if that fails too, the round stays not run") and KP-062's correction say the same case in the old words. Neither is in a release T increment's Scope; TASK-038 edits the policy for its merge mechanics. Check: TASK-038's brief widens its Scope to the policy's sentence and KP-062's, recorded in its accept, or a later text release takes them (Review A, TASK-037 round 1, B1's sites outside the Scope).
+ - **The digest has 7 characters left.** At TASK-037's merge the digest part is 9,493 of the 9,500 characters tests/test_session_start.py allows. Any later digest change (rule numbers kept) is paid for by a trim in the same change, named in the trace entry as TASK-034's and TASK-037's were (Review A, TASK-037 round 1, C4).
++
++### TASK-038, the merge mechanics and where reviewers write (2026-11-01)
++
++- **TASK-037's failed-launch lead, the policy's half done.** TASK-038 widened its policy region to the design mode and the bounded-loop paragraph now reads "if that fails too, Review B's row stays `not run (<the reason>)` and the subject goes on" (tests/test_release_t_merge.py, test_policy_design_mode_the_failed_launch_as_design_md_words_it). KP-062's correction still says "the round stays not run": Known-Pitfalls.md is outside TASK-038's Scope. Check: TASK-041, whose Scope rewrites KP-061's command line in the same file, widens to KP-062's sentence, recorded in its accept, or a later text release takes it.
++- **Four texts still put the live position on the status file's `In flight:` line.** Rule 43 now keeps it in `run/supervisor/in-flight.md`, the carried file's line reading `none` (T11, T17), but the loop guard's refusal (`bridge/cursor-bridge/loop-guard.py`, the message that says to write the agent "on the status file's `In flight:` line", which rule 43 tells the supervisor to copy), rule 54 (a pause writes `In flight:`) and `bridge/commands/calibrate-bridge.md`'s step 0 say otherwise, as does the delegation loop's step 3 for parallel increments (the branch's starting commit and each running builder written on `In flight:`; no increment of the plan runs in parallel), which TASK-038's Scope holds but its Done when does not name; a write to `docs/` while Review B runs is GATE-INTEGRITY. The template's `TASK-nnn in <checkout>` alternatives, in TASK-038's Scope, were taken out in its round 2 (Review A's Consider and Review B's round-1 Should fix converging). Rule 54 and calibrate-bridge.md are in no release T increment's Scope, and loop-guard.py is a program, which release T does not change. Check: a later text increment widens to rule 54, calibrate-bridge.md and step 3, and the guard's message is a program item named for the maintainer in TASK-045's entry (Review A, TASK-038 round 1, Should fix 1).
++- **A parametrised test id holding a non-ASCII character cannot be named in a mutants file.** TASK-038's pin `test_item2_each_excused_module_section_has_one_heading_and_is_pinned[delegation-loop.md-8. Merge \u2014 in a sub-file]` came back `not run` from `mutation-run.py --checkpoint` in both forms (pytest's escaped id and the character itself), so it was left out of `new_tests`, its text shown red by test_r045_a instead. Any later pin of an em-dash heading meets the same gap. Check: the maintainer's program release reads how the outcomes plugin records such an id against the listed one; until then an increment states the id it could not list and the test that shows its text red (Review A, TASK-038 round 1, Should fix 2).
++- **P7's documented form names its output file without the redirect.** merge.md's P7 sentence says the suite's output goes to `run/agent/<ID>-suite.out` and shows the launch without `> ... 2>&1`, the same name step 4's suite writes, so a P7 run overwrites step 4's output. Check: TASK-041, which rewrites the suite's launch commands for `--strip`, writes the redirect and a name of its own (`<ID>-suite-pr.out`) (Review A, TASK-038 round 1, Consider).
++- **T2's receipt check does not name the resolution round.** design.md's check (a reply with no finding names three verified statements, fewer is a failed launch) applies by its words to a resolution round too, whose reply answers questions and carries no findings by design; only the resolution file's own opening, which takes the place of the request for findings, keeps it out. Check: TASK-039 or a later text increment scopes the sentence to critique rounds (Review A, TASK-038 round 1, Consider).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index c1f05ba..08523ca 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -25,7 +25,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The phase modules | The supervisor's procedure, one file per part of the workflow, moved from the core verbatim but for 5 reworded passages (stage B3 reworded 11 passages in all, the other 6 where they stand in the core; each is excused by a `reword` entry in trace-exceptions.md; the trace excused 14 after TASK-017's three units split at the sentence, 52 since BUG-031 and 57 since BUG-033, each increment's rewords pinned in tests/test_core_carve.py): intake, design, interface, planning, run-parameters, configuration, delegation-loop, change-cycle, reflection, project-end (carved out of the reflection points as a declared split); the core keeps the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state and the standing rules, and names every module, and when a module is read outside its own phase (reflection at every reflection point, its Issues section whenever an issue is detected, project end at the last stage's close, another phase's module whole for a step a module runs by its heading: the change cycle's scaled Phases 1 to 4, the design critique's use of the delegation loop's steps 3b and 8); the modules install from the manifest with no installer change | bridge/cursor-bridge/workflow/phases/*.md; bridge/commands/supervisor.md | tests/test_core_carve.py; trace-check.py (424 passages, 0 dropped) | release B (TASK-010) |
+ | Classification at intake and traits at the design gate | Each part classified against the open list at intake, its product type and sub-type fixed there, its traits and its type's default traits proposed there and settled as a decision of their own at the design gate; the `Workflows:` line written and `workflow-check.py --status` run; a part that fits no type, two equally, two sub-types equally or an unwritten type or sub-type pauses the project before design (a run sheet to the maintainer; resumed after the release and the calibration, classified again before the gate); a new or unwritten trait's handling written into the design and flagged at the gate, where the owner may pause, kept as a `Flagged trait:` row for the promotion pass; each part's delivery kind confirmed at intake and recorded as a `Delivery kind:` row; the intake questions and answers kept in run/supervisor/intake-notes.md, never a key; intake.md and design.md open with their compaction-survival lists and declare their extension points | bridge/cursor-bridge/workflow/phases/intake.md; bridge/cursor-bridge/workflow/phases/design.md | tests/test_phase_modules_intake_design.py | release B (TASK-011) |
+ | The interface variants | The interface phase runs one variant per kind of interface a part has, each an addition: mockups for screens (today's Phase 3 procedure, activated by the trait has screens), command design for commands and contract design for a protocol other software calls (each declared with its heading and purpose, its procedure written by TASK-022: command design writes docs/design/COMMANDS.md, a section per command with its help text, output and exit codes, and never takes a secret as an option's value; contract design writes docs/design/CONTRACT.md and its machine-readable contract file, each operation naming who may call it and the mechanism that tells, what its inputs may reach, and how a refused call fails, changing and revealing nothing; an added or widened operation, like a breaking change, escalates to the owner), and a playable prototype for play (a pointer to the Game Development workflow, release E); interface.md declares them in a table and one `Variants:` line the session-start hook names after it; the owner's change requests are kept in run/supervisor/interface-notes.md, never a key; the owner approves each variant's artifact, the phase passing when all are approved, and the owner's word is asked even when no part runs a variant; the plan builds against what the phase approved (planning.md, "What the interface phase hands to the plan": every approved contract gets the increment whose tests enforce it; the increment that first builds an approved command carries the command reference's generator and its currency check, and each later one that adds or changes a command "the reference regenerated and committed", whatever the part's traits, the plan critic's lens asking both, BUG-021 and BUG-022); interface.md and planning.md open with their compaction-survival lists and declare their extension points | bridge/cursor-bridge/workflow/phases/interface.md; .../interface/*.md; .../planning.md | tests/test_phase_modules_interface_planning.py; tests/test_interface_text.py; tests/test_traits_existing.py (test_r017_) | release B (TASK-012; the two procedures TASK-022; the command reference BUG-021, BUG-022) |
+-| The build-phase modules | run-parameters.md, configuration.md and delegation-loop.md open with their compaction-survival lists and declare their extension points (run-parameters.parameters; configuration.items; delegation-loop.inspect-checks, .test-checks and .brief-constraints), each point's line saying where a conditional workflow's additions are made; each run-parameter answer is written to docs/RUN_PARAMETERS.md as the owner gives it (`n/a` for one that does not apply; never a key or a computer path), and the configuration's position is kept on the status file's `Next:` line; the delegation loop's step 9, the stage-close refactoring pass, is in delegation-loop/refactoring-pass.md, which the module's `Sub-files:` line and the session-start hook name after it, and the pass's candidates are kept in run/supervisor/refactor-<stage>-candidates.md | bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/refactoring-pass.md | tests/test_phase_modules_build.py | release B (TASK-013) |
++| The build-phase modules | run-parameters.md, configuration.md and delegation-loop.md open with their compaction-survival lists and declare their extension points (run-parameters.parameters; configuration.items; delegation-loop.inspect-checks, .test-checks and .brief-constraints), each point's line saying where a conditional workflow's additions are made; each run-parameter answer is written to docs/RUN_PARAMETERS.md as the owner gives it (`n/a` for one that does not apply; never a key or a computer path), and the configuration's position is kept on the status file's `Next:` line; the delegation loop's step 9, the stage-close refactoring pass, is in delegation-loop/refactoring-pass.md, and since TASK-038 its step 8, the merge, in delegation-loop/merge.md, which the module's `Sub-files:` line and the session-start hook name after it, and the pass's candidates are kept in run/supervisor/refactor-<stage>-candidates.md | bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/refactoring-pass.md | tests/test_phase_modules_build.py | release B (TASK-013) |
+ | The closing modules | change-cycle.md, reflection.md and project-end.md open with their compaction-survival lists; the change cycle runs the interface variant of every kind of interface a change touches (amending what was approved, re-presenting no untouched kind) and keeps its step on the `Change cycle:` line; the reflection points and project end keep their finished steps in run/supervisor/in-flight.md; every Issues entry gives the incident's time and a `Compaction before:` line; the promotion pass reads the inventory's `Flagged trait:` rows and proposes each trait as the maintainer could write it; reflection.md declares `reflection.items` and project-end.md `project-end.completion-conditions` and `project-end.delivery`, the change cycle none, and a test cross-checks the registry against every module; each interface variant file's declaring paragraph has a heading of its own | bridge/cursor-bridge/workflow/phases/change-cycle.md; .../reflection.md; .../project-end.md; .../interface/*.md | tests/test_phase_modules_close.py | release B (TASK-014) |
+ | The hook's module pointers | After a compaction, resume or fork the session-start hook names the current phase's module files (one Phase→module table, every template value), the files a module's `Sub-files:` and `Variants:` lines name, and the type, sub-type and trait files that touch the phase, in the order additions apply; it reads the open list and the registry only at their installed paths and through no link; a table or checker it cannot read or use gives one plain line and names no conditional or pointer-line file; nothing the checker returns is printed except as an exact str matching its pattern, what the checker prints through sys.stdout and sys.stderr is discarded (an exception's type name included, which is read inside a redirection of its own), a phase module line from the checker's file_lines that is not an exact str makes the checker unusable (the one plain line), each pointer path is taken exactly as written between `; ` separators (only the line's end is stripped), and the hook exits 0 | bridge/cursor-bridge/session-start.py | tests/test_session_start_module.py; tests/test_session_start.py | release B (TASK-015; hardened by FIX-003 before the first pointer line) |
+ | The first trait files | has screens, installable, performance budgets and external services, each a `#` title and `## Add at <point key>` sections: the phase modules' and the plan critic's conditional passages moved there unit by unit (three split at the sentence, each split's parts equal to the baseline unit in its sentence order), new text only in a `###` sub-section after the moved units or in a whole `## Add at` section of new text, each with a `new` entry; has screens activates the mockup variant and gathers the screen inventory, the interface ruleset, the design tooling, the frozen-rule brief constraint, the design auditor and the observability criteria and tests (founding rules N7 and N9 stay in the core); installable the delivery questions, the Delivery section, the code-signing escalation, the packaging stage with the command reference, and the packaging stage and the delivery scoped to the kinds `installer` and `install-script`; performance budgets the budgets at intake, their mechanisms in the design, the benchmark increment, its lens and the benchmark floor; external services the contract capture and its lens, and as new checks the bounded remote wait and the deployed layout tested before any deployment; the registry widens `planning.stages` to increments and adds `planning.acceptance-criteria`; the plan critic keeps its design lenses and flags a missing trait, and since BUG-021 and BUG-022 holds the command-reference lens for every approved command design and applies the lenses a round's file adds; design's trait gate carries the traits' plan lenses and asks a trait added there its questions; the four open-list rows are written | bridge/cursor-bridge/workflow/traits/has-screens.md, installable.md, performance-budgets.md, external-services.md; bridge/cursor-bridge/workflow/extension-points.md; .../phases/*.md; bridge/agents/plan-critic.md | tests/test_traits_existing.py; trace-check.py (424 passages, 0 dropped, 14 excused at TASK-017, 57 since BUG-033); tests/test_b3_least_confident.py (every excused trait section pinned) | release B (TASK-017) |
+@@ -101,7 +101,7 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | The traceability check traces every passage of the core (424 at the baseline), not only the standing rules and the conditional passages R-029 names | tracing them all costs nothing more and leaves no passage to be classed by hand; a passage that leaves the core without a home takes a `reword` entry the design review sees | 2026-10-20, supervisor (TASK-016) | a split increment needs a passage deleted outright |
+ | The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
+ | TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
+-| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,025 characters (88.4%), decide.md 117 lines and 13,071 characters; after TASK-035, which records R-003's ruling in the core and adds the template's `Deferred increments:` field, the core 864 lines and 97,047 characters, read in parts to its last line (FB-036); after TASK-034, which adds the review ceiling's text, the core 873 lines and 98,103 characters, delegation-loop.md 452 lines and 56,531 characters (94.2% of the bound), decide.md 139 lines and 17,368 characters; at stage B5's close, after BUG-031 and BUG-033, the core 874 lines and 98,327 characters, delegation-loop.md 452 lines and 57,217 characters (95.4% of the bound), decide.md 141 lines and 17,998 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 95.4% of its characters at stage B5's close: a further addition moves another step into a sub-file first) |
++| The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,025 characters (88.4%), decide.md 117 lines and 13,071 characters; after TASK-035, which records R-003's ruling in the core and adds the template's `Deferred increments:` field, the core 864 lines and 97,047 characters, read in parts to its last line (FB-036); after TASK-034, which adds the review ceiling's text, the core 873 lines and 98,103 characters, delegation-loop.md 452 lines and 56,531 characters (94.2% of the bound), decide.md 139 lines and 17,368 characters; at stage B5's close, after BUG-031 and BUG-033, the core 874 lines and 98,327 characters, delegation-loop.md 452 lines and 57,217 characters (95.4% of the bound), decide.md 141 lines and 17,998 characters; after TASK-038, which moved step 8 verbatim into the sub-file delegation-loop/merge.md and reworded it there, delegation-loop.md 357 lines and 41,737 characters (69.6% of the bound), merge.md 106 lines and 19,702 characters, the core 876 lines and 100,689 characters | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md is at 95.4% of its characters at stage B5's close: a further addition moves another step into a sub-file first) |
+ | The session-start hook's threat model is a partial, mismatched or hand-edited install, not a hostile checker: workflow-check.py runs in the hook's process and could write to its output directly. Inside it, nothing the checker returns reaches the output except as an exact str matching its pattern; what lies outside it is docs/HARDENING.md's (Stage B3, TASK-010 with TASK-015) | seven review rounds converged there; every guard past the model narrows a channel an in-process program can open another way | 2026-10-20, supervisor (TASK-015, by-class line) | the hook loads code other than the installed checker, or a finding inside the model |
+ | The hook reads the workflow tables only at their installed paths (`~/.claude/cursor-bridge/workflow/open-list.md` and `extension-points.md`), only once the checker's own table paths compare equal to them, and refuses them behind a link at workflow/ or at either file | the link test and the read then concern the same files on every platform (TASK-015 R3-3, R4-3, R5-1) | 2026-10-20, supervisor (TASK-015) | the tables move |
+ | TASK-015's accepted assumptions, each in f41f7cb's `Assumptions:` sections (C3 under its round-6 `Decisions:`): a trailing `;` on a pointer line is ignored, and `a.md;b.md` is one path, which fails the pattern (the brief's grammar, Requirements 4 and 7); a pointer line's files are not named when the tables fail (the one plain line stands for them); load_tables returns the path it was given through `slash` unchanged (workflow-check.py); a table key that is not an exact str names no file (HARDENING, Stage B3, decision C3); the checker touches neither `sys.stdout.buffer` nor `reconfigure` at import | each rests on the brief's grammar or on the installed checker as it is, and each fails closed (the plain line, or no file named) | 2026-10-20, supervisor (TASK-015; the row added 2026-10-23 at stage B3's review) | load_tables changes the path it returns, a checker touches stdout at import, or a checker returns keys of another type by design |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index ea1d546..ca69cd2 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -2,11 +2,11 @@
+ Last updated: 2026-11-01
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+-Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); plan gate passed 2026-11-01 (BUILD_PLAN.md "Release T — the plan addendum", stages T1 and T2, TASK-036 to TASK-045, subject release-t-plan, 5 reads); step 6, the loop, on Opus 5.5 (run parameters kept, docs/RUN_PARAMETERS.md): TASK-036 and TASK-037 merged (PRs #117 and #118), TASK-038 next
+-Increment: none (TASK-038 next)
+-Last accepted: TASK-037, reports, run sheets, the critique's record and project state (PR #118, at its merge): the critique's record and names, the pause before planning work, reports and run sheets, project state and the design's lenses (R-047, R-048, R-053 built); before it TASK-036, the pitfalls (PR #117); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-037, BUG-001 to BUG-038, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); plan gate passed 2026-11-01 (BUILD_PLAN.md "Release T — the plan addendum", stages T1 and T2, TASK-036 to TASK-045, subject release-t-plan, 5 reads); step 6, the loop, on Opus 5.5 (run parameters kept, docs/RUN_PARAMETERS.md): TASK-036 to TASK-038 merged (PRs #117 to #119), TASK-039 next
++Increment: none (TASK-039 next)
++Last accepted: TASK-038, the merge step in its own sub-file; the merge mechanics and where reviewers write (PR #119, at its merge): step 8 in delegation-loop/merge.md, the title form, bare push and merge, the P7 suite, every pushed commit scanned, the merged branch deleted, the status file as at the merge, where reviewers write and a clean reply's three statements (R-045, R-046 built); before it TASK-037, reports, run sheets, the critique's record and project state (PR #118); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-038, BUG-001 to BUG-038, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: nothing
+-Next: the loop on TASK-038 (the merge step in its own sub-file; the merge mechanics and where reviewers write), then TASK-039 to TASK-045 in the plan's order, the stage closes pausing; reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: the loop on TASK-039 (rule 6, convergence and the ceiling's text; briefs, reports and the accept step), then TASK-040 to TASK-045 in the plan's order, the stage closes pausing; reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -15,8 +15,8 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); intake-notes.md (release T's intake: what was read, the questions and the owner's answers); release T's rt_*.py (the item scan, the records writer, the critique's file); each closed gate's own files, named by its ID (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*, bug0nn_*, cal30b_*.py, the stage reviews' stage_b<n>_* and stage-b<n>-*, the fix and refactoring passes' fix*, refac_* and refactor*, the plan revision maintainer-text's plan_text_*.py, design_text_file.py and *-PLAN-TEXT.md); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); b5close_docs.py and b5close_records.py (stage B5's); b6close_docs.py and b6close_records*.py (stage B6's, run once each), write_stage_b6.py and refactor_b6_clones.py; the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py to demo_b5.py (run with python -X utf8) and demo_b6.py (PYTHONUTF8=1 through --kind driver); drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #118, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
+-Stage: release T's stage T1 running (TASK-036 and TASK-037 merged; T1 and T2 planned 2026-11-01); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). project end 2026-10-31 (Phase: done; completion and diagram checks OK, sync-check --strict IN SYNC, the User Manual, the promotion pass; HARDENING, Project end). Last reflection before it: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #119, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
++Stage: release T's stage T1 running (TASK-036 to TASK-038 merged; T1 and T2 planned 2026-11-01); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). project end 2026-10-31 (Phase: done; completion and diagram checks OK, sync-check --strict IN SYNC, the User Manual, the promotion pass; HARDENING, Project end). Last reflection before it: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-023 fixed (BUG-038, 2026.10.30d, installed 2026-10-31); ISS-021's field check passed (2026-10-31); ISS-011, ISS-015 and ISS-022 closed at stage B6's close, ISS-020 completed there (worked around; the roster check's sign-in advice to release T, HARDENING). Earlier: docs/archive/STATUS_HISTORY.md
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 93b0237..c7bd652 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -50,8 +50,8 @@ Revised 2026-11-01 (release T, the project's first change cycle; docs/DESIGN.md,
+ | R-042 | The code gate has a round ceiling held by programs, as the design critique has (KP-062). A round is one version of the increment the gate's reviewers read: each builder run of a brief (`handoff/<ID>.md`, then `<ID>-r<N>.md` — every re-delegation a new numbered brief, never a revision in place) and each Review B read that `review-guard.py snapshot <ID>-r<N>` opens, a round spent when its reply arrived; a fix the supervisor makes and Review A re-reads before step 8's snapshot is no round. Above three rounds — the guard's count of rounds opened for the increment, which the supervisor's report names, the launcher's count holding the briefs to it — the work is sent back only for a defect of a **blocking class** — behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, or a failing test — and every other finding (wording, a docstring, test strength beyond the brief's criteria, style, a surviving mutant outside those classes) is recorded in `docs/HARDENING.md` with the increment named and merges with it. The launcher refuses a builder launch of a brief above the ceiling, and the guard a snapshot above it, unless the brief (which the launcher reads, written before the builder launch) and the increment's `run/review/SCOPE-<ID>.md` (which the guard reads, written before the snapshot) name the class and the finding on a `Blocking class:` line — a line lifting the one round it was written for — or `docs/RUN_PARAMETERS.md` carries the owner's own words on a `Review rounds above the ceiling: <ID> <rounds> (<their words>, <date>)` line, `<rounds>` at least the larger of the guard's and the launcher's next counts for the increment, the lift recorded by the program that read it; both programs count a branch's rounds by one rule, read from both their records, whatever a later brief's or snapshot's name — a branch carries the ID its first brief names, or the IDs that brief's `Merge unit: <ID> <ID> ...` line names (the loop's merge units), each with its own budget; a brief or a snapshot under another ID is refused by either unless the owner's line names that ID (a class line, which no reviewer confirms below the ceiling, lifts rounds and never the branch rule), the claim lapsing when the counted IDs merge on `main` — the launcher also refuses a brief whose bytes changed after a completed run under the same name, the guard a new round under a name whose round already has its reply, and the permission guard a `cursor-agent` started around the launcher with a brief or a review file in its arguments, so that neither count is evaded by a revision in place, a renamed snapshot, a fix brief under a new ID (within an increment's gate the fix brief is `handoff/<ID>-r<N>.md`; `BUG-<nnn>` is the brief of a defect found after a merge) or a launch outside the launcher; an increment in flight when the release installs is counted from its snapshots and its builder reports; every reviewer and auditor grades a finding above the ceiling by the five classes first and confirms a named class or records a breach, which voids the round's result and withholds the merge as GATE-INTEGRITY does. A stage review is bounded the same way (`STAGE-<name>-r<N>`): below the ceiling a REJECT starts a fix brief and a new stage round, and a round ending with no REJECT but with findings the convergence rule makes blocking puts them into one fix increment through its own gate, the stage closing at its merge with no further stage round; at and above it only a blocking-class finding starts a fix brief and a new stage round, a convergent finding outside the five going to `docs/HARDENING.md` under the stage and opening no fix increment. The convergence rule grades a finding's certainty, never its class: below the ceiling, two reviewers' agreement makes a finding blocking whatever its grade, with one exception, a class already recorded in `docs/HARDENING.md` under the by-class line for that increment or that stage — the class is the defect, not the operator that exposed it, so a further mutant, input or operator family that shows it is that class, which stays recorded and starts no round, whether one reviewer names it or two — while a defect of one of the five blocks whatever was recorded before, and no class of the five is ever on that line. The quality floor stays whole: a blocking-class defect blocks at any round; the ceiling's number, three, is the owner's (2026-10-24, "I choose three", at this plan's gate). **Revised by release T** (2026-11-01, R-050, through the design gate of the change `release-t`): the convergence sentence gains P1's gate — two reviewers independently naming the same defect (two findings on one line are one defect only where they name the same fault in it) makes it blocking where its content is of one of the five classes, a convergent finding of another class being fixed by the next increment that edits its file or recorded in `docs/HARDENING.md` with no gate pass of its own — and T20's bound before it (a threat model recorded in the inventory's Decisions, with its reason and what would reopen it, bounds what a defect of the five is for the project: a finding outside it is recorded, not blocking, whatever its label and however many reviewers name it, the reviewers given the threat model with the diff; within it a defect of the five blocks whatever was recorded before); membership of a class is by reproduction on an ordinary, realistic layout, a label alone never deciding, a security finding within the threat model judged instead by whether untrusted input can reach it, never by the layout's ordinariness (P2, the by-class line of 2026-10-27); and a flagged round (GATE-INTEGRITY) spends nothing whichever of `verify`'s checks flagged it and whenever, a flag raised while the Review B run still goes on included, the void recorded by the launch's start time whatever its exit so far (BUG-039 restores it at its two sites in `verify` and at the re-snapshot in `snapshot`, which keeps the flag, its reproduction tests joining this row's Evidence). The increment that writes the revision rewrites the tests that pin the old sentence (`tests/test_loop_text_pace.py`, `test_bug033_` and the `test_r042_` convergence tests), each red on the installed text first; the row stays built, the revision's status being R-050's. | the owner's decision of 2026-10-20 (the maintainer's message: "I do agree with your prior three recommendations"; solution 1, "for example three rounds"); KP-062; standing rule 6 | built | the launcher's and the guard's counts, lifts, branch rule and refusals and the permission guard's: tests/test_bridge_run_review_ceiling.py, tests/test_review_guard_ceiling.py (test_r042_), tests/test_task032_supervisor_launcher.py, tests/test_task032_supervisor_guard.py, tests/test_task032_supervisor_r4.py (TASK-032); the loop's, the policy's and the reviewers' text, the stage review's and rule 6: tests/test_loop_text_pace.py (the test_r042_ tests; TASK-034), the names' pins re-taken in tests/test_core_carve.py, tests/test_phase_modules_build.py, tests/test_phase_modules_close.py, tests/test_allowlist.py, tests/test_session_start.py and tests/test_b3_least_confident.py; a report is no brief and the guard's inputs match an ID at its boundaries: tests/test_bug030.py (BUG-030); a refactoring branch's REFAC briefs and its REFAC-<stage> snapshot: tests/test_bug032.py (BUG-032); the late-finding sentence and the convergence rule: tests/test_loop_text_pace.py (test_bug033_; BUG-033); the seed counts no builder round release B's launcher logged as a Review B round: tests/test_bug036.py (BUG-036) |
+ | R-043 | Mutation checks run once per pass of the gate, on the version the gate reads: the mutation run (`mutation-run.py`, R-041) is launched at step 7 on every pass through it — once Review A and the auditors have accepted the increment's behaviour and before step 8's snapshot — never at every round's step 4, the cache filtering what is unchanged between passes; before the increment's first run, before any `--all` run and whenever the mutants file has changed since its last estimate the supervisor cuts the redundancy the mutants file itself shows (a duplicate mutant, its `file`, `pairs` and expectations equal to another's, removed from the file before the launch; never a criterion test, and nothing on the strength of a kept kill), then estimates the run's process count to its order of magnitude from the file as it stands (for each distinct `tests` list among the mutants it will apply, the processes one completed run of that list starts, every launch counted once per pass and the programs the launched programs start counted with them, reused for every mutant that lists it; the sum plus the collection check) and writes the cuts and the estimate on `run/supervisor/in-flight.md` with the mutants file's name; the increment's new tests' run against the checkpoint (`--checkpoint`) stays at step 4, before any reviewer. Where the larger of the two next counts — the guard's rounds opened for the increment plus one, and the launcher's round of the brief that would carry a code fix (R-042) — is at or below the ceiling, a surviving mutant is fixed — a criterion test's fix is the supervisor's and no round, a code fix a re-delegation and a round; above it a survived, not-applied or killed `expect: survive` mutant is a `docs/HARDENING.md` item, never a re-delegation, unless the untested code is a safety mechanism the increment relies on or the result shows a blocking-class defect. | the owner's decision of 2026-10-20 (solution 2: "The driver runs when the increment is otherwise accepted, not every round"); ISS-011 (about twelve whole-set runs of one driver in a night) | built | the program half's text, the run at step 7 with its cut, its estimate and exit 1's handling: tests/test_loop_text_windowless.py (test_r043_; TASK-030); the run on every pass once accepted, before step 8's snapshot, with the survivor rules read against the ceiling: tests/test_loop_text_pace.py (test_r043_; TASK-034), the later of the two |
+ | R-044 | The report cycle (`/evaluate-reports`) has a pace section for every project, computed by `pace-report.py`, read-only, from git and from the launcher's and the guard's own records on the computer: per ISO week, increments started (the increment's first builder launch or first snapshot on record, else unknown — a squash leaves no earlier commit on `main`) and merged (a squash subject read as `plan-check.py` reads one, for every brief's ID), rounds per increment (mean, maximum, the increments over the ceiling by ID with the lift each round above it used: a class line, the owner's line or none), days from start to merge, `docs/HARDENING.md` lines added, and the project's tokens that week with the week's tokens per merged increment, subagents' records counted where they lie under the project's session folder; the pace report and the plan check read a squash subject by one rule, one copy in `bridge_env.py`, under which a closing parenthesis merges an increment only when each of its comma-separated items is a bare ID (ISS-013). | the owner's decision of 2026-10-20 (solution 3: "Creeping slowdowns then show the week they start, not a month later"); ISS-013 | built | the program: tests/test_pace_report.py, tests/test_plan_check.py (test_r044_), tests/test_task033_supervisor.py, tests/test_task033_supervisor_r2.py, tests/test_task033_supervisor_r3.py, tests/test_task033_supervisor_r4.py (TASK-033); the report cycle's pace step and Pace section: tests/test_loop_text_pace.py (test_r044_; TASK-034), the later of the two; an ID with a tracked brief, a report being none: tests/test_bug030.py (BUG-030); a launch refused the slot gives no start and no lift: tests/test_bug032.py (BUG-032) |
+-| R-045 | The loop's merge mechanics are stated once, in the delegation loop's step 8 and the texts it names: a records, design or fix pull request's title starts with its kind and ends with bare IDs in parentheses, an increment's with its ID, and the `Merges:` trailer form holds only where the repository's squash message is the pull request's description, which this repository's is not (its squash message is the commit messages, read from GitHub on 2026-11-01), so the title form is the rule here and the text states both (T4); push and merge commands run bare, never piped, chained or wrapped (T8); before the first push of a pull request that changes the status file, `project.json` or a `VERSION`, the full suite runs once with the pull-request variables set, `GITHUB_REF=refs/pull/<n>/merge`, `GITHUB_BASE_REF=main` and `GITHUB_EVENT_NAME=pull_request`, `<n>` the number the pull request will take, predicted as the next the repository issues, one above its latest pull request or issue (`gh pr list --state all --limit 1`, `gh issue list --state all --limit 1`), the same number the branch's status file writes on its Last accepted line for that pull request (ISS-009: the file reads as at its own merge, not the previous one), the run repeated with the real number where GitHub issues another (P7); before every push every commit the push publishes is scanned for computer paths and account names, a leak in an unpushed commit removed from that commit, never covered (P5: step 8 and `secret-sentinel`); after every merge the branch is deleted locally and on the remote (`git branch -D <branch>`, then `git push origin --delete <branch>`: the remote delete runs on the existing allow rule `Bash(git push:*)`, which the permission guard's force-push check does not touch; the local delete gains `Bash(git branch -D:*)` in `settings.bridge.json`, installed with the release, since `tests/test_allowlist.py` fails a backticked command no rule allows), and where the repository refuses auto-merge the armed form is skipped and the direct merge after the green watch is the merge (P4's text half; its program half, a read of the setting before the arm, waits, the non-goals); the status file a pull request carries reads as at its merge, the live position between merges living in `run/supervisor/in-flight.md`, which a resume reads first, and a pull request whose status file no longer reads as at its own merge because another merged first (T11) rewrites it and merges `main`, a new head the reviews read again under step 8's rule for a branch updated from `main` (T17: rule 43, the status template, the session-start hook's text, KP-069). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+-| R-046 | Every reviewer and critic is told where it may write and what a clean reply holds: the directive's clauses, the policy's invocation and the design critique's constant prompt say that it writes no file under the checkout and points no cache there, that scratch files and test caches go to the system temporary folder, and that it edits nothing (T5); a part reviewed while Review B runs runs single test files at most, its mutation runs on a copy outside the checkout (T16); each stage-review part's prompt names its turn budget and reserves the last turns for the verdict (T25); a design critic's reply with no finding names three statements it verified, each with a short quotation, which the receipt check reads (T2). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
++| R-045 | The loop's merge mechanics are stated once, in the delegation loop's step 8 and the texts it names: a records, design or fix pull request's title starts with its kind and ends with bare IDs in parentheses, an increment's with its ID, and the `Merges:` trailer form holds only where the repository's squash message is the pull request's description, which this repository's is not (its squash message is the commit messages, read from GitHub on 2026-11-01), so the title form is the rule here and the text states both (T4); push and merge commands run bare, never piped, chained or wrapped (T8); before the first push of a pull request that changes the status file, `project.json` or a `VERSION`, the full suite runs once with the pull-request variables set, `GITHUB_REF=refs/pull/<n>/merge`, `GITHUB_BASE_REF=main` and `GITHUB_EVENT_NAME=pull_request`, `<n>` the number the pull request will take, predicted as the next the repository issues, one above its latest pull request or issue (`gh pr list --state all --limit 1`, `gh issue list --state all --limit 1`), the same number the branch's status file writes on its Last accepted line for that pull request (ISS-009: the file reads as at its own merge, not the previous one), the run repeated with the real number where GitHub issues another (P7); before every push every commit the push publishes is scanned for computer paths and account names, a leak in an unpushed commit removed from that commit, never covered (P5: step 8 and `secret-sentinel`); after every merge the branch is deleted locally and on the remote (`git branch -D <branch>`, then `git push origin --delete <branch>`: the remote delete runs on the existing allow rule `Bash(git push:*)`, which the permission guard's force-push check does not touch; the local delete gains `Bash(git branch -D:*)` in `settings.bridge.json`, installed with the release, since `tests/test_allowlist.py` fails a backticked command no rule allows), and where the repository refuses auto-merge the armed form is skipped and the direct merge after the green watch is the merge (P4's text half; its program half, a read of the setting before the arm, waits, the non-goals); the status file a pull request carries reads as at its merge, the live position between merges living in `run/supervisor/in-flight.md`, which a resume reads first, and a pull request whose status file no longer reads as at its own merge because another merged first (T11) rewrites it and merges `main`, a new head the reviews read again under step 8's rule for a branch updated from `main` (T17: rule 43, the status template, the session-start hook's text, KP-069). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | built | T4: tests/test_release_t_merge.py::test_r045_t4_the_title_form; T8: tests/test_release_t_merge.py::test_r045_t8_push_and_merge_bare; P7: tests/test_release_t_merge.py::test_r045_p7_the_suite_with_the_pull_request_variables; P5: tests/test_release_t_merge.py::test_r045_p5_every_pushed_commit_scanned; T11: tests/test_release_t_merge.py::test_r045_t11_t17_the_status_file_as_at_the_merge; T17: tests/test_release_t_merge.py::test_r045_t11_t17_the_status_file_as_at_the_merge |
++| R-046 | Every reviewer and critic is told where it may write and what a clean reply holds: the directive's clauses, the policy's invocation and the design critique's constant prompt say that it writes no file under the checkout and points no cache there, that scratch files and test caches go to the system temporary folder, and that it edits nothing (T5); a part reviewed while Review B runs runs single test files at most, its mutation runs on a copy outside the checkout (T16); each stage-review part's prompt names its turn budget and reserves the last turns for the verdict (T25); a design critic's reply with no finding names three statements it verified, each with a short quotation, which the receipt check reads (T2). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | built | T5: tests/test_release_t_merge.py::test_r046_t5_where_a_reviewer_may_write; T16: tests/test_release_t_merge.py::test_r046_t16_single_test_files_beside_review_b; T25: tests/test_release_t_merge.py::test_r046_t25_each_parts_turn_budget; T2: tests/test_release_t_merge.py::test_r046_t2_a_clean_reply_names_three_verified_statements |
+ | R-047 | The design critique's record and mechanics: a plan addendum whose increments stood in the design's review file from round 1 is criticised and gated with the design as one subject, the record naming both (T1); "the commit its file was built from" is the subject's head when the file was assembled, and a round in which one critic delivered is a critique round, the other recorded "not run (reason)" (T3); the design round's snapshot id is `DESIGN-<subject>-<round>` and the `.err` name follows from it (T7; ISS-001); a plan revision mid-build and a change's design are planning work: the supervisor pauses before them, names the model to set, and sends a push notification where Remote Control is on (T26, rule 48). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | built | T1: tests/test_release_t_records.py::test_r047_t1_a_plan_addendum_from_round_1_is_one_subject_with_the_design; T3: tests/test_release_t_records.py::test_r047_t3_the_records_definitions; T7: tests/test_release_t_records.py::test_r047_t7_the_snapshot_id_and_the_err_name_together; T26: tests/test_release_t_records.py::test_r047_t26_the_pause_before_planning_work_with_a_push_notification |
+ | R-048 | Reports and run sheets give the owner what they need to act: a turn that ends on a builder or reviewer run names the run's limit ("the builder runs until 19:16 at the latest") (D11, rule 43); an instruction that sends the owner into a vendor's console is written from the vendor's documentation fetched at the time, with the exact path (D10, the run-sheet template); the digest's rule 12 reads "Reports lead with the owner's decision, asked in the question form", paid for by a trim within 9,500 characters that keeps every rule number (D7); the `Calibrated:` line is rewritten at each calibration, holding the latest calibration and its pending items, the earlier text living in git (D6). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | built | D11: tests/test_release_t_records.py::test_r048_d11_a_turn_ending_on_a_run_names_its_limit; D10: tests/test_release_t_records.py::test_r048_d10_a_vendor_console_from_documentation_fetched_at_the_time; D7: tests/test_release_t_records.py::test_r048_d7_rule_12_in_the_question_form_in_the_core_and_the_digest; D6: tests/test_release_t_records.py::test_r048_d6_the_calibrated_line_is_rewritten |
+ | R-049 | The stage close's step 9 and the stage review: before a stage review every mutation driver is re-checked at HEAD (every live mutant applies exactly once), a fix that moves product code re-anchors or re-runs every driver anchored on the moved file in the same pull request, and a ruling that names surfaces gets one test per surface in the fix that introduces it (D1); every stage-review part is bounded alike (a test part at most 25 files, a product part per package, a drivers-and-records part per driver family) and a part that ends without a verdict is re-run on what it had not reached (D2); a stage that adds tables starts its live stack with the schema check at its first increment, the development database's rebuild run sheet is prepared before the demonstration, and a harness drives the product's own entry points (D3); before `git branch -D stage/<name>` a local tag `stage-review/<name>-<n>` is made, never pushed, and records cite a stage review's inputs as `<tag>:<path>` (D4); when stages interleave a stage's change is the union of its own squash commits, written by `stage-diff.py`, and a later stage's ready increments may merge before an earlier one closes, the still-open pull request's status file rewritten for its own merge and re-reviewed (T11, R-045); reflection item 5 lists the remote branches with no open pull request and deletes those whose pull request merged (P4's text half); where the plan's last stage is the release's own install, the stage review of the release's text runs before the stamp, a text-only correction found after it rides with the next release unless it changes what a project does, and a release's field acceptance names what may stand in for it while the trial project has no increment at the gate (P17: in `workflow/types/host-extension.md` for the kind host-installation and `workflow/traits/installable.md` for `installer` and `install-script`, the two files it names). | the evaluations of 2026-10-18 (§2 D) and 2026-10-25 (§2 D); Feedback, Proposed bridge changes; DESIGN.md, Change: release T | planned | — |
+diff --git a/docs/archive/STATUS_HISTORY.md b/docs/archive/STATUS_HISTORY.md
+index 433275c..a57a60e 100644
+--- a/docs/archive/STATUS_HISTORY.md
++++ b/docs/archive/STATUS_HISTORY.md
+@@ -127,3 +127,11 @@ Open issues, the line as it stood before the calibration to 2026.10.30a: ISS-011
+ - Next: the loop on TASK-037 (reports, run sheets, the critique's record and project state), then TASK-038 to TASK-045 in the plan's order, the stage closes pausing; reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ - Remote sync: main at the merge of PR #117, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
+ - Stage: release T's stage T1 running (TASK-036 merged; T1 and T2 planned 2026-11-01); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). project end 2026-10-31 (Phase: done; completion and diagram checks OK, sync-check --strict IN SYNC, the User Manual, the promotion pass; HARDENING, Project end). Last reflection before it: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
++
++## Moved out 2026-11-01 (TASK-038, the merge mechanics and where reviewers write, PR #119)
++- Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); plan gate passed 2026-11-01 (BUILD_PLAN.md "Release T — the plan addendum", stages T1 and T2, TASK-036 to TASK-045, subject release-t-plan, 5 reads); step 6, the loop, on Opus 5.5 (run parameters kept, docs/RUN_PARAMETERS.md): TASK-036 and TASK-037 merged (PRs #117 and #118), TASK-038 next
++- Increment: none (TASK-038 next)
++- Last accepted: TASK-037, reports, run sheets, the critique's record and project state (PR #118, at its merge): the critique's record and names, the pause before planning work, reports and run sheets, project state and the design's lenses (R-047, R-048, R-053 built); before it TASK-036, the pitfalls (PR #117); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-037, BUG-001 to BUG-038, the refactoring passes of B2 to B5, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++- Next: the loop on TASK-038 (the merge step in its own sub-file; the merge mechanics and where reviewers write), then TASK-039 to TASK-045 in the plan's order, the stage closes pausing; reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++- Remote sync: main at the merge of PR #118, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
++- Stage: release T's stage T1 running (TASK-036 and TASK-037 merged; T1 and T2 planned 2026-11-01); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29 (HARDENING, Stage B5); B6 (release B's install) closed 2026-10-31: TASK-026 (the release-level review, BUG-034 and BUG-035), TASK-027's stamp (2026.10.30a) and install on 2026-10-30, the trial on the TDP (the owner's choice), BUG-036 (2026.10.30b, installed 2026-10-30), the stage review's round 1 approved by every reviewer and its convergent finding fixed by BUG-037 (2026.10.30c, PR #112), the refactoring pass taking nothing (PRs #105 to #113). project end 2026-10-31 (Phase: done; completion and diagram checks OK, sync-check --strict IN SYNC, the User Manual, the promotion pass; HARDENING, Project end). Last reflection before it: stage B6's close, 2026-10-31 (demonstration passed, 18 checks (run/agent/demo-b6.out); the installed conformance check 22 OK / 2 MISSING, the recorded no-diagram-index decision and the calibration to 2026.10.30c until its install / 6 NOTE; Issues ISS-011 and ISS-015 fixed, ISS-020 completed, ISS-021 and ISS-022 added and fixed; Feedback FB-063 to FB-068; least confident in HARDENING; Project Summary patched)
+diff --git a/project.json b/project.json
+index 7124daa..ba87b48 100644
+--- a/project.json
++++ b/project.json
+@@ -5,7 +5,7 @@
+   "version": "2026.10.30d",
+   "state": {
+     "phase": "changing",
+-    "stage": "release T: stage T1, TASK-038 next (TASK-036 and TASK-037 merged; design and plan gates passed 2026-11-01); release B complete 2026-10-31",
++    "stage": "release T: stage T1, TASK-039 next (TASK-036 to TASK-038 merged; design and plan gates passed 2026-11-01); release B complete 2026-10-31",
+     "bridge": "2026.10.30d",
+     "updated": "2026-11-01"
+   }
+diff --git a/tests/test_b3_least_confident.py b/tests/test_b3_least_confident.py
+index 84331d0..ff09404 100644
+--- a/tests/test_b3_least_confident.py
++++ b/tests/test_b3_least_confident.py
+@@ -126,10 +126,10 @@ EXCUSED_MODULE_SECTIONS = {
+     ("delegation-loop.md", "3. Delegate to Cursor"): (7722, "453212c0f7afe18e2a6faccacf014292646b08b0d06d0e7e68d0e81ab121b1aa"),
+     ("delegation-loop.md", "3b. A model fails mid-step — switch automatically, restart the step, never wait"): (8732, "ff82fe52582243167c62ec0f37571694fd668c555341af13ea1b7a3b279b7337"),
+     ("delegation-loop.md", "7. Decide — in a sub-file"): (241, "9146216638749b537ebdd42d28bdad75eb7ecfdafea1f8236bf90c7bb07c55ee"),
+-    ("delegation-loop.md", "8. Merge (the verified gate)"): (15766, "81387daecb471e9eeef31e1f5aaac5921276317771925499eb21065c0c736d09"),
++    ("delegation-loop.md", "8. Merge — in a sub-file"): (254, "09c40215700ba7a539262fcd2a725ef97214238ef7d76c77a2cab87e93f28a9e"),
+     ("delegation-loop.md", "Extension points"): (1696, "71ab68db2d7893030aa65e8136e44bba2d06a321490d2127803a47a4e9ad680d"),
+     ("delegation-loop.md", "The model, the timeout and the limit"): (1976, "75dd79f1bb1b958f3aaece7bcbf8c38d53d4c24871d79448f02600e1dc1a1ccd"),
+-    ("delegation-loop.md", "The procedure"): (359, "43426ab85b1373afd99983578086509a127d152b6db6ef4c398de9d2aaf480f1"),
++    ("delegation-loop.md", "The procedure"): (391, "01bfc06517bf225158b4ca4d79f9fc1b8d398a64f172d4839cb51e0be2861819"),
+     ("delegation-loop.md", "The tests before the first reviewer"): (6647, "b5a9eacc34dc1a242858721047991b60248c1dcf6d96a54cad5b939b18209548"),
+     ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (2262, "83ce830bdcc3897a5195d27756cc1298b3538fb81b93e2164edba740fa2f898f"),
+     ("delegation-loop.md", "What must survive a compaction"): (3334, "a369a6877d83a0602535fe4190ecf152f25f57d1ef6cb46d418771c415b5f635"),
+@@ -137,6 +137,8 @@ EXCUSED_MODULE_SECTIONS = {
+     ("delegation-loop/decide.md", "The mutation run"): (6067, "b88ad0f4ad6e4c64cc5331791c1f00ec54684dbdab456d00aea049c153297264"),
+     ("delegation-loop/decide.md", "The review ceiling"): (3621, "229ddf9d643b8be0c4eb050cb0543a7fab7561cf82a9d71ee252788e46c6b536"),
+     ("delegation-loop/decide.md", "Where this sub-file belongs"): (436, "9e38cf68a4da72d205ec742fe0d1cbf6f5c6e6bd75a04469b52333775ad19e01"),
++    ("delegation-loop/merge.md", "8. Merge (the verified gate)"): (19196, "b990cfc3a0c07d599941d7bca8a6a68c671798fa8412e96f7b9f08652cd81c01"),
++    ("delegation-loop/merge.md", "Where this sub-file belongs"): (471, "a81250c1d1fb84cfa7d259820cce8727477da8350b965049a0499b9be5975793"),
+     ("delegation-loop/refactoring-pass.md", "9. Refactoring and optimization pass (at stage close)"): (6474, "57bbd058bcf569f984c2e6bdf1881e64e69eb223bcd6294935b6152cdea5b94c"),
+     ("delegation-loop/refactoring-pass.md", "Keeping the pass's position"): (474, "16c05ddcf26b7cfb893f990cc227172f04ef2417dcce816df779b25abd84024b"),
+     ("delegation-loop/refactoring-pass.md", "Where this sub-file belongs"): (451, "d5cc03c8c0b31688c8182cc8c13bd6ef7288eb85dcc32c95a7157929cfcb696c"),
+@@ -144,7 +146,7 @@ EXCUSED_MODULE_SECTIONS = {
+     ("design.md", "Extension points"): (761, "0084dfd13bf170a046f673a2312ed9580521c8be2a0a428b167b06aca65ffeb1"),
+     ("design.md", "The delivery kind"): (494, "6b32868830fa9a36639468c4485c247450ad5d9337993b315eaed2480bf51dd5"),
+     ("design.md", "The gate"): (3276, "811efda0ecdbcc72898697ee0027efe24d7e9a09c5263ab4919bb976cd5c8768"),
+-    ("design.md", "The procedure"): (16524, "2b487b372616cbef7a956339f404b7cdd57719aed1c05a93e6779bb22a085d0d"),
++    ("design.md", "The procedure"): (16945, "f4f18ad53de894e060df18ffdc8a68602bb793826287c5771b294cea2dd7e21e"),
+     ("design.md", "Traits at the design gate"): (3403, "653036f6b84c11afd94a9900be1477d23e9b839bc1c9e2eb933a0d03860a617b"),
+     ("design.md", "What must survive a compaction"): (1906, "c02f83be92ac4da84e33cffdcafd0117448fae2be656e6685b11e1a6e4d11f9e"),
+     ("intake.md", "Classifying each part"): (3506, "e1c84b276fbe04b3d5b331daa6b65c04dfd5101550786fd874e49b8477150192"),
+@@ -170,7 +172,7 @@ EXCUSED_MODULE_SECTIONS = {
+     ("reflection.md", "Extension points"): (738, "bd09934998929fba6d2139393c37232ec3e9c13622b402ce9ac264fb7b7b8228"),
+     ("reflection.md", "Keeping the position"): (536, "197743ebea82a65f13ab634c7a4d70966457f1d3bc711817bed81386dcf22277"),
+     ("reflection.md", "Project end"): (200, "9a6b3ec9d97b138b9e9f711b9fab7d9f2846fdc6a8a8a93b567da2ef05b96429"),
+-    ("reflection.md", "The procedure"): (10929, "c3764e9f4b09e7f2c719fc1fa4b4535dd99236fc66830f3d8957aaf933bea2bb"),
++    ("reflection.md", "The procedure"): (11302, "bf2b83bd075e0d3997e7690596fc39ac1ccadbc5ae82c4e4ca451aafb48bdd89"),
+     ("reflection.md", "What must survive a compaction"): (1836, "87bdea3faeda10fa68f51d4fa10b4459fa6b5b62e0dff6c155cac05dd8da7c21"),
+     ("reflection.md", "Whether a compaction preceded it"): (897, "ebc5c943f5efaf88ed526fe33cf0e9ffa9364891949c853d27f525a674969be4"),
+     ("run-parameters.md", "Extension points"): (683, "5ef8d017187dfd16f8fa971a8e7ef3551136b497387f14e9477562f84331976c"),
+diff --git a/tests/test_core_carve.py b/tests/test_core_carve.py
+index fe51809..5d99671 100644
+--- a/tests/test_core_carve.py
++++ b/tests/test_core_carve.py
+@@ -169,7 +169,7 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
+ # (BUG-031: two more move from traced to excused, under BUG-031's own `reword` entries but labelled by the earlier
+ # entries that match first: the refactoring pass's step 6, whose title now names its REFAC-<nnn> brief IDs
+ # (TASK-035), and rule 39, which retires step 4's old-<nnn> worktree (TASK-015))
+-TRACED = "TRACED: 424 passages of baseline 0a186da; 139 in supervisor.md, 222 under workflow/, 0 dropped, 63 excused"
++TRACED = "TRACED: 424 passages of baseline 0a186da; 139 in supervisor.md, 219 under workflow/, 0 dropped, 66 excused"
+ NOTES = [
+     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
+     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
+@@ -181,6 +181,7 @@ NOTES = [
+     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
+     "NOTE (reword TASK-035) bridge/commands/supervisor.md: The project layout - You work in `Workspace/`; `Documents/` is its sibling (`../D",
+     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - For every **performance or cost budget** the design names th",
++    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - ```bash\\x0apython ~/.claude/cursor-bridge/bridge-run.py --limit",
+     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - It answers in the critic's grades (Blocking, Should fix, Con",
+     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **The loop stops by what was found, and after four rounds at",
+     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - `docs/DESIGN_CRITIQUE.md` has three parts, one block per sub",
+@@ -206,7 +207,9 @@ NOTES = [
+     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - 3. **Review B** \\u2014 a **cross-family**, non-Anthropic verifier",
+     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - **Convergence is a signal.** When two or more reviewers or a",
+     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - A `REJECT` from either reviewer goes back through re-delegat",
++    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - **PR titles start with every increment ID the branch carries",
+     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - When all four hold the merge is authorised. A pull request t",
++    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 8. Merge (the verified gate) - **After every merge, mark the increment's runs healthy and b",
+     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - 4. **One branch, many small commits.** Cut `refactor/<stage>",
+     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - 6. **One gate pass.** The whole branch goes through step 8 o",
+     "NOTE (reword TASK-035) bridge/commands/supervisor.md: 9. Refactoring and optimization pass (at stage close) - The pass never escalates. It never introduces an abstraction",
+@@ -239,7 +242,7 @@ NOTES = [
+ 
+ def test_r003_the_carve_traces_with_exactly_its_excuses():
+     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
+-    excused ones exactly the sixty-three passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
++    excused ones exactly the sixty-six passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+     TASK-015, TASK-017, TASK-030, TASK-034, TASK-035 and BUG-031 declare (three in the core's "Main and conditional workflows", six
+     standing rules, three under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits),
+     one in the design-tooling flow, four in the change cycle, one each in steps 2, 3, 4 and 9, and one each in the
+@@ -248,7 +251,7 @@ def test_r003_the_carve_traces_with_exactly_its_excuses():
+     more in the run parameters, rules 6 and 42, and step 3's brief paragraph; BUG-031's two: the refactoring
+     pass's step 6 and rule 39; and five passages BUG-033 reworded, which those entries excuse: the refactoring
+     pass's step 4 and the run parameters' Parallel increments item and its `on` option, under TASK-035's, step 3's
+-    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's), so an increment that excuses anything more changes this test. It
++    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's; and three passages TASK-038 reworded, which those entries excuse: the design critique's launch block under "Phase 2 \u2014 Design", and step 8's title paragraph and its after-merge paragraph, under TASK-012's and TASK-034's), so an increment that excuses anything more changes this test. It
+     needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+     the supervisor's checkout."""
+     repo = os.path.abspath(os.path.join(HERE, os.pardir))
+diff --git a/tests/test_loop_text_pace.py b/tests/test_loop_text_pace.py
+index a56cece..976cbd7 100644
+--- a/tests/test_loop_text_pace.py
++++ b/tests/test_loop_text_pace.py
+@@ -98,7 +98,7 @@ def reflection():
+ 
+ 
+ def step8():
+-    return section(loop(), STEP8, 3)
++    return section(module("delegation-loop/merge.md"), STEP8, 3)
+ 
+ 
+ def convergence_in(t):
+@@ -387,7 +387,7 @@ def test_r042_step_8_commits_the_scope_file_before_the_round_named_snapshot():
+     assert "\"<directive prompt>\" 2> run/review/REVIEW-<ID>-r<N>.err`" in s
+     assert "**Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`" in s
+     assert "and, at a round above the ceiling, that round's `Blocking class:` line." in s
+-    assert ("(at a round at or above the ceiling, the guard's count at three or more, a fifth clause: grade every "
++    assert ("(at a round at or above the ceiling, the guard's count at three or more, a sixth clause: grade every "
+             "finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line "
+             "where it has one)") in s
+     assert ("`git diff <merge-base>...HEAD > run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot below "
+@@ -398,8 +398,8 @@ def test_r042_step_8_commits_the_scope_file_before_the_round_named_snapshot():
+             "inputs, and refuses empty, the files under `run/review/` whose names hold it (KP-067); the SCOPE file, "
+             "which it reads by `<ID>`, is not among them, so confirm yourself that it is not empty.") in s
+     assert ("stopping only on non-convergence per step 7's brake, and at and above the ceiling only for a finding of "
+-            "one of the five blocking classes.") in f(loop())
+-    assert "`python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took" in f(loop())
++            "one of the five blocking classes.") in f(step8())
++    assert "`python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took" in f(step8())
+     surv = f(section(loop(), "What must survive a compaction", 3))
+     assert ("(the round's `REVIEW-<ID>-r<N>.diff`, `ASSUMPTIONS-<ID>-r<N>.md` and `REVIEW-<ID>-r<N>.err`, whose first "
+             "line is the launch time `pr-activity-check.py` needs, and the increment's `SCOPE-<ID>.md`), whole, with "
+diff --git a/tests/test_phase_modules_build.py b/tests/test_phase_modules_build.py
+index 424285c..bb4cd27 100644
+--- a/tests/test_phase_modules_build.py
++++ b/tests/test_phase_modules_build.py
+@@ -23,7 +23,8 @@ SUB = "delegation-loop/refactoring-pass.md"
+ STEP9 = "9. Refactoring and optimization pass (at stage close)"
+ DECIDE = "delegation-loop/decide.md"
+ STEP7 = "7. Decide (accept the increment)"
+-SUBS = [DECIDE, SUB]
++MERGE = "delegation-loop/merge.md"
++SUBS = [DECIDE, SUB, MERGE]
+ 
+ 
+ # the loop's steps as the module holds them, each with the sub-sections TASK-030 adds (step 7 itself in its sub-file,
+@@ -34,7 +35,7 @@ LOOP_HEADINGS = [(3, "1. Checkpoint"), (3, "2. Package the brief"), (3, "3. Dele
+                  (4, "Waiting for the slot, and a mutation run cut short"), (3, "4. Inspect"),
+                  (4, "The tests before the first reviewer"), (4, "The reviewers"), (3, "5. Scan"),
+                  (3, "5b. Dependency-admission gate"), (3, "6. Benchmarks and observability"),
+-                 (3, "7. Decide — in a sub-file"), (3, "8. Merge (the verified gate)")]
++                 (3, "7. Decide — in a sub-file"), (3, "8. Merge — in a sub-file")]
+ 
+ STRUCTURE = {
+     "run-parameters": [(2, "Run parameters — asked once, after the plan is approved, before configuration"),
+@@ -197,7 +198,7 @@ def test_r032_the_delegation_loop_names_its_sub_files_on_its_pointer_line():
+     assert pointer_lines(text) == [line], pointer_lines(text)
+     proc = section(text, "The procedure", 3)
+     assert "\n" + line + "\n" in proc
+-    assert flat(proc).strip() == ("Steps 1 to 8 below run for every increment, step 7 in a sub-file of this module; step "
++    assert flat(proc).strip() == ("Steps 1 to 8 below run for every increment, steps 7 and 8 in sub-files of this module; step "
+                                   "9, the refactoring and optimization pass at a stage's close, is in another. Each "
+                                   "sub-file is read whole with the module wherever the module is read: " + line
+                                   + " For each increment, in order:")
+@@ -351,7 +352,7 @@ def test_the_configurations_position_is_kept_on_next():
+     assert "`In flight:`" not in module("configuration")
+ 
+ 
+-@pytest.mark.parametrize("rel", ["run-parameters.md", "configuration.md", "delegation-loop.md", DECIDE, SUB])
++@pytest.mark.parametrize("rel", ["run-parameters.md", "configuration.md", "delegation-loop.md", DECIDE, SUB, MERGE])
+ def test_r032_the_module_and_its_sub_file_are_read_whole(rel):
+     """R-032: each enriched module and the sub-file stay within the bound a module is read whole by."""
+     text = module(rel)
+@@ -363,7 +364,8 @@ def test_r005_the_hook_names_the_delegation_loop_and_its_sub_file(tmp_path):
+     delegation-loop.md, then its sub-file, then the reflection and project-end modules."""
+     w = "~/.claude/cursor-bridge/workflow/phases/"
+     named = hook_named(tmp_path, "building")
+-    assert named == [w + "delegation-loop.md", w + DECIDE, w + SUB, w + "reflection.md", w + "project-end.md"], named
++    assert named == [w + "delegation-loop.md", w + DECIDE, w + SUB, w + MERGE, w + "reflection.md",
++                     w + "project-end.md"], named
+ 
+ 
+ def test_the_core_names_the_delegation_loops_sub_file():
+@@ -373,4 +375,5 @@ def test_the_core_names_the_delegation_loops_sub_file():
+     assert ("| The delegation loop (Phase 6) | `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md` and its "
+             "sub-files under `~/.claude/cursor-bridge/workflow/phases/delegation-loop/` |") in core
+     assert ("A step a module keeps in a sub-file keeps its heading there: the delegation loop's step 7 is in "
+-            "`delegation-loop/decide.md` and its step 9 in `delegation-loop/refactoring-pass.md`.") in core
++            "`delegation-loop/decide.md`, its step 8 in `delegation-loop/merge.md` and its step 9 in "
++            "`delegation-loop/refactoring-pass.md`.") in core
+diff --git a/tests/test_release_t_merge.py b/tests/test_release_t_merge.py
+new file mode 100644
+index 0000000..552fc95
+--- /dev/null
++++ b/tests/test_release_t_merge.py
+@@ -0,0 +1,197 @@
++"""R-045, R-046 (release T, TASK-038): the merge step in its own sub-file, the merge mechanics, and where reviewers
++write.
++
++enforces: docs/REQUIREMENTS.md R-045, R-046; docs/BUILD_PLAN.md TASK-038, Done when (a) to (d); docs/DESIGN.md, Change:
++release T (the table of what changes, rows R-045 and R-046).
++
++One test per item label of the two rows (R-045: T4, T8, P7, P5, P4, T11 with T17; R-046: T5, T16, T25, T2), each pinning
++its sentence in the home the design's table names, and one for each of Done when (a) and (c): step 8 in its sub-file,
++and the three allow rules with the commands they admit. KP-052: the one non-ASCII character these pins need, the em
++dash, is built with chr(), never typed."""
++import json
++import os
++import re
++
++from permission_rules import rule_matches
++
++ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++BRIDGE = os.path.join(ROOT, "bridge")
++CB = os.path.join(BRIDGE, "cursor-bridge")
++PHASES = os.path.join(CB, "workflow", "phases")
++LOOP = os.path.join(PHASES, "delegation-loop.md")
++MERGE = os.path.join(PHASES, "delegation-loop", "merge.md")
++CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
++HOOK = os.path.join(CB, "session-start.py")
++POLICY = os.path.join(CB, "Merge-Verification-Policy.md")
++DESIGN = os.path.join(PHASES, "design.md")
++REFLECTION = os.path.join(PHASES, "reflection.md")
++REVIEWER = os.path.join(BRIDGE, "agents", "diff-reviewer.md")
++SENTINEL = os.path.join(BRIDGE, "agents", "secret-sentinel.md")
++SETTINGS = os.path.join(CB, "settings.bridge.json")
++EM = chr(0x2014)
++
++
++def read(path):
++    with open(path, encoding="utf-8") as f:
++        return f.read().replace("\r\n", "\n")
++
++
++def flat(text):
++    return re.sub(r"\s+", " ", text)
++
++
++def section(text, title):
++    """The section under the heading `title`, up to the next heading of its level or higher; a line inside a fenced
++    block is no heading."""
++    lines = text.split("\n")
++    fenced, start, level = False, None, 0
++    for i, line in enumerate(lines):
++        if line.startswith("```"):
++            fenced = not fenced
++            continue
++        m = None if fenced else re.match(r"(#+) (.*)$", line)
++        if m and start is None and m.group(2) == title:
++            start, level = i + 1, len(m.group(1))
++        elif m and start is not None and len(m.group(1)) <= level:
++            return "\n".join(lines[start:i])
++    assert start is not None, "heading %r" % title
++    return "\n".join(lines[start:])
++
++
++def step8():
++    return flat(section(read(MERGE), "8. Merge (the verified gate)"))
++
++
++def rule(n):
++    rules = section(read(CORE), "Standing rules")
++    start = re.search(r"^%d\. " % n, rules, re.M).start()
++    end = re.search(r"^%d\. " % (n + 1), rules, re.M).start()
++    return flat(rules[start:end])
++
++
++def design_prompt(text):
++    """The design critique's constant prompt: the quoted argument of its one design-mode launch."""
++    lines = [line for line in text.split("\n") if "cursor-agent -p --mode=ask --trust" in line]
++    assert len(lines) == 1, lines
++    return lines[0]
++
++
++def test_r045_a_step_8_stands_in_its_own_sub_file():
++    """Done when (a): step 8 moved into delegation-loop/merge.md, the module keeping a pointer where it stood and
++    naming the sub-file third on its `Sub-files:` line."""
++    loop = read(LOOP)
++    assert "\nSub-files: delegation-loop/decide.md; delegation-loop/refactoring-pass.md; delegation-loop/merge.md\n" in loop
++    assert "### 8. Merge (the verified gate)" not in loop
++    assert ("### 8. Merge " + EM + " in a sub-file\n\nStep 8, the verified gate, from the review files and Review B's "
++            "snapshot to the merge and the healthy marks after it, stands in the sub-file `delegation-loop/merge.md` "
++            "(\"The procedure\" names it), read whole with this module.") in loop
++    merge = read(MERGE)
++    assert merge.startswith("## The merge (Phase 6, step 8)\n\n### Where this sub-file belongs\n\n")
++    assert merge.count("### 8. Merge (the verified gate)") == 1
++
++
++def test_r045_t4_the_title_form():
++    """T4: a pull request that merges no increment ends its title with bare IDs in parentheses; the `Merges:` trailer
++    form holds only where the squash message is the description (step 8 and the policy's invocation)."""
++    assert flat(" A pull request that merges no increment (records, a design, a fix of the records) starts its title with its kind (`Records:`, `Design:`) and ends it with the bare requirement or issue IDs it carries in parentheses, the one form every squash setting keeps, never a plan increment's ID there, which the squash reader would take as merged (ISS-013). The `Merges:` trailer form holds only where the repository's squash message is the pull request's description: where it is the commit messages, GitHub's default and the bridge's own repository's (read 2026-11-01), the trailer never reaches `main`, so the title form is the rule (T4).") in step8()
++    assert flat("\n**The merge's own commands.** Pushes and the merge run bare (`git push`, `gh pr merge <n> --squash --match-head-commit <sha>`), never piped, chained or wrapped: the allow rules and the permission guard read a command as written (rule 8, T8). A pull request's title starts with every increment ID it merges; one that merges none starts with its kind and ends with its bare requirement or issue IDs in parentheses, never a plan increment's ID there (ISS-013), and the `Merges:` trailer form holds only where the repository's squash message is the pull request's description (T4; the delegation loop's step 8, `~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`).\n").strip() in flat(section(read(POLICY), "Invocation"))
++
++
++def test_r045_t8_push_and_merge_bare():
++    """T8: every push and the merge run bare (step 8)."""
++    assert flat(' The same holds for every push and for the merge: `git push` and `gh pr merge` run bare, never piped, chained or wrapped (rule 8, T8).') in step8()
++
++
++def test_r045_p7_the_suite_with_the_pull_request_variables():
++    """P7: before the first push of a status-file change, the suite with the pull request's variables, in the documented
++    form, `<n>` predicted by the two reads."""
++    assert flat("**Before every push, and before the first push of a status-file change.** Every commit the push publishes (`origin/<the base>..HEAD`) is read for computer paths and account names first, `secret-sentinel` scanning those commits on request: a leak in a commit not yet pushed is removed from that commit, by rewriting it before the push, never covered by a later commit (P5). And before the first push of a pull request that changes the status file, `project.json` or a `VERSION`, the full suite runs once with the pull request's variables set, as CI runs it on the pull request's merge: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --key-file <a file outside the Workspace> --kind test -- python -m pytest -q tests`, its output to `run/agent/<ID>-suite.out`, in the background under the heavy launch's `timeout` (`delegation-loop.md`, step 3), the key file holding the three lines `GITHUB_REF=refs/pull/<n>/merge`, `GITHUB_BASE_REF=main` and `GITHUB_EVENT_NAME=pull_request` (the launcher applies a file of `NAME=value` lines; an environment prefix before `python` would match no allow rule). `<n>` is the number the pull request will take, predicted as the next the repository issues, one above its latest pull request or issue (`gh pr list --state all --limit 1`, `gh issue list --state all --limit 1`), the number the branch's status file writes on its Last accepted line for that pull request (ISS-009); where GitHub issues another, the status file takes the real number and the run is repeated with it (P7).\n\n").strip() in step8()
++    assert ("`python ~/.claude/cursor-bridge/bridge-run.py --limit auto --key-file <a file outside the Workspace> --kind "
++            "test -- python -m pytest -q tests`") in read(MERGE)
++
++
++def test_r045_p5_every_pushed_commit_scanned():
++    """P5: every commit a push publishes is read for computer paths and account names, a leak removed from the commit
++    (step 8 and secret-sentinel)."""
++    assert "a leak in a commit not yet pushed is removed from that commit, by rewriting it before the push, never covered by a later commit (P5)" in step8()
++    assert flat('\n**Before a push, every commit it publishes.** When the supervisor asks before a push, scan every commit the push publishes (`git log -p <the base>..HEAD`), not only the staged diff, for those paths and for the account names the supervisor gives you: a commit not yet pushed is rewritten to remove the leak, never covered by a later commit, so report each by its commit and line (P5).\n').strip() in flat(read(SENTINEL))
++
++
++def test_r045_p4_the_merged_branch_deleted_and_the_armed_form_skipped():
++    """P4's text: the armed form skipped where the repository refuses auto-merge; the merged branch deleted locally and
++    on the remote with the two bare commands."""
++    assert flat(', or, where the repository refuses auto-merge (its `allow_auto_merge` setting off), skip the armed form, the direct merge after the green watch being the merge,') in step8()
++    assert flat(' Then delete the merged branch, locally and on the remote, each command bare: `git branch -D <branch>`, then `git push origin --delete <branch>` (P4).') in step8()
++
++
++def test_r045_t11_t17_the_status_file_as_at_the_merge():
++    """T11 and T17: the status file as at the merge, the live position in in-flight.md, an overtaken pull request
++    rewritten and re-reviewed (rule 43, the template, the hook's text, step 8)."""
++    assert flat("write it in `run/supervisor/in-flight.md` (where the live position between merges lives: the status file a pull request carries reads as at that pull request's merge, its `In flight:` line `none`, ISS-009 and KP-069; a resume reads `in-flight.md`'s last entries first) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> \"<the agent>\"`") in rule(43)
++    assert flat(" A pull request whose status file another pull request's merge overtook has the file rewritten as at its own merge and `main` merged into it, a new head the reviews read again (the delegation loop's step 8).") in rule(43)
++    assert "copied to the status file after `verify`" not in rule(43)
++    assert "\n" + 'In flight: none (the file a pull request carries reads as at its merge; between merges the live position is written in run/supervisor/in-flight.md, rule 43: TASK-nnn in <checkout> since <time>, one line per parallel increment; <agent> in the background since <HH:MM>, ceiling <HH:MM>)' + "\n" in read(CORE)
++    assert "| TASK-nnn in <checkout>" not in read(CORE)
++    hook = read(HOOK)
++    first = hook.index('out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")')
++    assert hook.index('out.append(' + '"The status file reads as at its last merge (ISS-009): where run/supervisor/in-flight.md exists, read its last entries first, the live position between merges."' + ')') > first
++    assert flat(" So is a pull request whose status file another pull request's merge overtook: the file a pull request carries reads as at that pull request's merge (ISS-009, KP-069), so where another merged first the branch rewrites it as at its own merge and merges `main`, and the reviews read the new head again (T11, T17).") in step8()
++
++
++def test_r045_c_the_three_allow_rules_and_the_commands_they_admit():
++    """Done when (c): `Bash(git branch -D:*)` beside the narrower stage rule, which stays, and the two reads for P7's
++    prediction; each documented command is admitted, the remote delete on the existing `Bash(git push:*)`."""
++    allow = json.loads(read(SETTINGS))["permissions"]["allow"]
++    for r in ("Bash(git branch -D stage/*)", "Bash(git branch -D:*)", "Bash(gh pr list:*)", "Bash(gh issue list:*)",
++              "Bash(git push:*)"):
++        assert r in allow, r
++    for cmd in ("git branch -D task-038", "git push origin --delete task-038", "gh pr list --state all --limit 1",
++                "gh issue list --state all --limit 1"):
++        assert any(rule_matches(r, cmd) for r in allow), cmd
++    merge = read(MERGE)
++    for cmd in ("`git branch -D <branch>`", "`git push origin --delete <branch>`", "`gh pr list --state all --limit 1`",
++                "`gh issue list --state all --limit 1`"):
++        assert cmd in merge, cmd
++
++
++def test_r046_t5_where_a_reviewer_may_write():
++    """T5: the directive's clause, the policy's invocation, the design critique's constant prompt (its two copies one
++    text) and the reviewer's definition say where a reviewer may write and that it edits nothing."""
++    assert "with five short clauses (release A5; where a reviewer writes, release T)" in step8()
++    assert "a sixth clause: grade every" in step8() and "a fifth clause" not in step8()
++    assert flat('write no file under the checkout and point no cache there, scratch files and test caches going to the system temporary folder, and edit nothing (what `verify` restores was still written, and a write under `docs/`, `handoff/` or `run/review/` is a flag);') in step8()
++    assert flat('that the reviewer writes no file under the checkout and points no cache there, its scratch files and test caches going to the system temporary folder, and edits nothing,') in flat(section(read(POLICY), "Invocation"))
++    prompt = design_prompt(read(DESIGN))
++    assert "Write no file under the checkout, point no cache there, and edit nothing." in prompt
++    assert design_prompt(read(POLICY)) == prompt
++    assert flat('You write no file under the checkout and point no cache there: a scratch file or a test cache goes to the system temporary folder (pytest run with `-p no:cacheprovider`), so the tree is as you found it.') in flat(read(REVIEWER))
++
++
++def test_r046_t16_single_test_files_beside_review_b():
++    """T16: a part reviewed while Review B runs runs single test files at most, its mutation runs on a copy outside the
++    checkout (the stage review's step 4, and step 8's read-only subagents)."""
++    stage = flat(read(REFLECTION))
++    assert "a part read while Review B runs (step 5) runs single test files at most, never the suite, and any mutation run on a copy outside the checkout" in stage
++    assert flat(", each running single test files at most, never the suite, and any mutation run on a copy outside the checkout, as `mutation-run.py` makes one, since the reviewer's own run shares the checkout's databases, ports and caches (T16)") in step8()
++
++
++def test_r046_t25_each_parts_turn_budget():
++    """T25: each stage-review part's prompt names its turn budget and keeps the last turns for the verdict (step 4)."""
++    assert flat(" Each part's prompt names its turn budget (the reviewer's `maxTurns`) and keeps the last turns for the verdict, so a part that runs short still answers (T25); a part read while Review B runs (step 5) runs single test files at most, never the suite, and any mutation run on a copy outside the checkout, so it shares nothing of the checkout with the reviewer's own run (T16).").strip() in flat(read(REFLECTION))
++
++
++def test_r046_t2_a_clean_reply_names_three_verified_statements():
++    """T2: a design critic's reply with no finding names three statements it verified, each with a short quotation, and
++    the receipt check reads them; the reviewer's clean APPROVE does the same."""
++    design = read(DESIGN)
++    assert flat(' A reply with no finding names three statements of the file it verified, each with a short quotation, and the check reads them against the file: fewer than three, or a quotation the file does not hold, is a failed launch too (T2).').strip() in flat(design)
++    assert flat('; where you find nothing, name instead three statements of the file you verified, each with a short quotation from it. Write no file under the checkout, point no cache there, and edit nothing.').strip("; ") in design_prompt(design)
++    assert flat('An `APPROVE` with no finding in any section names, under NOTED, three statements of the diff you verified, each with a short quotation and the file and line it stands at, so the supervisor can see the diff was read; a clean reply with none is read as no review.') in flat(read(REVIEWER))
++
++
++def test_policy_design_mode_the_failed_launch_as_design_md_words_it():
++    """The policy's design-mode paragraph, widened from its "Invocation" region (TASK-037's HARDENING lead): a failed
++    last launch leaves Review B's row `not run (<the reason>)`, as design.md says, never "the round stays not run"."""
++    policy = flat(read(POLICY))
++    assert "if that fails too, Review B's row stays `not run (<the reason>)` and the subject goes on" in policy
++    assert "the round stays not run" not in policy
+diff --git a/tests/test_session_start_module.py b/tests/test_session_start_module.py
+index 08dbd13..a327171 100644
+--- a/tests/test_session_start_module.py
++++ b/tests/test_session_start_module.py
+@@ -93,7 +93,8 @@ def test_r005_the_table_maps_every_template_phase_value():
+ POINTED = {
+     "interface": ["interface/mockups.md", "interface/command-design.md", "interface/contract-design.md",
+                   "interface/playable-prototype.md"],
+-    "delegation-loop": ["delegation-loop/decide.md", "delegation-loop/refactoring-pass.md"],
++    "delegation-loop": ["delegation-loop/decide.md", "delegation-loop/refactoring-pass.md",
++                        "delegation-loop/merge.md"],
+ }
+ IFACE = [P + "interface.md"] + [P + f for f in POINTED["interface"]]
+ LOOP = [P + "delegation-loop.md"] + [P + f for f in POINTED["delegation-loop"]]
