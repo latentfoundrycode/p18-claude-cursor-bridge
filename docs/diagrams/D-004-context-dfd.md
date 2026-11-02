@@ -37,6 +37,7 @@ Notes:
 | ds_agent_home | ~/.cursor-bridge/agent-home/ |
 | ds_bridge_gitconfig | ~/.cursor-bridge/gitconfig |
 | ds_gh_empty | ~/AppData/Local/cursor-bridge/gh-empty/ |
+| ds_no_hooks | the system's temporary folder, review-guard-no-hooks-\*/ (outside the repository; made fresh and empty per process by tempfile.mkdtemp, removed at exit while it is empty, nothing checking that it is empty) |
 | ds_actions_secrets | Actions secret SOCKET_SECURITY_API_KEY |
 | ext_owner | the owner |
 | ext_user_env | the Windows user environment |
@@ -79,6 +80,7 @@ ds_review_hashes[("review-hashes")]
 ds_heavy_lock[("heavy.lock")]
 ds_bridge_gitconfig[("bridge gitconfig")]
 ds_gh_empty[("gh-empty")]
+ds_no_hooks[("review-guard-no-hooks")]
 end
 
 subgraph tb_agents["Agent processes: identity withheld"]
@@ -161,6 +163,7 @@ p_review_guard -->|"snapshot, rounds, verified mark, premerge record"| ds_guard_
 ds_guard_records -->|"UNTRUSTED: snapshot, hash-checked"| p_review_guard
 p_review_guard <-->|"sha256 copy"| ds_review_hashes
 p_review_guard -->|"restore: reset, clean, refs back, hooks off"| ds_checkout
+p_review_guard -->|"empty folder"| ds_no_hooks
 ds_run_outputs -->|"UNTRUSTED: exit line of REVIEW-nnn.err"| p_review_guard
 p_review_guard -->|"OK, GATE-INTEGRITY, LEFT BEHIND, CANNOT VERIFY, hash, merge command"| p_supervisor
 ext_github -->|"SECRET: PR head, read with the owner's gh login"| p_review_guard
