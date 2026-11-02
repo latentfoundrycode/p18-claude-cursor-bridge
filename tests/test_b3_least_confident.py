@@ -116,7 +116,7 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
 # re-takes its pin in the same diff as its `reword` entry, and a reviewer reads the change to a pin as a new trace
 # exception; an increment that adds an entry adds its section's pin.
 EXCUSED_MODULE_SECTIONS = {
-    ("change-cycle.md", "The procedure"): (7291, "c996f09117cfab632a93770734efb2d1eccd94b86ca7ffe8bca6a9f2be745fb8"),
+    ("change-cycle.md", "The procedure"): (7673, "fbc09eca6489033d4d89887ed70700fd09b36600091ac51f8aea6efe28b5e454"),
     ("change-cycle.md", "What must survive a compaction"): (2143, "3cb57dbda1906c93b20e17a0e3cd13e38c2a3084fad1db978ce6ae888c08fada"),
     ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
     ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
@@ -132,14 +132,14 @@ EXCUSED_MODULE_SECTIONS = {
     ("delegation-loop.md", "The model, the timeout and the limit"): (1976, "75dd79f1bb1b958f3aaece7bcbf8c38d53d4c24871d79448f02600e1dc1a1ccd"),
     ("delegation-loop.md", "The procedure"): (391, "01bfc06517bf225158b4ca4d79f9fc1b8d398a64f172d4839cb51e0be2861819"),
     ("delegation-loop.md", "The reviewers"): (2971, "45510dcf46719919fb3e6b44671557df3b5778dfdb37fea7d01a6dc280b1fabc"),
-    ("delegation-loop.md", "The tests before the first reviewer"): (6939, "9f86e6484cd30a342bb632b538600b921428ca584ec66b4c761924e99b350a27"),
+    ("delegation-loop.md", "The tests before the first reviewer"): (7421, "aa72f25fd3991a936b4a1626dd8837c709194e59d0de04736f204102b94ec8e9"),
     ("delegation-loop.md", "Waiting for the slot, and a mutation run cut short"): (2262, "83ce830bdcc3897a5195d27756cc1298b3538fb81b93e2164edba740fa2f898f"),
     ("delegation-loop.md", "What must survive a compaction"): (3767, "258021a65ac62f4a0503574c8855803c49095b21d72ef09ae4e792f11bafdafc"),
-    ("delegation-loop/decide.md", "7. Decide (accept the increment)"): (19141, "f7f42f2280cfeb5f8fab17023f3141d65d8e7223503e9da4b75a671ba08d9fdd"),
-    ("delegation-loop/decide.md", "The mutation run"): (6067, "b88ad0f4ad6e4c64cc5331791c1f00ec54684dbdab456d00aea049c153297264"),
+    ("delegation-loop/decide.md", "7. Decide (accept the increment)"): (20047, "cadbc2214ac110a2c8ff34a28d6003f2da668dbaccfb390cea03b087b4ee2363"),
+    ("delegation-loop/decide.md", "The mutation run"): (6973, "478ce51188c0ae215b879b7f6df05337692a4c32e5d388bb48c0e52a8e341a2f"),
     ("delegation-loop/decide.md", "The review ceiling"): (4137, "e9807334a5b84684cb86eb093f3b076242aa4747fba69dac8648a345c304debf"),
     ("delegation-loop/decide.md", "Where this sub-file belongs"): (436, "9e38cf68a4da72d205ec742fe0d1cbf6f5c6e6bd75a04469b52333775ad19e01"),
-    ("delegation-loop/merge.md", "8. Merge (the verified gate)"): (20317, "05db2d121f6ce2e08d1dffb98aa125711f916fc074d9f9acec1e7c77e4fac678"),
+    ("delegation-loop/merge.md", "8. Merge (the verified gate)"): (20414, "358a4fadb5d8fc6fd8f7b0bc3f3c7c63c080a8fae3e764a02a2265172266f0a8"),
     ("delegation-loop/merge.md", "Where this sub-file belongs"): (471, "a81250c1d1fb84cfa7d259820cce8727477da8350b965049a0499b9be5975793"),
     ("delegation-loop/refactoring-pass.md", "9. Refactoring and optimization pass (at stage close)"): (6708, "780b6637bf4bb3b4cd2d699116056e34a17d935a3c574a42305e93a8319ebfd4"),
     ("delegation-loop/refactoring-pass.md", "Keeping the pass's position"): (474, "16c05ddcf26b7cfb893f990cc227172f04ef2417dcce816df779b25abd84024b"),

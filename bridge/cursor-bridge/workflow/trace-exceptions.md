@@ -183,3 +183,9 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new BUG-040 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)
 - new BUG-040 bridge/cursor-bridge/workflow/phases/reflection.md The procedure
 - new BUG-040 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The review ceiling
+- reword TASK-041 bridge/commands/supervisor.md The project layout
+- reword TASK-041 bridge/commands/supervisor.md Project state
+- new TASK-041 bridge/cursor-bridge/workflow/phases/delegation-loop.md The tests before the first reviewer
+- new TASK-041 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The mutation run
+- new TASK-041 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)
+- new TASK-041 bridge/cursor-bridge/workflow/phases/change-cycle.md The procedure

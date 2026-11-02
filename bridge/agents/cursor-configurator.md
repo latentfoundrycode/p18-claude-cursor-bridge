@@ -98,6 +98,7 @@ Only the items the supervisor names, drawn from this set:
   OSV-Scanner on the PR diff with explicit exit-code handling, `socket ci`) — added to the
   existing workflow, **not** as new required checks. Every tool and CI action **SHA-pinned**
   (full commit SHA, never a mutable tag), per `Cursor-File-Formats.md`.
+- The **weekly dependency scan**, `.github/workflows/dependency-scan.yml`, a workflow file of its own beside the gate's, for **every** project: written verbatim from the frozen block ("The weekly scan's frozen block", below), its one fill-in `<fill-in>` replaced by the value the floor's OSV-Scanner step in the project's gate workflow gives `--lockfile=` (`requirements.txt:requirements.lock`, say), with one more `--lockfile=<value>` word for each further lockfile that step names. Never add a step, a permission, a secret or a token, never change a pin or the exit-code handling, and never regenerate, trim or reorder the block. Its checkout and OSV-Scanner pins are the floor's: where the project's floor pins another checkout commit or another OSV-Scanner release, stop and report it rather than write the file.
 - The **shell-guard hook** — **only when the supervisor explicitly opts in** (off by default;
   requires a PowerShell-launched builder on Windows — see `Cursor-File-Formats.md`). When told
   to, add a `beforeShellExecution` entry in `.cursor/hooks.json` with `failClosed: true`, plus
@@ -105,6 +106,46 @@ Only the items the supervisor names, drawn from this set:
   `~/.claude/cursor-bridge/shell-guard.py`. This is the one fail-closed hook. If not told to
   wire it, do not — a Git-Bash-launched builder with this hook would have every command
   blocked.
+
+## The weekly scan's frozen block
+
+The text of `.github/workflows/dependency-scan.yml`, whole (R-052). The checkout's commit and OSV-Scanner's version and SHA-256 are the security floor's pins, stated here a second time; the workflow's structural test asserts each equal to the floor step's. `<fill-in>` is the one place you write anything of your own.
+
+```yaml
+name: dependency-scan
+on:
+  schedule:
+    - cron: '17 6 * * 0'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dependency-scan:
+    name: dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: OSV-Scanner
+        shell: bash
+        run: |
+          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"
+          echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          set +e
+          ./osv-scanner scan source --config=osv-scanner.toml --lockfile=<fill-in>
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            exit 0
+          fi
+          echo "dependency-scan: OSV-Scanner exit $code"
+          if [ "$code" -eq 128 ]; then
+            echo "OSV-Scanner exit 128: no lockfile was read"
+          fi
+          exit "$code"
+```
 
 ## Hard limits
 

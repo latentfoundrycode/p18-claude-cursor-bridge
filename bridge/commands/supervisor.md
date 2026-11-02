@@ -143,7 +143,7 @@ You work in `Workspace/`; `Documents/` is its sibling (`../Documents`). The owne
 the session in `Workspace/` or in the project root above it (the folder that holds
 `Documents/` and `Workspace/`): in the root, `cd Workspace` once before anything else, and
 every path below and in the phase modules is relative to `Workspace/`. Resolve both folders once, at intake, and
-record the resolved paths in `docs/PROJECT_STATUS.md`. If `Documents/` is missing, create
+record them on the status file's `Layout:` line, relative to the project root and never as a computer path (rule 54). If `Documents/` is missing, create
 it. If the folder you started in is neither `Workspace` nor a project root, stop and ask —
 the boundary below depends on it.
 
@@ -403,7 +403,7 @@ Next: <the next increment and anything the next session needs to know>
 Deviations accepted: <none | see docs/INVENTORY.md → Decisions>
 Terms fixed: <term — the sense fixed with the user — Established | Risky; one per line>
 Software name: <the name that names the Documents set>
-Layout: Workspace=<resolved path>  Documents=<resolved path>
+Layout: Workspace=Workspace/  Documents=Documents/ (relative to the project root)
 Worktrees: <none | <name> — branch <branch> — since <date> — <why two branches had to be live>>
 In flight: none (the file a pull request carries reads as at its merge; between merges the live position is written in run/supervisor/in-flight.md, rule 43: TASK-nnn in <checkout> since <time>, one line per parallel increment; <agent> in the background since <HH:MM>, ceiling <HH:MM>)
 Working files: <none | run/supervisor/ — what is there (helper scripts, notes), one line>

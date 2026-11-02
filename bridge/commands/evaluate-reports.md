@@ -12,7 +12,7 @@ A maintainer command, run in the bridge project by the maintainer session (the B
    python ~/.claude/cursor-bridge/evaluate-reports.py collect
    ```
 
-   It writes `Reports/Evaluations/<date>/unprocessed.md`: every entry absent from the ledger (`Reports/ledger.json`) or whose text changed since it was evaluated (shown with the earlier verdict). "Nothing new" leaves steps 2 and 3 only the entries the owner's messages raise (the extract below), and the evaluation file only those and its Pace section (the ledger keeps the run's date); the pace report below runs all the same. Then:
+   It writes `Reports/Evaluations/<date>/unprocessed.md`: every entry absent from the ledger (`Reports/ledger.json`) or whose text changed since it was evaluated (shown with the earlier verdict). "Nothing new" leaves steps 2 and 3 only the entries the owner's messages raise (the extract below), and the evaluation file only those and its Pace section (the ledger keeps the run's date); the pace report below runs all the same. Before the extract, note the ledger's `_meta.last_extract`, the previous run's date, which the extract rewrites: it opens the window step 1b reads. Then:
 
    ```bash
    python ~/.claude/cursor-bridge/evaluate-reports.py extract
@@ -25,6 +25,43 @@ A maintainer command, run in the bridge project by the maintainer session (the B
    ```
 
    It reads, read-only, every project's git history and its launcher's and review guard's records, and writes per project and per ISO week the increments started and merged, the rounds per increment (mean and maximum), the days from start to merge, the `docs/HARDENING.md` lines added and the tokens, with the increments over the code gate's three-round ceiling by ID and the lift each round above it used (a class line, the owner's line, `none`, or `unknown` where no launcher row or guard round records it, as for rounds run before release B's programs logged lifts). In a project that tracks any file under `handoff/`, an increment is an ID with a tracked brief, so one the supervisor built without a brief is not counted, and a project that tracks only builder reports there (`<ID>-report.md`, `<ID>-r<N>-report.md`, `<ID>-r<N><letter>-report.md`, which are no briefs) counts no increment at all (in a project that tracks nothing under `handoff/`, every ID a squash subject names is counted merged, and the started and rounds cells read `n/a`), and a stage review is listed only from the review guard's rounds files, which release B's guard writes from its install.
+
+1b. **Read the weekly dependency scan and the Dependabot alerts**, for every project, a week with nothing new included (R-052; the three kinds below are the bridge design's, `docs/DESIGN.md`, "The weekly dependency scan"). `<owner>/<repo>` is the project's GitHub repository. First the workflow's state:
+
+   ```bash
+   gh workflow list --all --repo <owner>/<repo>
+   ```
+
+   Any disabled state of the workflow (`disabled_inactivity`, `disabled_manually`) is the third kind below whatever its runs show: GitHub disables a public repository's scheduled workflows after 60 days with no activity, and `gh run list` lists no run of a disabled workflow without `--all`. Then the runs created since the date noted before the extract, each with its status and conclusion:
+
+   ```bash
+   gh run list --repo <owner>/<repo> --workflow dependency-scan.yml --created ">=<the ledger's _meta.last_extract>"
+   ```
+
+   and, for each run whose conclusion is `failure`, the step's exit line, `dependency-scan: OSV-Scanner exit <code>`:
+
+   ```bash
+   gh run view <run id> --repo <owner>/<repo> --log-failed
+   ```
+
+   Each project falls in one of three kinds, or is green:
+   - **A finding**: a completed run of the window ended `failure` and its exit line reads `exit 1`, a flaw in a dependency, fixed by a `DEP-<nnn>` increment (the merge policy's procedure), never by an unreviewed change; it stands until a later run of the window ends `success`.
+   - **A scanner failure**: no finding stands and the window's last completed run proved nothing, a `failure` with another exit code or no exit line at all, or any conclusion other than `success` and `failure`; it is reported with the rerun's one command, `gh workflow run dependency-scan.yml --repo <owner>/<repo>`, and the rerun is read at the next evaluation.
+   - **No completed run since the previous evaluation**: the workflow disabled, no run of the window listed, a list the login cannot read, or only runs still queued or in progress, a finding of its own and never green (KP-005: silence is not green), reported with its remedy: where the workflow is disabled, a run sheet for the project's owner (`gh workflow enable dependency-scan.yml`, then `gh workflow run dependency-scan.yml`); where no run is listed, the rerun command; where a run is in progress, none, the next Sunday reading it.
+
+   A window whose last completed run ended `success`, with no finding standing, is green. Then the Dependabot alerts, in two calls. The first,
+
+   ```bash
+   gh api repos/<owner>/<repo>/vulnerability-alerts
+   ```
+
+   answers 204 where the alerts are enabled and 404 where they are not, a 404 the finding "alerts off"; then
+
+   ```bash
+   gh api "repos/<owner>/<repo>/dependabot/alerts?state=open"
+   ```
+
+   lists the open alerts, an empty list being alerts on with nothing open. A 403 on either call is the login's scope, named in a run sheet for the owner, never a token in text, the project's Security tab the fallback. Step 4's file gives each project's kind, its alerts and the remedy in a **Dependency scan** section, written every week beside the Pace section; a finding of either is an entry of the evaluation like any other.
 
 2. **Classify** each entry: a bridge defect; a gap in the bridge; a pitfall worth recording; already addressed (cite the release); already planned (cite the plan's section); or project-specific, needing nothing.
 

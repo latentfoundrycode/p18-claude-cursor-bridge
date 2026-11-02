@@ -278,8 +278,11 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
 # pin is reviewed as a new trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the
 # increment's record names each passage it adds or rewords under the procedure. BUG-040 (stage T1's review, Review
 # A's S3) rewords item 4 alone, its plan addendum criticised and gated with the design revision as one subject where
-# its increments stood in the design's review file from round 1 (design.md's T1): 7,291 characters
-PROCEDURE_SHA256 = "c996f09117cfab632a93770734efb2d1eccd94b86ca7ffe8bca6a9f2be745fb8"
+# its increments stood in the design's review file from round 1 (design.md's T1): 7,291 characters. TASK-041 (R-052's
+# T12) adds one sentence to item 1, after the register's: a project supervised after it was built runs the conformance
+# check before the first delegation, its MISSING floors configuration increments (tests/test_release_t_floor.py
+# pins it): 7,673 characters
+PROCEDURE_SHA256 = "fbc09eca6489033d4d89887ed70700fd09b36600091ac51f8aea6efe28b5e454"
 
 
 def test_the_change_cycles_procedure_is_pinned():
@@ -287,7 +290,7 @@ def test_the_change_cycles_procedure_is_pinned():
     one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
     text = module("change-cycle")
     proc = text[text.index("### The procedure"):].rstrip()
-    assert len(proc) == 7291 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
+    assert len(proc) == 7673 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
 
 
 def test_r004_the_positions_the_survival_lists_name_are_kept():
