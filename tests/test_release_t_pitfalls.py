@@ -131,5 +131,5 @@ def test_r054_kp038_narrowed_and_d004_first_deviation_closed():
             "release redirects them (KP-038)") in d004
     dev = read(DEV)
     assert "| D-004 | p_bridge_env |" not in dev, "D-004's first deviation is removed"
-    # re-taken at TASK-041, which closed the suite's edge (p_bridge_run -> p_test_suite)
-    assert dev.count("| D-004 |") == 1, "D-004's one other row stays (TASK-043)"
+    # re-taken at TASK-041, which closed the suite's edge (p_bridge_run -> p_test_suite), and at TASK-043, which closed the last
+    assert dev.count("| D-004 |") == 0, "no D-004 row stands (TASK-043)"
