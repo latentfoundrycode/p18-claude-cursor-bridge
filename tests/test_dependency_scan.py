@@ -111,6 +111,7 @@ def test_r052_no_secret_and_no_token():
     """R-052, D-004: no `secrets.` reference, no `GITHUB_TOKEN` and no token handed to a step, at any level."""
     assert not SECRET_REF.search(_text(SCAN)), "R-052: the workflow reads a secret or the job's token"
     assert not TOKEN.search(_text(SCAN)), "R-052: the workflow names a token"
+    assert "${{" not in _text(SCAN), "R-052: an expression can carry the job's token or an event field into the run"
     data = _data()
     assert "env" not in data and "env" not in _job(), "R-052: an env above the step"
     for step in _steps(_job()):
@@ -134,6 +135,7 @@ def test_r052_a_finding_fails_the_run_and_every_exit_is_named():
     call = next(i for i, s in enumerate(lines) if s.startswith("./osv-scanner scan source"))
     assert lines[call - 1] == "set +e" and lines[call + 1] == "code=$?" and lines[call + 2] == "set -e", lines
     clean = lines.index('if [ "$code" -eq 0 ]; then')
+    assert clean == call + 3, "R-052: the clean branch reads the scanner's own status, nothing changing it between"
     assert lines[clean + 1:clean + 3] == ["exit 0", "fi"], lines
     assert [i for i, s in enumerate(lines) if s == "exit 0"] == [clean + 1], "R-052: exit 0 outside the clean-status branch"
     named = lines.index('echo "dependency-scan: OSV-Scanner exit $code"')
@@ -143,13 +145,19 @@ def test_r052_a_finding_fails_the_run_and_every_exit_is_named():
 
 
 def test_r052_the_scanner_is_checked_before_it_runs_and_cannot_be_skipped():
-    """R-052: the binary is checked by its SHA-256 before it runs, with no guard, `continue-on-error` or exit-swallower."""
+    """R-052: the two steps alone, the binary checked by its SHA-256 before it runs under bash, whose `-e` stops the step on a
+    mismatch, with no guard, `continue-on-error`, trap or exit-swallower, and the scanner's call chained to nothing."""
     job, step = _job(), _scanner_step()
+    assert len(_steps(job)) == 2, "R-052: the checkout and the scanner, and no other step"
+    assert step["shell"] == "bash", step["shell"]
     lines = _lines(step)
-    assert lines.index(next(s for s in lines if "sha256sum -c -" in s)) < lines.index(next(s for s in lines if s.startswith("./osv-scanner"))), lines
+    scan = next(s for s in lines if s.startswith("./osv-scanner"))
+    assert lines.index(next(s for s in lines if "sha256sum -c -" in s)) < lines.index(scan), lines
+    assert len(_commands(scan)) == 1, "R-052: the scanner's call is chained: %r" % scan
     for holder in (job, step):
         assert "if" not in holder and not holder.get("continue-on-error"), holder
     assert job["runs-on"] == "ubuntu-latest", job["runs-on"]
     for line in lines:
         assert not DISABLERS.search(line), line
+        assert not line.startswith("trap"), line
         assert len(_commands(line)) <= 2, "R-052: a chained command: %r" % line
