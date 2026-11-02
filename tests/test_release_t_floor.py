@@ -124,13 +124,32 @@ EV_NOTE = ("Before the extract, note the ledger's `_meta.last_extract`, the prev
            "rewrites: it opens the window step 1b reads.")
 EV_HEAD = ("1b. **Read the weekly dependency scan and the Dependabot alerts**, for every project, a week with nothing new "
            "included (R-052; the three kinds below are the bridge design's, `docs/DESIGN.md`, \"The weekly dependency "
-           "scan\"). `<owner>/<repo>` is the project's GitHub repository. First the workflow's state:")
+           "scan\"). `<owner>/<repo>` is the project's GitHub repository, read from its `origin` remote. First the "
+           "workflow's state:")
 EV_COMMANDS = (
     "gh workflow list --all --repo <owner>/<repo>",
-    "gh run list --repo <owner>/<repo> --workflow dependency-scan.yml --created \">=<the ledger's _meta.last_extract>\"",
+    "gh run list --repo <owner>/<repo> --workflow dependency-scan.yml --created \">=<the ledger's _meta.last_extract>\" "
+    "--json databaseId,status,conclusion",
     "gh run view <run id> --repo <owner>/<repo> --log-failed",
     "gh api repos/<owner>/<repo>/vulnerability-alerts",
-    "gh api \"repos/<owner>/<repo>/dependabot/alerts?state=open\"",
+    "gh api --paginate \"repos/<owner>/<repo>/dependabot/alerts?state=open\"",
+)
+EV_WINDOW = (
+    "The date is a day and the schedule runs on the morning of the evaluation's own Sunday, so that list also holds the "
+    "runs the previous evaluation read. The window is the listed runs whose `databaseId` is greater than the `last run "
+    "read:` id the previous evaluation's Dependency scan section gives for the project, or every listed run where that "
+    "section gives none; each evaluation's section gives, per project, `last run read: <id>`, the newest completed run of "
+    "its window, or the previous section's id where the window completed none, so a run still in progress at the reading "
+    "is read the next Sunday, and a late or missing schedule leaves the window without a completed run.")
+EV_NOT_CONFIGURED = (
+    "A list that holds no `dependency-scan.yml` names a project that has not received the workflow yet (one not "
+    "calibrated to release T): it is written `not configured`, its calibration's item, and no run is read for it.")
+EV_EVERY_WEEK = (
+    "and the evaluation file only those and its Pace and Dependency scan sections (the ledger keeps the run's date)",
+    "a creeping slowdown named the week it starts; then the **Dependency scan** section step 1b gives.",
+    "In a week with nothing new the file is written all the same, holding the Pace and Dependency scan sections and "
+    "any entry the owner's messages raised.",
+    "A Sunday with nothing new writes the Pace and Dependency scan sections and any entry the owner's messages raised.",
 )
 EV_SENTENCES = (
     "Any disabled state of the workflow (`disabled_inactivity`, `disabled_manually`) is the third kind below whatever "
@@ -149,11 +168,14 @@ EV_SENTENCES = (
     "(`gh workflow enable dependency-scan.yml`, then `gh workflow run dependency-scan.yml`); where no run is listed, the "
     "rerun command; where a run is in progress, none, the next Sunday reading it.",
     "A window whose last completed run ended `success`, with no finding standing, is green.",
-    "answers 204 where the alerts are enabled and 404 where they are not, a 404 the finding \"alerts off\"; then",
-    "lists the open alerts, an empty list being alerts on with nothing open. A 403 on either call is the login's scope, "
-    "named in a run sheet for the owner, never a token in text, the project's Security tab the fallback.",
-    "Step 4's file gives each project's kind, its alerts and the remedy in a **Dependency scan** section, written every "
-    "week beside the Pace section; a finding of either is an entry of the evaluation like any other.",
+    "answers 204 where the alerts are enabled and 404 where they are not, a 404 the finding \"alerts off\" and the "
+    "second call not made; after a 204,",
+    "lists the open alerts, every page of them, an empty list being alerts on with nothing open. A 403 on either call is "
+    "the login's scope, named in a run sheet for the owner, never a token in text, the project's Security tab the "
+    "fallback.",
+    "Step 4's file gives each project's kind, its `last run read:` id, its alerts and the remedy in a **Dependency scan** "
+    "section, written every week beside the Pace section; a finding of either is an entry of the evaluation like any "
+    "other.",
 )
 
 # --- T12 and T19
@@ -205,10 +227,11 @@ HOST_ROW = ("| A permission allow rule's `*` between fixed words admits a launch
             "TASK-041's (a): `bridge-run.py --limit auto --strip --kind test -- python -m pytest -q -rs "
             "tests/test_release_t_strip.py` ran from this session twice with no prompt and no refusal (10:45:12Z, exit 1, "
             "the test reading HOME after the suite's own fixture had replaced it, a defect of the test; 10:45:50Z, exit 0, "
-            "the strip test passing: HOME the agent home, no withheld name); the absence of a prompt is the observable, a "
-            "command auto mode's classifier allowed looking the same as one the rule allowed, so the two heavy-launch "
-            "rules are kept and the documented `--strip` commands are pinned as matching (`tests/test_allowlist.py`) | "
-            "2.1.309, 2026-11-02 |")
+            "the strip test passing: HOME the agent home, no withheld name); the absence of a prompt is the observable the "
+            "plan names, and it does not tell a launch the rule allowed from one auto mode's classifier allowed, so the "
+            "observation does not contradict the assumption rather than proving it: the two heavy-launch rules are kept, "
+            "the documented `--strip` commands are pinned as matching (`tests/test_allowlist.py`), and a prompt or a "
+            "refusal at any later stripped launch is still the trigger for the widening below | 2.1.309, 2026-11-02 |")
 
 
 def bash_blocks(text):
@@ -297,8 +320,10 @@ def test_r052_evaluate_reports_reads_the_scan_in_three_kinds():
     lines = bash_blocks(text)
     for cmd in EV_COMMANDS:
         assert cmd in lines, cmd
-    for sentence in EV_SENTENCES:
+    for sentence in EV_SENTENCES + (EV_WINDOW, EV_NOT_CONFIGURED) + EV_EVERY_WEEK:
         assert sentence in t, sentence[:60]
+    assert t.index(EV_WINDOW) < t.index("--log-failed")
+    assert "Pace section and any entry" not in t, "a nothing-new week names the Dependency scan section too"
 
 
 def test_r052_t12_the_change_cycle_runs_the_conformance_check_first():
@@ -339,9 +364,7 @@ def test_r052_the_five_homes_give_one_command():
     for name, text in (("calibrate", cal), ("KP-061", kp)):
         for old in UNSTRIPPED:
             assert old not in text, (name, old)
-    homes = (SUITE_CMD, CHECKPOINT_CMD, MUTATION_CMD, P7_CMD, CALIBRATE_CMD)
-    assert all(cmd.startswith(LAUNCHER + "--") for cmd in homes)
-    assert ("bridge-run.py " + LAUNCHER.split("bridge-run.py ", 1)[1].strip()) in KP061
+        assert "bridge-run.py --limit auto --strip --kind test" in text, name
 
 
 def test_r052_d004_s_deviation_closed_and_its_edge_redrawn():
