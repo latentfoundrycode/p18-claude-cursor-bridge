@@ -135,21 +135,23 @@ EV_COMMANDS = (
     "gh api --paginate \"repos/<owner>/<repo>/dependabot/alerts?state=open\"",
 )
 EV_WINDOW = (
-    "The date is a day and the schedule runs on the morning of the evaluation's own Sunday, so that list also holds the "
-    "runs the previous evaluation read. The window is the listed runs whose `createdAt` is later than the `last run "
-    "read:` time the previous evaluation's Dependency scan section gives for the project, or, where that section gives "
-    "none, the listed runs whose `createdAt` falls on a later day than that date, so the previous Sunday's run cannot "
-    "cover this one; each evaluation's section gives, per project, `last run read: <createdAt>`, the creation time of "
-    "the newest completed run of its window, or the previous section's time where the window completed none, so a run "
-    "still in progress at the reading is read the next Sunday (an older one beside a newer completed run goes unread, "
-    "the newer run's time passing it), and a late or missing schedule leaves the window without "
-    "a completed run. A run re-run from the Actions tab keeps its creation time and is not read again; the rerun this "
-    "step names, `gh workflow run`, starts a new run. While a finding stands, the section also gives `finding standing: "
-    "run <id>`, carried from each section to the next until a later run ends `success`, so the finding is "
-    "reported every week it stands, beside whatever kind the week's own runs show.")
+    "The date is a day and the schedule runs on the morning of the evaluation's own Sunday, so that list also holds "
+    "the runs the previous evaluation read. The window is the listed runs whose `createdAt` is later than the `last "
+    "run read:` time the previous evaluation's Dependency scan section gives for the project, every listed run where "
+    "that section reads `last run read: none`, and, where no previous section names the project, the listed runs "
+    "whose `createdAt` falls on a later day than that date, so a run of that day cannot cover this Sunday; each "
+    "evaluation's section gives, per project, `last run read: <createdAt>`, the creation time of the newest "
+    "completed run of its window, or the previous section's value where the window completed none, `none` where "
+    "there was no previous one, so a run still in progress at the reading is read the next Sunday (an older one "
+    "beside a newer completed run goes unread, the newer run's time passing it), and a late or missing schedule "
+    "leaves the window without a completed run. A run re-run from the Actions tab keeps its creation time and is not "
+    "read again; the rerun this step names, `gh workflow run`, starts a new run. While a finding stands, the section "
+    "also gives `finding standing: run <id>`, carried from each section to the next until a later run ends "
+    "`success`, so the finding is reported every week it stands, beside whatever kind the week's own runs show.")
 EV_NOT_CONFIGURED = (
     "A list that holds no `dependency-scan.yml` names a project that has not received the workflow yet (one not "
-    "calibrated to release T): it is written `not configured`, its calibration's item, and no run is read for it.")
+    "calibrated to release T): it is written `not configured`, its calibration's item, with `last run read: none`, "
+    "and no run is read for it.")
 EV_EVERY_WEEK = (
     "and the evaluation file only those and its Pace and Dependency scan sections (the ledger keeps the run's date)",
     "a creeping slowdown named the week it starts; then the **Dependency scan** section step 1b gives.",
