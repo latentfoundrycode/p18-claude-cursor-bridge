@@ -299,7 +299,8 @@ def test_r042_the_five_and_the_class_is_the_defect_in_all_three_homes():
 def test_r042_rule_6_states_the_outcomes_and_the_programs():
     r = rule(6)
     assert r.startswith("Judge re-delegation by defect class, never by a round count alone.")
-    assert "One of the five always blocks." in r
+    # BUG-040 (stage T1's review, Review B's consider): "always" carries the threat model's bound
+    assert "One of the five always blocks, within the threat model recorded for its part (below)." in r
     assert ("held by two programs: the launcher (`bridge-run.py`) counts the builder rounds and the review guard "
             "(`review-guard.py`) the Review B rounds (Phase 6, step 7, \"The review ceiling\")") in r
     assert "the owner's number at the plan's gate" in r
@@ -513,8 +514,10 @@ def test_r042_the_stage_review_takes_the_rounds_names_and_its_scope_file():
     r = f(section(reflection(), "The procedure", 3))
     # TASK-040 (R-049, T11) rewrote step 2: the SCOPE sentence now follows the union's and names the class line's
     # commit; its whole text is pinned in tests/test_release_t_stage_close.py (STEP2_SCOPE).
-    assert ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the earlier rounds' "
-            "dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7) with, beside it,") in r
+    assert ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the threat models "
+            "`docs/INVENTORY.md` records for the parts the stage touched, or that none is recorded (R-050), given "
+            "to both reviewers with the diff, the earlier rounds' dispositions and, at a round above the ceiling, its `Blocking class:` line "
+            "(step 7) with, beside it,") in r
     assert ("then `git add -f` the round's diff, its parts and the SCOPE file and commit them on the stage "
             "branch.") in r
     assert ("3. `python ~/.claude/cursor-bridge/review-guard.py snapshot STAGE-<name>-r<N>`, `<N>` the round it opens: "
@@ -604,7 +607,7 @@ def test_bug031_a_late_finding_has_one_outcome_in_all_three_homes():
     by-class line is drawn, rule 6 sent "a late finding outside the five back when it is not that tail" while step
     7's brake said a late finding "blocks the merge only if it is of one of the five"; the three-homes test above
     checked only the class sentence and passed on the two outcomes. Each home now gives the one outcome: a late
-    finding blocks only if it is of the five (or, below the ceiling, if two reviewers name it: the test after this).
+    finding blocks only if it is of the five (two reviewers naming it make it certain, never blocking of itself: the test after this).
     enforces: R-042 (the by-class line; only the five send work back); rule 6; step 7's brake; the policy's
     re-delegation paragraph"""
     r = rule(6)

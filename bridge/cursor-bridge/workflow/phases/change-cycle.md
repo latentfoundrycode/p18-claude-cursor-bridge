@@ -7,7 +7,7 @@ After a compaction or a resume in a change cycle, read these before your next ac
 - this module, whole, and the module of the step the change has reached, whole, with the conditional workflows the `Workflows:` line names that touch that module, each whole (while the phase is `changing`, the session-start hook names only those that touch this module, `delegation-loop.md`, `reflection.md` or `project-end.md`): its intake runs `intake.md`'s procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its `Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with `docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, each scaled to the change; its new stages run `delegation-loop.md` with its sub-files, and their closes `reflection.md` and `project-end.md`, which the session-start hook names with this module while the phase is `changing`;
 - `docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its date and the step it has reached, and `Awaiting user on:` a gate, or an intake question, that waits for the owner; the inventory's Features answer a request already satisfied, and its Decisions name one the change reverses (item 1);
 - `docs/REQUIREMENTS.md`, with the failures `completion-check.py --mode done` printed at item 1: each is a gap in the previous delivery, reported to the owner first and planned ahead of the request unless the owner defers it;
-- the change's records as far as they are written, whole: its `Change: <name>` section of `docs/DESIGN.md`, its record in `docs/DESIGN_CRITIQUE.md` under the change's subject and under `<the change's name>-plan`, the interface artifacts it amends, and its stages in `docs/BUILD_PLAN.md`;
+- the change's records as far as they are written, whole: its `Change: <name>` section of `docs/DESIGN.md`, its record in `docs/DESIGN_CRITIQUE.md` under the change's subject and, where the plan addendum is a subject of its own (item 4), under `<the change's name>-plan`, the interface artifacts it amends, and its stages in `docs/BUILD_PLAN.md`;
 - while its intake runs, this project's own Issues file, `Documents/<Name> Issues During Development and Their Solutions.md`, whole: it takes the place of the prior-project lessons step.
 
 ### The procedure
@@ -44,7 +44,7 @@ Keep the step the change has reached on the `Change cycle:` line, rewritten as e
    that alters or removes existing behaviour → say so plainly in the brief and the
    change log). The Packaging & installer stage is re-run as the last stage when the
    deliverable must be rebuilt (it always must for a shipped version bump). Run
-   the two-critic loop, with its ceiling, on the addendum (the subject `<the change's name>-plan`). Gate: present it and get approval.
+   the two-critic loop, with its ceiling, on the addendum (the subject `<the change's name>-plan`), unless its increments stood in the design revision's review file from round 1, when it is criticised and gated with the design revision as one subject (Phase 2, "The procedure"). Gate: present it and get approval, at the design's gate where the two are one subject.
 5. **Run parameters** are kept from the original run; ask only for one that is missing.
    **Configuration** (Phase 5) is skipped unless the change needs new tooling, in which
    case only the additions are configured, append-only.

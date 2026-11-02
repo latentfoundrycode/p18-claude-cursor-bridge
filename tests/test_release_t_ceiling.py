@@ -324,10 +324,12 @@ def test_r051_p6_invisible_check_before_every_commit_and_escapes_as_text():
             "commit takes: the staged, the unstaged and the untracked changes." % (EM, EM)) in s5
     assert "--staged" not in s5 and "--staged" not in read(SENTINEL)
     rules = flat(between(read(PACKAGER), "## Rules", "## Output"))
-    assert ("**Escapes as text; non-ASCII listed.** Write an escape sequence or a backtick as the characters you mean, "
-            "through the file-writing tool, never through a tool or a shell that reads escapes (a here-document, an "
-            "inline command): a shell reads a backslash sequence as the real character, a right-to-left override among "
-            "them (KP-052).") in rules
+    # BUG-040 (stage T1's review, Review A's S2): a character a brief must not hold is named by its code point
+    assert ("**Escapes as text; non-ASCII listed.** Name a character a brief must mention but must not hold by its "
+            "code point (U+202E), never by a typed backslash escape, which no tool writes safely, the file-writing "
+            "tool included (KP-052); write a backtick or a backslash through the file-writing tool, never through a "
+            "shell that reads escapes (a here-document, an inline command), which reads a backslash sequence as the "
+            "real character, a right-to-left override among them.") in rules
 
 
 def test_r051_t13_the_briefs_non_ascii_characters_listed_before_the_checkpoint():
