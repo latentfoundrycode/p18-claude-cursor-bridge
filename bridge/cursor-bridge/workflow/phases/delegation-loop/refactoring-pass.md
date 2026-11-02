@@ -21,7 +21,7 @@ around **one gate pass per stage**. **Normative diagrams are constraints on it:*
    ```
    Record the pinned `jscpd` version in `docs/INVENTORY.md` (Resources); verify-first on the first
    use (KP-008). The report is input for the scout, not a verdict.
-2. **Scout.** Delegate to **refactor-scout** with the stage base commit (where stages interleave on `main`, the stage's own squash commits instead, the change being their union as `stage-diff.py` writes it at the stage review's step 2 in `reflection.md`, T11), the detector
+2. **Scout.** Delegate to **refactor-scout** with the stage base commit (where stages interleave on `main`, the stage's own squash commits instead, their union written for the scout by `stage-diff.py` as the stage review's step 2 in `reflection.md` writes it, the review itself coming after the pass, T11), the detector
    report, the complexity report, and the size budget (default **400 changed lines**) —
    and, where budgets exist, the **performance inputs**: `bench/budgets.json`,
    `bench/baseline.json`, the latest `bench/results/latest.json`, and a profile of each

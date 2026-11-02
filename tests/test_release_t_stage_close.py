@@ -24,7 +24,8 @@ INSTALLABLE = os.path.join(WORKFLOW, "traits", "installable.md")
 D1 = ("Re-check every mutation driver of the stage at HEAD first: every live mutant of the stage's mutants files "
       "applies exactly once, its `old` text found once in its file as the stage branch holds it (`mutation-run.py` "
       "applies a pair only then, and a pair found other than once is a mutant not applied, its earlier kill claiming "
-      "nothing, KP-065), and one that does not is re-anchored in its mutants file before the review; between stage "
+      "nothing, KP-065), and one that does not is re-anchored in its mutants file and run again before the review, its "
+      "kill counting only from that run; between stage "
       "reviews, a fix that moves product code re-anchors or re-runs every driver anchored on the moved file in the same "
       "pull request, and a ruling that names surfaces gets one test per surface in the fix that introduces it (D1).")
 STEP2_DIFF = ("Then write the stage's whole change from committed state: `git diff <the stage's first checkpoint commit> "
@@ -35,7 +36,8 @@ T11 = ("Where stages interleave, a later stage's ready increments having merged 
        "delegation loop's step 8 says), the stage's change is the union of its own squash commits, written by "
        "`python ~/.claude/cursor-bridge/stage-diff.py <each squash commit of the stage> --out run/review/ --name "
        "<name>-r<N>`: the whole change as `run/review/STAGE-<name>-r<N>.diff` and one part per commit beside it, a path "
-       "the stage changed again after another commit named `OVERLAP` (exit 1) and read in the parts (T11).")
+       "the stage changed again after another commit named `OVERLAP` and read in the parts, its exit 1 also meaning an "
+       "empty change, looked at before the review (T11).")
 STEP2_SCOPE = ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the earlier rounds' "
                "dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7) with, beside it, the "
                "head the previous stage round's snapshot recorded, against whose code the reviewers confirm or "
@@ -46,7 +48,10 @@ D2 = ("each part a `diff-reviewer` call of its own and every part bounded alike:
       "a drivers-and-records part per driver family (D2): a 79-file part once ended at the reviewer's turn limit without "
       "a verdict (reAngle, stage 3b), and a part that ends without a verdict, of any kind, is run again on what it had "
       "not reached (rule 43).")
-D3 = ("Three things keep the demonstration true to the product (D3): a stage that adds tables starts its live stack, "
+D2_UNION = ("For an interleaved stage (step 2) the parts are `stage-diff.py`'s per-commit parts or its union split by "
+            "path, never the plain range, which holds the other stage's commits, and the test part's files are counted "
+            "on the union's own file list (D2, T11).")
+D3 =("Three things keep the demonstration true to the product (D3): a stage that adds tables starts its live stack, "
       "with the schema check, at its first increment, never first at its close; the development database's rebuild run "
       "sheet is prepared before the demonstration, so that a database earlier runs left behind is rebuilt, never read "
       "as it stands; and the demonstration's harness drives the product's own entry points (its commands, its server, "
@@ -58,14 +63,16 @@ D4 = ("8. Still on the stage branch, tag its head: `git tag stage-review/<name>-
       "`<tag>:<path>`, `stage-review/<name>-<n>:run/review/SCOPE-STAGE-<name>.md` say, and reads it back with "
       "`git cat-file -p stage-review/<name>-<n>:<path>`, never with git show, whose `--output` form creates the file "
       "empty (KP-067) (D4).")
-P4 = ("Then list the remote branches that have no open pull request: read them with `git branch -r`, after the fetch "
+P4 = ("Then list the remote branches, the default branch and its `HEAD` pointer apart, that have no open pull "
+      "request: read them with `git branch -r`, after the fetch "
       "`sync-check.py` made, beside the open pull requests, `gh pr list --state open --limit 100`; delete each whose "
       "pull request merged (`gh pr list --state merged --head <branch>` names it) with `git push origin --delete "
       "<branch>`, as the delegation loop's step 8 deletes a merged branch, and name the others in the report, deleting "
       "none unasked (P4).")
 REFAC_T11 = ("Delegate to **refactor-scout** with the stage base commit (where stages interleave on `main`, the "
-             "stage's own squash commits instead, the change being their union as `stage-diff.py` writes it at the "
-             "stage review's step 2 in `reflection.md`, T11), the detector report,")
+             "stage's own squash commits instead, their union written for the scout by `stage-diff.py` as the stage "
+             "review's step 2 in `reflection.md` writes it, the review itself coming after the pass, T11), the detector "
+             "report,")
 P17_TAIL = ("the stage review of the release's text runs before the stamp, so that what is stamped is what both "
             "reviewers read; a correction to text alone found after the stamp rides with the next release, unless it "
             "changes what a project does, which takes a fix release of its own; and the release's field acceptance "
@@ -108,7 +115,7 @@ def test_r049_d2_every_stage_review_part_is_bounded_alike():
     """D2: a test part at most 25 files, a product part per package, a drivers-and-records part per driver family; a
     part without a verdict, of any kind, run again on what it had not reached."""
     step = stage_step(4)
-    assert D2 in step, step
+    assert (D2 + " " + D2_UNION) in step, step
     assert "the test files' part at most 25 files" not in step
 
 

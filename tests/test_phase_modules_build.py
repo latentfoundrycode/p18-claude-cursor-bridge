@@ -295,14 +295,14 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
 
 
 # sha256 of step 9 as TASK-040 (release T) leaves it (from its heading to its last line, LF, trailing whitespace
-# stripped; 6,662 characters): the scout's item names the stage's own squash commits where stages interleave (T11).
+# stripped; 6,708 characters): the scout's item names the stage's own squash commits where stages interleave (T11).
 # Before it: BUG-033 (6,474 characters, sha256 57bbd058bcf569f9...): steps 4 and 6 name the branch rule BUG-032 gave a refactoring branch (every REFAC-<nnn> brief, the
 # REFAC-<stage> snapshot). Before it: BUG-031 reworded step 6's title sentence (6,055 characters, sha256
 # b86e3bceb2b8508546e2f1d3...); TASK-035 the project-end sentence under its `reword` and `new` entries (5,695); the
 # step as the delegation-loop module held it at origin/main 5bed396 (5,542 characters), moved verbatim. trace-check,
 # which would see a change, has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword
 # updates this with its record
-STEP9_SHA256 = "7db9b902b7237b1f3b10fb512974c4bcba3d2440c1d56600e1b68c9cbca5bb6a"
+STEP9_SHA256 = "780b6637bf4bb3b4cd2d699116056e34a17d935a3c574a42305e93a8319ebfd4"
 
 
 def test_r032_step_9_is_verbatim():
@@ -314,7 +314,7 @@ def test_r032_step_9_is_verbatim():
     import hashlib
     sub = module(SUB)
     step = sub[sub.index("### " + STEP9):sub.index("### Keeping the pass's position")].rstrip()
-    assert len(step) == 6662 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
+    assert len(step) == 6708 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
 
 
 def test_the_refactoring_passs_position_is_written_down():

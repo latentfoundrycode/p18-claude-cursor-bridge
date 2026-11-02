@@ -191,6 +191,18 @@ def test_r049_d4_the_new_rules_admit_nothing_beyond_the_tag_s_namespace():
                 "git branch -r -d origin/task-040"):
         assert not any(rule_matches(r, cmd) for r in ALLOW), cmd
         assert decide(cmd, ALLOW, DENY)[0] != "allow", cmd
+    # A `*` matches any text, so the tag rule alone admits an option after the name (Review A, TASK-040 round 1, S1:
+    # `git tag stage-review/x -d v1.0` deletes another tag, `-a` makes the annotated tag --follow-tags carries, `-f`
+    # moves a tag a record cites); the deny rule `Bash(git tag stage-review/* -*)` refuses any option after the name.
+    # Not ` *`: a trailing ` *` also matches the bare command, which would refuse the tag itself. A commit named after
+    # the tag's name (`git tag stage-review/T1-1 HEAD~3`) stays admitted: without `-f` it makes a new local lightweight
+    # tag only, moving and deleting none.
+    assert "Bash(git tag stage-review/* -*)" in DENY
+    for cmd in ("git tag stage-review/T1-2 -d v1.0", "git tag stage-review/T1-2 -d stage-review/T1-1",
+                "git tag stage-review/T1-2 --delete v1.0", "git tag stage-review/T1-1 -a -m annotated",
+                "git tag stage-review/T1-1 -f", "git tag stage-review/T1-1 HEAD~3 --force"):
+        assert decide(cmd, ALLOW, DENY)[0] == "deny", cmd
+    assert decide("git tag stage-review/T1-1", ALLOW, DENY)[0] == "allow"
 
 
 def test_r049_d4_the_guard_treats_the_stage_tag_as_it_treats_the_loop_s_state_commands(program):

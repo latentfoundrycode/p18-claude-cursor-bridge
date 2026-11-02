@@ -85,7 +85,8 @@
       "PowerShell(*agent.cmd*)",
       "PowerShell(*agent.ps1*)",
       "PowerShell(*cursor-agent*)",
-      "PowerShell(*bridge-run*)"
+      "PowerShell(*bridge-run*)",
+      "Bash(git tag stage-review/* -*)"
     ]
   },
   "retired": [
