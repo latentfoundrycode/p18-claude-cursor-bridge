@@ -51,7 +51,7 @@ def test_bug041_a_deleted_snapshot_is_a_flag_and_voids_the_launch(tmp_path):
     G.launched(repo, NAME)
     os.remove(str(snapshot_file(repo)))
     rc, out = G.guard(repo, "verify", NAME)
-    assert rc == 1 and "GATE-INTEGRITY" in out and "deleted" in out, out
+    assert rc == 1 and "GATE-INTEGRITY" in out and "the snapshot was deleted" in out, out
     assert "Traceback" not in out, out
     entry = G.entry(repo, ID, 1)
     assert (entry.get("flagged_launch") or "").rstrip("Z") == start_of(repo), entry
@@ -133,7 +133,7 @@ def test_bug041_negative_a_launch_before_the_round_is_not_voided(tmp_path):
     G.snap_ok(repo, NAME)
     os.remove(str(snapshot_file(repo)))
     rc, out = G.guard(repo, "verify", NAME)
-    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    assert rc == 1 and "GATE-INTEGRITY" in out and "NOT restored" in out, out
     assert "flagged_launch" not in G.entry(repo, ID, 1), G.entry(repo, ID, 1)
 
 
@@ -168,3 +168,5 @@ def test_bug041_negative_a_standing_snapshot_is_unchanged(tmp_path):
     G.launched(repo, NAME)
     G.verify_ok(repo, NAME)
     assert mark_file(repo).exists()
+    rc, out = G.guard(repo, "premerge", NAME)
+    assert rc == 0 and len(premerge_records(repo)) == 1, out
