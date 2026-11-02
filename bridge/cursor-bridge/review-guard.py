@@ -378,8 +378,9 @@ def record_flagged_launch(common, root, nnn, snap):
     id_part, rnd = parsed
     err_path = os.path.join(root, "run", "review", "REVIEW-%s.err" % nnn)
     launched_at, exit_code = launch_info(err_path)
-    snap_taken = (snap.get("taken") or "").rstrip("Z")
-    if exit_code != 0 or not launched_at or launched_at.rstrip("Z") < snap_taken:
+    taken_raw = snap.get("taken") if isinstance(snap, dict) else None
+    snap_taken = (taken_raw if isinstance(taken_raw, str) else "").rstrip("Z")
+    if not launched_at or (snap_taken and launched_at.rstrip("Z") < snap_taken):
         return
     rpath = rounds_path(common, id_part)
     if not os.path.isfile(rpath):
@@ -832,6 +833,8 @@ def cmd_snapshot(nnn, cwd):
                 entry["lift"] = r.get("lift")
                 entry["lift_line"] = r.get("lift_line")
                 entry["time"] = r.get("time") or entry["time"]
+                if "flagged_launch" in r:
+                    entry["flagged_launch"] = r["flagged_launch"]
                 data["rounds"][i] = entry
                 replaced = True
                 break
@@ -879,6 +882,7 @@ def cmd_verify(nnn, cwd):
         return 2
     if state:
         print("review-guard: GATE-INTEGRITY - the snapshot was rewritten after it was taken; the checkout was NOT restored from it and no git command was run")
+        record_flagged_launch(common, root, nnn, snap)
         return 1
     flags, notes = [], []
     # 1. the repository's configuration and hooks, read as files, before any git command runs
@@ -895,6 +899,7 @@ def cmd_verify(nnn, cwd):
         for f in flags:
             print("  GATE-INTEGRITY  " + f)
         print("review-guard: GATE-INTEGRITY - the checkout was NOT restored and no git command was run; inspect the configuration and the hooks first")
+        record_flagged_launch(common, root, nnn, snap)
         return 1
     # 2. where HEAD is, and the refs
     head = run_git(["rev-parse", "HEAD"], root, common).strip()
@@ -940,6 +945,7 @@ def cmd_verify(nnn, cwd):
             held = held_elsewhere(snap["branch"], root, common)
             if held:                                   # P3 (second pass of the plan review): a reset here would rewind the branch we are on
                 print("review-guard: GATE-INTEGRITY - %s is checked out in another worktree (%s); the checkout was NOT restored and nothing was reset: tear that worktree down first (worktree-teardown.py), then verify again" % (snap["branch"], held))
+                record_flagged_launch(common, root, nnn, snap)
                 return 1
             run_git(["checkout", "-q", "-f", snap["branch"][len("refs/heads/"):] if snap["branch"].startswith("refs/heads/") else snap["branch"]], root, common)
             try:
@@ -948,6 +954,7 @@ def cmd_verify(nnn, cwd):
                 now_on = ""
             if now_on != snap["branch"]:
                 print("review-guard: GATE-INTEGRITY - the checkout could not be put back on %s (it is on %s); nothing was reset" % (snap["branch"], now_on or "a detached HEAD"))
+                record_flagged_launch(common, root, nnn, snap)
                 return 1
         run_git(["reset", "-q", "--hard", snap["head"]], root, common)
     else:
@@ -1002,6 +1009,19 @@ def cmd_verify(nnn, cwd):
     launched_at, exit_code = launch_info(err_path)
     snap_taken = (snap.get("taken") or "").rstrip("Z")
     launch_ok = launched_at and launched_at >= snap_taken
+    if not str(nnn).startswith("DESIGN-") and bridge_env.parse_review_name(str(nnn)):
+        id_part, rnd = bridge_env.parse_review_name(str(nnn))
+        rpath = rounds_path(common, id_part)
+        if os.path.isfile(rpath):
+            data, _, err = load_rounds(common, id_part, root=None, seed=False)
+            if not err:
+                for r in data.get("rounds") or []:
+                    if r.get("round") == rnd:
+                        flagged = (r.get("flagged_launch") or "").rstrip("Z")
+                        if flagged and launched_at and flagged == launched_at.rstrip("Z"):
+                            print("review-guard: GATE-INTEGRITY - this Review B launch was voided by an earlier GATE-INTEGRITY verify; no reply and no verified mark; run Review B again on this snapshot")
+                            return 1
+                        break
     if (
         not str(nnn).startswith("DESIGN-")
         and bridge_env.parse_review_name(str(nnn))
@@ -1077,7 +1097,7 @@ def cmd_premerge(nnn, cwd, pr=None):
         print("review-guard: CANNOT CHECK - the tree is not clean; commit the removal of the review files first")
         return 2
     head = run_git(["rev-parse", "HEAD"], root, common).strip()
-    p = subprocess.run(["git", "-c", "core.hooksPath=" + no_hooks_dir(common), "merge-base", "--is-ancestor", snap["head"], head], cwd=root, capture_output=True, timeout=GIT_TIMEOUT, creationflags=NO_WINDOW)
+    p = _git_proc(["merge-base", "--is-ancestor", snap["head"], head], root, common)
     if p.returncode != 0:
         print("  GATE-INTEGRITY  the head about to merge (%s) does not descend from the reviewed head (%s)" % (head[:12], snap["head"][:12]))
         print("review-guard: GATE-INTEGRITY - do not merge; the reviews approved a different history")
