@@ -16,17 +16,19 @@ and the design's R-051 row still named `--staged`. The constants below are the s
 applied from them. KP-052: no character outside ASCII is typed here."""
 import os
 
-from phase_modules import CORE, PHASES, flat, read, rule, section
+from phase_modules import PHASES, flat, read, rule, section
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MERGE = os.path.join(PHASES, "delegation-loop", "merge.md")
+DECIDE = os.path.join(PHASES, "delegation-loop", "decide.md")
 REFLECTION = os.path.join(PHASES, "reflection.md")
 CHANGE = os.path.join(PHASES, "change-cycle.md")
 PACKAGER = os.path.join(ROOT, "bridge", "agents", "spec-packager.md")
 REQUIREMENTS = os.path.join(ROOT, "docs", "REQUIREMENTS.md")
 DESIGN = os.path.join(ROOT, "docs", "DESIGN.md")
 
-B1_MERGE = ("Where that re-read would open a round above the ceiling, the rewrite is behaviour against the register, "
+B1_MERGE = ("Where that re-read would open a round above the ceiling, the overtaken file is behaviour against the "
+            "register, "
             "R-045's T17, one of the five, so its lift is a class line, `Blocking class: behaviour - R-045, the status "
             "file overtaken by PR #<m>'s merge`, written into `run/review/SCOPE-<ID>.md` before the snapshot (step 7, "
             "\"The review ceiling\"), which the reviewers confirm or deny against the round it lifts.")
@@ -34,8 +36,8 @@ B1_RULE43 = ("A pull request whose status file another pull request's merge over
              "own merge and `main` merged into it, a new head the reviews read again (the delegation loop's step 8), "
              "above the ceiling under the class line step 8 gives it.")
 S1_STEP2 = ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the threat models "
-            "`docs/INVENTORY.md` records for the parts the stage touched (R-050), given to both reviewers with the "
-            "diff, the earlier rounds' dispositions and,")
+            "`docs/INVENTORY.md` records for the parts the stage touched, or that none is recorded (R-050), given to "
+            "both reviewers with the diff, the earlier rounds' dispositions and,")
 S1_STEP4 = ("4. Review A: `diff-reviewer` on `run/review/STAGE-<name>-r<N>.diff`, told the stage's briefs, the threat "
             "models the SCOPE file carries, and that it reads a stage, not an increment.")
 S2_PACKAGER = ("**Escapes as text; non-ASCII listed.** Name a character a brief must mention but must not hold by its "
@@ -52,6 +54,9 @@ S3_SURVIVAL = ("its record in `docs/DESIGN_CRITIQUE.md` under the change's subje
 RULE6 = "One of the five always blocks, within the threat model recorded for its part (below)."
 DESIGN_R051 = ("`invisible-check.py` with a base and `--staged` (as built: its default form, `--staged` left to a "
                "program release, R-051's note);")
+R051_ESCAPE = ("`spec-packager` names a character a brief must not hold by its code point, never by a typed "
+               "backslash escape, and writes a backtick or a backslash through the file-writing tool, never "
+               "through a shell that reads escapes")
 R045_EVIDENCE = (
     "P4: tests/test_release_t_merge.py::test_r045_p4_the_merged_branch_deleted_and_the_armed_form_skipped",
     "(a): tests/test_release_t_merge.py::test_r045_a_step_8_stands_in_its_own_sub_file",
@@ -75,6 +80,10 @@ def test_bug040_b1_the_overtaken_re_review_names_its_lift():
     assert ("and merges `main`, and the reviews read the new head again (T11, T17). " + B1_MERGE) in s
     r = rule(43)
     assert B1_RULE43 in r
+    # Review A's read of BUG-040, Should fix 1: the class line's form names this lift's finding
+    assert ("its finding naming the reviewer's finding it answers (`Review A, round 3, B1`, say), or, for an "
+            "overtaken pull request's re-review, the requirement the overtaken file breaks and the merge that "
+            "overtook it (step 8).") in flat(section(read(DECIDE), "The review ceiling", 4))
     assert "a new head the reviews read again (the delegation loop's step 8). The `loop-guard`" not in r
 
 
@@ -123,4 +132,6 @@ def test_bug040_records_r045_evidence_and_the_design_s_r051_row():
     for item in R045_EVIDENCE:
         assert item in row[0], item
     assert DESIGN_R051 in read(DESIGN)
-    assert os.path.exists(CORE)
+    # Review A's read of BUG-040, a consider: the R-051 row's escape clause as spec-packager now words it
+    r051 = [l for l in read(REQUIREMENTS).split("\n") if l.startswith("| R-051 |")]
+    assert len(r051) == 1 and R051_ESCAPE in r051[0]

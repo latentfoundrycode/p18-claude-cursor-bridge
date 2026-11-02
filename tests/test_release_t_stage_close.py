@@ -40,8 +40,8 @@ T11 = ("Where stages interleave, a later stage's ready increments having merged 
        "the stage changed again after another commit named `OVERLAP` and read in the parts, its exit 1 also meaning an "
        "empty change, looked at before the review (T11).")
 STEP2_SCOPE = ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the threat models "
-               "`docs/INVENTORY.md` records for the parts the stage touched (R-050), given to both reviewers with "
-               "the diff, the earlier rounds' dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7) with, beside it, the "
+               "`docs/INVENTORY.md` records for the parts the stage touched, or that none is recorded (R-050), "
+               "given to both reviewers with the diff, the earlier rounds' dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7) with, beside it, the "
                "head the previous stage round's snapshot recorded, against whose code the reviewers confirm or "
                "deny the line, a stage round having no builder run; then `git add -f` "
                "the round's diff, its parts and the SCOPE file and commit them on the stage branch.")

@@ -217,7 +217,6 @@ def test_r049_d4_the_guard_treats_the_stage_tag_as_it_treats_the_loop_s_state_co
     tag = "git tag stage-review/<name>-<n>"
     assert tag in documented, tag
     assert "commit" in guard.STATE_GIT and "push" in guard.STATE_GIT
-    assert not guard.state_changing(guard.words("git tag -l"))
     for cmd in (tag, "git tag stage-review/T1-1", "git commit -m x", "git push origin task-040"):
         assert guard.state_changing(guard.words(cmd)), cmd
     for cmd in ("git cat-file -p stage-review/<name>-<n>:<path>", "git branch -r", "git tag -l"):

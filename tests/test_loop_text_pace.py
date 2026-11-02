@@ -515,8 +515,8 @@ def test_r042_the_stage_review_takes_the_rounds_names_and_its_scope_file():
     # TASK-040 (R-049, T11) rewrote step 2: the SCOPE sentence now follows the union's and names the class line's
     # commit; its whole text is pinned in tests/test_release_t_stage_close.py (STEP2_SCOPE).
     assert ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the threat models "
-            "`docs/INVENTORY.md` records for the parts the stage touched (R-050), given to both reviewers with the "
-            "diff, the earlier rounds' dispositions and, at a round above the ceiling, its `Blocking class:` line "
+            "`docs/INVENTORY.md` records for the parts the stage touched, or that none is recorded (R-050), given "
+            "to both reviewers with the diff, the earlier rounds' dispositions and, at a round above the ceiling, its `Blocking class:` line "
             "(step 7) with, beside it,") in r
     assert ("then `git add -f` the round's diff, its parts and the SCOPE file and commit them on the stage "
             "branch.") in r
