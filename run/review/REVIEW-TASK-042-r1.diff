@@ -1,0 +1,356 @@
+diff --git a/.github/workflows/dependency-scan.yml b/.github/workflows/dependency-scan.yml
+new file mode 100644
+index 0000000..aaad3e9
+--- /dev/null
++++ b/.github/workflows/dependency-scan.yml
+@@ -0,0 +1,33 @@
++name: dependency-scan
++on:
++  schedule:
++    - cron: '17 6 * * 0'
++  workflow_dispatch:
++permissions:
++  contents: read
++jobs:
++  dependency-scan:
++    name: dependency scan
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
++        with:
++          persist-credentials: false
++      - name: OSV-Scanner
++        shell: bash
++        run: |
++          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"
++          echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner" | sha256sum -c -
++          chmod +x osv-scanner
++          set +e
++          ./osv-scanner scan source --config=osv-scanner.toml --lockfile=requirements.txt:requirements.lock
++          code=$?
++          set -e
++          if [ "$code" -eq 0 ]; then
++            exit 0
++          fi
++          echo "dependency-scan: OSV-Scanner exit $code"
++          if [ "$code" -eq 128 ]; then
++            echo "OSV-Scanner exit 128: no lockfile was read"
++          fi
++          exit "$code"
+diff --git a/docs/DESIGN.md b/docs/DESIGN.md
+index d8a1703..64e63fd 100644
+--- a/docs/DESIGN.md
++++ b/docs/DESIGN.md
+@@ -43,7 +43,7 @@ Every item was read against the installed text of 2026.10.30d (`bridge/` equals
+ 
+ ### The weekly dependency scan
+ 
+-The floor's OSV-Scanner runs only on a pull request's or a push's event, over the whole lockfile as it stands then, so a flaw disclosed later in an unchanged dependency, or in a paused or finished project with no event, was never flagged (the owner, 2026-10-28). The design: a second workflow file, `.github/workflows/dependency-scan.yml`, run on a weekly `schedule` (Sunday 06:17 UTC — off the hour, since GitHub delays the `schedule` event at high-load times, "the start of every hour" among them — which precedes the Sunday evaluation's 14:00 on the owner's clock, UTC+1 or UTC+2, `evaluate-reports.md`; a run still queued or running at the evaluation's hour is not read this Sunday — where nothing else completed since the previous evaluation, that is the third kind below, with no rerun — and is read the next, unless a newer run has completed, whose time passes it and leaves it unread) and on `workflow_dispatch`; `permissions: contents: read` and nothing else; a checkout without persisted credentials; OSV-Scanner at the floor's version and SHA-256 — one pin stated twice, so the workflow's structural test asserts the two equal and T9's deprecation check names both — run over every lockfile the repository holds (`osv-scanner scan source --config=osv-scanner.toml --lockfile=...` per lockfile, as the floor's step does) with the floor's exit-code handling (0 clean; 128, no lockfile read, fails as KP-005 says; every other code fails as it is) and one line more than the floor's, `dependency-scan: OSV-Scanner exit <code>` printed on every non-zero exit, which the evaluation reads; no token and no secret anywhere in it: no `secrets.` reference and no token handed to a step (the automatic `GITHUB_TOKEN` exists in every job, here with `contents: read` alone, used by nothing, the checkout persisting no credentials), which is what the structural test's "no secret" asserts. **What the Sunday evaluation reads** (`bridge/commands/evaluate-reports.md`, a step the maintainer's command gains, R-052): each project's workflow state and its runs since the previous evaluation — first `gh workflow list --all`, where any disabled state (`disabled_inactivity`, or `disabled_manually`, hidden the same way and started by no `gh workflow run`) is the third kind below whatever the runs show, since `gh run list --workflow dependency-scan.yml` lists no run of a disabled workflow without `-a` (gh's own reference, read 2026-11-01 on gh 2.97.0: `gh workflow list` "hiding disabled workflows by default", and both commands' `-a, --all  Include disabled workflows`) and an old success would otherwise read green; then `gh run list --workflow dependency-scan.yml --created ">=<the previous evaluation's date>"`, the date the ledger (`Reports/ledger.json`) keeps as its `_meta.last_extract` stamp for the previous run, read before this run's extract overwrites it (a nothing-new week leaves no run folder, so the folder is not the record), listed with `--json databaseId,createdAt,status,conclusion`, the window being the listed runs whose `createdAt` is later than the `last run read:` time the previous evaluation's Dependency scan section gives for the project, the creation time of the newest completed run that evaluation read, or the previous section's value where its window completed none, `none` where there was no previous one (a section reading `none` leaves every listed run in the window, and where no previous section names the project the window is the listed runs created on a later day than that date, so a run of that day cannot cover this Sunday: Review A and Review B, TASK-041, round 2): the date is a day and the schedule runs on the morning of the evaluation's own Sunday, so the date alone would take in the run already read and hide a late or missing schedule behind it; a creation time, not the run's id, since GitHub documents no order of its ids; a run re-run from the Actions tab keeps its creation time and is not read again, the rerun the evaluation names (`gh workflow run`) starting a new run; and the section carries `finding standing: run <id>` from week to week until a later run ends `success`, so a finding the narrower window would drop is reported every week it stands (Review A and Review B, TASK-041); a project whose workflow list holds no `dependency-scan.yml` is `not configured`, its calibration's item, with `last run read: none`; the window gives each run its status and conclusion, and for a `failure` `gh run view <run id> --log-failed` gives the step's `dependency-scan: OSV-Scanner exit <code>` line, which tells the first two kinds apart — in **three kinds, defined here once** (R-052, Failure modes and the inventory's row say the same): (1) **a finding**: a completed run of the window whose conclusion is `failure` and whose exit line reads `exit 1` — a flaw, fixed by a `DEP-<nnn>` increment, the merge policy's procedure, never by an unreviewed change; a finding stands until a later run ends `success`, in that window or a later one, a later run of the second kind superseding nothing, both then reported; (2) **a scanner failure**: the window's last completed run proved nothing — a `failure` with any other exit code (127, 128 or another) or with no exit line at all (the step never reached the scanner: the checkout or the download failed), or any conclusion other than `success` and `failure` (`cancelled`, `timed_out`, `startup_failure`, `skipped`, `action_required`, `neutral`, `stale`) — reported as such with the rerun's one command, `gh workflow run dependency-scan.yml`, the rerun read at the next evaluation; (3) **no completed run since the previous evaluation**: the workflow disabled, no run of the window listed, a list the login cannot read, or only runs still queued or in progress at the reading (a late schedule) — a finding of its own, never green (KP-005: silence is not green), reported with its remedy: the enabling run sheet below where the workflow is disabled, the rerun command where no run is listed, and none where a run is in progress, which the next Sunday reads. A window whose last completed run ended `success` with no finding standing is green. The host fact that makes the third kind certain, read from GitHub's documentation on 2026-11-01 ("Disabling and enabling a workflow"): *in a public repository, scheduled workflows are automatically disabled when no repository activity has occurred in 60 days*; a schedule may also start late. So every paused or finished public project reaches the third kind within two months, the evaluation names it, and the remedy is a run sheet for that project's owner — `gh workflow enable dependency-scan.yml`, then `gh workflow run dependency-scan.yml` (or the Actions tab's *Enable workflow*) — the enabled run read at the next evaluation; the documentation names public repositories, and a private one is read the same way, its missing run the same finding. Two more of GitHub's facts, read from the same documentation ("Events that trigger workflows"): *this event will only trigger a workflow run if the workflow file exists on the default branch* (`workflow_dispatch`), and *scheduled workflows will only run on the default branch*; so the workflow's first proof, one `workflow_dispatch` run read green, comes after the file reaches the default branch — after the configuration increment's merge for a project, after this repository's increment merges here — read by the supervisor then and by the evaluation at the latest, never a Done criterion before the merge. Dependabot alerts: the owner switched them on (2026-11-01, "Yes, I switched Dependabot on"); whether GitHub's separate option that enables them for new repositories was taken is not verified, so the evaluation reads each project in two calls that tell the three results apart: `gh api repos/<owner>/<repo>/vulnerability-alerts` answers 204 where the alerts are enabled and 404 where they are not (GitHub's REST documentation, read 2026-11-01; the owner's login has the admin read it needs on their own repositories), a 404 the finding "alerts off"; then, after a 204 only, `gh api --paginate repos/<owner>/<repo>/dependabot/alerts?state=open`, every page, an empty list being alerts on with nothing open; a 403 on either call is the login's scope, named in a run sheet, never a token in text, the project's Security tab the fallback; the bridge writes nothing for them. The convention text (`Cursor-Project-Configuration.md`, the security-floor section) says every project has the workflow; `cursor-configurator` writes it from a frozen block that carries the exit-code handling, with one fill-in, the `--lockfile=` list copied from the floor's OSV-Scanner step in the project's `tests.yml` (OSV-Scanner finds a lockfile by its standard name alone, so this repository's `requirements.lock` needs the floor's `requirements.txt:requirements.lock` form and a recursive scan would miss it), the structural test asserting the frozen part equal to the block and the list equal to the floor's; the increment that adds it to a project is proved by one `workflow_dispatch` run the supervisor reads green after its merge, beside the structural test before it (T9's rule: a floor is trusted only after it ran; the dispatch fact above); `conformance-check.py` is not changed by this release (a floor for it is a program item for the maintainer's next program release, named in the CHANGELOG entry); the calibration's `Running projects must` item adds the workflow to each running project as configuration.
++The floor's OSV-Scanner runs only on a pull request's or a push's event, over the whole lockfile as it stands then, so a flaw disclosed later in an unchanged dependency, or in a paused or finished project with no event, was never flagged (the owner, 2026-10-28). The design: a second workflow file, `.github/workflows/dependency-scan.yml`, run on a weekly `schedule` (Sunday 06:17 UTC — off the hour, since GitHub delays the `schedule` event at high-load times, "the start of every hour" among them — which precedes the Sunday evaluation's 14:00 on the owner's clock, UTC+1 or UTC+2, `evaluate-reports.md`; a run still queued or running at the evaluation's hour is not read this Sunday — where nothing else completed since the previous evaluation, that is the third kind below, with no rerun — and is read the next, unless a newer run has completed, whose time passes it and leaves it unread) and on `workflow_dispatch`; `permissions: contents: read` and nothing else; a checkout without persisted credentials; OSV-Scanner at the floor's version and SHA-256 — one pin stated twice, so the workflow's structural test asserts the two equal and T9's deprecation check names both — run over every lockfile the repository holds (`osv-scanner scan source --config=osv-scanner.toml --lockfile=...` per lockfile, as the floor's step does) with the floor's exit-code handling (0 clean; 128, no lockfile read, fails as KP-005 says; every other code fails as it is) and one line more than the floor's, `dependency-scan: OSV-Scanner exit <code>` printed on every non-zero exit, which the evaluation reads; no token and no secret anywhere in it: no `secrets.` reference and no token handed to a step (the automatic `GITHUB_TOKEN` exists in every job, here with `contents: read` alone, used only by the checkout's own fetch and removed before the next step, the checkout persisting no credentials), which is what the structural test's "no secret" asserts. **What the Sunday evaluation reads** (`bridge/commands/evaluate-reports.md`, a step the maintainer's command gains, R-052): each project's workflow state and its runs since the previous evaluation — first `gh workflow list --all`, where any disabled state (`disabled_inactivity`, or `disabled_manually`, hidden the same way and started by no `gh workflow run`) is the third kind below whatever the runs show, since `gh run list --workflow dependency-scan.yml` lists no run of a disabled workflow without `-a` (gh's own reference, read 2026-11-01 on gh 2.97.0: `gh workflow list` "hiding disabled workflows by default", and both commands' `-a, --all  Include disabled workflows`) and an old success would otherwise read green; then `gh run list --workflow dependency-scan.yml --created ">=<the previous evaluation's date>"`, the date the ledger (`Reports/ledger.json`) keeps as its `_meta.last_extract` stamp for the previous run, read before this run's extract overwrites it (a nothing-new week leaves no run folder, so the folder is not the record), listed with `--json databaseId,createdAt,status,conclusion`, the window being the listed runs whose `createdAt` is later than the `last run read:` time the previous evaluation's Dependency scan section gives for the project, the creation time of the newest completed run that evaluation read, or the previous section's value where its window completed none, `none` where there was no previous one (a section reading `none` leaves every listed run in the window, and where no previous section names the project the window is the listed runs created on a later day than that date, so a run of that day cannot cover this Sunday: Review A and Review B, TASK-041, round 2): the date is a day and the schedule runs on the morning of the evaluation's own Sunday, so the date alone would take in the run already read and hide a late or missing schedule behind it; a creation time, not the run's id, since GitHub documents no order of its ids; a run re-run from the Actions tab keeps its creation time and is not read again, the rerun the evaluation names (`gh workflow run`) starting a new run; and the section carries `finding standing: run <id>` from week to week until a later run ends `success`, so a finding the narrower window would drop is reported every week it stands (Review A and Review B, TASK-041); a project whose workflow list holds no `dependency-scan.yml` is `not configured`, its calibration's item, with `last run read: none`; the window gives each run its status and conclusion, and for a `failure` `gh run view <run id> --log-failed` gives the step's `dependency-scan: OSV-Scanner exit <code>` line, which tells the first two kinds apart — in **three kinds, defined here once** (R-052, Failure modes and the inventory's row say the same): (1) **a finding**: a completed run of the window whose conclusion is `failure` and whose exit line reads `exit 1` — a flaw, fixed by a `DEP-<nnn>` increment, the merge policy's procedure, never by an unreviewed change; a finding stands until a later run ends `success`, in that window or a later one, a later run of the second kind superseding nothing, both then reported; (2) **a scanner failure**: the window's last completed run proved nothing — a `failure` with any other exit code (127, 128 or another) or with no exit line at all (the step never reached the scanner: the checkout or the download failed), or any conclusion other than `success` and `failure` (`cancelled`, `timed_out`, `startup_failure`, `skipped`, `action_required`, `neutral`, `stale`) — reported as such with the rerun's one command, `gh workflow run dependency-scan.yml`, the rerun read at the next evaluation; (3) **no completed run since the previous evaluation**: the workflow disabled, no run of the window listed, a list the login cannot read, or only runs still queued or in progress at the reading (a late schedule) — a finding of its own, never green (KP-005: silence is not green), reported with its remedy: the enabling run sheet below where the workflow is disabled, the rerun command where no run is listed, and none where a run is in progress, which the next Sunday reads. A window whose last completed run ended `success` with no finding standing is green. The host fact that makes the third kind certain, read from GitHub's documentation on 2026-11-01 ("Disabling and enabling a workflow"): *in a public repository, scheduled workflows are automatically disabled when no repository activity has occurred in 60 days*; a schedule may also start late. So every paused or finished public project reaches the third kind within two months, the evaluation names it, and the remedy is a run sheet for that project's owner — `gh workflow enable dependency-scan.yml`, then `gh workflow run dependency-scan.yml` (or the Actions tab's *Enable workflow*) — the enabled run read at the next evaluation; the documentation names public repositories, and a private one is read the same way, its missing run the same finding. Two more of GitHub's facts, read from the same documentation ("Events that trigger workflows"): *this event will only trigger a workflow run if the workflow file exists on the default branch* (`workflow_dispatch`), and *scheduled workflows will only run on the default branch*; so the workflow's first proof, one `workflow_dispatch` run read green, comes after the file reaches the default branch — after the configuration increment's merge for a project, after this repository's increment merges here — read by the supervisor then and by the evaluation at the latest, never a Done criterion before the merge. Dependabot alerts: the owner switched them on (2026-11-01, "Yes, I switched Dependabot on"); whether GitHub's separate option that enables them for new repositories was taken is not verified, so the evaluation reads each project in two calls that tell the three results apart: `gh api repos/<owner>/<repo>/vulnerability-alerts` answers 204 where the alerts are enabled and 404 where they are not (GitHub's REST documentation, read 2026-11-01; the owner's login has the admin read it needs on their own repositories), a 404 the finding "alerts off"; then, after a 204 only, `gh api --paginate repos/<owner>/<repo>/dependabot/alerts?state=open`, every page, an empty list being alerts on with nothing open; a 403 on either call is the login's scope, named in a run sheet, never a token in text, the project's Security tab the fallback; the bridge writes nothing for them. The convention text (`Cursor-Project-Configuration.md`, the security-floor section) says every project has the workflow; `cursor-configurator` writes it from a frozen block that carries the exit-code handling, with one fill-in, the `--lockfile=` list copied from the floor's OSV-Scanner step in the project's `tests.yml` (OSV-Scanner finds a lockfile by its standard name alone, so this repository's `requirements.lock` needs the floor's `requirements.txt:requirements.lock` form and a recursive scan would miss it), the structural test asserting the frozen part equal to the block and the list equal to the floor's; the increment that adds it to a project is proved by one `workflow_dispatch` run the supervisor reads green after its merge, beside the structural test before it (T9's rule: a floor is trusted only after it ran; the dispatch fact above); `conformance-check.py` is not changed by this release (a floor for it is a program item for the maintainer's next program release, named in the CHANGELOG entry); the calibration's `Running projects must` item adds the workflow to each running project as configuration.
+ 
+ ### Architecture — the retrofit's diagrams
+ 
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 2dbf438..02d0348 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1622,3 +1622,11 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ - **Noted for the operator:** the summary lines of `verify` and `premerge` say "rewritten" for a deletion, the line above them saying "deleted", as the brief required. Symlinks and a case-sensitive file system were not run (Windows refused the links); by reading they take the moved-aside route.
+ - **Review B's note on TASK-043's round, recorded here because that head could not change:** `launch_info`'s started-line pattern collapses a launcher id with a same-second `Z-<n>` suffix onto that second, so a second launch in that second stays voided, refusing the merge: it fails closed.
+ - **The supervisor's slips, each caught and fixed before Review B:** a test asserted the word "deleted" against output whose temporary paths hold it, so mutant m04 would have survived (Review A); the record's recovery sentence was untrue for a name with a rounds record (both reviewers); a commit mixed the test fix with the bug record, which scope-check read as drift, undone unpushed and split.
++
++### TASK-042: the weekly dependency scan in this repository (2026-11-02)
++- **Supervisor-authored, no builder.** `cursor-configurator` wrote the workflow from the frozen block; the tests came first. Review A APPROVE, 0 blocking, 0 should fix; the security audit PASS, advisories only. The asset's SHA-256 was checked against the release's own `osv-scanner_SHA256SUMS`, and the checkout's commit against its `v5` tag (the audit). R-052 stays planned until TASK-044's `workflow_dispatch` proof.
++- **Taken in the tests (both reviewers named the narrow assertions):** no expression in the file, the two steps alone, bash, no trap, the scanner's call chained to nothing, the clean branch tied to the scanner's own status; m30 to m35 show each. Still held by the frozen-block equality alone, as `WORKFLOW_PIN` holds the floor: another `--config`, `--allow-no-lockfiles`, the binary downloaded again after its check, a `container:` at a mutable tag, `set +e` before the check.
++- **A lead, a text item for the next edit of `bridge/commands/evaluate-reports.md` (the audit's A1, contrived, none of the five):** `gh run list --workflow` has no event or branch filter, so a fork's pull request adding `on: pull_request` to its copy of this file should list under the same workflow (GitHub's documented behaviour, not reproduced; it needs the owner's approval click, the policy reading `first_time_contributors`), a spoofed `success` clearing a standing finding until the next schedule, a spoofed `failure` putting a stranger's text in `--log-failed` for the maintainer's session to read, D-004 not marking that flow untrusted; the owner's own `gh workflow run --ref <branch>` lists the same way. The fix: two calls, `--event schedule` and `--event workflow_dispatch`, each with `--branch <default>`; `tests/test_release_t_floor.py` pins the command. The test's "runs on no pull-request or push event" holds for the default branch's copy.
++- **Recorded, contrived:** the second workflow's one guard is `tests/test_dependency_scan.py`, so a hostile file under the allowed name with that test deleted passes the floor's file; both changes stand in one diff for the reviewers (the audit's A3). `osv-scanner.toml`'s content is read by no test: an `[[IgnoredVulns]]` entry with no `ignoreUntil` would turn the scan green, a gate-integrity flag for the reviewers (the audit's A5, Review A). No mutant exercises `test_r002_workflow_is_the_only_one`'s third-file direction, a mutant being unable to add a file; Review A and the audit each ran it by hand and it fails.
++- **Assumed, the floor's behaviour, not verified offline (Review A):** OSV-Scanner exits non-zero when its advisory query fails, not only on a finding.
++- **Beyond the Scope's literal list, kept:** D-004's two edge labels (`workflow_dispatch` beside the schedule; `rules` off the scan's edge, since it runs no Semgrep), within the Done when's "redrawn as in the tree". The objection on the exit-128 line, which differs from the floor's by design, is settled by the frozen block.
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index ac9e740..91d88bb 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -45,6 +45,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | Release T's pitfalls and records text | The Known Pitfalls catalogue holds the cycle's lessons (KP-061's outcome line, KP-063 to KP-074, KP-052 corrected: no tool is safe for a typed escape, KP-038 narrowed; R-054); the design critique's record and mechanics, a plan addendum from the design's review file from round 1 one subject with it (R-047); reports name a run's limit, a vendor console is written from its documentation fetched at the time, rule 12 asks in the question form, the `Calibrated:` line is rewritten (R-048); a decided rule not yet built says how it is held, the worked-scenario lens, the all-omitted diagram index (R-053) | bridge/cursor-bridge/Known-Pitfalls.md; bridge/commands/supervisor.md; bridge/commands/calibrate-bridge.md; bridge/cursor-bridge/workflow/phases/design.md, change-cycle.md; bridge/skills/explain-for-decision/SKILL.md; bridge/agents/plan-critic.md; bridge/cursor-bridge/Diagram-Planning-Conventions.md | tests/test_release_t_pitfalls.py; tests/test_release_t_records.py | release T (TASK-036, TASK-037) |
+ | The security floor's conventions and the weekly scan's text | The configuration guide's security floor carries T9's conventions (teeth proved by a planted finding on a real CI run, the plants removed in the same increment; every pin checked for deprecation; a vendor token enabling no paid engine, a paid one only on the owner's word; the floor's test the supervisor's; vendor CLIs with banner, spinner and telemetry off; the CLI installed without the key and with `--ignore-scripts`; the first CI log of a step holding a secret read for any part of it), the boundary log's `.gitignore` line (T22) and the weekly OSV-Scanner workflow as every project's, which cursor-configurator writes from the frozen block, its one fill-in the floor's `--lockfile=` list; the Sunday evaluation notes the ledger's `_meta.last_extract` before the extract and reads each project's workflow state, its runs since then and a failed run's exit line in three kinds (a finding, a scanner failure, no completed run), and Dependabot in two calls; a change cycle runs the conformance check before its first delegation (T12); the status template's `Layout:` line is relative to the project root (T19); the loop's suite, checkpoint, mutation and P7 launches, calibration's suite and KP-061 carry `--strip`, a driver's with `--scratch ~/.cursor-bridge/scratch/<the project root's folder name>`, applying from release T's install (P10), the launch observed once from the supervisor's session with no prompt and no refusal, so the heavy-launch rules are kept (docs/DESIGN.md, the host table); D-004's edge into the suite redrawn and its deviation closed | bridge/cursor-bridge/Cursor-Project-Configuration.md; bridge/agents/cursor-configurator.md; bridge/commands/evaluate-reports.md; bridge/cursor-bridge/workflow/phases/change-cycle.md; bridge/commands/supervisor.md; .../delegation-loop.md; .../delegation-loop/decide.md; .../delegation-loop/merge.md; bridge/commands/calibrate-bridge.md; bridge/cursor-bridge/Known-Pitfalls.md; docs/diagrams/D-004-context-dfd.md | tests/test_release_t_floor.py; tests/test_allowlist.py (test_r052_); tests/test_release_t_strip.py (an environment test) | release T (TASK-041) |
+ | Release B's acceptance tests | The traceability check run over the finished split, green with nothing dropped, each of the baseline's 424 passages in exactly one home or excused by its `reword`, the homes being the core, the ten phase modules with their sub-files and variants, and TASK-017's four trait files (skipped where the baseline commit is absent, as in CI); a sample project for each written type and sub-type, and a local web app with every written trait, walked from intake to configuration through the session-start hook on a copy of bridge/, the files it names for each phase equal to those computed from the core's phase table, the modules' `Sub-files:` and `Variants:` lines, the registry, the open list and each conditional file's change headings; the four running projects' committed fixtures classified as the Decision 6 row records §6.3, the workflow check and the calibration grades clean, the bridge's own status file carrying its fixture's line | bridge/cursor-bridge/trace-check.py; session-start.py; workflow-check.py; conformance-check.py (calibration_workflows_grades); tests/fixtures/workflows/ | tests/test_trace_full_split.py; tests/test_reads_only_applicable.py; tests/test_running_projects_classify.py | release B (TASK-025) |
++| The weekly dependency scan | A second workflow beside the gate's, on a weekly schedule (Sunday 06:17 UTC) and `workflow_dispatch`, with `contents: read` alone and no secret: OSV-Scanner at the floor's pinned version and SHA-256 over the floor's lockfile list, a finding failing the run and every non-zero exit named in the log for the Sunday evaluation to read; the frozen block with its one fill-in; its proof is a `workflow_dispatch` run on the default branch (TASK-044) | .github/workflows/dependency-scan.yml; bridge/agents/cursor-configurator.md, "The weekly scan's frozen block" | tests/test_dependency_scan.py; tests/test_release_b_ci_floor.py (test_r002_workflow_is_the_only_one) | release T (TASK-042) |
+ 
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 5b4ab4b..1abba3d 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -2,11 +2,11 @@
+ Last updated: 2026-11-02
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+-Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); plan gate passed 2026-11-01 (BUILD_PLAN.md "Release T — the plan addendum", stages T1 and T2, TASK-036 to TASK-045, subject release-t-plan, 5 reads); step 6, the loop, on Opus 5.5 (run parameters kept, docs/RUN_PARAMETERS.md): stage T1 closed 2026-11-02 (TASK-036 to TASK-040, REFAC-T1 and BUG-040, PRs #117 to #123; its review two rounds; the close records PR #124), stage T2 running (TASK-041, PR #125; TASK-043, PR #126; BUG-041, PR #127)
+-Increment: none (TASK-042 ready)
+-Last accepted: BUG-041 (PR #127, at its merge): a snapshot deleted after it was taken is GATE-INTEGRITY, not a snapshot never taken, one builder round; before it TASK-043, BUG-039 (PR #126); before it TASK-041, R-052's text (PR #125); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-041 and TASK-043, BUG-001 to BUG-041, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design gate passed 2026-11-01 (DESIGN.md "Change: release T", D-001 to D-004, subject release-t, traits confirmed); plan gate passed 2026-11-01 (BUILD_PLAN.md "Release T — the plan addendum", stages T1 and T2, TASK-036 to TASK-045, subject release-t-plan, 5 reads); step 6, the loop, on Opus 5.5 (run parameters kept, docs/RUN_PARAMETERS.md): stage T1 closed 2026-11-02 (TASK-036 to TASK-040, REFAC-T1 and BUG-040, PRs #117 to #123; its review two rounds; the close records PR #124), stage T2 running (TASK-041, PR #125; TASK-043, PR #126; BUG-041, PR #127; TASK-042, PR #128)
++Increment: none (TASK-044 ready)
++Last accepted: TASK-042 (PR #128, at its merge): the weekly dependency scan in this repository, R-052's proof waiting for TASK-044's dispatch run; before it BUG-041 (PR #127); before it TASK-043, BUG-039 (PR #126); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-043, BUG-001 to BUG-041, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: nothing
+-Next: stage T2's TASK-042, TASK-044 and TASK-045, the stamp and the install run sheet; the loop's own launches run as the installed text states them, unstripped, until release T installs (P10); then the releases after T, one at a time on the owner's word: B2, the progress graph, W, G, E, F, then C and D, which wait for the TDP's code map (INVENTORY, Decisions, 2026-11-02); reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: stage T2's TASK-044 and TASK-045, the stamp and the install run sheet; the loop's own launches run as the installed text states them, unstripped, until release T installs (P10); then the releases after T, one at a time on the owner's word: B2, the progress graph, W, G, E, F, then C and D, which wait for the TDP's code map (INVENTORY, Decisions, 2026-11-02); reAngle and the video factory calibrate when the owner resumes them (R-031, R-037); the TDP calibrates to 2026.10.30d in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -15,8 +15,8 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); intake-notes.md (release T's intake: what was read, the questions and the owner's answers); release T's rt_*.py (the item scan, the records writer, the critique's file) and rt0nn_*.py; each increment's mutants file <ID>-mutants.json; each closed gate's own files, named by its ID (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*, bug0nn_*, cal30b_*.py, the stage reviews' stage_b<n>_* and stage-b<n>-*, the fix and refactoring passes' fix*, refac_* and refactor*, the plan revision maintainer-text's plan_text_*.py, design_text_file.py and *-PLAN-TEXT.md); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); b5close_docs.py and b5close_records.py (stage B5's); b6close_docs.py and b6close_records*.py (stage B6's, run once each), write_stage_b6.py and refactor_b6_clones.py; the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py to demo_b5.py (run with python -X utf8) and demo_b6.py (PYTHONUTF8=1 through --kind driver); drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md
+ Delegated gates: none
+-Remote sync: main at the merge of PR #127, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
+-Stage: release T's stage T1 closed 2026-11-02 (TASK-036 to TASK-040, REFAC-T1, BUG-040; HARDENING, Stage T1's review), stage T2 running (TASK-041, TASK-043 and BUG-041 merged); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29; B6 (release B's install) 2026-10-31; project end 2026-10-31 (docs/archive/STATUS_HISTORY.md). Last reflection: stage T1's close, 2026-11-02 (demonstration passed live on main 219caff: the suite 3,371 passed, the tests written first red again on their checkpoints, the trace, diagram, sources and hook checks; conformance 25 OK, 0 MISSING, 5 NOTE; Issues ISS-024; Feedback FB-071 to FB-074; least confident in HARDENING; Project Summary patched)
++Remote sync: main at the merge of PR #128, in sync with origin/main at that merge (sync-check.py --apply after it); local main is fast-forwarded after every merge
++Stage: release T's stage T1 closed 2026-11-02 (TASK-036 to TASK-040, REFAC-T1, BUG-040; HARDENING, Stage T1's review), stage T2 running (TASK-041 to TASK-043 and BUG-041 merged); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29; B6 (release B's install) 2026-10-31; project end 2026-10-31 (docs/archive/STATUS_HISTORY.md). Last reflection: stage T1's close, 2026-11-02 (demonstration passed live on main 219caff: the suite 3,371 passed, the tests written first red again on their checkpoints, the trace, diagram, sources and hook checks; conformance 25 OK, 0 MISSING, 5 NOTE; Issues ISS-024; Feedback FB-071 to FB-074; least confident in HARDENING; Project Summary patched)
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-026 fixed (BUG-041). ISS-025 fixed (BUG-039's three rounds). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-023 fixed (BUG-038, 2026.10.30d, installed 2026-10-31); ISS-021's field check passed (2026-10-31); ISS-011, ISS-015 and ISS-022 closed at stage B6's close, ISS-020 completed there (worked around; the roster check's sign-in advice to release T, HARDENING). Earlier: docs/archive/STATUS_HISTORY.md
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+diff --git a/docs/archive/STATUS_HISTORY.md b/docs/archive/STATUS_HISTORY.md
+index 3638a34..0650575 100644
+--- a/docs/archive/STATUS_HISTORY.md
++++ b/docs/archive/STATUS_HISTORY.md
+@@ -193,3 +193,7 @@ Last accepted: TASK-041, R-052's text (PR #125, at its merge): the security floo
+ ## Moved 2026-11-02 (BUG-041)
+ 
+ Last accepted: TASK-043, BUG-039 (PR #126, at its merge): a flagged round spends nothing, whichever of `verify`'s checks flagged it and whenever, seven causes fixed on three builder rounds; D-003 and D-004 redrawn as built, the last four deviations closed; before it TASK-041, R-052's text (PR #125); before it Records: stage T1's close (PR #124); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-041 and TASK-043, BUG-001 to BUG-040, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++
++## Moved 2026-11-02 (TASK-042)
++
++Last accepted: BUG-041 (PR #127, at its merge): a snapshot deleted after it was taken is GATE-INTEGRITY, not a snapshot never taken, one builder round; before it TASK-043, BUG-039 (PR #126); before it TASK-041, R-052's text (PR #125); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-041 and TASK-043, BUG-001 to BUG-041, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+diff --git a/docs/diagrams/D-004-context-dfd.md b/docs/diagrams/D-004-context-dfd.md
+index 04e4cb0..efa2896 100644
+--- a/docs/diagrams/D-004-context-dfd.md
++++ b/docs/diagrams/D-004-context-dfd.md
+@@ -8,7 +8,6 @@ Notes:
+ - **Stripped environment** (`bridge_env.stripped_env`; the shim applies the same test). Withheld: `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GIT_ASKPASS`, `SSH_ASKPASS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0`, every name `SECRET_LIKE` matches (whole-word TOKEN or SECRET, PASSWORD, PASSWD, PASSPHRASE, CREDENTIAL, API, ACCESS or PRIVATE KEY, a `_KEY` or `_KEYS` ending) but `CURSOR_*` and `GIT_CONFIG_KEY_*`. Set: `GH_CONFIG_DIR` (the empty folder), `GIT_TERMINAL_PROMPT=0`, `GIT_CONFIG_GLOBAL` (the bridge's gitconfig: includes `~/.gitconfig`, resets the helper list), `GIT_CONFIG_PARAMETERS='credential.helper='` (read after the checkout's `.git/config`), `HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH` (the agent home), `HF_HUB_CACHE`, `TORCH_HOME`, `PUPPETEER_CACHE_DIR` (the owner's caches, where present). `APPDATA` and `LOCALAPPDATA` are not set and stay the owner's real folders, so a store a tool reaches through them is found by default, as KP-038 says; their redirect is a program item for the maintainer, probed first (the shim and cursor-agent live under `LOCALAPPDATA`). Passed: the rest. An unusable agent home refuses the run (exit 125).
+ - `bridge-run.py` strips for `cursor-agent` and with `--strip`; the loop's and the calibration's suite and driver launch commands carry `--strip` (R-052, TASK-041), the driver with `--scratch` naming its folder under the owner's profile, outside the agent home the strip names as `HOME`. A test, driver or watch run without the flag still gets the owner's environment, which the loop's text instructs only for a driver whose suite needs a variable beyond `.env`, under a recorded Decision in `docs/INVENTORY.md` naming the variable. `--key-file` is refused with `cursor-agent` and a driver; a driver's copy carries the project's `.env`. A watch run (`gh pr checks`) runs no builder-written code and keeps the owner environment by design. `p_test_suite` stays in `tb_supervisor`: it is the owner's user running the project's own interpreter in the Workspace, launched and bounded by the supervisor, its environment stripped by the loop's `--strip` but its process no agent's.
+ - The guard's records lie in the checkout's `.git`; the sha256 copy outside it finds a rewritten snapshot. Both are in the owner's profile, which the agents' user can reach.
+-- `p_dependency_scan` is designed (docs/DESIGN.md, "The weekly dependency scan", R-052), not yet in the tree.
+ 
+ | Element | Paths |
+ |---|---|
+@@ -27,7 +26,7 @@ Notes:
+ | p_shell_guard | bridge/cursor-bridge/shell-guard.py (.cursor/hooks/ copy) |
+ | p_ci_tests | .github/workflows/tests.yml, job tests |
+ | p_ci_security_floor | .github/workflows/tests.yml, job security-floor |
+-| p_dependency_scan | .github/workflows/dependency-scan.yml (designed) |
++| p_dependency_scan | .github/workflows/dependency-scan.yml |
+ | ds_checkout | the Workspace and Worktrees/ checkouts |
+ | ds_run_outputs | run/agent/\*.err, run/review/REVIEW-nnn.err |
+ | ds_runs_log | run/launcher/runs.jsonl |
+@@ -100,7 +99,7 @@ end
+ subgraph tb_ci["GitHub's CI: secrets as step-level env only"]
+ p_ci_tests("CI tests")
+ p_ci_security_floor("CI security floor")
+-p_dependency_scan("Weekly scan, designed")
++p_dependency_scan("Weekly scan")
+ ds_actions_secrets[("Actions secret")]
+ end
+ 
+@@ -178,10 +177,11 @@ p_bridge_install -->|"installs"| p_cursor_agent_shim
+ p_bridge_install -->|"link .cursor, skeleton, rename probe"| ds_agent_home
+ 
+ ext_github -->|"push or PR event, contents read, no persisted credentials"| p_ci_tests & p_ci_security_floor
+-ext_github -->|"weekly schedule, contents read, no secret"| p_dependency_scan
++ext_github -->|"weekly schedule or workflow_dispatch, contents read, no secret"| p_dependency_scan
+ ds_actions_secrets -->|"SECRET: Socket step env only"| p_ci_security_floor
+ p_ci_security_floor -->|"SECRET: Socket token, manifest"| ext_advisory
+ p_ci_security_floor & p_dependency_scan -->|"lockfile packages"| ext_advisory
+-ext_advisory -->|"advisories, rules, OSV-Scanner pinned by SHA-256"| p_ci_security_floor & p_dependency_scan
++ext_advisory -->|"advisories, rules, OSV-Scanner pinned by SHA-256"| p_ci_security_floor
++ext_advisory -->|"advisories, OSV-Scanner pinned by SHA-256"| p_dependency_scan
+ p_ci_tests & p_ci_security_floor & p_dependency_scan -->|"results, logs"| ext_github
+ ```
+diff --git a/tests/test_dependency_scan.py b/tests/test_dependency_scan.py
+new file mode 100644
+index 0000000..e5acb27
+--- /dev/null
++++ b/tests/test_dependency_scan.py
+@@ -0,0 +1,163 @@
++"""Release T - TASK-042 (the weekly dependency scan in this repository) structural test.
++
++enforces: docs/BUILD_PLAN.md TASK-042 Done when; satisfies R-052, D-004 (`p_dependency_scan`).
++Supervisor-authored, written before the workflow file. Asserts the committed workflow: the frozen block of
++bridge/agents/cursor-configurator.md with its one fill-in, the security floor's pins and lockfile list, the two triggers
++and no other, `contents: read` and nothing else, no secret and no token, and exit-code handling that names every non-zero
++exit. Reads committed files only. A `workflow_dispatch` run is the workflow's proof, which GitHub runs only for a file on
++the default branch: TASK-044's criterion, not this test's.
++"""
++import pathlib
++import re
++
++import yaml
++
++from test_release_b_ci_floor import DISABLERS, OSV, SECRET_REF, SHA40, _commands, _lines, _on, _steps
++
++ROOT = pathlib.Path(__file__).resolve().parent.parent
++SCAN = ROOT / ".github" / "workflows" / "dependency-scan.yml"
++FLOOR = ROOT / ".github" / "workflows" / "tests.yml"
++CONFIGURATOR = ROOT / "bridge" / "agents" / "cursor-configurator.md"
++TOKEN = re.compile(r"\b(?:GITHUB_TOKEN|GH_TOKEN|token)\b", re.I)
++LOCKFILE = re.compile(r"--lockfile=(?:'([^']+)'|(\S+))")
++VERSION = re.compile(r"osv-scanner/releases/download/(v[0-9.]+)/osv-scanner_linux_amd64")
++SHA256 = re.compile(r'echo "([0-9a-f]{64})  osv-scanner" \| sha256sum -c -')
++CHECKOUT = re.compile(r"^\s*-\s*uses:\s*actions/checkout@([0-9a-f]{40})", re.M)
++
++
++def _text(path):
++    return path.read_text(encoding="utf-8").replace("\r\n", "\n")
++
++
++def _data():
++    return yaml.safe_load(_text(SCAN))
++
++
++def _job():
++    jobs = _data()["jobs"]
++    assert list(jobs) == ["dependency-scan"], "R-052: the workflow holds one job: %s" % list(jobs)
++    return jobs["dependency-scan"]
++
++
++def _scanner_step():
++    found = [s for s in _steps(_job()) if any(OSV.search(line) for line in _lines(s))]
++    assert len(found) == 1, "R-052: one step runs OSV-Scanner: %s" % found
++    return found[0]
++
++
++def _block():
++    text = _text(CONFIGURATOR)
++    m = re.search(r"^## The weekly scan's frozen block$.*?^```yaml\n(.*?)^```$", text, re.M | re.S)
++    assert m, "R-052: the frozen block is not in cursor-configurator.md"
++    return m.group(1)
++
++
++def _lockfiles(path):
++    return [a or b for a, b in LOCKFILE.findall(_text(path))]
++
++
++def test_r052_the_file_is_the_frozen_block_with_its_fill_in():
++    """R-052, docs/BUILD_PLAN.md TASK-042: the file equals the frozen block but for its one fill-in, the floor's lockfile value."""
++    block = _block()
++    assert block.count("<fill-in>") == 1, "R-052: the block holds one fill-in"
++    assert _text(SCAN) == block.replace("<fill-in>", "requirements.txt:requirements.lock")
++
++
++def test_r052_the_lockfile_list_is_the_floors():
++    """R-052: the `--lockfile=` list equals the floor step's, so the two scans read the same files."""
++    listed = _lockfiles(SCAN)
++    assert listed == _lockfiles(FLOOR) and listed == ["requirements.txt:requirements.lock"], listed
++
++
++def test_r052_the_pins_are_the_floors():
++    """R-052: the OSV-Scanner version and SHA-256 and the checkout commit equal the floor's, each statement of each pin equal."""
++    for pattern in (VERSION, SHA256, CHECKOUT):
++        scan, floor = pattern.findall(_text(SCAN)), pattern.findall(_text(FLOOR))
++        assert len(scan) == 1, "R-052: %s: %s" % (pattern.pattern, scan)
++        assert floor and set(floor) == set(scan), "R-052: %s: %s and %s" % (pattern.pattern, scan, floor)
++
++
++def test_r052_every_action_is_pinned_by_commit():
++    """R-052, rule 14: every `uses:` names a 40-hex commit, and at least one exists."""
++    uses = [s["uses"] for s in _steps(_job()) if "uses" in s]
++    assert uses, "R-052: no uses: found (vacuous pass)"
++    for use in uses:
++        assert SHA40.search(use + " "), "R-052: unpinned uses: %r" % use
++
++
++def test_r052_contents_read_and_nothing_else():
++    """R-052: `permissions:` holds `contents: read` and nothing else, and no job widens it."""
++    data = _data()
++    assert data["permissions"] == {"contents": "read"}, data["permissions"]
++    assert "permissions" not in _job(), "R-052: a job carries its own permissions"
++
++
++def test_r052_the_two_triggers_and_no_other():
++    """R-052, D-004: the schedule `17 6 * * 0` and `workflow_dispatch`, so it runs on no pull-request or push event."""
++    on = _on(_data())
++    assert sorted(on) == ["schedule", "workflow_dispatch"], sorted(on)
++    assert on["schedule"] == [{"cron": "17 6 * * 0"}], on["schedule"]
++    assert on["workflow_dispatch"] is None, on["workflow_dispatch"]
++
++
++def test_r052_the_checkout_keeps_no_credentials():
++    """R-052, D-004: the checkout sets `persist-credentials: false`."""
++    checkouts = [s for s in _steps(_job()) if "actions/checkout" in str(s.get("uses", ""))]
++    assert len(checkouts) == 1, checkouts
++    assert checkouts[0]["with"] == {"persist-credentials": False}, checkouts[0]["with"]
++
++
++def test_r052_no_secret_and_no_token():
++    """R-052, D-004: no `secrets.` reference, no `GITHUB_TOKEN` and no token handed to a step, at any level."""
++    assert not SECRET_REF.search(_text(SCAN)), "R-052: the workflow reads a secret or the job's token"
++    assert not TOKEN.search(_text(SCAN)), "R-052: the workflow names a token"
++    assert "${{" not in _text(SCAN), "R-052: an expression can carry the job's token or an event field into the run"
++    data = _data()
++    assert "env" not in data and "env" not in _job(), "R-052: an env above the step"
++    for step in _steps(_job()):
++        assert "env" not in step, "R-052: a step carries an env: %s" % step
++
++
++def test_r052_no_patterns_catch_their_forms():
++    """R-052 (a negative test must show its precondition): the token pattern and the exit-swallowers it relies on match."""
++    for bad in ("GITHUB_TOKEN: x", "token: ${{ x }}", "GH_TOKEN=x"):
++        assert TOKEN.search(bad), bad
++    assert not TOKEN.search("requirements.txt:requirements.lock")
++    for bad in ("x || true", "x; exit 0"):
++        assert DISABLERS.search(bad), bad
++
++
++def test_r052_a_finding_fails_the_run_and_every_exit_is_named():
++    """R-052, KP-005: the status is taken at once, `exit 0` stands only under the clean-status branch, the
++    `dependency-scan: OSV-Scanner exit` line prints on every non-zero exit before the branch for 128, and the step ends
++    with `exit "$code"`, so the evaluation reads the exit from the log and silence is not green."""
++    lines = _lines(_scanner_step())
++    call = next(i for i, s in enumerate(lines) if s.startswith("./osv-scanner scan source"))
++    assert lines[call - 1] == "set +e" and lines[call + 1] == "code=$?" and lines[call + 2] == "set -e", lines
++    clean = lines.index('if [ "$code" -eq 0 ]; then')
++    assert clean == call + 3, "R-052: the clean branch reads the scanner's own status, nothing changing it between"
++    assert lines[clean + 1:clean + 3] == ["exit 0", "fi"], lines
++    assert [i for i, s in enumerate(lines) if s == "exit 0"] == [clean + 1], "R-052: exit 0 outside the clean-status branch"
++    named = lines.index('echo "dependency-scan: OSV-Scanner exit $code"')
++    assert named == clean + 3, "R-052: the exit line prints on every non-zero exit, straight after the clean branch"
++    assert lines[-1] == 'exit "$code"', lines
++    assert lines[named + 1:-1] == ['if [ "$code" -eq 128 ]; then', 'echo "OSV-Scanner exit 128: no lockfile was read"', "fi"], lines
++
++
++def test_r052_the_scanner_is_checked_before_it_runs_and_cannot_be_skipped():
++    """R-052: the two steps alone, the binary checked by its SHA-256 before it runs under bash, whose `-e` stops the step on a
++    mismatch, with no guard, `continue-on-error`, trap or exit-swallower, and the scanner's call chained to nothing."""
++    job, step = _job(), _scanner_step()
++    assert len(_steps(job)) == 2, "R-052: the checkout and the scanner, and no other step"
++    assert step["shell"] == "bash", step["shell"]
++    lines = _lines(step)
++    scan = next(s for s in lines if s.startswith("./osv-scanner"))
++    assert lines.index(next(s for s in lines if "sha256sum -c -" in s)) < lines.index(scan), lines
++    assert len(_commands(scan)) == 1, "R-052: the scanner's call is chained: %r" % scan
++    for holder in (job, step):
++        assert "if" not in holder and not holder.get("continue-on-error"), holder
++    assert job["runs-on"] == "ubuntu-latest", job["runs-on"]
++    for line in lines:
++        assert not DISABLERS.search(line), line
++        assert not line.startswith("trap"), line
++        assert len(_commands(line)) <= 2, "R-052: a chained command: %r" % line
+diff --git a/tests/test_release_b_ci_floor.py b/tests/test_release_b_ci_floor.py
+index a9884d3..093cf06 100644
+--- a/tests/test_release_b_ci_floor.py
++++ b/tests/test_release_b_ci_floor.py
+@@ -332,11 +332,11 @@ def test_r002_workflow_is_the_pinned_one():
+ 
+ 
+ def test_r002_workflow_is_the_only_one():
+-    """R-002 (BUG-001 round 6, Review A): the pin and the one-secret rule read one file, so the workflow folder holds
+-    that file alone; a second workflow (handing a secret to an install, or running on `pull_request_target`) fails
+-    here and must widen these tests in the same diff."""
++    """R-002 (BUG-001 round 6, Review A), R-052: the pin and the one-secret rule read one file, and the weekly scan's file
++    is tests/test_dependency_scan.py's, so the workflow folder holds those two alone; another workflow (handing a secret
++    to an install, or running on `pull_request_target`) fails here and must widen these tests in the same diff."""
+     names = sorted(p.name for p in WORKFLOW.parent.iterdir())
+-    assert names == [WORKFLOW.name], f"R-002: the workflow folder holds {names}, not the pinned workflow alone"
++    assert names == sorted(["dependency-scan.yml", WORKFLOW.name]), f"R-002: the workflow folder holds {names}, not the two pinned workflows alone"
+ 
+ 
+ def test_r002_one_step_holds_a_secret():
