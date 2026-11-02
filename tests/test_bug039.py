@@ -100,8 +100,8 @@ def test_bug039_site1_a_flag_before_any_git_command_voids_the_launch(tmp_path, l
     assert_voided_and_round_not_spent(repo)
 
 
-@pytest.mark.parametrize("rewritten", ["[]", "{}", '{"taken": 5}', '{"taken": "9999-01-01T00:00:00Z"}', '{"taken": "zzz"}', "null", "not json"],
-                         ids=["not-an-object", "no-taken", "taken-not-a-string", "taken-in-the-future", "taken-not-a-time", "json-null", "not-json"])
+@pytest.mark.parametrize("rewritten", ["[]", "{}", '{"taken": 5}', '{"taken": "9999-01-01T00:00:00Z"}', '{"taken": "zzz"}', "null", "not json", "[" * 200000],
+                         ids=["not-an-object", "no-taken", "taken-not-a-string", "taken-in-the-future", "taken-not-a-time", "json-null", "not-json", "too-deep"])
 def test_bug039_site1_negative_a_snapshot_rewritten_to_any_shape_stays_a_clean_flag(tmp_path, rewritten):
     """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 1: the snapshot's content is untrusted at the first early
     return, so neither its shape nor its value decides the void: whatever it was rewritten to, `verify` ends in the
@@ -130,13 +130,17 @@ def test_bug039_site1_negative_a_rewritten_snapshot_voids_no_launch_before_the_r
     assert "flagged_launch" not in G.entry(repo, NAME, 1), G.entry(repo, NAME, 1)
 
 
-def test_bug039_site1_negative_the_void_runs_no_git_on_the_pre_git_returns(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("rewritten", [True, False], ids=["snapshot-rewritten", "config-changed"])
+def test_bug039_site1_negative_the_void_runs_no_git_on_the_pre_git_returns(tmp_path, monkeypatch, capsys, rewritten):
     """R-042, D-003. enforces: TASK-043's brief, Requirement 2: at the snapshot-rewritten and the config-or-hook returns the
     void runs no git command, as their printed lines say. Every git process started during the void is watched."""
     repo = G.make_repo(tmp_path)
     G.snap_ok(repo, NAME)
     G.launched(repo, NAME)
-    change_the_config(repo)
+    if rewritten:
+        rewrite_the_snapshot(repo)
+    else:
+        change_the_config(repo)
     guard = load_guard(monkeypatch)
     started, during = [], []
     real_run = subprocess.run
@@ -157,6 +161,38 @@ def test_bug039_site1_negative_the_void_runs_no_git_on_the_pre_git_returns(tmp_p
     assert guard.cmd_verify(NAME, str(repo)) == 1
     assert "no git command was run" in capsys.readouterr().out
     assert during == [[]]
+
+
+@pytest.mark.parametrize("rewritten", ["null", "not json"], ids=["json-null", "not-json"])
+def test_bug039_site1_negative_premerge_reaches_its_rewritten_return(tmp_path, rewritten):
+    """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 1: `premerge` reads the same snapshot, so a rewrite to anything
+    reaches its rewritten return too: GATE-INTEGRITY, exit 1, no traceback."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    G.verify_ok(repo, NAME)
+    (G.bridge_dir(repo) / ("review-%s.json" % NAME)).write_text(rewritten, encoding="utf-8")
+    rc, out = G.guard(repo, "premerge", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    assert "Traceback" not in out, out
+
+
+def test_bug039_site1_negative_an_unreadable_snapshot_stays_a_cannot_verify(tmp_path, monkeypatch, capsys):
+    """R-042, D-003. enforces: TASK-043's r3 brief, Requirement 1 (Review A's Blocking 1 and the security audit's B1, round 2):
+    a snapshot that cannot be read, as a scanner holding it open makes it, has not been shown rewritten: exit 2 with the
+    CANNOT VERIFY line, as `main` gives every OSError, never a traceback and never exit 1."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    guard = load_guard(monkeypatch)
+
+    def held(_file):
+        raise PermissionError(13, "held open")
+
+    monkeypatch.setattr(guard.json, "load", held)
+    monkeypatch.chdir(str(repo))
+    monkeypatch.setattr(sys, "argv", ["review-guard.py", "verify", NAME])
+    assert guard.main() == 2
+    assert "CANNOT VERIFY" in capsys.readouterr().out
 
 
 def test_bug039_site1_the_branch_held_in_another_worktree_voids_the_launch(tmp_path):
@@ -468,39 +504,79 @@ def test_bug039_site6_the_hooks_folder_lies_outside_the_repository(tmp_path, mon
     assert not os.path.normcase(os.path.abspath(folder)).startswith(os.path.normcase(os.path.abspath(str(repo))))
 
 
+def test_bug039_site6_the_hooks_folder_is_gone_at_exit(tmp_path, monkeypatch):
+    """R-042, D-004. enforces: TASK-043's r2 brief, Requirement 4: the fresh folder is removed at the process's exit, so a
+    run of the guard leaves nothing in the temporary folder. An invariant (a mutant of the fixed guard shows it strong)."""
+    repo = verified_round(tmp_path)
+    temp = tmp_path / "temp"
+    temp.mkdir()
+    for name in ("TEMP", "TMP", "TMPDIR"):
+        monkeypatch.setenv(name, str(temp))
+    rc, out = G.guard(repo, "premerge", NAME)
+    assert rc == 0, out
+    assert os.listdir(str(temp)) == []
+
+
 # --- Site 5: flags already found when a later git step fails --------------------------------
 
-def run_verify_with_clean_failing(repo, monkeypatch):
+CLEAN_FAILED = "git clean failed: a file is held open"
+
+
+def run_verify_with_clean_failing(repo, monkeypatch, failure=None, change_the_guard=None):
     """`verify` through the program's own main, its `git clean` failing, as a file held open makes it fail."""
     guard = load_guard(monkeypatch)
     real_run_git = guard.run_git
 
     def failing(args, root, common):
         if args[:1] == ["clean"]:
-            raise RuntimeError("git clean failed: a file is held open")
+            raise failure or RuntimeError(CLEAN_FAILED)
         return real_run_git(args, root, common)
 
     monkeypatch.setattr(guard, "run_git", failing)
+    if change_the_guard:
+        change_the_guard(guard)
     monkeypatch.chdir(str(repo))
     monkeypatch.setattr(sys, "argv", ["review-guard.py", "verify", NAME])
     return guard.main()
 
 
-def test_bug039_site5_a_git_failure_after_a_flag_keeps_the_flag(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("failure", [RuntimeError(CLEAN_FAILED), subprocess.TimeoutExpired("git clean", 120), OSError(CLEAN_FAILED)],
+                         ids=["git-failed", "git-timed-out", "os-error"])
+def test_bug039_site5_a_git_failure_after_a_flag_keeps_the_flag(tmp_path, monkeypatch, capsys, failure):
     """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 3 (the security audit, round 1, B3): a flag already found when
-    a later git step fails is printed and voids the launch, the exit staying 2, so the next verify, the tree now back and
-    nothing left to find, does not write a mark for it."""
+    a later git step fails, whichever of the three failures `main` reads as CANNOT VERIFY, is printed and voids the launch,
+    the exit staying 2, so the next verify, the tree now back and nothing left to find, does not write a mark for it."""
     repo = G.make_repo(tmp_path)
     G.snap_ok(repo, NAME)
     G.launched(repo, NAME)
     G.git(repo, "branch", "left-by-the-reviewer")
-    assert run_verify_with_clean_failing(repo, monkeypatch) == 2
+    assert run_verify_with_clean_failing(repo, monkeypatch, failure) == 2
     out = capsys.readouterr().out
     assert "CANNOT VERIFY" in out and "GATE-INTEGRITY" in out and "left-by-the-reviewer" in out, out
     assert flagged_key(repo) == start_of(repo), G.entry(repo, NAME, 1)
     rc, out = G.guard(repo, "verify", NAME)
     assert rc == 1 and "voided" in out, out
     assert not (G.bridge_dir(repo) / ("verified-%s.json" % NAME)).exists(), out
+
+
+def test_bug039_site5_negative_a_void_that_cannot_be_written_leaves_the_git_failure_named(tmp_path, monkeypatch, capsys):
+    """R-042, D-003. enforces: TASK-043's r3 brief, Requirement 2 (Review A's Should fix 1 and the security audit's A3, round 2):
+    the void's own write failing does not replace the git failure, and it says the void was not recorded, so the supervisor
+    knows the next verify cannot refuse this launch."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    G.git(repo, "branch", "left-by-the-reviewer")
+
+    def no_write(guard):
+        def failing_write(*_args):
+            raise OSError("the record cannot be written")
+        monkeypatch.setattr(guard, "write_rounds", failing_write)
+
+    assert run_verify_with_clean_failing(repo, monkeypatch, change_the_guard=no_write) == 2
+    out = capsys.readouterr().out
+    assert "left-by-the-reviewer" in out and CLEAN_FAILED in out, out
+    assert "not recorded" in out, out
 
 
 def test_bug039_site5_negative_a_git_failure_with_no_flag_voids_nothing(tmp_path, monkeypatch, capsys):
@@ -530,6 +606,21 @@ def test_bug039_site7_an_exit_line_too_long_to_read_is_no_exit(tmp_path):
     assert rc == 1 and "GATE-INTEGRITY" in out, out
     assert "Traceback" not in out, out
     assert flagged_key(repo) == start_of(repo), G.entry(repo, NAME, 1)
+
+
+def test_bug039_site7_a_real_windows_exit_code_is_read(tmp_path):
+    """R-042, D-003. enforces: TASK-043's r3 brief, Requirement 3 (Review A's Should fix 2 and the security audit's A1, round 2):
+    a crash's exit code on Windows has ten digits (0xC000013A is 3221225786). The last exit line decides, so an earlier exit 0
+    does not make a crashed run a reply, and `premerge` refuses it."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    with open(str(repo / "run" / "review" / ("REVIEW-%s.err" % NAME)), "a", encoding="utf-8") as f:
+        f.write("bridge-run: exit 3221225786\n")
+    G.verify_ok(repo, NAME)
+    assert G.entry(repo, NAME, 1).get("reply") is None, G.entry(repo, NAME, 1)
+    rc, out = G.guard(repo, "premerge", NAME)
+    assert rc == 2 and "3221225786" in out, out
 
 
 def add_a_long_exit_line(repo):
