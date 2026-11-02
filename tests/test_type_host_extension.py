@@ -18,11 +18,13 @@ from workflow_files import (CORE, PHASES, REGISTRY, TRAITS, TYPES, WORKFLOW, FIX
                             file_entries, flat, row, run_check, trace_units)
 
 DELIVERY = "Add at project-end.delivery for host-installation"
-# Each file's path under workflow/types/, its title and its change headings, in its order (BUILD_PLAN TASK-021).
+# Each file's path under workflow/types/, its title and its change headings, in its order (BUILD_PLAN TASK-021;
+# `Add at planning.stages` added by TASK-040, release T's P17, under its own `new` entry).
+LATER = {"Add at planning.stages": "TASK-040"}
 FILES = {
     "host-extension": ("host-extension.md", "Host extension",
-                       ["Set at intake.delivery-kind", "Add at design.sections", "Add at delegation-loop.test-checks",
-                        DELIVERY]),
+                       ["Set at intake.delivery-kind", "Add at design.sections", "Add at planning.stages",
+                        "Add at delegation-loop.test-checks", DELIVERY]),
     "claude-code-extension": ("host-extension/claude-code-extension.md", "Claude Code extension",
                               ["Add at design.sections"]),
 }
@@ -183,10 +185,12 @@ def test_r025_the_sub_workflow_names_claude_codes_extension_points_and_its_versi
 @pytest.mark.parametrize("key", sorted(FILES))
 def test_r025_every_section_has_its_own_new_entry_and_no_other_entry_names_the_file(key):
     """BUILD_PLAN TASK-021: every section of the two files is new text under a `new` entry naming the file and that
-    heading (the trace check counts the type files as modules); no `reword` entry, and none on the title."""
+    heading (the trace check counts the type files as modules); no `reword` entry, and none on the title; a section
+    a later increment added is under that increment's entry (LATER), after TASK-021's."""
     rel = "bridge/cursor-bridge/workflow/types/" + FILES[key][0]
     got = file_entries(rel)
-    assert got == [("new", "TASK-021", h) for h in FILES[key][2]], got
+    first = [("new", "TASK-021", h) for h in FILES[key][2] if h not in LATER]
+    assert got == first + [("new", LATER[h], h) for h in FILES[key][2] if h in LATER], got
 
 
 @pytest.mark.parametrize("key", sorted(FILES))

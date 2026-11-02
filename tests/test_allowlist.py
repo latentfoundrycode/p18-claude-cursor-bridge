@@ -161,3 +161,49 @@ def test_the_digest_and_the_merge_step_show_the_same_review_b_form():
     forms = [cmd for src, cmd in collect_agent_invocations() if "REVIEW-" in cmd and "REVIEW-DESIGN" not in cmd]
     assert len(forms) >= 2, forms
     assert all(re.search(r"2> run/review/REVIEW-(<ID>-r<N>|STAGE-<name>-r<N>)\.err", f) and "--force" in f and "--limit auto --kind review" in f for f in forms), forms
+
+
+def test_r049_d4_p4_the_stage_review_tag_its_read_and_the_remote_branch_list_are_allowed():
+    """R-049, TASK-040's Done when: `settings.bridge.json` gains `Bash(git tag stage-review/*)`, `Bash(git cat-file -p
+    stage-review/*)` and the exact `Bash(git branch -r)`; the commands reflection.md documents for them (D4's tag and its
+    read, P4's remote-branch list beside `gh pr list --state open --limit 100`) are collected and allowed."""
+    for r in ("Bash(git tag stage-review/*)", "Bash(git cat-file -p stage-review/*)", "Bash(git branch -r)",
+              "Bash(gh pr list:*)", "Bash(git push:*)"):
+        assert r in ALLOW, r
+    documented = [cmd for _src, cmd in collect_commands()]
+    for cmd in ("git tag stage-review/<name>-<n>", "git cat-file -p stage-review/<name>-<n>:<path>", "git branch -r",
+                "gh pr list --state open --limit 100", "gh pr list --state merged --head <branch>",
+                "git push origin --delete <branch>"):
+        assert cmd in documented, cmd
+    for cmd in ("git tag stage-review/T1-1", "git cat-file -p stage-review/T1-1:run/review/SCOPE-STAGE-T1.md",
+                "git branch -r", "gh pr list --state open --limit 100"):
+        assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
+
+
+def test_r049_d4_the_new_rules_admit_nothing_beyond_the_tag_s_namespace():
+    """R-049, TASK-040's Done when: `git show stage-review/<name>-<n>:<path> --output=<file>` (KP-067: the file created
+    empty) matches no rule, which is why the read is `git cat-file -p`, which has no such option; a tag outside the
+    namespace, a tag deleted, an object read outside it and a remote branch deleted are not admitted either."""
+    new = ("Bash(git tag stage-review/*)", "Bash(git cat-file -p stage-review/*)", "Bash(git branch -r)")
+    assert all(r in ALLOW for r in new), [r for r in new if r not in ALLOW]
+    for cmd in ("git show stage-review/<name>-<n>:<path> --output=<file>", "git show stage-review/T1-1:run/review/x.md --output=x",
+                "git tag v1.0", "git tag -d stage-review/T1-1", "git cat-file -p HEAD:docs/INVENTORY.md",
+                "git branch -r -d origin/task-040"):
+        assert not any(rule_matches(r, cmd) for r in ALLOW), cmd
+        assert decide(cmd, ALLOW, DENY)[0] != "allow", cmd
+
+
+def test_r049_d4_the_guard_treats_the_stage_tag_as_it_treats_the_loop_s_state_commands(program):
+    """R-049, TASK-040's Done when: the permission guard reads the documented `git tag stage-review/<name>-<n>` as a
+    state change, as it reads `git commit` and `git push` (`tag` is in its STATE_GIT list beside them), so a chain
+    carrying it is refused as theirs is (rule 8); the tag's read and the remote-branch list are reads."""
+    guard = program("permission-guard")
+    documented = [cmd for _src, cmd in collect_commands()]
+    tag = "git tag stage-review/<name>-<n>"
+    assert tag in documented, tag
+    assert "tag" in guard.STATE_GIT and "commit" in guard.STATE_GIT and "push" in guard.STATE_GIT
+    for cmd in (tag, "git tag stage-review/T1-1", "git commit -m x", "git push origin task-040"):
+        assert guard.state_changing(guard.words(cmd)), cmd
+    for cmd in ("git cat-file -p stage-review/<name>-<n>:<path>", "git branch -r", "git tag -l"):
+        assert cmd in documented or cmd == "git tag -l", cmd
+        assert not guard.state_changing(guard.words(cmd)), cmd

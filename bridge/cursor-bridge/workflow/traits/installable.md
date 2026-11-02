@@ -51,6 +51,10 @@ CLI plan without the generator, is incomplete.
 
 The stage as written is for the delivery kinds `installer` and `install-script`; a part of another kind takes the packaging stage its type workflow adds, if any, and an `Installer verification` answer of `n/a` passes the lifecycle check over.
 
+### The release's own install
+
+For the kinds `installer` and `install-script`, where the plan's last stage is the release's own install (the release stamped, its installer or install script run on a computer that uses it, and the result tried there), the stage review of the release's text runs before the stamp, so that what is stamped is what both reviewers read; a correction to text alone found after the stamp rides with the next release, unless it changes what a project does, which takes a fix release of its own; and the release's field acceptance names what may stand in for it while the trial project has no increment at the gate, the acceptance itself recorded when that increment comes (P17).
+
 ## Add at planning.critic-lenses
 
 - **Packaging stage (installable software: desktop application, command-line tool, local
