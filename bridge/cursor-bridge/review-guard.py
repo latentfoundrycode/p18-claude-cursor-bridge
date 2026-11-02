@@ -305,8 +305,12 @@ def snapshot_rewritten(common, nnn):
     except OSError:
         print("review-guard: CANNOT VERIFY - no copy of the snapshot hash (%s): take the snapshot again and run Review B on it (a snapshot taken before 2026.10.25a has none)" % hash_copy_path(common, nnn))
         return "missing"
-    if sha256_file(snapshot_path(common, nnn)) != recorded:
-        print("  GATE-INTEGRITY  the snapshot was rewritten after it was taken: %s no longer matches the hash in %s" % (snapshot_path(common, nnn), hash_copy_path(common, nnn)))
+    sp = snapshot_path(common, nnn)
+    if not os.path.isfile(sp):
+        print("  GATE-INTEGRITY  the snapshot was deleted after it was taken: %s; the hash copy remains in %s" % (sp, hash_copy_path(common, nnn)))
+        return "rewritten"
+    if sha256_file(sp) != recorded:
+        print("  GATE-INTEGRITY  the snapshot was rewritten after it was taken: %s no longer matches the hash in %s" % (sp, hash_copy_path(common, nnn)))
         return "rewritten"
     return None
 
@@ -887,6 +891,8 @@ def load_snapshot(nnn, cwd):
         return None, None, None, None
     p = snapshot_path(common, nnn)
     if not os.path.isfile(p):
+        if os.path.isfile(hash_copy_path(common, nnn)):
+            return {}, root, common, None
         print("review-guard: CANNOT VERIFY - no snapshot %s (run `review-guard.py snapshot %s` before the launch)" % (p, nnn))
         return None, None, None, None
     try:
