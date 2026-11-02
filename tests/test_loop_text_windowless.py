@@ -167,10 +167,13 @@ def test_r039_every_suite_runs_through_the_launcher_and_test_runner_reads_its_fi
     s = flat(section(loop(), "The tests before the first reviewer", 4))
     for sentence in (
         "A suite is the project's recorded suite command, or any run of more than the increment's own test files.",
-        "The suite runs through the launcher in the background, whatever its length: `python "
-        "~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite command> > "
-        "run/agent/TASK-<nnn>-suite.out 2>&1`, under the heavy launch's `timeout` (step 3); its completion wakes you, "
-        "and `test-runner` then reads that file.",
+        # re-taken at TASK-041 (R-052): the suite stripped, its command in a fenced block (tests/test_release_t_floor.py)
+        "The suite runs through the launcher in the background, whatever its length, with the owner's environment "
+        "stripped (`--strip`, between `--limit` and `--kind`):",
+        "```bash python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind test -- <the recorded suite "
+        "command> > run/agent/TASK-<nnn>-suite.out 2>&1 ```",
+        "It runs under the heavy launch's `timeout` (step 3); its completion wakes you, and `test-runner` then reads that "
+        "file.",
         "so a suite never runs in the foreground and its expected length no longer chooses the path.",
         "A run of the increment's own test files alone may run in the foreground, yours or `test-runner`'s, since this "
         "session's console is hidden (a probe of 2026-10-20), where it ends within the ten minutes a foreground "
@@ -221,11 +224,14 @@ def test_r041_the_checkpoint_run_is_mutation_run_py_and_each_result_has_its_hand
     s = flat(section(loop(), "The tests before the first reviewer", 4))
     for sentence in (
         "list the increment's new tests in the mutants file's `new_tests` (a new test file by its path, a changed file "
-        "by its new tests' ids), stage them (`git add`), and launch `python ~/.claude/cursor-bridge/bridge-run.py "
-        "--limit auto --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json "
-        "--checkpoint <the increment's checkpoint commit> > run/agent/<id>-checkpoint.out 2>&1` in the background like "
-        "any mutation run, the `python` after the `--` being the project's own interpreter as step 7 says "
-        "(`delegation-loop/decide.md`, \"The mutation run\").",
+        "by its new tests' ids), stage them (`git add`), and launch the engine in the background like any mutation run, "
+        "stripped and with its scratch folder named as step 7 says (`delegation-loop/decide.md`, \"The mutation run\"), "
+        "the `python` after the `--` being the project's own interpreter:",
+        # re-taken at TASK-041 (R-052): the command stripped, its scratch folder named, in a fenced block
+        "```bash python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind driver -- python "
+        "~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json --checkpoint <the increment's "
+        "checkpoint commit> --scratch ~/.cursor-bridge/scratch/<the project root's folder name> > "
+        "run/agent/<id>-checkpoint.out 2>&1 ```",
         "The program runs the listed tests on a copy of the tree at that commit, so no worktree of your own is needed; "
         "it copies over that tree the listed test files and the working tree's `conftest.py` files on their way (one "
         "reached through a link refused), and every other file a new test needs that the commit lacks or holds in an "
@@ -291,8 +297,10 @@ def test_r043_the_mutation_run_is_launched_at_step_7_on_every_pass():
         "The mutation run is launched here, on every pass through this step: once Review A and the auditors have "
         "accepted the increment's behaviour, and before step 8's snapshot; never at every round's step 4",
         "The new tests' run against the checkpoint (`--checkpoint`) stays at step 4, before any reviewer.",
-        "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind driver -- python "
-        "~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json > run/agent/<id>-mutation.out 2>&1",
+        # re-taken at TASK-041 (R-052): the run stripped, its scratch folder named
+        "python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind driver -- python "
+        "~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json --scratch "
+        "~/.cursor-bridge/scratch/<the project root's folder name> > run/agent/<id>-mutation.out 2>&1",
         "a mutant whose keyed inputs (the mutated file's folder, the test folders it runs, the suite's configuration "
         "and the mutant itself) are byte-identical since its last kill keeps that kill, and every survived, unapplied "
         "or erred mutant runs again.",
@@ -435,8 +443,10 @@ def test_r039_calibration_writes_the_floor_between_two_suite_runs():
     cal = flat(text("commands", "calibrate-bridge.md"))
     for sentence in (
         "**The `Windowless test suite` floor is the one written during this calibration**, before the project resumes",
+        # re-taken at TASK-041 (R-052): the calibration's suite stripped as the loop's
         "Run the project's recorded suite once, with `-rA` added where the command lacks it, in the background through "
-        "the launcher: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind test -- <the recorded suite "
+        "the launcher, stripped as the loop's suites run (`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, "
+        "step 4): `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind test -- <the recorded suite "
         "command> -rA > run/agent/calibrate-suite-before.out 2>&1`, under the heavy launch's `timeout`",
         "Run the same suite once more the same way, into `run/agent/calibrate-suite-after.out`, and read it when its "
         "completion arrives.",

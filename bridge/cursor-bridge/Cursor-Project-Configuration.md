@@ -61,7 +61,7 @@ the brief.
   `.cursor/rules/workspace-boundary.mdc` (always-on; format in `Cursor-File-Formats.md`) and
   append the advisory **`boundary-check`** `afterFileEdit` hook entry (§2 hook array), which
   copies `~/.claude/cursor-bridge/boundary-check.py` into `.cursor/hooks/` and logs any edit
-  outside the workspace to `docs/BOUNDARY_VIOLATIONS.md`. It detects after the fact; only the
+  outside the workspace to `docs/BOUNDARY_VIOLATIONS.md`, which the same item adds to `.gitignore`: the log holds this computer's absolute paths, so it is read locally and never committed (rule 54, T22). It detects after the fact; only the
   opt-in shell guard (§5c step 6) can deny such a write beforehand. Same Windows quirks as
   every hook: explicit interpreter, no bare script, BOM-tolerant (the script strips it).
 
@@ -348,6 +348,17 @@ CI gate at Phase 1/config. Steps:
    which — being fail-closed — would block *every* command and brick the build. Confirm it
    fires on the target setup with the verification harness before enabling. The gate does not
    depend on it (defense-in-depth only).
+
+7. **The floor's conventions (T9).** The floor is trusted only once it has shown that it can fail, and it is kept the way it was proved:
+   - **Teeth first.** The floor's first increment plants one finding for each scanner (a pattern the Semgrep rules match, a lock entry with a published advisory for OSV-Scanner, a package Socket flags) on a real CI run, reads each step red in that run's log, and removes the plants in the same increment, before any review of the floor is trusted; a scanner whose step stays green with its plant in place has no teeth, whatever it prints.
+   - **Every pin checked for deprecation.** Each action's and tool's pin is read against its vendor's release page when it is written and at every change of the floor, the OSV-Scanner pin in both places it is stated (the floor's step and the weekly scan's, step 8): a deprecated, archived or unsupported release is replaced through an increment, never kept because it still runs.
+   - **A vendor token enables no paid engine.** What a token turns on is read from the vendor's documentation when it is set; a token that would enable a paid engine or plan is set only on the owner's word, a consequence they bear (rule 56).
+   - **The floor's test is the supervisor's.** The structural test of the floor (its pins, its permissions, its steps, its exit-code handling) is written by the supervisor, never by the builder whose work the floor gates.
+   - **Vendor CLIs quiet.** Every vendor CLI runs with its banner, its spinner and its telemetry off, by the option or variable its documentation names (`socket ci --no-banner`): a banner once printed part of a key into a public log.
+   - **The install apart from the key.** A vendor CLI is installed in a step of its own, without the key and with `--ignore-scripts` (an install runs the package's code and its dependencies'); the key stands in the scan step's `env` alone.
+   - **The first log read.** The first CI log of every step that holds a secret is read for any part of it before the next push; a part found there is told to the owner as a run sheet, since deleting the logs and replacing the key are the owner's actions.
+
+8. **The weekly dependency scan, every project's.** The floor's OSV-Scanner runs only on a pull request's or a push's event, so a flaw disclosed later in an unchanged dependency, or in a paused or finished project, is never flagged by it. Every project therefore has a second workflow, `.github/workflows/dependency-scan.yml`, written by `cursor-configurator` from its frozen block, the block's one fill-in the `--lockfile=` list copied from the floor's OSV-Scanner step: a weekly `schedule` (Sunday 06:17 UTC) and `workflow_dispatch`, `permissions: contents: read` and nothing else, the checkout at the floor's pin without persisted credentials, OSV-Scanner at the floor's version and SHA-256 with the floor's exit-code handling and the line `dependency-scan: OSV-Scanner exit <code>` on every non-zero exit, no secret and no token handed to a step; a finding fails the run. The increment that adds it is proved by one `workflow_dispatch` run read green after its merge, since GitHub runs a dispatch or a schedule only for a file on the default branch, beside its structural test before the merge; a running project receives it at its calibration, as configuration. The Sunday evaluation reads its runs and the project's Dependabot alerts (`~/.claude/commands/evaluate-reports.md`).
 
 **Escalation:** only the two **API tokens** — the **Socket** token and the **Semgrep**
 (`SEMGREP_APP_TOKEN`, for the Pro engine) token — both repo secrets, already owner-authorised;

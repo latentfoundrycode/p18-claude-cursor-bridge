@@ -589,17 +589,20 @@ def test_r044_evaluate_reports_runs_the_pace_report_every_week():
     assert "Then, on every run, a week with nothing new included:" in fr
     assert "   ```bash\n   python ~/.claude/cursor-bridge/pace-report.py --tokens > Reports/Evaluations/<date>/pace.md\n   ```" in er
     assert '"--tokens"' in read(os.path.join(CB, "pace-report.py"))
+    # the three sentences re-taken at TASK-041, which adds the Dependency scan section beside the Pace section (R-052)
     assert ("\"Nothing new\" leaves steps 2 and 3 only the entries the owner's messages raise (the extract below), "
-            "and the evaluation file only those and its Pace section (the ledger keeps the run's date); the pace "
-            "report below runs all the same.") in fr
+            "and the evaluation file only those and its Pace and Dependency scan sections (the ledger keeps the run's "
+            "date); the pace report below runs all the same.") in fr
     assert "ends the run in one line" not in fr and "ends in one line" not in fr
     assert ("then a **Pace** section that reads `pace.md`: per project the week's rows against the weeks before, a "
-            "creeping slowdown named the week it starts. An increment over the ceiling whose round used no lift "
+            "creeping slowdown named the week it starts; then the **Dependency scan** section step 1b gives. An "
+            "increment over the ceiling whose round used no lift "
             "(`none`), or whose class line a reviewer denied (its Issues entry), is an entry of the evaluation like "
             "any other; an `unknown` lift is a round no record covers, an entry only when the round was run after "
-            "release B installed. In a week with nothing new the file is written all the same, holding the Pace section and any "
-            "entry the owner's messages raised.") in fr
-    assert "A Sunday with nothing new writes the Pace section and any entry the owner's messages raised." in fr
+            "release B installed. In a week with nothing new the file is written all the same, holding the Pace and "
+            "Dependency scan sections and any entry the owner's messages raised.") in fr
+    assert ("A Sunday with nothing new writes the Pace and Dependency scan sections and any entry the owner's messages "
+            "raised.") in fr
 
 
 def test_bug031_a_late_finding_has_one_outcome_in_all_three_homes():
