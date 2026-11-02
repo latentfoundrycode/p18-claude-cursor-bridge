@@ -33,7 +33,8 @@ STEP2_DIFF = ("Then write the stage's whole change from committed state: `git di
               "increment merged between the stage's first checkpoint and its last merge.")
 T11 = ("Where stages interleave, a later stage's ready increments having merged before an earlier stage closed (they "
        "may: each still-open pull request's status file is then rewritten for its own merge and re-reviewed, as the "
-       "delegation loop's step 8 says), the stage's change is the union of its own squash commits, written by "
+       "delegation loop's step 8 says), the stage's change is the union of its own squash commits, the refactoring "
+       "pass's among them, since the review comes after the pass has merged, written by "
        "`python ~/.claude/cursor-bridge/stage-diff.py <each squash commit of the stage> --out run/review/ --name "
        "<name>-r<N>`: the whole change as `run/review/STAGE-<name>-r<N>.diff` and one part per commit beside it, a path "
        "the stage changed again after another commit named `OVERLAP` and read in the parts, its exit 1 also meaning an "
@@ -48,9 +49,10 @@ D2 = ("each part a `diff-reviewer` call of its own and every part bounded alike:
       "a drivers-and-records part per driver family (D2): a 79-file part once ended at the reviewer's turn limit without "
       "a verdict (reAngle, stage 3b), and a part that ends without a verdict, of any kind, is run again on what it had "
       "not reached (rule 43).")
-D2_UNION = ("For an interleaved stage (step 2) the parts are `stage-diff.py`'s per-commit parts or its union split by "
-            "path, never the plain range, which holds the other stage's commits, and the test part's files are counted "
-            "on the union's own file list (D2, T11).")
+D2_UNION = ("For an interleaved stage (step 2) the parts are `stage-diff.py`'s per-commit parts, a part over these "
+            "bounds split by path alike, or its union split by path, never the plain range, which holds the other "
+            "stage's commits, and the test part's files are counted on the union's own file list, the `diff --git` "
+            "headers of the committed `run/review/STAGE-<name>-r<N>.diff` (D2, T11).")
 D3 =("Three things keep the demonstration true to the product (D3): a stage that adds tables starts its live stack, "
       "with the schema check, at its first increment, never first at its close; the development database's rebuild run "
       "sheet is prepared before the demonstration, so that a database earlier runs left behind is rebuilt, never read "
@@ -104,8 +106,9 @@ def stage_step(n):
 
 
 def test_r049_d1_every_driver_is_re_checked_at_head_before_a_stage_review():
-    """D1: before the stage's diff is written, every live mutant applies exactly once at HEAD; a fix that moves product
-    code re-anchors or re-runs the drivers on the moved file in its own pull request; one test per named surface."""
+    """D1: before the stage's diff is written, every live mutant applies exactly once at HEAD, one that does not
+    re-anchored and run again, its kill counting only from that run; a fix that moves product code re-anchors or re-runs
+    the drivers on the moved file in its own pull request; one test per named surface."""
     step = stage_step(2)
     assert step.startswith("2. " + D1 + " " + STEP2_DIFF), step[:300]
     assert flat(D1) not in flat(read(REFACTOR))
@@ -138,7 +141,8 @@ def test_r049_d4_the_stage_review_tag_before_the_branch_is_deleted():
 
 def test_r049_t11_the_union_of_the_stage_s_squash_commits():
     """T11: where stages interleave, the stage's change is the union of its own squash commits by `stage-diff.py`,
-    in the stage review's step 2 and where step 9 names the stage's change for the scout."""
+    the refactoring pass's among them, in the stage review's step 2 and where step 9 names the stage's change for the
+    scout."""
     step = stage_step(2)
     assert (STEP2_DIFF + " " + T11 + " " + STEP2_SCOPE) in step, step
     assert "then `git add -f` both and commit them" not in step
