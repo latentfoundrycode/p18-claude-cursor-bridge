@@ -9,7 +9,8 @@ T13), each pinning its sentence in every home the design's table names. R-042's 
 sentence was, by the rewritten convergence tests of tests/test_loop_text_pace.py. KP-052: the one non-ASCII character
 these pins need, the em dash, is built with chr(), never typed."""
 import os
-import re
+
+from phase_modules import flat, read, rule
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIDGE = os.path.join(ROOT, "bridge")
@@ -72,15 +73,6 @@ AGENT_PARA = ("**The threat model, the class and the count.** The supervisor giv
               "the output line it quotes: a count with no line, or one its line does not show, is a finding.")
 
 
-def read(path):
-    with open(path, encoding="utf-8") as f:
-        return f.read().replace("\r\n", "\n")
-
-
-def flat(text):
-    return re.sub(r"\s+", " ", text)
-
-
 def between(text, start, end):
     i = text.index(start)
     return text[i:text.index(end, i + len(start))]
@@ -89,12 +81,6 @@ def between(text, start, end):
 def paragraph(text, start):
     i = text.index(start)
     return flat(text[i:text.index("\n\n", i)])
-
-
-def rule(n):
-    body = read(CORE).split("\n## Standing rules\n", 1)[1]
-    m = re.search(r"^%d\. (.*?)(?=^%d\. )" % (n, n + 1), body, re.S | re.M)
-    return flat(m.group(1))
 
 
 def redelegation():

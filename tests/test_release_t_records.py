@@ -8,7 +8,8 @@ One test per item label of the three rows (R-047: T1, T3, T7, T26; R-048: D11, D
 each pinning its sentence in the home the design's table names. KP-052: the one non-ASCII character these pins need,
 the template's ellipsis, is built with chr(), never typed."""
 import os
-import re
+
+from phase_modules import digest, flat, read, rule, section
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIDGE = os.path.join(ROOT, "bridge")
@@ -23,46 +24,6 @@ CONVENTIONS = os.path.join(BRIDGE, "cursor-bridge", "Diagram-Planning-Convention
 ELLIPSIS = chr(0x2026)
 
 
-def read(path):
-    with open(path, encoding="utf-8") as f:
-        return f.read().replace("\r\n", "\n")
-
-
-def flat(text):
-    return re.sub(r"\s+", " ", text)
-
-
-def section(text, title):
-    """The section under the heading `title`, up to the next heading of its level or higher; a line inside a fenced
-    block (the status template's `# Project Status`, say) is no heading."""
-    lines = text.split("\n")
-    fenced, start, level = False, None, 0
-    for i, line in enumerate(lines):
-        if line.startswith("```"):
-            fenced = not fenced
-            continue
-        m = None if fenced else re.match(r"(#+) (.*)$", line)
-        if m and start is None and m.group(2) == title:
-            start, level = i + 1, len(m.group(1))
-        elif m and start is not None and len(m.group(1)) <= level:
-            return "\n".join(lines[start:i])
-    assert start is not None, "heading %r" % title
-    return "\n".join(lines[start:])
-
-
-def rule(n):
-    """Standing rule n of the core, from its number to the next rule's."""
-    rules = section(read(CORE), "Standing rules")
-    start = re.search(r"^%d\. " % n, rules, re.M).start()
-    end = re.search(r"^%d\. " % (n + 1), rules, re.M).start()
-    return flat(rules[start:end])
-
-
-def digest():
-    text = read(CORE)
-    return text[text.index("<!-- digest:start -->"):text.index("<!-- digest:end -->")]
-
-
 def item(text, number, label):
     """A numbered item of a procedure list, from `<number>. **<label>**` to the next item."""
     start = text.index("\n%d. **%s**" % (number, label))
@@ -75,13 +36,13 @@ def test_r047_t1_a_plan_addendum_from_round_1_is_one_subject_with_the_design():
     with the design as one subject, the record naming both (design.md, the critique's subjects)."""
     assert ("A plan addendum whose increments stood in the design's review file from round 1 is no subject of its "
             "own: it is criticised and gated with the design as one subject, under the design's token, and the "
-            "subject's block heading in `docs/DESIGN_CRITIQUE.md` names both.") in flat(section(read(DESIGN), "The procedure"))
+            "subject's block heading in `docs/DESIGN_CRITIQUE.md` names both.") in flat(section(read(DESIGN), "The procedure", 3))
 
 
 def test_r047_t3_the_records_definitions():
     """T3: "the commit its file was built from" is the subject's head when the file was assembled; a round in which
     one critic delivered is a critique round, the other recorded "not run (reason)" (design.md, the record)."""
-    procedure = flat(section(read(DESIGN), "The procedure"))
+    procedure = flat(section(read(DESIGN), "The procedure", 3))
     assert ("The commit its file was built from is the subject's head when the round's file was assembled; a round "
             "in which one critic delivered is a critique round, the other critic's row reading "
             "`not run (<the reason>)`.") in procedure
@@ -95,7 +56,7 @@ def test_r047_t3_the_records_definitions():
 
 def test_r047_t7_the_snapshot_id_and_the_err_name_together():
     """T7: the design round's snapshot id is `DESIGN-<subject>-<round>` and the `.err` name follows from it."""
-    procedure = flat(section(read(DESIGN), "The procedure"))
+    procedure = flat(section(read(DESIGN), "The procedure", 3))
     assert ("The snapshot's id is the round file's name, `DESIGN-<subject>-<round>` (`review-guard.py snapshot "
             "DESIGN-<subject>-<round>`, then `verify` under the same id), and the `.err` file's name follows from "
             "it, `run/review/REVIEW-DESIGN-<subject>-<round>.err`, as the command above writes it.") in procedure
@@ -137,7 +98,7 @@ def test_r048_d11_a_turn_ending_on_a_run_names_its_limit():
 def test_r048_d10_a_vendor_console_from_documentation_fetched_at_the_time():
     """D10 (the run-sheet template): an instruction that sends the owner into a vendor's console is written from the
     vendor's documentation fetched at the time, with the exact path."""
-    sheet = flat(section(read(SKILL), "Handing the user something to run " + chr(0x2014) + " the run sheet"))
+    sheet = flat(section(read(SKILL), "Handing the user something to run " + chr(0x2014) + " the run sheet", 2))
     assert ("- A step that sends the owner into a vendor's console (a dashboard, a settings or billing page) is "
             "written from the vendor's documentation, fetched at the time, with the exact path to the field or "
             "figure; never from memory, and the owner is never sent to look for a figure the sheet has not "
@@ -157,8 +118,8 @@ def test_r048_d6_the_calibrated_line_is_rewritten():
     """D6: the `Calibrated:` line is rewritten at each calibration, holding the latest calibration and its pending
     items, the earlier text living in git (calibrate-bridge.md step 5 and the status template)."""
     assert ("The line is rewritten at each calibration, never appended to: it holds the latest calibration and its "
-            "pending items, and the earlier text lives in git.") in flat(section(read(CALIBRATE), "5. Record and report"))
-    template = section(read(CORE), "Project state")
+            "pending items, and the earlier text lives in git.") in flat(section(read(CALIBRATE), "5. Record and report", 2))
+    template = section(read(CORE), "Project state", 2)
     fence = template[template.index("```markdown\n"):template.index("\n```\n", template.index("```markdown\n"))]
     line = [l for l in fence.split("\n") if l.startswith("Calibrated: ")]
     assert line == ["Calibrated: <date> from <old> to <new> " + chr(0x2014) + " applied: %s; pending: %s @ <phase>; "
@@ -174,7 +135,7 @@ def test_r053_p10_a_decided_rule_not_yet_built():
             "whether it applies from the decision and how it is held until built; the next report names every "
             "decided-but-unbuilt rule with how it is applied meanwhile. A release that adds a safety mechanism "
             "names, in its `Running projects must` items, how the loop holds it by hand until the release "
-            "installs.") in flat(section(read(CORE), "Project state"))
+            "installs.") in flat(section(read(CORE), "Project state", 2))
 
 
 def test_r053_p9_the_worked_scenario_lens_in_both_critics():
@@ -184,12 +145,12 @@ def test_r053_p9_the_worked_scenario_lens_in_both_critics():
             "data is read against one worked scenario before it reaches code review (a retry after a lost reply, a "
             "dry run, a benchmark, an approved live smoke, two users on one account), each step naming the store it "
             "reads and writes; `plan-critic` carries the lens, and Review B's file copies it with the rest of its "
-            "sections.") in flat(section(read(DESIGN), "The procedure"))
+            "sections.") in flat(section(read(DESIGN), "The procedure", 3))
     assert ("- **A worked scenario for money and stored data.** Is every rule about money or stored data read "
             "against one worked scenario before it reaches code review: a retry after a lost reply, a dry run, a "
             "benchmark, an approved live smoke, two users on one account, each step naming the store it reads and "
             "writes? A rule no scenario was walked through is **Should fix**; a step that can charge twice or lose "
-            "a result is **Blocking**.") in flat(section(read(PLAN_CRITIC), "When reviewing a design document"))
+            "a result is **Blocking**.") in flat(section(read(PLAN_CRITIC), "When reviewing a design document", 2))
 
 
 def test_r053_p20_the_all_omitted_index_and_the_minimum_sets_binding():
@@ -202,7 +163,7 @@ def test_r053_p20_the_all_omitted_index_and_the_minimum_sets_binding():
             "index's Why column and in its inventory's Decisions. The calibration's retrofit reads the same rows: a "
             "kind omitted with its reason recorded in both places is covered, and any other omitted kind is a "
             "retrofit item.") in \
-        flat(section(read(CONVENTIONS), "8. As-built diagrams and the retrofit (release A3, plan 8.7)"))
+        flat(section(read(CONVENTIONS), "8. As-built diagrams and the retrofit (release A3, plan 8.7)", 2))
     assert ("a state machine wherever the Issues file records a failure of state; a kind of it the project's "
             "diagram index omits with its reason recorded in the index's Why column and in its inventory's "
             "Decisions counting as selected, `Diagram-Planning-Conventions.md` §8) and write "

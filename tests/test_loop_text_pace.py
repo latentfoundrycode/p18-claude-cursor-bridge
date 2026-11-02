@@ -16,7 +16,7 @@ import sys
 
 import pytest
 
-from phase_modules import flat, module, read, section
+from phase_modules import digest, flat, module, read, rule, section
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
@@ -50,19 +50,6 @@ def f(s):
 
 def core():
     return text("commands", "supervisor.md")
-
-
-def digest():
-    t = core()
-    return t[t.index("<!-- digest:start -->"):t.index("<!-- digest:end -->")]
-
-
-def rule(n):
-    """Standing rule n of the core, flat."""
-    t = core()
-    body = t.split("\n## Standing rules\n", 1)[1]
-    m = re.search(r"^%d\. (.*?)(?=^%d\. )" % (n, n + 1), body, re.S | re.M)
-    return f(m.group(1))
 
 
 def policy():

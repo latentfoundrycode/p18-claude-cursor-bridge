@@ -1,7 +1,7 @@
 """The phase modules as the phase-module tests read them (tests/test_phase_modules_*.py): a module's text with its
 line endings made "\n", its headings and sections, the extension points the registry names a module as declaring, and
 the R-004 and R-006 shapes every module's test asserts, and the files the session-start hook names for a phase (stage
-B5's refactoring pass). Not a test file; the tests import
+B5's refactoring pass); the core's digest and its standing rules, as release T's pin files read them (stage T1's). Not a test file; the tests import
 it as they import instructions.py."""
 import json
 import os
@@ -13,6 +13,7 @@ import sys
 BRIDGE = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "bridge"))
 PHASES = os.path.join(BRIDGE, "cursor-bridge", "workflow", "phases")
 REGISTRY = os.path.join(BRIDGE, "cursor-bridge", "workflow", "extension-points.md")
+CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
 
 
 def read(path):
@@ -80,6 +81,19 @@ def section(text, title, level):
     lines = text.split("\n")
     start, end = section_span(lines, title, level)
     return "\n".join(lines[start + 1:end])
+
+
+def digest():
+    """The core's digest, from its start marker to its end marker."""
+    text = read(CORE)
+    return text[text.index("<!-- digest:start -->"):text.index("<!-- digest:end -->")]
+
+
+def rule(n):
+    """Standing rule n of the core, flat, from after its number to the next rule's."""
+    body = read(CORE).split("\n## Standing rules\n", 1)[1]
+    m = re.search(r"^%d\. (.*?)(?=^%d\. )" % (n, n + 1), body, re.S | re.M)
+    return flat(m.group(1))
 
 
 def registry_rows(heading="## Extension points"):
