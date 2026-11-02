@@ -143,7 +143,7 @@ EV_WINDOW = (
     "still in progress at the reading is read the next Sunday, and a late or missing schedule leaves the window without "
     "a completed run. A run re-run from the Actions tab keeps its creation time and is not read again; the rerun this "
     "step names, `gh workflow run`, starts a new run. While a finding stands, the section also gives `finding standing: "
-    "run <id>`, carried from each section to the next until a run of a later window ends `success`, so the finding is "
+    "run <id>`, carried from each section to the next until a later run ends `success`, so the finding is "
     "reported every week it stands, beside whatever kind the week's own runs show.")
 EV_NOT_CONFIGURED = (
     "A list that holds no `dependency-scan.yml` names a project that has not received the workflow yet (one not "
@@ -161,11 +161,11 @@ EV_SENTENCES = (
     "`gh run list` lists no run of a disabled workflow without `--all`.",
     "**A finding**: a completed run of the window ended `failure` and its exit line reads `exit 1`, a flaw in a "
     "dependency, fixed by a `DEP-<nnn>` increment (the merge policy's procedure), never by an unreviewed change; it "
-    "stands until a later run of the window ends `success`.",
-    "**A scanner failure**: no finding stands and the window's last completed run proved nothing, a `failure` with "
+    "stands until a later run ends `success`, in this window or a later one.",
+    "**A scanner failure**: the window's last completed run proved nothing, a `failure` with "
     "another exit code or no exit line at all, or any conclusion other than `success` and `failure`; it is reported "
     "with the rerun's one command, `gh workflow run dependency-scan.yml --repo <owner>/<repo>`, and the rerun is read at "
-    "the next evaluation.",
+    "the next evaluation, a finding that stands reported beside it, superseded by nothing but a `success`.",
     "**No completed run since the previous evaluation**: the workflow disabled, no run of the window listed, a list the "
     "login cannot read, or only runs still queued or in progress, a finding of its own and never green (KP-005: silence "
     "is not green), reported with its remedy: where the workflow is disabled, a run sheet for the project's owner "

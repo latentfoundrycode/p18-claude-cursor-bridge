@@ -40,6 +40,22 @@ def owner_profile():
     return os.path.dirname(os.path.dirname(os.path.normpath(local)))
 
 
+def git_bash_put_it_back(name, value):
+    """Git for Windows' login shell sets SSH_ASKPASS to its own helper, so a shell an agent opens inside a stripped run
+    (Review B's, TASK-041 round 1) holds it though the launcher withheld it. The helper holds no secret and only that value
+    is excused here; that the launcher withholds the name is the next test's."""
+    return name == "SSH_ASKPASS" and os.path.basename(value.replace("\\", "/")).lower() == "git-askpass.exe"
+
+
+def test_r052_the_strip_itself_withholds_git_bash_s_helper(tmp_path):
+    """The name the test below excuses for its one value: stripped_env removes it whatever its value, so the excuse hides
+    no launcher that keeps it. tmp_path stands in for the profile, as tests/test_account_keys.py's sample does."""
+    env = {"PATH": os.environ.get("PATH", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""), "HOME": str(tmp_path),
+           "USERPROFILE": str(tmp_path), "SSH_ASKPASS": "C:/somewhere/git-askpass.exe"}
+    (tmp_path / ".cursor").mkdir()
+    assert "SSH_ASKPASS" not in bridge_env.stripped_env(env)
+
+
 def test_r052_a_stripped_suite_launch_gets_the_agent_home_and_no_withheld_name():
     env = LAUNCH_ENV
     profile = owner_profile()
@@ -52,7 +68,7 @@ def test_r052_a_stripped_suite_launch_gets_the_agent_home_and_no_withheld_name()
         pytest.skip("HOME is the owner's profile: this run was not launched with --strip")
     assert _same(home, os.path.join(profile, ".cursor-bridge", "agent-home")), "HOME is not the agent home: " + home
     assert _same(env.get("USERPROFILE", ""), home), "USERPROFILE is not the agent home"
-    present = [name for name in WITHHELD if name in env]
+    present = [name for name in WITHHELD if name in env and not git_bash_put_it_back(name, env[name])]
     assert not present, "withheld names present: " + ", ".join(present)
     secret = sorted(name for name in env if bridge_env.secret_like(name))
     assert not secret, "names SECRET_LIKE matches present: " + ", ".join(secret)
