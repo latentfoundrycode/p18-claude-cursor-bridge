@@ -356,6 +356,25 @@ def test_bug039_site2_negative_a_tampered_record_admits_no_launch(tmp_path, tamp
     assert rc == 2 and "no verified mark" in out, out
 
 
+def test_bug039_site2_negative_the_tamper_line_is_the_fixed_sentence(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: TASK-043's r3 brief, Requirement 4 (Review A's Should fix 3 of round 2, and both reviewers' note of
+    round 3 that nothing pinned it): a record of the wrong shape with its hash copy gone reaches `load_rounds`' own message, which
+    holds no such words as `rounds record`. The line printed is the one fixed sentence naming the ID, the message not printed."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    guard = load_guard(monkeypatch)
+    os.remove(guard.rounds_hash_copy_path(os.path.realpath(str(G.bridge_dir(repo).parent)), ID))
+    (G.bridge_dir(repo) / ("rounds-%s.json" % ID)).write_text('{"rounds": 5}', encoding="utf-8")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1, out
+    assert ("review-guard: GATE-INTEGRITY - the rounds record of %s was changed outside the guard or cannot be read" % ID) in out, out
+    assert "is not a list" not in out, out
+    assert not (G.bridge_dir(repo) / ("verified-%s.json" % NAME)).exists(), out
+    rc, out = G.guard(repo, "premerge", NAME)
+    assert rc == 2 and "no verified mark" in out, out
+
+
 def test_bug039_site2_negative_a_launch_before_the_snapshot_is_not_voided(tmp_path):
     """R-042, D-003. enforces: TASK-043's brief, Requirement 3: a launch before the snapshot, or an `.err` with no started
     line, is no launch of this snapshot, and a flag voids neither. An invariant (a mutant of the fixed guard shows it
@@ -576,7 +595,7 @@ def test_bug039_site5_negative_a_void_that_cannot_be_written_leaves_the_git_fail
     assert run_verify_with_clean_failing(repo, monkeypatch, change_the_guard=no_write) == 2
     out = capsys.readouterr().out
     assert "left-by-the-reviewer" in out and CLEAN_FAILED in out, out
-    assert "not recorded" in out, out
+    assert any(line.startswith("review-guard: GATE-INTEGRITY - ") and "not recorded" in line for line in out.splitlines()), out
 
 
 def test_bug039_site5_negative_a_git_failure_with_no_flag_voids_nothing(tmp_path, monkeypatch, capsys):
