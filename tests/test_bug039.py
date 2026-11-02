@@ -19,6 +19,7 @@ import pytest
 import test_task032_supervisor_guard as G
 
 NAME = "TASK-001"
+ID = "TASK-001"
 
 
 def start_of(repo, name=NAME):
@@ -99,12 +100,13 @@ def test_bug039_site1_a_flag_before_any_git_command_voids_the_launch(tmp_path, l
     assert_voided_and_round_not_spent(repo)
 
 
-@pytest.mark.parametrize("rewritten", ["[]", "{}", '{"taken": 5}'], ids=["not-an-object", "no-taken", "taken-not-a-string"])
+@pytest.mark.parametrize("rewritten", ["[]", "{}", '{"taken": 5}', '{"taken": "9999-01-01T00:00:00Z"}', '{"taken": "zzz"}', "null", "not json"],
+                         ids=["not-an-object", "no-taken", "taken-not-a-string", "taken-in-the-future", "taken-not-a-time", "json-null", "not-json"])
 def test_bug039_site1_negative_a_snapshot_rewritten_to_any_shape_stays_a_clean_flag(tmp_path, rewritten):
-    """R-042, D-003. enforces: TASK-043's brief, Requirement 8: the snapshot's content is untrusted at the first early
-    return, which now calls `record_flagged_launch`; a snapshot rewritten to valid JSON of another shape still ends in the
-    GATE-INTEGRITY line and exit 1, with no traceback. An invariant (it holds on the unfixed guard, which reads no field
-    there; a mutant of the fixed guard shows it strong)."""
+    """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 1: the snapshot's content is untrusted at the first early
+    return, so neither its shape nor its value decides the void: whatever it was rewritten to, `verify` ends in the
+    GATE-INTEGRITY line and exit 1 with no traceback, the launch is voided, and round 1 may be taken again on a changed
+    tree (Review A and the security audit, round 1)."""
     repo = G.make_repo(tmp_path)
     G.snap_ok(repo, NAME)
     G.launched(repo, NAME)
@@ -112,6 +114,49 @@ def test_bug039_site1_negative_a_snapshot_rewritten_to_any_shape_stays_a_clean_f
     rc, out = G.guard(repo, "verify", NAME)
     assert rc == 1 and "rewritten after it was taken" in out, out
     assert "Traceback" not in out, out
+    assert_voided_and_round_not_spent(repo)
+
+
+def test_bug039_site1_negative_a_rewritten_snapshot_voids_no_launch_before_the_round(tmp_path):
+    """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 1: at the rewritten return the launch is compared with the
+    round entry's `time` from the hash-checked record, so a snapshot rewritten to hold no time does not void a launch
+    from before the round."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME, offset=-3600)
+    (G.bridge_dir(repo) / ("review-%s.json" % NAME)).write_text("{}", encoding="utf-8")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "rewritten after it was taken" in out, out
+    assert "flagged_launch" not in G.entry(repo, NAME, 1), G.entry(repo, NAME, 1)
+
+
+def test_bug039_site1_negative_the_void_runs_no_git_on_the_pre_git_returns(tmp_path, monkeypatch, capsys):
+    """R-042, D-003. enforces: TASK-043's brief, Requirement 2: at the snapshot-rewritten and the config-or-hook returns the
+    void runs no git command, as their printed lines say. Every git process started during the void is watched."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    change_the_config(repo)
+    guard = load_guard(monkeypatch)
+    started, during = [], []
+    real_run = subprocess.run
+    real_record = guard.record_flagged_launch
+
+    def watching(cmd, *args, **kwargs):
+        if cmd and cmd[0] == "git":
+            started.append(list(cmd))
+        return real_run(cmd, *args, **kwargs)
+
+    def watched_record(*args):
+        del started[:]
+        real_record(*args)
+        during.append(list(started))
+
+    monkeypatch.setattr(subprocess, "run", watching)
+    monkeypatch.setattr(guard, "record_flagged_launch", watched_record)
+    assert guard.cmd_verify(NAME, str(repo)) == 1
+    assert "no git command was run" in capsys.readouterr().out
+    assert during == [[]]
 
 
 def test_bug039_site1_the_branch_held_in_another_worktree_voids_the_launch(tmp_path):
@@ -153,11 +198,13 @@ def test_bug039_site1_negative_no_path_clears_a_recorded_flag(tmp_path):
     repo = flagged_round(tmp_path)
     voided = flagged_key(repo)
     assert voided == start_of(repo)
-    G.guard(repo, "verify", NAME)
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1, out
     assert flagged_key(repo) == voided, G.entry(repo, NAME, 1)
     assert G.entry(repo, NAME, 1).get("reply") is None, G.entry(repo, NAME, 1)
     G.snap_ok(repo, NAME)
-    G.guard(repo, "verify", NAME)
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1, out
     assert flagged_key(repo) == voided, G.entry(repo, NAME, 1)
     assert G.entry(repo, NAME, 1).get("reply") is None, G.entry(repo, NAME, 1)
 
@@ -202,6 +249,110 @@ def test_bug039_site2_negative_no_path_admits_a_flagged_launch(tmp_path):
     assert G.entry(repo, NAME, 1).get("reply") == 0, G.entry(repo, NAME, 1)
     rc, out = G.guard(repo, "premerge", NAME)
     assert rc == 0, out
+
+
+@pytest.mark.parametrize("exit_code", [None, 0, 1], ids=["no-exit-yet", "exit-0", "exit-1"])
+def test_bug039_site2_the_void_holds_whatever_the_exit(tmp_path, exit_code):
+    """R-042, D-003. enforces: TASK-043's brief, Requirements 3 and 4: the flag voids the launch whatever the `.err` file's
+    exit so far, and a verify that finds nothing left to flag refuses that launch whatever its exit: exit 1, a line saying
+    it was voided, no reply, no mark."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME, exit_code=exit_code)
+    G.git(repo, "branch", "left-by-the-reviewer")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    assert flagged_key(repo) == start_of(repo), G.entry(repo, NAME, 1)
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out and "voided" in out, out
+    assert G.entry(repo, NAME, 1).get("reply") is None, G.entry(repo, NAME, 1)
+    assert not (G.bridge_dir(repo) / ("verified-%s.json" % NAME)).exists(), out
+
+
+def test_bug039_site2_negative_a_voided_launch_stays_voided_under_a_later_snapshot(tmp_path):
+    """R-042, D-003. enforces: TASK-043's brief, Requirement 4, "whether or not the launch is at or after the current
+    snapshot": the same round taken again after the launch, its exit 0 and its flag still refuse it."""
+    repo = flagged_round(tmp_path)
+    for _ in range(3):
+        G.next_second()
+    G.snap_ok(repo, NAME)
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "voided" in out, out
+    assert not (G.bridge_dir(repo) / ("verified-%s.json" % NAME)).exists(), out
+
+
+def test_bug039_site2_negative_a_voided_verify_still_restores_the_tree(tmp_path):
+    """R-042, D-003. enforces: TASK-043's brief, Requirement 4: the refusal comes after the restore, so what the run left in
+    the tree is gone though the launch is refused."""
+    repo = flagged_round(tmp_path)
+    G.put(repo / "left-by-the-reviewer.txt", "left\n")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "voided" in out, out
+    assert not (repo / "left-by-the-reviewer.txt").exists(), out
+
+
+def delete_the_record(path):
+    os.remove(str(path))
+
+
+def append_to_the_record(path):
+    with open(str(path), "ab") as f:
+        f.write(b" ")
+
+
+@pytest.mark.parametrize("tamper", [delete_the_record, append_to_the_record], ids=["record-deleted", "record-changed"])
+def test_bug039_site2_negative_a_tampered_record_admits_no_launch(tmp_path, tamper):
+    """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 2 (Review A and the security audit, round 1): the record the
+    void lives in is changed or deleted outside the guard, its hash copy still standing. `verify` says so as GATE-INTEGRITY,
+    exit 1, no mark, and `premerge` refuses."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME, exit_code=None)
+    G.git(repo, "branch", "left-by-the-reviewer")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1, out
+    add_exit_0(repo)
+    tamper(G.bridge_dir(repo) / ("rounds-%s.json" % ID))
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out and "rounds record" in out, out
+    assert not (G.bridge_dir(repo) / ("verified-%s.json" % NAME)).exists(), out
+    rc, out = G.guard(repo, "premerge", NAME)
+    assert rc == 2 and "no verified mark" in out, out
+
+
+def test_bug039_site2_negative_a_launch_before_the_snapshot_is_not_voided(tmp_path):
+    """R-042, D-003. enforces: TASK-043's brief, Requirement 3: a launch before the snapshot, or an `.err` with no started
+    line, is no launch of this snapshot, and a flag voids neither. An invariant (a mutant of the fixed guard shows it
+    strong)."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME, offset=-3600)
+    G.git(repo, "branch", "left-by-the-reviewer")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    assert "flagged_launch" not in G.entry(repo, NAME, 1), G.entry(repo, NAME, 1)
+    G.put(repo / "run" / "review" / ("REVIEW-%s.err" % NAME), "reviewer output\n")
+    G.git(repo, "branch", "left-by-the-reviewer-again")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out and "Traceback" not in out, out
+    assert "flagged_launch" not in G.entry(repo, NAME, 1), G.entry(repo, NAME, 1)
+
+
+def test_bug039_site2_negative_a_void_touches_only_its_key(tmp_path):
+    """R-042, D-003. enforces: TASK-043's brief, Requirement 3: writing `flagged_launch` touches only that key of that
+    round's entry, an existing `reply` left as it is. An invariant (a mutant of the fixed guard shows it strong)."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    G.verify_ok(repo, NAME)
+    before = dict(G.entry(repo, NAME, 1))
+    assert before.get("reply") == 0, before
+    G.git(repo, "branch", "left-by-the-reviewer")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    after = dict(G.entry(repo, NAME, 1))
+    assert after.pop("flagged_launch").rstrip("Z") == start_of(repo), after
+    assert after == before
 
 
 # --- Site 3: premerge's git call ----------------------------------------------------------
@@ -277,9 +428,113 @@ def test_bug039_site3_negative_premerge_runs_no_planted_hook_or_monitor(tmp_path
         G.put(repo / ".git" / "hooks" / hook, script)
         os.chmod(str(repo / ".git" / "hooks" / hook), 0o755)
     G.git(repo, "config", "core.fsmonitor", planted.as_posix())
+    os.utime(str(repo / "a.py"), (1700000000, 1700000000))  # so `status` rewrites the index, the event the hook is planted on
     rc, out = G.guard(repo, "premerge", NAME)
     assert rc == 0, out
     assert not marker.exists(), "a planted program ran during premerge: " + marker.read_text(encoding="utf-8")
+
+
+def plant_in_the_guard_s_own_folder(repo, tmp_path):
+    marker = tmp_path / "planted-ran"
+    script = "#!/bin/sh\necho ran >> '%s'\nexit 0\n" % marker.as_posix()
+    for hook in ("post-index-change", "reference-transaction"):
+        G.put(repo / ".git" / "bridge" / "no-hooks" / hook, script)
+        os.chmod(str(repo / ".git" / "bridge" / "no-hooks" / hook), 0o755)
+    os.utime(str(repo / "a.py"), (1700000000, 1700000000))
+    return marker
+
+
+@pytest.mark.parametrize("command", ["verify", "premerge"])
+def test_bug039_site6_a_hook_planted_in_the_guard_s_folder_never_runs(tmp_path, command):
+    """R-042, D-004 (`p_review_guard` to `ds_checkout`, hooks off), KP-032. enforces: TASK-043's r2 brief, Requirement 4 (the
+    security audit, round 1, B4): the folder the guard points `core.hooksPath` at lay inside `.git/`, where the reviewer's
+    run writes, unchecked. A hook planted at that path runs under neither command."""
+    repo = verified_round(tmp_path)
+    marker = plant_in_the_guard_s_own_folder(repo, tmp_path)
+    if command == "verify":
+        G.launched(repo, NAME)
+    rc, out = G.guard(repo, command, NAME)
+    assert rc == 0, out
+    assert not marker.exists(), "a planted program ran during %s: %s" % (command, marker.read_text(encoding="utf-8"))
+
+
+def test_bug039_site6_the_hooks_folder_lies_outside_the_repository(tmp_path, monkeypatch):
+    """R-042, D-004, KP-032. enforces: TASK-043's r2 brief, Requirement 4: `no_hooks_dir` gives an empty folder outside the
+    repository, so nothing the reviewer's run writes in the checkout can be in it."""
+    repo = G.make_repo(tmp_path)
+    guard = load_guard(monkeypatch)
+    folder = guard.no_hooks_dir(str(repo / ".git"))
+    assert os.path.isdir(folder) and os.listdir(folder) == []
+    assert not os.path.normcase(os.path.abspath(folder)).startswith(os.path.normcase(os.path.abspath(str(repo))))
+
+
+# --- Site 5: flags already found when a later git step fails --------------------------------
+
+def run_verify_with_clean_failing(repo, monkeypatch):
+    """`verify` through the program's own main, its `git clean` failing, as a file held open makes it fail."""
+    guard = load_guard(monkeypatch)
+    real_run_git = guard.run_git
+
+    def failing(args, root, common):
+        if args[:1] == ["clean"]:
+            raise RuntimeError("git clean failed: a file is held open")
+        return real_run_git(args, root, common)
+
+    monkeypatch.setattr(guard, "run_git", failing)
+    monkeypatch.chdir(str(repo))
+    monkeypatch.setattr(sys, "argv", ["review-guard.py", "verify", NAME])
+    return guard.main()
+
+
+def test_bug039_site5_a_git_failure_after_a_flag_keeps_the_flag(tmp_path, monkeypatch, capsys):
+    """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 3 (the security audit, round 1, B3): a flag already found when
+    a later git step fails is printed and voids the launch, the exit staying 2, so the next verify, the tree now back and
+    nothing left to find, does not write a mark for it."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    G.git(repo, "branch", "left-by-the-reviewer")
+    assert run_verify_with_clean_failing(repo, monkeypatch) == 2
+    out = capsys.readouterr().out
+    assert "CANNOT VERIFY" in out and "GATE-INTEGRITY" in out and "left-by-the-reviewer" in out, out
+    assert flagged_key(repo) == start_of(repo), G.entry(repo, NAME, 1)
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "voided" in out, out
+    assert not (G.bridge_dir(repo) / ("verified-%s.json" % NAME)).exists(), out
+
+
+def test_bug039_site5_negative_a_git_failure_with_no_flag_voids_nothing(tmp_path, monkeypatch, capsys):
+    """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 3: a git failure with nothing flagged stays what it was, exit 2
+    and no void, and the verify after it goes through. An invariant (a mutant of the fixed guard shows it strong)."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    assert run_verify_with_clean_failing(repo, monkeypatch) == 2
+    assert "GATE-INTEGRITY" not in capsys.readouterr().out
+    assert "flagged_launch" not in G.entry(repo, NAME, 1), G.entry(repo, NAME, 1)
+    G.verify_ok(repo, NAME)
+
+
+# --- Site 7: the exit line --------------------------------------------------------------------
+
+def test_bug039_site7_an_exit_line_too_long_to_read_is_no_exit(tmp_path):
+    """R-042, D-003, D-004 (`ds_run_outputs` to `p_review_guard`, untrusted). enforces: TASK-043's r2 brief, Requirement 5 (the
+    security audit, round 1, A3): the early returns now read the `.err` file, and an exit line past int()'s limit must not
+    turn a clean flag into a traceback: the flag stands and the launch is voided."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME, exit_code=None)
+    add_a_long_exit_line(repo)
+    change_the_config(repo)
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    assert "Traceback" not in out, out
+    assert flagged_key(repo) == start_of(repo), G.entry(repo, NAME, 1)
+
+
+def add_a_long_exit_line(repo):
+    with open(str(repo / "run" / "review" / ("REVIEW-%s.err" % NAME)), "a", encoding="utf-8") as f:
+        f.write("bridge-run: exit " + "9" * 5000 + "\n")
 
 
 # --- Site 4: the re-snapshot --------------------------------------------------------------
@@ -295,6 +550,15 @@ def test_bug039_site4_a_resnapshot_keeps_the_flag(tmp_path):
     G.bump(repo)
     G.snap_ok(repo, NAME)
     assert G.entry(repo, NAME, 1).get("reply") is None, G.entry(repo, NAME, 1)
+
+
+def test_bug039_site4_negative_a_resnapshot_of_an_unflagged_round_gains_no_key(tmp_path):
+    """R-042, D-003. enforces: TASK-043's brief, Requirement 7: an entry with no flag gains no new content on a re-snapshot,
+    so no other reader of the record sees a change. An invariant (a mutant of the fixed guard shows it strong)."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.snap_ok(repo, NAME)
+    assert "flagged_launch" not in G.entry(repo, NAME, 1), G.entry(repo, NAME, 1)
 
 
 @pytest.mark.parametrize("change_the_tree", [False, True], ids=["same-tree", "changed-tree"])
