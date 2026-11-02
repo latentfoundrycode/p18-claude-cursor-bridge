@@ -17,7 +17,8 @@ CORE = os.path.join(BRIDGE, "commands", "supervisor.md")
 
 
 def read(path):
-    return open(path, encoding="utf-8").read().replace("\r\n", "\n")
+    with open(path, encoding="utf-8") as f:
+        return f.read().replace("\r\n", "\n")
 
 
 def module(rel):
@@ -90,8 +91,8 @@ def digest():
 
 
 def rule(n):
-    """Standing rule n of the core, flat, from after its number to the next rule's."""
-    body = read(CORE).split("\n## Standing rules\n", 1)[1]
+    """Standing rule n of the core, flat, from after its number to the next rule's, inside the Standing rules section."""
+    body = section(read(CORE), "Standing rules", 2)
     m = re.search(r"^%d\. (.*?)(?=^%d\. )" % (n, n + 1), body, re.S | re.M)
     return flat(m.group(1))
 
