@@ -15,10 +15,13 @@ alone ignored the threat model's bound. Review A's records part: R-045's Evidenc
 and the design's R-051 row still named `--staged`. The constants below are the sentences as written; the text was
 applied from them. KP-052: no character outside ASCII is typed here."""
 import os
+import sys
 
 from phase_modules import PHASES, flat, read, rule, section
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "bridge", "cursor-bridge"))
+import bridge_env  # noqa: E402
 MERGE = os.path.join(PHASES, "delegation-loop", "merge.md")
 DECIDE = os.path.join(PHASES, "delegation-loop", "decide.md")
 REFLECTION = os.path.join(PHASES, "reflection.md")
@@ -85,6 +88,16 @@ def test_bug040_b1_the_overtaken_re_review_names_its_lift():
             "overtaken pull request's re-review, the requirement the overtaken file breaks and the merge that "
             "overtook it (step 8).") in flat(section(read(DECIDE), "The review ceiling", 4))
     assert "a new head the reviews read again (the delegation loop's step 8). The `loop-guard`" not in r
+
+
+def test_bug040_b1_the_lift_line_reads_as_the_behaviour_class():
+    """Stage T1's review, round 2 (Review A's tests part, C4; least confident 2): B1's lift line, as step 8 writes it,
+    is read by bridge_env's reader, the guard's, as the class `behaviour` with the overtaken file as its finding."""
+    line = "Blocking class: behaviour - R-045, the status file overtaken by PR #<m>'s merge"
+    assert ("`" + line + "`") in step8()
+    assert bridge_env.read_blocking_class_line(line) == (
+        "behaviour", "R-045, the status file overtaken by PR #<m>'s merge", line)
+    assert "behaviour" in bridge_env.BLOCKING_CLASSES
 
 
 def test_bug040_s1_the_stage_review_carries_the_threat_models():
