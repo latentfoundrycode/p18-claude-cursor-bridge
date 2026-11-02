@@ -438,7 +438,7 @@ def launch_info(err_path):
             break
     code = None
     for line in reversed(lines):
-        e = re.match(r"bridge-run: exit (\d{1,9})(?!\d)", line.strip())
+        e = re.match(r"bridge-run: exit (\d{1,10})(?!\d)", line.strip())
         if e:
             code = int(e.group(1))
             break
@@ -892,7 +892,7 @@ def load_snapshot(nnn, cwd):
     try:
         with open(p, encoding="utf-8", errors="replace") as f:
             snap = json.load(f)
-    except (OSError, ValueError):
+    except (ValueError, RecursionError):
         snap = {}
     if not isinstance(snap, dict):
         snap = {}
@@ -1037,7 +1037,10 @@ def cmd_verify(nnn, cwd):
         for f in flags:
             print("  GATE-INTEGRITY  " + f)
         if flags:
-            record_flagged_launch(common, root, nnn, snap)
+            try:
+                record_flagged_launch(common, root, nnn, snap)
+            except OSError:
+                print("review-guard: GATE-INTEGRITY - the flagged launch could not be voided: not recorded")
         raise
     print("review-guard: snapshot hash %s - must equal the hash `snapshot` printed" % snap_hash)
     left = sum(1 for n in notes if n.startswith("LEFT BEHIND"))
@@ -1058,12 +1061,7 @@ def cmd_verify(nnn, cwd):
         rpath = rounds_path(common, id_part)
         rounds_data, _, rounds_err = load_rounds(common, id_part, root=None, seed=False)
         if rounds_err:
-            msg = rounds_err
-            if msg.startswith("review-guard: "):
-                msg = msg[len("review-guard: "):]
-            if msg.startswith("refused - "):
-                msg = msg[len("refused - "):]
-            print("review-guard: GATE-INTEGRITY - %s" % msg)
+            print("review-guard: GATE-INTEGRITY - the rounds record of %s was changed outside the guard or cannot be read: no reply and no verified mark" % id_part)
             return 1
         for r in rounds_data.get("rounds") or []:
             if r.get("round") == rnd:
