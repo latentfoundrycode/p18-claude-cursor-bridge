@@ -69,12 +69,14 @@ outside the checkout (the owner's profile, the installed bridge, other projects)
 reviewer that deliberately reaches for the credential store. It is a guard against what a
 reviewer does in passing, not a sandbox.
 """
+import atexit
 import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -91,10 +93,20 @@ PR_HEAD_WAIT, PR_HEAD_STEP = 90, 15                # premerge: how long, and how
 _NO_HOOKS = {}
 
 
+def _remove_no_hooks_dir():
+    d = _NO_HOOKS.get("dir")
+    if d:
+        try:
+            os.rmdir(d)
+        except OSError:
+            pass
+
+
 def no_hooks_dir(common):
-    d = os.path.join(common, "bridge", "no-hooks")
-    os.makedirs(d, exist_ok=True)
-    return d
+    if "dir" not in _NO_HOOKS:
+        _NO_HOOKS["dir"] = tempfile.mkdtemp(prefix="review-guard-no-hooks-")
+        atexit.register(_remove_no_hooks_dir)
+    return _NO_HOOKS["dir"]
 
 
 def _git_proc(args, root, common):
@@ -378,10 +390,26 @@ def record_flagged_launch(common, root, nnn, snap):
     id_part, rnd = parsed
     err_path = os.path.join(root, "run", "review", "REVIEW-%s.err" % nnn)
     launched_at, exit_code = launch_info(err_path)
-    taken_raw = snap.get("taken") if isinstance(snap, dict) else None
-    snap_taken = (taken_raw if isinstance(taken_raw, str) else "").rstrip("Z")
-    if not launched_at or (snap_taken and launched_at.rstrip("Z") < snap_taken):
+    if not launched_at:
         return
+    if snap is None:
+        rpath = rounds_path(common, id_part)
+        if not os.path.isfile(rpath):
+            return
+        data_pre, _, err_pre = load_rounds(common, id_part, root=None, seed=False)
+        if err_pre:
+            return
+        round_time = None
+        for r in data_pre.get("rounds") or []:
+            if r.get("round") == rnd:
+                round_time = r.get("time")
+                break
+        if not round_time or not _launch_time_ge_round(launched_at, round_time):
+            return
+    else:
+        snap_taken = (snap.get("taken") or "").rstrip("Z")
+        if snap_taken and launched_at.rstrip("Z") < snap_taken:
+            return
     rpath = rounds_path(common, id_part)
     if not os.path.isfile(rpath):
         return
@@ -410,7 +438,7 @@ def launch_info(err_path):
             break
     code = None
     for line in reversed(lines):
-        e = re.match(r"bridge-run: exit (\d+)", line.strip())
+        e = re.match(r"bridge-run: exit (\d{1,9})(?!\d)", line.strip())
         if e:
             code = int(e.group(1))
             break
@@ -861,8 +889,14 @@ def load_snapshot(nnn, cwd):
     if not os.path.isfile(p):
         print("review-guard: CANNOT VERIFY - no snapshot %s (run `review-guard.py snapshot %s` before the launch)" % (p, nnn))
         return None, None, None, None
-    with open(p, encoding="utf-8") as f:
-        return json.load(f), root, common, sha256_file(p)[:16]
+    try:
+        with open(p, encoding="utf-8", errors="replace") as f:
+            snap = json.load(f)
+    except (OSError, ValueError):
+        snap = {}
+    if not isinstance(snap, dict):
+        snap = {}
+    return snap, root, common, sha256_file(p)[:16]
 
 
 def diff_hashes(before, after):
@@ -882,7 +916,7 @@ def cmd_verify(nnn, cwd):
         return 2
     if state:
         print("review-guard: GATE-INTEGRITY - the snapshot was rewritten after it was taken; the checkout was NOT restored from it and no git command was run")
-        record_flagged_launch(common, root, nnn, snap)
+        record_flagged_launch(common, root, nnn, None)
         return 1
     flags, notes = [], []
     # 1. the repository's configuration and hooks, read as files, before any git command runs
@@ -901,103 +935,110 @@ def cmd_verify(nnn, cwd):
         print("review-guard: GATE-INTEGRITY - the checkout was NOT restored and no git command was run; inspect the configuration and the hooks first")
         record_flagged_launch(common, root, nnn, snap)
         return 1
-    # 2. where HEAD is, and the refs
-    head = run_git(["rev-parse", "HEAD"], root, common).strip()
     try:
-        branch = run_git(["symbolic-ref", "-q", "HEAD"], root, common).strip()
-    except RuntimeError:
-        branch = ""
-    if branch != snap["branch"]:
-        flags.append("the branch changed during the review: %s -> %s" % (snap["branch"] or "detached", branch or "detached"))
-    if head != snap["head"]:
-        flags.append("HEAD moved during the review: %s -> %s (a checkout or a commit)" % (snap["head"][:12], head[:12]))
-    now_refs = refs(root, common)
-    repairs = []                                   # (ref, old sha or None)
-    for name, sha in sorted(now_refs.items()):
-        if name not in snap["refs"]:
+        # 2. where HEAD is, and the refs
+        head = run_git(["rev-parse", "HEAD"], root, common).strip()
+        try:
+            branch = run_git(["symbolic-ref", "-q", "HEAD"], root, common).strip()
+        except RuntimeError:
+            branch = ""
+        if branch != snap["branch"]:
+            flags.append("the branch changed during the review: %s -> %s" % (snap["branch"] or "detached", branch or "detached"))
+        if head != snap["head"]:
+            flags.append("HEAD moved during the review: %s -> %s (a checkout or a commit)" % (snap["head"][:12], head[:12]))
+        now_refs = refs(root, common)
+        repairs = []                                   # (ref, old sha or None)
+        for name, sha in sorted(now_refs.items()):
+            if name not in snap["refs"]:
+                if local_ref(name):
+                    flags.append("new ref during the review: %s" % name)
+                    repairs.append((name, None))
+                else:
+                    notes.append("NOTE remote-tracking ref appeared during the review (a fetch): %s" % name)
+            elif snap["refs"][name] != sha:
+                if local_ref(name):
+                    flags.append("ref moved during the review: %s" % name)
+                    repairs.append((name, snap["refs"][name]))
+                else:
+                    notes.append("NOTE remote-tracking ref moved during the review (a fetch): %s" % name)
+        for name in sorted(set(snap["refs"]) - set(now_refs)):
             if local_ref(name):
-                flags.append("new ref during the review: %s" % name)
-                repairs.append((name, None))
-            else:
-                notes.append("NOTE remote-tracking ref appeared during the review (a fetch): %s" % name)
-        elif snap["refs"][name] != sha:
-            if local_ref(name):
-                flags.append("ref moved during the review: %s" % name)
+                flags.append("ref deleted during the review: %s" % name)
                 repairs.append((name, snap["refs"][name]))
             else:
-                notes.append("NOTE remote-tracking ref moved during the review (a fetch): %s" % name)
-    for name in sorted(set(snap["refs"]) - set(now_refs)):
-        if local_ref(name):
-            flags.append("ref deleted during the review: %s" % name)
-            repairs.append((name, snap["refs"][name]))
+                notes.append("NOTE remote-tracking ref gone during the review: %s" % name)
+        now_stashes = stashes(root, common)
+        if len(now_stashes) != len(snap["stashes"]):
+            flags.append("the stash list changed during the review (%d -> %d entries)" % (len(snap["stashes"]), len(now_stashes)))
+        # 3. restore the tree: the recorded branch first (a reset on another branch would move it), then the refs
+        dirty = [l for l in run_git(["status", "--porcelain"], root, common).splitlines() if l.strip()]
+        if snap["branch"]:
+            if snap["branch"] not in now_refs:         # the reviewer deleted the task branch itself
+                run_git(["update-ref", snap["branch"], snap["head"]], root, common)
+                notes.append("repaired: %s recreated at %s" % (snap["branch"], snap["head"][:12]))
+            if branch != snap["branch"]:
+                held = held_elsewhere(snap["branch"], root, common)
+                if held:                                   # P3 (second pass of the plan review): a reset here would rewind the branch we are on
+                    print("review-guard: GATE-INTEGRITY - %s is checked out in another worktree (%s); the checkout was NOT restored and nothing was reset: tear that worktree down first (worktree-teardown.py), then verify again" % (snap["branch"], held))
+                    record_flagged_launch(common, root, nnn, snap)
+                    return 1
+                run_git(["checkout", "-q", "-f", snap["branch"][len("refs/heads/"):] if snap["branch"].startswith("refs/heads/") else snap["branch"]], root, common)
+                try:
+                    now_on = run_git(["symbolic-ref", "-q", "HEAD"], root, common).strip()
+                except RuntimeError:
+                    now_on = ""
+                if now_on != snap["branch"]:
+                    print("review-guard: GATE-INTEGRITY - the checkout could not be put back on %s (it is on %s); nothing was reset" % (snap["branch"], now_on or "a detached HEAD"))
+                    record_flagged_launch(common, root, nnn, snap)
+                    return 1
+            run_git(["reset", "-q", "--hard", snap["head"]], root, common)
         else:
-            notes.append("NOTE remote-tracking ref gone during the review: %s" % name)
-    now_stashes = stashes(root, common)
-    if len(now_stashes) != len(snap["stashes"]):
-        flags.append("the stash list changed during the review (%d -> %d entries)" % (len(snap["stashes"]), len(now_stashes)))
-    # 3. restore the tree: the recorded branch first (a reset on another branch would move it), then the refs
-    dirty = [l for l in run_git(["status", "--porcelain"], root, common).splitlines() if l.strip()]
-    if snap["branch"]:
-        if snap["branch"] not in now_refs:         # the reviewer deleted the task branch itself
-            run_git(["update-ref", snap["branch"], snap["head"]], root, common)
-            notes.append("repaired: %s recreated at %s" % (snap["branch"], snap["head"][:12]))
-        if branch != snap["branch"]:
-            held = held_elsewhere(snap["branch"], root, common)
-            if held:                                   # P3 (second pass of the plan review): a reset here would rewind the branch we are on
-                print("review-guard: GATE-INTEGRITY - %s is checked out in another worktree (%s); the checkout was NOT restored and nothing was reset: tear that worktree down first (worktree-teardown.py), then verify again" % (snap["branch"], held))
-                record_flagged_launch(common, root, nnn, snap)
-                return 1
-            run_git(["checkout", "-q", "-f", snap["branch"][len("refs/heads/"):] if snap["branch"].startswith("refs/heads/") else snap["branch"]], root, common)
+            run_git(["checkout", "-q", "-f", "--detach", snap["head"]], root, common)
+        for name, old in repairs:
+            if name == snap["branch"] or name == "refs/stash":
+                continue
+            if old is None:
+                run_git(["update-ref", "-d", name], root, common)
+                notes.append("repaired: %s deleted (it did not exist at the snapshot)" % name)
+            else:
+                run_git(["update-ref", name, old], root, common)
+                notes.append("repaired: %s back to %s" % (name, old[:12]))
+        err_rel = "run/review/REVIEW-%s.err" % nnn
+        err_path = os.path.join(root, "run", "review", "REVIEW-%s.err" % nnn)
+        if os.path.isfile(err_path):
             try:
-                now_on = run_git(["symbolic-ref", "-q", "HEAD"], root, common).strip()
-            except RuntimeError:
-                now_on = ""
-            if now_on != snap["branch"]:
-                print("review-guard: GATE-INTEGRITY - the checkout could not be put back on %s (it is on %s); nothing was reset" % (snap["branch"], now_on or "a detached HEAD"))
-                record_flagged_launch(common, root, nnn, snap)
-                return 1
-        run_git(["reset", "-q", "--hard", snap["head"]], root, common)
-    else:
-        run_git(["checkout", "-q", "-f", "--detach", snap["head"]], root, common)
-    for name, old in repairs:
-        if name == snap["branch"] or name == "refs/stash":
-            continue
-        if old is None:
-            run_git(["update-ref", "-d", name], root, common)
-            notes.append("repaired: %s deleted (it did not exist at the snapshot)" % name)
-        else:
-            run_git(["update-ref", name, old], root, common)
-            notes.append("repaired: %s back to %s" % (name, old[:12]))
-    err_rel = "run/review/REVIEW-%s.err" % nnn
-    err_path = os.path.join(root, "run", "review", "REVIEW-%s.err" % nnn)
-    if os.path.isfile(err_path):
-        try:
-            with open(err_path, encoding="utf-8", errors="replace") as f:
-                first = f.readline().strip()
-            notes.append("launch time line kept (%s): %s" % (err_rel, first[:120]))
-        except OSError:
-            pass
-    cleaned = [l.strip() for l in run_git(["clean", "-fd", "-e", err_rel], root, common).splitlines() if l.strip()]
-    for l in dirty:
-        notes.append("restored: " + l.strip())
-    for l in cleaned:
-        notes.append(l)
-    # 4. ignored files: records, briefs and review material are protected even when ignored
-    now_ign = ignored_entries(root, common)
-    for rel in sorted(set(now_ign) | set(snap["ignored"])):
-        before, after = snap["ignored"].get(rel), now_ign.get(rel)
-        if before == after or rel == err_rel:
-            continue
-        what = "new" if before is None else ("removed" if after is None else "changed")
-        base = os.path.basename(rel.rstrip("/"))
-        if base == ".env" or base.startswith(".env.") or rel.startswith(PROTECTED_PREFIXES):
-            flags.append("%s %s during the review (ignored by git, so not restored) - inspect it before anything runs" % (rel, what))
-        else:
-            notes.append("LEFT BEHIND (ignored, %s): %s" % (what, rel))
-    for n in notes:
-        print("  " + n)
-    for f in flags:
-        print("  GATE-INTEGRITY  " + f)
+                with open(err_path, encoding="utf-8", errors="replace") as f:
+                    first = f.readline().strip()
+                notes.append("launch time line kept (%s): %s" % (err_rel, first[:120]))
+            except OSError:
+                pass
+        cleaned = [l.strip() for l in run_git(["clean", "-fd", "-e", err_rel], root, common).splitlines() if l.strip()]
+        for l in dirty:
+            notes.append("restored: " + l.strip())
+        for l in cleaned:
+            notes.append(l)
+        # 4. ignored files: records, briefs and review material are protected even when ignored
+        now_ign = ignored_entries(root, common)
+        for rel in sorted(set(now_ign) | set(snap["ignored"])):
+            before, after = snap["ignored"].get(rel), now_ign.get(rel)
+            if before == after or rel == err_rel:
+                continue
+            what = "new" if before is None else ("removed" if after is None else "changed")
+            base = os.path.basename(rel.rstrip("/"))
+            if base == ".env" or base.startswith(".env.") or rel.startswith(PROTECTED_PREFIXES):
+                flags.append("%s %s during the review (ignored by git, so not restored) - inspect it before anything runs" % (rel, what))
+            else:
+                notes.append("LEFT BEHIND (ignored, %s): %s" % (what, rel))
+        for n in notes:
+            print("  " + n)
+        for f in flags:
+            print("  GATE-INTEGRITY  " + f)
+    except (RuntimeError, subprocess.TimeoutExpired, OSError):
+        for f in flags:
+            print("  GATE-INTEGRITY  " + f)
+        if flags:
+            record_flagged_launch(common, root, nnn, snap)
+        raise
     print("review-guard: snapshot hash %s - must equal the hash `snapshot` printed" % snap_hash)
     left = sum(1 for n in notes if n.startswith("LEFT BEHIND"))
     if flags:
@@ -1009,35 +1050,36 @@ def cmd_verify(nnn, cwd):
     launched_at, exit_code = launch_info(err_path)
     snap_taken = (snap.get("taken") or "").rstrip("Z")
     launch_ok = launched_at and launched_at >= snap_taken
-    if not str(nnn).startswith("DESIGN-") and bridge_env.parse_review_name(str(nnn)):
-        id_part, rnd = bridge_env.parse_review_name(str(nnn))
+    parsed = bridge_env.parse_review_name(str(nnn)) if not str(nnn).startswith("DESIGN-") else None
+    rounds_data = None
+    rpath = None
+    if parsed:
+        id_part, rnd = parsed
         rpath = rounds_path(common, id_part)
+        rounds_data, _, rounds_err = load_rounds(common, id_part, root=None, seed=False)
+        if rounds_err:
+            msg = rounds_err
+            if msg.startswith("review-guard: "):
+                msg = msg[len("review-guard: "):]
+            if msg.startswith("refused - "):
+                msg = msg[len("refused - "):]
+            print("review-guard: GATE-INTEGRITY - %s" % msg)
+            return 1
+        for r in rounds_data.get("rounds") or []:
+            if r.get("round") == rnd:
+                flagged = (r.get("flagged_launch") or "").rstrip("Z")
+                if flagged and launched_at and flagged == launched_at.rstrip("Z"):
+                    print("review-guard: GATE-INTEGRITY - this Review B launch was voided by an earlier GATE-INTEGRITY verify; no reply and no verified mark; run Review B again on this snapshot")
+                    return 1
+                break
+    if parsed and exit_code == 0 and launch_ok:
+        id_part, rnd = parsed
         if os.path.isfile(rpath):
-            data, _, err = load_rounds(common, id_part, root=None, seed=False)
-            if not err:
-                for r in data.get("rounds") or []:
-                    if r.get("round") == rnd:
-                        flagged = (r.get("flagged_launch") or "").rstrip("Z")
-                        if flagged and launched_at and flagged == launched_at.rstrip("Z"):
-                            print("review-guard: GATE-INTEGRITY - this Review B launch was voided by an earlier GATE-INTEGRITY verify; no reply and no verified mark; run Review B again on this snapshot")
-                            return 1
-                        break
-    if (
-        not str(nnn).startswith("DESIGN-")
-        and bridge_env.parse_review_name(str(nnn))
-        and exit_code == 0
-        and launch_ok
-    ):
-        id_part, rnd = bridge_env.parse_review_name(str(nnn))
-        rpath = rounds_path(common, id_part)
-        if os.path.isfile(rpath):
-            data, _, err = load_rounds(common, id_part, root=None, seed=False)
-            if not err:
-                for r in data.get("rounds") or []:
-                    if r.get("round") == rnd and r.get("reply") is None:
-                        r["reply"] = 0
-                        break
-                write_rounds(common, id_part, data)
+            for r in rounds_data.get("rounds") or []:
+                if r.get("round") == rnd and r.get("reply") is None:
+                    r["reply"] = 0
+                    break
+            write_rounds(common, id_part, rounds_data)
     mark = {"nnn": str(nnn), "snapshot": snap_hash, "head": snap["head"], "taken": snap["taken"],
             "launched": launched_at, "exit": exit_code, "verified": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     try:
