@@ -129,18 +129,22 @@ EV_HEAD = ("1b. **Read the weekly dependency scan and the Dependabot alerts**, f
 EV_COMMANDS = (
     "gh workflow list --all --repo <owner>/<repo>",
     "gh run list --repo <owner>/<repo> --workflow dependency-scan.yml --created \">=<the ledger's _meta.last_extract>\" "
-    "--json databaseId,status,conclusion",
+    "--json databaseId,createdAt,status,conclusion",
     "gh run view <run id> --repo <owner>/<repo> --log-failed",
     "gh api repos/<owner>/<repo>/vulnerability-alerts",
     "gh api --paginate \"repos/<owner>/<repo>/dependabot/alerts?state=open\"",
 )
 EV_WINDOW = (
     "The date is a day and the schedule runs on the morning of the evaluation's own Sunday, so that list also holds the "
-    "runs the previous evaluation read. The window is the listed runs whose `databaseId` is greater than the `last run "
-    "read:` id the previous evaluation's Dependency scan section gives for the project, or every listed run where that "
-    "section gives none; each evaluation's section gives, per project, `last run read: <id>`, the newest completed run of "
-    "its window, or the previous section's id where the window completed none, so a run still in progress at the reading "
-    "is read the next Sunday, and a late or missing schedule leaves the window without a completed run.")
+    "runs the previous evaluation read. The window is the listed runs whose `createdAt` is later than the `last run "
+    "read:` time the previous evaluation's Dependency scan section gives for the project, or every listed run where that "
+    "section gives none; each evaluation's section gives, per project, `last run read: <createdAt>`, the creation time of "
+    "the newest completed run of its window, or the previous section's time where the window completed none, so a run "
+    "still in progress at the reading is read the next Sunday, and a late or missing schedule leaves the window without "
+    "a completed run. A run re-run from the Actions tab keeps its creation time and is not read again; the rerun this "
+    "step names, `gh workflow run`, starts a new run. While a finding stands, the section also gives `finding standing: "
+    "run <id>`, carried from each section to the next until a run of a later window ends `success`, so the finding is "
+    "reported every week it stands, beside whatever kind the week's own runs show.")
 EV_NOT_CONFIGURED = (
     "A list that holds no `dependency-scan.yml` names a project that has not received the workflow yet (one not "
     "calibrated to release T): it is written `not configured`, its calibration's item, and no run is read for it.")
@@ -173,7 +177,8 @@ EV_SENTENCES = (
     "lists the open alerts, every page of them, an empty list being alerts on with nothing open. A 403 on either call is "
     "the login's scope, named in a run sheet for the owner, never a token in text, the project's Security tab the "
     "fallback.",
-    "Step 4's file gives each project's kind, its `last run read:` id, its alerts and the remedy in a **Dependency scan** "
+    "Step 4's file gives each project's kind, its `last run read:` time and any `finding standing:` run, its alerts and "
+    "the remedy in a **Dependency scan** "
     "section, written every week beside the Pace section; a finding of either is an entry of the evaluation like any "
     "other.",
 )
