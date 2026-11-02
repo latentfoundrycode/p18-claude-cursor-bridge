@@ -87,7 +87,7 @@ def test_a_maintainers_request_is_recorded_and_answered():
 
 def test_a_stage_review_runs_in_parts_of_at_most_25_test_files():
     stage = section(SV, "**At a stage close, after the refactoring pass has merged", "**Then the stage's demonstration runs live:**")
-    assert "the test files' part at most 25 files" in stage
+    assert "every part bounded alike: a test part at most 25 files" in stage  # D2 (R-049, TASK-040)
     assert "run/review/STAGE-<name>-r<N>-<part>.diff" in stage
     assert "run again on what it had not reached (rule 43)" in stage
 

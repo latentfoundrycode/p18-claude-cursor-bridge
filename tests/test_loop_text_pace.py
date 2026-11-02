@@ -524,15 +524,18 @@ def test_r042_the_rounds_input_names_are_the_ones_the_guard_checks(tmp_path):
 
 def test_r042_the_stage_review_takes_the_rounds_names_and_its_scope_file():
     r = f(section(reflection(), "The procedure", 3))
-    assert ("write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the earlier rounds' "
-            "dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7); then `git add -f` "
-            "both and commit them on the stage branch.") in r
+    # TASK-040 (R-049, T11) rewrote step 2: the SCOPE sentence now follows the union's and names the class line's
+    # commit; its whole text is pinned in tests/test_release_t_stage_close.py (STEP2_SCOPE).
+    assert ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the earlier rounds' "
+            "dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7) with, beside it,") in r
+    assert ("then `git add -f` the round's diff, its parts and the SCOPE file and commit them on the stage "
+            "branch.") in r
     assert ("3. `python ~/.claude/cursor-bridge/review-guard.py snapshot STAGE-<name>-r<N>`, `<N>` the round it opens: "
             "one more than the rounds the guard has counted for the stage; the round's diff and its parts carry the "
             "snapshot's name, since the guard lists as the review's inputs, and refuses empty, the files under "
             "`run/review/` whose names hold it (KP-067); the SCOPE file, which it reads by the stage's name, is not "
             "among them, so confirm yourself that it is not empty.") in r
-    assert "origin/main > run/review/STAGE-<name>-r<N>.diff`, `<N>` the round step 3 opens;" in r
+    assert "origin/main > run/review/STAGE-<name>-r<N>.diff`, `<N>` the round step 3 opens," in r
     assert "4. Review A: `diff-reviewer` on `run/review/STAGE-<name>-r<N>.diff`," in r
     assert "origin/main -- <paths> > run/review/STAGE-<name>-r<N>-<part>.diff`" in r
     assert "naming run/review/STAGE-<name>-r<N>.diff and the stage>" in r

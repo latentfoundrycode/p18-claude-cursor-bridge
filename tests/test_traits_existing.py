@@ -78,7 +78,8 @@ SUBSECTIONS = {
     "installable": {"Which delivery kinds the intake passage is for": "intake.questions",
                     "Code signing": "design.sections",
                     "Which delivery kinds the Delivery section is for": "design.sections",
-                    "Which delivery kinds the packaging stage is for": "planning.stages"},
+                    "Which delivery kinds the packaging stage is for": "planning.stages",
+                    "The release's own install": "planning.stages"},  # P17 (R-049, TASK-040)
     "performance-budgets": {"The mechanism and the hot path": "design.sections"},
     "external-services": {},
 }

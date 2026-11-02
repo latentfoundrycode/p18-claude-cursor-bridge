@@ -172,3 +172,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The review ceiling
 - new TASK-039 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)
 - new TASK-039 bridge/cursor-bridge/workflow/phases/reflection.md The procedure
+- new TASK-040 bridge/cursor-bridge/workflow/phases/reflection.md The procedure
+- new TASK-040 bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md 9. Refactoring and optimization pass (at stage close)
+- new TASK-040 bridge/cursor-bridge/workflow/types/host-extension.md Add at planning.stages
+- new TASK-040 bridge/cursor-bridge/workflow/traits/installable.md The release's own install
