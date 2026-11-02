@@ -8,7 +8,6 @@ Notes:
 - **Stripped environment** (`bridge_env.stripped_env`; the shim applies the same test). Withheld: `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GIT_ASKPASS`, `SSH_ASKPASS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0`, every name `SECRET_LIKE` matches (whole-word TOKEN or SECRET, PASSWORD, PASSWD, PASSPHRASE, CREDENTIAL, API, ACCESS or PRIVATE KEY, a `_KEY` or `_KEYS` ending) but `CURSOR_*` and `GIT_CONFIG_KEY_*`. Set: `GH_CONFIG_DIR` (the empty folder), `GIT_TERMINAL_PROMPT=0`, `GIT_CONFIG_GLOBAL` (the bridge's gitconfig: includes `~/.gitconfig`, resets the helper list), `GIT_CONFIG_PARAMETERS='credential.helper='` (read after the checkout's `.git/config`), `HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH` (the agent home), `HF_HUB_CACHE`, `TORCH_HOME`, `PUPPETEER_CACHE_DIR` (the owner's caches, where present). `APPDATA` and `LOCALAPPDATA` are not set and stay the owner's real folders, so a store a tool reaches through them is found by default, as KP-038 says; their redirect is a program item for the maintainer, probed first (the shim and cursor-agent live under `LOCALAPPDATA`). Passed: the rest. An unusable agent home refuses the run (exit 125).
 - `bridge-run.py` strips for `cursor-agent` and with `--strip`; the loop's and the calibration's suite and driver launch commands carry `--strip` (R-052, TASK-041), the driver with `--scratch` naming its folder under the owner's profile, outside the agent home the strip names as `HOME`. A test, driver or watch run without the flag still gets the owner's environment, which the loop's text instructs only for a driver whose suite needs a variable beyond `.env`, under a recorded Decision in `docs/INVENTORY.md` naming the variable. `--key-file` is refused with `cursor-agent` and a driver; a driver's copy carries the project's `.env`. A watch run (`gh pr checks`) runs no builder-written code and keeps the owner environment by design. `p_test_suite` stays in `tb_supervisor`: it is the owner's user running the project's own interpreter in the Workspace, launched and bounded by the supervisor, its environment stripped by the loop's `--strip` but its process no agent's.
 - The guard's records lie in the checkout's `.git`; the sha256 copy outside it finds a rewritten snapshot. Both are in the owner's profile, which the agents' user can reach.
-- `p_dependency_scan` is designed (docs/DESIGN.md, "The weekly dependency scan", R-052), not yet in the tree.
 
 | Element | Paths |
 |---|---|
@@ -27,7 +26,7 @@ Notes:
 | p_shell_guard | bridge/cursor-bridge/shell-guard.py (.cursor/hooks/ copy) |
 | p_ci_tests | .github/workflows/tests.yml, job tests |
 | p_ci_security_floor | .github/workflows/tests.yml, job security-floor |
-| p_dependency_scan | .github/workflows/dependency-scan.yml (designed) |
+| p_dependency_scan | .github/workflows/dependency-scan.yml |
 | ds_checkout | the Workspace and Worktrees/ checkouts |
 | ds_run_outputs | run/agent/\*.err, run/review/REVIEW-nnn.err |
 | ds_runs_log | run/launcher/runs.jsonl |
@@ -100,7 +99,7 @@ end
 subgraph tb_ci["GitHub's CI: secrets as step-level env only"]
 p_ci_tests("CI tests")
 p_ci_security_floor("CI security floor")
-p_dependency_scan("Weekly scan, designed")
+p_dependency_scan("Weekly scan")
 ds_actions_secrets[("Actions secret")]
 end
 
@@ -178,10 +177,11 @@ p_bridge_install -->|"installs"| p_cursor_agent_shim
 p_bridge_install -->|"link .cursor, skeleton, rename probe"| ds_agent_home
 
 ext_github -->|"push or PR event, contents read, no persisted credentials"| p_ci_tests & p_ci_security_floor
-ext_github -->|"weekly schedule, contents read, no secret"| p_dependency_scan
+ext_github -->|"weekly schedule or workflow_dispatch, contents read, no secret"| p_dependency_scan
 ds_actions_secrets -->|"SECRET: Socket step env only"| p_ci_security_floor
 p_ci_security_floor -->|"SECRET: Socket token, manifest"| ext_advisory
 p_ci_security_floor & p_dependency_scan -->|"lockfile packages"| ext_advisory
-ext_advisory -->|"advisories, rules, OSV-Scanner pinned by SHA-256"| p_ci_security_floor & p_dependency_scan
+ext_advisory -->|"advisories, rules, OSV-Scanner pinned by SHA-256"| p_ci_security_floor
+ext_advisory -->|"advisories, OSV-Scanner pinned by SHA-256"| p_dependency_scan
 p_ci_tests & p_ci_security_floor & p_dependency_scan -->|"results, logs"| ext_github
 ```

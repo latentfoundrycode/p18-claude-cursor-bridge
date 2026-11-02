@@ -1,0 +1,33 @@
+name: dependency-scan
+on:
+  schedule:
+    - cron: '17 6 * * 0'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dependency-scan:
+    name: dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: OSV-Scanner
+        shell: bash
+        run: |
+          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"
+          echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          set +e
+          ./osv-scanner scan source --config=osv-scanner.toml --lockfile=requirements.txt:requirements.lock
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            exit 0
+          fi
+          echo "dependency-scan: OSV-Scanner exit $code"
+          if [ "$code" -eq 128 ]; then
+            echo "OSV-Scanner exit 128: no lockfile was read"
+          fi
+          exit "$code"
