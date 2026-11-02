@@ -332,11 +332,11 @@ def test_r002_workflow_is_the_pinned_one():
 
 
 def test_r002_workflow_is_the_only_one():
-    """R-002 (BUG-001 round 6, Review A): the pin and the one-secret rule read one file, so the workflow folder holds
-    that file alone; a second workflow (handing a secret to an install, or running on `pull_request_target`) fails
-    here and must widen these tests in the same diff."""
+    """R-002 (BUG-001 round 6, Review A), R-052: the pin and the one-secret rule read one file, and the weekly scan's file
+    is tests/test_dependency_scan.py's, so the workflow folder holds those two alone; another workflow (handing a secret
+    to an install, or running on `pull_request_target`) fails here and must widen these tests in the same diff."""
     names = sorted(p.name for p in WORKFLOW.parent.iterdir())
-    assert names == [WORKFLOW.name], f"R-002: the workflow folder holds {names}, not the pinned workflow alone"
+    assert names == sorted(["dependency-scan.yml", WORKFLOW.name]), f"R-002: the workflow folder holds {names}, not the two pinned workflows alone"
 
 
 def test_r002_one_step_holds_a_secret():
