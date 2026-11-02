@@ -169,7 +169,7 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # (BUG-031: two more move from traced to excused, under BUG-031's own `reword` entries but labelled by the earlier
 # entries that match first: the refactoring pass's step 6, whose title now names its REFAC-<nnn> brief IDs
 # (TASK-035), and rule 39, which retires step 4's old-<nnn> worktree (TASK-015))
-TRACED = "TRACED: 424 passages of baseline 0a186da; 139 in supervisor.md, 219 under workflow/, 0 dropped, 66 excused"
+TRACED = "TRACED: 424 passages of baseline 0a186da; 138 in supervisor.md, 214 under workflow/, 0 dropped, 72 excused"
 NOTES = [
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
@@ -184,6 +184,7 @@ NOTES = [
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - ```bash\\x0apython ~/.claude/cursor-bridge/bridge-run.py --limit",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - It answers in the critic's grades (Blocking, Should fix, Con",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **The loop stops by what was found, and after four rounds at",
+    "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - The convergence rule of step 8 (two reviewers naming the sam",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - `docs/DESIGN_CRITIQUE.md` has three parts, one block per sub",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - Also for a UI-bearing project, add an **\"Observability & Ver",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - **Gate:** present the design to the user. Do not proceed to ",
@@ -199,7 +200,11 @@ NOTES = [
     "NOTE (reword TASK-030) bridge/commands/supervisor.md: 3. Delegate to Cursor - - **The brief carries the constraints \\u2014 the command line car",
     "NOTE (reword TASK-030) bridge/commands/supervisor.md: 3. Delegate to Cursor - **Parallel increments** (only when `docs/RUN_PARAMETERS.md` ",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 3b. A model fails mid-step \\u2014 switch automatically, restart the step, never wait - (The one exception: every exit 125 whose message begins `bri",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 3b. A model fails mid-step \\u2014 switch automatically, restart the step, never wait - 3. **Restart the interrupted step** with the newly resolved ",
     "NOTE (reword TASK-030) bridge/commands/supervisor.md: 4. Inspect - **The tests run before the first reviewer** (release A5, pla",
+    "NOTE (reword TASK-030) bridge/commands/supervisor.md: 4. Inspect - Delegate the diff to **diff-reviewer**, naming the tests you",
+    "NOTE (reword TASK-039) bridge/commands/supervisor.md: 5. Scan - Delegate to **secret-sentinel** before anything is committed",
+    "NOTE (reword TASK-034) bridge/commands/supervisor.md: 7. Decide (accept the increment) - - **Accept** \\u2014 local review, scan, and tests pass. Run `scop",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 7. Decide (accept the increment) - - **Iterate** \\u2014 something is wrong and you understand why. R",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 7. Decide (accept the increment) - - **Re-delegate on a review REJECT** \\u2014 if a reviewer rejects",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: 7. Decide (accept the increment) - **Diagnose before you re-delegate a defect \\u2014 the `root-cause",
@@ -232,6 +237,7 @@ NOTES = [
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 24. Windowless by default. The user works on the same Window",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 28. The installed bridge is the governing text, and its vers",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 34. A request on a finished project is a change cycle: the s",
+    "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 36. Every artifact the loop writes lives inside `Workspace/`",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 39. Sequential work is branches in one checkout, never a wor",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 42. Every builder run ends with an `Assumed, not verified` l",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 43. Never end a turn while the loop has work unless somethin",
@@ -242,7 +248,7 @@ NOTES = [
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped, and the
-    excused ones exactly the sixty-six passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
+    excused ones exactly the seventy-two passages of the `reword` entries the carve (TASK-010), TASK-012, TASK-014,
     TASK-015, TASK-017, TASK-030, TASK-034, TASK-035 and BUG-031 declare (three in the core's "Main and conditional workflows", six
     standing rules, three under "Phase 2 \u2014 Design" (the design gate and the two paragraphs TASK-017 splits),
     one in the design-tooling flow, four in the change cycle, one each in steps 2, 3, 4 and 9, and one each in the
@@ -251,7 +257,7 @@ def test_r003_the_carve_traces_with_exactly_its_excuses():
     more in the run parameters, rules 6 and 42, and step 3's brief paragraph; BUG-031's two: the refactoring
     pass's step 6 and rule 39; and five passages BUG-033 reworded, which those entries excuse: the refactoring
     pass's step 4 and the run parameters' Parallel increments item and its `on` option, under TASK-035's, step 3's
-    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's; and three passages TASK-038 reworded, which those entries excuse: the design critique's launch block under "Phase 2 \u2014 Design", and step 8's title paragraph and its after-merge paragraph, under TASK-012's and TASK-034's), so an increment that excuses anything more changes this test. It
+    Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's; and three passages TASK-038 reworded, which those entries excuse: the design critique's launch block under "Phase 2 \u2014 Design", and step 8's title paragraph and its after-merge paragraph, under TASK-012's and TASK-034's; and six passages TASK-039 reworded: step 3b's restart item and step 7's Accept bullet, which TASK-034's entries excuse, step 5's paragraph, under TASK-039's own entry, and, at its Review A's round 1, the design critique's convergence paragraph under "Phase 2 — Design", step 4's reviewers paragraph and rule 36, under TASK-012's, TASK-030's and TASK-015's), so an increment that excuses anything more changes this test. It
     needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))

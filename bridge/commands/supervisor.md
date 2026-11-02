@@ -522,8 +522,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
    (Phase 6, step 7, "The review ceiling"). Below it, new, legitimate, now-fixed concerns
    each round are the gate working; keep going; once the increment's core behaviour is
    verified, record the long tail of a hard subsystem under the by-class line and merge it;
-   a late finding then blocks only if it is of the five, or if two or more reviewers or
-   auditors name it and it shows no class already recorded under that line (the convergence rule). At and above it,
+   a late finding then blocks only if it is of the five, within the threat model `docs/INVENTORY.md` records for the part it is in (outside it a finding is recorded, not blocking; where none is recorded, the five stand unbounded), its class shown by reproduction on an ordinary, realistic layout, a label alone never deciding (a security finding by whether untrusted input can reach it), two reviewers naming the same defect making it certain, never blocking of itself (the convergence rule). At and above it,
    every finding of an increment's review outside the five goes to `docs/HARDENING.md` with the
    increment, and a stage round's findings are disposed of as the reflection module's step 7
    says. Stop only on true non-convergence (same defect twice, a regressing fix). Resolve reviewer splits yourself, favouring established invariants; convene a
@@ -753,7 +752,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
     clean, `git diff <merge-base>...HEAD`) so a new file is never silently absent; a
     manifest change without its lockfile change fails `lock-check.py` before any reviewer;
     a brief is packaged only after a reality check that what it assumes exists as built;
-    two reviewers converging on one line is blocking.
+    two reviewers naming the same defect make it certain, and blocking only where it is of the five (rule 6).
 37. Code that talks to an external service is not done against a mock the builder invented.
     The integration's first increment is a contract capture — an attended live call whose
     real responses become the fixtures the tests replay — and "done" means passing against

@@ -137,7 +137,12 @@ def test_r042_the_class_line_the_text_gives_is_the_one_the_programs_read():
     assert ("You write it into the brief before the builder launch, where the launcher reads it, and into "
             "`run/review/SCOPE-<ID>.md` before the snapshot, where the guard reads it; a line lifts the one round it "
             "was written for.") in c
-    assert ("The reviewers are told of the line and confirm or deny it: a reviewer's denial voids the round's result "
+    assert ("The reviewers are told of the line and confirm or deny it against the code of the round it lifted as "
+            "that round's builder found it " + chr(0x2014) + " the commit that round's builder was launched on, its "
+            "brief's commit (for a round of your own fix, with no builder run, the head the previous round's "
+            "snapshot recorded), which you name beside the line at step 4 and in the SCOPE file, the brief carrying the line alone " + chr(0x2014)
+            + " never against the "
+            "fixed code under review: a reviewer's denial voids the round's result "
             "and withholds the merge as GATE-INTEGRITY does, and the breach is recorded in `docs/HARDENING.md` under "
             "the increment and as an issue.") in c
 
@@ -312,9 +317,13 @@ def test_r042_rule_6_states_the_outcomes_and_the_programs():
             "(`review-guard.py`) the Review B rounds (Phase 6, step 7, \"The review ceiling\")") in r
     assert "the owner's number at the plan's gate" in r
     assert ("once the increment's core behaviour is verified, record the long tail of a hard subsystem under the "
-            "by-class line and merge it; a late finding then blocks only if it is of the five, or if two or more "
-            "reviewers or auditors name it and it shows no class already recorded under that line (the convergence "
+            "by-class line and merge it; a late finding then blocks only if it is of the five, within the threat "
+            "model `docs/INVENTORY.md` records for the part it is in (outside it a finding is recorded, not blocking; "
+            "where none is recorded, the five stand unbounded), its class shown by reproduction on an ordinary, "
+            "realistic layout, a label alone never deciding (a security finding by whether untrusted input can reach "
+            "it), two reviewers naming the same defect making it certain, never blocking of itself (the convergence "
             "rule).") in r
+    assert "or if two or more reviewers or auditors name it" not in r
     assert ("At and above it, every finding of an increment's review outside the five goes to `docs/HARDENING.md` "
             "with the increment, and a stage round's findings are disposed of as the reflection module's step 7 "
             "says.") in r
@@ -336,14 +345,27 @@ def test_r042_the_digest_stays_within_its_cap_with_every_rule_number():
 
 
 def test_r042_the_convergence_rule_grades_certainty_never_class_in_both_homes():
+    """R-042 as revised by release T (P1, T20): two reviewers naming the same defect make it certain, and blocking only
+    where its content is of the five, at any round; a convergent finding of another class is fixed by the next
+    increment that edits its file or recorded, with no gate pass of its own; a recorded class stays that class; a
+    finding outside the recorded threat model is recorded, however many name it. The old sentence (two reviewers'
+    agreement blocking whatever the grade below the ceiling) is gone from both homes."""
     homes = {"policy": convergence_in(policy()), "loop": convergence_in(step8())}
     for name, t in homes.items():
         assert "The rule grades a finding's certainty, never its class." in t, name
-        assert ("Below the ceiling, two reviewers' agreement makes a finding blocking whatever its grade, with one "
-                "exception: a class already recorded under the by-class line for that increment or that stage — two "
-                "reviewers naming a further mutant, input or operator family of it name that class, which stays "
+        assert "independently name the same defect," in t and "same line or the same defect" not in t, name
+        assert "two findings on one line are one defect only where they name the same fault in it." in t, name
+        assert ("Two reviewers independently naming the same defect make it blocking where its content is of one of "
+                "the five blocking classes, at any round; a convergent finding of another class is fixed by the next "
+                "increment that edits its file, or recorded in `docs/HARDENING.md`, marked convergent, with no gate "
+                "pass of its own.") in t, name
+        assert ("A class already recorded under the by-class line for that increment or that stage stays that class: "
+                "two reviewers naming a further mutant, input or operator family of it name that class, which stays "
                 "recorded and starts no round, and no class of the five is ever on that line.") in t, name
-        assert "a convergent finding outside the five goes to `docs/HARDENING.md`, marked convergent" in t, name
+        assert ("A finding outside the threat model `docs/INVENTORY.md` (Decisions) records for the part it is in is "
+                "recorded, not blocking, however many reviewers name it; where none is recorded for that part, the "
+                "five stand unbounded.") in t, name
+        assert "two reviewers' agreement makes a finding blocking whatever its grade" not in t, name
 
 
 def test_r042_the_convergence_by_class_pointers_name_the_two_rules_apart():
@@ -386,10 +408,12 @@ def test_r042_step_8_commits_the_scope_file_before_the_round_named_snapshot():
             "first), a round off its count and a round above the ceiling with no lift") in s
     assert "\"<directive prompt>\" 2> run/review/REVIEW-<ID>-r<N>.err`" in s
     assert "**Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`" in s
-    assert "and, at a round above the ceiling, that round's `Blocking class:` line." in s
+    assert ("and, at a round above the ceiling, that round's `Blocking class:` line with, beside it, the commit "
+            "that round's builder was launched on, its brief's commit (for a round of your own fix, with no builder "
+            "run, the head the previous round's snapshot recorded).") in s
     assert ("(at a round at or above the ceiling, the guard's count at three or more, a sixth clause: grade every "
             "finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line "
-            "where it has one)") in s
+            "where it has one, against the code of the round it lifted, never against the fixed code under review)") in s
     assert ("`git diff <merge-base>...HEAD > run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot below "
             "is, the earlier round's diff and assumptions file removed with `git rm` and committed first, so that no "
             "round's diff carries another's;") in s
@@ -436,12 +460,14 @@ def test_r042_the_policy_carries_the_ceiling_the_names_and_the_breach():
             "increment, and a round above the ceiling runs only under a `Blocking class:` line or the owner's `Review "
             "rounds above the ceiling:` line.") in para
     assert ("Every reviewer and auditor grades each finding of a round at or above the ceiling by the five first and "
-            "confirms or denies the round's `Blocking class:` line where it has one; a denial is a breach, which voids the round's result and withholds "
+            "confirms or denies the round's `Blocking class:` line where it has one, against the code of the round it "
+            "lifted, never against the fixed code under review; a denial is a breach, which voids the round's result and withholds "
             "the merge as GATE-INTEGRITY does, recorded in `docs/HARDENING.md` and as an issue.") in para
     assert "\"<prompt>\" 2> run/review/REVIEW-<ID>-r<N>.err`" in p
     assert "names `run/review/SCOPE-<ID>.md`, committed beside the diff before the snapshot," in p
     assert ("that at a round at or above the ceiling every finding is graded by the five blocking classes first and "
-            "the SCOPE file's `Blocking class:` line, where it has one, confirmed or denied,") in p
+            "the SCOPE file's `Blocking class:` line, where it has one, confirmed or denied against the code of the "
+            "round it lifted, never against the fixed code under review,") in p
     assert "(`run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot," in p
     assert "It also reads `run/review/ASSUMPTIONS-<ID>-r<N>.md`" in p
     assert "the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`, step 7, \"The review ceiling\")" in p
@@ -601,25 +627,26 @@ def test_bug031_a_late_finding_has_one_outcome_in_all_three_homes():
         assert "outside the five back" not in home and "when it is not that tail" not in home
 
 
-def test_bug033_a_late_finding_two_reviewers_name_blocks_below_the_ceiling_in_every_home():
-    """BUG-033 (stage B5's review, round 2; core S1 and modules C2, convergent): below the ceiling, the three homes of
-    the late-finding sentence said a late finding blocks "only if it is of the five", while the convergence rule (the
-    policy's and step 8's "Convergence is a signal") makes a finding two reviewers name blocking whatever its grade,
-    outside a class already recorded under the by-class line: a convergent late finding outside the five had two
-    outcomes. Each of the three homes names the exception, and both convergence paragraphs keep the rule it points to.
-    enforces: R-042 (the by-class line; the convergence rule below the ceiling); rule 6; step 7's brake; the policy's
+def test_bug033_a_late_finding_two_reviewers_name_blocks_only_of_the_five_in_every_home():
+    """BUG-033 (stage B5's review, round 2; core S1 and modules C2, convergent) found the late-finding sentence and the
+    convergence rule giving a convergent late finding outside the five two outcomes, and made each home name the
+    convergence rule's exception. R-042 as revised by release T (P1, TASK-039) gives it one outcome the other way: two
+    reviewers naming a late finding make it certain, never blocking of itself, and it blocks only where its content is
+    of the five, at any round, in all three homes of the late-finding sentence and both convergence paragraphs.
+    enforces: R-042 (the by-class line; the convergence rule, as revised); rule 6; step 7's brake; the policy's
     re-delegation and convergence paragraphs; step 8's convergence paragraph"""
     r = rule(6)
-    assert ("a late finding then blocks only if it is of the five, or if two or more reviewers or auditors name it and "
-            "it shows no class already recorded under that line (the convergence rule).") in r
-    assert ("Below the ceiling, a late finding two or more reviewers or auditors name blocks too, unless it shows a "
-            "class already recorded under the by-class line (step 8, \"Convergence is a signal\").") in brake()
-    p = policy_paragraph("**Re-delegation runs while the code converges")
-    assert ("Below the ceiling, a late finding two or more reviewers or auditors name blocks too, unless it shows a "
-            "class already recorded under the by-class line (\"Convergence is a signal\", below).") in p
+    assert "a late finding then blocks only if it is of the five, within the threat model" in r
+    assert "two reviewers naming the same defect making it certain, never blocking of itself (the convergence rule)." in r
+    assert "or if two or more reviewers or auditors name it" not in r
+    for name, home in (("brake", brake()), ("policy", policy_paragraph("**Re-delegation runs while the code converges"))):
+        assert ("Two reviewers naming the same late finding make it certain, never blocking of itself: it blocks only "
+                "where its content is of the five") in home, name
+        assert "a late finding two or more reviewers or auditors name blocks too" not in home, name
     for name, home in (("policy", convergence_in(policy())), ("loop", convergence_in(step8()))):
-        assert ("Below the ceiling, two reviewers' agreement makes a finding blocking whatever its grade, with one "
-                "exception: a class already recorded under the by-class line for that increment or that stage") in home, name
+        assert ("Two reviewers independently naming the same defect make it blocking where its content is of one of "
+                "the five blocking classes, at any round;") in home, name
+        assert "two reviewers' agreement makes a finding blocking whatever its grade" not in home, name
 
 
 def test_bug031_evaluate_reports_says_what_the_pace_report_counts():

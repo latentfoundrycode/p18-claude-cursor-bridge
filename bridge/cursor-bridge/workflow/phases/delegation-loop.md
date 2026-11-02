@@ -11,6 +11,7 @@ After a compaction or a resume in this phase, read these before your next action
 - `docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass runs and whether increments run in parallel, and the models the delegate command and Review B name;
 - the increment's verdicts, kept in `run/supervisor/in-flight.md`: Review A's, each auditor's and Review B's reply, each written there as it returns, and the mutation run's cuts and estimate (step 7);
 - the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, `run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message (step 4), `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background, and the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files `run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); and, while a gate is open, its files under `run/review/` (the round's `REVIEW-<ID>-r<N>.diff`, `ASSUMPTIONS-<ID>-r<N>.md` and `REVIEW-<ID>-r<N>.err`, whose first line is the launch time `pr-activity-check.py` needs, and the increment's `SCOPE-<ID>.md`), whole, with the review guard's count of rounds opened for the increment, which names the next snapshot `<ID>-r<N>` (step 8) and says whether the round is above the ceiling (step 7, "The review ceiling");
+- after an interruption (a compaction, a resume, a session ended mid-run), the background task's output and its `.err` file, read first: with a snapshot open, `review-guard.py verify` runs before anything else once the run has ended, an `.err` holding `bridge-run: exit`; one with no such line is a run still going, waited for or ended with `bridge-stop.py` first, since a `verify` during the run resets the tree under the reviewer;
 - while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's "Keeping the pass's position"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.
 
 ### The procedure
@@ -180,7 +181,7 @@ that is not a model of the roster (exit 2) and changes nothing (KP-034).
      same brief is re-issued with the new `--model`. A Review B launch: re-run on the same
      committed diff file with the new reviewer. A resolution round or a stage-close pass:
      re-run the failed call with the new model; earlier completed calls stand. Nothing
-     partial survives, nothing completed is redone.
+     partial survives, nothing completed is redone. A change in flight that the old profile's builder built is rebuilt by the new profile's builder before any Review B reads it: `roster-check.py` prints a `REBUILD` line when the new Review B is of the family that built it, and the launcher refuses that Review B until the rebuild.
   4. **Record and report.** Open an issue (`ISS-nnn`) whose entry carries the stderr
      excerpt — that text is how the maintainer sharpens the classifier — and put the switch
      in the **first line of the next report**: "auto-switched to the native profile at
@@ -259,7 +260,7 @@ brief has no `## Scope` — a `spec-packager` defect; fix the brief, do not proc
 
 #### The tests before the first reviewer
 
-**The tests run before the first reviewer** (release A5, plan 13.1). Once the scope and diagram checks pass: if the increment's acceptance criteria are not yet covered by tests, write those tests yourself first — you are allowed to write tests, and tests written by the reviewer rather than the implementer are worth more; each carries the paragraph it enforces (`enforces: <document> §<section>` in its docstring or a comment).
+**The tests run before the first reviewer** (release A5, plan 13.1). Once the scope and diagram checks pass: if the increment's acceptance criteria are not yet covered by tests, write those tests yourself first — you are allowed to write tests, and tests written by the reviewer rather than the implementer are worth more; each carries the paragraph it enforces (`enforces: <document> §<section>` in its docstring or a comment). An increment you write yourself (`Author: supervisor.` in its plan entry) takes the same test-strength rule before its gate: its tests written first and run against its checkpoint (below), its mutants in its mutants file run by the bridge's engine, and each kill judged by the test it names.
 
 **The mutants are yours; the engine is the bridge's.** The increment's mutants are written here too, on your side, after the builder's run and never by the builder, in its mutants file `run/supervisor/<id>-mutants.json` (`<id>` the increment's ID): each mutant's `id`, its `file` and `pairs` (the text it replaces and the text it puts in its place), the test files it runs (`tests`) and the test ids that must fail (`expect_fail`), with the criterion tests those name, which are yours too (the brief's mutation list is the builder's own in-process check, by hand, no script of it in the diff). A builder's mutants are judged by nobody, and five that did not model their names once cost three rounds (reAngle TASK-010c); `diff-reviewer` reads your mutants file against each mutant's name as it reads a test against its paragraph, and a fix brief after a driver run asks for the code fix only. The engine that applies each mutant, runs its tests and records the outcome is the bridge's `mutation-run.py`, reviewed at the bridge's own gate; it works on a scratch copy of the Workspace and so restores nothing in it. A **driver** is a Python program under `run/supervisor/` or a `mutation-run.py` run, and nothing else, and every mutation run is a `mutation-run.py` run through the launcher's driver kind (`--kind driver`), in the background under the heavy launch's `timeout` (step 3, "The model, the timeout and the limit") like a suite, since a foreground launcher call ends at ten minutes (KP-061); the step resumes when its completion arrives. No driver edits the Workspace's files: a program under `run/supervisor/` that changes code changes it in a scratch copy in the system temporary folder, as `mutation-run.py` does, so a run killed at any point leaves nothing in the product (KP-056). `# wake` is not available for a driver: it stays for a benchmark or a runner the launcher does not know, each named with its reason in the status file. A driver run you must end is ended whole with `bridge-stop.py` (KP-056). The full mutation run comes at step 7, once the increment's behaviour is accepted (`delegation-loop/decide.md`, see "The mutation run").
 
@@ -270,7 +271,7 @@ brief has no `## Scope` — a `spec-packager` defect; fix the brief, do not proc
 #### The reviewers
 
 Delegate the diff to **diff-reviewer**, naming the tests you wrote and the paragraph each
-enforces, so it judges them against the paragraph and does not take them for the builder's.
+enforces, so it judges them against the paragraph and does not take them for the builder's. Give it, and each auditor below, the project's threat model as `docs/INVENTORY.md`'s Decisions record it for what the diff changes, or say that none is recorded. From the guard's count at three or more, tell them the round is at or above the ceiling, and at a round above it give them the brief's `Blocking class:` line with the commit beside it (step 7, "The review ceiling").
 You are asking two questions: does this implement the brief, and is it sound? A diff that does something better than the
 brief asked for is still a deviation — flag it rather than silently accepting it.
 File-level drift is already settled by the scope check before it reads; `diff-reviewer`'s
@@ -305,11 +306,11 @@ approved."
 
 Delegate to **secret-sentinel** before anything is committed. This runs on every
 increment without exception, including ones that look trivial. It runs
-`python ~/.claude/cursor-bridge/invisible-check.py` first (release A4): a zero-width or
+`python ~/.claude/cursor-bridge/invisible-check.py origin/main` first (release A4), against `origin/main` so that every commit of the branch is read: a zero-width or
 bidirectional character in a changed file hides a token from every reader and reorders
 what a reviewer sees, and the diff reviewers cannot see it either. `secret-sentinel` still flags
 unpinned or oddly-shaped dependency names and protected-path/`.gitignore` issues, but
-dependency **reputation** now belongs to the admission gate below, not its heuristic.
+dependency **reputation** now belongs to the admission gate below, not its heuristic. Before every commit of yours as well — a brief's, the accept commit, a records commit — run `python ~/.claude/cursor-bridge/invisible-check.py` with its default base, `HEAD`, which reads everything the commit takes: the staged, the unstaged and the untracked changes.
 
 ### 5b. Dependency-admission gate
 

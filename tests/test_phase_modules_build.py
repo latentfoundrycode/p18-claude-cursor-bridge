@@ -108,6 +108,10 @@ SURVIVAL = {
         "`pr-activity-check.py` needs, and the increment's `SCOPE-<ID>.md`), whole, with the review guard's count of rounds opened for the increment, which "
         "names the next snapshot `<ID>-r<N>` (step 8) and says whether the round is above the ceiling (step 7, \"The "
         "review ceiling\");",
+        "after an interruption (a compaction, a resume, a session ended mid-run), the background task's output and "
+        "its `.err` file, read first: with a snapshot open, `review-guard.py verify` runs before anything else once the "
+        "run has ended, an `.err` holding `bridge-run: exit`; one with no such line is a run still going, waited for or "
+        "ended with `bridge-stop.py` first, since a `verify` during the run resets the tree under the reviewer;",
         "while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's \"Keeping the "
         "pass's position\"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief "
         "with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.",
@@ -237,8 +241,11 @@ def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
 # brief (`<ID>-r<N>` inside a gate, BUG after a merge) and the brake's by-class bullet (the five classes, the class
 # the defect, for the increment or the stage), and added "The review ceiling" between the step and the mutation run (R-042);
 # BUG-033 (stage B5's review, round 2) added to the brake's by-class bullet the convergence exception below the
-# ceiling, naming two or more reviewers or auditors (7,832 characters; at TASK-034 7,641, sha256 dcf588e45b134ec8...)
-STEP7_SHA256 = "b9497aeec8f3a0b301c6430789874982dc4a8c7d051c167f26633c00857b43b7"
+# ceiling, naming two or more reviewers or auditors (7,832 characters, sha256 b9497aeec8f3a0b3...; at TASK-034 7,641,
+# sha256 dcf588e45b134ec8...); TASK-039 (release T) gave the Accept bullet P11's quoted counts and T10's records-only
+# commit, and the brake's by-class bullet T20's threat model, P2's membership and P1's convergent late finding
+# (8,933 characters; 8,941 after Review A's round 1 bounded the threat model to the parts it names, 8,794 before)
+STEP7_SHA256 = "c05d0386d8514eeb509dcf7aaf538434ddf7322bf2a7ad91314d40188523dfe6"
 
 
 def test_r032_step_7_is_verbatim():
@@ -247,7 +254,7 @@ def test_r032_step_7_is_verbatim():
     import hashlib
     sub = module(DECIDE)
     step = sub[sub.index("### " + STEP7):sub.index("#### The review ceiling")].rstrip()
-    assert len(step) == 7832 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
+    assert len(step) == 8933 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
 
 
 def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():

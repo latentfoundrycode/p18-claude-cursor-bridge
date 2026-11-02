@@ -313,9 +313,7 @@ edges), the supervisor draws a **by-class line**: it records each such finding t
 finding blocks the merge only if it is of one of the five **blocking classes** — behaviour
 against the brief or the register, security, data integrity, a defeated safety mechanism the
 increment relies on (a bug in the very timeout or kill path built to protect the run is core,
-not tail), a failing test. Below the ceiling, a late finding two or more reviewers or auditors name blocks too,
-unless it shows a class already recorded under the by-class line ("Convergence is a signal",
-below). The class is the defect, not the operator that exposed it: a
+not tail), a failing test. What a defect of the five is for the project is bounded by its threat model, recorded in `docs/INVENTORY.md` (Decisions) with its reason and what would reopen it and given to the reviewers with the diff, for the parts the model names: a finding in those parts outside it is recorded, not blocking, whatever its label and however many reviewers name it, and where the inventory records none for the part a finding is in, the five stand unbounded. Within it, a finding is a member of a blocking class when it reproduces as a regression or a false result on an ordinary, realistic project layout, a reviewer's label alone never deciding: one that needs a contrived setup goes to `docs/HARDENING.md` with the increment, and a security finding is judged instead by whether untrusted input can reach it (files a builder or reviewer writes, a cloned or third-party repository), never by the layout's ordinariness. Two reviewers naming the same late finding make it certain, never blocking of itself: it blocks only where its content is of the five ("Convergence is a signal", below). The class is the defect, not the operator that exposed it: a
 further mutant, input or operator family that shows a class already recorded in
 `docs/HARDENING.md` under the by-class line for the increment or the stage is that class and
 never a new one, while a defect of one of the five blocks whatever was recorded before.
@@ -327,23 +325,12 @@ the line is the rule: only a finding of the five sends the work back, every othe
 to `docs/HARDENING.md` with the increment, and a round above the ceiling runs only under a
 `Blocking class:` line or the owner's `Review rounds above the ceiling:` line. Every reviewer
 and auditor grades each finding of a round at or above the ceiling by the five first and confirms
-or denies the round's `Blocking class:` line where it has one; a denial is a breach, which voids the round's result and
+or denies the round's `Blocking class:` line where it has one, against the code of the round it lifted, never against the fixed code under review; a denial is a breach, which voids the round's result and
 withholds the merge as GATE-INTEGRITY does, recorded in `docs/HARDENING.md` and as an issue. Stop entirely only on genuine non-convergence: the **same** defect unfixed twice, or a
 fix that **regresses** something already passing. A deadlock over what the software should
 **do** is the one thing that reaches the human, as an intent question.
 
-**Convergence is a signal.** When two or more reviewers or auditors independently name the
-same line or the same defect, it is blocking even if each alone marked it advisory —
-decorrelated reviewers agreeing is the strongest evidence this gate produces (three of four
-converged on a lock-leaking lifecycle bug that each had called advisory). The rule is the code
-gate's: a design critique's two critics are bounded by rounds instead (§"Review B's design
-mode", below), and a finding both name keeps the grade its content earns. The rule grades a
-finding's certainty, never its class. Below the ceiling, two reviewers' agreement makes a
-finding blocking whatever its grade, with one exception: a class already recorded under the
-by-class line for that increment or that stage — two reviewers naming a further mutant, input
-or operator family of it name that class, which stays recorded and starts no round, and no
-class of the five is ever on that line. At and above the ceiling a convergent finding outside
-the five goes to `docs/HARDENING.md`, marked convergent.
+**Convergence is a signal.** When two or more reviewers or auditors independently name the same defect, it is certain even if each alone marked it advisory — decorrelated reviewers agreeing is the strongest evidence this gate produces (three of four converged on a lock-leaking lifecycle bug that each had called advisory); two findings on one line are one defect only where they name the same fault in it. The rule is the code gate's: a design critique's two critics are bounded by rounds instead (§"Review B's design mode", below), and a finding both name keeps the grade its content earns. The rule grades a finding's certainty, never its class. Two reviewers independently naming the same defect make it blocking where its content is of one of the five blocking classes, at any round; a convergent finding of another class is fixed by the next increment that edits its file, or recorded in `docs/HARDENING.md`, marked convergent, with no gate pass of its own. A class already recorded under the by-class line for that increment or that stage stays that class: two reviewers naming a further mutant, input or operator family of it name that class, which stays recorded and starts no round, and no class of the five is ever on that line. A finding outside the threat model `docs/INVENTORY.md` (Decisions) records for the part it is in is recorded, not blocking, however many reviewers name it; where none is recorded for that part, the five stand unbounded.
 
 **Split verdicts are resolved by the supervisor, not escalated.** First **name the
 disagreement out loud** — `REVIEWERS DISAGREE on <crux>`, which reviewers, and whether the
@@ -536,12 +523,12 @@ Two options for reaching it:
   and ends the run at the limit, KP-032 and KP-033) with
   a prompt that tells it to **read the diff from that file** — do **not** pass the diff
   inline through the shell — and that names `run/review/SCOPE-<ID>.md`, committed beside
-  the diff before the snapshot, where the supervisor wrote the brief's Scope and Out of scope, the tests it wrote
+  the diff before the snapshot, where the supervisor wrote the brief's Scope and Out of scope, the project's threat model from `docs/INVENTORY.md`'s Decisions, the tests it wrote
   first with the paragraph each enforces, and the bookkeeping files in the diff that are
   expected (`docs/BUILDER_NOTES.md`, the builder's report file under `handoff/`); the prompt itself says only that design for later increments is not this diff's
   defect, that a claim about a build is verified by building it, that the reviewer writes no file under the checkout and points no cache there, its scratch files and test caches going to the system temporary folder, and edits nothing, that at a round at or above the
   ceiling every finding is graded by the five blocking classes first and the SCOPE file's
-  `Blocking class:` line, where it has one, confirmed or denied, and that the reply is one of
+  `Blocking class:` line, where it has one, confirmed or denied against the code of the round it lifted, never against the fixed code under review, and that the reply is one of
   the three verdicts (release A5; `~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`, step 8, has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
   diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
   real failure that has happened — the file path avoids it.) Confirm from its reply that it
