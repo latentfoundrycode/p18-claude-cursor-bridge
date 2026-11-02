@@ -10,16 +10,13 @@ row (D5, D13, T27, T13, P21). KP-052: the one non-ASCII character these pins nee
 with chr(), never typed."""
 import os
 
+from phase_modules import read
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KP = os.path.join(ROOT, "bridge", "cursor-bridge", "Known-Pitfalls.md")
 D004 = os.path.join(ROOT, "docs", "diagrams", "D-004-context-dfd.md")
 DEV = os.path.join(ROOT, "docs", "diagrams", "DEVIATIONS.md")
 DASH = chr(0x2014)
-
-
-def read(path):
-    with open(path, encoding="utf-8") as f:
-        return f.read().replace("\r\n", "\n")
 
 
 def heading(number, title):

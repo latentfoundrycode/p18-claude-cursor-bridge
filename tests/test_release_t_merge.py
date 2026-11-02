@@ -10,9 +10,9 @@ and the three allow rules with the commands they admit. KP-052: the one non-ASCI
 dash, is built with chr(), never typed."""
 import json
 import os
-import re
 
 from permission_rules import rule_matches
+from phase_modules import flat, numbered_rule as rule, read, section
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIDGE = os.path.join(ROOT, "bridge")
@@ -31,42 +31,8 @@ SETTINGS = os.path.join(CB, "settings.bridge.json")
 EM = chr(0x2014)
 
 
-def read(path):
-    with open(path, encoding="utf-8") as f:
-        return f.read().replace("\r\n", "\n")
-
-
-def flat(text):
-    return re.sub(r"\s+", " ", text)
-
-
-def section(text, title):
-    """The section under the heading `title`, up to the next heading of its level or higher; a line inside a fenced
-    block is no heading."""
-    lines = text.split("\n")
-    fenced, start, level = False, None, 0
-    for i, line in enumerate(lines):
-        if line.startswith("```"):
-            fenced = not fenced
-            continue
-        m = None if fenced else re.match(r"(#+) (.*)$", line)
-        if m and start is None and m.group(2) == title:
-            start, level = i + 1, len(m.group(1))
-        elif m and start is not None and len(m.group(1)) <= level:
-            return "\n".join(lines[start:i])
-    assert start is not None, "heading %r" % title
-    return "\n".join(lines[start:])
-
-
 def step8():
-    return flat(section(read(MERGE), "8. Merge (the verified gate)"))
-
-
-def rule(n):
-    rules = section(read(CORE), "Standing rules")
-    start = re.search(r"^%d\. " % n, rules, re.M).start()
-    end = re.search(r"^%d\. " % (n + 1), rules, re.M).start()
-    return flat(rules[start:end])
+    return flat(section(read(MERGE), "8. Merge (the verified gate)", 3))
 
 
 def design_prompt(text):
@@ -94,7 +60,7 @@ def test_r045_t4_the_title_form():
     """T4: a pull request that merges no increment ends its title with bare IDs in parentheses; the `Merges:` trailer
     form holds only where the squash message is the description (step 8 and the policy's invocation)."""
     assert flat(" A pull request that merges no increment (records, a design, a fix of the records) starts its title with its kind (`Records:`, `Design:`) and ends it with the bare requirement or issue IDs it carries in parentheses, the one form every squash setting keeps, never a plan increment's ID there, which the squash reader would take as merged (ISS-013). The `Merges:` trailer form holds only where the repository's squash message is the pull request's description: where it is the commit messages, GitHub's default and the bridge's own repository's (read 2026-11-01), the trailer never reaches `main`, so the title form is the rule (T4).") in step8()
-    assert flat("\n**The merge's own commands.** Pushes and the merge run bare (`git push`, `gh pr merge <n> --squash --match-head-commit <sha>`), never piped, chained or wrapped: the allow rules and the permission guard read a command as written (rule 8, T8). A pull request's title starts with every increment ID it merges; one that merges none starts with its kind and ends with its bare requirement or issue IDs in parentheses, never a plan increment's ID there (ISS-013), and the `Merges:` trailer form holds only where the repository's squash message is the pull request's description (T4; the delegation loop's step 8, `~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`).\n").strip() in flat(section(read(POLICY), "Invocation"))
+    assert flat("\n**The merge's own commands.** Pushes and the merge run bare (`git push`, `gh pr merge <n> --squash --match-head-commit <sha>`), never piped, chained or wrapped: the allow rules and the permission guard read a command as written (rule 8, T8). A pull request's title starts with every increment ID it merges; one that merges none starts with its kind and ends with its bare requirement or issue IDs in parentheses, never a plan increment's ID there (ISS-013), and the `Merges:` trailer form holds only where the repository's squash message is the pull request's description (T4; the delegation loop's step 8, `~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`).\n").strip() in flat(section(read(POLICY), "Invocation", 2))
 
 
 def test_r045_t8_push_and_merge_bare():
@@ -160,7 +126,7 @@ def test_r046_t5_where_a_reviewer_may_write():
     assert "with five short clauses (release A5; where a reviewer writes, release T)" in step8()
     assert "a sixth clause: grade every" in step8() and "a fifth clause" not in step8()
     assert flat('write no file under the checkout and point no cache there, scratch files and test caches going to the system temporary folder, and edit nothing (what `verify` restores was still written, and a write under `docs/`, `handoff/` or `run/review/` is a flag);') in step8()
-    assert flat('that the reviewer writes no file under the checkout and points no cache there, its scratch files and test caches going to the system temporary folder, and edits nothing,') in flat(section(read(POLICY), "Invocation"))
+    assert flat('that the reviewer writes no file under the checkout and points no cache there, its scratch files and test caches going to the system temporary folder, and edits nothing,') in flat(section(read(POLICY), "Invocation", 2))
     prompt = design_prompt(read(DESIGN))
     assert "Write no file under the checkout, point no cache there, and edit nothing." in prompt
     assert design_prompt(read(POLICY)) == prompt
