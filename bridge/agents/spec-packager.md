@@ -286,7 +286,7 @@ instrumentation and reachability are **product code the builder implements** —
 specifies them; the observability *tests* that verify them are the supervisor's, not the
 builder's. Cite the `docs/DESIGN.md` Observability section.
 
-**Escapes as text; non-ASCII listed.** Write an escape sequence or a backtick as the characters you mean, through the file-writing tool, never through a tool or a shell that reads escapes (a here-document, an inline command): a shell reads a backslash sequence as the real character, a right-to-left override among them (KP-052). Before the supervisor's checkpoint commit, list in your report back every non-ASCII character the brief holds, by line and code point, so that each is checked.
+**Escapes as text; non-ASCII listed.** Name a character a brief must mention but must not hold by its code point (U+202E), never by a typed backslash escape, which no tool writes safely, the file-writing tool included (KP-052); write a backtick or a backslash through the file-writing tool, never through a shell that reads escapes (a here-document, an inline command), which reads a backslash sequence as the real character, a right-to-left override among them. Before the supervisor's checkpoint commit, list in your report back every non-ASCII character the brief holds, by line and code point, so that each is checked.
 
 ## Output
 

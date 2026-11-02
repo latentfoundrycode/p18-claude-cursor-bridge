@@ -209,13 +209,15 @@ def test_r049_d4_the_new_rules_admit_nothing_beyond_the_tag_s_namespace():
 
 def test_r049_d4_the_guard_treats_the_stage_tag_as_it_treats_the_loop_s_state_commands(program):
     """R-049, TASK-040's Done when: the permission guard reads the documented `git tag stage-review/<name>-<n>` as a
-    state change, as it reads `git commit` and `git push` (`tag` is in its STATE_GIT list beside them), so a chain
-    carrying it is refused as theirs is (rule 8); the tag's read and the remote-branch list are reads."""
+    state change, as it reads `git commit` and `git push` (its `tag` branch, beside `worktree`'s, reads a tag with a
+    name as a state change and `-l` as a read), so a chain carrying it is refused as theirs is (rule 8); the tag's read and
+    the remote-branch list are reads."""
     guard = program("permission-guard")
     documented = [cmd for _src, cmd in collect_commands()]
     tag = "git tag stage-review/<name>-<n>"
     assert tag in documented, tag
-    assert "tag" in guard.STATE_GIT and "commit" in guard.STATE_GIT and "push" in guard.STATE_GIT
+    assert "commit" in guard.STATE_GIT and "push" in guard.STATE_GIT
+    assert not guard.state_changing(guard.words("git tag -l"))
     for cmd in (tag, "git tag stage-review/T1-1", "git commit -m x", "git push origin task-040"):
         assert guard.state_changing(guard.words(cmd)), cmd
     for cmd in ("git cat-file -p stage-review/<name>-<n>:<path>", "git branch -r", "git tag -l"):

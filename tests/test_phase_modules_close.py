@@ -61,7 +61,8 @@ SURVIVAL = {
         "`docs/REQUIREMENTS.md`, with the failures `completion-check.py --mode done` printed at item 1: each is a gap in "
         "the previous delivery, reported to the owner first and planned ahead of the request unless the owner defers it;",
         "the change's records as far as they are written, whole: its `Change: <name>` section of `docs/DESIGN.md`, its "
-        "record in `docs/DESIGN_CRITIQUE.md` under the change's subject and under `<the change's name>-plan`, the "
+        "record in `docs/DESIGN_CRITIQUE.md` under the change's subject and, where the plan addendum is a subject of "
+        "its own (item 4), under `<the change's name>-plan`, the "
         "interface artifacts it amends, and its stages in `docs/BUILD_PLAN.md`;",
         "while its intake runs, this project's own Issues file, `Documents/<Name> Issues During Development and Their "
         "Solutions.md`, whole: it takes the place of the prior-project lessons step.",
@@ -275,8 +276,10 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
 # sentence, the only gates; TASK-014 left it at 6,378): the trace entry on "The procedure" excuses new text anywhere
 # under it, so CI holds the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this
 # pin is reviewed as a new trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the
-# increment's record names each passage it adds or rewords under the procedure
-PROCEDURE_SHA256 = "e440cf4ca3f4682799e5c11683df71e2dce634699c3d9765e2b651d8761e960d"
+# increment's record names each passage it adds or rewords under the procedure. BUG-040 (stage T1's review, Review
+# A's S3) rewords item 4 alone, its plan addendum criticised and gated with the design revision as one subject where
+# its increments stood in the design's review file from round 1 (design.md's T1): 7,291 characters
+PROCEDURE_SHA256 = "c996f09117cfab632a93770734efb2d1eccd94b86ca7ffe8bca6a9f2be745fb8"
 
 
 def test_the_change_cycles_procedure_is_pinned():
@@ -284,7 +287,7 @@ def test_the_change_cycles_procedure_is_pinned():
     one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
     text = module("change-cycle")
     proc = text[text.index("### The procedure"):].rstrip()
-    assert len(proc) == 7060 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
+    assert len(proc) == 7291 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
 
 
 def test_r004_the_positions_the_survival_lists_name_are_kept():
