@@ -97,6 +97,11 @@ def rule(n):
     return flat(m.group(1))
 
 
+def numbered_rule(n):
+    """Standing rule n of the core, flat, from its number to the next rule's: `rule(n)` with its `n. ` before it."""
+    return "%d. %s" % (n, rule(n))
+
+
 def registry_rows(heading="## Extension points"):
     """The rows of the registry's table under `heading`, each a {column: cell} dict."""
     text = read(REGISTRY)

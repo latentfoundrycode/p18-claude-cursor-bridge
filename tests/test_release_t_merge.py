@@ -12,7 +12,7 @@ import json
 import os
 
 from permission_rules import rule_matches
-from phase_modules import flat, read, rule, section
+from phase_modules import flat, numbered_rule as rule, read, section
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIDGE = os.path.join(ROOT, "bridge")

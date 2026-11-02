@@ -9,7 +9,7 @@ each pinning its sentence in the home the design's table names. KP-052: the one 
 the template's ellipsis, is built with chr(), never typed."""
 import os
 
-from phase_modules import digest, flat, read, rule, section
+from phase_modules import digest, flat, numbered_rule as rule, read, section
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIDGE = os.path.join(ROOT, "bridge")
