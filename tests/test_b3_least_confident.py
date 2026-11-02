@@ -174,7 +174,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("reflection.md", "Extension points"): (738, "bd09934998929fba6d2139393c37232ec3e9c13622b402ce9ac264fb7b7b8228"),
     ("reflection.md", "Keeping the position"): (536, "197743ebea82a65f13ab634c7a4d70966457f1d3bc711817bed81386dcf22277"),
     ("reflection.md", "Project end"): (200, "9a6b3ec9d97b138b9e9f711b9fab7d9f2846fdc6a8a8a93b567da2ef05b96429"),
-    ("reflection.md", "The procedure"): (14464, "f4ad0d4a4e87bb644c3abab55c0da2fefa9c92eaefd8cb9e9f5fb1cb3b54bc50"),
+    ("reflection.md", "The procedure"): (14631, "40899ce0a2a9ab273d663c838827b358854d8362628b30416879ab07939a25f6"),
     ("reflection.md", "What must survive a compaction"): (1836, "87bdea3faeda10fa68f51d4fa10b4459fa6b5b62e0dff6c155cac05dd8da7c21"),
     ("reflection.md", "Whether a compaction preceded it"): (897, "ebc5c943f5efaf88ed526fe33cf0e9ffa9364891949c853d27f525a674969be4"),
     ("run-parameters.md", "Extension points"): (683, "5ef8d017187dfd16f8fa971a8e7ef3551136b497387f14e9477562f84331976c"),

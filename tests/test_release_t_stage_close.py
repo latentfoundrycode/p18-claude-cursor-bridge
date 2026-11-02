@@ -37,7 +37,9 @@ T11 = ("Where stages interleave, a later stage's ready increments having merged 
        "<name>-r<N>`: the whole change as `run/review/STAGE-<name>-r<N>.diff` and one part per commit beside it, a path "
        "the stage changed again after another commit named `OVERLAP` (exit 1) and read in the parts (T11).")
 STEP2_SCOPE = ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the earlier rounds' "
-               "dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7); then `git add -f` "
+               "dispositions and, at a round above the ceiling, its `Blocking class:` line (step 7) with, beside it, the "
+               "head the previous stage round's snapshot recorded, against whose code the reviewers confirm or "
+               "deny the line, a stage round having no builder run; then `git add -f` "
                "the round's diff, its parts and the SCOPE file and commit them on the stage branch.")
 D2 = ("each part a `diff-reviewer` call of its own and every part bounded alike: a test part at most 25 files (counted "
       "by `git diff --name-only <the first checkpoint> origin/main -- <the test folders>`), a product part per package, "
