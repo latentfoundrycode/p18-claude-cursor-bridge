@@ -189,3 +189,7 @@ Open issues, the line as it stood before the calibration to 2026.10.30a: ISS-011
 ## Moved 2026-11-02 (TASK-043)
 
 Last accepted: TASK-041, R-052's text (PR #125, at its merge): the security floor's conventions (T9), the boundary log's ignore line (T22), the weekly scan's frozen block and the Sunday step that reads it, the conformance check before a change cycle's first delegation (T12), the relative `Layout:` line (T19), and `--strip` on the loop's suite and driver launches in five homes, observed first from this session with no prompt and no refusal (the heavy-launch rules kept); D-004's deviation on the suite's edge closed; before it Records: stage T1's close (PR #124); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-041, BUG-001 to BUG-038 and BUG-040, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+
+## Moved 2026-11-02 (BUG-041)
+
+Last accepted: TASK-043, BUG-039 (PR #126, at its merge): a flagged round spends nothing, whichever of `verify`'s checks flagged it and whenever, seven causes fixed on three builder rounds; D-003 and D-004 redrawn as built, the last four deviations closed; before it TASK-041, R-052's text (PR #125); before it Records: stage T1's close (PR #124); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-041 and TASK-043, BUG-001 to BUG-040, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
