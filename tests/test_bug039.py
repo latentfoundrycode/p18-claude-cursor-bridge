@@ -99,6 +99,21 @@ def test_bug039_site1_a_flag_before_any_git_command_voids_the_launch(tmp_path, l
     assert_voided_and_round_not_spent(repo)
 
 
+@pytest.mark.parametrize("rewritten", ["[]", "{}", '{"taken": 5}'], ids=["not-an-object", "no-taken", "taken-not-a-string"])
+def test_bug039_site1_negative_a_snapshot_rewritten_to_any_shape_stays_a_clean_flag(tmp_path, rewritten):
+    """R-042, D-003. enforces: TASK-043's brief, Requirement 8: the snapshot's content is untrusted at the first early
+    return, which now calls `record_flagged_launch`; a snapshot rewritten to valid JSON of another shape still ends in the
+    GATE-INTEGRITY line and exit 1, with no traceback. An invariant (it holds on the unfixed guard, which reads no field
+    there; a mutant of the fixed guard shows it strong)."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    (G.bridge_dir(repo) / ("review-%s.json" % NAME)).write_text(rewritten, encoding="utf-8")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "rewritten after it was taken" in out, out
+    assert "Traceback" not in out, out
+
+
 def test_bug039_site1_the_branch_held_in_another_worktree_voids_the_launch(tmp_path):
     """R-042, D-003. enforces: TASK-043 Done when (1), the third early return: the recorded branch checked out in another
     worktree."""
