@@ -185,11 +185,11 @@ def test_bug042_the_configurator_s_stop_has_a_way_forward():
     agent = flat(read(BRIDGE, "agents", "cursor-configurator.md"))
     assert "Stop and report the same where that step names no `--lockfile=` word," in agent
     assert "where any value it gives, its shell quotes aside, holds anything but letters, digits and `.`, `_`, `-`, `/`, `:`," in agent
-    assert " where the project has no such step," in agent
+    assert " where the project has no such step or no GitHub remote," in agent
     assert ("or where a workflow named `dependency-scan`, `.yml` or `.yaml` in any case, already stands and is not this block filled with the floor's list, compared whole.") in agent
     assert ("an increment brings an older floor pin to the block's, gives the floor the step or the word, or moves a lockfile whose value the list refuses, and you write the file after it merges;") in agent
-    assert ("a standing file that differs from the block only by an older block's pins or list is replaced whole from the block by the increment that moves them;") in agent
-    assert ("any other standing file is read by the supervisor and never overwritten unread, an increment of its own keeping, renaming or removing it;") in agent
+    assert ("a standing file that differs from the block only by an older block's pins or list is replaced whole from the block by an increment;") in agent
+    assert ("any other standing file is read by the supervisor and never overwritten unread, an increment of its own renaming or removing it;") in agent
     assert ("a floor pin newer than the block's is never taken back, and the file waits for the bridge release that carries it, the reason "
             "recorded in `docs/INVENTORY.md`;") in agent
     assert "a project with no GitHub remote has nowhere to run the workflow, the reason recorded there too;" in agent
@@ -210,9 +210,9 @@ def test_bug042_the_guide_and_the_evaluation_know_the_stop_s_two_cases():
     the guide met neither, while the evaluation read a project with no remote as a list it cannot read, a finding every Sunday, and one
     waiting for a newer pin as its calibration's item, which that calibration cannot act on."""
     guide = flat(read(BRIDGE, "cursor-bridge", "Cursor-Project-Configuration.md"))
-    assert "a project with no GitHub remote has nowhere to run it, and a floor pin newer than the block's waits for the bridge release that carries the newer pin." in guide
+    assert "Two cases go without it, each with its reason in `docs/INVENTORY.md` (`cursor-configurator`, the stop): a project with no GitHub remote has nowhere to run it, and a floor pin newer than the block's waits for the bridge release that carries the newer pin." in guide
     text = flat(read(BRIDGE, "commands", "evaluate-reports.md"))
-    assert "A project with no GitHub remote has no list to read: it is written `no remote`, the reason its inventory records," in text
+    assert "A project with no GitHub remote has no list to read and no alerts: it is written `no remote`, with the reason its inventory records, a finding where it records none, and no run and no alert is read for it." in text
     assert "Where its inventory records that the file waits for the bridge release that carries a newer floor pin, that reason takes the place of the calibration's item." in text
 
 
