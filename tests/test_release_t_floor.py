@@ -211,7 +211,7 @@ LOOP_SUITE = ("The suite runs through the launcher in the background, whatever i
               "stripped (`--strip`, between `--limit` and `--kind`): the flag withholds the owner's `gh` and git login and the environment's "
               "secret-like variables from code the builder wrote (D-004, R-052). A variable the suite needs reaches it by "
               "`--key-file <a file outside the Workspace>`, which the test kind accepts and which hands that code what the file names, "
-              "so a key file holds only what the brief or the inventory names for this increment, never what a test's failure asks for:")
+              "so a key file holds only what the brief or the inventory names for this increment, or the loop's own step names, never what a test's failure asks for:")
 LOOP_CHECKPOINT = ("stage them (`git add`), and launch the engine in the background like any mutation run, stripped and "
                    "with its scratch folder named as step 7 says (`delegation-loop/decide.md`, \"The mutation run\"), the "
                    "`python` after the `--` being the project's own interpreter:")

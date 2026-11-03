@@ -46,7 +46,7 @@ def test_bug043_the_loop_runs_the_increment_s_own_files_through_the_launcher():
     text = loop()
     assert "A run of the increment's own test files alone goes through the launcher the same way, yours and never `test-runner`'s, since it runs code no reviewer has read: `" + OWN_FILES + "`, in the background under the same `timeout`, and `test-runner` reads that file." in text
     assert "A run of the increment's own test files alone may run in the foreground" not in text
-    assert "A stripped suite or own-file run that fails for want of a variable takes `--key-file` as above, for want of a file a variable naming a copy outside the Workspace, never a home variable, which would undo the strip, and is never run again without `--strip`; a 125 on a runner you know, or naming the agent home, is a defect to fix, not a runner the launcher does not know." in text
+    assert "A stripped suite or own-file run that fails for want of a variable takes `--key-file` as above, a variable nothing names being the run's failure, back to the builder or the owner, and for want of a file a variable naming a copy outside the Workspace, never a home variable, which would undo the home redirect; it is never run again without `--strip`, and a 125 on a runner you know, or naming the agent home, is a defect to fix, not a runner the launcher does not know." in text
 
 
 def test_bug043_the_test_runner_reads_their_file():
@@ -54,18 +54,18 @@ def test_bug043_the_test_runner_reads_their_file():
     assert "you may run the increment's own test files alone in the foreground." not in text
     assert "The increment's own test files alone are the supervisor's launch too, stripped, in the background, since they run code no reviewer has read: `" + OWN_FILES + "` (D-004, R-052), and you read that file." in text
     assert "If you are asked to run either yourself, say so and hand the command back." in text
-    assert "A stripped run that fails for want of a variable or a file is said so in your report, for the supervisor's `--key-file`, and never run again without `--strip`." in text
+    assert "A stripped run that fails for want of a variable or a file is said so in your report, for the supervisor's `--key-file` where the brief or the inventory names it, and never run again without `--strip`." in text
     assert "so read the run's file first" in text
     assert "so run the suite first" not in text
     assert "You run tests and report failures." not in text
     assert "the run is lost with its result" not in text
 
 
-def test_bug043_the_claim_says_what_the_launches_do():
+def test_bug043_the_claim_says_what_the_flag_withholds():
     """Review A's B1 and the audit's B3 of the second text: a sentence about every launch of the loop was false against `# wake`'s direct run and against the key file in its own next clause. It now says what the flag withholds, and what a key file hands over."""
     assert OLD_CLAIM not in loop()
     assert "no launch of the loop" not in loop()
-    assert "the flag withholds the owner's `gh` and git login and the environment's secret-like variables from code the builder wrote (D-004, R-052). A variable the suite needs reaches it by `--key-file <a file outside the Workspace>`, which the test kind accepts and which hands that code what the file names, so a key file holds only what the brief or the inventory names for this increment, never what a test's failure asks for:" in loop()
+    assert "the flag withholds the owner's `gh` and git login and the environment's secret-like variables from code the builder wrote (D-004, R-052). A variable the suite needs reaches it by `--key-file <a file outside the Workspace>`, which the test kind accepts and which hands that code what the file names, so a key file holds only what the brief or the inventory names for this increment, or the loop's own step names, never what a test's failure asks for:" in loop()
     design = flat(read(ROOT, "docs", "DESIGN.md"))
     assert "builder-written code never runs in the loop" not in design
     assert "no launch of the loop" not in design
@@ -96,7 +96,7 @@ def test_bug043_every_home_states_a_class_not_a_count():
 
 def test_bug043_step_4_reads_the_git_config_as_a_file_first():
     """The audit's B2 of the first text; Review A's B2 and S1 and the audit's B1 and B2 of the second: a `.git` setting a builder or its tests wrote runs on the session's next git command, in its own environment, and no diff shows `.git`. The read stands after every run of what a builder wrote, reads a class of lines, and says what it is: text cannot hold the order, so it is a check, not a boundary, and the launcher's comparison is a program item."""
-    assert "After a run of what a builder wrote (a builder, the own-file run, a suite) and before your next git command, step 3b's `git status` and reset and a parallel branch's switch included, read `.git/config` with the Read tool, never through git, and list `.git/hooks`: a line you did not write that names a program or another file (`core.fsmonitor`, a foreign `core.hooksPath`, `diff.*`, `filter.*`, `include*`, `extensions.*`, among them), a new hook, or a `.git/config` that cannot be read is a gate-integrity flag, the line removed by hand (KP-032). This is a check, not a boundary: the strip does not keep a run from writing `.git`, and a git command the session or the app runs first still runs what it wrote; the launcher's comparison before and after a run is a program item." in loop()
+    assert "After a run of what a builder wrote (a builder, the own-file run and a suite among them) and before your next git command, step 3b's `git status` and reset and a parallel branch's switch included, read `.git/config` with the Read tool, never through git, and list the active hooks folder and `.git/hooks`: a line you did not write that names a program or another file (`core.fsmonitor`, a foreign `core.hooksPath`, `diff.*`, `filter.*`, `include*`, `extensions.*`, among them), a new hook, or a `.git/config` that cannot be read is a gate-integrity flag, the line removed by hand (KP-032). This is a check, not a boundary: the strip does not keep a run from writing `.git`, and a git command the session or the app runs first still runs what it wrote; the launcher's comparison before and after a run is a program item." in loop()
     plan = flat(read(ROOT, "docs", "BUILD_PLAN.md"))
     assert "a launcher comparison of `.git/config`, `.git/config.worktree`, `.git/info/attributes` and the hooks folders before and after a run of what a builder wrote" in plan
     assert "a refusal of a home variable in a `--key-file`" in plan
@@ -105,12 +105,18 @@ def test_bug043_step_4_reads_the_git_config_as_a_file_first():
 def test_bug043_every_home_states_what_the_strip_does_not_stop():
     """Review A's B2 and the audit's B1 of the second text, the threat model R-050 asks to be recorded: what a run is handed is withheld; what it can reach on purpose is KP-032's, stated, with the crossing drawn."""
     inventory = flat(read(ROOT, "docs", "INVENTORY.md"))
-    assert "The strip withholds what a run is handed, never what it can reach on purpose: a test that writes `.git` so that a later git command runs its program, or that asks the credential store, is KP-032's deliberate reach, stated here, never blocking by itself (R-050)" in inventory
+    assert "The strip withholds what a run is handed, never what it can reach on purpose. That neither the strip nor the loop's text can stop a run writing the checkout's `.git`, so that a later git command runs its program, or asking the credential store, is a stated limit, KP-032's, no blocking finding by itself (R-050)" in inventory
+    assert "the act is not the limit: code in a diff that does either, or a line step 4's check finds, is a gate-integrity flag and a security finding, as the guard's row says for a reviewer." in inventory
+    assert "a check, not a boundary, since a git command of the session or the app may run first." in inventory
+    assert "so it holds only what the brief or the inventory names for this increment, or the loop's own step names." in inventory
+    assert "a step 4 flag or a diff's test is found in real work" in inventory
+    assert "KP-032's deliberate reach, stated here, never blocking" not in inventory
     design = flat(read(ROOT, "docs", "DESIGN.md"))
     assert "a stripped run can still write `.git`, which a later git command of the session runs: step 4 reads it as a check, not a boundary (KP-032)" in design
     d004 = flat(read(ROOT, "docs", "diagrams", "D-004-context-dfd.md"))
     assert "A stripped run can still write `.git`, which a later git command of the session runs: step 4's check, not a boundary (KP-032)." in d004
-    assert 'p_test_suite -->|"UNTRUSTED: writes, .git config, hooks, which a later git command of the session runs (BUG-043)"| ds_checkout' in d004
+    assert 'p_test_suite -.->|"UNTRUSTED: a deliberate write, .git config, hooks, which a later git command of the session runs (BUG-043)"| ds_checkout' in d004
+    assert 'p_test_suite -.->|"deliberate only"| ext_credential_store' in d004
     assert "| ds_run_outputs | run/agent/\\*.err, run/agent/\\*.out, run/review/REVIEW-nnn.err |" in read(ROOT, "docs", "diagrams", "D-004-context-dfd.md")
 
 
