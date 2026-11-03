@@ -96,7 +96,7 @@ Escalate to the user only if the crux turns out to be intent — what the softwa
 never correctness.
 
 If a run has left the tree in a state you cannot make sense of:
-`git reset --hard HEAD` returns you to the checkpoint. Say so plainly when you do it.
+step 4's read of `.git/config` and the hooks folders, then `git reset --hard HEAD` returns you to the checkpoint. Say so plainly when you do it.
 
 #### The review ceiling
 

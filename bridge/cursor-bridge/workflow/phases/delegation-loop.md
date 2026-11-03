@@ -99,7 +99,7 @@ Rules for this call, all of which matter:
 python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind builder -- cursor-agent -p --force --workspace ../Worktrees/TASK-<nnn> --model <builder> "Read handoff/TASK-<nnn>.md and implement exactly what it specifies. Stay inside the Scope section. Do not modify .env, secrets/, CI configuration, or anything under docs/ or handoff/ unless the Scope section names the file. Do not add dependencies. When finished, print a one-paragraph summary and the path of your report file." 2> run/agent/TASK-<nnn>.err
 ```
 
-4. **When a builder finishes**, remove its worktree from your checkout (`python ~/.claude/cursor-bridge/worktree-teardown.py ../Worktrees/TASK-<nnn>`, which refuses while anything is linked inside and never forces), switch your checkout to its branch, and run steps 4 to 8 there like any increment: the scope check with `--base <the recorded starting commit>`, the diagram check, the reviews, the tests, the accept commit, the pull request, the gate, the merge. Process finished branches **one at a time**. Before the accept commit of every branch after the first, run `git merge --no-edit origin/main` to bring in what merged meanwhile — the other increment's code, disjoint by construction, and its record updates, so the change log, the inventory, and the register do not conflict. CI runs on the pull request's merge with `main`, so the combined state is tested either way.
+4. **When a builder finishes**, make step 4's read of `.git/config` and the hooks folders, then remove its worktree from your checkout (`python ~/.claude/cursor-bridge/worktree-teardown.py ../Worktrees/TASK-<nnn>`, which refuses while anything is linked inside and never forces), switch your checkout to its branch, and run steps 4 to 8 there like any increment: the scope check with `--base <the recorded starting commit>`, the diagram check, the reviews, the tests, the accept commit, the pull request, the gate, the merge. Process finished branches **one at a time**. Before the accept commit of every branch after the first, run `git merge --no-edit origin/main` to bring in what merged meanwhile — the other increment's code, disjoint by construction, and its record updates, so the change log, the inventory, and the register do not conflict. CI runs on the pull request's merge with `main`, so the combined state is tested either way.
 5. **A re-delegation** after a review runs in your own checkout like any sequential increment.
 
 Never use Cursor's own `--worktree` option: it places the checkout under your home folder, outside the project and outside the Workspace boundary. **One writer per checkout** holds throughout: no two builders share a checkout, and you never touch a checkout a builder is running in. The price is known: a builder in a worktree has no project environment (no virtual environment, no installed packages), so it cannot run the test suite and its first delivery may need one more iteration. Record each running builder on `In flight:`; each is a background task, so the loop guard knows something will wake you.
@@ -135,7 +135,7 @@ ceiling" says; every other `bridge-run: refused - ` of a builder or review launc
 `heavy.lock`, a limit, a key file) and every other `review-guard: refused - ` is no model's failure
 either, and is read and fixed as its message says.)
 
-**First, when the exit code is 124, look before you discard** (KP-033): `git status` and
+**First, when the exit code is 124, look before you discard** (KP-033): step 4's read of `.git/config` and the hooks folders, then `git status` and
 `git diff --stat` in the checkout. A builder that completed its edits and then hung on its
 way out (a lost connection while reporting, an orphaned server it started) has done the
 work; take the tree through the normal inspect, scan and test steps as if the run had
@@ -168,7 +168,7 @@ that is not a model of the roster (exit 2) and changes nothing (KP-034).
   has already marked the pool exhausted (or the model unavailable, for six hours) in the
   roster's state file (`.git/bridge/roster-state.json`, which no reset touches). Now, **in
   this order**:
-  1. **Restart point first.** A delegation: the working tree goes back to the
+  1. **Restart point first.** A delegation: step 4's read of `.git/config` and the hooks folders, then the working tree goes back to the
      pre-delegation checkpoint (`git reset --hard <checkpoint sha>` then `git clean -fd`
      inside the workspace — the checkpoint exists exactly for this). The reset cannot
      erase the switch: the roster's state lives under `.git/bridge/`, and the re-resolve

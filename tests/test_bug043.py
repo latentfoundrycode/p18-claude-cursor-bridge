@@ -102,6 +102,24 @@ def test_bug043_step_4_reads_the_git_config_as_a_file_first():
     assert "a refusal of a home variable in a `--key-file`" in plan
 
 
+def test_bug043_each_git_command_after_a_run_comes_after_the_read():
+    """Review B's second finding: step 4's sentence names step 3b's `git status` and reset and a parallel branch's switch, while those sites still put the git command first, so a reader at the site runs what a builder wrote before the read. Each site now says the read comes first."""
+    text = loop()
+    read_first = "step 4's read of `.git/config` and the hooks folders, then "
+    assert "look before you discard** (KP-033): " + read_first + "`git status` and `git diff --stat` in the checkout." in text
+    assert "**Restart point first.** A delegation: " + read_first + "the working tree goes back to the pre-delegation checkpoint (`git reset --hard <checkpoint sha>`" in text
+    assert "**When a builder finishes**, make " + read_first + "remove its worktree from your checkout" in text
+    decide_text = flat(read(BRIDGE, "cursor-bridge", "workflow", "phases", "delegation-loop", "decide.md"))
+    assert "a state you cannot make sense of: " + read_first + "`git reset --hard HEAD` returns you to the checkpoint." in decide_text
+
+
+def test_bug043_d004_s_note_names_no_only():
+    """Review B's first finding: "instructs only for a driver" was the absolute the fix removed from the loop, false against the note's own next sentences."""
+    d004 = flat(read(ROOT, "docs", "diagrams", "D-004-context-dfd.md"))
+    assert "instructs only for a driver" not in d004
+    assert "A test, driver or watch run without the flag still gets the owner's environment; of the launcher's runs of builder-written code, the loop's text leaves the flag off by name for a driver whose suite needs a variable beyond `.env`, under a recorded Decision in `docs/INVENTORY.md` naming the variable." in d004
+
+
 def test_bug043_every_home_states_what_the_strip_does_not_stop():
     """Review A's B2 and the audit's B1 of the second text, the threat model R-050 asks to be recorded: what a run is handed is withheld; what it can reach on purpose is KP-032's, stated, with the crossing drawn."""
     inventory = flat(read(ROOT, "docs", "INVENTORY.md"))
@@ -167,4 +185,4 @@ def test_bug043_the_design_is_past_the_retrofit():
 def test_bug043_the_inventory_keeps_the_trace_series():
     """Round 2's records part, C4: the series names the last move of the count tests/test_core_carve.py pins."""
     inventory = read(ROOT, "docs", "INVENTORY.md")
-    assert inventory.count("79 since BUG-042") == 2
+    assert inventory.count("83 since BUG-043") == 2
