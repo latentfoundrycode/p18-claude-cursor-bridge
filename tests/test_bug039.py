@@ -393,6 +393,53 @@ def test_bug039_site2_negative_a_void_touches_only_its_key(tmp_path):
     assert after == before
 
 
+def void_path_call(tmp_path, monkeypatch, snap, rounds=None):
+    """`record_flagged_launch` called directly on round 1 of a launched round, the record's read and write stubbed: returns the
+    reads and the writes it made. With `rounds` None the read fails the test, so a call that returns before it passes."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    guard = load_guard(monkeypatch)
+    reads, writes = [], []
+
+    def read(*args, **kwargs):
+        assert rounds is not None, "the record was read"
+        reads.append(args)
+        return {"rounds": rounds}, None, None
+
+    monkeypatch.setattr(guard, "load_rounds", read)
+    monkeypatch.setattr(guard, "write_rounds", lambda common, id_part, data: writes.append(data))
+    guard.record_flagged_launch(os.path.realpath(str(G.bridge_dir(repo).parent)), str(repo), NAME, snap)
+    return reads, writes
+
+
+def test_bug039_void_path_a_launch_before_the_snapshot_reads_no_record(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: with a snapshot given, a launch before
+    it returns before any read of the record, whose read can raise on what `load_rounds` does not catch."""
+    assert void_path_call(tmp_path, monkeypatch, {"taken": "2999-01-01T00:00:00Z"}) == ([], [])
+
+
+def test_bug039_void_path_no_entry_with_a_snapshot_still_writes(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: with a snapshot given and no entry for the
+    round, the record is written back as it was read, no entry gaining a void."""
+    reads, writes = void_path_call(tmp_path, monkeypatch, {"taken": ""}, rounds=[{"round": 2, "time": "2000-01-01T00:00:00Z"}])
+    assert reads and writes == [{"rounds": [{"round": 2, "time": "2000-01-01T00:00:00Z"}]}]
+
+
+def test_bug039_void_path_no_entry_without_a_snapshot_writes_nothing(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: with no snapshot, only an entry for the round
+    with a time at or before the launch gives a write; no entry gives none."""
+    reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[{"round": 2, "time": "2000-01-01T00:00:00Z"}])
+    assert reads and writes == []
+
+
+def test_bug039_void_path_an_entry_with_no_time_and_no_snapshot_writes_nothing(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: the round's recorded time is what a call
+    with no snapshot voids by, so an entry with an empty time gives no write."""
+    reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[{"round": 1, "time": ""}])
+    assert reads and writes == []
+
+
 # --- Site 3: premerge's git call ----------------------------------------------------------
 
 def verified_round(tmp_path):
