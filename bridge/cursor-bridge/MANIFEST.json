@@ -1,6 +1,6 @@
 {
   "version": "2026.10.30d",
-  "generated": "2026-11-03 11:30",
+  "generated": "2026-11-03 13:46",
   "files": {
     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
@@ -11,7 +11,7 @@
     "agents/secret-sentinel.md": "903d162d668e6cead11d208240bba9ac73868f132a5ea5292ecc33506bb46150",
     "agents/security-auditor.md": "8f7c3e9b3b6467accf81ffe6c4904966789e251ef0ac2bbab23fdca3c8b903ce",
     "agents/spec-packager.md": "4f1a3d435db670c6fbcc1c6ad862cee819d9b8dfbdf3a9a70827834c83dca7d8",
-    "agents/test-runner.md": "abbaa2acc5252dc9357906a4e06fb9a3d49078659c54645fd85068a905c25d36",
+    "agents/test-runner.md": "39ab421b3e81096e27f07c1509279730abc1d68e38a39087c5d49cb412c87761",
     "commands/calibrate-bridge.md": "4019373a2a8e938cca4d275a5e58970f3b018ef1bd5d8004eac99f82150564dd",
     "commands/evaluate-reports.md": "3a72fa1647401c9bec9dfd267ee93fe2651dd3fdc9ede571674a502dae543383",
     "commands/supervisor.md": "81d5cc08ae320dc8c4eb630536c38cc7cc3d88f7bb4643dd3417fabebb8b39b4",
@@ -113,7 +113,7 @@
     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
     "cursor-bridge/workflow/phases/change-cycle.md": "c634fec9a161871b6e67d9098e0b01c6b2ba463c7603c2f3a6c2812ae7f8d090",
     "cursor-bridge/workflow/phases/configuration.md": "2f309ea4908f2187bba3fab6f3eed62df45af5b9c5b15cc068c203fb70d88dc3",
-    "cursor-bridge/workflow/phases/delegation-loop.md": "c3fc4d8a3e253d9a5e5395e9cdbe4dfab03381920f1d045fa22d9ea6fb7abca5",
+    "cursor-bridge/workflow/phases/delegation-loop.md": "2b46198ae11eb7e6ddd81027cbd28f8dda898026ad63106810153607346359ec",
     "cursor-bridge/workflow/phases/delegation-loop/decide.md": "43814624972b92adabfc6c8fa8aec8f86f98edaf31851dace662e9ac29ba5d03",
     "cursor-bridge/workflow/phases/delegation-loop/merge.md": "3caf33a7b03f1510f6755ebd6c4d5ad1655d790796d026a66b4bf65fda9a8d92",
     "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "bec0f719a2c9f1eb9b586f19898606d8b2009cfaf3a125d7656146383a3156f0",

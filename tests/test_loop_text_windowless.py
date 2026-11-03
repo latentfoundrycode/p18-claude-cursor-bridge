@@ -162,7 +162,7 @@ def test_r040_step_3b_handles_the_slots_exits_without_a_model_failure():
 def test_r039_every_suite_runs_through_the_launcher_and_test_runner_reads_its_file():
     """R-039: a suite is the recorded suite command or any run of more than the increment's own test files; every
     suite runs through the launcher in the background, whatever its length, and test-runner reads the output file; the
-    increment's own test files alone may run in the foreground; test-runner.md says the suite is always the
+    increment's own test files alone go through the launcher stripped (BUG-043) and may run in the foreground; test-runner.md says the suite is always the
     launcher's background run whose file it reads."""
     s = flat(section(loop(), "The tests before the first reviewer", 4))
     for sentence in (
@@ -175,15 +175,16 @@ def test_r039_every_suite_runs_through_the_launcher_and_test_runner_reads_its_fi
         "It runs under the heavy launch's `timeout` (step 3); its completion wakes you, and `test-runner` then reads that "
         "file.",
         "so a suite never runs in the foreground and its expected length no longer chooses the path.",
-        "A run of the increment's own test files alone may run in the foreground, yours or `test-runner`'s, since this "
-        "session's console is hidden (a probe of 2026-10-20), where it ends within the ten minutes a foreground "
-        "command has (KP-061); a longer one runs through the launcher like a suite.",
+        # re-taken at BUG-043: the increment's own files through the launcher, stripped (tests/test_bug043.py)
+        "and may run in the foreground, yours or `test-runner`'s, since this session's console is hidden (a probe of "
+        "2026-10-20), where it ends within the ten minutes a foreground command has, any wait for the slot included "
+        "(KP-061); a longer one runs in the background like a suite.",
     ):
         assert sentence in s, sentence
     tr = flat(text("agents", "test-runner.md"))
     assert ("The suite is always the supervisor's launch through the launcher in the background, and you read the "
             "output file it names you (`run/agent/TASK-<nnn>-suite.out`).") in tr
-    assert "you may run the increment's own test files alone in the foreground." in tr
+    assert "The increment's own test files alone you run in the foreground through the launcher, stripped," in tr
 
 
 def test_r041_every_mutation_run_is_mutation_run_py_through_the_driver_kind():
