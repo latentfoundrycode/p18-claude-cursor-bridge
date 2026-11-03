@@ -22,7 +22,7 @@ manifest and project.json are checked against the newest heading.
 - test_r056_if_rolled_back_says_what_the_rollback_does enforces: the allow rules removed, the kept weekly file, BUG-042's
   false OK, the voids an older guard reads, the text falling back; and that a by-hand `--strip` is not said to fall to the
   classifier, since TASK-041 wrote no form of it (the heavy-launch rules admit it, on 2026.10.30d's rules too).
-- test_r056_the_six_allow_rules_are_the_release_s enforces: the six rules If rolled back names are in
+- test_r056_the_six_allow_rules_are_the_release_s enforces: the six allow and two deny rules If rolled back names are in
   settings.bridge.json, and no `--strip` form is.
 - test_r056_the_program_items_and_the_three_halves_are_listed enforces: the program items for the maintainer and the
   three halves outside bridge/.
@@ -61,6 +61,7 @@ GLOSSARY_PHASES = ("intake", "design", "mockups", "planning", "configuration", "
 ROWS = ["R-042"] + ["R-%03d" % n for n in range(45, 57)]
 ALLOW_RULES = ("Bash(git branch -D:*)", "Bash(gh pr list:*)", "Bash(gh issue list:*)", "Bash(git tag stage-review/*)",
                "Bash(git cat-file -p stage-review/*)", "Bash(git branch -r)")
+DENY_RULES = ("Bash(git tag stage-review/* -*)", "PowerShell(*git tag stage-review/* -*)")
 
 
 def load(path, name):
@@ -118,10 +119,10 @@ def test_r056_version_entry_manifest_and_project_agree():
 
 def test_r056_the_version_is_the_stamp_s_form_and_sorts_after_2026_10_30d():
     found = headings()
-    assert re.fullmatch(r"2026\.11\.\d{2}a", RELEASE_T)
+    assert re.fullmatch(r"2026\.11\.\d{2}a", version())
     assert len(found) == len(set(found)), "one entry per release"
     assert found.index(RELEASE_T) + 1 == found.index(PREVIOUS), "release T's entry stands directly above %s" % PREVIOUS
-    assert RELEASE_T > PREVIOUS
+    assert version() > PREVIOUS
     assert found[0] == version() and all(found[0] > other for other in found[1:]), "the newest version sorts last"
 
 
@@ -174,6 +175,15 @@ def test_r056_every_running_projects_item_is_phase_marked_and_the_items_are_name
         "a configuration item",
         "`workflow_dispatch`",
         "run `review-guard.py verify <ID>-r<N>` once more under the new release",
+        "only where nothing has been committed or changed in the checkout since that snapshot",
+        "`verify` restores the checkout to the snapshot",
+        "the flag already opened stands",
+        "whose branch has moved since",
+        "a repository re-created at the same path",
+        "Remove it only for a re-creation or a clearing you made yourself",
+        "Any other stop of the configurator's",
+        "never what a test's failure asks for and never a home variable",
+        "Read the session's variable names",
         "known limitation",
         "the owner's line is the lift",
         "`<key>-rounds-<id>.sha256`",
@@ -190,9 +200,13 @@ def test_r056_every_running_projects_item_is_phase_marked_and_the_items_are_name
 
 def test_r056_if_rolled_back_says_what_the_rollback_does():
     joined = flat(" ".join(items("**If rolled back**")))
-    for rule in ALLOW_RULES:
+    for rule in ALLOW_RULES + DENY_RULES:
         assert "`" + rule + "`" in joined, rule
     for words in (
+        "So a `git branch -D` outside `stage/` and those commands fall to the classifier",
+        "BUG-039's fixes go back with it",
+        "voids that launch whatever a later `verify` says",
+        "a `--strip` by hand stays admitted",
         "`bridge-install.py --rollback`",
         "`delegation-loop/merge.md`",
         "`.github/workflows/dependency-scan.yml` keeps running",
@@ -212,6 +226,9 @@ def test_r056_the_six_allow_rules_are_the_release_s():
     for rule in ALLOW_RULES:
         assert rule in allow, rule
     assert not [r for r in allow if "--strip" in r], "TASK-041's observed launch ran on the heavy-launch rules"
+    deny = json.load(open(SETTINGS, encoding="utf-8"))["permissions"]["deny"]
+    for rule in DENY_RULES:
+        assert rule in deny, rule
 
 
 def test_r056_the_program_items_and_the_three_halves_are_listed():
