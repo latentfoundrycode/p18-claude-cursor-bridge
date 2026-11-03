@@ -1,6 +1,6 @@
 {
   "version": "2026.10.30d",
-  "generated": "2026-11-03 17:04",
+  "generated": "2026-11-03 17:16",
   "files": {
     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
@@ -113,9 +113,9 @@
     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
     "cursor-bridge/workflow/phases/change-cycle.md": "c634fec9a161871b6e67d9098e0b01c6b2ba463c7603c2f3a6c2812ae7f8d090",
     "cursor-bridge/workflow/phases/configuration.md": "2f309ea4908f2187bba3fab6f3eed62df45af5b9c5b15cc068c203fb70d88dc3",
-    "cursor-bridge/workflow/phases/delegation-loop.md": "f3d40a514511162c776231f55272372c2b77ff827a2f708dfb444e6a103761b0",
+    "cursor-bridge/workflow/phases/delegation-loop.md": "f364ed359c50e402eccff7bc5d56abe4235a6423c0df1d4d7092aaaadc28a5b2",
     "cursor-bridge/workflow/phases/delegation-loop/decide.md": "1f9a7e259b5e529de4eb427f565962a683159ce66f30e306ae0b393f763efab4",
-    "cursor-bridge/workflow/phases/delegation-loop/merge.md": "5e9aafcaf7353ae25da837b073f6e2815a6d57b44d6ad28f82888eaca4db7e21",
+    "cursor-bridge/workflow/phases/delegation-loop/merge.md": "853ad003a15f390182386dc19ba6a3b7192a04154db17efe7f8fc6266df12d5d",
     "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "bec0f719a2c9f1eb9b586f19898606d8b2009cfaf3a125d7656146383a3156f0",
     "cursor-bridge/workflow/phases/design.md": "8e3335fae831276035992b6c957566e8b5b54104d674095618c13c9b095e9ba6",
     "cursor-bridge/workflow/phases/intake.md": "c7a162f73b15572ddd6ece525a994c213d98e4c30018c6ec5f01cda83c66ffd2",
