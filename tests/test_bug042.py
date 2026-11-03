@@ -18,6 +18,7 @@ BRIDGE = os.path.join(ROOT, "bridge")
 ROW = "OSV-Scanner in the gate"
 PIN = "OSV-Scanner version pinned"
 OSV = "      - name: osv\n        run: osv-scanner@v2.3.1 --lockfile package-lock.json\n"
+WEEKLY_HEAD = "on:\n  workflow_dispatch:\njobs:\n  scan:\n    runs-on: ubuntu-latest\n    steps:\n"
 
 
 def read(*parts):
@@ -83,7 +84,37 @@ def test_bug042_the_weekly_file_alone_is_no_gate(tmp_path):
     make_workspace(tmp_path)
     (tmp_path / ".github" / "workflows" / "ci.yml").unlink()
     add_weekly(tmp_path)
-    assert verdict(run(tmp_path)[1], ROW)[0] == "MISSING"
+    out = run(tmp_path)[1]
+    assert [verdict(out, "%s in the gate" % name)[0] for name in ("Semgrep", "OSV-Scanner", "Socket")] == ["MISSING"] * 3, out
+    assert verdict(out, "CI gate")[0] is None, out
+
+
+def test_bug042_the_same_steps_under_another_name_are_a_gate(tmp_path):
+    """The name is the one thing left out, whole: the weekly text in a file of another name answers the row, and a name that only
+    begins with or holds the weekly file's is no weekly file."""
+    workspace(tmp_path, GATE.replace(OSV, ""))
+    (tmp_path / ".github" / "workflows" / "ci.yml").unlink()
+    for name in ("security-scan.yml", "dependency-scan-pr.yml"):
+        path = tmp_path / ".github" / "workflows" / name
+        path.write_text(weekly(), encoding="utf-8")
+        assert verdict(run(tmp_path)[1], ROW)[0] == "OK", name
+        path.unlink()
+
+
+@pytest.mark.parametrize("floor,step", [
+    ("Socket runs without its banner", "      - name: scan\n        run: npx socket@1.2.3 ci\n"),
+    ("Socket CLI installed without the key",
+     "      - name: scan\n        run: npm install -g socket@1.2.3\n        env:\n          SOCKET_CLI_API_TOKEN: ${{ secrets.SOCKET_SECURITY_API_KEY }}\n"),
+], ids=["banner", "keyed-install"])
+def test_bug042_a_socket_hazard_in_the_weekly_file_still_reads_missing(tmp_path, floor, step):
+    """The security audit of round 1: these two rows are no gate floors, they flag a key's exposure in any workflow (ISS-005, FB-007),
+    so a step of either form in a file named as the weekly one reads as it does in any other file."""
+    workspace(tmp_path, GATE)
+    assert verdict(run(tmp_path)[1], floor)[0] is None, "the precondition: the gate holds neither hazard"
+    (tmp_path / ".github" / "workflows" / "other.yml").write_text(WEEKLY_HEAD + step, encoding="utf-8")
+    assert verdict(run(tmp_path)[1], floor)[0] == "MISSING", "the same step in another file"
+    (tmp_path / ".github" / "workflows" / "other.yml").rename(tmp_path / ".github" / "workflows" / "dependency-scan.yml")
+    assert verdict(run(tmp_path)[1], floor)[0] == "MISSING"
 
 
 def test_bug042_negative_a_gate_step_beside_the_weekly_file_is_ok(tmp_path):
@@ -117,7 +148,9 @@ def test_bug042_the_guard_s_docstrings_name_the_deleted_snapshot():
     assert "1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge)" in module
     assert "a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY" in module
     assert "2 = cannot verify (no snapshot," not in module
-    assert "2 = cannot verify (a snapshot never taken," in module
+    assert "2 = cannot verify (no copy of the snapshot's hash," in module
+    assert "from `verify` voids a qualifying Review B launch" in module
+    assert "`premerge` voids nothing" in module
     assert "or the file is gone while the copy stands" in fn
 
 
@@ -150,9 +183,14 @@ def test_bug042_the_configurator_s_stop_has_a_way_forward():
     """Review A's bridge and ci parts: a floor with other pins, no `--lockfile=` word or no OSV step stopped the configurator with
     no sentence saying what came next, and the first OSV-Scanner release after this one makes that stop the expected one."""
     agent = flat(read(BRIDGE, "agents", "cursor-configurator.md"))
-    assert ("Stop and report the same where that step names no `--lockfile=` word or the project has no such step. The supervisor settles "
-            "each: an increment brings the floor to the block's pins or gives it the step, and you write the file after it merges; a "
-            "project with no CI receives no weekly workflow, the reason recorded in `docs/INVENTORY.md`.") in agent
+    assert "Stop and report the same where that step names no `--lockfile=` word," in agent
+    assert "where the value it gives holds anything but letters, digits and `.`, `_`, `-`, `/`, `:`," in agent
+    assert "or where `.github/workflows/dependency-scan.yml` already stands and is not this block." in agent
+    assert "an increment brings an older floor pin to the block's, or gives the floor the step or the word," in agent
+    assert ("a floor pin newer than the block's is never taken back, and the file waits for the bridge release that carries it, the reason "
+            "recorded in `docs/INVENTORY.md`;") in agent
+    assert "a project with no GitHub remote has nowhere to run the workflow," in agent
+    assert "a project on GitHub whose gates run locally receives the file, the list taken from its local OSV-Scanner command." in agent
 
 
 def test_bug042_the_evaluation_reads_the_list_by_what_it_prints():
@@ -182,3 +220,4 @@ def test_bug042_negative_a_stripped_suite_launch_gets_its_key_file(tmp_path):
     assert p.returncode == 0, p.stderr
     assert p.stdout.split() == ["refs/pull/1/merge", "value-never-printed", "None", "agent-home"], p.stdout
     assert "value-never-printed" not in p.stderr, "names are printed, values never"
+    assert "MY_SERVICE_API_KEY" in p.stderr, p.stderr

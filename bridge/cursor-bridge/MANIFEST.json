@@ -1,8 +1,8 @@
 {
   "version": "2026.10.30d",
-  "generated": "2026-11-03 08:36",
+  "generated": "2026-11-03 09:07",
   "files": {
-    "agents/cursor-configurator.md": "949db71fc81ddfee89192a99a9f1e442ac6d023f9b37b1bc69827ea577f574bb",
+    "agents/cursor-configurator.md": "55da936d4bbe104d0b75761b9fbaefb0ca600dc6c5e9129f743f76d85520fe25",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
     "agents/diagram-specialist.md": "7105060c84d870d933be43675b410c90c1e04df6029f92ad4146884c57d2fee5",
     "agents/diff-reviewer.md": "43e2a8f205a4ce37033d2902b1b9afb687d6034b966b6b22966fcf399c1edc01",
