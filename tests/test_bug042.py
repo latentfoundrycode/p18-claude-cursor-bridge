@@ -7,6 +7,8 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 import test_bridge_run as B
 from test_conformance_check import GATE, make_workspace, run, verdict
 
@@ -46,6 +48,14 @@ def test_bug042_a_gate_with_no_osv_step_stays_missing_beside_the_weekly_file(tmp
     workspace(tmp_path, GATE.replace(OSV, ""))
     assert verdict(run(tmp_path)[1], ROW)[0] == "MISSING", "the precondition: no weekly file, no OSV step"
     add_weekly(tmp_path)
+    assert verdict(run(tmp_path)[1], ROW)[0] == "MISSING"
+
+
+@pytest.mark.parametrize("name", ["Dependency-Scan.yml", "dependency-scan.yaml"])
+def test_bug042_the_weekly_file_is_known_by_its_name_in_either_form(tmp_path, name):
+    """The name is compared case-insensitively and either workflow suffix is left out, as `.github/workflows/` reads both."""
+    workspace(tmp_path, GATE.replace(OSV, ""))
+    (tmp_path / ".github" / "workflows" / name).write_text(weekly(), encoding="utf-8")
     assert verdict(run(tmp_path)[1], ROW)[0] == "MISSING"
 
 
