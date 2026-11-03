@@ -208,9 +208,10 @@ P7_CMD = LAUNCHER + "--key-file <a file outside the Workspace> --kind test -- py
 CALIBRATE_CMD = LAUNCHER + "--kind test -- <the recorded suite command> -rA > run/agent/calibrate-suite-before.out 2>&1"
 KP061 = "(`bridge-run.py --limit auto --strip --kind test`)"
 LOOP_SUITE = ("The suite runs through the launcher in the background, whatever its length, with the owner's environment "
-              "stripped (`--strip`, between `--limit` and `--kind`): code the builder wrote never runs in the loop with "
-              "the owner's login or secret-like variables (D-004, R-052), and a variable the suite needs reaches it by "
-              "`--key-file <a file outside the Workspace>`, which the test kind accepts:")
+              "stripped (`--strip`, between `--limit` and `--kind`): the flag withholds the owner's `gh` and git login and the environment's "
+              "secret-like variables from code the builder wrote (D-004, R-052). A variable the suite needs reaches it by "
+              "`--key-file <a file outside the Workspace>`, which the test kind accepts and which hands that code what the file names, "
+              "so a key file holds only what the brief or the inventory names for this increment, or the loop's own step names, never what a test's failure asks for:")
 LOOP_CHECKPOINT = ("stage them (`git add`), and launch the engine in the background like any mutation run, stripped and "
                    "with its scratch folder named as step 7 says (`delegation-loop/decide.md`, \"The mutation run\"), the "
                    "`python` after the `--` being the project's own interpreter:")

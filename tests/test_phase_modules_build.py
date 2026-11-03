@@ -100,7 +100,7 @@ SURVIVAL = {
         "reply, each written there as it returns, and the mutation run's cuts and estimate (step 7);",
         "the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, "
         "`run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message "
-        "(step 4), `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background, and "
+        "(step 4), `run/agent/TASK-<nnn>-suite.out` and `run/agent/TASK-<nnn>-own.out`, which `test-runner` reads after a suite or own-file run in the background, and "
         "the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files "
         "`run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); "
         "and, while a gate is open, its files under `run/review/` (the round's `REVIEW-<ID>-r<N>.diff`, "
@@ -244,8 +244,9 @@ def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
 # ceiling, naming two or more reviewers or auditors (7,832 characters, sha256 b9497aeec8f3a0b3...; at TASK-034 7,641,
 # sha256 dcf588e45b134ec8...); TASK-039 (release T) gave the Accept bullet P11's quoted counts and T10's records-only
 # commit, and the brake's by-class bullet T20's threat model, P2's membership and P1's convergent late finding
-# (8,933 characters; 8,941 after Review A's round 1 bounded the threat model to the parts it names, 8,794 before)
-STEP7_SHA256 = "c05d0386d8514eeb509dcf7aaf538434ddf7322bf2a7ad91314d40188523dfe6"
+# (8,933 characters; 8,941 after Review A's round 1 bounded the threat model to the parts it names, 8,794 before);
+# BUG-043 put step 4's read before the last-resort reset (8,992 characters)
+STEP7_SHA256 = "dc129c7317b21c32038b50c627bec7cea375ee28bbe7b6124a6b5a0298985b79"
 
 
 def test_r032_step_7_is_verbatim():
@@ -254,7 +255,7 @@ def test_r032_step_7_is_verbatim():
     import hashlib
     sub = module(DECIDE)
     step = sub[sub.index("### " + STEP7):sub.index("#### The review ceiling")].rstrip()
-    assert len(step) == 8933 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
+    assert len(step) == 8992 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
 
 
 def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():

@@ -193,3 +193,4 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - reword BUG-042 bridge/commands/supervisor.md Phase 5 — Configure the Cursor build environment
 - new BUG-042 bridge/cursor-bridge/workflow/phases/intake.md The procedure
 - new BUG-042 bridge/cursor-bridge/workflow/phases/configuration.md The procedure
+- new BUG-043 bridge/cursor-bridge/workflow/phases/delegation-loop.md 4. Inspect
