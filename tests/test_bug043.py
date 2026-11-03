@@ -106,7 +106,7 @@ def test_bug043_every_home_states_what_the_strip_does_not_stop():
     """Review A's B2 and the audit's B1 of the second text, the threat model R-050 asks to be recorded: what a run is handed is withheld; what it can reach on purpose is KP-032's, stated, with the crossing drawn."""
     inventory = flat(read(ROOT, "docs", "INVENTORY.md"))
     assert "The strip withholds what a run is handed, never what it can reach on purpose. That neither the strip nor the loop's text can stop a run writing the checkout's `.git`, so that a later git command runs its program, or asking the credential store, is a stated limit, KP-032's, no blocking finding by itself (R-050)" in inventory
-    assert "the act is not the limit: code in a diff that does either, or a line step 4's check finds, is a gate-integrity flag and a security finding, as the guard's row says for a reviewer." in inventory
+    assert "the act is not the limit: code in a diff that writes the checkout's `.git` (as the guard's row says for a reviewer) or asks the credential store for the owner's login, or a line step 4's check finds, is a gate-integrity flag and a security finding." in inventory
     assert "a check, not a boundary, since a git command of the session or the app may run first." in inventory
     assert "so it holds only what the brief or the inventory names for this increment, or the loop's own step names." in inventory
     assert "a step 4 flag or a diff's test is found in real work" in inventory
