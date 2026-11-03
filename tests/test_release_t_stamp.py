@@ -30,7 +30,8 @@ manifest and project.json are checked against the newest heading.
   register parsed as completion-check.py parses it, a `<label>: <test>` entry for each, at least one test where a cell
   carries none, every test named existing.
 - test_r056_the_grammar_reads_the_plan_s_examples enforces: the plan's own four examples of the grammar.
-- test_r056_the_completion_check_passes_in_done_mode enforces: `completion-check.py --mode done`, RESULT OK.
+- test_r056_the_completion_check_passes_in_done_mode enforces: `completion-check.py --mode done`, RESULT OK; it skips only
+  where no repository exists, a mutation run's copy, since the check reads git's tracked files, and never on CI.
 """
 import importlib.util
 import json
@@ -38,6 +39,8 @@ import os
 import re
 import subprocess
 import sys
+
+import pytest
 
 from phase_modules import read
 from workflow_files import BRIDGE, flat
@@ -318,5 +321,8 @@ def test_r056_every_row_is_built_with_evidence_in_the_grammar():
 
 
 def test_r056_the_completion_check_passes_in_done_mode():
+    if not os.path.exists(os.path.join(ROOT, ".git")):
+        assert "GITHUB_ACTIONS" not in os.environ, "CI holds a checkout, so this test never skips there"
+        pytest.skip("completion-check.py reads `git ls-files`, and mutation-run.py's copy holds no repository")
     p = subprocess.run([sys.executable, COMPLETION, "--mode", "done"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert p.returncode == 0 and "RESULT: OK" in p.stdout, p.stdout[-800:]
