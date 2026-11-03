@@ -223,7 +223,8 @@ def test_r041_the_checkpoint_run_is_mutation_run_py_and_each_result_has_its_hand
     s = flat(section(loop(), "The tests before the first reviewer", 4))
     for sentence in (
         "list the increment's new tests in the mutants file's `new_tests` (a new test file by its path, a changed file "
-        "by its new tests' ids), stage them (`git add`), and launch the engine in the background like any mutation run, "
+        "by its new tests' ids), make step 4's read of `.git/config` and the hooks folders, then stage them (`git add`), "
+        "and launch the engine in the background like any mutation run, "
         "stripped and with its scratch folder named as step 7 says (`delegation-loop/decide.md`, \"The mutation run\"), "
         "the `python` after the `--` being the project's own interpreter:",
         # re-taken at TASK-041 (R-052): the command stripped, its scratch folder named, in a fenced block

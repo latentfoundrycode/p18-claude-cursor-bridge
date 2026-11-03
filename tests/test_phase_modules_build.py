@@ -244,7 +244,8 @@ def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
 # ceiling, naming two or more reviewers or auditors (7,832 characters, sha256 b9497aeec8f3a0b3...; at TASK-034 7,641,
 # sha256 dcf588e45b134ec8...); TASK-039 (release T) gave the Accept bullet P11's quoted counts and T10's records-only
 # commit, and the brake's by-class bullet T20's threat model, P2's membership and P1's convergent late finding
-# (8,933 characters; 8,941 after Review A's round 1 bounded the threat model to the parts it names, 8,794 before)
+# (8,933 characters; 8,941 after Review A's round 1 bounded the threat model to the parts it names, 8,794 before);
+# BUG-043 put step 4's read before the last-resort reset (8,992 characters)
 STEP7_SHA256 = "dc129c7317b21c32038b50c627bec7cea375ee28bbe7b6124a6b5a0298985b79"
 
 

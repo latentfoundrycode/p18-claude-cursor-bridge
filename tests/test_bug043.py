@@ -96,14 +96,14 @@ def test_bug043_every_home_states_a_class_not_a_count():
 
 def test_bug043_step_4_reads_the_git_config_as_a_file_first():
     """The audit's B2 of the first text; Review A's B2 and S1 and the audit's B1 and B2 of the second: a `.git` setting a builder or its tests wrote runs on the session's next git command, in its own environment, and no diff shows `.git`. The read stands after every run of what a builder wrote, reads a class of lines, and says what it is: text cannot hold the order, so it is a check, not a boundary, and the launcher's comparison is a program item."""
-    assert "After a run of what a builder wrote (a builder, the own-file run and a suite among them) and before your next git command, step 3b's `git status` and reset and a parallel branch's switch included, read `.git/config` with the Read tool, never through git, and list the active hooks folder and `.git/hooks`: a line you did not write that names a program or another file (`core.fsmonitor`, a foreign `core.hooksPath`, `diff.*`, `filter.*`, `include*`, `extensions.*`, among them), a new hook, or a `.git/config` that cannot be read is a gate-integrity flag, the line removed by hand (KP-032). This is a check, not a boundary: the strip does not keep a run from writing `.git`, and a git command the session or the app runs first still runs what it wrote; the launcher's comparison before and after a run is a program item." in loop()
+    assert "After a run of what a builder wrote (a builder, the own-file run and a suite among them) and before your next git command, step 3b's `git status` and reset and a parallel branch's switch included, read `.git/config` with the Read tool, never through git, and list the active hooks folder and `.git/hooks`, and for a builder in a worktree that worktree's own hooks folder as `core.hooksPath` resolves there: a line you did not write that names a program or another file (`core.fsmonitor`, a foreign `core.hooksPath`, `diff.*`, `filter.*`, `include*`, `extensions.*`, among them), a new hook, or a `.git/config` that cannot be read is a gate-integrity flag, the line removed by hand (KP-032). The read holds after each such run, wherever a module or a sub-file states the next git command, the first of a reviewer you send next among them, whether or not that site repeats it. This is a check, not a boundary: the strip does not keep a run from writing `.git`, a listing shows a new hook and not a changed one, and a git command the session or the app runs first still runs what it wrote; the launcher's comparison before and after a run is a program item." in loop()
     plan = flat(read(ROOT, "docs", "BUILD_PLAN.md"))
     assert "a launcher comparison of `.git/config`, `.git/config.worktree`, `.git/info/attributes` and the hooks folders before and after a run of what a builder wrote" in plan
     assert "a refusal of a home variable in a `--key-file`" in plan
 
 
-def test_bug043_each_git_command_after_a_run_comes_after_the_read():
-    """Review B's second finding: step 4's sentence names step 3b's `git status` and reset and a parallel branch's switch, while those sites still put the git command first, so a reader at the site runs what a builder wrote before the read. Each site now says the read comes first."""
+def test_bug043_the_read_holds_wherever_a_git_command_follows_a_run():
+    """Review B's second finding: step 4's sentence names step 3b's `git status` and reset and a parallel branch's switch, while those sites still put the git command first, so a reader at the site runs what a builder wrote before the read. Each site that says what comes first now says the read does; Review A's B1 and B2 on that fix: naming sites left the checkpoint run's `git add` and P7's push, so step 4 states the class and those two repeat it."""
     text = loop()
     read_first = "step 4's read of `.git/config` and the hooks folders, then "
     assert "look before you discard** (KP-033): " + read_first + "`git status` and `git diff --stat` in the checkout." in text
@@ -111,12 +111,25 @@ def test_bug043_each_git_command_after_a_run_comes_after_the_read():
     assert "**When a builder finishes**, make " + read_first + "remove its worktree from your checkout" in text
     decide_text = flat(read(BRIDGE, "cursor-bridge", "workflow", "phases", "delegation-loop", "decide.md"))
     assert "a state you cannot make sense of: " + read_first + "`git reset --hard HEAD` returns you to the checkpoint." in decide_text
+    assert "The read holds after each such run, wherever a module or a sub-file states the next git command, the first of a reviewer you send next among them, whether or not that site repeats it." in text
+    assert "make " + read_first + "stage them (`git add`), and launch" in text
+    merge = flat(read(BRIDGE, "cursor-bridge", "workflow", "phases", "delegation-loop", "merge.md"))
+    assert "The push comes after step 4's read of `.git/config` and the hooks folders: a `pre-push` hook, a `core.sshCommand` or a credential helper line that run wrote fires on the command that carries the login." in merge
+
+
+def test_bug043_the_read_lists_a_worktree_s_own_hooks_folder():
+    """The audit's B1 on that fix: a relative `core.hooksPath` makes a hook a parallel builder committed in its worktree fire at the teardown's status and at the switch, after a clean read of the supervisor's checkout. Reproduced with the real worktree-teardown.py."""
+    assert "and list the active hooks folder and `.git/hooks`, and for a builder in a worktree that worktree's own hooks folder as `core.hooksPath` resolves there:" in loop()
+    assert "a listing shows a new hook and not a changed one," in loop()
+    assert "`worktree-teardown.py` turning hooks off as it turns off the file monitor" in flat(read(ROOT, "docs", "BUILD_PLAN.md"))
 
 
 def test_bug043_d004_s_note_names_no_only():
     """Review B's first finding: "instructs only for a driver" was the absolute the fix removed from the loop, false against the note's own next sentences."""
     d004 = flat(read(ROOT, "docs", "diagrams", "D-004-context-dfd.md"))
     assert "instructs only for a driver" not in d004
+    assert "and driver the loop launches" not in d004
+    assert "on every suite and increment's own test files the loop launches and on every driver but one under a recorded Decision" in d004
     assert "A test, driver or watch run without the flag still gets the owner's environment; of the launcher's runs of builder-written code, the loop's text leaves the flag off by name for a driver whose suite needs a variable beyond `.env`, under a recorded Decision in `docs/INVENTORY.md` naming the variable." in d004
 
 
