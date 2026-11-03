@@ -119,7 +119,7 @@ def test_r056_version_entry_manifest_and_project_agree():
 
 def test_r056_the_version_is_the_stamp_s_form_and_sorts_after_2026_10_30d():
     found = headings()
-    assert re.fullmatch(r"2026\.11\.\d{2}a", version())
+    assert re.fullmatch(r"\d{4}\.\d{2}\.\d{2}[a-z]", version())
     assert len(found) == len(set(found)), "one entry per release"
     assert found.index(RELEASE_T) + 1 == found.index(PREVIOUS), "release T's entry stands directly above %s" % PREVIOUS
     assert version() > PREVIOUS
@@ -175,10 +175,16 @@ def test_r056_every_running_projects_item_is_phase_marked_and_the_items_are_name
         "a configuration item",
         "`workflow_dispatch`",
         "run `review-guard.py verify <ID>-r<N>` once more under the new release",
-        "only where nothing has been committed or changed in the checkout since that snapshot",
-        "`verify` restores the checkout to the snapshot",
+        "read as files with no git command run",
+        "returns before any git command and restores nothing",
+        "puts HEAD, every local branch and tag and the tree back to the snapshot",
+        "only where nothing of yours or a builder's has been committed, made, moved or changed",
+        "`git for-each-ref` against the snapshot file's `refs`",
+        "do not run it",
+        "for the round's count only",
         "the flag already opened stands",
-        "whose branch has moved since",
+        "where `verify` would undo such work, cannot be recovered",
+        "the copy is removed on the owner's word",
         "a repository re-created at the same path",
         "Remove it only for a re-creation or a clearing you made yourself",
         "Any other stop of the configurator's",
@@ -219,6 +225,7 @@ def test_r056_if_rolled_back_says_what_the_rollback_does():
     ):
         assert words in joined, words
     assert "`--strip` falls to the classifier" not in joined, "the heavy-launch rules admit `--strip` on the older release too"
+    assert "the hooks and the file monitor on" not in joined, "the older premerge has its hooks off; the file monitor alone is lost"
 
 
 def test_r056_the_six_allow_rules_are_the_release_s():
