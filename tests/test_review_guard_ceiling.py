@@ -1,4 +1,4 @@
-"""R-042: review-guard holds the code gate's round ceiling (docs/REQUIREMENTS.md line 48)."""
+"""R-042, D-003: review-guard holds the code gate's round ceiling (docs/REQUIREMENTS.md line 48)."""
 import json
 import os
 import subprocess

@@ -1,6 +1,7 @@
 """CONFIG-B3b - the generated command reference (tools/dump-cli.py, docs/cli-reference.json, docs/CLI_REFERENCE.md).
 
-enforces: handoff/CONFIG-B3b.md, Acceptance criteria 1-13; Delivery-Conventions.md section 4 (the command reference, rule 32).
+enforces: handoff/CONFIG-B3b.md, Acceptance criteria 1-13; Delivery-Conventions.md section 4 (the command reference, rule 32);
+D-002 (R-055): the programs the generator loads equal the diagram's `dump_cli` edges, which no import line shows.
 Supervisor-authored before the builder's run. Most tests run the generator on a copy of the repository's programs in a
 temporary folder (a "sandbox": tools/dump-cli.py and bridge/cursor-bridge/), so nothing here writes the repository's own
 files, a path the generator takes from a program's location really moves, and extra programs can be added to the copy.
@@ -972,3 +973,31 @@ def test_cfgb3b_r4_a_default_or_choice_that_is_the_program_folder_itself_is_refu
     a default and a choice alike; a path under the folder still takes the placeholder (test above)."""
     _refused(tmp_path / "d", "zz-hd.py", _argparse_program('    p.add_argument("--x", default=HERE)\n'), "--x")
     _refused(tmp_path / "c", "zz-hc.py", _argparse_program('    p.add_argument("--x", choices=[HERE])\n'), "--x")
+
+
+def _d002_dump_cli_edges():
+    """The program files D-002's `dump_cli -.-> <element>` edges name, each read through the diagram's element map."""
+    text = (ROOT / "docs" / "diagrams" / "D-002-components.md").read_text(encoding="utf-8")
+    paths = dict(re.findall(r"^\| (\w+) \| bridge/cursor-bridge/([^ |/]+\.py) \|\s*$", text, re.M))
+    return sorted(paths[name] for name in re.findall(r"^\s*dump_cli -\.-> (\w+)\s*$", text, re.M))
+
+
+def test_r055_d002_the_programs_dump_cli_loads_equal_the_diagrams_edges(monkeypatch):
+    """R-055, D-002 (`dump_cli`). enforces: docs/BUILD_PLAN.md TASK-044 Done when: a thirteenth program gaining a
+    `build_parser` changes no `import` and no `spec_from_file_location` call, so `check:components` cannot see it. The
+    generator's own selection runs, command by command, with its one load recorded, and what it loaded equals the edges."""
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    gen = _load(GEN, "d002")
+    loaded = []
+    real_load = gen.load_bridge_module
+
+    def recording(path, tag):
+        loaded.append(os.path.basename(path))
+        return real_load(path, tag)
+
+    monkeypatch.setattr(gen, "load_bridge_module", recording)
+    for name in gen.command_programs(str(BRIDGE)):
+        gen.command_entry(str(BRIDGE), name)
+    edges = _d002_dump_cli_edges()
+    assert edges, "D-002 names no dump_cli edge: the reading found nothing (vacuous pass)"
+    assert sorted(loaded) == edges, "the programs dump-cli.py loads and D-002's dump_cli edges differ"
