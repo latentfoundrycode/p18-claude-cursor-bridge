@@ -201,3 +201,7 @@ Last accepted: BUG-041 (PR #127, at its merge): a snapshot deleted after it was 
 ## Moved 2026-11-03 (TASK-044)
 
 Last accepted: TASK-042 (PR #128, at its merge): the weekly dependency scan in this repository, R-052's proof waiting for TASK-044's dispatch run; before it BUG-041 (PR #127); before it TASK-043, BUG-039 (PR #126); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-043, BUG-001 to BUG-041, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+
+## Moved 2026-11-03 (REFAC-T2)
+
+Last accepted: TASK-044 (PR #129, at its merge): the retrofit's enforcement, R-052 and R-055 built; before it TASK-042 (PR #128); before it BUG-041 (PR #127); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-044, BUG-001 to BUG-041, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004

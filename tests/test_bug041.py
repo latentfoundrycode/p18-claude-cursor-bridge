@@ -5,11 +5,10 @@ exits 2 with no flag and no void, and nothing says the guard's own record was re
 snapshot rewritten by another route, and takes that return. The helpers are tests/test_task032_supervisor_guard.py's.
 """
 import os
-import subprocess
 import sys
 
 import test_task032_supervisor_guard as G
-from test_bug039 import load_guard
+from test_bug039 import load_guard, start_of, watch_git
 
 NAME = "TASK-001"
 ID = "TASK-001"
@@ -35,11 +34,6 @@ def snap_noting_the_hash_copy(repo):
     written = [n for n in set(G.hash_files()) - before if n.endswith("-%s.sha256" % NAME) and "-rounds-" not in n]
     assert len(written) == 1, written
     return written[0]
-
-
-def start_of(repo):
-    with open(str(repo / "run" / "review" / ("REVIEW-%s.err" % NAME)), encoding="utf-8") as f:
-        return f.readline().split("started ")[1].strip().rstrip("Z")
 
 
 def test_bug041_a_deleted_snapshot_is_a_flag_and_voids_the_launch(tmp_path):
@@ -71,19 +65,13 @@ def test_bug041_negative_a_deleted_snapshot_restores_nothing_and_runs_no_git(tmp
     G.git(repo, "branch", "left-by-the-reviewer")
     os.remove(str(snapshot_file(repo)))
     guard = load_guard(monkeypatch)
-    started = []
-    real_run, real_rewritten = subprocess.run, guard.snapshot_rewritten
-
-    def watching(cmd, *args, **kwargs):
-        if cmd and cmd[0] == "git":
-            started.append(list(cmd))
-        return real_run(cmd, *args, **kwargs)
+    real_rewritten = guard.snapshot_rewritten
+    started = watch_git(monkeypatch)
 
     def rewritten_then_watch(*args):
         del started[:]
         return real_rewritten(*args)
 
-    monkeypatch.setattr(guard.subprocess, "run", watching)
     monkeypatch.setattr(guard, "snapshot_rewritten", rewritten_then_watch)
     monkeypatch.chdir(str(repo))
     monkeypatch.setattr(sys, "argv", ["review-guard.py", "verify", NAME])

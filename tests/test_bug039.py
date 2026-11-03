@@ -38,15 +38,29 @@ def flagged_key(repo):
     return (G.entry(repo, NAME, 1).get("flagged_launch") or "").rstrip("Z")
 
 
-def flagged_round(tmp_path):
-    """A round whose verify flagged it at the end (a ref left behind), with its Review B exited 0."""
+def flagged_round(tmp_path, **launch):
+    """A round whose verify flagged it (a ref left behind), its Review B launched as `launch` says, by default exited 0."""
     repo = G.make_repo(tmp_path)
     G.snap_ok(repo, NAME)
-    G.launched(repo, NAME)
+    G.launched(repo, NAME, **launch)
     G.git(repo, "branch", "left-by-the-reviewer")
     rc, out = G.guard(repo, "verify", NAME)
     assert rc == 1 and "GATE-INTEGRITY" in out, out
     return repo
+
+
+def watch_git(monkeypatch):
+    """Every git process `subprocess.run` starts from here on recorded and run as asked; the record is returned."""
+    started = []
+    real_run = subprocess.run
+
+    def watching(cmd, *args, **kwargs):
+        if cmd and cmd[0] == "git":
+            started.append(list(cmd))
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", watching)
+    return started
 
 
 def assert_voided_and_round_not_spent(repo):
@@ -142,21 +156,15 @@ def test_bug039_site1_negative_the_void_runs_no_git_on_the_pre_git_returns(tmp_p
     else:
         change_the_config(repo)
     guard = load_guard(monkeypatch)
-    started, during = [], []
-    real_run = subprocess.run
+    during = []
     real_record = guard.record_flagged_launch
-
-    def watching(cmd, *args, **kwargs):
-        if cmd and cmd[0] == "git":
-            started.append(list(cmd))
-        return real_run(cmd, *args, **kwargs)
+    started = watch_git(monkeypatch)
 
     def watched_record(*args):
         del started[:]
         real_record(*args)
         during.append(list(started))
 
-    monkeypatch.setattr(subprocess, "run", watching)
     monkeypatch.setattr(guard, "record_flagged_launch", watched_record)
     assert guard.cmd_verify(NAME, str(repo)) == 1
     assert "no git command was run" in capsys.readouterr().out
@@ -252,12 +260,7 @@ def test_bug039_site2_a_flag_during_the_run_voids_the_launch_that_later_exits_0(
     `record_flagged_launch` records the void by the launch's start time whatever the `.err` file's exit so far, so a flag
     raised while the run goes on voids the launch that later exits 0, and the next snapshot of the round on a changed tree
     is admitted."""
-    repo = G.make_repo(tmp_path)
-    G.snap_ok(repo, NAME)
-    G.launched(repo, NAME, exit_code=None)
-    G.git(repo, "branch", "left-by-the-reviewer")
-    rc, out = G.guard(repo, "verify", NAME)
-    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    repo = flagged_round(tmp_path, exit_code=None)
     add_exit_0(repo)
     assert_voided_and_round_not_spent(repo)
 
@@ -267,12 +270,7 @@ def test_bug039_site2_negative_no_path_admits_a_flagged_launch(tmp_path):
     path. A flag raised during the run, the run then exiting 0, and a verify that finds nothing left to flag (the first
     verify repaired the ref): no reply, no verified mark, exit 1, and `premerge` refuses. A new Review B run on the same
     snapshot is a launch of its own, and it is admitted."""
-    repo = G.make_repo(tmp_path)
-    G.snap_ok(repo, NAME)
-    G.launched(repo, NAME, exit_code=None)
-    G.git(repo, "branch", "left-by-the-reviewer")
-    rc, out = G.guard(repo, "verify", NAME)
-    assert rc == 1, out
+    repo = flagged_round(tmp_path, exit_code=None)
     add_exit_0(repo)
     rc, out = G.guard(repo, "verify", NAME)
     assert rc == 1 and "GATE-INTEGRITY" in out, out
@@ -292,12 +290,7 @@ def test_bug039_site2_the_void_holds_whatever_the_exit(tmp_path, exit_code):
     """R-042, D-003. enforces: TASK-043's brief, Requirements 3 and 4: the flag voids the launch whatever the `.err` file's
     exit so far, and a verify that finds nothing left to flag refuses that launch whatever its exit: exit 1, a line saying
     it was voided, no reply, no mark."""
-    repo = G.make_repo(tmp_path)
-    G.snap_ok(repo, NAME)
-    G.launched(repo, NAME, exit_code=exit_code)
-    G.git(repo, "branch", "left-by-the-reviewer")
-    rc, out = G.guard(repo, "verify", NAME)
-    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    repo = flagged_round(tmp_path, exit_code=exit_code)
     assert flagged_key(repo) == start_of(repo), G.entry(repo, NAME, 1)
     rc, out = G.guard(repo, "verify", NAME)
     assert rc == 1 and "GATE-INTEGRITY" in out and "voided" in out, out
@@ -341,12 +334,7 @@ def test_bug039_site2_negative_a_tampered_record_admits_no_launch(tmp_path, tamp
     """R-042, D-003. enforces: TASK-043's r2 brief, Requirement 2 (Review A and the security audit, round 1): the record the
     void lives in is changed or deleted outside the guard, its hash copy still standing. `verify` says so as GATE-INTEGRITY,
     exit 1, no mark, and `premerge` refuses."""
-    repo = G.make_repo(tmp_path)
-    G.snap_ok(repo, NAME)
-    G.launched(repo, NAME, exit_code=None)
-    G.git(repo, "branch", "left-by-the-reviewer")
-    rc, out = G.guard(repo, "verify", NAME)
-    assert rc == 1, out
+    repo = flagged_round(tmp_path, exit_code=None)
     add_exit_0(repo)
     tamper(G.bridge_dir(repo) / ("rounds-%s.json" % ID))
     rc, out = G.guard(repo, "verify", NAME)
@@ -379,12 +367,7 @@ def test_bug039_site2_negative_a_launch_before_the_snapshot_is_not_voided(tmp_pa
     """R-042, D-003. enforces: TASK-043's brief, Requirement 3: a launch before the snapshot, or an `.err` with no started
     line, is no launch of this snapshot, and a flag voids neither. An invariant (a mutant of the fixed guard shows it
     strong)."""
-    repo = G.make_repo(tmp_path)
-    G.snap_ok(repo, NAME)
-    G.launched(repo, NAME, offset=-3600)
-    G.git(repo, "branch", "left-by-the-reviewer")
-    rc, out = G.guard(repo, "verify", NAME)
-    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    repo = flagged_round(tmp_path, offset=-3600)
     assert "flagged_launch" not in G.entry(repo, NAME, 1), G.entry(repo, NAME, 1)
     G.put(repo / "run" / "review" / ("REVIEW-%s.err" % NAME), "reviewer output\n")
     G.git(repo, "branch", "left-by-the-reviewer-again")
@@ -410,6 +393,65 @@ def test_bug039_site2_negative_a_void_touches_only_its_key(tmp_path):
     assert after == before
 
 
+def void_path_call(tmp_path, monkeypatch, snap, rounds=None):
+    """`record_flagged_launch` called directly on round 1 of a launched round, the record's read and write stubbed: returns the
+    reads and the writes it made. With `rounds` None the read fails the test, so a call that returns before it passes."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    G.launched(repo, NAME)
+    guard = load_guard(monkeypatch)
+    reads, writes = [], []
+
+    def read(*args, **kwargs):
+        assert rounds is not None, "the record was read"
+        reads.append(args)
+        return {"rounds": rounds}, None, None
+
+    monkeypatch.setattr(guard, "load_rounds", read)
+    monkeypatch.setattr(guard, "write_rounds", lambda common, id_part, data: writes.append(data))
+    guard.record_flagged_launch(os.path.realpath(str(G.bridge_dir(repo).parent)), str(repo), NAME, snap)
+    return reads, writes
+
+
+def test_bug039_void_path_a_launch_before_the_snapshot_reads_no_record(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: with a snapshot given, a launch before
+    it returns before any read of the record, whose read can raise on what `load_rounds` does not catch."""
+    assert void_path_call(tmp_path, monkeypatch, {"taken": "2999-01-01T00:00:00Z"}) == ([], [])
+
+
+def test_bug039_void_path_no_entry_with_a_snapshot_still_writes(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: with a snapshot given and no entry for the
+    round, the record is written back as it was read, no entry gaining a void."""
+    reads, writes = void_path_call(tmp_path, monkeypatch, {"taken": ""}, rounds=[{"round": 2, "time": "2000-01-01T00:00:00Z"}])
+    assert reads and writes == [{"rounds": [{"round": 2, "time": "2000-01-01T00:00:00Z"}]}]
+
+
+def test_bug039_void_path_no_entry_without_a_snapshot_writes_nothing(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: with no snapshot, no entry for the round gives
+    no write."""
+    reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[{"round": 2, "time": "2000-01-01T00:00:00Z"}])
+    assert reads and writes == []
+
+
+@pytest.mark.parametrize("entry", [{"round": 1, "time": ""}, {"round": 1, "time": None}, {"round": 1}], ids=["empty", "none", "missing"])
+def test_bug039_void_path_an_entry_with_no_time_and_no_snapshot_writes_nothing(tmp_path, monkeypatch, entry):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: the round's recorded time is what a call
+    with no snapshot voids by, so an entry with an empty or missing time gives no write."""
+    reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[entry])
+    assert reads and writes == []
+
+
+def test_bug039_void_path_of_two_entries_for_a_round_the_first_decides_and_is_voided(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: of two entries for one round, which the
+    guard's own records never hold, the first decides by its time and alone takes the void."""
+    early, late = "2000-01-01T00:00:00Z", "2999-01-01T00:00:00Z"
+    reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[{"round": 1, "time": early}, {"round": 1, "time": late}])
+    assert reads and len(writes) == 1
+    first, second = writes[0]["rounds"]
+    assert first["time"] == early and first.get("flagged_launch"), first
+    assert second == {"round": 1, "time": late}
+
+
 # --- Site 3: premerge's git call ----------------------------------------------------------
 
 def verified_round(tmp_path):
@@ -426,15 +468,7 @@ def test_bug039_site3_every_git_command_of_premerge_runs_with_both_switches(tmp_
     `core.fsmonitor=false` like every other git command of the guard. Every git process `premerge` starts is watched."""
     repo = verified_round(tmp_path)
     guard = load_guard(monkeypatch)
-    started = []
-    real_run = subprocess.run
-
-    def watching(cmd, *args, **kwargs):
-        if cmd and cmd[0] == "git":
-            started.append(list(cmd))
-        return real_run(cmd, *args, **kwargs)
-
-    monkeypatch.setattr(subprocess, "run", watching)
+    started = watch_git(monkeypatch)
     assert guard.cmd_premerge(NAME, str(repo)) == 0, capsys.readouterr().out
     assert any("merge-base" in cmd for cmd in started), started
     for cmd in started:

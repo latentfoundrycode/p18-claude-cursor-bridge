@@ -396,21 +396,7 @@ def record_flagged_launch(common, root, nnn, snap):
     launched_at, exit_code = launch_info(err_path)
     if not launched_at:
         return
-    if snap is None:
-        rpath = rounds_path(common, id_part)
-        if not os.path.isfile(rpath):
-            return
-        data_pre, _, err_pre = load_rounds(common, id_part, root=None, seed=False)
-        if err_pre:
-            return
-        round_time = None
-        for r in data_pre.get("rounds") or []:
-            if r.get("round") == rnd:
-                round_time = r.get("time")
-                break
-        if not round_time or not _launch_time_ge_round(launched_at, round_time):
-            return
-    else:
+    if snap is not None:
         snap_taken = (snap.get("taken") or "").rstrip("Z")
         if snap_taken and launched_at.rstrip("Z") < snap_taken:
             return
@@ -420,10 +406,11 @@ def record_flagged_launch(common, root, nnn, snap):
     data, _, err = load_rounds(common, id_part, root=None, seed=False)
     if err:
         return
-    for r in data.get("rounds") or []:
-        if r.get("round") == rnd:
-            r["flagged_launch"] = launched_at
-            break
+    entry = next((r for r in data.get("rounds") or [] if r.get("round") == rnd), None)
+    if snap is None and not (entry is not None and _launch_time_ge_round(launched_at, entry.get("time"))):
+        return
+    if entry is not None:
+        entry["flagged_launch"] = launched_at
     write_rounds(common, id_part, data)
 
 
@@ -651,7 +638,6 @@ def load_rounds(common, id_part, root=None, seed=True):
 
 
 def write_rounds(common, id_part, data):
-    import tempfile
     path = rounds_path(common, id_part)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".rounds-", suffix=".tmp")
@@ -1060,8 +1046,6 @@ def cmd_verify(nnn, cwd):
     snap_taken = (snap.get("taken") or "").rstrip("Z")
     launch_ok = launched_at and launched_at >= snap_taken
     parsed = bridge_env.parse_review_name(str(nnn)) if not str(nnn).startswith("DESIGN-") else None
-    rounds_data = None
-    rpath = None
     if parsed:
         id_part, rnd = parsed
         rpath = rounds_path(common, id_part)
@@ -1077,7 +1061,6 @@ def cmd_verify(nnn, cwd):
                     return 1
                 break
     if parsed and exit_code == 0 and launch_ok:
-        id_part, rnd = parsed
         if os.path.isfile(rpath):
             for r in rounds_data.get("rounds") or []:
                 if r.get("round") == rnd and r.get("reply") is None:
