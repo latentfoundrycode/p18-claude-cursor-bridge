@@ -149,7 +149,7 @@ EV_WINDOW = (
     "also gives `finding standing: run <id>`, carried from each section to the next until a later run ends "
     "`success`, so the finding is reported every week it stands, beside whatever kind the week's own runs show.")
 EV_NOT_CONFIGURED = (
-    "A list that holds no `dependency-scan.yml` names a project that has not received the workflow yet (one not "
+    "A list that holds no `dependency-scan` names a project that has not received the workflow yet (one not "
     "calibrated to release T): it is written `not configured`, its calibration's item, with `last run read: none`, "
     "and no run is read for it.")
 EV_EVERY_WEEK = (

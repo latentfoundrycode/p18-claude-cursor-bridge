@@ -85,7 +85,7 @@ Only the items the supervisor names, drawn from this set:
   the workspace. **Append** it to the same `.cursor/hooks.json` array; copy
   `~/.claude/cursor-bridge/boundary-check.py` to `.cursor/hooks/boundary-check.py` verbatim
   and invoke it with the explicit interpreter path, as with the other hooks. Never
-  `failClosed`.
+  `failClosed`. Add `docs/BOUNDARY_VIOLATIONS.md` to `.gitignore`: the log holds this computer's absolute paths, so it is read locally and never committed (rule 54).
 - `.cursor/rules/minimal-code.mdc` — the frozen minimal-code rule, for **every** project.
   Copy the body verbatim from `~/.claude/cursor-bridge/minimal-code.snapshot.md` with the
   frontmatter from `Cursor-File-Formats.md`. Never regenerate, trim, or "improve" it — and
@@ -98,7 +98,7 @@ Only the items the supervisor names, drawn from this set:
   OSV-Scanner on the PR diff with explicit exit-code handling, `socket ci`) — added to the
   existing workflow, **not** as new required checks. Every tool and CI action **SHA-pinned**
   (full commit SHA, never a mutable tag), per `Cursor-File-Formats.md`.
-- The **weekly dependency scan**, `.github/workflows/dependency-scan.yml`, a workflow file of its own beside the gate's, for **every** project: written verbatim from the frozen block ("The weekly scan's frozen block", below), its one fill-in `<fill-in>` replaced by the value the floor's OSV-Scanner step in the project's gate workflow gives `--lockfile=` (`requirements.txt:requirements.lock`, say), with one more `--lockfile=<value>` word for each further lockfile that step names. Never add a step, a permission, a secret or a token, never change a pin or the exit-code handling, and never regenerate, trim or reorder the block. Its checkout and OSV-Scanner pins are the floor's: where the project's floor pins another checkout commit or another OSV-Scanner release, stop and report it rather than write the file.
+- The **weekly dependency scan**, `.github/workflows/dependency-scan.yml`, a workflow file of its own beside the gate's, for **every** project: written verbatim from the frozen block ("The weekly scan's frozen block", below), its one fill-in `<fill-in>` replaced by the value the floor's OSV-Scanner step in the project's gate workflow gives `--lockfile=` (`requirements.txt:requirements.lock`, say), with one more `--lockfile=<value>` word for each further lockfile that step names. Never add a step, a permission, a secret or a token, never change a pin or the exit-code handling, and never regenerate, trim or reorder the block. Its checkout and OSV-Scanner pins are the floor's: where the project's floor pins another checkout commit or another OSV-Scanner release, stop and report it rather than write the file. Stop and report the same where that step names no `--lockfile=` word or the project has no such step. The supervisor settles each: an increment brings the floor to the block's pins or gives it the step, and you write the file after it merges; a project with no CI receives no weekly workflow, the reason recorded in `docs/INVENTORY.md`.
 - The **shell-guard hook** — **only when the supervisor explicitly opts in** (off by default;
   requires a PowerShell-launched builder on Windows — see `Cursor-File-Formats.md`). When told
   to, add a `beforeShellExecution` entry in `.cursor/hooks.json` with `failClosed: true`, plus

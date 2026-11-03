@@ -3,9 +3,9 @@
 enforces: docs/REQUIREMENTS.md R-052 (the loop's suite and driver launches carry `--strip`); docs/diagrams/D-004-context-dfd.md,
 the note "Stripped environment" (what is withheld and what is set).
 
-One environment test, not a pin and not in a mutants file's new_tests: it reads the environment this pytest process was
+One environment test beside a pin of `stripped_env`, neither in a mutants file's new_tests (m42 the pin's proof): it reads the environment this pytest process was
 given. Under `bridge-run.py --strip` the launcher sets GH_CONFIG_DIR to the empty folder and HOME to the agent home, while
-LOCALAPPDATA stays the owner's real folder (D-004's deviation), so the owner's profile is read from it. Where GH_CONFIG_DIR
+LOCALAPPDATA stays the owner's real folder (docs/diagrams/D-004-context-dfd.md's note, a program item), so the owner's profile is read from it. Where GH_CONFIG_DIR
 is set and HOME is not the owner's profile, the run is a stripped one, and HOME must be the agent home and every name the
 note lists as withheld absent. Anywhere else (CI, a plain local run) it skips and says why. The environment is read when
 the module is collected, before tests/conftest.py's autouse fixture `home_of_the_tests` points HOME and USERPROFILE at a
@@ -47,9 +47,11 @@ def git_bash_put_it_back(name, value):
     return name == "SSH_ASKPASS" and os.path.basename(value.replace("\\", "/")).lower() == "git-askpass.exe"
 
 
-def test_r052_the_strip_itself_withholds_git_bash_s_helper(tmp_path):
+def test_r052_the_strip_itself_withholds_git_bash_s_helper(tmp_path, monkeypatch):
     """The name the test below excuses for its one value: stripped_env removes it whatever its value, so the excuse hides
-    no launcher that keeps it. tmp_path stands in for the profile, as tests/test_account_keys.py's sample does."""
+    no launcher that keeps it. tmp_path stands in for the profile, as tests/test_account_keys.py's sample does, and for
+    LOCALAPPDATA, where `stripped_env` makes its empty `gh` folder, so the owner's profile gets none (stage T2's review)."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     env = {"PATH": os.environ.get("PATH", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""), "HOME": str(tmp_path),
            "USERPROFILE": str(tmp_path), "SSH_ASKPASS": "C:/somewhere/git-askpass.exe"}
     (tmp_path / ".cursor").mkdir()

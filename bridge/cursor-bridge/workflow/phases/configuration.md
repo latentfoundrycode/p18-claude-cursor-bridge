@@ -50,7 +50,7 @@ the configurator writes `.semgrep.yml`, `osv-scanner.toml`, `socket.yml`, the fr
 `.cursor/rules/secure-coding.mdc` (from the bundled
 `~/.claude/cursor-bridge/secure-coding.snapshot.md`, level-filtered to the ASVS level from
 Phase 1/2 + the LLM supplement for AI-bearing products), the third advisory Semgrep hook, and the
-three floor steps **inside the existing `gate` job**. You pin and record the Semgrep/OSV/
+three floor steps **inside the existing `gate` job**, and the weekly dependency scan's workflow beside it (§5c, step 8). You pin and record the Semgrep/OSV/
 Socket versions, the ASVS level, and the workflow file that pins every CI action by commit in `docs/INVENTORY.md` (Resources). The
 escalations are the two **API tokens** — **Socket** and **Semgrep** (`SEMGREP_APP_TOKEN`, for
 the Pro engine) — repo secrets, already owner-authorised; set once and referenced as secrets,

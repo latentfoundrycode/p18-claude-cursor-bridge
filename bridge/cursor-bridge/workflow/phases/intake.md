@@ -72,7 +72,7 @@ Also at intake: **fix the software name** — the name the user will call the pr
 names the four `Documents/` files (see "The project layout") and never changes; if the user
 has not named it, propose one and get it confirmed with the summary below. And resolve the
 layout: confirm you are in `Workspace/`, that `../Documents` exists (create it if not), and
-record both resolved paths and the software name in `docs/PROJECT_STATUS.md`.
+record them and the software name in `docs/PROJECT_STATUS.md`, the two on its `Layout:` line, relative to the project root and never as a computer path (rule 54).
 
 ### The intake notes
 

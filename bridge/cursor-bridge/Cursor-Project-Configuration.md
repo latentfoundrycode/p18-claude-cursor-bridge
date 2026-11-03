@@ -478,7 +478,7 @@ this reliable:
    frozen `.cursor/rules/secure-coding.mdc` from the bundled ASVS snapshot at the chosen
    level; append the third (Semgrep, advisory) `afterFileEdit` hook; **(opt-in only, and only
    for a PowerShell-launched builder)** the fail-closed `beforeShellExecution` shell-guard hook
-   (+ place `shell-guard.py`); pin and record the Semgrep/OSV/Socket versions, ASVS level, and
+   (+ place `shell-guard.py`); write `.github/workflows/dependency-scan.yml` from `cursor-configurator`'s frozen block (§5c, step 8); pin and record the Semgrep/OSV/Socket versions, ASVS level, and
    the file that pins each SHA in `docs/INVENTORY.md` (Resources). The Socket token escalates once (repo secret).
 8b. §5e performance floor (where budgets exist): `bench/budgets.json`, the `bench-check.py` CI step, pinned bench/profile tools, gitignores.
 8. §5d observability (UI-bearing projects): wire the supervisor-authored observability e2e

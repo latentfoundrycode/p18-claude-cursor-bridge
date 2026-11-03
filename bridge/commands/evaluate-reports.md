@@ -32,7 +32,7 @@ A maintainer command, run in the bridge project by the maintainer session (the B
    gh workflow list --all --repo <owner>/<repo>
    ```
 
-   Any disabled state of the workflow (`disabled_inactivity`, `disabled_manually`) is the third kind below whatever its runs show: GitHub disables a public repository's scheduled workflows after 60 days with no activity, and `gh run list` lists no run of a disabled workflow without `--all`. A list that holds no `dependency-scan.yml` names a project that has not received the workflow yet (one not calibrated to release T): it is written `not configured`, its calibration's item, with `last run read: none`, and no run is read for it. Then the runs created since the date noted before the extract, each with its id, status and conclusion:
+   Any disabled state of the workflow (`disabled_inactivity`, `disabled_manually`) is the third kind below whatever its runs show: GitHub disables a public repository's scheduled workflows after 60 days with no activity, and `gh run list` lists no run of a disabled workflow without `--all`. A list that holds no `dependency-scan` names a project that has not received the workflow yet (one not calibrated to release T): it is written `not configured`, its calibration's item, with `last run read: none`, and no run is read for it. Then the runs created since the date noted before the extract, each with its id, status and conclusion:
 
    ```bash
    gh run list --repo <owner>/<repo> --workflow dependency-scan.yml --created ">=<the ledger's _meta.last_extract>" --json databaseId,createdAt,status,conclusion
