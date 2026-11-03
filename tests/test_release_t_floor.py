@@ -208,7 +208,7 @@ P7_CMD = LAUNCHER + "--key-file <a file outside the Workspace> --kind test -- py
 CALIBRATE_CMD = LAUNCHER + "--kind test -- <the recorded suite command> -rA > run/agent/calibrate-suite-before.out 2>&1"
 KP061 = "(`bridge-run.py --limit auto --strip --kind test`)"
 LOOP_SUITE = ("The suite runs through the launcher in the background, whatever its length, with the owner's environment "
-              "stripped (`--strip`, between `--limit` and `--kind`): no launch of the loop hands code the builder wrote "
+              "stripped (`--strip`, between `--limit` and `--kind`): no launch of the loop but a driver under a recorded Decision (step 7) hands code the builder wrote "
               "the owner's login or secret-like variables (D-004, R-052), and a variable the suite needs reaches it by "
               "`--key-file <a file outside the Workspace>`, which the test kind accepts:")
 LOOP_CHECKPOINT = ("stage them (`git add`), and launch the engine in the background like any mutation run, stripped and "
