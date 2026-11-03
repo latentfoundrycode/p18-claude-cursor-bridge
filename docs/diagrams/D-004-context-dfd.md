@@ -135,7 +135,7 @@ ext_key_file -->|"SECRET: NAME=value to the child only, not to cursor-agent or a
 p_bridge_run -->|"SECRET: stripped environment (--strip, R-052) on every suite, increment's own test files and driver the loop launches, a suite's or own-file run's named key values by --key-file, handed to that code, a driver's from the project's .env in its scratch copy, its scratch folder named by --scratch under the owner's profile, outside the agent home"| p_test_suite
 ds_checkout -->|"UNTRUSTED: code and tests the builder wrote; SECRET: the .env service passwords a driver copies into its scratch copy"| p_test_suite
 ds_checkout -->|"UNTRUSTED: code and tests the builder wrote, run in the session's own environment: stated limits (BUG-043)"| p_supervisor
-p_test_suite -->|"UNTRUSTED: writes, .git config, hooks, which a later git command of the session runs (BUG-043)"| ds_checkout
+p_test_suite -.->|"UNTRUSTED: a deliberate write, .git config, hooks, which a later git command of the session runs (BUG-043)"| ds_checkout
 p_bridge_run -->|"SECRET: owner's gh login, CI watch"| ext_github
 
 ds_agent_home -->|"link .cursor"| ext_cursor_home
@@ -153,6 +153,7 @@ ds_checkout -->|"UNTRUSTED: .cursor hook wiring"| p_shell_guard
 p_builder & p_review_b --x|"withheld: gh login, token, credential helper, prompt"| ext_github
 p_builder & p_review_b --x|"no .claude in the home: hooks not imported"| ext_claude_home
 p_builder & p_review_b -.->|"deliberate only"| ext_credential_store
+p_test_suite -.->|"deliberate only"| ext_credential_store
 p_builder & p_review_b -.->|"deliberate only, not found by default: the profile root's stores (~/.gitconfig, ~/.ssh, ~/.aws)"| ext_owner_profile
 p_builder & p_review_b -->|"found by default: ~/AppData through APPDATA and LOCALAPPDATA, which stay the owner's until a probed release redirects them (KP-038)"| ext_owner_profile
 p_builder & p_review_b -.->|"UNTRUSTED: write, reported after as BOUNDARY"| ext_beside_workspace
