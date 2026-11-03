@@ -289,7 +289,9 @@ or NOTE. It runs at every calibration and every reflection point; each MISSING i
 calibration item, applied as configuration work in the next stage. It never changes anything.
 
 What it checks, with the file it reads (the 0b review corrected several of these):
-  - the gate workflows (.github/workflows/*.yml), step by step: a step runs Semgrep,
+  - the gate workflows (.github/workflows/*.yml), step by step, except the weekly
+    dependency-scan file (dependency-scan.yml or dependency-scan.yaml), which is not read for
+    gate steps or scanner version lines: a step runs Semgrep,
     OSV-Scanner and Socket; a scanner step guarded by `if:` is MISSING (it is skipped
     silently when its condition is false); Semgrep runs the bridge rules or the Pro engine
     (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner
@@ -806,9 +808,11 @@ What each step does:
             with `--match-head-commit`.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
-2 = cannot verify (no snapshot, dirty tree, git or gh failure); 125 = refused (review round
-ceiling, grammar, branch rule; writes no snapshot). Never prints a value of anything.
-ASCII-only.
+a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY;
+2 = cannot verify (a snapshot never taken, dirty tree, git or gh failure); 125 = refused
+(review round ceiling, grammar, branch rule; writes no snapshot). A GATE-INTEGRITY from
+`verify` voids the Review B launch for round counting; `premerge` voids nothing. Never prints
+a value of anything. ASCII-only.
 
 What it does not cover, said plainly (KP-032): the contents of cache folders, anything
 outside the checkout (the owner's profile, the installed bridge, other projects), and a

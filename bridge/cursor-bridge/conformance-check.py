@@ -12,7 +12,9 @@ or NOTE. It runs at every calibration and every reflection point; each MISSING i
 calibration item, applied as configuration work in the next stage. It never changes anything.
 
 What it checks, with the file it reads (the 0b review corrected several of these):
-  - the gate workflows (.github/workflows/*.yml), step by step: a step runs Semgrep,
+  - the gate workflows (.github/workflows/*.yml), step by step, except the weekly
+    dependency-scan file (dependency-scan.yml or dependency-scan.yaml), which is not read for
+    gate steps or scanner version lines: a step runs Semgrep,
     OSV-Scanner and Socket; a scanner step guarded by `if:` is MISSING (it is skipped
     silently when its condition is false); Semgrep runs the bridge rules or the Pro engine
     (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner
@@ -799,8 +801,15 @@ def main():
     # --- the gate workflows, step by step
     workflows = sorted(glob.glob(os.path.join(ws, ".github", "workflows", "*.yml")) + glob.glob(os.path.join(ws, ".github", "workflows", "*.yaml")))
     wf_text = "\n".join(read(p) or "" for p in workflows)
-    steps = []
+    gate_workflows = []
     for p in workflows:
+        stem, ext = os.path.splitext(os.path.basename(p))
+        if stem.lower() == "dependency-scan" and ext.lower() in (".yml", ".yaml"):
+            continue
+        gate_workflows.append(p)
+    gate_wf_text = "\n".join(read(p) or "" for p in gate_workflows)
+    steps = []
+    for p in gate_workflows:
         steps.extend(workflow_steps(read(p) or ""))
     if not workflows:
         add("MISSING", "CI gate", "no workflow under .github/workflows/; the merge gate needs a required check")
@@ -815,7 +824,7 @@ def main():
                 continue
             add("OK", "%s in the gate" % name)
             # the version may sit in the step that installs the scanner rather than the one that runs it
-            scanner_lines = [l for l in wf_text.splitlines() if re.search(pattern, l, re.I)]
+            scanner_lines = [l for l in gate_wf_text.splitlines() if re.search(pattern, l, re.I)]
             if not any(re.search(r"(==\s*\d|@v?\d|@[0-9a-f]{40}|version:\s*['\"]?\d|/v?\d+\.\d+(\.\d+)?/)", l) for l in scanner_lines):
                 add("NOTE", "%s version pinned" % name, "no version where the step installs or runs it; pin it (rule 14: never auto-adopt a tool update)")
             if any(re.search(r"\bif\s+\[\[?\s*-[nz]\s+\"?\$\{?[A-Z0-9_]*(TOKEN|KEY|SECRET)", body) for body, _ in hits):

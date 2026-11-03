@@ -60,9 +60,11 @@ What each step does:
             with `--match-head-commit`.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
-2 = cannot verify (no snapshot, dirty tree, git or gh failure); 125 = refused (review round
-ceiling, grammar, branch rule; writes no snapshot). Never prints a value of anything.
-ASCII-only.
+a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY;
+2 = cannot verify (a snapshot never taken, dirty tree, git or gh failure); 125 = refused
+(review round ceiling, grammar, branch rule; writes no snapshot). A GATE-INTEGRITY from
+`verify` voids the Review B launch for round counting; `premerge` voids nothing. Never prints
+a value of anything. ASCII-only.
 
 What it does not cover, said plainly (KP-032): the contents of cache folders, anything
 outside the checkout (the owner's profile, the installed bridge, other projects), and a
@@ -297,8 +299,9 @@ def hash_copy_path(common, nnn):
 
 def snapshot_rewritten(common, nnn):
     """'rewritten' when the snapshot file's hash differs from the copy `snapshot` wrote outside the
-    checkout (FB-037), 'missing' when there is no copy (fail closed: a snapshot taken before this
-    release or a deleted copy is taken again), None when it matches."""
+    checkout (FB-037), or the file is gone while the copy stands, 'missing' when there is no copy
+    (fail closed: a snapshot taken before this release or a deleted copy is taken again), None when
+    it matches."""
     try:
         with open(hash_copy_path(common, nnn), encoding="utf-8") as f:
             recorded = f.read().strip()
