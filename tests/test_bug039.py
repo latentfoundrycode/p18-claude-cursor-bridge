@@ -8,6 +8,7 @@ call site of git). The helpers are tests/test_task032_supervisor_guard.py's, imp
 """
 import ast
 import importlib.util
+import json
 import os
 import re
 import stat
@@ -361,6 +362,45 @@ def test_bug039_site2_negative_the_tamper_line_is_the_fixed_sentence(tmp_path, m
     assert not (G.bridge_dir(repo) / ("verified-%s.json" % NAME)).exists(), out
     rc, out = G.guard(repo, "premerge", NAME)
     assert rc == 2 and "no verified mark" in out, out
+
+
+def test_bug039_site2_a_launch_in_the_snapshot_s_own_second_is_voided(tmp_path):
+    """R-042, D-003. enforces: TASK-043's brief, Requirement 3, "at or after" the snapshot (stage T2's review, Review A's tests part):
+    `G.launched` starts a launch a second later by default, so `<=` for `<` at the comparison survived this file."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    with open(str(G.bridge_dir(repo) / ("review-%s.json" % NAME)), encoding="utf-8") as f:
+        taken = json.load(f)["taken"].rstrip("Z")
+    G.put(repo / "run" / "review" / ("REVIEW-%s.err" % NAME), "bridge-run: started %sZ\nbridge-run: exit 0\n" % taken)
+    G.git(repo, "branch", "left-by-the-reviewer")
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 1 and "GATE-INTEGRITY" in out, out
+    assert flagged_key(repo) == taken, G.entry(repo, NAME, 1)
+
+
+def in_the_snapshot_s_own_second(tmp_path):
+    """A round whose Review B started in the second the snapshot was taken and exited 0; `G.launched` starts one a second later."""
+    repo = G.make_repo(tmp_path)
+    G.snap_ok(repo, NAME)
+    with open(str(G.bridge_dir(repo) / ("review-%s.json" % NAME)), encoding="utf-8") as f:
+        taken = json.load(f)["taken"].rstrip("Z")
+    G.put(repo / "run" / "review" / ("REVIEW-%s.err" % NAME), "bridge-run: started %sZ\nbridge-run: exit 0\n" % taken)
+    return repo, taken
+
+
+def test_bug042_a_clean_launch_in_the_snapshot_s_own_second_gets_its_reply(tmp_path):
+    """R-042, D-003. enforces: docs/debug/BUG-042.md, stage T2's review, Review A's tests part, C3: at or after, at verify's mark."""
+    repo, _ = in_the_snapshot_s_own_second(tmp_path)
+    rc, out = G.guard(repo, "verify", NAME)
+    assert rc == 0, out
+    assert G.entry(repo, NAME, 1)["reply"] == 0
+
+
+def test_bug042_an_unverified_launch_at_the_round_s_own_time_counts_as_its_reply(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: docs/debug/BUG-042.md, stage T2's review, Review A's tests part, C3: at or after, where an unverified run is read."""
+    repo, taken = in_the_snapshot_s_own_second(tmp_path)
+    guard = load_guard(monkeypatch)
+    assert guard.err_counts_as_reply(str(repo), {"name": NAME, "time": taken + "Z"}) is True
 
 
 def test_bug039_site2_negative_a_launch_before_the_snapshot_is_not_voided(tmp_path):

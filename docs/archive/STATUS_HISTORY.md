@@ -205,3 +205,7 @@ Last accepted: TASK-042 (PR #128, at its merge): the weekly dependency scan in t
 ## Moved 2026-11-03 (REFAC-T2)
 
 Last accepted: TASK-044 (PR #129, at its merge): the retrofit's enforcement, R-052 and R-055 built; before it TASK-042 (PR #128); before it BUG-041 (PR #127); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-044, BUG-001 to BUG-041, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+
+## Moved 2026-11-03 (BUG-042)
+
+Last accepted: REFAC-T2, stage T2's refactoring pass (PR #130, at its merge): the guard's void path reads the rounds record once and four dead lines go, the guard tests' helpers and the frozen block's reader one copy each, behaviour unchanged; before it TASK-044 (PR #129); before it TASK-042 (PR #128); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-044, BUG-001 to BUG-041, the refactoring passes of B2 to B5, T1 and T2, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004

@@ -189,3 +189,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new TASK-041 bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md The mutation run
 - new TASK-041 bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md 8. Merge (the verified gate)
 - new TASK-041 bridge/cursor-bridge/workflow/phases/change-cycle.md The procedure
+- reword BUG-042 bridge/commands/supervisor.md Phase 1 — Intake
+- reword BUG-042 bridge/commands/supervisor.md Phase 5 — Configure the Cursor build environment
+- new BUG-042 bridge/cursor-bridge/workflow/phases/intake.md The procedure
+- new BUG-042 bridge/cursor-bridge/workflow/phases/configuration.md The procedure

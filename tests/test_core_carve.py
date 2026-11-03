@@ -169,7 +169,10 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # (BUG-031: two more move from traced to excused, under BUG-031's own `reword` entries but labelled by the earlier
 # entries that match first: the refactoring pass's step 6, whose title now names its REFAC-<nnn> brief IDs
 # (TASK-035), and rule 39, which retires step 4's old-<nnn> worktree (TASK-015))
-TRACED = "TRACED: 424 passages of baseline 0a186da; 138 in supervisor.md, 209 under workflow/, 0 dropped, 77 excused"
+# (BUG-042: two more move from traced to excused, under BUG-042's own `reword` entries: intake's software-name
+# paragraph, whose paths go on the `Layout:` line (rule 54), and the configuration's security-tooling paragraph,
+# which names the weekly scan's workflow)
+TRACED = "TRACED: 424 passages of baseline 0a186da; 138 in supervisor.md, 207 under workflow/, 0 dropped, 79 excused"
 NOTES = [
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
@@ -180,6 +183,7 @@ NOTES = [
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - Until the phases are moved into files of their own, each pha",
     "NOTE (reword TASK-010) bridge/commands/supervisor.md: Main and conditional workflows - **The order additions apply in.** Additions from several con",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: The project layout - You work in `Workspace/`; `Documents/` is its sibling (`../D",
+    "NOTE (reword BUG-042) bridge/commands/supervisor.md: Phase 1 \\u2014 Intake - Also at intake: **fix the software name** \\u2014 the name the use",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - For every **performance or cost budget** the design names th",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - ```bash\\x0apython ~/.claude/cursor-bridge/bridge-run.py --limit",
     "NOTE (reword TASK-012) bridge/commands/supervisor.md: Phase 2 \\u2014 Design - It answers in the critic's grades (Blocking, Should fix, Con",
@@ -195,6 +199,7 @@ NOTES = [
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Run parameters \\u2014 asked once, after the plan is approved, before configuration - - `on` \\u2014 ready independent increments are built at once, eac",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Run parameters \\u2014 asked once, after the plan is approved, before configuration - ```markdown\\x0a# Run parameters\\x0aSet: <date>   (owner may change",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Run parameters \\u2014 asked once, after the plan is approved, before configuration - Three optional lines are never asked and are written only on",
+    "NOTE (reword BUG-042) bridge/commands/supervisor.md: Phase 5 \\u2014 Configure the Cursor build environment - Work the **security-tooling** steps in `Cursor-Project-Confi",
     "NOTE (reword TASK-017) bridge/commands/supervisor.md: 2. Package the brief - Delegate to **spec-packager** to write `handoff/TASK-<nnn>.m",
     "NOTE (reword TASK-030) bridge/commands/supervisor.md: 3. Delegate to Cursor - The `--model` value is copied from `docs/ROSTER.resolved.jso",
     "NOTE (reword TASK-030) bridge/commands/supervisor.md: 3. Delegate to Cursor - - **The brief carries the constraints \\u2014 the command line car",

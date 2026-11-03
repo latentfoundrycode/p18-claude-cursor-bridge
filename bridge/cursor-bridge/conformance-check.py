@@ -12,14 +12,18 @@ or NOTE. It runs at every calibration and every reflection point; each MISSING i
 calibration item, applied as configuration work in the next stage. It never changes anything.
 
 What it checks, with the file it reads (the 0b review corrected several of these):
-  - the gate workflows (.github/workflows/*.yml), step by step: a step runs Semgrep,
+  - the gate workflows (.github/workflows/*.yml), step by step, except the weekly
+    dependency-scan file (dependency-scan.yml or dependency-scan.yaml), which is not read for
+    gate steps or scanner version lines: a step runs Semgrep,
     OSV-Scanner and Socket; a scanner step guarded by `if:` is MISSING (it is skipped
     silently when its condition is false); Semgrep runs the bridge rules or the Pro engine
     (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner
     without a pinned version is a NOTE (rule 14); every `uses:` is pinned by a 40-character
-    commit; the runner is Linux (a note otherwise); `socket ci` without `--no-banner` is
-    MISSING (its banner prints part of the key, ISS-005), and so is a step that installs the
-    Socket CLI while its `env:` holds the Socket key (the install scripts see it, FB-007);
+    commit; the runner is Linux (a note otherwise);
+  - every workflow's steps, the weekly dependency-scan file included, for the two Socket
+    key-exposure floors: `socket ci` without `--no-banner` is MISSING (its banner prints part
+    of the key, ISS-005), and so is a step that installs the Socket CLI while its `env:` holds
+    the Socket key (the install scripts see it, FB-007);
   - on GitHub, read-only through `gh` unless --offline: the default branch has a required
     status check (N6), and the repository's visibility (a public repository is a NOTE);
   - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
@@ -799,9 +803,19 @@ def main():
     # --- the gate workflows, step by step
     workflows = sorted(glob.glob(os.path.join(ws, ".github", "workflows", "*.yml")) + glob.glob(os.path.join(ws, ".github", "workflows", "*.yaml")))
     wf_text = "\n".join(read(p) or "" for p in workflows)
-    steps = []
+    gate_workflows = []
     for p in workflows:
+        stem, ext = os.path.splitext(os.path.basename(p))
+        if stem.lower() == "dependency-scan" and ext.lower() in (".yml", ".yaml"):
+            continue
+        gate_workflows.append(p)
+    gate_wf_text = "\n".join(read(p) or "" for p in gate_workflows)
+    steps = []
+    for p in gate_workflows:
         steps.extend(workflow_steps(read(p) or ""))
+    all_steps = []
+    for p in workflows:
+        all_steps.extend(workflow_steps(read(p) or ""))
     if not workflows:
         add("MISSING", "CI gate", "no workflow under .github/workflows/; the merge gate needs a required check")
     else:
@@ -815,7 +829,7 @@ def main():
                 continue
             add("OK", "%s in the gate" % name)
             # the version may sit in the step that installs the scanner rather than the one that runs it
-            scanner_lines = [l for l in wf_text.splitlines() if re.search(pattern, l, re.I)]
+            scanner_lines = [l for l in gate_wf_text.splitlines() if re.search(pattern, l, re.I)]
             if not any(re.search(r"(==\s*\d|@v?\d|@[0-9a-f]{40}|version:\s*['\"]?\d|/v?\d+\.\d+(\.\d+)?/)", l) for l in scanner_lines):
                 add("NOTE", "%s version pinned" % name, "no version where the step installs or runs it; pin it (rule 14: never auto-adopt a tool update)")
             if any(re.search(r"\bif\s+\[\[?\s*-[nz]\s+\"?\$\{?[A-Z0-9_]*(TOKEN|KEY|SECRET)", body) for body, _ in hits):
@@ -828,10 +842,10 @@ def main():
                 add("MISSING", "Semgrep bridge rules or Pro engine", "Semgrep runs public rulesets only; the floor is `.semgrep/bridge-rules.yml` or `semgrep ci` (Cursor-Project-Configuration.md 5c, KP-001)")
         # the Socket CLI's banner prints five characters of the key's secret part (ISS-005); its
         # install scripts run with the key when the install shares the step that holds it (FB-007)
-        bannered = [body for body, _, cmds in steps if any(SOCKET_CI.search(l) and "--no-banner" not in l for l in re.sub(r"\\\n\s*", " ", cmds).splitlines())]
+        bannered = [body for body, _, cmds in all_steps if any(SOCKET_CI.search(l) and "--no-banner" not in l for l in re.sub(r"\\\n\s*", " ", cmds).splitlines())]
         if bannered:
             add("MISSING", "Socket runs without its banner", "%d step(s) run `socket ci` without `--no-banner`: the banner prints part of the key into the CI log, and GitHub masks whole secrets only (ISS-005)" % len(bannered))
-        keyed_install = [body for body, _, cmds in steps if SOCKET_INSTALL.search(cmds) and re.search(r"^env:", body, re.M) and SOCKET_KEY.search(body.split("\nenv:", 1)[-1])]
+        keyed_install = [body for body, _, cmds in all_steps if SOCKET_INSTALL.search(cmds) and re.search(r"^env:", body, re.M) and SOCKET_KEY.search(body.split("\nenv:", 1)[-1])]
         if keyed_install:
             add("MISSING", "Socket CLI installed without the key", "%d step(s) install the Socket CLI in the step whose `env:` holds the Socket key: the package's and its dependencies' install scripts run with it; install it in a step of its own, without the key and with `--ignore-scripts` (FB-007)" % len(keyed_install))
         unpinned = sorted(set(m.group(1) for m in re.finditer(r"uses:\s*([^\s#]+@[^\s#]+)", wf_text) if not re.search(r"@[0-9a-f]{40}$", m.group(1))))
