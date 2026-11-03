@@ -427,17 +427,29 @@ def test_bug039_void_path_no_entry_with_a_snapshot_still_writes(tmp_path, monkey
 
 
 def test_bug039_void_path_no_entry_without_a_snapshot_writes_nothing(tmp_path, monkeypatch):
-    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: with no snapshot, only an entry for the round
-    with a time at or before the launch gives a write; no entry gives none."""
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: with no snapshot, no entry for the round gives
+    no write."""
     reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[{"round": 2, "time": "2000-01-01T00:00:00Z"}])
     assert reads and writes == []
 
 
-def test_bug039_void_path_an_entry_with_no_time_and_no_snapshot_writes_nothing(tmp_path, monkeypatch):
+@pytest.mark.parametrize("entry", [{"round": 1, "time": ""}, {"round": 1, "time": None}, {"round": 1}], ids=["empty", "none", "missing"])
+def test_bug039_void_path_an_entry_with_no_time_and_no_snapshot_writes_nothing(tmp_path, monkeypatch, entry):
     """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: the round's recorded time is what a call
-    with no snapshot voids by, so an entry with an empty time gives no write."""
-    reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[{"round": 1, "time": ""}])
+    with no snapshot voids by, so an entry with an empty or missing time gives no write."""
+    reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[entry])
     assert reads and writes == []
+
+
+def test_bug039_void_path_of_two_entries_for_a_round_the_first_decides_and_is_voided(tmp_path, monkeypatch):
+    """R-042, D-003. enforces: handoff/REFAC-004.md, a characterization of the void path: of two entries for one round, which the
+    guard's own records never hold, the first decides by its time and alone takes the void."""
+    early, late = "2000-01-01T00:00:00Z", "2999-01-01T00:00:00Z"
+    reads, writes = void_path_call(tmp_path, monkeypatch, None, rounds=[{"round": 1, "time": early}, {"round": 1, "time": late}])
+    assert reads and len(writes) == 1
+    first, second = writes[0]["rounds"]
+    assert first["time"] == early and first.get("flagged_launch"), first
+    assert second == {"round": 1, "time": late}
 
 
 # --- Site 3: premerge's git call ----------------------------------------------------------
