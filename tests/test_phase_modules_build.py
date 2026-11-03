@@ -100,7 +100,7 @@ SURVIVAL = {
         "reply, each written there as it returns, and the mutation run's cuts and estimate (step 7);",
         "the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, "
         "`run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message "
-        "(step 4), `run/agent/TASK-<nnn>-suite.out`, which `test-runner` reads after a suite run in the background, and "
+        "(step 4), `run/agent/TASK-<nnn>-suite.out` and `run/agent/TASK-<nnn>-own.out`, which `test-runner` reads after a suite or own-file run in the background, and "
         "the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files "
         "`run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); "
         "and, while a gate is open, its files under `run/review/` (the round's `REVIEW-<ID>-r<N>.diff`, "

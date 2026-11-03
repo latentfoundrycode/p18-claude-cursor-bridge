@@ -46,7 +46,7 @@ def test_bug043_the_loop_runs_the_increment_s_own_files_through_the_launcher():
     text = loop()
     assert "A run of the increment's own test files alone goes through the launcher the same way, yours and never `test-runner`'s, since it runs code no reviewer has read: `" + OWN_FILES + "`, in the background under the same `timeout`, and `test-runner` reads that file." in text
     assert "A run of the increment's own test files alone may run in the foreground" not in text
-    assert "A stripped run that fails for want of a variable or a file of the owner's home takes `--key-file`, and is never run again without `--strip`; a 125 naming an option or the agent home is a defect to fix, not a runner the launcher does not know." in text
+    assert "A stripped suite or own-file run that fails for want of a variable takes `--key-file` as above, for want of a file a variable naming a copy outside the Workspace, never a home variable, which would undo the strip, and is never run again without `--strip`; a 125 on a runner you know, or naming the agent home, is a defect to fix, not a runner the launcher does not know." in text
 
 
 def test_bug043_the_test_runner_reads_their_file():
@@ -54,20 +54,32 @@ def test_bug043_the_test_runner_reads_their_file():
     assert "you may run the increment's own test files alone in the foreground." not in text
     assert "The increment's own test files alone are the supervisor's launch too, stripped, in the background, since they run code no reviewer has read: `" + OWN_FILES + "` (D-004, R-052), and you read that file." in text
     assert "If you are asked to run either yourself, say so and hand the command back." in text
-    assert "A stripped run that fails for want of a variable or a file of the owner's home is said so in your report, for `--key-file`, and never run again without `--strip`." in text
+    assert "A stripped run that fails for want of a variable or a file is said so in your report, for the supervisor's `--key-file`, and never run again without `--strip`." in text
+    assert "so read the run's file first" in text
+    assert "so run the suite first" not in text
+    assert "You run tests and report failures." not in text
+    assert "the run is lost with its result" not in text
 
 
 def test_bug043_the_claim_says_what_the_launches_do():
+    """Review A's B1 and the audit's B3 of the second text: a sentence about every launch of the loop was false against `# wake`'s direct run and against the key file in its own next clause. It now says what the flag withholds, and what a key file hands over."""
     assert OLD_CLAIM not in loop()
-    assert "no launch of the loop but a driver under a recorded Decision (step 7) hands code the builder wrote the owner's login or secret-like variables (D-004, R-052)" in loop()
+    assert "no launch of the loop" not in loop()
+    assert "the flag withholds the owner's `gh` and git login and the environment's secret-like variables from code the builder wrote (D-004, R-052). A variable the suite needs reaches it by `--key-file <a file outside the Workspace>`, which the test kind accepts and which hands that code what the file names, so a key file holds only what the brief or the inventory names for this increment, never what a test's failure asks for:" in loop()
     design = flat(read(ROOT, "docs", "DESIGN.md"))
     assert "builder-written code never runs in the loop" not in design
-    assert "no launch of the loop but a driver under a recorded Decision hands builder-written code the owner's secret-like variables and login" in design
+    assert "no launch of the loop" not in design
+    assert "so the flag withholds the owner's `gh` and git login and the environment's secret-like variables from builder-written code" in design
+    inventory = flat(read(ROOT, "docs", "INVENTORY.md"))
+    assert "no launch of the loop" not in inventory
+    assert "the flag withholds the owner's `gh` and git login and the environment's secret-like variables from code the builder wrote" in inventory
+    d004 = flat(read(ROOT, "docs", "diagrams", "D-004-context-dfd.md"))
+    assert "a suite's or own-file run's named key values by --key-file, handed to that code" in d004
 
 
 def test_bug043_every_home_states_a_class_not_a_count():
     """Review A's B1 and the audit's B1: "three runs" was a new absolute with the old claim's fault, and the next sentence of the same paragraph disproved it. What stays in a session's own environment is a class, stated where the claim stands, so an auditor reading every crossing of D-004 is told it exists."""
-    assert "The strip is instructed, no program holding the flag, and reaches only what goes through the launcher. Whatever else runs what a builder wrote runs in a session's own environment, stated limits (`docs/INVENTORY.md`, Decisions; D-004), among them: " + LIMITS + "." in loop()
+    assert "The strip is instructed, no program holding the flag, and reaches only what goes through the launcher. Whatever else runs what a builder wrote on this computer runs in a session's own environment, stated limits (`docs/INVENTORY.md`, Decisions; D-004), among them: " + LIMITS + "." in loop()
     design = flat(read(ROOT, "docs", "DESIGN.md"))
     d004 = flat(read(ROOT, "docs", "diagrams", "D-004-context-dfd.md"))
     inventory = flat(read(ROOT, "docs", "INVENTORY.md"))
@@ -76,16 +88,30 @@ def test_bug043_every_home_states_a_class_not_a_count():
     assert 'ds_checkout -->|"UNTRUSTED: code and tests the builder wrote, run in the session\'s own environment: stated limits (BUG-043)"| p_supervisor' in d004
     assert "the increment's own test files with them (BUG-043)" in d004
     assert "| The strip reaches only what goes through the launcher, and no program holds the flag:" in inventory
-    assert "whatever else runs what a builder wrote runs in a session's own environment, stated limits, among them: " + LIMITS in inventory
+    assert "whatever else runs what a builder wrote on this computer runs in a session's own environment, stated limits, among them: " + LIMITS in inventory
     assert "the increment's own test files run stripped too (BUG-043;" in flat(row("R-052"))
     for text in (loop(), design, d004, flat(read(ROOT, "docs", "debug", "BUG-043.md"))):
         assert "hree runs stay" not in text
 
 
 def test_bug043_step_4_reads_the_git_config_as_a_file_first():
-    """The audit's B2: a `core.fsmonitor` line a builder wrote runs on the supervisor's next `git status`, in the session's own environment, before any reading; no diff shows `.git`. Available today as text; the launcher's check is a program item."""
-    assert "Before your first git command after a builder run, read `.git/config` with the Read tool, never through git: a `core.fsmonitor` line, or a `core.hooksPath` other than the project's, is a gate-integrity flag, the line removed by hand before any git command runs (KP-032)." in loop()
-    assert "a launcher check of `.git/config` after a builder run" in flat(read(ROOT, "docs", "BUILD_PLAN.md"))
+    """The audit's B2 of the first text; Review A's B2 and S1 and the audit's B1 and B2 of the second: a `.git` setting a builder or its tests wrote runs on the session's next git command, in its own environment, and no diff shows `.git`. The read stands after every run of what a builder wrote, reads a class of lines, and says what it is: text cannot hold the order, so it is a check, not a boundary, and the launcher's comparison is a program item."""
+    assert "After a run of what a builder wrote (a builder, the own-file run, a suite) and before your next git command, step 3b's `git status` and reset and a parallel branch's switch included, read `.git/config` with the Read tool, never through git, and list `.git/hooks`: a line you did not write that names a program or another file (`core.fsmonitor`, a foreign `core.hooksPath`, `diff.*`, `filter.*`, `include*`, `extensions.*`, among them), a new hook, or a `.git/config` that cannot be read is a gate-integrity flag, the line removed by hand (KP-032). This is a check, not a boundary: the strip does not keep a run from writing `.git`, and a git command the session or the app runs first still runs what it wrote; the launcher's comparison before and after a run is a program item." in loop()
+    plan = flat(read(ROOT, "docs", "BUILD_PLAN.md"))
+    assert "a launcher comparison of `.git/config`, `.git/config.worktree`, `.git/info/attributes` and the hooks folders before and after a run of what a builder wrote" in plan
+    assert "a refusal of a home variable in a `--key-file`" in plan
+
+
+def test_bug043_every_home_states_what_the_strip_does_not_stop():
+    """Review A's B2 and the audit's B1 of the second text, the threat model R-050 asks to be recorded: what a run is handed is withheld; what it can reach on purpose is KP-032's, stated, with the crossing drawn."""
+    inventory = flat(read(ROOT, "docs", "INVENTORY.md"))
+    assert "The strip withholds what a run is handed, never what it can reach on purpose: a test that writes `.git` so that a later git command runs its program, or that asks the credential store, is KP-032's deliberate reach, stated here, never blocking by itself (R-050)" in inventory
+    design = flat(read(ROOT, "docs", "DESIGN.md"))
+    assert "a stripped run can still write `.git`, which a later git command of the session runs: step 4 reads it as a check, not a boundary (KP-032)" in design
+    d004 = flat(read(ROOT, "docs", "diagrams", "D-004-context-dfd.md"))
+    assert "A stripped run can still write `.git`, which a later git command of the session runs: step 4's check, not a boundary (KP-032)." in d004
+    assert 'p_test_suite -->|"UNTRUSTED: writes, .git config, hooks, which a later git command of the session runs (BUG-043)"| ds_checkout' in d004
+    assert "| ds_run_outputs | run/agent/\\*.err, run/agent/\\*.out, run/review/REVIEW-nnn.err |" in read(ROOT, "docs", "diagrams", "D-004-context-dfd.md")
 
 
 def test_bug043_negative_the_own_file_launch_runs_on_the_heavy_launch_rules():
@@ -95,19 +121,24 @@ def test_bug043_negative_the_own_file_launch_runs_on_the_heavy_launch_rules():
 
 
 def test_bug043_negative_a_stripped_launch_of_one_test_file_gets_no_account_key(tmp_path):
-    """An invariant of the launcher, with no bypass (Review A's C2, the audit's A6: the helper's BRIDGE_RUN_ALLOW_ANY would prove nothing of the form's acceptance): `python -m pytest <file>`, through `--strip --kind test`, runs with the agent home and without an account key of the environment. Its value is made up."""
+    """An invariant of the launcher, with no bypass (Review A's C2, the audit's A6: the helper's BRIDGE_RUN_ALLOW_ANY would prove nothing of the form's acceptance): `python -m pytest <file>`, through `--strip --kind test`, runs with the agent home and without an account key of the environment, and the same launch without the flag hands the key over, the test's own precondition (Review A's S4 of the second text). Its value is made up."""
     ws = tmp_path / "Workspace"
     ws.mkdir()
-    (ws / "test_one.py").write_text("import os\n\n\ndef test_one():\n    assert 'OTHER_API_KEY' not in os.environ\n    assert os.path.basename(os.environ['HOME']) == 'agent-home'\n", encoding="utf-8")
+    (ws / "test_key.py").write_text("import os\n\n\ndef test_key():\n    assert 'OTHER_API_KEY' not in os.environ\n", encoding="utf-8")
+    (ws / "test_home.py").write_text("import os\n\n\ndef test_home():\n    assert os.path.basename(os.environ['HOME']) == 'agent-home'\n", encoding="utf-8")
     profile = tmp_path / "profile"
     (profile / ".cursor").mkdir(parents=True)
     env = B.env_for(tmp_path, HOME=str(profile), USERPROFILE=str(profile), OTHER_API_KEY="withheld")
     env.pop("BRIDGE_RUN_ALLOW_ANY", None)
     env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
-    p = subprocess.run([sys.executable, B.PROG, "--limit", "60", "--strip", "--kind", "test", "--", "python", "-m", "pytest", "-q", "test_one.py"],
-                       capture_output=True, text=True, env=env, cwd=str(ws))
+    run = [sys.executable, B.PROG, "--limit", "60", "--strip", "--kind", "test", "--", "python", "-m", "pytest", "-q"]
+    p = subprocess.run(run + ["test_key.py", "test_home.py"], capture_output=True, text=True, env=env, cwd=str(ws))
     assert p.returncode == 0, p.stdout + p.stderr
-    assert "1 passed" in p.stdout, p.stdout
+    assert "2 passed" in p.stdout, p.stdout
+    run.remove("--strip")
+    control = subprocess.run(run + ["test_key.py"], capture_output=True, text=True, env=env, cwd=str(ws))
+    assert control.returncode == 1, control.stdout + control.stderr
+    assert "1 failed" in control.stdout, control.stdout
 
 
 def test_bug043_r042_names_its_p2_entry():
