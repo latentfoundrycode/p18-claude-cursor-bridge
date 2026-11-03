@@ -1,4 +1,4 @@
-"""Supervisor-side reproduction tests of BUG-036 (R-042); written by the supervisor; the builder reads and runs them, never edits them.
+"""Supervisor-side reproduction tests of BUG-036 (R-042, D-003's seed); written by the supervisor; the builder reads and runs them, never edits them.
 
 Release B's trial (the TDP, 2026-10-30, its ISS-016): the review guard refused BUG-004's first Review B, `round 1 is
 off the count (current 3)`. With no rounds-<ID>.json, `_seed_rounds` takes the highest <N> of the tracked

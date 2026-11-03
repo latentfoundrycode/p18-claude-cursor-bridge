@@ -1,8 +1,10 @@
 """Account keys are withheld from builder and reviewer runs (2026.10.04e): release 0b told
 projects to move paid keys "to the user's environment", which hands them to every process
 the owner starts, while the launcher withheld only GitHub variables. The Python recipe
-(bridge_env.stripped_env) and the shell recipe (cursor-agent.shim) must decide the same way."""
+(bridge_env.stripped_env) and the shell recipe (cursor-agent.shim) must decide the same way.
+D-004 (R-055): the withheld and set names its note lists are read from the diagram and compared with bridge_env's."""
 import os
+import re
 import shutil
 import subprocess
 
@@ -10,12 +12,15 @@ import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHIM = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "cursor-agent.shim")
+D004 = os.path.join(HERE, os.pardir, "docs", "diagrams", "D-004-context-dfd.md")
+GIT_CONFIG_VARS = ("GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0")
 
 WITHHELD = ["ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "AZURE_DI_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET",
             "HF_TOKEN", "NPM_TOKEN", "SOCKET_CLI_API_TOKEN", "SEMGREP_APP_TOKEN", "STRIPE_SECRET_KEY",
             "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "PGPASSWORD", "MINIO_ROOT_PASSWORD", "MY_PRIVATE_KEY",
             "GOOGLE_APPLICATION_CREDENTIALS", "LLM_APIKEY", "GH_TOKEN", "GITHUB_TOKEN", "TOKEN", "SECRET",
-            "SFVF_SECRETS_PASSPHRASE", "SFVF_SECRETS_PATH", "DEPLOY_KEYS", "API_TOKENS"]
+            "SFVF_SECRETS_PASSPHRASE", "SFVF_SECRETS_PATH", "DEPLOY_KEYS", "API_TOKENS", "MY_PASSWD", "MY_PASSPHRASE",
+            "DEPLOY_KEY", "AWS_ACCESSKEY", "MY_PRIVATEKEY", "GIT_ASKPASS", "SSH_ASKPASS"]
 KEPT = ["PATH", "HOME", "CURSOR_API_KEY", "CURSOR_TOKEN", "TOKENIZERS_PARALLELISM", "SECRETARY", "KEYBOARD_LAYOUT",
         "MONKEY", "PYTHONUTF8", "DATABASE_URL", "REANGLE_INSTANCE_NAME", "LOG_LEVEL"]
 
@@ -167,3 +172,55 @@ def test_the_shim_refuses_a_run_whose_home_cannot_be_prepared(tmp_path):
     env["USERPROFILE"] = env["HOME"] = str(tmp_path / "home" / ".gitconfig")       # a file where the folder must be made
     p = subprocess.run([shutil.which("sh"), str(probe)], capture_output=True, text=True, env=env)
     assert p.returncode == 125 and "refused" in p.stderr and "KP-038" in p.stderr, p.stdout + p.stderr
+
+
+def d004_stripped_note():
+    """(withheld names, the words of the `SECRET_LIKE` clause, the kept prefixes, set names) as D-004's note lists them."""
+    with open(D004, encoding="utf-8") as f:
+        note = next(line for line in f if line.startswith("- **Stripped environment**"))
+    m = re.search(r"Withheld: (.*?), every name `SECRET_LIKE` matches \((.*?)\) but (.*?)\. Set: (.*?)\. `APPDATA`", note)
+    assert m, "D-004's note on the stripped environment has lost its shape"
+    withheld = re.findall(r"`([A-Z0-9_]+)`", m.group(1))
+    words = set(re.findall(r"[A-Z_]{3,}", m.group(2)))
+    kept = re.findall(r"`([A-Z_]+)\*`", m.group(3))
+    set_names = re.findall(r"`([A-Z_]+)[=`]", m.group(4))
+    return withheld, words, kept, set_names
+
+
+def test_r055_d004_the_withheld_names_are_the_notes(program, tmp_path, monkeypatch):
+    """R-055, D-004 (`p_bridge_env`). enforces: docs/BUILD_PLAN.md TASK-044 Done when: the note's withheld names, its
+    `SECRET_LIKE` words and its kept prefixes, read from the diagram, equal bridge_env's, each ways round, and a name
+    the note lists does not reach a run, so a hand edit of the note or of the recipe is caught."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "localappdata"))
+    be = program("bridge_env")
+    withheld, words, kept, _ = d004_stripped_note()
+    assert sorted(withheld) == sorted(be.TOKEN_VARS + GIT_CONFIG_VARS)
+    singular = {"TOKENS": "TOKEN", "SECRETS": "SECRET", "KEYS": "KEY"}
+    in_the_recipe = {singular.get(w, w) for w in re.findall(r"[A-Z]{3,}", be.SECRET_LIKE.pattern)}
+    assert {singular.get(w.strip("_"), w.strip("_")) for w in words} == in_the_recipe
+    assert {"_KEY", "_KEYS"} <= words and "_KEYS?$" in be.SECRET_LIKE.pattern
+    assert sorted(kept) == sorted(be.KEEP_PREFIXES)
+    sample = sample_env(tmp_path)
+    sample.update({name: "v" for name in withheld})
+    sample["my_api_key"] = "v"
+    out = be.stripped_env(sample)
+    assert not set(withheld) & set(out), "a name the note withholds reached the run"
+    assert "my_api_key" not in out, "the test holds whatever a name's case"
+
+
+def test_r055_d004_the_set_names_are_the_notes(program, tmp_path, monkeypatch):
+    """R-055, D-004 (`p_bridge_env`). enforces: docs/BUILD_PLAN.md TASK-044 Done when: the variables the recipe gives a
+    value of its own are exactly the ones the note says it sets, read from the diagram; every other one, `APPDATA` and
+    `LOCALAPPDATA` by name, passes as it was."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "localappdata"))
+    be = program("bridge_env")
+    _, _, _, set_names = d004_stripped_note()
+    sample = sample_env(tmp_path)
+    sample["APPDATA"] = str(tmp_path / "appdata")
+    out = be.stripped_env(sample)
+    written = {k for k, v in out.items() if sample.get(k) != v}
+    expected = set(set_names) if os.name == "nt" else set(set_names) - {"HOMEDRIVE", "HOMEPATH"}
+    assert written == expected
+    for name in set(sample) - set(WITHHELD) - expected:
+        assert out.get(name) == sample[name], "%s did not pass as it was" % name
+    assert out["LOCALAPPDATA"] == sample["LOCALAPPDATA"] and out["APPDATA"] == sample["APPDATA"]

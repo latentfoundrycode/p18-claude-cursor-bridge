@@ -1,4 +1,4 @@
-"""review-guard.py (0b review, finding 2 and its second pass S2-S7): the checkpoint Review B
+"""review-guard.py (D-003; 0b review, finding 2 and its second pass S2-S7): the checkpoint Review B
 runs on is snapshotted, verified and restored; a moved HEAD, a commit, a new or moved local
 ref, a changed .git/config, hook, .env or ignored record is a gate-integrity flag; the guard
 never runs a hook of the repository; the launcher's .err file survives; the merge head must

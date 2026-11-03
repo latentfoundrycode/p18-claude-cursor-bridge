@@ -1,13 +1,17 @@
 """bridge-run.py: the limit kills the whole process tree (KP-033), exit codes and output
 pass through, only the loop's commands are accepted, and the stripped environment reaches
-the child (KP-032). The tests point LOCALAPPDATA at a temporary folder so nothing is
-written into the real profile (release 0a review, F4)."""
+the child (KP-032), the withheld and set names D-004's note lists among them. The tests point
+LOCALAPPDATA at a temporary folder so nothing is written into the real profile (release 0a
+review, F4)."""
+import json
 import os
 import subprocess
 import sys
 import time
 
 import pytest
+
+from test_account_keys import d004_stripped_note
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "bridge-run.py")
@@ -272,6 +276,34 @@ def test_stripped_environment_reaches_the_child(tmp_path):
     home = os.path.join(os.environ["USERPROFILE"], ".cursor-bridge", "agent-home")
     assert p.returncode == 0 and os.path.normcase(p.stdout.splitlines()[0].strip()) == os.path.normcase(home), "the child runs in the agent's own home (KP-038): " + p.stdout + p.stderr
     assert os.path.lexists(os.path.join(home, ".cursor"))
+
+
+def test_r055_d004_a_stripped_run_gets_the_notes_names(tmp_path):
+    """R-055, D-004 (`p_bridge_run` to `p_test_suite`). enforces: docs/BUILD_PLAN.md TASK-044 Done when: through the
+    launcher's `--strip`, the child holds none of the withheld names the diagram's note lists, and every name it says is set,
+    the owner's three caches being present here, its home the agent's and not the owner's; without the flag the same variables
+    reach the child, so the test can fail."""
+    withheld, _, _, set_names = d004_stripped_note()
+    home = tmp_path / "home"
+    for rel in (".cursor", os.path.join(".cache", "huggingface", "hub"), os.path.join(".cache", "torch"), os.path.join(".cache", "puppeteer")):
+        (home / rel).mkdir(parents=True)
+    extra = {name: "v" for name in withheld}
+    extra.update(HOME=str(home), USERPROFILE=str(home))
+    env = env_for(tmp_path, **extra)
+    for name in set_names:
+        if name not in ("HOME", "USERPROFILE"):
+            env.pop(name, None)
+    code = "import json, os; print(json.dumps({'names': sorted(os.environ), 'homes': [os.environ.get('HOME'), os.environ.get('USERPROFILE')]}))"
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--strip", "--", sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    assert p.returncode == 0, p.stderr
+    seen = json.loads(p.stdout)
+    names = set(seen["names"])
+    assert [os.path.basename(h) for h in seen["homes"]] == ["agent-home", "agent-home"], "the run's home is the agent's"
+    assert not set(withheld) & names, "a name the note withholds reached the child"
+    missing = set(set_names) - names if os.name == "nt" else set(set_names) - names - {"HOMEDRIVE", "HOMEPATH"}
+    assert not missing, "a name the note says is set did not reach the child"
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--", sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    assert p.returncode == 0 and set(withheld) <= set(json.loads(p.stdout)["names"]), p.stderr
 
 
 def test_stripped_environment_recipe(program, tmp_path, monkeypatch):

@@ -197,3 +197,7 @@ Last accepted: TASK-043, BUG-039 (PR #126, at its merge): a flagged round spends
 ## Moved 2026-11-02 (TASK-042)
 
 Last accepted: BUG-041 (PR #127, at its merge): a snapshot deleted after it was taken is GATE-INTEGRITY, not a snapshot never taken, one builder round; before it TASK-043, BUG-039 (PR #126); before it TASK-041, R-052's text (PR #125); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-041 and TASK-043, BUG-001 to BUG-041, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+
+## Moved 2026-11-03 (TASK-044)
+
+Last accepted: TASK-042 (PR #128, at its merge): the weekly dependency scan in this repository, R-052's proof waiting for TASK-044's dispatch run; before it BUG-041 (PR #127); before it TASK-043, BUG-039 (PR #126); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-043, BUG-001 to BUG-041, the refactoring passes of B2 to B5 and T1, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
