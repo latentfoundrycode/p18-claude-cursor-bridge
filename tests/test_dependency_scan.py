@@ -13,11 +13,11 @@ import re
 import yaml
 
 from test_release_b_ci_floor import DISABLERS, OSV, SECRET_REF, SHA40, _commands, _lines, _on, _steps
+from test_release_t_floor import frozen_block
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCAN = ROOT / ".github" / "workflows" / "dependency-scan.yml"
 FLOOR = ROOT / ".github" / "workflows" / "tests.yml"
-CONFIGURATOR = ROOT / "bridge" / "agents" / "cursor-configurator.md"
 TOKEN = re.compile(r"\b(?:GITHUB_TOKEN|GH_TOKEN|token)\b", re.I)
 LOCKFILE = re.compile(r"--lockfile=(?:'([^']+)'|(\S+))")
 VERSION = re.compile(r"osv-scanner/releases/download/(v[0-9.]+)/osv-scanner_linux_amd64")
@@ -45,20 +45,13 @@ def _scanner_step():
     return found[0]
 
 
-def _block():
-    text = _text(CONFIGURATOR)
-    m = re.search(r"^## The weekly scan's frozen block$.*?^```yaml\n(.*?)^```$", text, re.M | re.S)
-    assert m, "R-052: the frozen block is not in cursor-configurator.md"
-    return m.group(1)
-
-
 def _lockfiles(path):
     return [a or b for a, b in LOCKFILE.findall(_text(path))]
 
 
 def test_r052_the_file_is_the_frozen_block_with_its_fill_in():
     """R-052, docs/BUILD_PLAN.md TASK-042: the file equals the frozen block but for its one fill-in, the floor's lockfile value."""
-    block = _block()
+    block = frozen_block()
     assert block.count("<fill-in>") == 1, "R-052: the block holds one fill-in"
     assert _text(SCAN) == block.replace("<fill-in>", "requirements.txt:requirements.lock")
 
