@@ -296,9 +296,11 @@ What it checks, with the file it reads (the 0b review corrected several of these
     silently when its condition is false); Semgrep runs the bridge rules or the Pro engine
     (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner
     without a pinned version is a NOTE (rule 14); every `uses:` is pinned by a 40-character
-    commit; the runner is Linux (a note otherwise); `socket ci` without `--no-banner` is
-    MISSING (its banner prints part of the key, ISS-005), and so is a step that installs the
-    Socket CLI while its `env:` holds the Socket key (the install scripts see it, FB-007);
+    commit; the runner is Linux (a note otherwise);
+  - every workflow's steps, the weekly dependency-scan file included, for the two Socket
+    key-exposure floors: `socket ci` without `--no-banner` is MISSING (its banner prints part
+    of the key, ISS-005), and so is a step that installs the Socket CLI while its `env:` holds
+    the Socket key (the install scripts see it, FB-007);
   - on GitHub, read-only through `gh` unless --offline: the default branch has a required
     status check (N6), and the repository's visibility (a public repository is a NOTE);
   - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in
@@ -809,9 +811,9 @@ What each step does:
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
 a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY;
-2 = cannot verify (a snapshot never taken, dirty tree, git or gh failure); 125 = refused
+2 = cannot verify (no copy of the snapshot's hash, dirty tree, git or gh failure); 125 = refused
 (review round ceiling, grammar, branch rule; writes no snapshot). A GATE-INTEGRITY from
-`verify` voids the Review B launch for round counting; `premerge` voids nothing. Never prints
+`verify` voids a qualifying Review B launch for round counting; `premerge` voids nothing. Never prints
 a value of anything. ASCII-only.
 
 What it does not cover, said plainly (KP-032): the contents of cache folders, anything
