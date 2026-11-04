@@ -785,3 +785,67 @@ def test_r057_run_parameters_each_key_compared(key, value):
 
 
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---
+
+
+def test_r057_nine_nested_mapping_keys_are_refused():
+    refused(head(*chain(9)), 10)
+
+
+def test_r057_mixed_list_mapping_depth_eight_reads_nine_refused():
+    lines, indent = ["root:"], "  "
+    for i in range(2):
+        lines.append("%s- k%d:" % (indent, i))
+        indent += "    "
+        lines.append("%sinner:" % indent)
+        indent += "  "
+    lines.append("%s- leaf: word" % indent)
+    assert need("read_header")(head(*lines))[0] is not None
+    lines.append("%s- k2:" % indent)
+    indent += "    "
+    lines.append("%sinner:" % indent)
+    indent += "  "
+    lines.append("%s- too: deep" % indent)
+    refused(head(*lines))
+
+
+def test_r057_a_key_pyyaml_would_type_is_refused():
+    refused(head("on: word"), 2)
+
+
+def test_r057_an_integer_over_the_digit_limit_is_a_header_error():
+    refused(head("n: " + "9" * 5000))
+
+
+def test_r057_a_lone_surrogate_in_the_block_is_a_header_error():
+    refused("---\na: " + chr(0xD800) + "\n---\n")
+
+
+def test_r057_a_form_feed_inside_a_quoted_string_is_text():
+    text = head('a: "a' + chr(0x0C) + 'b"', "b: word")
+    assert need("read_header")(text)[0] == {"a": "a" + chr(0x0C) + "b", "b": "word"}
+
+
+def test_r057_header_error_line_on_crlf():
+    text = "---\r\nbad:\r\n  \t- x\r\n---\r\n"
+    err = refused(text)
+    assert err.line == 3
+
+
+def test_r057_header_error_line_with_byte_order_mark():
+    text = chr(0xFEFF) + "---\na: 'x'\n---\n"
+    err = refused(text)
+    assert err.line == 2
+
+
+def test_r057_historic_with_merged_none_and_scope_line_disagrees():
+    fallback = historic_fallback(None, scope=["a.py"])
+    assert need("header_agrees")("build-plan", historic_header(True), fallback) == ["TASK-046 historic"]
+
+
+def test_r057_flow_mapping_refusal_names_flow_mapping():
+    err = refused(head("a: {b: c}"), 2)
+    assert "flow mapping" in str(err).lower()
+
+
+def test_r057_historic_mark_when_merged_set_is_empty():
+    assert need("header_agrees")("build-plan", historic_header(True), historic_fallback([])) == ["TASK-046 historic"]
