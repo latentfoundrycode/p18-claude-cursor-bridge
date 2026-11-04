@@ -726,7 +726,7 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 
 **Resolution**: none due: nothing Blocking or non-convergent after the confirming read's fixes (Review B's B1 refines the round-2 and round-4 rules for `kind` and `parallel` into one, reversing no critic's ask).
 
-**Gate**: (pending)
+**Gate**: passed 2026-11-04, the owner's six approvals asked in the question form on the records at 1c463b3 (the behaviour the design fixes, the register R-057 to R-064, D-001 as revised, the critique's record, the addendum's stages H1 and H2, the traits unchanged), the status file's `Working files:` trim told; the five round files removed with `git rm` in the commit that passes the gate.
 
 ## Subject: release-t-plan (release T's plan addendum: stages T1 and T2, TASK-036 to TASK-045; 2026-11-01)
 
