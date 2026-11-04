@@ -231,3 +231,11 @@ Calibration pending: reAngle and the video factory calibrate when the owner resu
 ## Stage B1, closed 2026-10-19
 - Stage review: four rounds; round 4 (snapshot STAGE-B1, 4db96c3, hash 36eee2821606eec6, verify OK; stage/B1 deleted) Review B APPROVE with no findings, Review A APPROVE 0/0/3 (two taken in these records, one recorded as FB-024 and least-confident item 3). The record: docs/HARDENING.md, "Stage B1", rounds 2 to 4 and "Least confident (stage close, 2026-10-19)".
 - B1's change is its own squash commits (9e181e6, fba63bc, 6743b25, 4d0f77b, 1b8c8da, ba1e181), not a range of main: stage B1 merged after stage B2's TASK-003 to TASK-007, because TASK-002 waited on the owner's Socket variable.
+
+## Moved 2026-11-04 (project end of release T)
+
+Change cycle: release T (2026-11-01, the owner's word on Fable 5.1): the report cycle's text follow-ups, the weekly OSV-Scanner run, the diagram retrofit; intake confirmed 2026-11-01 (Option A); design and plan gates passed 2026-11-01; step 7, project end, as at PR #133's merge: stage T1 closed 2026-11-02 (PRs #117 to #124), stage T2's increments merged (TASK-041 to TASK-044, BUG-041 to BUG-043, REFAC-T2, PRs #125 to #132) with its review, three rounds, and the stamp TASK-045 (PR #133); the owner's install next, then stage T2's close and project end
+
+Last accepted: TASK-045 (PR #133, at its merge): the stamp 2026.11.03a; before it stage T2's review, round 3, no finding of the five (HARDENING); before it BUG-043 (PR #132); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-045, BUG-001 to BUG-043, the refactoring passes of B2 to B5, T1 and T2, HOTFIX-001 and HOTFIX-002, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+
+Stage: release T's stage T1 closed 2026-11-02 (HARDENING, Stage T1's review), stage T2 running (TASK-041 to TASK-045, BUG-041 to BUG-043 and its refactoring pass merged, its review done at round 3, tag stage-review/T2-3; the install, its demonstration and its close next); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29; B6 (release B's install) 2026-10-31; project end 2026-10-31 (docs/archive/STATUS_HISTORY.md). Last reflection: stage T1's close, 2026-11-02 (demonstration passed live on main 219caff; conformance 25 OK, 0 MISSING, 5 NOTE; Issues ISS-024; Feedback FB-071 to FB-074; least confident in HARDENING; Project Summary patched)
