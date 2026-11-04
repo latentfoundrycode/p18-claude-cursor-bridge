@@ -20,6 +20,7 @@ import glob
 import os
 import sys
 import time
+import tracemalloc
 
 import pytest
 import yaml
@@ -1278,6 +1279,522 @@ def test_r057_r2_a_wrong_record_is_one_finding():
     header["record"] = "inventory"
     got = need("check_header")("brief", header)
     assert len(got) == 1 and "record" in got[0], got
+
+
+# --- what round 2 read wrongly: the supervisor's second probe (TASK-046-r3) ---
+# enforces: docs/DESIGN.md, "The reader" (what the subset reads, indentation, comments, the character rule, a line ends
+# at LF or CRLF); handoff/TASK-046-r2.md's rulings it repeats; D-005, "Notes on values" (Kind), and the value rule on header.
+# The earlier tests compared what the reader accepts and let every refusal pass, so a false refusal went unseen.
+# Here every shape of the stated subset is written out and must be read as written, in both line endings.
+
+E_ACUTE = chr(0xE9)
+FLOW_LIST = ["x", "z"]
+BLOCK_LIST = ["p", "q"]
+LEAVES = ["word", 1, None, FLOW_LIST, "R&D # x" + E_ACUTE]
+
+
+def scalar_text(value):
+    if isinstance(value, str) and not value.isalnum():
+        return '"%s"' % value
+    return str(value)
+
+
+def key_lines(start, value, column):
+    """The lines of one key, `start` holding it up to its colon, `column` the column its name stands at."""
+    if value is None:
+        return [start]
+    if value == FLOW_LIST:
+        return [start + " [x, z]"]
+    if isinstance(value, dict):
+        return [start] + mapping_lines(value, column + 2)
+    if isinstance(value, list):
+        return [start] + list_lines(value, column + 2)
+    return [start + " " + scalar_text(value)]
+
+
+def mapping_lines(mapping, column):
+    lines = []
+    for key, value in mapping.items():
+        lines += key_lines(" " * column + key + ":", value, column)
+    return lines
+
+
+def list_lines(items, column):
+    lines = []
+    for item in items:
+        if isinstance(item, dict):
+            keys = list(item)
+            lines += key_lines(" " * column + "- " + keys[0] + ":", item[keys[0]], column + 2)
+            lines += mapping_lines({k: item[k] for k in keys[1:]}, column + 2)
+        else:
+            lines.append(" " * column + "- " + scalar_text(item))
+    return lines
+
+
+def subset_shapes():
+    first = list(LEAVES) + [BLOCK_LIST, ["p", {"k": "word"}], [{"k": 1}, {"k": None}]]
+    first += [{"k": v} for v in LEAVES]
+    first += [{"k": v, "j": w} for v in LEAVES for w in LEAVES]
+    first += [[{"k": v}] for v in LEAVES]
+    first += [[{"k": v, "j": w}] for v in LEAVES for w in LEAVES]
+    second = []
+    for v in first:
+        second += [
+            {"k": v}, {"k": v, "j": "word"}, [{"k": v}], [{"k": v, "j": "word"}], [{"k": "word", "j": v}],
+            [{"k": v, "j": "word"}, {"k": v}], {"k": [{"k": v, "j": "word"}], "j": "word"},
+        ]
+    return first + second
+
+
+SUBSET_SHAPES = subset_shapes()
+TRAILING = " # caf" + E_ACUTE + ' it"s: [x'
+BETWEEN_LINES = {
+    "as written": None,
+    "a blank line": "",
+    "spaces alone": "   ",
+    "a comment at column 0": "# note",
+    "a comment at an odd column": "   # note",
+    "non-ASCII and a quote in a comment at column 0": "# caf" + E_ACUTE + ' it"s',
+    "non-ASCII and a quote in a deep comment": "          # caf" + E_ACUTE + ' it"s',
+}
+
+
+def with_between(lines, between):
+    if between is None:
+        return list(lines)
+    out = [between]
+    for line in lines:
+        out += [line, between]
+    return out
+
+
+def read_as_written_failures(lines_of, ending):
+    read, error = need("read_header"), need("HeaderError")
+    wrong = []
+    for shape in SUBSET_SHAPES:
+        document = {"a": shape}
+        lines = lines_of(mapping_lines(document, 0))
+        assert yaml.safe_load(block_of(lines)) == document, "the test's own writer is wrong: %r" % (lines,)
+        text = ("---\n" + block_of(lines) + "---\nbody\n").replace("\n", ending)
+        try:
+            header = read(text)[0]
+        except error as caught:
+            wrong.append((lines, str(caught)))
+            continue
+        if header != document:
+            wrong.append((lines, header))
+    return wrong
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n"], ids=["LF", "CRLF"])
+@pytest.mark.parametrize("between", list(BETWEEN_LINES))
+def test_r057_r3_every_shape_of_the_subset_is_read_as_written(between, ending):
+    wrong = read_as_written_failures(lambda lines: with_between(lines, BETWEEN_LINES[between]), ending)
+    assert not wrong, "%d of %d shapes not read as written, the first: %r" % (len(wrong), len(SUBSET_SHAPES), wrong[:3])
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n"], ids=["LF", "CRLF"])
+def test_r057_r3_a_comment_after_every_line_of_every_shape_is_read_as_written(ending):
+    wrong = read_as_written_failures(lambda lines: [line + TRAILING for line in lines], ending)
+    assert not wrong, "%d of %d shapes not read as written, the first: %r" % (len(wrong), len(SUBSET_SHAPES), wrong[:3])
+
+
+@pytest.mark.parametrize("moved", [1, 3, -1], ids=["one deeper", "three deeper", "one shallower"])
+def test_r057_r3_a_line_at_an_odd_column_is_refused_at_that_line_in_every_shape(moved):
+    read, error = need("read_header"), need("HeaderError")
+    wrong = []
+    for shape in SUBSET_SHAPES:
+        lines = mapping_lines({"a": shape}, 0)
+        for i, line in enumerate(lines):
+            if moved < 0 and not line.startswith(" "):
+                continue
+            changed = list(lines)
+            changed[i] = line[1:] if moved < 0 else " " * moved + line
+            try:
+                wrong.append((changed, read(head(*changed))[0]))
+            except error as caught:
+                if caught.line != i + 2:
+                    wrong.append((changed, str(caught)))
+    assert not wrong, "%d not refused at the moved line, the first: %r" % (len(wrong), wrong[:3])
+
+
+@pytest.mark.parametrize("lines", [
+    ["a:", "  - k:", "      m: 1", "    j: 2"],
+    ["a:", "  - k:", "      - p", "    j: 2"],
+    ["a:", "  - k:", "      - p", "      - q", "    j:", "      m: 1", "    i: 3", "  - k: 4"],
+    ["a:", "  - k:", "", "      m: 1"],
+    ["a:", "  - k:", "      # a comment", "      m: 1"],
+    ["a:", "  - k:", "# a comment", "      - p"],
+])
+def test_r057_r3_a_list_items_first_key_keeps_its_child_and_its_later_keys(lines):
+    equals_pyyaml(lines)
+
+
+@pytest.mark.parametrize("lines", [
+    ["a:", "    b: x"],
+    ["a:", "    - x"],
+    ["a:", "  - k:", "        - x"],
+    ["a:", "  - k:", "        m: 1"],
+    ["a:", "  - k: 1", "      j: 2"],
+    ["a:", "  - k:", "", "        - x"],
+    ["a:", "  - k:", "      m:", "          - x"],
+])
+def test_r057_r3_a_child_two_levels_deeper_is_refused_at_its_line(lines):
+    refused(head(*lines), len(lines) + 1)
+
+
+@pytest.mark.parametrize("lines", [
+    ["a:", "  - k:", "      m: 1", "    k: 2"],
+    ["a:", "  - k:", "      - p", "    j: 1", "    j: 2"],
+    ["a:", "  - j: 1", "    k:", "      m: 1", "    j: 2"],
+])
+def test_r057_r3_a_duplicate_key_after_a_nested_first_key_is_refused(lines):
+    refused(head(*lines), len(lines) + 1)
+
+
+def item_chain(levels):
+    """`levels` containers, the root and the list and the item among them, through a list item's first key."""
+    lines, column, level = ["a:", "  - k:"], 6, 4
+    while level < levels:
+        lines.append(" " * column + "b%d:" % level)
+        column += 2
+        level += 1
+    lines.append(" " * column + "b%d: word" % level)
+    return lines
+
+
+def test_r057_r3_nesting_through_a_list_items_first_key_is_counted_alike():
+    equals_pyyaml(item_chain(8))
+    lines = item_chain(9)
+    refused(head(*lines), len(lines) + 1)
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n"], ids=["LF", "CRLF"])
+@pytest.mark.parametrize("lines,expected", [
+    (["a: 1 # note", "b: 2"], {"a": 1, "b": 2}),
+    (["# note", "a: 1"], {"a": 1}),
+    (["a:", "  # note", "  b: 1"], {"a": {"b": 1}}),
+    (['a: "x" # note', "b: [p, q] # note"], {"a": "x", "b": ["p", "q"]}),
+    (["a: 1", "# caf" + E_ACUTE], {"a": 1}),
+    ([" # caf" + E_ACUTE, "a: 1"], {"a": 1}),
+])
+def test_r057_r3_a_comment_is_read_past_in_either_line_ending(lines, expected, ending):
+    text = ("---\n" + block_of(lines) + "---\nbody\n").replace("\n", ending)
+    assert need("read_header")(text) == (expected, "body" + ending)
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n"], ids=["LF", "CRLF"])
+@pytest.mark.parametrize("code,name", REFUSED_CHARACTERS)
+def test_r057_r3_a_refused_character_is_refused_in_every_place_a_comment_stands(code, name, ending):
+    c = chr(code)
+    for lines in (
+        ["# x%sy" % c, "a: 1"],
+        ["a: 1", "# x%sy" % c],
+        ["a: 1", "   # x%sy" % c],
+        ["a: 1 # x%sy" % c],
+        ['# it"s', "a: 1 # x%sy" % c],
+        ["a:", "  - k:", "      # x%sy" % c, "      m: 1"],
+    ):
+        at = next(i for i, line in enumerate(lines) if c in line) + 2
+        refused(("---\n" + block_of(lines) + "---\n").replace("\n", ending), at)
+
+
+@pytest.mark.parametrize("lines", [
+    ['a: "x""'],
+    ['a: """'],
+    ['a: """"'],
+    ['a: "x"""'],
+    ['a: ""x'],
+    ['a: "x""y"'],
+    ["z:", '  - k: "x""'],
+    ["z:", '  - "x""'],
+    ['a: ["x""]'],
+    ['a: ["x"", z]'],
+    ['a: "x', 'b: y"'],
+])
+def test_r057_r3_a_doubled_quote_is_no_form_of_the_subset(lines):
+    at = next(i for i, line in enumerate(lines) if '"' in line) + 2
+    refused(head(*lines), at)
+
+
+@pytest.mark.parametrize("lines", [['a: ""'], ['a: "" # note'], ['a: ["", ""]'], ["z:", '  - ""'], ["z:", '  - k: ""']])
+def test_r057_r3_the_empty_string_still_reads(lines):
+    equals_pyyaml(lines)
+
+
+@pytest.mark.parametrize("key,value", [
+    ("header", 2), ("header", "1"), ("header", None), ("header", [1]), ("record", 3), ("record", None), ("record", "brief"), ("record", "bogus"),
+])
+def test_r057_r3_a_wrong_record_or_header_value_is_one_finding(key, value):
+    header = valid("requirements")
+    header[key] = value
+    got = need("check_header")("requirements", header)
+    assert len(got) == 1 and key in got[0], got
+
+
+@pytest.mark.parametrize("key", ["header", "record"])
+def test_r057_r3_a_missing_record_or_header_is_one_finding(key):
+    header = valid("brief")
+    del header[key]
+    got = need("check_header")("brief", header)
+    assert len(got) == 1 and key in got[0], got
+
+
+@pytest.mark.parametrize("prose", ["bogus", "Merge unit", "increment group"])
+def test_r057_r3_a_kind_the_plan_check_would_not_accept_disagrees(prose):
+    assert need("header_agrees")("build-plan", plan_header(), plan_fallback({"kind": prose})) == ["TASK-046 kind"]
+
+
+# --- Review A's and the security audit's findings on round 2, and the rulings on them (TASK-046-r3) ---
+# enforces: docs/DESIGN.md, "The reader" and its Security paragraph; D-005, "Notes on values"; handoff/TASK-046.md, Requirements 1, 2, 18, 29, 33.
+
+BACKSLASH = chr(92)
+
+
+def text_with(lines, ending="\n"):
+    return ("---\n" + block_of(lines) + "---\n").replace("\n", ending)
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n"], ids=["LF", "CRLF"])
+@pytest.mark.parametrize("code,name", REFUSED_CHARACTERS)
+def test_r057_r3_a_quote_in_a_comment_opens_nothing_and_a_backslash_skips_nothing(code, name, ending):
+    """Both reviewers: a `# "` line opened a string in the scanner, whose backslash skipped a line separator, hiding key b."""
+    c = chr(code)
+    for lines in (
+        ["a: 1", '# "' + BACKSLASH + c + "b: 2"],
+        ["z: 1", '# "', "c: 2 # " + BACKSLASH + c + "b: 3"],
+        ["z: 1", '# "', "agent_ceiling: 5 # " + BACKSLASH + c + "review_rounds_above_ceiling: 9"],
+        ['# it"s', 'a: "x' + BACKSLASH + c + 'y"'],
+        ['a: "x' + BACKSLASH + c + 'y"'],
+        ['# "', 'a: "x"', "b: 1 # " + BACKSLASH + c],
+    ):
+        at = next(i for i, line in enumerate(lines) if c in line) + 2
+        refused(text_with(lines, ending), at)
+
+
+@pytest.mark.parametrize("space", [chr(0xA0), chr(0x3000), chr(0x2003)], ids=["NBSP", "ideographic", "em"])
+def test_r057_r3_a_unicode_space_is_no_whitespace_whatever_a_comment_before_it_holds(space):
+    """Both reviewers: past the scanner, a bare strip() read `round: <NBSP>5` as the integer 5, and pyyaml as a string."""
+    for lines, at in (
+        (["z: 0", '# "', "a: 1" + space], 4),
+        (["z: 0", '# "', "a: word" + space], 4),
+        (["z: 0", '# "', "b: [x" + space + ", q]"], 4),
+        (["z: 0", '# "', space, "b: 1"], 4),
+        (["z: 0", '# "', "round: " + space + "5"], 4),
+        (["z: 0", '# "', "x: " + space + "true" + space], 4),
+        (["z: 0", '# "', "a:", "  " + space], 5),
+        (["z: 0", '# "', "a: 3", "  " + space], 5),
+        (['# "', 'a: "x"', "b: " + space], 4),
+        (['a: "x""', "b: 1" + space], None),
+    ):
+        refused(text_with(lines), at)
+
+
+def test_r057_r3_a_refused_character_is_named_at_its_own_line_after_a_backslash_at_a_line_end():
+    refused(text_with(["z: 0", '# "' + BACKSLASH, "a: 1", "b: " + chr(0x85)]), 5)
+    refused(text_with(['a: "x' + BACKSLASH, "b: 1", TAB]), 4)
+    refused(text_with(["z: 1", '# "' + BACKSLASH] + ["# " + BACKSLASH] * 50 + [TAB]), 54)
+
+
+MEBIBYTE = 1024 * 1024
+
+
+@pytest.mark.parametrize("text", [
+    "\n" * MEBIBYTE,
+    "x\n" * (MEBIBYTE // 2),
+    "---\na: 1\n---\n" + "\n" * MEBIBYTE,
+    "---\na: 1\n---\n" + "x\n" * (MEBIBYTE // 2),
+    "---\n" + "\n" * MEBIBYTE,
+    "---\n" + "\n" * MEBIBYTE + "---\n",
+    "---\n" + "# x\n" * (MEBIBYTE // 4) + "---\n",
+], ids=["headerless newlines", "headerless lines", "body newlines", "body lines", "unterminated", "over the bound", "over the bound, comments"])
+def test_r057_r3_reading_a_text_holds_no_more_than_about_the_text_in_memory(text):
+    """The security audit: a tuple per line of the whole file, 437 MB for 4 MB of newlines, with a MemoryError outside the handlers."""
+    read, error = need("read_header"), need("HeaderError")
+    tracemalloc.start()
+    try:
+        try:
+            read(text)
+        except error:
+            pass
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert peak <= 3 * len(text), "peak %d bytes for a text of %d characters" % (peak, len(text))
+
+
+@pytest.mark.parametrize("last", [TAB, chr(0xD800), chr(0x2028)], ids=["tab", "surrogate", "LS"])
+def test_r057_r3_the_byte_bound_is_held_before_the_characters_are_read(last):
+    lines = ["# " + "x" * 1000] * 300 + [last]
+    refused(text_with(lines), 2)
+
+
+def test_r057_r3_a_key_is_at_most_pyyamls_limit():
+    equals_pyyaml(["a" * 1024 + ": 1"])
+    refused(head("a" * 1025 + ": 1"), 2)
+    equals_pyyaml(["z:", "  - " + "a" * 1024 + ": 1"])
+    refused(head("z:", "  - " + "a" * 1025 + ": 1"), 3)
+
+
+@pytest.mark.parametrize("lines", [["a: b c"], ["z:", "  - b c"], ["z:", "  - k: b c"], ["z:", "  - a b: c"]])
+def test_r057_r3_a_word_with_a_space_carries_the_advice_and_is_not_called_multi_line(lines):
+    message = str(refused(head(*lines), len(lines) + 1))
+    assert "quote" in message and "multi-line" not in message, message
+
+
+@pytest.mark.parametrize("line", ["a: [] x", "a: [x]#c", "a: [x] y"])
+def test_r057_r3_a_closed_flow_list_with_text_after_it_is_not_called_multi_line(line):
+    message = str(refused(head(line), 2))
+    assert "multi-line" not in message, message
+
+
+@pytest.mark.parametrize("lines", [["a: R&D"], ["a: x&y"], ["a: x!!y"], ["a: x*y"], ["z:", "  - R&D"], ["z:", "  - k: R&D"]])
+def test_r057_r3_a_word_holding_a_marker_is_a_plain_scalar_with_the_advice(lines):
+    message = str(refused(head(*lines), len(lines) + 1))
+    assert "quote" in message and "anchor" not in message and "alias" not in message and "tag" not in message, message
+
+
+@pytest.mark.parametrize("statuses,word", [
+    (["planned", "built", "deferred", "bogus"], "set"),
+    (["planned", "built", "deferred", "planned"], None),
+    (["planned", "built", "deferred"], None),
+    (["planned", "built", "deferred", {"a": 1}], None),
+    (["planned", "built", "deferred", ["dropped"]], None),
+    (["planned", "built", "deferred", None], None),
+    ("planned", None),
+    (None, None),
+    ({"a": 1}, None),
+])
+def test_r057_r3_one_fault_in_statuses_is_one_finding(statuses, word):
+    header = valid("requirements")
+    header["statuses"] = statuses
+    got = need("check_header")("requirements", header)
+    assert len(got) == 1 and "statuses" in got[0], got
+    if word:
+        assert word in got[0], got
+
+
+def test_r057_r3_a_key_of_any_type_is_a_finding_and_no_exception():
+    check = need("check_header")
+    header = valid("brief")
+    header[(1, 2)] = 3
+    assert len(check("brief", header)) == 1
+    header = valid("requirements")
+    header["roles"] = dict(header["roles"])
+    header["roles"][(1, 2)] = "x"
+    assert len(check("requirements", header)) == 1
+
+
+def test_r057_r3_a_role_is_one_finding_whichever_its_fault():
+    check = need("check_header")
+    header = valid("requirements")
+    header["roles"] = dict(header["roles"], extra="nope")
+    got = check("requirements", header)
+    assert len(got) == 1 and "extra" in got[0], got
+    header = valid("requirements")
+    header["roles"] = dict(header["roles"], id="nope")
+    got = check("requirements", header)
+    assert len(got) == 1 and "id" in got[0], got
+    header = valid("requirements")
+    header["roles"] = dict(header["roles"], id=3)
+    got = check("requirements", header)
+    assert len(got) == 1 and "id" in got[0], got
+
+
+@pytest.mark.parametrize("columns", [[{"a": 1}], [["x"]], [None], "text", 5])
+def test_r057_r3_columns_of_the_wrong_shape_are_a_finding_and_no_exception(columns):
+    header = valid("requirements")
+    header["columns"] = columns
+    assert need("check_header")("requirements", header) != []
+
+
+def test_r057_r3_many_roles_and_columns_are_checked_in_about_linear_time():
+    header = valid("requirements")
+    header["columns"] = ["c%d" % i for i in range(20000)]
+    header["roles"] = {"r%d" % i: "absent%d" % i for i in range(20000)}
+    started = time.perf_counter()
+    assert need("check_header")("requirements", header) != []
+    assert time.perf_counter() - started < 2.0
+
+
+@pytest.mark.parametrize("key,value", [("parallel", False), ("parent", None), ("deferred", None), ("depends_on", []), ("diagrams", [])])
+def test_r057_r3_a_blank_field_line_reads_as_an_absent_line(key, value):
+    """The ruling on Review A's S2: plan-check.py's FIELD_RX gives "" for a blank line, and its `or` defaults read that as absent."""
+    assert need("header_agrees")("build-plan", plan_header(**{key: value}), plan_fallback({key: ""})) == []
+
+
+def test_r057_r3_a_blank_parallel_line_disagrees_with_a_true_header_and_a_word_with_either():
+    agrees = need("header_agrees")
+    assert agrees("build-plan", plan_header(parallel=True), plan_fallback({"parallel": ""})) == ["TASK-046 parallel"]
+    assert agrees("build-plan", plan_header(parallel=False), plan_fallback({"parallel": "maybe"})) == ["TASK-046 parallel"]
+    assert agrees("build-plan", plan_header(parallel=True), plan_fallback({"parallel": "maybe"})) == ["TASK-046 parallel"]
+
+
+def test_r057_r3_a_merge_unit_read_as_a_tuple_compares_as_a_list():
+    """Review A's S1: bridge_env.merge_unit_ids returns a tuple, and the header holds a list."""
+    agrees = need("header_agrees")
+    header = valid("brief")
+    header["merge_unit"] = ["TASK-046", "TASK-047"]
+    assert agrees("brief", header, dict(fallback_brief(), merge_unit=("TASK-046", "TASK-047"))) == []
+    assert agrees("brief", header, dict(fallback_brief(), merge_unit=("TASK-047", "TASK-046"))) == ["merge_unit"]
+    assert agrees("brief", header, dict(fallback_brief(), merge_unit=("TASK-046",))) == ["merge_unit"]
+
+
+@pytest.mark.parametrize("lines", [
+    ["1: x"], ["aB: 1"], ['"a": 1'], ["z:", "  - on: x"], ["z:", "  -x"], ['a: "x' + BACKSLASH], ['a: ["x]'], ['a: ["x" q]'],
+    ["a: ['x']"], ["a: [x"], ['a: "x' + BACKSLASH + 'n"'],
+])
+def test_r057_r3_these_forms_are_refused_at_their_line(lines):
+    refused(head(*lines), len(lines) + 1)
+
+
+@pytest.mark.parametrize("lines", [
+    ['a: ["x' + BACKSLASH + '"y", z]'],
+    ["z:", '  - "a' + BACKSLASH + '"b"'],
+    ["z:", '  - "a' + BACKSLASH + '"b: c"'],
+    ["z:", '  - k: "a' + BACKSLASH + '"b: c"'],
+    ['a: "b' + BACKSLASH + BACKSLASH + '" # c'],
+    ['a: ["b' + BACKSLASH + BACKSLASH + '", z]'],
+    ['a: "x # y" # z', 'b: "c: d"'],
+])
+def test_r057_r3_an_escaped_quote_ends_no_string_in_any_of_the_readings(lines):
+    equals_pyyaml(lines)
+
+
+@pytest.mark.parametrize("header", [
+    {"record": "build-plan", "header": 1, "stages": ["x"]},
+    {"record": "build-plan", "header": 1, "stages": [{"name": "S", "demonstration": True, "increments": ["x"]}]},
+    {"record": "build-plan", "header": 1, "stages": "x"},
+    {"record": "inventory", "header": 1, "reflected_through": None, "development_data": "", "tables": "x"},
+    {"record": "inventory", "header": 1, "reflected_through": None, "development_data": "", "tables": {"features": "x", "resources": 1, "decisions": None, "deferred": []}},
+    {"record": "requirements", "header": 1, "columns": [], "roles": "x", "statuses": []},
+])
+def test_r057_r3_a_nested_value_of_the_wrong_shape_is_a_finding_and_no_exception(header):
+    assert need("check_header")(header["record"], header) != []
+
+
+@pytest.mark.parametrize("header", [[], "x", None, 3])
+def test_r057_r3_a_header_that_is_no_mapping_is_a_finding_and_no_exception(header):
+    assert need("check_header")("brief", header) != []
+
+
+def test_r057_r3_a_brief_whose_name_cannot_be_read_disagrees_on_id_and_round():
+    got = need("header_agrees")("brief", valid("brief"), dict(fallback_brief(), name="notes"))
+    assert got == ["id", "round"]
+
+
+def test_r057_r3_a_kind_with_no_agreement_is_said():
+    assert need("header_agrees")("nonsense", {}, {}) != []
+
+
+def test_r057_r3_a_stage_or_an_increment_on_the_header_side_only_is_said():
+    agrees = need("header_agrees")
+    header, fallback = two_stage_plan()
+    del fallback["stages"][1]
+    assert agrees("build-plan", header, fallback) == ["Later name"]
+    header, fallback = two_stage_plan()
+    fallback["stages"][1]["increments"] = []
+    assert agrees("build-plan", header, fallback) == ["TASK-047 id"]
 
 
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---
