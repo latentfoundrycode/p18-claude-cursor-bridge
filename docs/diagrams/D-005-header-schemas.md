@@ -19,7 +19,7 @@ Level 4, refines D-002 (`bridge_env` = `bridge/cursor-bridge/bridge_env.py`, whi
 | DeviationsHeader | `deviations` | `docs/diagrams/DEVIATIONS.md` | `diagram-check.py` (`known_deviations`: every column) |
 | RunParametersHeader | `run-parameters` | `docs/RUN_PARAMETERS.md` | `loop-guard.py` (agent_ceiling, ceiling_above_twice), `bridge-run.py` (ceiling_above_twice, design_rounds_above_five, review_rounds_above_ceiling through `bridge_env.review_owner_lifts`), `review-guard.py` (review_rounds_above_ceiling); the five values by this repository's tests (`test_r001_run_parameters_owner_values`) and no program |
 
-The nested mappings: WorkflowPart (ProjectStatusHeader.workflows), Stage and Increment (BuildPlanHeader.stages), InventoryTables and TableShape (InventoryHeader.tables), RequirementsRoles (RequirementsHeader.roles), DiagramIndexRoles (DiagramIndexHeader.roles), DeviationsRoles (DeviationsHeader.roles), DesignLift and ReviewLift (RunParametersHeader's two lift lists).
+The nested mappings: WorkflowPart (ProjectStatusHeader.workflows), Stage and Increment (BuildPlanHeader.stages), InventoryTables and TableShape (InventoryHeader.tables), RequirementsRoles (RequirementsHeader.roles), DiagramIndexRoles (DiagramIndexHeader.roles), DeviationsRoles (DeviationsHeader.roles), CeilingLift, DesignLift and ReviewLift (RunParametersHeader's three lift lists). Revised at the critique's round 3: `ceiling_above_twice` a list of CeilingLift (one per `Ceiling above twice: <kind> <seconds> (<words>)` line, as the two programs read them); an absent list line the empty list; a `roles` value naming a column absent from `columns` malformed.
 
 ## How the attributes are written (machine-readable)
 
@@ -31,11 +31,11 @@ The nested mappings: WorkflowPart (ProjectStatusHeader.workflows), Stage and Inc
 ## Notes on values, from the design
 
 - `phase`: one of the `Phase:` values the Glossary lists and the session-start hook's table maps (the set in the attribute). `awaiting_user_on`: the empty string means no wait ("nothing", "none" and "n/a" in the prose all become `""`). `bridge_version`: the release stamp `YYYY.MM.DD` with an optional letter, or `""`. `workflows`: one WorkflowPart per part, in the open list's names; an empty list means not yet classified. `open_issues`: one entry per segment of the `Open issues:` line as `evaluate-reports.py`'s `status_segments` splits it.
-- Increment `id`: the plan's ID grammar. `scope`: paths. `satisfies`: R-ids. `deferred`: the owner and the date. `parallel`: the prose `yes` is `true`, `no` is `false`. `historic: true`: an increment merged before the plan's fields existed, written by the migration where the fallback reads no Scope or Kind and the ID is in the merged set `plan-check.py` reads (`bridge_env.squash_merged_ids` over the same base, `origin/main` by default); it has no prose line and is compared by that derivation; `plan-check.py` exempts it from the shape rules (no Scope, no Kind) and from nothing else, and only where its own merged set holds the ID, so a hand-written mark on an unmerged increment is a finding (under `--no-git` the mark is accepted with a note). `kind` and `parallel` are null only on a historic increment, a value rule `check_header` holds (`kind : enum ... or null` and `parallel : boolean or null` below). Stage `name` is compared with the stage heading; `demonstration` is `true` where a `Demonstration:` line with text follows the heading (the presence `plan-check.py`'s `DEMO_RX` reads), `false` where none does, and is compared with that presence.
+- Increment `id`: the plan's ID grammar. `scope`: paths, each entry the bullet's path as `split_entry` reads it, a folder's `/` kept. `satisfies`: R-ids. `deferred`: the owner and the date. `parallel`: the prose `yes` is `true`, `no` is `false`. A list key whose prose line is absent (`scope`, `depends_on`, `diagrams`, `satisfies`) is the empty list, the fallback's reading today, never null; an optional scalar's absent line (`parent`, `deferred`) is null. `historic: true`: an increment merged before the plan's fields existed, written by the migration where the fallback reads no Scope or Kind and the ID is in the merged set, read by the one function both programs call, `bridge_env.squash_merged_ids(folder, PLAN_ID_PATTERN, ref=<--base>)`, `origin/main` the default of both programs' `--base`; it has no prose line and is compared by that derivation; `plan-check.py` exempts it from the shape rules (no Scope, no Kind) and from nothing else, and only where that set holds the ID, so a hand-written mark on an unmerged increment is a finding (under `--no-git` the mark is accepted with a note). `kind` and `parallel` are null only on a historic increment, a value rule `check_header` holds (`kind : enum ... or null` and `parallel : boolean or null` below). Stage `name` is compared with the stage heading; `demonstration` is `true` where a `Demonstration:` line with text follows the heading (the presence `plan-check.py`'s `DEMO_RX` reads), `false` where none does, and is compared with that presence.
 - Brief `id` and `round`: read from the file's name by `bridge_env.parse_review_name` (`handoff/<ID>[-r<N>].md`), which is their fallback, the header's values having to equal the name's; `round` is an integer, 1 for a plain name, as that reader gives it. `scope`: the paths the `## Scope` section allows, one entry per bullet, a folder entry ending in `/`. `satisfies`: the brief's `Satisfies:` line. `merge_unit` and `blocking_class`: the brief's `Merge unit:` and `Blocking class:` lines; `blocking_class` one of `bridge_env.BLOCKING_CLASSES` (the set in the attribute). Every key is compared with its prose by the brief's checker, `scope-check.py`. Brief and increment `id`: `bridge_env`'s ID grammar.
 - Inventory `development_data`: the first cell of the Decisions row that begins `Development data:`, the one value a tabular header copies from its table. TableShape `key`: the name of the column that identifies a row.
-- RequirementsRoles, DiagramIndexRoles and DeviationsRoles: each value the name of the column that plays the role. Requirements `statuses`: the allowed set, exactly the four words `planned`, `built`, `deferred`, `dropped` in this release (a value rule `check_header` holds: a list of fewer or other words is malformed), and a Status cell opening with a word outside them is the register check's finding, as today. Every `date` is `YYYY-MM-DD`, written quoted, since the reader's plain form refuses a date; the empty string (`awaiting_user_on`, `bridge_version`) is written `""`, since a blank reads as null; each kind's `record` value is its class annotation, which `tests/test_header_schemas.py` reads.
-- Run parameters: the five values as the owner gave them, `n/a` where one does not apply; `agent_ceiling` in seconds; `ceiling_above_twice` the owner's words. The header mirrors the owner's lines and never creates them.
+- RequirementsRoles, DiagramIndexRoles and DeviationsRoles: each value the name of the column that plays the role, one of the header's own `columns` (a role naming a column absent from `columns` is malformed, `check_header`'s rule; a role's column absent from the table's header row is the owning checker's `HEADER DISAGREES: roles.<role>`). Requirements `statuses`: the allowed set, exactly the four words `planned`, `built`, `deferred`, `dropped` in this release (a value rule `check_header` holds: a list of fewer or other words is malformed), and a Status cell opening with a word outside them is the register check's finding, as today. Every `date` is `YYYY-MM-DD`, written quoted, since the reader's plain form refuses a date; the empty string (`awaiting_user_on`, `bridge_version`) is written `""`, since a blank reads as null; each kind's `record` value is its class annotation, which `tests/test_header_schemas.py` reads.
+- Run parameters: the five values as the owner gave them, `n/a` where one does not apply; `agent_ceiling` in seconds; `ceiling_above_twice` one CeilingLift per `Ceiling above twice: <kind> <seconds> (<words>)` line (`kind` the launch kind the line names, `seconds` the integer, `words` the parenthesis's text whole, as `bridge-run.py`'s `owner_cap` reads it), an empty list where no line stands, the launcher and the loop guard reading the lift by kind. The header mirrors the owner's lines and never creates them.
 
 ```mermaid
 classDiagram
@@ -161,9 +161,14 @@ classDiagram
         installer_verification : string
         parallel_increments : string
         agent_ceiling : integer or null
-        ceiling_above_twice : string or null
+        ceiling_above_twice : list of CeilingLift
         design_rounds_above_five : list of DesignLift
         review_rounds_above_ceiling : list of ReviewLift
+    }
+    class CeilingLift {
+        kind : string
+        seconds : integer
+        words : string
     }
     class DesignLift {
         subject : string
@@ -195,6 +200,7 @@ classDiagram
     RequirementsHeader "1" *-- "1" RequirementsRoles : roles
     DiagramIndexHeader "1" *-- "1" DiagramIndexRoles : roles
     DeviationsHeader "1" *-- "1" DeviationsRoles : roles
+    RunParametersHeader "1" *-- "0..*" CeilingLift : ceiling_above_twice
     RunParametersHeader "1" *-- "0..*" DesignLift : design_rounds_above_five
     RunParametersHeader "1" *-- "0..*" ReviewLift : review_rounds_above_ceiling
 ```
