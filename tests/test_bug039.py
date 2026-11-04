@@ -764,7 +764,7 @@ def test_bug039_site4_negative_a_resnapshot_counts_no_reply_on_either_tree(tmp_p
 
 
 def test_bug039_the_void_lands_on_the_round_flagged_never_on_round_1(tmp_path):
-    """R-042, D-003 (`review_launched` to `flagged_gate_integrity`), at a later round. enforces: a flag on round 2 voids
+    """R-042, D-003 (`reply_arrived` to `flagged_gate_integrity`), at a later round. enforces: a flag on round 2 voids
     round 2's launch and leaves round 1's replied entry as it stood, and the same launch verified again gets no mark.
     Stage T2's review, round 3, found every other void test flagging round 1 (docs/HARDENING.md, Project end)."""
     repo = G.make_repo(tmp_path)
@@ -774,14 +774,16 @@ def test_bug039_the_void_lands_on_the_round_flagged_never_on_round_1(tmp_path):
     later = NAME + "-r2"
     G.snap_ok(repo, later)
     G.launched(repo, later)
+    first = G.entry(repo, ID, 1)
+    assert first.get("reply") == 0, first
     G.git(repo, "branch", "left-by-the-reviewer")
     rc, out = G.guard(repo, "verify", later)
     assert rc == 1 and "GATE-INTEGRITY" in out, out
     second = G.entry(repo, ID, 2)
     assert (second.get("flagged_launch") or "").rstrip("Z") == start_of(repo, later), second
     assert second.get("reply") is None, second
-    first = G.entry(repo, ID, 1)
-    assert "flagged_launch" not in first and first.get("reply") == 0, first
+    assert G.entry(repo, ID, 1) == first, G.entry(repo, ID, 1)
     rc, out = G.guard(repo, "verify", later)
     assert rc == 1 and "voided by an earlier GATE-INTEGRITY verify" in out, out
     assert "verified mark written" not in out, out
+    assert G.entry(repo, ID, 2).get("reply") is None, G.entry(repo, ID, 2)
