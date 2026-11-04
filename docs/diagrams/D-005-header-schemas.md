@@ -1,6 +1,6 @@
 # D-005 class: the header schemas of the eight record kinds
 
-Level 4, refines D-002 (`bridge_env` = `bridge/cursor-bridge/bridge_env.py`, which holds these schemas once, as data, in `HEADER_SCHEMAS`, beside `read_header` and `check_header`). Realizes R-057, R-058, R-059, R-060, R-061. Drawn from docs/DESIGN.md, "Change: release B2", the table "The records and their headers" and the paragraphs after it. Nothing else of `bridge_env` is drawn: the reader, the agreement helper and the fallback readers (one copy per field, moved into `bridge_env` by the release) are the builder's free implementation space, held by their tests. Revised 2026-11-04 at the critique's round 1: the eighth kind, `deviations`; `statuses` as a list of the four status words; the brief's `id` and `round` read from the file's name.
+Level 4, refines D-002 (`bridge_env` = `bridge/cursor-bridge/bridge_env.py`, which holds these schemas once, as data, in `HEADER_SCHEMAS`, beside `read_header` and `check_header`). Realizes R-057, R-058, R-059, R-060, R-061, R-062 (the migration writes every schema below and reads them back). Drawn from docs/DESIGN.md, "Change: release B2", the table "The records and their headers" and the paragraphs after it. Nothing else of `bridge_env` is drawn: the reader, the agreement helper and the fallback readers (one copy per field, moved into `bridge_env` by the release) are the builder's free implementation space, held by their tests. Revised 2026-11-04 at the critique's round 1: the eighth kind, `deviations`; `statuses` as a list of the four status words; the brief's `id` and `round` read from the file's name. Revised at its round 2: an increment's `kind` and `parallel` nullable, null allowed only where `historic` is true; the brief's `round` an integer (1 for a plain name); the value rules and normalisations noted below.
 
 **Load-bearing: integrity.** The header is the one persistent structure every program of release B2 reads; a key or type drifting between the design's text, `HEADER_SCHEMAS` and a record breaks every check at once.
 
@@ -31,10 +31,10 @@ The nested mappings: WorkflowPart (ProjectStatusHeader.workflows), Stage and Inc
 ## Notes on values, from the design
 
 - `phase`: one of the `Phase:` values the Glossary lists and the session-start hook's table maps (the set in the attribute). `awaiting_user_on`: the empty string means no wait ("nothing", "none" and "n/a" in the prose all become `""`). `bridge_version`: the release stamp `YYYY.MM.DD` with an optional letter, or `""`. `workflows`: one WorkflowPart per part, in the open list's names; an empty list means not yet classified. `open_issues`: one entry per segment of the `Open issues:` line as `evaluate-reports.py`'s `status_segments` splits it.
-- Increment `id`: the plan's ID grammar. `scope`: paths. `satisfies`: R-ids. `deferred`: the owner and the date. `historic: true`: an increment merged before the plan's fields existed, written by the migration where the fallback reads no Scope or Kind and `bridge_env.squash_merged_ids` finds the ID on `main`; `plan-check.py` exempts it from the shape rules (no Scope, no Kind) and from nothing else, and only where that ID is merged, so a hand-written mark on an unmerged increment is a finding. Stage `name` and `demonstration` are compared with the stage heading and its `Demonstration:` line as an increment's fields are with its lines.
-- Brief `id` and `round`: read from the file's name by `bridge_env.parse_review_name` (`handoff/<ID>[-r<N>].md`), which is their fallback, the header's values having to equal the name's. `scope`: the paths the `## Scope` section allows, one entry per bullet, a folder entry ending in `/`. `satisfies`: the brief's `Satisfies:` line. `merge_unit` and `blocking_class`: the brief's `Merge unit:` and `Blocking class:` lines; `blocking_class` one of `bridge_env.BLOCKING_CLASSES` (the set in the attribute). Every key is compared with its prose by the brief's checker, `scope-check.py`. Brief and increment `id`: `bridge_env`'s ID grammar.
+- Increment `id`: the plan's ID grammar. `scope`: paths. `satisfies`: R-ids. `deferred`: the owner and the date. `parallel`: the prose `yes` is `true`, `no` is `false`. `historic: true`: an increment merged before the plan's fields existed, written by the migration where the fallback reads no Scope or Kind and the ID is in the merged set `plan-check.py` reads (`bridge_env.squash_merged_ids` over the same base, `origin/main` by default); it has no prose line and is compared by that derivation; `plan-check.py` exempts it from the shape rules (no Scope, no Kind) and from nothing else, and only where its own merged set holds the ID, so a hand-written mark on an unmerged increment is a finding (under `--no-git` the mark is accepted with a note). `kind` and `parallel` are null only on a historic increment, a value rule `check_header` holds (`kind : enum ... or null` and `parallel : boolean or null` below). Stage `name` is compared with the stage heading; `demonstration` is `true` where a `Demonstration:` line with text follows the heading (the presence `plan-check.py`'s `DEMO_RX` reads), `false` where none does, and is compared with that presence.
+- Brief `id` and `round`: read from the file's name by `bridge_env.parse_review_name` (`handoff/<ID>[-r<N>].md`), which is their fallback, the header's values having to equal the name's; `round` is an integer, 1 for a plain name, as that reader gives it. `scope`: the paths the `## Scope` section allows, one entry per bullet, a folder entry ending in `/`. `satisfies`: the brief's `Satisfies:` line. `merge_unit` and `blocking_class`: the brief's `Merge unit:` and `Blocking class:` lines; `blocking_class` one of `bridge_env.BLOCKING_CLASSES` (the set in the attribute). Every key is compared with its prose by the brief's checker, `scope-check.py`. Brief and increment `id`: `bridge_env`'s ID grammar.
 - Inventory `development_data`: the first cell of the Decisions row that begins `Development data:`, the one value a tabular header copies from its table. TableShape `key`: the name of the column that identifies a row.
-- RequirementsRoles, DiagramIndexRoles and DeviationsRoles: each value the name of the column that plays the role. Requirements `statuses`: the four status words a Status cell opens with, each an item of the enumeration `planned`, `built`, `deferred`, `dropped`, so the header pins the set and a fifth word is malformed. Every `date` is `YYYY-MM-DD`, written quoted, since the reader's plain form refuses a date; each kind's `record` value is its class annotation, which `tests/test_header_schemas.py` reads.
+- RequirementsRoles, DiagramIndexRoles and DeviationsRoles: each value the name of the column that plays the role. Requirements `statuses`: the allowed set, exactly the four words `planned`, `built`, `deferred`, `dropped` in this release (a value rule `check_header` holds: a list of fewer or other words is malformed), and a Status cell opening with a word outside them is the register check's finding, as today. Every `date` is `YYYY-MM-DD`, written quoted, since the reader's plain form refuses a date; the empty string (`awaiting_user_on`, `bridge_version`) is written `""`, since a blank reads as null; each kind's `record` value is its class annotation, which `tests/test_header_schemas.py` reads.
 - Run parameters: the five values as the owner gave them, `n/a` where one does not apply; `agent_ceiling` in seconds; `ceiling_above_twice` the owner's words. The header mirrors the owner's lines and never creates them.
 
 ```mermaid
@@ -72,10 +72,10 @@ classDiagram
     class Increment {
         id : string
         title : string
-        kind : enum of increment, group
+        kind : enum of increment, group or null
         parent : string or null
         depends_on : list of string
-        parallel : boolean
+        parallel : boolean or null
         diagrams : list of string
         scope : list of string
         satisfies : list of string
@@ -86,7 +86,7 @@ classDiagram
     class BriefHeader {
         <<brief>>
         id : string
-        round : integer or null
+        round : integer
         satisfies : list of string
         scope : list of string
         merge_unit : list of string or null
