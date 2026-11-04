@@ -31,7 +31,10 @@ manifest and project.json are checked against the newest heading.
   carries none, every test named existing.
 - test_r056_the_grammar_reads_the_plan_s_examples enforces: the plan's own four examples of the grammar.
 - test_r056_the_completion_check_passes_in_done_mode enforces: `completion-check.py --mode done`, RESULT OK; it skips only
-  where no repository exists, a mutation run's copy, since the check reads git's tracked files, and never on CI.
+  where no repository exists, a mutation run's copy, since the check reads git's tracked files, and never on CI. While a
+  later change cycle runs (`Phase: changing`) its rows after R-056 may still be planned, and nothing else may be reported.
+- test_r056_only_a_change_cycle_s_later_planned_rows_are_excused enforces: that excuse's limits, docs/HARDENING.md, "Release
+  B2's design records"; TASK-045's Done when asks for the check green at the accept commit, not at every later commit.
 """
 import importlib.util
 import json
@@ -325,4 +328,38 @@ def test_r056_the_completion_check_passes_in_done_mode():
         assert "GITHUB_ACTIONS" not in os.environ, "CI holds a checkout, so this test never skips there"
         pytest.skip("completion-check.py reads `git ls-files`, and mutation-run.py's copy holds no repository")
     p = subprocess.run([sys.executable, COMPLETION, "--mode", "done"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    assert p.returncode == 0 and "RESULT: OK" in p.stdout, p.stdout[-800:]
+    phase = re.search(r"^Phase: (\S+)", read(STATUS), re.M).group(1)
+    ok = p.returncode == 0 and "RESULT: OK" in p.stdout
+    assert ok or (p.returncode == 1 and later_rows_only(p.stdout, phase)), p.stdout[-800:]
+
+
+def later_rows_only(stdout, phase):
+    """True only in a change cycle, where every problem the check counted is a later release's row still planned."""
+    if phase != "changing":
+        return False
+    lines = [line for line in stdout.splitlines() if line]
+    problems = [line for line in lines if not line.startswith(("note:", "RESULT:"))]
+    if not problems or lines[-1] != "RESULT: %d problem(s)" % len(problems):
+        return False
+    newest = max(int(rid[2:]) for rid in ROWS)
+    for line in problems:
+        m = re.fullmatch(r"NOT BUILT: R-(\d+) \(.*\) is still planned", line)
+        if not m or int(m.group(1)) <= newest:
+            return False
+    return True
+
+
+def test_r056_only_a_change_cycle_s_later_planned_rows_are_excused():
+    def printed(*problems):
+        return "\n".join(("note: mode done",) + problems + ("RESULT: %d problem(s)" % len(problems),)) + "\n"
+
+    later = "NOT BUILT: R-057 (a later release's row) is still planned"
+    assert later_rows_only(printed(later), "changing")
+    assert not later_rows_only(printed(later), "done"), "at Phase: done the check must read RESULT: OK"
+    assert not later_rows_only(printed(later), "building"), "only a change cycle excuses a planned row"
+    assert not later_rows_only(printed("NOT BUILT: R-056 (this release's row) is still planned"), "changing")
+    assert not later_rows_only(printed("NOT BUILT: R-042 (this release's row) is still planned"), "changing")
+    assert not later_rows_only(printed(later, "NO EVIDENCE: R-050 (a row)"), "changing"), "any other problem still fails"
+    assert not later_rows_only(printed(), "changing"), "a problem no line names still fails"
+    assert not later_rows_only(later + "\n", "changing"), "no RESULT line: the check did not finish"
+    assert not later_rows_only(later + "\nRESULT: 9 problem(s)\n", "changing"), "a count no line accounts for still fails"
