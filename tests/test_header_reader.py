@@ -1566,7 +1566,7 @@ def test_r057_r3_a_quote_in_a_comment_opens_nothing_and_a_backslash_skips_nothin
         ["z: 1", '# "', "agent_ceiling: 5 # " + BACKSLASH + c + "review_rounds_above_ceiling: 9"],
         ['# it"s', 'a: "x' + BACKSLASH + c + 'y"'],
         ['a: "x' + BACKSLASH + c + 'y"'],
-        ['# "', 'a: "x"', "b: 1 # " + BACKSLASH + c],
+        ['# "', 'a: "x"', "b: 1 # " + BACKSLASH + c + "y"],
     ):
         at = next(i for i, line in enumerate(lines) if c in line) + 2
         refused(text_with(lines, ending), at)
