@@ -705,6 +705,20 @@ The fixes from stage B2's review, round 2: the builder made workflow-check.py pr
 
 **Gate**: passed 2026-11-01 (the paragraph above).
 
+## Subject: release-b2 (the change cycle's design revision and its plan addendum as one subject: machine-readable headers on the records both the model and a program read; 2026-11-04)
+
+**What is criticised:** the change cycle's design revision for release B2 (change-cycle.md, item 2), the second change on the finished bridge, and, as one subject with it since its increments stood in the round-1 file (design.md, "The procedure"), its plan addendum (item 4): docs/DESIGN.md's section "Change: release B2" (the seven record kinds and their typed keys; the three kinds of record and their one rule each; header first, fallback, malformed; the subset reader in `bridge_env.py` with `pyyaml` in the tests only; the migration program and the calibration's step; the status file's cap on the body), the register's rows R-057 to R-064, the inventory's eight Decisions rows, D-005 (the header schemas, Level 4, new) and the revised D-001 and D-002 with the index, and docs/BUILD_PLAN.md's "Release B2 — the plan addendum" (its four constraints; stage H1, TASK-046 to TASK-050, the reader and the programs; stage H2, TASK-051 to TASK-054, the migration program, the texts, this repository's records and the stamp). The critics read `run/review/DESIGN-release-b2-<round>.md`, built from the committed records by run/supervisor/b2_design_file.py, with plan-critic's design and build-plan lenses and the trait installable's planning lenses. Four rounds at the most, then a confirming read if the text changed, then one resolution round for what is still open, then the gate (design.md, "The procedure").
+
+**Accepted** (finding, critic, round, the reason):
+- (none yet)
+
+**Rounds** (round, kind, the commit its file was built from, critic, Blocking / Should fix / Consider, what was fixed):
+- (none yet)
+
+**Resolution**: (pending)
+
+**Gate**: (pending)
+
 ## Subject: release-t-plan (release T's plan addendum: stages T1 and T2, TASK-036 to TASK-045; 2026-11-01)
 
 What is criticised: the two stages change-cycle.md's item 4 appends to docs/BUILD_PLAN.md for release T (the addendum's constraints, stage T1's five text increments, stage T2's weekly workflow, BUG-039 as TASK-043, the retrofit's tests and the stamp), read against the approved design (docs/DESIGN.md, "Change: release T"), the register's rows R-042 as revised and R-045 to R-056, the four diagrams and their deviations file, with the plan-critic's build-plan lenses and the trait installable's `planning.critic-lenses` addition (the packaging stage lens, not applicable to the kind host-installation, and the command-reference lens). The critics: `plan-critic` (Fable 5.1) and Review B (grok-4.7-medium, the native profile) in design mode, each reading `run/review/DESIGN-release-t-plan-<round>.md`. Four rounds at the most, then a confirming read if the text changed, then one resolution round for what is still open, then the gate (design.md, "The procedure").

@@ -1,12 +1,14 @@
-# D-002 component — the bridge's programs (as built)
+# D-002 component — the bridge's programs (as built, revised as designed for release B2)
 
-Level 3. Drawn as built (conventions §8) from the code on 2026-11-01. Every program of `bridge/cursor-bridge/` is a component whose path is its file, grouped by what starts it: the supervisor's shell; Claude Code's hooks (`bridge/cursor-bridge/settings.bridge.json`); the Cursor hooks, which a project's `.cursor/hooks/` holds as verbatim copies; the installer; the maintainer's command (`bridge/commands/evaluate-reports.md`). The repository's `tools/` programs and this project's own installed hook copies are elements too, so every tracked Python file outside `tests/` belongs to one. An edge `a --> b` or `a -.-> b` means `a` may depend on `b` by importing or loading it; every edge joins two components, never a subgraph.
+Level 3. Drawn as built (conventions §8) from the code on 2026-11-01; revised as designed on 2026-11-04 for release B2 (`docs/DESIGN.md`, "Change: release B2", "Architecture — the diagrams the change touches"). Every program of `bridge/cursor-bridge/` is a component whose path is its file, grouped by what starts it: the supervisor's shell; Claude Code's hooks (`bridge/cursor-bridge/settings.bridge.json`); the Cursor hooks, which a project's `.cursor/hooks/` holds as verbatim copies; the installer; the maintainer's command (`bridge/commands/evaluate-reports.md`). The repository's `tools/` programs and this project's own installed hook copies are elements too, so every tracked Python file outside `tests/` belongs to one. An edge `a --> b` or `a -.-> b` means `a` may depend on `b` by importing or loading it; every edge joins two components, never a subgraph.
 
 The dependency rule (`docs/DESIGN.md`, "Architecture — the retrofit's diagrams", D-002) allows two kinds of edge. A program may import the shared module `bridge_env`. A program may also load a sibling program by file (`importlib.util.spec_from_file_location`) where it reuses that program's one copy of a rule, the shared judge, or, for the one tool `dump_cli`, to read the sibling's argument parser. Each such load is its own edge. Every other dependency between programs is by running one or reading its record as a file. Those are not edges and are not drawn. `bridge-run.py` is the one launcher.
 
 Notes:
 
-- **Plain imports** (solid edges, `-->`): an `import bridge_env` statement, which `check:components` sees. This covers `bridge_run`, `review_guard`, `plan_check`, `roster_check`, `pace_report` (at module level), `mutation_run` (at module level, inside a `try`) and `bridge_check` (inside `check_agent_home`).
+- **Plain imports** (solid edges, `-->`): an `import bridge_env` statement, which `check:components` sees. As built, this covers `bridge_run`, `review_guard`, `plan_check`, `roster_check`, `pace_report` (at module level), `mutation_run` (at module level, inside a `try`) and `bridge_check` (inside `check_agent_home`). **As designed for release B2** (built by release B2's increments, not in the code on 2026-11-04): every program that reads a record imports `bridge_env` for its one header reader (`read_header`, `check_header`, `HEADER_SCHEMAS`), which adds eight edges: `completion_check`, `diagram_check`, `inventory_check`, `scope_check`, `workflow_check`, `loop_guard`, `session_start` and `evaluate_reports` `--> bridge_env`. `plan_check`, `bridge_run` and `review_guard` have the edge already. `conformance_check` keeps its load of `bridge_env` by file (dotted edge below) and gains no solid one; `bridge_install` likewise keeps its load by file. The new program `records_migrate` (`bridge/cursor-bridge/records-migrate.py`, started by the supervisor's shell, release B2's migration) is drawn with its designed edge `records_migrate --> bridge_env`; its file does not exist until the increment that adds it.
+- **`session_start`'s import of `bridge_env`** (as designed): the hook imports `bridge_env` from its own installed folder, `~/.claude/cursor-bridge/`, through no link, after the same path checks it makes for `workflow-check.py`, and keeps its one plain line on any failure. This revisits the hook's threat-model decision (INVENTORY, Decisions, "The session-start hook's threat model"); the row is revised, not reversed.
+- **Reading a record is not an edge.** Release B2's programs read each record's header first (the header-first reading, with today's pattern matching as the fallback); the records every program reads are listed in `docs/DESIGN.md`, "Change: release B2", "The records and their headers". That reading is by reading a file, as the dependency rule above says, and is not drawn. The only edges the release adds are the imports of `bridge_env` above.
 - **Loads by file** (dotted edges, `-.->`): `importlib.util.spec_from_file_location` of a sibling file. `check:components` reads only `import` and `from` lines, so it does not see these. They are enforced by `diff-reviewer`'s named review item: a `spec_from_file_location` of a sibling program is a D-002 edge the diff must draw or raise. As of the code:
   - `conformance_check` loads `bridge_env` (`_load_bridge_env`);
   - `bridge_install` loads the source release's `bridge_env.py` (`prepare_agent_home`);
@@ -16,8 +18,9 @@ Notes:
   - `session_start` loads `workflow_check` (`load_checker_module`: `slash`, `is_link`, `read_utf8`, `load_tables`);
   - `pace_report` loads `evaluate_reports` (`_load_evaluate_reports`, the project keys);
   - `dump_cli` loads each program of `bridge/cursor-bridge/` that has a `__main__` block and a top-level `build_parser`, to read its parser. As of the code that is 12: `completion_check`, `diagram_check`, `inventory_check`, `mutation_run`, `plan_check`, `records_check`, `stage_diff`, `sync_check`, `trace_check`, `workflow_check` in `sg_shell`, and `evaluate_reports`, `pace_report` in `sg_maintainer`. It reads every other program's docstring with `ast` and does not load it. The selection is made at run time; each of the twelve is drawn as its own edge. A thirteenth program gaining a `build_parser` changes no `import` and no `spec_from_file_location` call, so the enforcement of these edges is a test: `tests/test_dump_cli.py`, naming D-002, asserts that the programs `dump-cli.py` loads (computed as the tool computes them) equal this diagram's `dump_cli` edges read from this file (the addendum's test increment, R-055).
+- **`dump_cli` and `records_migrate`:** `records-migrate.py` will have a `build_parser`, so once it exists `dump_cli` loads it. The edge `dump_cli -.-> records_migrate` is deliberately **not** drawn in this revision: `tests/test_dump_cli.py` compares the `dump_cli` edges with the code as it stands, and the program does not exist yet, so the edge drawn now would fail that test. The increment that adds `records-migrate.py` adds the edge to this file in the same change.
 - **Not edges:** `mutation_run` contains `import` lines inside the source strings of the pytest plugins it generates (`OUTCOMES_PLUGIN_CODE`, `write_resolution_plugin`). These are text that mutation-run writes to a file, not imports of its own. `make_manifest` and `compaction_baseline` import nothing of the project.
-- **Grouping:** `shell_guard` is Cursor's `beforeShellExecution` hook, copied to a project's `.cursor/hooks/shell-guard.py`; `settings.bridge.json` has no entry for it. Only the maintainer's command starts `pace_report` (`evaluate-reports.md`, step 3). `windowless_check` is started by the supervisor's shell (an allow rule in `settings.bridge.json`) and by a project's pre-commit gate from its copy. `project_cursor_hooks` is this project's installed copies of the Cursor hooks (`boundary-check.py`, `run-hidden.py`, `windowless-check.py`). It has no edges. It is marked external in the block because `check:components` does not read `.cursor/`, so no file can mark it built.
+- **Grouping:** `shell_guard` is Cursor's `beforeShellExecution` hook, copied to a project's `.cursor/hooks/shell-guard.py`; `settings.bridge.json` has no entry for it. Only the maintainer's command starts `pace_report` (`evaluate-reports.md`, step 3). `windowless_check` is started by the supervisor's shell (an allow rule in `settings.bridge.json`) and by a project's pre-commit gate from its copy. `records_migrate` is started by the supervisor's shell (the calibration's step 4 and the addendum's migration increment). `project_cursor_hooks` is this project's installed copies of the Cursor hooks (`boundary-check.py`, `run-hidden.py`, `windowless-check.py`). It has no edges. It is marked external in the block because `check:components` does not read `.cursor/`, so no file can mark it built.
 - `tests/` is outside `check:components`.
 
 | Element | Paths |
@@ -34,6 +37,7 @@ Notes:
 | workflow_check | bridge/cursor-bridge/workflow-check.py |
 | trace_check | bridge/cursor-bridge/trace-check.py |
 | records_check | bridge/cursor-bridge/records-check.py |
+| records_migrate | bridge/cursor-bridge/records-migrate.py |
 | stage_diff | bridge/cursor-bridge/stage-diff.py |
 | invisible_check | bridge/cursor-bridge/invisible-check.py |
 | lock_check | bridge/cursor-bridge/lock-check.py |
@@ -80,6 +84,7 @@ flowchart LR
         workflow_check["workflow-check.py"]
         trace_check["trace-check.py"]
         records_check["records-check.py"]
+        records_migrate["records-migrate.py (release B2, designed)"]
         stage_diff["stage-diff.py"]
         invisible_check["invisible-check.py"]
         lock_check["lock-check.py"]
@@ -125,7 +130,7 @@ flowchart LR
     end
 
     %% external: project_cursor_hooks
-    %% plain imports: seen by check:components
+    %% plain imports: seen by check:components (as built)
     bridge_run --> bridge_env
     review_guard --> bridge_env
     plan_check --> bridge_env
@@ -133,6 +138,17 @@ flowchart LR
     mutation_run --> bridge_env
     bridge_check --> bridge_env
     pace_report --> bridge_env
+
+    %% plain imports as designed for release B2 (the header reader), built by its increments
+    completion_check --> bridge_env
+    diagram_check --> bridge_env
+    inventory_check --> bridge_env
+    scope_check --> bridge_env
+    workflow_check --> bridge_env
+    loop_guard --> bridge_env
+    session_start --> bridge_env
+    evaluate_reports --> bridge_env
+    records_migrate --> bridge_env
 
     %% loads by file (spec_from_file_location): seen by diff-reviewer's review item
     conformance_check -.-> bridge_env
