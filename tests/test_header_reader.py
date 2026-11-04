@@ -19,6 +19,7 @@ cases below the marker and edits nothing above it.
 import glob
 import os
 import sys
+import time
 
 import pytest
 import yaml
@@ -83,8 +84,8 @@ def test_r057_a_later_rule_is_body():
 
 def test_r057_crlf_reads_as_lf_and_the_body_keeps_its_endings():
     """docs/ is CRLF in a Windows checkout (core.autocrlf), so a header there must read."""
-    text = "---\r\na: word\r\nb: [x, y]\r\nc:\r\n  - p\r\n---\r\nbody\r\nmore\r\n"
-    assert need("read_header")(text) == ({"a": "word", "b": ["x", "y"], "c": ["p"]}, "body\r\nmore\r\n")
+    text = "---\r\na: word\r\nb: [x, z]\r\nc:\r\n  - p\r\n---\r\nbody\r\nmore\r\n"
+    assert need("read_header")(text) == ({"a": "word", "b": ["x", "z"], "c": ["p"]}, "body\r\nmore\r\n")
 
 
 def test_r057_byte_order_mark_tolerated():
@@ -782,6 +783,501 @@ def test_r057_run_parameters_each_key_compared(key, value):
     fallback = fallback_run_parameters()
     fallback[key] = value
     assert need("header_agrees")("run-parameters", valid("run-parameters"), fallback) == [key]
+
+
+# --- what round 1 read wrongly: the supervisor's probe against yaml.safe_load (TASK-046-r2) ---
+# enforces: docs/DESIGN.md, "The reader"; handoff/TASK-046.md, Requirements 1, 2, 4, 6, 8, 10, 14, 16, 17.
+
+TAB = chr(9)
+BOM = chr(0xFEFF)
+
+
+def block_of(lines):
+    return "".join(line + "\n" for line in lines)
+
+
+def equals_pyyaml(lines):
+    expected = yaml.safe_load(block_of(lines))
+    assert need("read_header")(head(*lines))[0] == ({} if expected is None else expected)
+
+
+@pytest.mark.parametrize("text", [
+    "R&D", "the *main* point", "*main", "wow!! yes", "uses {b: c} here", "{b: c}", "see [[name]] here", "[[name]]",
+    "a | b", "|", ">", "&x", "!!str word", "x - y", "- y", "key: value",
+])
+def test_r057_r2_a_quoted_string_is_text_whatever_it_holds(text):
+    equals_pyyaml(['a: "%s"' % text])
+    equals_pyyaml(['a: ["%s", z]' % text])
+    equals_pyyaml(["a:", '  - "%s"' % text])
+    equals_pyyaml(["a:", '  - k: "%s"' % text])
+
+
+@pytest.mark.parametrize("comment", ["R&D", "the *main* point", "wow!!", "{b: c}", "see [[name]]", "|", "- y", "key: value"])
+def test_r057_r2_a_comment_is_ignored_whatever_it_holds(comment):
+    equals_pyyaml(["a: word # " + comment])
+    equals_pyyaml(["# " + comment, "a: word"])
+    equals_pyyaml(["a:", "  # " + comment, "  b: word"])
+
+
+@pytest.mark.parametrize("name,lines,line", [
+    ("a doubled quote", ['a: "x""y"'], 2),
+    ("a doubled quote in a flow list", ['a: ["x""y"]'], 2),
+    ("no space after the colon", ["a:b"], 2),
+    ("no space after the colon before a flow list", ["a:[x]"], 2),
+    ("no space after the colon in a list item", ["a:", "  - b:c"], 3),
+    ("a flow list's leading comma", ["a: [,x]"], 2),
+    ("a flow list's double comma", ["a: [x,,y]"], 2),
+    ("an indent of one", ["a:", " b: c"], 3),
+    ("an indent of three", ["a:", "   b: c"], 3),
+    ("an indent of four", ["a:", "    b: c"], 3),
+    ("a list indented by four", ["a:", "    - x"], 3),
+    ("a list at its key's column", ["a:", "- x"], 3),
+    ("a root key indented", [" a: 1", "b: 2"], 2),
+    ("a line deeper than the key before it", ["a:", "  b: 1", "    c: 2"], 4),
+    ("a line deeper than a scalar key", ["a: 1", "  b: 2"], 3),
+    ("a list item deeper than the one before it", ["a:", "  - x", "    - y"], 4),
+    ("a key deeper than its list item's first", ["a:", "  - k: 1", "      j: 2"], 4),
+    ("a key shallower than its list item's first", ["a:", "  - k: 1", "   j: 2"], 4),
+    ("a tab before a key", [TAB + "b: c"], 2),
+    ("a tab before a child", ["a:", TAB + "b: c"], 3),
+    ("a tab after spaces", ["a:", "  " + TAB + "b: c"], 3),
+    ("a tab before a list item", ["a:", TAB + "- x"], 3),
+])
+def test_r057_r2_refused_where_round_1_read_it_otherwise_than_pyyaml(name, lines, line):
+    refused(head(*lines), line)
+
+
+@pytest.mark.parametrize("form", TYPED_BY_PYYAML + NEVER_WRITTEN_PLAIN + TYPED_ELSEWHERE)
+def test_r057_r2_a_flow_item_is_held_to_the_plain_scalar_rule(form):
+    error = refused(head("a: [x, %s]" % form), 2)
+    assert "quote" in str(error).lower(), "no advice to quote: %s" % error
+
+
+@pytest.mark.parametrize("lines", [
+    ["a:", "  - k:", "    j: 2"],
+    ["a:", "  - k:", "      inner: 1"],
+    ["a:", "  - k:"],
+    ["a:", "  - k:", "      - x"],
+    ["a:", "  - k:", "    j:", "      inner: 1"],
+    ["a:", "# a comment", "  b: x"],
+    ["a:", "", "  b: x"],
+    ["a:", "", "  - p"],
+    ["a:", "  - p", "# a comment", "  - q"],
+    ["a:", "  - k: 1", "", "    j: 2"],
+])
+def test_r057_r2_a_list_items_first_key_and_a_line_between_a_key_and_its_child(lines):
+    equals_pyyaml(lines)
+
+
+def test_r057_r2_a_null_key_at_the_eighth_level_reads():
+    lines = chain(8)
+    lines[-1] = lines[-1].replace(": word", ":")
+    equals_pyyaml(lines)
+
+
+def test_r057_r2_a_list_of_scalars_at_the_eighth_level_reads_and_at_the_ninth_is_refused():
+    lines = chain(7)
+    lines[-1] = lines[-1].replace(": word", ":")
+    equals_pyyaml(lines + ["  " * 7 + "- x"])
+    lines = chain(8)
+    lines[-1] = lines[-1].replace(": word", ":")
+    refused(head(*(lines + ["  " * 8 + "- x"])), 10)
+
+
+def test_r057_r2_a_flow_list_at_the_eighth_level_is_no_level_of_its_own():
+    lines = chain(8)
+    lines[-1] = lines[-1].replace(": word", ": [x, z]")
+    equals_pyyaml(lines)
+
+
+def test_r057_r2_a_lone_carriage_return_ends_no_line():
+    cr = chr(13)
+    text = "---" + cr + "a: 1" + cr + "---" + cr + "body" + cr
+    assert need("read_header")(text) == (None, text)
+    refused("---\na: x" + cr + "y: 1\n---\n", 2)
+
+
+@pytest.mark.parametrize("text", ["plain\n", "# Title\n---\na: b\n---\n", ""])
+def test_r057_r2_a_headerless_body_keeps_its_byte_order_mark(text):
+    assert need("read_header")(BOM + text) == (None, BOM + text)
+
+
+FRAGMENTS = [
+    "a: word", "b: 1", "a:", "c:", "  b: x", "  c:", "    d: z", "  - p", "  - k: 1", "    j: 2", "  - k:", "      m: 1",
+    "- q", " e: 1", "   f: 1", "# note", "", "g: [x, 1]", 'h: "R&D"', "j:k",
+    TAB, "a: 1" + TAB, "a: word" + chr(0xA0) + "#z", chr(0x3000), "# c" + chr(0x2028) + "b: 2",
+]
+
+
+def test_r057_r2_every_block_the_reader_accepts_of_these_fragments_equals_pyyaml():
+    """Every sequence of up to three fragments: what read_header accepts, yaml.safe_load reads the same.
+
+    A refusal is allowed (the subset is narrower); a different reading, or a reading of what pyyaml refuses, is not.
+    """
+    read, error = need("read_header"), need("HeaderError")
+    sequences = [[a] for a in FRAGMENTS]
+    sequences += [[a, b] for a in FRAGMENTS for b in FRAGMENTS]
+    sequences += [[a, b, c] for a in FRAGMENTS for b in FRAGMENTS for c in FRAGMENTS]
+    wrong = []
+    for lines in sequences:
+        try:
+            ours = read(head(*lines))[0]
+        except error:
+            continue
+        try:
+            theirs = yaml.safe_load(block_of(lines))
+        except yaml.YAMLError as caught:
+            wrong.append((lines, ours, type(caught).__name__))
+            continue
+        if ours != ({} if theirs is None else theirs):
+            wrong.append((lines, ours, theirs))
+    assert not wrong, "%d blocks read otherwise than pyyaml, the first: %r" % (len(wrong), wrong[:5])
+
+
+@pytest.mark.parametrize("key", ["open_issues", "workflows"])
+def test_r057_r2_status_an_absent_list_line_agrees_with_the_empty_list(key):
+    header = valid("project-status")
+    header[key] = []
+    fallback = fallback_status()
+    del fallback[key]
+    assert need("header_agrees")("project-status", header, fallback) == []
+    fallback[key] = None
+    assert need("header_agrees")("project-status", header, fallback) == []
+
+
+@pytest.mark.parametrize("key", ["satisfies", "scope", "merge_unit"])
+def test_r057_r2_brief_an_absent_list_line_agrees_with_the_empty_list(key):
+    header = valid("brief")
+    header[key] = []
+    fallback = fallback_brief()
+    del fallback[key]
+    assert need("header_agrees")("brief", header, fallback) == []
+    fallback[key] = None
+    assert need("header_agrees")("brief", header, fallback) == []
+
+
+def test_r057_r2_brief_a_null_merge_unit_agrees_with_an_absent_line_and_not_with_a_filled_one():
+    header = valid("brief")
+    header["merge_unit"] = None
+    fallback = fallback_brief()
+    del fallback["merge_unit"]
+    assert need("header_agrees")("brief", header, fallback) == []
+    fallback["merge_unit"] = ["TASK-046", "TASK-047"]
+    assert need("header_agrees")("brief", header, fallback) == ["merge_unit"]
+
+
+@pytest.mark.parametrize("key", ["ceiling_above_twice", "design_rounds_above_five", "review_rounds_above_ceiling"])
+def test_r057_r2_run_parameters_an_absent_list_line_agrees_with_the_empty_list(key):
+    header = valid("run-parameters")
+    header[key] = []
+    fallback = fallback_run_parameters()
+    del fallback[key]
+    assert need("header_agrees")("run-parameters", header, fallback) == []
+    fallback[key] = None
+    assert need("header_agrees")("run-parameters", header, fallback) == []
+
+
+def test_r057_r2_a_filled_list_against_an_absent_line_disagrees_in_every_line_record():
+    agrees = need("header_agrees")
+    header = valid("run-parameters")
+    header["review_rounds_above_ceiling"] = [{"id": "TASK-001", "rounds": 4, "words": "w", "date": "2026-11-04"}]
+    fallback = fallback_run_parameters()
+    del fallback["review_rounds_above_ceiling"]
+    assert agrees("run-parameters", header, fallback) == ["review_rounds_above_ceiling"]
+    header = valid("project-status")
+    header["open_issues"] = ["ISS-001"]
+    fallback = fallback_status()
+    del fallback["open_issues"]
+    assert agrees("project-status", header, fallback) == ["open_issues"]
+
+
+def test_r057_r2_an_absent_agent_ceiling_agrees_with_null():
+    header = valid("run-parameters")
+    header["agent_ceiling"] = None
+    fallback = fallback_run_parameters()
+    del fallback["agent_ceiling"]
+    assert need("header_agrees")("run-parameters", header, fallback) == []
+
+
+def test_r057_r2_an_id_standing_on_one_side_at_the_same_position_disagrees():
+    fallback = plan_fallback()
+    fallback["stages"][0]["increments"][0]["id"] = "TASK-999"
+    assert need("header_agrees")("build-plan", plan_header(), fallback) != []
+
+
+def test_r057_r2_two_increments_in_another_order_disagree():
+    agrees = need("header_agrees")
+    other = dict(plan_header()["stages"][0]["increments"][0], id="TASK-047")
+    header = plan_header()
+    header["stages"][0]["increments"].append(other)
+    fallback = plan_fallback()
+    first = fallback["stages"][0]["increments"][0]
+    fallback["stages"][0]["increments"] = [dict(first, id="TASK-047"), first]
+    assert agrees("build-plan", header, fallback) != []
+
+
+@pytest.mark.parametrize("key,prose,value", [
+    ("scope", ["b.py"], ["a.py"]), ("kind", "group", "increment"), ("kind", None, "group"), ("satisfies", ["R-058"], ["R-057"]),
+])
+def test_r057_r2_a_merged_set_not_read_still_compares_every_field(key, prose, value):
+    got = need("header_agrees")("build-plan", plan_header(**{key: value}), plan_fallback({key: prose}, merged=None))
+    assert got == ["TASK-046 %s" % key]
+
+
+def test_r057_r2_a_merged_set_not_read_unmarked_and_without_lines_agrees():
+    assert need("header_agrees")("build-plan", historic_header(False), historic_fallback(None)) == []
+
+
+def test_r057_r2_a_merged_set_not_read_a_mark_where_a_line_stands_disagrees_on_the_mark_alone():
+    got = need("header_agrees")("build-plan", plan_header(historic=True), plan_fallback(merged=None))
+    assert got == ["TASK-046 historic"]
+
+
+# --- Review A's findings on round 1 and the supervisor's rulings on them (TASK-046-r2) ---
+# enforces: docs/DESIGN.md, "The reader", the character rule; D-005, "Notes on values"; handoff/TASK-046-r2.md.
+
+REFUSED_CHARACTERS = [
+    (0x00, "NUL"), (0x07, "BEL"), (0x09, "tab"), (0x0C, "form feed"), (0x0D, "lone CR"), (0x1F, "C0"), (0x7F, "DEL"),
+    (0x80, "C1"), (0x85, "NEL"), (0x2028, "LS"), (0x2029, "PS"), (0xD800, "surrogate"), (0xFFFE, "noncharacter"), (0xFFFF, "noncharacter"),
+]
+
+
+@pytest.mark.parametrize("code,name", REFUSED_CHARACTERS)
+def test_r057_r2_a_refused_character_is_refused_at_its_own_line_in_a_string_and_in_a_comment(code, name):
+    c = chr(code)
+    refused(head("a: 1", 'b: "x%sy"' % c), 3)
+    refused(head("a: 1", "# x%sy" % c), 3)
+    refused(head("a: 1", "b: word # x%sy" % c), 3)
+
+
+@pytest.mark.parametrize("code,name", REFUSED_CHARACTERS)
+def test_r057_r2_a_refused_character_is_left_alone_in_a_body_and_a_headerless_text(code, name):
+    c = chr(code)
+    body = "x%sy\n" % c
+    assert need("read_header")("---\na: 1\n---\n" + body) == ({"a": 1}, body)
+    assert need("read_header")(body) == (None, body)
+
+
+@pytest.mark.parametrize("line", [
+    "a: word" + chr(0xA0) + "#z", "a: " + chr(0x2003) + "word", "k" + chr(0x2003) + ": v", chr(0x3000), "a: " + chr(0xE9), chr(0xE9) + ": v",
+])
+def test_r057_r2_outside_a_string_or_a_comment_only_ascii_is_read(line):
+    refused(head(line), 2)
+
+
+@pytest.mark.parametrize("lines", [
+    ['a: "caf%s %s"' % (chr(0xE9), chr(0x2192))],
+    ["# caf%s %s" % (chr(0xE9), chr(0xA0)), "a: word"],
+    ["a: word # %s%s" % (chr(0x2003), chr(0x3000))],
+    ['a: ["caf%s", z]' % chr(0xE9)],
+    ["a:", '  - "caf%s"' % chr(0xE9)],
+])
+def test_r057_r2_other_text_stands_in_a_string_and_a_comment(lines):
+    equals_pyyaml(lines)
+
+
+@pytest.mark.parametrize("lines,line", [
+    (["a: 1", TAB, "b: 2"], 3), ([TAB + "# c", "a: 1"], 2), (["a: word" + TAB], 2), (["a: word" + TAB + "# c"], 2),
+    (["a:" + TAB + "word"], 2), (['a: "x"' + TAB + "# c"], 2),
+])
+def test_r057_r2_a_tab_anywhere_is_refused(lines, line):
+    refused(head(*lines), line)
+
+
+@pytest.mark.parametrize("name,lines,line", [
+    ("two spaces after a dash before a key", ["a:", "  -  k: 1", "    j: 2"], 3),
+    ("two spaces after a dash before a scalar", ["a:", "  -  x"], 3),
+    ("a space before a colon", ["a : 1"], 2),
+    ("a space before a list item key's colon", ["a:", "  - k : 1"], 3),
+    ("a flow list as a list item", ["a:", "  - [x, z]"], 3),
+    ("a flow list's trailing comma", ["a: [x, z,]"], 2),
+    ("a dash and a space alone", ["a:", "  - "], 3),
+    ("a dash alone", ["a:", "  -"], 3),
+    ("no space between a colon and a comment", ["a:#x"], 2),
+])
+def test_r057_r2_a_form_the_subset_does_not_state_is_refused(name, lines, line):
+    refused(head(*lines), line)
+
+
+@pytest.mark.parametrize("item", ["'x: y'", "2026-11-04T10:00", "1:30", "b:c", "'word'", "yes"])
+def test_r057_r2_a_list_item_refused_as_a_scalar_carries_the_advice(item):
+    error = refused(head("a:", "  - " + item), 3)
+    assert "quote" in str(error).lower(), "no advice to quote: %s" % error
+
+
+def test_r057_r2_the_block_bound_is_exact():
+    read = need("read_header")
+    assert read("---\n# " + "x" * 262141 + "\n---\n")[0] == {}
+    refused("---\n# " + "x" * 262142 + "\n---\n")
+
+
+@pytest.mark.parametrize("opening,character,closing", [
+    ('a: "', "{", '"'), ('a: "', "[", '"'), ('a: "', "*", '"'), ("# ", "{", ""), ("a: ", "{", ""),
+])
+def test_r057_r2_a_block_under_the_bound_is_read_in_linear_time(opening, character, closing):
+    read, error, start = need("read_header"), need("HeaderError"), time.perf_counter()
+    try:
+        read("---\n" + opening + character * 262000 + closing + "\n---\n")
+    except error:
+        pass
+    assert time.perf_counter() - start < 5, "read_header took over five seconds on a block under its bound"
+
+
+@pytest.mark.parametrize("value", [b"---\na: 1\n---\n", None, 3])
+def test_r057_r2_a_value_that_is_not_a_string_is_a_callers_mistake(value):
+    with pytest.raises(TypeError):
+        need("read_header")(value)
+
+
+def test_r057_r2_the_filler_reads_as_an_absent_line_only_for_the_three_keys():
+    agrees = need("header_agrees")
+    assert agrees("build-plan", plan_header(scope=[]), plan_fallback({"scope": "none"})) == ["TASK-046 scope"]
+    assert agrees("build-plan", plan_header(satisfies=[]), plan_fallback({"satisfies": "None"})) == ["TASK-046 satisfies"]
+
+
+def test_r057_r2_an_inventory_section_that_is_none_is_absent():
+    fallback = fallback_inventory()
+    fallback["sections"]["deferred"] = None
+    assert need("header_agrees")("inventory", valid("inventory"), fallback) == ["tables.deferred"]
+
+
+@pytest.mark.parametrize("kind,key,reader", [
+    ("project-status", "stage", fallback_status), ("project-status", "bridge_version", fallback_status),
+    ("run-parameters", "stage_pause", fallback_run_parameters), ("run-parameters", "merge_authority", fallback_run_parameters),
+    ("run-parameters", "refactoring_pass", fallback_run_parameters), ("run-parameters", "installer_verification", fallback_run_parameters),
+    ("run-parameters", "parallel_increments", fallback_run_parameters), ("inventory", "development_data", fallback_inventory),
+])
+def test_r057_r2_a_never_null_strings_absent_line_is_the_empty_string(kind, key, reader):
+    agrees = need("header_agrees")
+    header = valid(kind)
+    header[key] = ""
+    assert need("check_header")(kind, header) == []
+    fallback = reader()
+    del fallback[key]
+    assert agrees(kind, header, fallback) == []
+    fallback[key] = None
+    assert agrees(kind, header, fallback) == []
+    assert agrees(kind, valid(kind), fallback) == [key]
+
+
+@pytest.mark.parametrize("prose", ["-", "   ", " - ", "<none>", " <nothing> "])
+def test_r057_r2_the_loop_guards_no_wait_forms_agree_with_the_empty_string(prose):
+    fallback = fallback_status()
+    fallback["awaiting_user_on"] = prose
+    assert need("header_agrees")("project-status", valid("project-status"), fallback) == []
+
+
+def test_r057_r2_angle_brackets_are_stripped_at_the_ends_only():
+    fallback = fallback_status()
+    fallback["awaiting_user_on"] = "no<ne of it"
+    assert need("header_agrees")("project-status", valid("project-status"), fallback) == ["awaiting_user_on"]
+
+
+@pytest.mark.parametrize("prose,value", [("Group", "group"), (" group ", "group"), ("", "increment"), ("   ", "increment")])
+def test_r057_r2_kind_read_as_the_plan_check_reads_it(prose, value):
+    assert need("header_agrees")("build-plan", plan_header(kind=value), plan_fallback({"kind": prose})) == []
+
+
+def two_stage_plan():
+    header, fallback = plan_header(), plan_fallback()
+    second = dict(header["stages"][0]["increments"][0], id="TASK-047", title="Second")
+    header["stages"].append({"name": "Later", "demonstration": True, "increments": [second]})
+    fallback["stages"].append({
+        "name": "Later", "demonstration": "shown", "increments": [{"id": "TASK-047", "title": "Second", "fields": {"scope": ["a.py"], "satisfies": ["R-057"]}}],
+    })
+    return header, fallback
+
+
+def test_r057_r2_an_extra_increment_masks_nothing_else():
+    header, fallback = two_stage_plan()
+    fallback["stages"][0]["increments"][0]["title"] = "Changed"
+    fallback["stages"][0]["increments"].append({"id": "TASK-099", "title": "x", "fields": {}})
+    fallback["stages"][1]["increments"][0]["title"] = "Changed too"
+    got = need("header_agrees")("build-plan", header, fallback)
+    assert "TASK-046 title" in got and "TASK-047 title" in got and len(got) == 3
+
+
+def test_r057_r2_an_extra_stage_masks_nothing_else():
+    header, fallback = two_stage_plan()
+    fallback["stages"][0]["increments"][0]["title"] = "Changed"
+    fallback["stages"].append({"name": "Third", "demonstration": None, "increments": []})
+    got = need("header_agrees")("build-plan", header, fallback)
+    assert "TASK-046 title" in got and len(got) == 2
+
+
+def test_r057_r2_run_parameters_compare_every_key_of_the_schema():
+    fallback = fallback_run_parameters()
+    got = need("header_agrees")("run-parameters", {"record": "run-parameters", "header": 1}, fallback)
+    assert set(got) == {k for k, v in fallback.items() if v not in (None, "", [])}
+
+
+def test_r057_r2_inventory_compares_every_section_of_either_side():
+    agrees = need("header_agrees")
+    header = valid("inventory")
+    header["tables"] = {}
+    assert sorted(agrees("inventory", header, fallback_inventory())) == ["tables.decisions", "tables.deferred", "tables.features", "tables.resources"]
+    fallback = fallback_inventory()
+    fallback["sections"]["surplus"] = ["A"]
+    assert agrees("inventory", valid("inventory"), fallback) == ["tables.surplus"]
+
+
+def test_r057_r2_two_sections_differing_give_columns_once():
+    fallback = fallback_inventory()
+    fallback["sections"]["features"] = ["Other"]
+    fallback["sections"]["resources"] = ["Other"]
+    assert need("header_agrees")("inventory", valid("inventory"), fallback) == ["columns"]
+
+
+def test_r057_r2_statuses_in_another_order_are_no_finding():
+    header = valid("requirements")
+    header["statuses"] = ["dropped", "planned", "built", "deferred"]
+    assert need("check_header")("requirements", header) == []
+
+
+@pytest.mark.parametrize("statuses", [
+    ["planned", "built", "deferred", "planned"],
+    ["planned", "built", "deferred", {"a": 1}],
+    ["planned", "built", "deferred", ["dropped"]],
+    ["planned", "built", "deferred", None],
+])
+def test_r057_r2_statuses_with_a_repeat_or_a_nested_item_are_a_finding_and_no_exception(statuses):
+    header = valid("requirements")
+    header["statuses"] = statuses
+    assert need("check_header")("requirements", header) != []
+
+
+@pytest.mark.parametrize("kind", [("a", "b"), ("a",), None, 3, ""])
+def test_r057_r2_a_kind_with_no_table_is_a_finding_whatever_it_is(kind):
+    assert need("check_header")(kind, {}) != []
+
+
+@pytest.mark.parametrize("key", ["record", "statuses", "roles", "columns"])
+def test_r057_r2_a_missing_key_is_one_finding(key):
+    header = valid("requirements")
+    del header[key]
+    got = need("check_header")("requirements", header)
+    assert len(got) == 1 and key in got[0], got
+
+
+def test_r057_r2_a_null_is_a_wrong_type_never_a_missing_key():
+    header = valid("brief")
+    header["scope"] = None
+    got = need("check_header")("brief", header)
+    assert len(got) == 1 and "scope" in got[0] and "missing" not in got[0], got
+
+
+def test_r057_r2_a_value_outside_its_set_says_so():
+    header = valid("project-status")
+    header["phase"] = "elsewhere"
+    got = need("check_header")("project-status", header)
+    assert len(got) == 1 and "phase" in got[0] and "set" in got[0], got
+
+
+def test_r057_r2_a_wrong_record_is_one_finding():
+    header = valid("brief")
+    header["record"] = "inventory"
+    got = need("check_header")("brief", header)
+    assert len(got) == 1 and "record" in got[0], got
 
 
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---

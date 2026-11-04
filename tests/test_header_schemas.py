@@ -105,6 +105,14 @@ def test_r057_d005_every_key_and_type_equals_the_diagram(table):
         assert norm(got[key]) == norm(want[key]), "%s.%s: %r in HEADER_SCHEMAS, %r in D-005" % (table, key, got[key], want[key])
 
 
+@pytest.mark.parametrize("table", sorted(
+    list(KINDS) + ["WorkflowPart", "Stage", "Increment", "InventoryTables", "TableShape", "RequirementsRoles",
+                   "DiagramIndexRoles", "DeviationsRoles", "CeilingLift", "DesignLift", "ReviewLift"]))
+def test_r057_r2_every_tables_keys_stand_in_the_diagrams_order(table):
+    """TASK-051 writes a header's keys in the schema's order (handoff/TASK-046.md, Requirement 11)."""
+    assert list(schemas()[table]) == list(expected_tables()[table])
+
+
 @pytest.mark.parametrize("kind", KINDS)
 def test_r057_every_kind_opens_with_record_and_header(kind):
     keys = list(schemas()[kind])
