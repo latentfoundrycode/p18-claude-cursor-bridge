@@ -1523,7 +1523,7 @@ def test_r057_r3_the_empty_string_still_reads(lines):
 
 
 @pytest.mark.parametrize("key,value", [
-    ("header", 2), ("header", "1"), ("header", None), ("header", [1]), ("record", 3), ("record", None), ("record", "brief"), ("record", "bogus"),
+    ("header", 2), ("header", "1"), ("header", None), ("header", [1]), ("header", True), ("record", 3), ("record", None), ("record", "brief"), ("record", "bogus"),
 ])
 def test_r057_r3_a_wrong_record_or_header_value_is_one_finding(key, value):
     header = valid("requirements")
@@ -1717,6 +1717,22 @@ def test_r057_r3_many_roles_and_columns_are_checked_in_about_linear_time():
     assert time.perf_counter() - started < 2.0
 
 
+def test_r057_r3_valid_roles_over_many_columns_are_compared_in_about_linear_time():
+    """enforces: handoff/TASK-046-r3.md Requirement 10 (roles and columns compared as sets, not pair by pair).
+
+    Review A's read of round 3: the test above stops at the first unknown role, so the column comparison
+    never ran at scale. Here every role is valid and names a column at the end of a long header row."""
+    columns = ["c%d" % i for i in range(20000)] + ["ID", "Status", "Evidence"]
+    header = valid("requirements")
+    header["columns"] = list(columns)
+    started = time.perf_counter()
+    assert need("check_header")("requirements", header) == []
+    assert need("header_agrees")("requirements", header, {"header_row": list(columns)}) == []
+    header["roles"] = dict(header["roles"], status="absent")
+    assert need("check_header")("requirements", header) != []
+    assert time.perf_counter() - started < 2.0
+
+
 @pytest.mark.parametrize("key,value", [("parallel", False), ("parent", None), ("deferred", None), ("depends_on", []), ("diagrams", [])])
 def test_r057_r3_a_blank_field_line_reads_as_an_absent_line(key, value):
     """The ruling on Review A's S2: plan-check.py's FIELD_RX gives "" for a blank line, and its `or` defaults read that as absent."""
@@ -1839,7 +1855,7 @@ def test_r057_r3_a_marker_that_opens_a_value_is_named_by_what_it_is(line, word):
 
 
 @pytest.mark.parametrize("character", [chr(0xE9), chr(0xA0), chr(0x2003)], ids=["e-acute", "no-break-space", "em-space"])
-@pytest.mark.parametrize("line", ["a: %s", "%s: 1", "a: [%s]", "z:\n  - %s"], ids=["value", "key", "flow-item", "list-item"])
+@pytest.mark.parametrize("line", ["a: %s", "%s: 1", "a: [%s]", "z:\n  - %s", "a: b#%s"], ids=["value", "key", "flow-item", "list-item", "after-a-glued-hash"])
 def test_r057_r3_non_ascii_outside_a_string_is_named_at_its_line_before_an_earlier_structural_fault(character, line):
     """enforces: docs/DESIGN.md, "The reader": the character rule runs over the whole block before the parse."""
     lines = (line % character).split("\n")
