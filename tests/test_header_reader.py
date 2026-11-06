@@ -1797,6 +1797,78 @@ def test_r057_r3_a_stage_or_an_increment_on_the_header_side_only_is_said():
     assert agrees("build-plan", header, fallback) == ["TASK-047 id"]
 
 
+# --- the items of round 3's Assumed list, each settled by a test ---
+
+
+def test_r057_r3_assumed_a_merge_unit_read_as_a_list_compares_like_the_tuple():
+    """Round 3's report assumed this without a test: the same order agrees, another disagrees."""
+    agrees = need("header_agrees")
+    header = valid("brief")
+    header["merge_unit"] = ["TASK-046", "TASK-047"]
+    assert agrees("brief", header, dict(fallback_brief(), merge_unit=["TASK-046", "TASK-047"])) == []
+    assert agrees("brief", header, dict(fallback_brief(), merge_unit=["TASK-047", "TASK-046"])) == ["merge_unit"]
+    assert agrees("brief", header, dict(fallback_brief(), merge_unit=["TASK-046"])) == ["merge_unit"]
+
+
+@pytest.mark.parametrize("opening", ["\n", "\r\n"], ids=["opening-LF", "opening-CRLF"])
+@pytest.mark.parametrize("closing", ["\n", "\r\n"], ids=["closing-LF", "closing-CRLF"])
+def test_r057_r3_assumed_an_empty_block_reads_in_every_line_ending(opening, closing):
+    """Round 3's report assumed this without a test: `---` straight after the opening line.
+    The closing line at the very end of the text, with no line ending, is refused for an empty block
+    alone; a text holding only an empty header fails its schema anyway (docs/HARDENING.md, TASK-046)."""
+    body = "body\r\nmore\n"
+    assert need("read_header")("---" + opening + "---" + closing + body) == ({}, body)
+    assert need("read_header")(chr(0xFEFF) + "---" + opening + "---" + closing + body) == ({}, body)
+
+
+@pytest.mark.parametrize("text", ["---\r\n---x\r\n", "---\n---\rbody\n", "---\n--- \n", "---\n"])
+def test_r057_r3_assumed_a_line_that_only_starts_like_the_close_does_not_close_an_empty_block(text):
+    refused(text)
+
+
+# --- what the mutation sweep of round 3 showed untested ---
+
+
+@pytest.mark.parametrize("line,word", [
+    ("a: &x 1", "anchor"), ("a: *x", "alias"), ("a: !!str x", "tag"), ("a: |", "block scalar"), ("a: >", "block scalar"),
+    ("a: [[x]]", "flow list"), ('"a": 1', "quoted key"),
+])
+def test_r057_r3_a_marker_that_opens_a_value_is_named_by_what_it_is(line, word):
+    """enforces: docs/DESIGN.md, "The reader"; the words kept for a marker that opens a value."""
+    assert word in str(refused(head(line), 2)).lower()
+
+
+@pytest.mark.parametrize("character", [chr(0xE9), chr(0xA0), chr(0x2003)], ids=["e-acute", "no-break-space", "em-space"])
+@pytest.mark.parametrize("line", ["a: %s", "%s: 1", "a: [%s]", "z:\n  - %s"], ids=["value", "key", "flow-item", "list-item"])
+def test_r057_r3_non_ascii_outside_a_string_is_named_at_its_line_before_an_earlier_structural_fault(character, line):
+    """enforces: docs/DESIGN.md, "The reader": the character rule runs over the whole block before the parse."""
+    lines = (line % character).split("\n")
+    refused(head("not a key line", *lines), 2 + len(lines))
+
+
+@pytest.mark.parametrize("code,name", [(0x09, "tab"), (0x2028, "LS"), (0x85, "NEL"), (0xFFFE, "FFFE"), (0xD800, "surrogate")])
+def test_r057_r3_a_backslash_in_a_string_skips_no_refused_character_before_an_earlier_structural_fault(code, name):
+    """enforces: docs/DESIGN.md, "The reader": a backslash never skips a refused character."""
+    refused(head("not a key line", 'a: "x' + BACKSLASH + chr(code) + 'y"'), 3)
+
+
+@pytest.mark.parametrize("item", [1, "word", True, None, ["x"]], ids=["integer", "string", "boolean", "null", "list"])
+def test_r057_r3_a_list_of_mappings_holding_something_else_is_one_wrong_type(item):
+    """enforces: D-005, a list of a class holds that class."""
+    header = valid("project-status")
+    header["workflows"] = [item]
+    assert need("check_header")("project-status", header) == ["wrong type for workflows"]
+
+
+@pytest.mark.parametrize("value", [["x"], {"k": "x"}, 5, None, True], ids=["list", "mapping", "integer", "null", "boolean"])
+def test_r057_r3_a_role_naming_no_string_is_one_finding_and_raises_nothing(value):
+    """Requirement 10 of round 3: a non-string role is one finding, of any shape."""
+    header = valid("requirements")
+    role = sorted(header["roles"])[0]
+    header["roles"][role] = value
+    assert need("check_header")("requirements", header) == ["role %s" % role]
+
+
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---
 
 
@@ -1812,7 +1884,7 @@ def test_r057_mixed_list_mapping_depth_eight_reads_nine_refused():
         lines.append("%sinner:" % indent)
         indent += "  "
     lines.append("%s- word" % indent)
-    assert need("read_header")(head(*lines))[0] is not None
+    equals_pyyaml(lines)
     lines[-1] = "%s- leaf: word" % indent
     refused(head(*lines), 7)
 
@@ -1830,8 +1902,10 @@ def test_r057_a_lone_surrogate_in_the_block_is_a_header_error():
     refused(head("a: 1", 'b: "x%sy"' % chr(0xD800)), 3)
 
 
-def test_r057_a_form_feed_inside_a_quoted_string_is_refused_at_its_line():
+def test_r057_a_form_feed_inside_a_quoted_string_is_refused_at_its_line_and_stands_untouched_in_a_body():
     refused(head('a: "a' + chr(0x0C) + 'b"'), 2)
+    body = "x" + chr(0x0C) + "y\n"
+    assert need("read_header")("---\na: 1\n---\n" + body) == ({"a": 1}, body)
 
 
 def test_r057_header_error_line_on_crlf():
