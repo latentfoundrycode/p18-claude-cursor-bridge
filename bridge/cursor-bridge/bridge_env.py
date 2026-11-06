@@ -1184,12 +1184,6 @@ def _header_refuse(line, msg):
     raise HeaderError(line, "line %d: %s" % (line, msg))
 
 
-def _strip_bom(text):
-    if text.startswith("\ufeff"):
-        return text[1:], True
-    return text, False
-
-
 def _line_end_len(text, pos):
     if pos < len(text) and text[pos] == "\r":
         if pos + 1 < len(text) and text[pos + 1] == "\n":
@@ -1219,33 +1213,35 @@ def _split_physical_lines(text):
     return out
 
 
-def _first_line_exact(text, marker):
-    lines = _split_physical_lines(text)
-    if not lines:
-        return False
-    return lines[0][1] == marker
+_CLOSE_BLOCK = re.compile(r"(?:\r\n|\n)---(?:\r\n|\n|$)")
 
 
 def _find_block(text):
     """Return (block_text, body, block_start_line) or (None, whole, None)."""
     whole = text
-    text, _bom = _strip_bom(text)
-    if not _first_line_exact(text, "---"):
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    if len(text) < 3 or text[:3] != "---":
         return None, whole, None
-    lines = _split_physical_lines(text)
-    if not lines or lines[0][1] != "---":
-        return None, text, None
-    start_line = lines[0][0]
-    i = 1
-    while i < len(lines):
-        if lines[i][1] == "---":
-            block_parts = [lines[j][2] for j in range(1, i)]
-            block = "".join(block_parts)
-            body_parts = [lines[j][2] for j in range(i + 1, len(lines))]
-            body = "".join(body_parts)
-            return block, body, start_line
-        i += 1
-    _header_refuse(lines[-1][0], "unterminated header block")
+    el0 = _line_end_len(text, 3)
+    if len(text) > 3 and not el0:
+        return None, whole, None
+    base_line = 1
+    start = 3 + el0
+    if text.startswith("---", start):
+        el1 = _line_end_len(text, start + 3)
+        if el1:
+            block = ""
+            body = text[start + 3 + el1:]
+            return block, body, base_line
+    close_m = _CLOSE_BLOCK.search(text, start)
+    if not close_m:
+        _header_refuse(base_line, "unterminated header block")
+    prefix = close_m.group(0)
+    cut = close_m.start() + prefix.index("---")
+    block = text[start:cut]
+    body = text[close_m.end():]
+    return block, body, base_line
 
 
 def _is_refused_char(c, in_string_or_comment=False):
@@ -1269,60 +1265,71 @@ def _is_refused_char(c, in_string_or_comment=False):
     return False
 
 
-def _scan_block_characters(block, first_line):
-    line = first_line
-    i, n = 0, len(block)
+def _scan_line_characters(raw, line_no):
     in_str = in_comment = False
-    while i < n:
-        c = block[i]
+    j, n = 0, len(raw)
+    while j < n:
+        c = raw[j]
         if in_comment:
-            if c == "\n":
-                in_comment = False
-                line += 1
-                i += 1
-                continue
             if _is_refused_char(c, True):
-                _header_refuse(line, "refused character")
-            i += 1
+                _header_refuse(line_no, "refused character")
+            j += 1
             continue
         if in_str:
-            if c == "\\" and i + 1 < n:
-                i += 2
+            if c == "\\":
+                if j + 1 < n and _is_refused_char(raw[j + 1], True):
+                    _header_refuse(line_no, "refused character")
+                j += 2
                 continue
             if c == '"':
-                if i + 1 < n and block[i + 1] == '"':
-                    i += 2
-                    continue
+                if j + 1 < n and raw[j + 1] == '"':
+                    _header_refuse(line_no, "plain scalar; double-quote it")
                 in_str = False
-                i += 1
+                j += 1
                 continue
-            if c == "\n":
-                line += 1
-            elif _is_refused_char(c, True):
-                _header_refuse(line, "refused character")
-            i += 1
+            if _is_refused_char(c, True):
+                _header_refuse(line_no, "refused character")
+            j += 1
             continue
         if c == '"':
             in_str = True
-            i += 1
+            j += 1
             continue
-        if c == "#" and (i == 0 or block[i - 1] == " "):
+        if c == "#" and (j == 0 or raw[j - 1] == " "):
             in_comment = True
-            i += 1
+            j += 1
             continue
         if c == "\r":
-            if i + 1 < n and block[i + 1] == "\n":
-                line += 1
-                i += 2
+            if j + 1 < n and raw[j + 1] == "\n":
+                j += 2
                 continue
-            _header_refuse(line, "lone carriage return")
-        if c == "\n":
-            line += 1
-            i += 1
-            continue
+            _header_refuse(line_no, "lone carriage return")
         if _is_refused_char(c, False):
-            _header_refuse(line, "refused character")
+            _header_refuse(line_no, "refused character")
+        j += 1
+
+
+def _scan_block_characters(block, first_line):
+    for line_no, content, _end in _split_physical_lines(block):
+        _scan_line_characters(content, first_line + line_no - 1)
+
+
+def _dq_end_in_line(raw, start, line_no):
+    i = start + 1
+    n = len(raw)
+    while i < n:
+        c = raw[i]
+        if c == "\\":
+            if i + 1 >= n:
+                _header_refuse(line_no, "unterminated quoted string")
+            i += 2
+            continue
+        if c == '"':
+            if i + 1 < n and raw[i + 1] == '"':
+                _header_refuse(line_no, "plain scalar; double-quote it")
+            return i + 1
         i += 1
+    _header_refuse(line_no, "unterminated quoted string")
 
 
 def _split_line_parts(raw, line_no):
@@ -1332,19 +1339,21 @@ def _split_line_parts(raw, line_no):
     if i < n and raw[i] == "\t":
         _header_refuse(line_no, "tab")
     indent = i
+    code_start = i
     in_str = False
     code_end = n
     j = i
     while j < n:
         c = raw[j]
         if in_str:
-            if c == "\\" and j + 1 < n:
+            if c == "\\":
+                if j + 1 >= n:
+                    _header_refuse(line_no, "unterminated quoted string")
                 j += 2
                 continue
             if c == '"':
                 if j + 1 < n and raw[j + 1] == '"':
-                    j += 2
-                    continue
+                    _header_refuse(line_no, "plain scalar; double-quote it")
                 in_str = False
                 j += 1
                 continue
@@ -1354,49 +1363,35 @@ def _split_line_parts(raw, line_no):
             in_str = True
             j += 1
             continue
-        if c == "#" and (j == i or raw[j - 1] == " "):
+        if c == "#" and (j == code_start or raw[j - 1] == " "):
             code_end = j
-            while code_end > i and raw[code_end - 1] == " ":
+            while code_end > code_start and raw[code_end - 1] == " ":
                 code_end -= 1
             break
         j += 1
-    return indent, raw[i:code_end]
+    if in_str:
+        _header_refuse(line_no, "unterminated quoted string")
+    return indent, raw[code_start:code_end]
 
 
-def _code_outside_quotes(code):
+def _code_outside_quotes(code, line_no):
     out, i, n = [], 0, len(code)
-    in_str = False
     while i < n:
-        c = code[i]
-        if in_str:
-            if c == "\\" and i + 1 < n:
-                i += 2
-                continue
-            if c == '"':
-                if i + 1 < n and code[i + 1] == '"':
-                    i += 2
-                    continue
-                in_str = False
-                i += 1
-                continue
-            i += 1
+        if code[i] == '"':
+            i = _dq_end_in_line(code, i, line_no)
             continue
-        if c == '"':
-            in_str = True
-            i += 1
-            continue
-        out.append(c)
+        out.append(code[i])
         i += 1
     return "".join(out)
 
 
 def _structural_guards(code, line_no):
-    bare = _code_outside_quotes(code)
-    if re.search(r"&\w", bare):
+    bare = _code_outside_quotes(code, line_no)
+    if re.search(r"(^|\s)&\w", bare):
         _header_refuse(line_no, "anchor not allowed")
     if re.search(r"(^|\s)\*\w+", bare):
         _header_refuse(line_no, "alias not allowed")
-    if "!!" in bare:
+    if re.search(r"(^|\s)!!", bare):
         _header_refuse(line_no, "tag not allowed")
     if "{" in bare:
         ib = bare.index("{")
@@ -1410,6 +1405,8 @@ def _structural_guards(code, line_no):
 
 
 def _valid_key(name):
+    if len(name) > 1024:
+        return False
     if not re.fullmatch(r"[a-z][a-z0-9_]*", name or ""):
         return False
     if name.lower() in _PLAIN_TYPED_WORDS:
@@ -1425,10 +1422,6 @@ def _parse_double_quoted(s, line):
     while i < len(s):
         c = s[i]
         if c == '"':
-            if i + 1 < len(s) and s[i + 1] == '"':
-                if i + 2 >= len(s):
-                    return "".join(out)
-                _header_refuse(line, "plain scalar; double-quote it")
             if i + 1 != len(s):
                 _header_refuse(line, "text after closing quote")
             return "".join(out)
@@ -1451,10 +1444,10 @@ def _parse_double_quoted(s, line):
 
 
 def _parse_flow_list(rest, line):
-    rest = rest.strip()
+    rest = rest.strip(" ")
     if not rest.startswith("[") or not rest.endswith("]"):
         _header_refuse(line, "bad flow list")
-    inner = rest[1:-1].strip()
+    inner = rest[1:-1].strip(" ")
     if not inner:
         return []
     items = []
@@ -1468,28 +1461,15 @@ def _parse_flow_list(rest, line):
         if inner[i] == ",":
             _header_refuse(line, "bad flow list")
         if inner[i] == '"':
-            j = i + 1
-            while j < n:
-                if inner[j] == "\\":
-                    j += 2
-                    continue
-                if inner[j] == '"':
-                    if j + 1 < n and inner[j + 1] == '"':
-                        j += 2
-                        continue
-                    j += 1
-                    break
-                j += 1
-            else:
-                _header_refuse(line, "bad flow list")
-            token = inner[i:j]
+            end = _dq_end_in_line(inner, i, line)
+            token = inner[i:end]
             items.append(_parse_double_quoted(token, line))
-            i = j
+            i = end
         else:
             j = i
             while j < n and inner[j] != ",":
                 j += 1
-            token = inner[i:j].strip()
+            token = inner[i:j].strip(" ")
             items.append(_parse_scalar_token(token, line, flow_item=True))
             i = j
         while i < n and inner[i] == " ":
@@ -1498,7 +1478,7 @@ def _parse_flow_list(rest, line):
             if inner[i] != ",":
                 _header_refuse(line, "bad flow list")
             i += 1
-    if inner.rstrip().endswith(","):
+    if inner.rstrip(" ").endswith(","):
         _header_refuse(line, "bad flow list")
     return items
 
@@ -1506,6 +1486,8 @@ def _parse_flow_list(rest, line):
 def _parse_scalar_token(token, line, flow_item=False):
     if token == "":
         return None
+    if token == '""':
+        return ""
     if token == "true":
         return True
     if token == "false":
@@ -1524,16 +1506,14 @@ def _parse_scalar_token(token, line, flow_item=False):
         except ValueError:
             _header_refuse(line, "integer value too large")
     if _PLAIN_WORD_RE.fullmatch(token):
-        if flow_item and token.lower() in _PLAIN_TYPED_WORDS:
-            _header_refuse(line, "plain scalar; double-quote it")
-        if not flow_item and token.lower() in _PLAIN_TYPED_WORDS:
+        if token.lower() in _PLAIN_TYPED_WORDS:
             _header_refuse(line, "plain scalar; double-quote it")
         return token
     _header_refuse(line, "plain scalar; double-quote it")
 
 
 def _parse_scalar_value(rest, line):
-    rest = rest.strip()
+    rest = rest.strip(" ")
     if rest == "":
         return None
     if rest.startswith('"'):
@@ -1542,10 +1522,10 @@ def _parse_scalar_value(rest, line):
         _header_refuse(line, "single-quoted scalar; double-quote it")
     if rest.startswith("[") and rest.endswith("]"):
         return _parse_flow_list(rest, line)
-    if rest.startswith("[") and not rest.endswith("]"):
-        _header_refuse(line, "multi-line flow list not allowed")
+    if rest.startswith("["):
+        _header_refuse(line, "bad flow list")
     if " " in rest:
-        _header_refuse(line, "multi-line plain scalar; double-quote it")
+        _header_refuse(line, "plain scalar; double-quote it")
     return _parse_scalar_token(rest, line)
 
 
@@ -1559,45 +1539,25 @@ class _ParseFrame:
         self.keys = set() if kind == "map" else None
 
 
-def _find_colon(code):
-    in_str = False
-    i = 0
-    while i < len(code):
-        c = code[i]
-        if in_str:
-            if c == "\\" and i + 1 < len(code):
-                i += 2
-                continue
-            if c == '"':
-                if i + 1 < len(code) and code[i + 1] == '"':
-                    i += 2
-                    continue
-                in_str = False
-                i += 1
-                continue
-            i += 1
+def _find_colon(code, line_no):
+    i, n = 0, len(code)
+    while i < n:
+        if code[i] == '"':
+            i = _dq_end_in_line(code, i, line_no)
             continue
-        if c == '"':
-            in_str = True
-            i += 1
-            continue
-        if c == ":":
+        if code[i] == ":":
             return i
         i += 1
     return -1
-
-
-def _line_col_for_frame(frame):
-    return frame.content_col
 
 
 class _HeaderParser:
     def __init__(self, block, base_line):
         self.base_line = base_line
         first_content_line = base_line + 1
-        _scan_block_characters(block, first_content_line)
         if len(block.encode("utf-8", "surrogatepass")) > _HEADER_BYTE_BOUND:
-            _header_refuse(base_line + 1, "header block over byte bound")
+            _header_refuse(first_content_line, "header block over byte bound")
+        _scan_block_characters(block, first_content_line)
         self.lines = []
         for line_no, content, _end in _split_physical_lines(block):
             self.lines.append((base_line + line_no, content))
@@ -1636,7 +1596,7 @@ class _HeaderParser:
             if rest.startswith("[") or rest.startswith("'"):
                 self._refuse("plain scalar; double-quote it")
             code = rest
-        ci = _find_colon(code)
+        ci = _find_colon(code, line_no)
         if ci < 0:
             if allow_list_item:
                 try:
@@ -1647,6 +1607,8 @@ class _HeaderParser:
         key = code[:ci]
         after = code[ci + 1:]
         if " " in key or (key and key[-1] == " "):
+            if allow_list_item:
+                self._refuse("plain scalar; double-quote it")
             self._refuse("bad key")
         if key.startswith('"') or key.startswith("'"):
             self._refuse("quoted key not allowed")
@@ -1665,10 +1627,10 @@ class _HeaderParser:
         while self.i < len(self.lines):
             line_no, raw = self.lines[self.i]
             indent, code = _split_line_parts(raw, line_no)
-            if not code.strip():
+            if not code.strip(" "):
                 self.i += 1
                 continue
-            need_col = _line_col_for_frame(stack[-1])
+            need_col = stack[-1].content_col
             if indent < need_col:
                 return
             if indent != need_col:
@@ -1678,46 +1640,19 @@ class _HeaderParser:
             if frame.kind == "list":
                 parsed = self._parse_key_value(code, line_no, allow_list_item=True)
                 if parsed[0] is None:
-                    val = parsed[1]
-                    frame.obj.append(val)
+                    frame.obj.append(parsed[1])
                     self.i += 1
                     continue
                 key, val = parsed
                 mapping = {}
-                self._enter_depth()
                 frame.obj.append(mapping)
-                child = _ParseFrame("map", mapping, indent + 2)
-                stack.append(child)
-                if val.strip() == "":
-                    mapping[key] = None
-                    child.keys.add(key)
-                    self.i += 1
-                    if self.i < len(self.lines):
-                        nxt_ind, nxt_code = _split_line_parts(self.lines[self.i][1], self.lines[self.i][0])
-                        if nxt_code.strip() and nxt_ind >= indent + 4:
-                            if nxt_code.startswith("- "):
-                                lst = []
-                                mapping[key] = lst
-                                self._enter_depth()
-                                stack.append(_ParseFrame("list", lst, nxt_ind))
-                                self._parse_children(stack)
-                                stack.pop()
-                                self._leave_depth()
-                            else:
-                                nested = {}
-                                mapping[key] = nested
-                                self._enter_depth()
-                                stack.append(_ParseFrame("map", nested, indent + 4))
-                                self._parse_children(stack)
-                                stack.pop()
-                                self._leave_depth()
-                        else:
-                            self._parse_children(stack)
-                else:
-                    mapping[key] = _parse_scalar_value(val, line_no)
-                    child.keys.add(key)
-                    self.i += 1
-                    self._parse_children(stack)
+                self._enter_depth()
+                stack.append(_ParseFrame("map", mapping, indent + 2))
+                if key in stack[-1].keys:
+                    self._refuse("duplicate key")
+                stack[-1].keys.add(key)
+                self._store_map_key(stack, indent + 2, key, val, line_no)
+                self._parse_children(stack)
                 stack.pop()
                 self._leave_depth()
                 continue
@@ -1725,41 +1660,45 @@ class _HeaderParser:
             if key in frame.keys:
                 self._refuse("duplicate key")
             frame.keys.add(key)
-            if val.strip() == "":
-                self.i += 1
-                frame.obj[key] = None
-                child_opened = False
-                while self.i < len(self.lines):
-                    nxt_ind, nxt_code = _split_line_parts(self.lines[self.i][1], self.lines[self.i][0])
-                    if not nxt_code.strip():
-                        self.i += 1
-                        continue
-                    if nxt_ind < indent + 2:
-                        break
-                    if not child_opened:
-                        if nxt_code.startswith("- "):
-                            lst = []
-                            frame.obj[key] = lst
-                            self._enter_depth()
-                            stack.append(_ParseFrame("list", lst, indent + 2))
-                            child_opened = True
-                        else:
-                            child = {}
-                            frame.obj[key] = child
-                            self._enter_depth()
-                            stack.append(_ParseFrame("map", child, indent + 2))
-                            child_opened = True
-                    break
-                if child_opened:
-                    self._parse_children(stack)
-                    stack.pop()
-                    self._leave_depth()
-            else:
-                if val.strip().startswith("[") and not val.strip().endswith("]"):
-                    self._refuse("multi-line flow list not allowed")
-                frame.obj[key] = _parse_scalar_value(val, line_no)
-                self.i += 1
+            self._store_map_key(stack, indent, key, val, line_no)
         return
+
+    def _store_map_key(self, stack, indent, key, val, line_no):
+        frame = stack[-1]
+        if val.strip(" ") == "":
+            self.i += 1
+            frame.obj[key] = None
+            child_opened = False
+            while self.i < len(self.lines):
+                nxt_ind, nxt_code = _split_line_parts(self.lines[self.i][1], self.lines[self.i][0])
+                if not nxt_code.strip(" "):
+                    self.i += 1
+                    continue
+                if nxt_ind < indent + 2:
+                    break
+                if not child_opened:
+                    if nxt_code.startswith("- "):
+                        lst = []
+                        frame.obj[key] = lst
+                        self._enter_depth()
+                        stack.append(_ParseFrame("list", lst, indent + 2))
+                        child_opened = True
+                    else:
+                        child = {}
+                        frame.obj[key] = child
+                        self._enter_depth()
+                        stack.append(_ParseFrame("map", child, indent + 2))
+                        child_opened = True
+                break
+            if child_opened:
+                self._parse_children(stack)
+                stack.pop()
+                self._leave_depth()
+        else:
+            if val.strip(" ").startswith("[") and not val.strip(" ").endswith("]"):
+                self._refuse("bad flow list")
+            frame.obj[key] = _parse_scalar_value(val, line_no)
+            self.i += 1
 
 
 def read_header(text):
@@ -1771,12 +1710,7 @@ def read_header(text):
         return None, body
     if block == "":
         return {}, body
-    try:
-        header = _HeaderParser(block, base).parse()
-    except HeaderError:
-        raise
-    except RecursionError:
-        raise HeaderError(base + 1, "line %d: nesting too deep" % (base + 1))
+    header = _HeaderParser(block, base).parse()
     return header, body
 
 def _type_spec(type_str):
@@ -1850,6 +1784,9 @@ def _check_value(spec, value, key, findings):
 
 def _check_mapping(table, header, findings, label=None):
     for k in header:
+        if not isinstance(k, str):
+            findings.append("unknown key %r" % (k,))
+            continue
         if k not in table:
             findings.append("unknown key %s" % k)
     for k in table:
@@ -1859,45 +1796,62 @@ def _check_mapping(table, header, findings, label=None):
         _check_value(_type_spec(table[k]), header[k], k, findings)
 
 
+def _statuses_ok(st):
+    return (
+        isinstance(st, list)
+        and len(st) == 4
+        and all(isinstance(x, str) for x in st)
+        and len(set(st)) == 4
+        and set(st) == set(_REQ_STATUSES)
+    )
+
+
 def check_header(kind, header):
     """Schema findings for a parsed header mapping; empty list when valid."""
-    findings = []
     if kind not in _KINDS:
-        findings.append("unknown kind %r" % (kind,))
-        return findings
+        return ["unknown kind %r" % (kind,)]
     table = HEADER_SCHEMAS.get(kind)
     if not table:
-        findings.append("unknown kind %s" % kind)
-        return findings
+        return ["unknown kind %s" % kind]
     if not isinstance(header, dict):
-        findings.append("header is not a mapping")
-        return findings
-    _check_mapping(table, header, findings)
+        return ["header is not a mapping"]
+    for k in header:
+        if not isinstance(k, str):
+            return ["unknown key %r" % (k,)]
     if header.get("record") != kind:
-        if "record" in header:
-            findings[:] = [f for f in findings if f != "missing key record"]
-            findings.append("record")
+        return ["record"]
     if header.get("header") != 1:
-        findings.append("header")
-    if kind == "requirements" and "statuses" in header:
+        return ["header"]
+    if kind == "requirements" and not _statuses_ok(header.get("statuses")):
         st = header.get("statuses")
-        ok = (
-            isinstance(st, list)
-            and len(st) == 4
-            and all(isinstance(x, str) for x in st)
-            and len(set(st)) == 4
-            and set(st) == set(_REQ_STATUSES)
-        )
-        if not ok:
-            findings[:] = [f for f in findings if f != "statuses"]
-            findings.append("statuses")
+        if isinstance(st, list) and any(isinstance(x, str) and x not in _REQ_STATUSES for x in st):
+            return ["statuses outside set"]
+        return ["statuses"]
     if kind in ("requirements", "diagram-index", "deviations"):
         cols = header.get("columns")
         roles = header.get("roles")
-        if isinstance(cols, list) and isinstance(roles, dict):
-            for rk, col in roles.items():
-                if isinstance(col, str) and col not in cols:
-                    findings.append("role %s" % rk)
+        if not isinstance(cols, list):
+            return ["columns"]
+        if not isinstance(roles, dict):
+            return ["roles"]
+        role_table = {
+            "requirements": "RequirementsRoles",
+            "diagram-index": "DiagramIndexRoles",
+            "deviations": "DeviationsRoles",
+        }[kind]
+        schema_roles = HEADER_SCHEMAS[role_table]
+        col_set = frozenset(c for c in cols if isinstance(c, str))
+        for rk, col in roles.items():
+            if not isinstance(rk, str):
+                return ["role %r" % (rk,)]
+            if rk not in schema_roles:
+                return ["role %s" % rk]
+            if not isinstance(col, str):
+                return ["role %s" % rk]
+            if col not in col_set:
+                return ["role %s" % rk]
+    findings = []
+    _check_mapping(table, header, findings)
     return findings
 
 
@@ -1941,9 +1895,36 @@ def _kind_norm(prose):
         return "increment"
     if isinstance(prose, str):
         k = prose.strip().lower()
-        if k in ("increment", "group"):
-            return k
+        if not k:
+            return "increment"
+        return k
     return "increment"
+
+
+def _plan_field_value(fk, fields):
+    if fk not in fields:
+        if fk in ("parent", "deferred"):
+            return None
+        if fk == "parallel":
+            return False
+        return []
+    val = fields[fk]
+    if val == "":
+        if fk in ("parent", "deferred"):
+            return None
+        if fk == "parallel":
+            return False
+        if fk in ("depends_on", "diagrams", "scope", "satisfies"):
+            return []
+    if fk == "parent" and _none_filler(val):
+        return None
+    if fk in ("depends_on", "diagrams") and (val is None or _none_filler(val)):
+        return []
+    if fk == "parallel":
+        return _parallel_norm(val)
+    if fk in ("scope", "satisfies") and val is None:
+        return []
+    return val
 
 
 def _demonstration_present(line):
@@ -1976,28 +1957,6 @@ def _fallback_string(fallback, key):
     if val is None:
         return ""
     return val
-
-
-def _field_fallback(fields, key):
-    if key not in fields:
-        if key in ("parent", "deferred"):
-            return None
-        return []
-    val = fields.get(key)
-    if key == "parent":
-        if _none_filler(val):
-            return None
-        return val
-    if key in ("depends_on", "diagrams"):
-        if val is None or _none_filler(val):
-            return []
-        return val
-    if key in ("scope", "satisfies"):
-        if val is None:
-            return []
-        return val
-    if key == "deferred":
-        return val
 
 
 def header_agrees(kind, header, fallback):
@@ -2045,6 +2004,8 @@ def header_agrees(kind, header, fallback):
                 continue
             if key == "merge_unit" and hv == [] and fv is None:
                 continue
+            if key == "merge_unit" and isinstance(fv, tuple):
+                fv = list(fv)
             if hv != fv:
                 out.append(key)
         return out
@@ -2154,14 +2115,14 @@ def _plan_agrees(header, fallback):
             if inc_h.get("title") != inc_f.get("title"):
                 out.append("%s title" % iid)
             for fk in ("kind", "parallel", "parent", "depends_on", "diagrams", "scope", "satisfies", "deferred"):
-                fv = _field_fallback(fields, fk)
+                fv = _plan_field_value(fk, fields)
                 hv = inc_h.get(fk)
                 if fk == "kind":
                     if _kind_norm(fields.get("kind") if "kind" in fields else None) != hv:
                         out.append("%s kind" % iid)
                     continue
                 if fk == "parallel":
-                    if _parallel_norm(fields.get("parallel") if "parallel" in fields else None) != hv:
+                    if _plan_field_value("parallel", fields) != hv:
                         out.append("%s parallel" % iid)
                     continue
                 if fv != hv:
