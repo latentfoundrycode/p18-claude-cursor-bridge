@@ -95,7 +95,7 @@ sys.path.insert(0, HERE)
 
 
 def _load_bridge_env():
-    path = os.path.join(HERE, "bridge_env.py")
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "bridge_env.py")
     if os.path.isfile(path):
         spec = importlib.util.spec_from_file_location("bridge_env", path)
         if spec is None or spec.loader is None:
