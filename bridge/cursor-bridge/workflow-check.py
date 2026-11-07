@@ -696,7 +696,9 @@ def check_status(path, text, tables):
                 findings.append(("form", shown, "-", reason))
             elif reason == p2:
                 findings.append(("e", shown, part or "-", reason))
-        if line_problems and not (len(line_problems) == 1 and line_problems[0] in (p2, p3)):
+        if p0 in line_problems or p1 in line_problems:
+            continue
+        if len(line_problems) > 1 and p3 not in line_problems:
             continue
         if body == "not yet classified":
             continue

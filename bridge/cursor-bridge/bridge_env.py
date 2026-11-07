@@ -2288,19 +2288,24 @@ def status_workflow_line(rest, multi, seen_parts):
     part, body_line, bad = _status_prefix_of(rest, multi)
     if bad is not None:
         return None, None, bad, [STATUS_WORKFLOWS_PROBLEMS[0]], None
+    line_problems = []
     if part is not None:
         seen_parts[part] = seen_parts.get(part, 0) + 1
         if seen_parts[part] == 2:
-            return part, body_line, None, [STATUS_WORKFLOWS_PROBLEMS[2]], None
+            line_problems.append(STATUS_WORKFLOWS_PROBLEMS[2])
     if body_line == "not yet classified":
-        return part, body_line, None, [], None
+        return part, body_line, None, line_problems, None
     if body_line.count(_STATUS_TRAITS_MARK) != 1:
-        return part, body_line, None, [STATUS_WORKFLOWS_PROBLEMS[1]], None
+        line_problems.append(STATUS_WORKFLOWS_PROBLEMS[1])
+        return part, body_line, None, line_problems, None
     head, _traits = body_line.split(_STATUS_TRAITS_MARK, 1)
     for segment in [s.strip() for s in head.split(_STATUS_ARROW)]:
         for name in [n.strip() for n in segment.split(",")]:
             if name == "":
-                return part, body_line, None, [STATUS_WORKFLOWS_PROBLEMS[3]], None
+                line_problems.append(STATUS_WORKFLOWS_PROBLEMS[3])
+                return part, body_line, None, line_problems, None
+    if line_problems:
+        return part, body_line, None, line_problems, None
     parsed = _status_workflow_part(body_line)
     return part, body_line, None, [], parsed
 

@@ -1,6 +1,6 @@
 {
   "version": "2026.11.03a",
-  "generated": "2026-11-07 07:01",
+  "generated": "2026-11-07 08:03",
   "files": {
     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
@@ -33,7 +33,7 @@
     "cursor-bridge/bridge-install.py": "705f1de0f6957343524fa5c0b885ba18f3963325d707296a0d7c6e301c2f812f",
     "cursor-bridge/bridge-run.py": "dbcfea82523590e997472659b230a5f92356e532a9f4224ffd3251a987f955cf",
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
-    "cursor-bridge/bridge_env.py": "923558f5827f830e21b370f62bbb890f25571acfab226e7610bdfa351c813f7c",
+    "cursor-bridge/bridge_env.py": "40c1f68f784d496e5e7e23ba8e19d6149f1943fb4bdcaa65cc4dd6bda85a6325",
     "cursor-bridge/completion-check.py": "de97b528392fe0e3ac0c62e17132bbb0964fe7f898aac8e449172a59d01822ba",
     "cursor-bridge/conformance-check.py": "ff69f26f4ddfbd5a5503a6cf362db32486d34249fdafe2d2eaa5b07077861bbc",
     "cursor-bridge/cursor-agent.shim": "913f3a0214b76c5a92fca21b8bfe8f9ea63979af412df30dc47509a0accbf8e2",
@@ -108,7 +108,7 @@
     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
     "cursor-bridge/windowless-default.snapshot.md": "b3c59981f63e2c3f450f2acd378bab995df9a8363f50fe2d833c1e797d0ed20e",
-    "cursor-bridge/workflow-check.py": "2111485999eebf41f08d1c98e7518cb0b6fb6fd9bf33343eaa8456c365932099",
+    "cursor-bridge/workflow-check.py": "c7498f3deadc7ba537808bf154a4336a265f68d51b2097f41e1d4f68f99e8177",
     "cursor-bridge/workflow/extension-points.md": "b3973253f2bdf38fe9f329f1a0fb13604a221453c1d7f7bdfbd227013c0592d0",
     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
     "cursor-bridge/workflow/phases/change-cycle.md": "c634fec9a161871b6e67d9098e0b01c6b2ba463c7603c2f3a6c2812ae7f8d090",
