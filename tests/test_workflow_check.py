@@ -1818,6 +1818,7 @@ def test_r014_default_root_is_read_when_no_root_is_given(tmp_path):
     folder = tmp_path / "bin"
     folder.mkdir()
     shutil.copyfile(REPO / PROG, folder / "workflow-check.py")
+    shutil.copyfile(REPO / "bridge" / "cursor-bridge" / "bridge_env.py", folder / "bridge_env.py")
     shutil.copytree(REPO / "bridge" / "cursor-bridge" / "workflow", folder / "workflow")
     (folder / "workflow" / "types").mkdir(exist_ok=True)
     (folder / "workflow" / "types" / "not-a-type.md").write_text("## Add at intake.questions\n\nq\n", encoding="utf-8")

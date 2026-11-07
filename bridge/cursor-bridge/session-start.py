@@ -108,6 +108,7 @@ PHASE_CONVENTIONS = {
 WORKFLOW_PREFIX = "~/.claude/cursor-bridge/workflow/"
 PHASE_PREFIX = WORKFLOW_PREFIX + "phases/"
 CHECKER_SHOWN = "~/.claude/cursor-bridge/workflow-check.py"
+BRIDGE_ENV_SHOWN = "~/.claude/cursor-bridge/bridge_env.py"
 OPEN_SHOWN = WORKFLOW_PREFIX + "open-list.md"
 REG_SHOWN = WORKFLOW_PREFIX + "extension-points.md"
 POINTER_PATH = re.compile(r"^[a-z0-9-]+(/[a-z0-9-]+)*\.md$")
@@ -118,6 +119,46 @@ TABLES_NOT_INSTALLED = "%s: cannot be used (its tables are not at their installe
 PROJECT_END_NOTE = "(read at the close of the plan's last stage)"
 TRAITS_MARK = "; traits: "
 ARROW = "\u2192"
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+_bridge_env_import_err = None
+_bridge_env_unusable = False
+bridge_env = None
+
+
+def _load_bridge_env_at_import():
+    global bridge_env, _bridge_env_import_err, _bridge_env_unusable
+    _env_py = os.path.join(HERE, "bridge_env.py")
+    try:
+        _st = os.lstat(_env_py)
+        _env_link = os.path.islink(_env_py) or bool(getattr(_st, "st_reparse_tag", 0))
+    except OSError:
+        _env_link = False
+    if _env_link:
+        _bridge_env_import_err = ImportError("link")
+        return
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    sink = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            import bridge_env as _be
+        if not all(hasattr(_be, n) for n in ("status_values", "status_workflows", "STATUS_WORKFLOWS_PROBLEMS")):
+            _bridge_env_unusable = True
+            _bridge_env_import_err = ImportError("incomplete")
+            bridge_env = None
+        else:
+            bridge_env = _be
+    except BaseException as err:
+        bridge_env = None
+        _bridge_env_import_err = err
+    finally:
+        sys.dont_write_bytecode = previous
+
+
+_load_bridge_env_at_import()
 
 
 def status_candidates(cwd):
@@ -150,12 +191,6 @@ def read_status(cwd):
             with open(p, encoding="utf-8-sig", errors="replace") as f:
                 return f.read()
     return None
-
-
-def field(text, name):
-    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
-    m = re.search(pat, text, re.M | re.I)
-    return m.group(1).strip().strip("*_`").strip() if m else None
 
 
 def installed_version():
@@ -328,45 +363,17 @@ def phase_module_installed(key):
     return os.path.join(workflow_root(), "phases", key + ".md")
 
 
-def parse_workflows_tail(tail):
-    """Parse one Workflows line body (after 'Workflows: '). Return None or (type_name, sub_name, trait_names)."""
-    if TRAITS_MARK not in tail:
-        return None
-    head, traits_text = tail.split(TRAITS_MARK, 1)
-    if TRAITS_MARK in traits_text:
-        return None
-    head = head.strip()
-    if ": " in head:
-        head = head.split(": ", 1)[1].strip()
-    if head == "not yet classified":
-        return None
-    sub_name = None
-    if ARROW in head:
-        type_name, sub_name = head.split(ARROW, 1)
-        type_name, sub_name = type_name.strip(), sub_name.strip()
-    else:
-        type_name = head.strip()
-    traits_text = traits_text.strip()
-    if traits_text == "none":
-        traits = []
-    else:
-        traits = [t.strip() for t in traits_text.split(", ")]
-    return type_name, sub_name, traits
-
-
-def workflows_lines_parsed(status):
+def workflows_from_values(workflows):
     out = []
-    for line in status.split("\n"):
-        if not line.startswith("Workflows: "):
+    for part in workflows or []:
+        if not isinstance(part, dict):
             continue
-        parsed = parse_workflows_tail(line[len("Workflows: "):])
-        if parsed is not None:
-            out.append(parsed)
+        out.append((part.get("type"), part.get("subtype"), list(part.get("traits") or [])))
     return out
 
 
-def needs_workflow_read(module_keys, status):
-    if workflows_lines_parsed(status):
+def needs_workflow_read(module_keys, workflows):
+    if workflows:
         return True
     for key in module_keys:
         if os.path.isfile(phase_module_installed(key)):
@@ -452,10 +459,10 @@ def conditional_candidates(wc, tables, type_name, sub_name, trait_names):
     return paths
 
 
-def collect_conditional_files(wc, tables, module_keys, status, already):
+def collect_conditional_files(wc, tables, module_keys, workflows, already):
     named = []
     root = workflow_root()
-    for type_name, sub_name, trait_names in workflows_lines_parsed(status):
+    for type_name, sub_name, trait_names in workflows_from_values(workflows):
         for rel in conditional_candidates(wc, tables, type_name, sub_name, trait_names):
             if rel in already:
                 continue
@@ -486,7 +493,7 @@ def _pointer_block_for_module(wc, key, printed_paths):
     return block
 
 
-def _read_workflow_pointers(wc, module_keys, status, printed_paths):
+def _read_workflow_pointers(wc, module_keys, workflows, printed_paths):
     if not tables_at_installed_paths(wc):
         return [], [], TABLES_NOT_INSTALLED
     link_err = workflow_table_link_error(wc)
@@ -499,35 +506,52 @@ def _read_workflow_pointers(wc, module_keys, status, printed_paths):
     for key in module_keys:
         pointer_blocks.append(_pointer_block_for_module(wc, key, printed_paths))
     conditional_lines = ["  - %s" % p for p in collect_conditional_files(
-        wc, tables, module_keys, status, printed_paths)]
+        wc, tables, module_keys, workflows, printed_paths)]
     return pointer_blocks, conditional_lines, None
 
 
-def pointers_part(status, source):
-    phase_raw = (field(status, "Phase") or "").strip()
+def pointers_part(status, source, status_path):
+    if _bridge_env_import_err is not None or bridge_env is None:
+        kind = "cannot be used" if _bridge_env_unusable else "cannot be loaded"
+        return "%s: %s (%s)" % (BRIDGE_ENV_SHOWN, kind, safe_exc_type_name(_bridge_env_import_err) if _bridge_env_import_err else "an exception")
+    values, malformed, disagrees = bridge_env.status_values(status)
+    _, wf_problems = bridge_env.status_workflows(status)
+    out = []
+    if malformed is not None:
+        line, _what = malformed
+        out.append("header malformed: %s:%d" % (status_path.replace("\\", "/"), line))
+    for key in ("phase", "awaiting_user_on", "bridge_version", "workflows"):
+        if key in disagrees:
+            out.append("header disagrees: %s" % key)
+    for reason in wf_problems:
+        if type(reason) is str and reason in bridge_env.STATUS_WORKFLOWS_PROBLEMS:
+            out.append("workflows line refused: %s" % reason)
+    phase_raw = values.get("phase") or ""
     phase = phase_raw.split()[0].lower() if phase_raw else ""
-    awaiting = (field(status, "Awaiting user on") or "nothing").strip()
-    if len(awaiting) > AWAITING_MAX:
-        awaiting = awaiting[:AWAITING_MAX] + "... (read it whole in docs/PROJECT_STATUS.md)"
+    phase_show = phase_raw if phase_raw else "unknown"
+    awaiting_val = values.get("awaiting_user_on") or ""
+    awaiting_show = awaiting_val if awaiting_val else "nothing"
+    if len(awaiting_show) > AWAITING_MAX:
+        awaiting_show = awaiting_show[:AWAITING_MAX] + "... (read it whole in docs/PROJECT_STATUS.md)"
     version = installed_version()
-    recorded = re.search(r"[0-9]{4}\.[0-9]{2}\.[0-9]{2}[a-z]?", field(status, "Bridge version") or "")
-    recorded = recorded.group(0) if recorded else ""
+    recorded = values.get("bridge_version") or ""
     if recorded and version != "?" and recorded != version:
         version += "; the status file records %s, so this project is not calibrated to the installed bridge: say so in your next report; /calibrate-bridge is started by the owner, or by the maintainer session's message (rule 57)" % recorded
-    waiting = awaiting.lower() not in ("nothing", "none", "", "-")
-    out = ["CLAUDE-CURSOR BRIDGE: this folder belongs to a bridge project (bridge %s) and this message is for its supervisor session. "
-           "If you are not the project's supervisor (you were not asked to act as supervisor here), ignore this message and the digest. "
-           "The context was just %s, and a compaction keeps only the first part of your instructions; the core digest is re-injected beside this message." % (version, source),
-           "",
-           "PROJECT STATE: Phase: %s. Awaiting user on: %s." % (phase_raw or "unknown", awaiting)]
+    waiting = awaiting_val != ""
+    out.extend(["CLAUDE-CURSOR BRIDGE: this folder belongs to a bridge project (bridge %s) and this message is for its supervisor session. "
+                "If you are not the project's supervisor (you were not asked to act as supervisor here), ignore this message and the digest. "
+                "The context was just %s, and a compaction keeps only the first part of your instructions; the core digest is re-injected beside this message." % (version, source),
+                "",
+                "PROJECT STATE: Phase: %s. Awaiting user on: %s." % (phase_show, awaiting_show)])
     module_keys = PHASE_MODULES.get(phase)
     read_error = None
     pointer_blocks = []
     conditional_lines = []
+    workflows = values.get("workflows") or []
     if module_keys:
         out.append("BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:")
         printed_paths = {PHASE_PREFIX + key + ".md" for key in module_keys}
-        if needs_workflow_read(module_keys, status):
+        if needs_workflow_read(module_keys, workflows):
             wc, load_err = load_checker_module()
             if load_err:
                 read_error = load_err
@@ -536,7 +560,7 @@ def pointers_part(status, source):
                 try:
                     with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
                         pointer_blocks, conditional_lines, read_error = _read_workflow_pointers(
-                            wc, module_keys, status, printed_paths)
+                            wc, module_keys, workflows, printed_paths)
                 except BaseException as err:
                     read_error = "%s: cannot be used (%s)" % (CHECKER_SHOWN, safe_exc_type_name(err))
                     pointer_blocks = []
@@ -553,7 +577,7 @@ def pointers_part(status, source):
             out.append(read_error)
         out.extend(conditional_lines)
     elif phase:
-        out.append("BEFORE YOUR NEXT ACTION, re-read the procedure for phase '%s' (not in the hook's map: see ## The phase modules in ~/.claude/commands/supervisor.md)." % phase_raw)
+        out.append("BEFORE YOUR NEXT ACTION, re-read the procedure for phase '%s' (not in the hook's map: see ## The phase modules in ~/.claude/commands/supervisor.md)." % phase_show)
     for conv in PHASE_CONVENTIONS.get(phase, []):
         out.append("  - and %s, whole" % conv)
     out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")
@@ -561,7 +585,7 @@ def pointers_part(status, source):
     if source == "forked from another session":
         out.append("This session is a COPY; the original may still be the supervisor. Do not continue the loop unless the owner says this session is the supervisor now.")
     elif waiting:
-        out.append("The status file says you are WAITING FOR THE OWNER on: %s. Do not continue the loop; wait for their word, and clear the line when they give it." % awaiting)
+        out.append("The status file says you are WAITING FOR THE OWNER on: %s. Do not continue the loop; wait for their word, and clear the line when they give it." % awaiting_show)
     else:
         out.append("Continue from where the status file says the work is.")
     return "\n".join(out)
@@ -585,7 +609,14 @@ def main():
     if not isinstance(data, dict):
         data = {}
     cwd = data.get("cwd") or os.getcwd()
-    status = read_status(cwd)
+    status_path = None
+    status = None
+    for p in status_candidates(cwd):
+        if os.path.isfile(p):
+            status_path = p
+            with open(p, encoding="utf-8-sig", errors="replace") as f:
+                status = f.read()
+            break
     if status is None:
         return 0
     sv = supervisor_path()
@@ -596,7 +627,17 @@ def main():
     version = installed_version()
     parts = []
     if part in ("pointers", "all"):
-        parts.append(cap(pointers_part(status, source), MAX_OUTPUT, "the section pointers"))
+        shown_path = status_path.replace("\\", "/")
+        if "PROJECT_STATUS.md" not in shown_path:
+            shown_path = "docs/PROJECT_STATUS.md"
+        pointers = pointers_part(status, source, shown_path)
+        if _bridge_env_import_err is not None or bridge_env is None:
+            if part == "pointers":
+                sys.stdout.write(pointers + "\n")
+                return 0
+            parts.append(pointers)
+        else:
+            parts.append(cap(pointers, MAX_OUTPUT, "the section pointers"))
     if part in ("digest", "all"):
         parts.append(cap(digest_part(digest, version), MAX_OUTPUT, "the digest"))
     sys.stdout.write("\n\n".join(parts) + "\n")

@@ -3,6 +3,7 @@
 
   python inventory-check.py [--inventory docs/INVENTORY.md] [--status docs/PROJECT_STATUS.md]
                             [--changes docs/CHANGES.md] [--max-lines 120] [--max-chars 12000]
+  The status cap counts lines and characters in the body after the header.
 
 Run from the Workspace root. Deterministic; reads only. Checks:
 
@@ -33,6 +34,58 @@ import os
 import re
 import subprocess
 import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+_bridge_env_import_err = None
+_bridge_bytecode = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
+try:
+    import bridge_env  # noqa: E402
+except BaseException as err:
+    bridge_env = None
+    _bridge_env_import_err = err
+finally:
+    sys.dont_write_bytecode = _bridge_bytecode
+
+
+def escape_field(value):
+    text = "" if value is None else str(value)
+    parts = []
+    for char in text:
+        if char.isprintable() and ord(char) < 128:
+            parts.append(char)
+        elif char == "\n":
+            parts.append("\\n")
+        elif char == "\r":
+            parts.append("\\r")
+        elif char == "\t":
+            parts.append("\\t")
+        elif ord(char) < 256:
+            parts.append("\\x%02x" % ord(char))
+        elif ord(char) < 0x10000:
+            parts.append("\\u%04x" % ord(char))
+        else:
+            parts.append("\\U%08x" % ord(char))
+    return "".join(parts)
+
+
+def _safe_exc_type_name(err):
+    if err is None:
+        return "ImportError"
+    try:
+        return type(err).__name__
+    except BaseException:
+        return "an exception"
+
+
+def _bridge_env_refuse_line():
+    shown = os.path.join(HERE, "bridge_env.py").replace("\\", "/")
+    if bridge_env is None:
+        return "%s: cannot be loaded (%s)" % (shown, _safe_exc_type_name(_bridge_env_import_err))
+    if not hasattr(bridge_env, "status_values"):
+        return "%s: cannot be used (%s)" % (shown, "ImportError")
+    return None
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -237,8 +290,10 @@ def build_parser():
     ap.add_argument("--inventory", default="docs/INVENTORY.md")
     ap.add_argument("--status", default="docs/PROJECT_STATUS.md")
     ap.add_argument("--changes", default="docs/CHANGES.md")
-    ap.add_argument("--max-lines", type=int, default=120)
-    ap.add_argument("--max-chars", type=int, default=12000)
+    ap.add_argument("--max-lines", type=int, default=120,
+                    help="maximum status body lines after the header (default 120)")
+    ap.add_argument("--max-chars", type=int, default=12000,
+                    help="maximum status body characters after the header (default 12000)")
     return ap
 
 
@@ -249,7 +304,22 @@ def main():
     # 1. status cap
     if os.path.exists(a.status):
         st = read(a.status)
-        n_lines, n_chars = len(st.splitlines()), len(st)
+        shown_status = a.status.replace("\\", "/")
+        refuse = _bridge_env_refuse_line()
+        if refuse is not None:
+            print(escape_field(refuse))
+            print("RESULT: not checked")
+            return 2
+        _values, malformed, disagrees = bridge_env.status_values(st)
+        if malformed is not None:
+            line, what = malformed
+            print("HEADER MALFORMED: %s:%d %s" % (escape_field(shown_status), line, escape_field(what)))
+            print("RESULT: not checked")
+            return 2
+        for key in disagrees:
+            fails.append("HEADER DISAGREES: %s" % key)
+        _, body = bridge_env.read_header(st)
+        n_lines, n_chars = len(body.splitlines()), len(body)
         if n_lines > a.max_lines or n_chars > a.max_chars:
             fails.append("STATUS TOO LONG: %s is %d lines / %d chars (cap %d / %d). Rewrite it as "
                          "current state; move product facts to the inventory and history to "
