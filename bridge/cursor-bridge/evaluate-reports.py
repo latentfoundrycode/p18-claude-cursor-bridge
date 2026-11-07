@@ -284,10 +284,7 @@ def status_entries(project_root, written, report=None):
         line, _what = malformed
         if report is not None:
             report.append("header malformed: %s:%d" % (path.replace("\\", "/"), line))
-        fallback = bridge_env.status_fallback(text)
-        segments = fallback.get("open_issues") or []
-    else:
-        segments = values.get("open_issues") or []
+    segments = values.get("open_issues") or []
     out = []
     for seg in segments:
         if not STATUS_TO_WRITE_RX.search(seg):

@@ -2142,7 +2142,30 @@ def _plan_agrees(header, fallback):
 
 _STATUS_TRAITS_MARK = "; traits: "
 _STATUS_ARROW = "\u2192"
-_OPEN_ISSUES_RX = re.compile(r"^\s*(?:[-*]\s+)?[*_`]*Open issues[*_`]*\s*:[*_`]*\s*(.*)$", re.M | re.I)
+_OPEN_ISSUES_RX = re.compile(r"^[ \t]*(?:[-*]\s+)?[*_`]*Open issues[*_`]*\s*:[*_`]*\s*(.*)$", re.M | re.I)
+
+STATUS_WORKFLOWS_PROBLEMS = (
+    "Workflows line breaks the part-prefix rule",
+    "Workflows line must contain '; traits: ' exactly once",
+    "two Workflows lines name the same part",
+    "empty name in the Workflows head",
+)
+
+
+def _status_rule_line_end(text, pos):
+    """After a --- at pos, return index after the line ending when the rule line is well formed."""
+    if pos + 3 > len(text) or text[pos:pos + 3] != "---":
+        return None
+    i = pos + 3
+    while i < len(text) and text[i] in " \t\r":
+        i += 1
+    if i >= len(text):
+        return i
+    if text[i] == "\n":
+        return i + 1
+    if text[i] == "\r" and i + 1 < len(text) and text[i + 1] == "\n":
+        return i + 2
+    return None
 
 
 def _status_prose_body(text):
@@ -2150,14 +2173,33 @@ def _status_prose_body(text):
         return ""
     if text.startswith("\ufeff"):
         text = text[1:]
-    if len(text) >= 3 and text[:3] == "---":
-        _, body, _ = _find_block(text)
-        return body
-    return text
+    if len(text) < 3 or text[:3] != "---":
+        return text
+    first_end = _status_rule_line_end(text, 0)
+    if first_end is None:
+        return text
+    pos = first_end
+    while pos <= len(text):
+        if text.startswith("---", pos):
+            close_end = _status_rule_line_end(text, pos)
+            if close_end is not None:
+                return text[close_end:]
+        nl = text.find("\n", pos)
+        if nl == -1:
+            break
+        pos = nl + 1
+    return text[first_end:]
+
+
+def _status_body_lines(text):
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        del lines[-1]
+    return lines
 
 
 def _status_hook_field(text, name):
-    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
+    pat = r"^[ \t]*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
     m = re.search(pat, text, re.M | re.I)
     if not m:
         return None
@@ -2165,7 +2207,7 @@ def _status_hook_field(text, name):
 
 
 def _status_stage_field(text):
-    m = re.search(r"^[\s*_-]*Stage[*_]*\s*:[*_\s`]*([^`\n]+)", text, re.M | re.I)
+    m = re.search(r"^[ \t*_-]*Stage[*_]*\s*:[*_\s`]*([^`\n]+)", text, re.M | re.I)
     return m.group(1).strip() if m else None
 
 
@@ -2241,10 +2283,32 @@ def _status_workflow_part(body):
     return {"type": type_name, "subtype": sub_name or None, "traits": traits}
 
 
+def status_workflow_line(rest, multi, seen_parts):
+    """One Workflows: line's grammar (part prefix, traits marker, duplicate part, empty name)."""
+    part, body_line, bad = _status_prefix_of(rest, multi)
+    if bad is not None:
+        return None, None, bad, [STATUS_WORKFLOWS_PROBLEMS[0]], None
+    if part is not None:
+        seen_parts[part] = seen_parts.get(part, 0) + 1
+        if seen_parts[part] == 2:
+            return part, body_line, None, [STATUS_WORKFLOWS_PROBLEMS[2]], None
+    if body_line == "not yet classified":
+        return part, body_line, None, [], None
+    if body_line.count(_STATUS_TRAITS_MARK) != 1:
+        return part, body_line, None, [STATUS_WORKFLOWS_PROBLEMS[1]], None
+    head, _traits = body_line.split(_STATUS_TRAITS_MARK, 1)
+    for segment in [s.strip() for s in head.split(_STATUS_ARROW)]:
+        for name in [n.strip() for n in segment.split(",")]:
+            if name == "":
+                return part, body_line, None, [STATUS_WORKFLOWS_PROBLEMS[3]], None
+    parsed = _status_workflow_part(body_line)
+    return part, body_line, None, [], parsed
+
+
 def status_workflows(text):
     """(parts, problems) from the status file's Workflows lines (strict grammar)."""
     body = _status_prose_body(text)
-    lines = [line for line in body.splitlines() if line.startswith("Workflows: ")]
+    lines = [line for line in _status_body_lines(body) if line.startswith("Workflows: ")]
     if not lines:
         return [], []
     multi = len(lines) > 1
@@ -2252,29 +2316,10 @@ def status_workflows(text):
     seen_parts = {}
     for line in lines:
         rest = line[len("Workflows: "):]
-        part, body_line, bad = _status_prefix_of(rest, multi)
-        if bad is not None:
-            problems.append("Workflows line breaks the part-prefix rule")
+        _part, _body, bad, line_problems, parsed = status_workflow_line(rest, multi, seen_parts)
+        problems.extend(line_problems)
+        if line_problems:
             continue
-        if part is not None:
-            seen_parts[part] = seen_parts.get(part, 0) + 1
-            if seen_parts[part] == 2:
-                problems.append("two Workflows lines name the same part")
-        if body_line == "not yet classified":
-            continue
-        if body_line.count(_STATUS_TRAITS_MARK) != 1:
-            problems.append("Workflows line must contain '; traits: ' exactly once")
-            continue
-        head, _traits = body_line.split(_STATUS_TRAITS_MARK, 1)
-        empty = False
-        for segment in [s.strip() for s in head.split(_STATUS_ARROW)]:
-            for name in [n.strip() for n in segment.split(",")]:
-                if name == "":
-                    empty = True
-        if empty:
-            problems.append("empty name in the Workflows head")
-            continue
-        parsed = _status_workflow_part(body_line)
         if parsed is not None:
             parts.append(parsed)
     return parts, problems

@@ -122,7 +122,12 @@ ARROW = "\u2192"
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 _bridge_env_import_err = None
-try:
+_bridge_env_unusable = False
+bridge_env = None
+
+
+def _load_bridge_env_at_import():
+    global bridge_env, _bridge_env_import_err, _bridge_env_unusable
     _env_py = os.path.join(HERE, "bridge_env.py")
     try:
         _st = os.lstat(_env_py)
@@ -130,13 +135,30 @@ try:
     except OSError:
         _env_link = False
     if _env_link:
-        raise ImportError("link")
+        _bridge_env_import_err = ImportError("link")
+        return
     if HERE not in sys.path:
         sys.path.insert(0, HERE)
-    import bridge_env
-except BaseException as _err:
-    bridge_env = None
-    _bridge_env_import_err = _err
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    sink = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            import bridge_env as _be
+        if not all(hasattr(_be, n) for n in ("status_values", "status_workflows", "STATUS_WORKFLOWS_PROBLEMS")):
+            _bridge_env_unusable = True
+            _bridge_env_import_err = ImportError("incomplete")
+            bridge_env = None
+        else:
+            bridge_env = _be
+    except BaseException as err:
+        bridge_env = None
+        _bridge_env_import_err = err
+    finally:
+        sys.dont_write_bytecode = previous
+
+
+_load_bridge_env_at_import()
 
 
 def status_candidates(cwd):
@@ -169,12 +191,6 @@ def read_status(cwd):
             with open(p, encoding="utf-8-sig", errors="replace") as f:
                 return f.read()
     return None
-
-
-def field(text, name):
-    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
-    m = re.search(pat, text, re.M | re.I)
-    return m.group(1).strip().strip("*_`").strip() if m else None
 
 
 def installed_version():
@@ -496,7 +512,8 @@ def _read_workflow_pointers(wc, module_keys, workflows, printed_paths):
 
 def pointers_part(status, source, status_path):
     if _bridge_env_import_err is not None or bridge_env is None:
-        return "%s: cannot be loaded (%s)" % (BRIDGE_ENV_SHOWN, safe_exc_type_name(_bridge_env_import_err) if _bridge_env_import_err else "an exception")
+        kind = "cannot be used" if _bridge_env_unusable else "cannot be loaded"
+        return "%s: %s (%s)" % (BRIDGE_ENV_SHOWN, kind, safe_exc_type_name(_bridge_env_import_err) if _bridge_env_import_err else "an exception")
     values, malformed, disagrees = bridge_env.status_values(status)
     _, wf_problems = bridge_env.status_workflows(status)
     out = []
@@ -507,15 +524,13 @@ def pointers_part(status, source, status_path):
         if key in disagrees:
             out.append("header disagrees: %s" % key)
     for reason in wf_problems:
-        if type(reason) is str and PLAIN_REASON.fullmatch(reason):
+        if type(reason) is str and reason in bridge_env.STATUS_WORKFLOWS_PROBLEMS:
             out.append("workflows line refused: %s" % reason)
-    phase = (values.get("phase") or "").split()[0].lower() if values.get("phase") else ""
-    phase_show = (field(status, "Phase") or values.get("phase") or "unknown").strip()
+    phase_raw = values.get("phase") or ""
+    phase = phase_raw.split()[0].lower() if phase_raw else ""
+    phase_show = phase_raw if phase_raw else "unknown"
     awaiting_val = values.get("awaiting_user_on") or ""
-    if awaiting_val:
-        awaiting_show = awaiting_val
-    else:
-        awaiting_show = (field(status, "Awaiting user on") or "nothing").strip()
+    awaiting_show = awaiting_val if awaiting_val else "nothing"
     if len(awaiting_show) > AWAITING_MAX:
         awaiting_show = awaiting_show[:AWAITING_MAX] + "... (read it whole in docs/PROJECT_STATUS.md)"
     version = installed_version()

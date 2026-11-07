@@ -203,6 +203,7 @@ def test_bridge_env_that_raises_at_import_prints_one_plain_line(tmp_path, home):
     data = json.dumps({"cwd": str(root / "Workspace"), "hook_event_name": "SessionStart", "source": "compact"})
     p = subprocess.run(
         [sys.executable, str(hook_dir / "session-start.py"), "--part", "pointers"],
-        input=data, capture_output=True, text=True, encoding="utf-8", env=env)
+        input=data, capture_output=True, text=True, encoding="utf-8", env=env,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     assert p.returncode == 0 and p.stderr == ""
     assert p.stdout == "~/.claude/cursor-bridge/bridge_env.py: cannot be loaded (RuntimeError)\n"

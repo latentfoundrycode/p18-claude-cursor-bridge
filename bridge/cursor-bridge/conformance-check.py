@@ -101,7 +101,12 @@ def _load_bridge_env():
         if spec is None or spec.loader is None:
             raise ImportError("bridge_env.py has no loader")
         mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        previous_bytecode = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        try:
+            spec.loader.exec_module(mod)
+        finally:
+            sys.dont_write_bytecode = previous_bytecode
         return mod
     import types
     mod = types.ModuleType("bridge_env")
@@ -700,7 +705,28 @@ def judge_workflows_line(path, text):
         return "not-checked", [ascii_text("%s: %s" % (shown, type(err).__name__))]
 
 
-def calibration_workflows_grades(path, text, phase):
+def _escape_field(value):
+    text = "" if value is None else str(value)
+    parts = []
+    for char in text:
+        if char.isprintable() and ord(char) < 128:
+            parts.append(char)
+        elif char == "\n":
+            parts.append("\\n")
+        elif char == "\r":
+            parts.append("\\r")
+        elif char == "\t":
+            parts.append("\\t")
+        elif ord(char) < 256:
+            parts.append("\\x%02x" % ord(char))
+        elif ord(char) < 0x10000:
+            parts.append("\\u%04x" % ord(char))
+        else:
+            parts.append("\\U%08x" % ord(char))
+    return "".join(parts)
+
+
+def calibration_workflows_grades(path, text, phase=None):
     """Calibration grades when judge_workflows_line returned valid (R-027, R-033).
 
     Returns (workflows_verdict, workflows_detail, notes). workflows_verdict is OK, MISSING, or
@@ -729,6 +755,13 @@ def calibration_workflows_grades(path, text, phase):
         return "not-checked", [ascii_text("%s: cannot be loaded (%s)" % (shown, type(err).__name__))], []
     finally:
         sys.dont_write_bytecode = previous_bytecode
+    if phase is None:
+        if hasattr(bridge_env, "status_values"):
+            header_values, _malformed, _disagrees = bridge_env.status_values(text)
+            _phase_parts = (header_values.get("phase") or "").split()
+            phase = _phase_parts[0] if _phase_parts else ""
+        else:
+            phase = ""
     try:
         open_text, open_shown, open_err = mod.read_utf8(mod.DEFAULT_OPEN)
         reg_text, reg_shown, reg_err = mod.read_utf8(mod.DEFAULT_REGISTRY)
@@ -748,10 +781,11 @@ def calibration_workflows_grades(path, text, phase):
         notes = []
         workflow_lines = [line for line in mod.file_lines(text) if line.startswith("Workflows: ")]
         multi = len(workflow_lines) > 1
+        seen_parts = {}
         for line in workflow_lines:
             rest = line[len("Workflows: "):]
-            part, body, bad = mod.prefix_of(rest, multi)
-            if bad is not None:
+            _part, body, _bad, line_problems, _parsed = bridge_env.status_workflow_line(rest, multi, seen_parts)
+            if line_problems:
                 continue
             if body == "not yet classified":
                 if phase != "intake":
@@ -796,6 +830,7 @@ def main():
 
     status_path = os.path.join(ws, "docs", "PROJECT_STATUS.md")
     status_vals = None
+    bridge_env_shown = os.path.join(HERE, "bridge_env.py").replace("\\", "/")
     if os.path.isfile(status_path) and hasattr(bridge_env, "status_values"):
         status_text_early = read(status_path)
         if status_text_early is not None:
@@ -803,7 +838,7 @@ def main():
             if malformed is not None:
                 line, what = malformed
                 shown = status_path.replace("\\", "/")
-                print("HEADER MALFORMED: %s:%d %s" % (shown, line, what))
+                print("HEADER MALFORMED: %s:%d %s" % (_escape_field(shown), line, _escape_field(what)))
                 return 2
             status_vals = values
 
@@ -1314,8 +1349,10 @@ def main():
 
     # --- the bridge version
     installed = (read(os.path.join(HERE, "VERSION")) or "").strip()
+    if not hasattr(bridge_env, "status_values") and os.path.isfile(status_path):
+        add("MISSING", "Calibrated to the installed bridge", "not checked: %s: cannot be used (ImportError)" % bridge_env_shown)
     recorded = (status_vals or {}).get("bridge_version") or ""
-    if recorded and installed:
+    if status_vals is not None and recorded and installed:
         if recorded == installed:
             add("OK", "Calibrated to the installed bridge (%s)" % installed)
         else:

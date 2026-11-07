@@ -46,7 +46,19 @@ from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import bridge_env  # noqa: E402
+_bridge_env_import_err = None
+bridge_env = None
+_bridge_bytecode = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
+try:
+    import bridge_env as _bridge_env_mod  # noqa: E402
+    if not hasattr(_bridge_env_mod, "status_values"):
+        raise ImportError("incomplete")
+    bridge_env = _bridge_env_mod
+except BaseException as err:
+    _bridge_env_import_err = err
+finally:
+    sys.dont_write_bytecode = _bridge_bytecode
 
 GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source (transcript fallback)
 AGENT_CEILING = 3600       # a background agent older than this no longer counts (release A2; `Agent ceiling:` in RUN_PARAMETERS overrides)
@@ -574,6 +586,11 @@ def main():
     cwd = data.get("cwd") or os.getcwd()
     status_path, status = read_status_file(cwd)
     if status is None:
+        allow()
+    if bridge_env is None:
+        shown = os.path.join("~", ".claude", "cursor-bridge", "bridge_env.py").replace("\\", "/")
+        err_name = type(_bridge_env_import_err).__name__ if _bridge_env_import_err else "ImportError"
+        sys.stderr.write("%s: cannot be loaded (%s)\n" % (shown, err_name))
         allow()
     record_input(data, cwd)
     values, malformed, disagrees = bridge_env.status_values(status)

@@ -37,10 +37,55 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+_bridge_env_import_err = None
+_bridge_bytecode = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
 try:
     import bridge_env  # noqa: E402
-except ImportError:
+except BaseException as err:
     bridge_env = None
+    _bridge_env_import_err = err
+finally:
+    sys.dont_write_bytecode = _bridge_bytecode
+
+
+def escape_field(value):
+    text = "" if value is None else str(value)
+    parts = []
+    for char in text:
+        if char.isprintable() and ord(char) < 128:
+            parts.append(char)
+        elif char == "\n":
+            parts.append("\\n")
+        elif char == "\r":
+            parts.append("\\r")
+        elif char == "\t":
+            parts.append("\\t")
+        elif ord(char) < 256:
+            parts.append("\\x%02x" % ord(char))
+        elif ord(char) < 0x10000:
+            parts.append("\\u%04x" % ord(char))
+        else:
+            parts.append("\\U%08x" % ord(char))
+    return "".join(parts)
+
+
+def _safe_exc_type_name(err):
+    if err is None:
+        return "ImportError"
+    try:
+        return type(err).__name__
+    except BaseException:
+        return "an exception"
+
+
+def _bridge_env_refuse_line():
+    shown = os.path.join(HERE, "bridge_env.py").replace("\\", "/")
+    if bridge_env is None:
+        return "%s: cannot be loaded (%s)" % (shown, _safe_exc_type_name(_bridge_env_import_err))
+    if not hasattr(bridge_env, "status_values"):
+        return "%s: cannot be used (%s)" % (shown, "ImportError")
+    return None
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -260,18 +305,20 @@ def main():
     if os.path.exists(a.status):
         st = read(a.status)
         shown_status = a.status.replace("\\", "/")
-        if bridge_env is not None and hasattr(bridge_env, "status_values"):
-            _values, malformed, disagrees = bridge_env.status_values(st)
-            if malformed is not None:
-                line, what = malformed
-                print("HEADER MALFORMED: %s:%d %s" % (shown_status, line, what))
-                print("RESULT: not checked")
-                return 2
-            for key in disagrees:
-                fails.append("HEADER DISAGREES: %s" % key)
-            _, body = bridge_env.read_header(st)
-        else:
-            body = st
+        refuse = _bridge_env_refuse_line()
+        if refuse is not None:
+            print(escape_field(refuse))
+            print("RESULT: not checked")
+            return 2
+        _values, malformed, disagrees = bridge_env.status_values(st)
+        if malformed is not None:
+            line, what = malformed
+            print("HEADER MALFORMED: %s:%d %s" % (escape_field(shown_status), line, escape_field(what)))
+            print("RESULT: not checked")
+            return 2
+        for key in disagrees:
+            fails.append("HEADER DISAGREES: %s" % key)
+        _, body = bridge_env.read_header(st)
         n_lines, n_chars = len(body.splitlines()), len(body)
         if n_lines > a.max_lines or n_chars > a.max_chars:
             fails.append("STATUS TOO LONG: %s is %d lines / %d chars (cap %d / %d). Rewrite it as "
