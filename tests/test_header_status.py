@@ -25,6 +25,25 @@ The fixed forms these tests pin, which the brief repeats:
   refused: <reason>`; the checkers print `HEADER MALFORMED: <path>:<line> <what>` and exit 2;
   inventory-check prints `HEADER DISAGREES: <key>`.
 
+Round 2 (the reviewers' findings on round 1) pins these besides:
+- The fallback never raises. Where the text starts with a `---` line, the prose body starts after the
+  first later line that is `---` with nothing after it but spaces, tabs or a carriage return; where no
+  such line follows, after the first line. status_values reads the header first and names a HeaderError
+  of any kind (an unterminated block too) as malformed, the fallback governing.
+- bridge_env.STATUS_WORKFLOWS_PROBLEMS is the tuple of the four wordings, in this order: the part-prefix
+  rule, the '; traits: ' rule, the same part twice, the empty name. They are worded nowhere else:
+  workflow-check, session-start and conformance-check take them from bridge_env, and workflow-check's
+  --status refuses exactly the lines status_workflows refuses. A line naming a part a second time is a
+  problem and adds no part.
+- The fallback of a file padded with blank or space-only lines takes linear time.
+- session-start loads bridge_env as it loads workflow-check: nothing the module prints reaches either
+  part, no bytecode is written, and a module without the status readers gives one plain line,
+  `~/.claude/cursor-bridge/bridge_env.py: cannot be loaded (<type>)` or `... cannot be used (<type>)`.
+  The phase it shows is the governing value, never a header line read as prose.
+- workflow-check and inventory-check without a usable bridge_env (missing, or without status_values)
+  exit 2 with a line naming bridge_env, never skipping the header check; loop-guard without one allows
+  the stop with exactly one stderr line naming it and no traceback.
+
 The supervisor's cases stand above the marker at the end of this file. The builder adds its own cases
 below the marker and edits nothing above it.
 """
@@ -35,6 +54,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -138,6 +158,23 @@ def tab_line(text):
     return caught.value.line
 
 
+# A block opened and never closed (round 2, Blocking 1): read_header refuses it; the prose is still read.
+UNTERMINATED_HEADER = "---\nrecord: project-status\n"
+# A block whose closing line carries a trailing space: read_header refuses it; the prose after that line governs,
+# never the block's own lines (its phase is "done", the prose's "building").
+TRAILING_SPACE_HEADER = header(phase="done")[:-len("---\n")] + "--- \n"
+# A Markdown rule on the first line and no block at all.
+LONE_RULE = "---\n"
+BAD = {"tab": TAB_HEADER, "schema": SCHEMA_HEADER, "unterminated": UNTERMINATED_HEADER,
+       "trailing-space": TRAILING_SPACE_HEADER, "lone-rule": LONE_RULE}
+BAD_IDS = sorted(BAD)
+
+
+def bad_line(bad, text):
+    """The line a malformed header is named on: 1 for a schema fault, else the HeaderError's line."""
+    return 1 if bad == "schema" else tab_line(text)
+
+
 # --- the fallback readers, one copy each, in bridge_env ---------------------------------------------------------
 
 FIELD_CASES = [
@@ -212,14 +249,14 @@ def test_r058_a_well_formed_header_governs_and_its_disagreements_are_named():
                       "open_issues": []}
 
 
-@pytest.mark.parametrize("bad", ["tab", "schema"], ids=["tab-in-block", "schema-fault"])
+@pytest.mark.parametrize("bad", BAD_IDS, ids=BAD_IDS)
 def test_r058_a_malformed_header_falls_back_and_names_its_line(bad):
     prose = "# Project Status\nPhase: building\nAwaiting user on: nothing\n"
-    text = (TAB_HEADER if bad == "tab" else SCHEMA_HEADER) + prose
+    text = BAD[bad] + prose
     values, malformed, disagrees = need("status_values")(text)
     assert values == need("status_fallback")(text) and values["phase"] == "building" and disagrees == []
     line, what = malformed
-    assert line == (tab_line(text) if bad == "tab" else 1) and isinstance(what, str) and what
+    assert line == bad_line(bad, text) and isinstance(what, str) and what
 
 
 @pytest.mark.parametrize("name", NAMES, ids=NAMES)
@@ -319,10 +356,11 @@ def test_r058_loop_guard_reads_the_fixture_alike_by_header_and_by_fallback(tmp_p
 
 @pytest.mark.parametrize("prose,code", [("Awaiting user on: the owner's word\n", 0), ("Awaiting user on: nothing\n", 2)],
                          ids=["prose-waits", "prose-does-not-wait"])
-def test_r058_loop_guard_on_a_malformed_header_does_what_the_prose_says(tmp_path, prose, code):
+@pytest.mark.parametrize("bad", BAD_IDS, ids=BAD_IDS)
+def test_r058_loop_guard_on_a_malformed_header_does_what_the_prose_says(tmp_path, bad, prose, code):
     need("status_values")  # the header path is new: red on the checkpoint, never passing there by the old reading
     ws = tmp_path / "Workspace"
-    write(ws / "docs" / "PROJECT_STATUS.md", TAB_HEADER + "# Project Status\nPhase: building\n" + prose)
+    write(ws / "docs" / "PROJECT_STATUS.md", BAD[bad] + "# Project Status\nPhase: building\n" + prose)
     rc, out, err = guard(ws)
     assert rc == code and "Traceback" not in err, err
 
@@ -388,13 +426,14 @@ def test_r058_session_start_reads_the_fixture_alike_by_header_and_by_fallback(tm
     assert headed == plain and P + "delegation-loop.md" in named(plain), headed
 
 
-@pytest.mark.parametrize("bad", ["tab", "schema"], ids=["tab-in-block", "schema-fault"])
+@pytest.mark.parametrize("bad", BAD_IDS, ids=BAD_IDS)
 def test_r058_session_start_falls_back_on_a_malformed_header_and_names_its_line(tmp_path, home, bad):
-    text = (TAB_HEADER if bad == "tab" else SCHEMA_HEADER) + "# Project Status\nPhase: building\nAwaiting user on: nothing\n"
+    text = BAD[bad] + "# Project Status\nPhase: building\nAwaiting user on: nothing\n"
     out = pointers(hook_status(tmp_path, text), home)
     m = re.search(r"^header malformed: .*PROJECT_STATUS\.md:(\d+)$", out, re.M)
-    assert m and int(m.group(1)) == (tab_line(text) if bad == "tab" else 1), out
+    assert m and int(m.group(1)) == bad_line(bad, text), out
     assert P + "delegation-loop.md" in named(out), "the prose's phase governs: " + out
+    assert "PROJECT STATE: Phase: building." in out, "the phase shown is the prose's: " + out
 
 
 BRIDGE_LINE = "Workflows: Host Extension Development %s Claude Code Extension; traits: Installable" % ARROW
@@ -433,11 +472,11 @@ def test_r058_retired_2_session_start_reads_no_wait_by_the_one_normalisation(tmp
     assert "WAITING FOR THE OWNER" not in out and "Continue from where the status file says the work is." in out, out
 
 
-def test_r058_retired_1_session_start_refuses_a_line_the_grammar_refuses(tmp_path, home):
-    line = "Workflows: main: Host Extension Development %s Claude Code Extension; traits: Installable" % ARROW
-    out = pointers(hook_status(tmp_path, "# Project Status\nPhase: building\n" + line + "\nAwaiting user on: nothing\n"), home)
-    assert "workflows line refused: Workflows line breaks the part-prefix rule" in out, out
-    assert W + "types/host-extension.md" not in named(out), out
+@pytest.mark.parametrize("line,reason", [c[1:] for c in REFUSED], ids=[c[0] for c in REFUSED])
+def test_r058_retired_1_session_start_refuses_a_line_the_grammar_refuses(tmp_path, home, line, reason):
+    out = pointers(hook_status(tmp_path, "# Project Status\nPhase: building\n" + line + "Awaiting user on: nothing\n"), home)
+    assert "workflows line refused: " + reason in out, out
+    assert not [n for n in named(out) if n.startswith(W + "types/")], out
 
 
 # --- conformance-check.py ---------------------------------------------------------------------------------------
@@ -474,12 +513,12 @@ def test_r058_conformance_check_reads_the_fixture_alike_by_header_and_by_fallbac
     assert rc2 == rc and status_lines(headed) == status_lines(plain) and status_lines(plain), headed
 
 
-@pytest.mark.parametrize("bad", ["tab", "schema"], ids=["tab-in-block", "schema-fault"])
+@pytest.mark.parametrize("bad", BAD_IDS, ids=BAD_IDS)
 def test_r058_conformance_check_refuses_a_malformed_header(tmp_path, bad):
-    text = (TAB_HEADER if bad == "tab" else SCHEMA_HEADER) + "# Project Status\nPhase: building\nWorkflows: not yet classified\n"
+    text = BAD[bad] + "# Project Status\nPhase: building\nWorkflows: not yet classified\n"
     rc, out, err = conformance(conformance_ws(tmp_path, text))
     m = re.search(r"HEADER MALFORMED: .*PROJECT_STATUS\.md:(\d+) \S", out)
-    assert rc == 2 and m and int(m.group(1)) == (tab_line(text) if bad == "tab" else 1), (rc, out, err)
+    assert rc == 2 and m and int(m.group(1)) == bad_line(bad, text), (rc, out, err)
 
 
 def test_r058_retired_3_conformance_check_reads_the_stamp_anywhere_in_the_value(tmp_path):
@@ -517,14 +556,14 @@ def test_r058_workflow_check_reads_the_fixture_alike_by_header_and_by_fallback(t
     assert workflow_check(path) == plain and plain[0] == 0, plain
 
 
-@pytest.mark.parametrize("bad", ["tab", "schema"], ids=["tab-in-block", "schema-fault"])
+@pytest.mark.parametrize("bad", BAD_IDS, ids=BAD_IDS)
 def test_r058_workflow_check_refuses_a_malformed_header(tmp_path, bad):
     path = tmp_path / "PROJECT_STATUS.md"
-    text = (TAB_HEADER if bad == "tab" else SCHEMA_HEADER) + fixture("bridge")
+    text = BAD[bad] + fixture("bridge")
     write(path, text)
     rc, out, err = workflow_check(path)
     m = re.search(r"HEADER MALFORMED: .*PROJECT_STATUS\.md:(\d+) \S", out)
-    assert rc == 2 and m and int(m.group(1)) == (tab_line(text) if bad == "tab" else 1), (rc, out, err)
+    assert rc == 2 and m and int(m.group(1)) == bad_line(bad, text), (rc, out, err)
 
 
 # --- inventory-check.py -----------------------------------------------------------------------------------------
@@ -547,14 +586,14 @@ def test_r058_inventory_check_reads_the_fixture_alike_by_header_and_by_fallback(
     assert inventory(tmp_path, path) == plain and "HEADER" not in plain[1], plain
 
 
-@pytest.mark.parametrize("bad", ["tab", "schema"], ids=["tab-in-block", "schema-fault"])
+@pytest.mark.parametrize("bad", BAD_IDS, ids=BAD_IDS)
 def test_r058_inventory_check_refuses_a_malformed_header(tmp_path, bad):
     path = tmp_path / "PROJECT_STATUS.md"
-    text = (TAB_HEADER if bad == "tab" else SCHEMA_HEADER) + fixture("bridge")
+    text = BAD[bad] + fixture("bridge")
     write(path, text)
     rc, out, err = inventory(tmp_path, path)
     m = re.search(r"HEADER MALFORMED: .*PROJECT_STATUS\.md:(\d+) \S", out)
-    assert rc == 2 and m and int(m.group(1)) == (tab_line(text) if bad == "tab" else 1), (rc, out, err)
+    assert rc == 2 and m and int(m.group(1)) == bad_line(bad, text), (rc, out, err)
 
 
 DISAGREE = [
@@ -636,14 +675,136 @@ def test_r058_evaluate_reports_reads_open_issues_from_the_header(tmp_path):
     assert rc == 0 and "Thing status: 1 incident(s)" in out, out
 
 
-@pytest.mark.parametrize("bad", ["tab", "schema"], ids=["tab-in-block", "schema-fault"])
+@pytest.mark.parametrize("bad", BAD_IDS, ids=BAD_IDS)
 def test_r058_evaluate_reports_falls_back_on_a_malformed_header_and_writes_its_line(tmp_path, bad):
     prose = "# Project Status\nPhase: building\nOpen issues: ISS-015 to write at the next reflection\n"
-    text = (TAB_HEADER if bad == "tab" else SCHEMA_HEADER) + prose
+    text = BAD[bad] + prose
     rc, out, written = evaluate(tmp_path, text, "out")
     m = re.search(r"header malformed: .*PROJECT_STATUS\.md:(\d+)", out + written)
-    assert rc == 0 and m and int(m.group(1)) == (tab_line(text) if bad == "tab" else 1), out + written
+    assert rc == 0 and m and int(m.group(1)) == bad_line(bad, text), out + written
     assert "Thing status: 1 incident(s)" in out, "the prose's Open issues line governs: " + out
+
+
+# --- round 2: the reviewers' findings on round 1 ----------------------------------------------------------------
+
+GRAMMAR_WORDINGS = ("Workflows line breaks the part-prefix rule", "Workflows line must contain '; traits: ' exactly once",
+                    "two Workflows lines name the same part", "empty name in the Workflows head")
+
+
+def test_r058_a_line_naming_a_part_twice_is_a_problem_and_adds_no_part():
+    text = ("# Project Status\nPhase: building\nWorkflows: app: Web App Development; traits: Installable\n"
+            "Workflows: app: Web App Development %s Local Web App; traits: none\n" % ARROW)
+    parts, problems = need("status_workflows")(text)
+    assert parts == [{"type": "Web App Development", "subtype": None, "traits": ["Installable"]}], parts
+    assert problems == ["two Workflows lines name the same part"], problems
+
+
+@pytest.mark.parametrize("pad", ["\n", " \n"], ids=["blank-lines", "space-lines"])
+def test_r058_the_status_values_of_a_padded_file_take_linear_time(pad):
+    text = "# Project Status\n" + pad * 20000
+    start = time.perf_counter()
+    values, malformed, disagrees = need("status_values")(text)
+    took = time.perf_counter() - start
+    assert took < 2.0 and values["phase"] == "" and malformed is None, took
+
+
+def test_r058_bridge_env_holds_the_four_workflows_wordings():
+    assert tuple(need("STATUS_WORKFLOWS_PROBLEMS")) == GRAMMAR_WORDINGS
+
+
+@pytest.mark.parametrize("program", ["workflow-check.py", "session-start.py", "conformance-check.py"],
+                         ids=["workflow-check", "session-start", "conformance-check"])
+def test_r058_the_workflows_grammar_is_worded_only_in_bridge_env(program):
+    need("STATUS_WORKFLOWS_PROBLEMS")  # the one copy is new: red on the checkpoint
+    tree = code_tree(program)
+    words = [w[len("Workflows line "):] if w.startswith("Workflows line ") else w for w in GRAMMAR_WORDINGS]
+    found = [n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)
+             and any(w in n.value for w in words)]
+    assert found == [], found
+
+
+def test_r058_workflow_check_refuses_a_workflows_line_as_bridge_env_does(tmp_path):
+    # A form feed splits a line for str.splitlines and not for a split at the line feed: one grammar reads it one way.
+    text = ("# Project Status\nPhase: building\n"
+            "Workflows: Web App Development; traits: none\x0cWorkflows: Web App Development; traits: none\n")
+    parts, problems = need("status_workflows")(text)
+    path = tmp_path / "PROJECT_STATUS.md"
+    write(path, text)
+    rc, out, err = workflow_check(path)
+    refused = [w for line in out.splitlines() for w in GRAMMAR_WORDINGS if line.startswith("FAIL") and line.endswith(w)]
+    assert refused == problems and problems, (problems, out)
+
+
+def installed_copy(tmp_path, module_text=None):
+    """A home holding the installed bridge, its bridge_env.py replaced by module_text where given."""
+    h = tmp_path / "home"
+    shutil.copytree(os.path.join(ROOT, "bridge", "commands"), str(h / ".claude" / "commands"))
+    shutil.copytree(BRIDGE, str(h / ".claude" / "cursor-bridge"), ignore=shutil.ignore_patterns("__pycache__"))
+    if module_text is not None:
+        write(h / ".claude" / "cursor-bridge" / "bridge_env.py", module_text)
+    return h
+
+
+def hook_run(ws, home):
+    data = {"cwd": str(ws), "hook_event_name": "SessionStart", "source": "compact"}
+    env = env_with_home(home)
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+    hook = home / ".claude" / "cursor-bridge" / "session-start.py"  # the copy: it loads bridge_env from its own folder
+    return run([hook, "--part", "pointers"], stdin=json.dumps(data), env=env)
+
+
+LEAK = 'import sys\nprint("LEAK-OUT")\nsys.stderr.write("LEAK-ERR\\n")\n'
+
+
+def test_r058_session_start_sinks_what_bridge_env_prints_and_writes_no_bytecode(tmp_path):
+    need("status_values")  # the header path is new: red on the checkpoint
+    with open(os.path.join(BRIDGE, "bridge_env.py"), encoding="utf-8") as f:
+        h = installed_copy(tmp_path, LEAK + f.read())
+    rc, out, err = hook_run(hook_status(tmp_path, fixture("bridge")), h)
+    assert rc == 0 and "LEAK" not in out + err and err == "", (out, err)
+    assert P + "delegation-loop.md" in named(out), out
+    assert not (h / ".claude" / "cursor-bridge" / "__pycache__").exists(), "bytecode written beside bridge_env.py"
+
+
+def test_r058_session_start_prints_one_line_where_bridge_env_lacks_the_status_readers(tmp_path):
+    need("status_values")  # the header path is new: red on the checkpoint
+    h = installed_copy(tmp_path, LEAK + "def read_header(text):\n    return None, text\n")
+    rc, out, err = hook_run(hook_status(tmp_path, fixture("bridge")), h)
+    assert rc == 0 and err == "" and re.fullmatch(
+        r"~/\.claude/cursor-bridge/bridge_env\.py: cannot be (loaded|used) \([A-Za-z ]+\)\n", out), (rc, out, err)
+
+
+@pytest.mark.parametrize("module", ["missing", "old"], ids=["missing", "old"])
+@pytest.mark.parametrize("program", ["workflow-check.py", "inventory-check.py"], ids=["workflow-check", "inventory-check"])
+def test_r058_a_checker_without_the_status_readers_refuses_and_never_skips_the_header(tmp_path, program, module):
+    need("status_values")  # the header path is new: red on the checkpoint
+    alone = tmp_path / "alone"
+    alone.mkdir()
+    shutil.copy(os.path.join(BRIDGE, program), str(alone / program))
+    if program == "workflow-check.py":  # its registry beside it, as the R-014 harness copies it
+        shutil.copytree(os.path.join(BRIDGE, "workflow"), str(alone / "workflow"))
+    if module == "old":
+        write(alone / "bridge_env.py", "def read_header(text):\n    return None, text\n")
+    status = tmp_path / "PROJECT_STATUS.md"
+    write(status, with_header("bridge"))
+    if program == "workflow-check.py":
+        rc, out, err = run([alone / program, "--open-list", OPEN_LIST, "--status", status])
+    else:
+        rc, out, err = run([alone / program, "--inventory", "absent-inventory.md", "--changes", "absent-changes.md",
+                            "--status", status], cwd=tmp_path)
+    assert rc == 2 and "bridge_env" in out + err and "Traceback" not in err, (rc, out, err)
+
+
+def test_r058_loop_guard_without_bridge_env_fails_open_with_one_plain_line(tmp_path):
+    need("status_values")  # the header path is new: red on the checkpoint
+    alone = tmp_path / "alone"
+    alone.mkdir()
+    shutil.copy(GUARD, str(alone / "loop-guard.py"))
+    ws = tmp_path / "Workspace"
+    write(ws / "docs" / "PROJECT_STATUS.md", "# Project Status\nPhase: building\nAwaiting user on: nothing\n")
+    data = {"cwd": str(ws), "hook_event_name": "Stop", "background_tasks": [], "session_crons": []}
+    rc, out, err = run([alone / "loop-guard.py"], stdin=json.dumps(data))
+    assert rc == 0 and "Traceback" not in err and len(err.splitlines()) == 1 and "bridge_env" in err, (rc, out, err)
 
 
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---
