@@ -807,6 +807,38 @@ def test_r058_loop_guard_without_bridge_env_fails_open_with_one_plain_line(tmp_p
     assert rc == 0 and "Traceback" not in err and len(err.splitlines()) == 1 and "bridge_env" in err, (rc, out, err)
 
 
+# --- round 3: a part named twice on a line that breaks the grammar again (Review A, round 2, B1) ---------------
+
+FIRST_APP = "# Project Status\nPhase: building\nWorkflows: app: Web App Development; traits: none\n"
+TWICE = "two Workflows lines name the same part"
+TWICE_AND = [
+    ("no-traits-mark", "Workflows: app: Web App Development\n", [TWICE, GRAMMAR_WORDINGS[1]]),
+    ("empty-name", "Workflows: app: Web App Development, ; traits: none\n", [TWICE, GRAMMAR_WORDINGS[3]]),
+    ("two-traits-marks", "Workflows: app: Web App Development; traits: a; traits: b\n", [TWICE, GRAMMAR_WORDINGS[1]]),
+]
+TWICE_AND_IDS = [c[0] for c in TWICE_AND]
+
+
+@pytest.mark.parametrize("second,expected", [c[1:] for c in TWICE_AND], ids=TWICE_AND_IDS)
+def test_r058_r3_a_part_named_twice_keeps_the_second_lines_other_problem(second, expected):
+    parts, problems = need("status_workflows")(FIRST_APP + second)
+    assert parts == [{"type": "Web App Development", "subtype": None, "traits": []}], parts
+    assert problems == expected, problems
+
+
+@pytest.mark.parametrize("second,expected", [c[1:] for c in TWICE_AND], ids=TWICE_AND_IDS)
+def test_r058_r3_workflow_check_refuses_a_part_named_twice_as_bridge_env_does(tmp_path, second, expected):
+    need("STATUS_WORKFLOWS_PROBLEMS")  # the one copy of the grammar is new: red on the checkpoint
+    _parts, problems = need("status_workflows")(FIRST_APP + second)
+    path = tmp_path / "PROJECT_STATUS.md"
+    write(path, FIRST_APP + second)
+    rc, out, err = workflow_check(path)
+    assert rc == 1 and "Traceback" not in err, (rc, out, err)
+    fails = [line for line in out.splitlines() if line.startswith("FAIL")]
+    refused = [w for line in fails for w in GRAMMAR_WORDINGS if line.endswith(w)]
+    assert refused == problems == expected, (problems, expected, out)
+
+
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---
 
 
