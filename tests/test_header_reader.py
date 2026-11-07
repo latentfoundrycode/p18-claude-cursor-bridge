@@ -898,7 +898,7 @@ def test_r057_r2_a_lone_carriage_return_ends_no_line():
     refused("---\na: x" + cr + "y: 1\n---\n", 2)
 
 
-@pytest.mark.parametrize("text", ["plain\n", "# Title\n---\na: b\n---\n", ""])
+@pytest.mark.parametrize("text", ["plain\n", "# Title\n---\na: b\n---\n", ""], ids=["plain-line", "marker-not-on-line-1", "empty"])
 def test_r057_r2_a_headerless_body_keeps_its_byte_order_mark(text):
     assert need("read_header")(BOM + text) == (None, BOM + text)
 
@@ -1837,7 +1837,7 @@ def test_r057_r3_assumed_an_empty_block_reads_in_every_line_ending(opening, clos
     assert need("read_header")(chr(0xFEFF) + "---" + opening + "---" + closing + body) == ({}, body)
 
 
-@pytest.mark.parametrize("text", ["---\r\n---x\r\n", "---\n---\rbody\n", "---\n--- \n", "---\n"])
+@pytest.mark.parametrize("text", ["---\r\n---x\r\n", "---\n---\rbody\n", "---\n--- \n", "---\n"], ids=["crlf-close-with-text", "lone-cr-after-close", "close-with-trailing-space", "no-close"])
 def test_r057_r3_assumed_a_line_that_only_starts_like_the_close_does_not_close_an_empty_block(text):
     refused(text)
 
