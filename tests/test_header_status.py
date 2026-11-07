@@ -877,6 +877,43 @@ def test_r058_r3_session_start_prints_no_refusal_outside_the_four_wordings(tmp_p
     assert P + "delegation-loop.md" in named(out), out
 
 
+# --- round 4: conformance-check through a link (CI on PR #138, bridge programs (ubuntu-latest)) ----------------
+
+LINKED_LOAD = r'''
+import importlib.util, os, sys
+link_dir, real_dir = sys.argv[1], sys.argv[2]
+real = os.path.realpath
+link_file = os.path.normcase(real(os.path.join(link_dir, "conformance-check.py")))
+def resolved(path, *args, **kwargs):
+    # A symbolic link resolved as Linux resolves it: the program's real file lives in real_dir.
+    if os.path.normcase(real(path, *args, **kwargs)) == link_file:
+        return os.path.join(real_dir, "conformance-check.py")
+    return real(path, *args, **kwargs)
+os.path.realpath = resolved
+spec = importlib.util.spec_from_file_location("conformance_check", os.path.join(link_dir, "conformance-check.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+print(hasattr(mod.bridge_env, "status_workflow_line"), hasattr(mod.bridge_env, "status_values"))
+'''
+
+
+def test_r058_r4_conformance_check_loads_bridge_env_beside_its_real_file(tmp_path):
+    # R-015's R2-2 for bridge_env: run through a link, conformance-check loads the bridge_env.py beside its real
+    # file, as it loads workflow-check.py, never one beside the link (the link's folder holds none here).
+    need("status_workflow_line")  # the per-line reader is new: red on the checkpoint
+    real_dir = tmp_path / "bin"
+    real_dir.mkdir()
+    for name in ("conformance-check.py", "workflow-check.py", "bridge_env.py"):
+        shutil.copy(os.path.join(BRIDGE, name), str(real_dir / name))
+    link_dir = tmp_path / "elsewhere"
+    link_dir.mkdir()
+    shutil.copy(os.path.join(BRIDGE, "conformance-check.py"), str(link_dir / "conformance-check.py"))
+    driver = tmp_path / "linked_load.py"
+    write(driver, LINKED_LOAD)
+    rc, out, err = run([driver, link_dir, real_dir], cwd=tmp_path)
+    assert rc == 0 and out.strip() == "True True", (rc, out, err)
+
+
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---
 
 
