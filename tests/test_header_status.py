@@ -839,6 +839,44 @@ def test_r058_r3_workflow_check_refuses_a_part_named_twice_as_bridge_env_does(tm
     assert refused == problems == expected, (problems, expected, out)
 
 
+LINE_FAULTS = [
+    ("no-traits-mark", "Workflows: Web App Development\n"),
+    ("two-traits-marks", "Workflows: Web App Development; traits: a; traits: b\n"),
+    ("prefix-fault", "Workflows: app: Web App Development; traits: none\nWorkflows: : Web App Development; traits: none\n"),
+]
+LINE_FAULT_IDS = [c[0] for c in LINE_FAULTS]
+
+
+@pytest.mark.parametrize("lines", [c[1] for c in LINE_FAULTS], ids=LINE_FAULT_IDS)
+def test_r058_r3_workflow_check_refuses_a_line_fault_as_bridge_env_does(tmp_path, lines):
+    # The sweep's c04: without the skip on a prefix or traits fault, workflow-check splits a body that breaks the rule.
+    need("STATUS_WORKFLOWS_PROBLEMS")  # the one copy of the grammar is new: red on the checkpoint
+    text = "# Project Status\nPhase: building\n" + lines
+    _parts, problems = need("status_workflows")(text)
+    path = tmp_path / "PROJECT_STATUS.md"
+    write(path, text)
+    rc, out, err = workflow_check(path)
+    assert rc == 1 and "Traceback" not in err, (rc, out, err)
+    refused = [w for line in out.splitlines() if line.startswith("FAIL") for w in GRAMMAR_WORDINGS if line.endswith(w)]
+    assert refused == problems and len(problems) == 1, (problems, out)
+
+
+FOREIGN_REASON = "a reason bridge_env never gives"
+
+
+def test_r058_r3_session_start_prints_no_refusal_outside_the_four_wordings(tmp_path):
+    # The sweep's r17: the hook prints a refusal only when it is one of bridge_env's four wordings.
+    need("STATUS_WORKFLOWS_PROBLEMS")  # the one copy of the grammar is new: red on the checkpoint
+    with open(os.path.join(BRIDGE, "bridge_env.py"), encoding="utf-8") as f:
+        real = f.read()
+    foreign = real + "\n\ndef status_workflows(text):\n    return [], [%r, 7]\n" % FOREIGN_REASON
+    h = installed_copy(tmp_path, foreign)
+    rc, out, err = hook_run(hook_status(tmp_path, fixture("bridge")), h)
+    assert rc == 0 and err == "", (rc, out, err)
+    assert "workflows line refused" not in out and FOREIGN_REASON not in out, out
+    assert P + "delegation-loop.md" in named(out), out
+
+
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---
 
 
