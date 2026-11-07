@@ -700,7 +700,7 @@ def judge_workflows_line(path, text):
         return "not-checked", [ascii_text("%s: %s" % (shown, type(err).__name__))]
 
 
-def calibration_workflows_grades(path, text):
+def calibration_workflows_grades(path, text, phase):
     """Calibration grades when judge_workflows_line returned valid (R-027, R-033).
 
     Returns (workflows_verdict, workflows_detail, notes). workflows_verdict is OK, MISSING, or
@@ -742,12 +742,6 @@ def calibration_workflows_grades(path, text):
         tables, errors = mod.load_tables(open_text, mod.DEFAULT_OPEN, reg_text, mod.DEFAULT_REGISTRY)
         if errors:
             return "not-checked", [field(mod, "%s: %s" % (item_path, reason)) for item_path, reason in errors], []
-        phase = ""
-        for line in mod.file_lines(text):
-            if line.startswith("Phase: "):
-                parts = line[len("Phase: "):].split()
-                phase = parts[0] if parts else ""
-                break
         shown_path = mod.slash(path)
         findings = mod.check_status(path, text, tables)
         f_items = [item for item in findings if item[0] == "f"]
@@ -799,6 +793,19 @@ def main():
 
     def add(verdict, floor, detail=""):
         results.append((verdict, floor, detail))
+
+    status_path = os.path.join(ws, "docs", "PROJECT_STATUS.md")
+    status_vals = None
+    if os.path.isfile(status_path) and hasattr(bridge_env, "status_values"):
+        status_text_early = read(status_path)
+        if status_text_early is not None:
+            values, malformed, _disagrees = bridge_env.status_values(status_text_early)
+            if malformed is not None:
+                line, what = malformed
+                shown = status_path.replace("\\", "/")
+                print("HEADER MALFORMED: %s:%d %s" % (shown, line, what))
+                return 2
+            status_vals = values
 
     # --- the gate workflows, step by step
     workflows = sorted(glob.glob(os.path.join(ws, ".github", "workflows", "*.yml")) + glob.glob(os.path.join(ws, ".github", "workflows", "*.yaml")))
@@ -1032,9 +1039,12 @@ def main():
     status_path = os.path.join(ws, "docs", "PROJECT_STATUS.md")
     if os.path.isfile(status_path):
         status_text = read(status_path)
+        _phase_parts = (status_vals.get("phase") or "").split() if status_vals else []
+        phase_for_grades = _phase_parts[0] if _phase_parts else ""
         outcome, rows = judge_workflows_line(status_path, "" if status_text is None else status_text)
         if outcome == "valid":
-            wv, wdetail, wnotes = calibration_workflows_grades(status_path, "" if status_text is None else status_text)
+            wv, wdetail, wnotes = calibration_workflows_grades(
+                status_path, "" if status_text is None else status_text, phase_for_grades)
             if wv == "MISSING":
                 add("MISSING", "Workflows line", wdetail)
             elif wv == "OK":
@@ -1067,14 +1077,18 @@ def main():
         else:
             st = pj.get("state") if isinstance(pj.get("state"), dict) else {}
             phase = str(st.get("phase") or "").lower()
-            status_phase = str(status_field(ws, "Phase") or "").lower()
+            status_phase = str((status_vals or {}).get("phase") or "").lower()
             stale = []
             if status_phase and not status_phase.startswith(phase.split()[0] if phase else "\0"):
                 stale.append("its phase (%s) is not the status file's (%s)" % (phase or "none", status_phase))
             inst = (read(os.path.join(HERE, "VERSION")) or "").strip()
             if inst and str(st.get("bridge") or "") != inst:
                 stale.append("its bridge version (%s) is not the installed one (%s)" % (st.get("bridge") or "none", inst))
-            status_stage = re.split(r"[(;,]", str(status_field(ws, "Stage") or ""))[0].strip().lower()   # the stage's name, not the rest of the line
+            if status_vals is not None:
+                stage_read = status_vals.get("stage") or ""
+            else:
+                stage_read = status_field(ws, "Stage") or ""
+            status_stage = re.split(r"[(;,]", str(stage_read))[0].strip().lower()   # the stage's name, not the rest of the line
             json_stage = str(st.get("stage") or "").strip().lower()
             first = lambda s: (re.sub(r"^stage\s+", "", s).split() or [""])[0]           # the stage's first token, exactly: 3 is not 3b, 1 is not 10
             if status_stage and json_stage and first(status_stage) != first(json_stage):
@@ -1299,14 +1313,13 @@ def main():
             add("NOTE", "Private memory notes", "%d note(s) in %s: %s; calibration step 2b reviews them (rule 41: a note never holds a rule or project state)" % (len(notes), d, ", ".join(notes[:8]) + (" ..." if len(notes) > 8 else "")))
 
     # --- the bridge version
-    status = read(os.path.join(ws, "docs", "PROJECT_STATUS.md")) or ""
-    m = re.search(r"^\s*(?:[-*]\s+)?[*_`]*Bridge version[*_`]*\s*:[*_`]*\s*([0-9.]+[a-z]?)", status, re.M | re.I)
     installed = (read(os.path.join(HERE, "VERSION")) or "").strip()
-    if m and installed:
-        if m.group(1) == installed:
+    recorded = (status_vals or {}).get("bridge_version") or ""
+    if recorded and installed:
+        if recorded == installed:
             add("OK", "Calibrated to the installed bridge (%s)" % installed)
         else:
-            add("MISSING", "Calibrated to the installed bridge", "the status file says %s, the installed bridge is %s: run /calibrate-bridge" % (m.group(1), installed))
+            add("MISSING", "Calibrated to the installed bridge", "the status file says %s, the installed bridge is %s: run /calibrate-bridge" % (recorded, installed))
 
     missing = [r for r in results if r[0] == "MISSING"]
     print("conformance-check: %s" % ws)

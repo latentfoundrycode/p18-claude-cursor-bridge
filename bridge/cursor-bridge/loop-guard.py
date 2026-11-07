@@ -44,6 +44,10 @@ import sys
 import time
 from datetime import datetime
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env  # noqa: E402
+
 GRACE_HOURS = 6            # a background task older than this no longer counts as a wake source (transcript fallback)
 AGENT_CEILING = 3600       # a background agent older than this no longer counts (release A2; `Agent ceiling:` in RUN_PARAMETERS overrides)
 KIND_CEILING = {"cursor-agent": 7200, "driver": 7200, "review": 3600, "gh pr checks": 3600, "# wake": 1800}
@@ -162,6 +166,14 @@ def read_status(cwd):
             with open(p, encoding="utf-8-sig", errors="replace") as f:
                 return f.read()
     return None
+
+
+def read_status_file(cwd):
+    for p in status_candidates(cwd):
+        if os.path.isfile(p):
+            with open(p, encoding="utf-8-sig", errors="replace") as f:
+                return p, f.read()
+    return None, None
 
 
 def field(text, name):
@@ -560,11 +572,19 @@ def main():
     if not isinstance(data, dict) or data.get("stop_hook_active"):
         allow()
     cwd = data.get("cwd") or os.getcwd()
-    status = read_status(cwd)
+    status_path, status = read_status_file(cwd)
     if status is None:
         allow()
     record_input(data, cwd)
-    phase = (field(status, "Phase") or "").strip()
+    values, malformed, disagrees = bridge_env.status_values(status)
+    if disagrees:
+        for key in disagrees:
+            if key in ("phase", "awaiting_user_on"):
+                sys.stderr.write("header disagrees: %s\n" % key)
+        if any(k in disagrees for k in ("phase", "awaiting_user_on")):
+            sys.exit(2)
+    phase_raw = values.get("phase") or ""
+    phase = phase_raw.split()[0] if phase_raw else ""
     tp = data.get("transcript_path")
     final = data.get("last_assistant_message")           # the hook's own copy; the transcript lags
     if not isinstance(final, str) or not final.strip():
@@ -574,7 +594,8 @@ def main():
         sys.exit(2)
     if not phase.lower().startswith(ACTIVE_PHASES):
         allow()
-    if names_a_wait(field(status, "Awaiting user on")):
+    awaiting = values.get("awaiting_user_on") or ""
+    if awaiting != "":
         allow()
     if paused_in_flight(cwd):                              # a pause in the untracked working file (FB-027)
         allow()

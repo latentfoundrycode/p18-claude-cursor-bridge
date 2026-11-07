@@ -121,7 +121,7 @@ def env_with_home(home=None):
 def run(args, cwd=None, stdin=None, env=None):
     p = subprocess.run([sys.executable] + [str(a) for a in args], cwd=str(cwd) if cwd else None, input=stdin,
                        capture_output=True, text=True, encoding="utf-8", errors="replace", env=env or env_with_home(),
-                       creationflags=NO_WINDOW)
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return p.returncode, p.stdout, p.stderr
 
 
@@ -647,3 +647,11 @@ def test_r058_evaluate_reports_falls_back_on_a_malformed_header_and_writes_its_l
 
 
 # --- THE BUILDER'S CASES GO BELOW THIS LINE; NOTHING ABOVE IT IS EDITED ---
+
+
+def test_r058_status_values_agreeing_header_matches_fixture_fallback(name="bridge"):
+    """R-058: when the header matches the prose fallback, status_values reports no disagreement."""
+    text = with_header(name)
+    values, malformed, disagrees = need("status_values")(text)
+    assert malformed is None and disagrees == []
+    assert values["workflows"] == need("status_fallback")(fixture(name))["workflows"]

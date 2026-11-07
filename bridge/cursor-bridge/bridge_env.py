@@ -2139,3 +2139,196 @@ def _plan_agrees(header, fallback):
                     out.append("%s historic" % iid)
     return out
 
+
+_STATUS_TRAITS_MARK = "; traits: "
+_STATUS_ARROW = "\u2192"
+_OPEN_ISSUES_RX = re.compile(r"^\s*(?:[-*]\s+)?[*_`]*Open issues[*_`]*\s*:[*_`]*\s*(.*)$", re.M | re.I)
+
+
+def _status_prose_body(text):
+    if not isinstance(text, str):
+        return ""
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    if len(text) >= 3 and text[:3] == "---":
+        _, body, _ = _find_block(text)
+        return body
+    return text
+
+
+def _status_hook_field(text, name):
+    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
+    m = re.search(pat, text, re.M | re.I)
+    if not m:
+        return None
+    return m.group(1).strip().strip("*_`").strip()
+
+
+def _status_stage_field(text):
+    m = re.search(r"^[\s*_-]*Stage[*_]*\s*:[*_\s`]*([^`\n]+)", text, re.M | re.I)
+    return m.group(1).strip() if m else None
+
+
+def _status_bridge_stamp(value):
+    if not value:
+        return ""
+    m = re.search(r"[0-9]{4}\.[0-9]{2}\.[0-9]{2}[a-z]?", value)
+    return m.group(0) if m else ""
+
+
+def _status_segments(value):
+    if not value:
+        return []
+    parts, depth, quote, cur = [], 0, False, ""
+    for i, ch in enumerate(value):
+        if ch == '"':
+            quote = not quote
+        elif not quote and ch in "([":
+            depth += 1
+        elif not quote and ch in ")]":
+            depth = max(0, depth - 1)
+        if depth == 0 and not quote and (ch == ";" or (ch == "." and value[i + 1:i + 2] in (" ", ""))):
+            parts.append(cur.strip())
+            cur = ""
+            continue
+        cur += ch
+    parts.append(cur.strip())
+    return [p for p in parts if p]
+
+
+def _status_prefix_of(rest, multi):
+    mark_at = rest.find(_STATUS_TRAITS_MARK)
+    if mark_at == -1:
+        head = rest
+        tail = ""
+    else:
+        head = rest[:mark_at]
+        tail = rest[mark_at:]
+    if ": " not in head:
+        if multi:
+            return None, None, "-"
+        return None, rest, None
+    cut = head.find(": ")
+    part = head[:cut]
+    invalid = part == "" or part != part.strip() or ";" in part or _STATUS_ARROW in part or ":" in part
+    if (not multi) or invalid:
+        return None, None, part or "-"
+    return part, head[cut + 2:] + tail, None
+
+
+def _status_workflow_part(body):
+    if body == "not yet classified":
+        return None
+    if body.count(_STATUS_TRAITS_MARK) != 1:
+        return None
+    head, traits_text = body.split(_STATUS_TRAITS_MARK, 1)
+    segments = [segment.strip() for segment in head.split(_STATUS_ARROW)]
+    for segment in segments:
+        for name in [n.strip() for n in segment.split(",")]:
+            if name == "":
+                return None
+    sub_name = None
+    if _STATUS_ARROW in head:
+        type_name, sub_name = head.split(_STATUS_ARROW, 1)
+        type_name, sub_name = type_name.strip(), sub_name.strip()
+    else:
+        type_name = head.strip()
+    traits_text = traits_text.strip()
+    if traits_text == "none":
+        traits = []
+    else:
+        traits = [t.strip() for t in traits_text.split(", ")]
+    return {"type": type_name, "subtype": sub_name or None, "traits": traits}
+
+
+def status_workflows(text):
+    """(parts, problems) from the status file's Workflows lines (strict grammar)."""
+    body = _status_prose_body(text)
+    lines = [line for line in body.splitlines() if line.startswith("Workflows: ")]
+    if not lines:
+        return [], []
+    multi = len(lines) > 1
+    parts, problems = [], []
+    seen_parts = {}
+    for line in lines:
+        rest = line[len("Workflows: "):]
+        part, body_line, bad = _status_prefix_of(rest, multi)
+        if bad is not None:
+            problems.append("Workflows line breaks the part-prefix rule")
+            continue
+        if part is not None:
+            seen_parts[part] = seen_parts.get(part, 0) + 1
+            if seen_parts[part] == 2:
+                problems.append("two Workflows lines name the same part")
+        if body_line == "not yet classified":
+            continue
+        if body_line.count(_STATUS_TRAITS_MARK) != 1:
+            problems.append("Workflows line must contain '; traits: ' exactly once")
+            continue
+        head, _traits = body_line.split(_STATUS_TRAITS_MARK, 1)
+        empty = False
+        for segment in [s.strip() for s in head.split(_STATUS_ARROW)]:
+            for name in [n.strip() for n in segment.split(",")]:
+                if name == "":
+                    empty = True
+        if empty:
+            problems.append("empty name in the Workflows head")
+            continue
+        parsed = _status_workflow_part(body_line)
+        if parsed is not None:
+            parts.append(parsed)
+    return parts, problems
+
+
+def status_fallback(text):
+    """The six project-status fields read from prose (one copy each)."""
+    body = _status_prose_body(text)
+    phase_raw = _status_hook_field(body, "Phase") or ""
+    phase_word = phase_raw.split()[0].lower() if phase_raw.split() else ""
+    awaiting_raw = _status_hook_field(body, "Awaiting user on")
+    if awaiting_raw is None:
+        awaiting = ""
+    else:
+        awaiting = _normalize_wait(awaiting_raw)
+    bridge = _status_bridge_stamp(_status_hook_field(body, "Bridge version") or "")
+    stage = _status_stage_field(body) or ""
+    issues_line = _OPEN_ISSUES_RX.search(body)
+    open_issues = _status_segments(issues_line.group(1)) if issues_line else []
+    workflows, _problems = status_workflows(text)
+    return {
+        "phase": phase_word,
+        "workflows": workflows,
+        "awaiting_user_on": awaiting,
+        "bridge_version": bridge,
+        "stage": stage,
+        "open_issues": open_issues,
+    }
+
+
+def status_values(text):
+    """(values, malformed, disagrees) for a status file's six header fields."""
+    fallback = status_fallback(text)
+    header = None
+    malformed = None
+    try:
+        header, _body = read_header(text)
+    except HeaderError as err:
+        malformed = (err.line, str(err))
+        return fallback, malformed, []
+    if header is None:
+        return fallback, None, []
+    findings = check_header("project-status", header)
+    if findings:
+        malformed = (1, "; ".join(findings))
+        return fallback, malformed, []
+    values = {
+        "phase": header.get("phase", ""),
+        "workflows": list(header.get("workflows") or []),
+        "awaiting_user_on": header.get("awaiting_user_on", ""),
+        "bridge_version": header.get("bridge_version", ""),
+        "stage": header.get("stage", ""),
+        "open_issues": list(header.get("open_issues") or []),
+    }
+    disagrees = header_agrees("project-status", header, fallback)
+    return values, None, disagrees
+

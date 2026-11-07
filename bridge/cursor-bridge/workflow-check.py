@@ -45,6 +45,11 @@ import stat
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+try:
+    import bridge_env  # noqa: E402
+except ImportError:
+    bridge_env = None
 DEFAULT_OPEN = os.path.join(HERE, "workflow", "open-list.md")
 DEFAULT_REGISTRY = os.path.join(HERE, "workflow", "extension-points.md")
 DEFAULT_ROOT = os.path.join(HERE, "workflow")
@@ -815,6 +820,13 @@ def main(argv=None):
         if err:
             errors.append((shown, err))
         else:
+            if bridge_env is not None and hasattr(bridge_env, "status_values"):
+                _values, malformed, _disagrees = bridge_env.status_values(text)
+                if malformed is not None:
+                    line, what = malformed
+                    print("HEADER MALFORMED: %s:%d %s" % (escape_field(shown), line, escape_field(what)))
+                    print("RESULT: not checked")
+                    return 2
             status_texts.append((status, text))
     if errors:
         for path, reason in errors:

@@ -635,7 +635,7 @@
           "choices": null,
           "default": 120,
           "dest": "max_lines",
-          "help": null,
+          "help": "maximum status body lines after the header (default 120)",
           "nargs": null,
           "option_strings": [
             "--max-lines"
@@ -647,7 +647,7 @@
           "choices": null,
           "default": 12000,
           "dest": "max_chars",
-          "help": null,
+          "help": "maximum status body characters after the header (default 12000)",
           "nargs": null,
           "option_strings": [
             "--max-chars"
