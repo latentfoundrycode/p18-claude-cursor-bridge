@@ -65,6 +65,10 @@ import os
 import re
 import sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env  # noqa: E402
+
 HOME = os.path.expanduser("~")
 PROJECTS = {
     "reAngle": r"E:\ck04k02s01-reangle-prototype",
@@ -266,26 +270,7 @@ def outside(text, entries):
     return max(0, total - inside)
 
 
-def status_segments(value):
-    """The parts of an `Open issues:` value: split at `;` and at a sentence's end, outside brackets and quotes."""
-    parts, depth, quote, cur = [], 0, False, ""
-    for i, ch in enumerate(value):
-        if ch == '"':
-            quote = not quote
-        elif not quote and ch in "([":
-            depth += 1
-        elif not quote and ch in ")]":
-            depth = max(0, depth - 1)
-        if depth == 0 and not quote and (ch == ";" or (ch == "." and value[i + 1:i + 2] in (" ", ""))):
-            parts.append(cur.strip())
-            cur = ""
-            continue
-        cur += ch
-    parts.append(cur.strip())
-    return [p for p in parts if p]
-
-
-def status_entries(project_root, written):
+def status_entries(project_root, written, report=None):
     """[(id, label, body, lines)] of the incidents the status file's `Open issues:` line names as
     still to write (2026.10.25a, C8 of 2026-10-18), less those the Issues document already holds
     (`written`, a set of IDs). Only that one line of the status file is read."""
@@ -294,11 +279,14 @@ def status_entries(project_root, written):
         text = read(path)
     except OSError:
         return []
-    m = re.search(r"^\s*(?:[-*]\s+)?[*_`]*Open issues[*_`]*\s*:[*_`]*\s*(.*)$", text, re.M | re.I)
-    if not m:
-        return []
+    values, malformed, _disagrees = bridge_env.status_values(text)
+    if malformed is not None:
+        line, _what = malformed
+        if report is not None:
+            report.append("header malformed: %s:%d" % (path.replace("\\", "/"), line))
+    segments = values.get("open_issues") or []
     out = []
-    for seg in status_segments(m.group(1)):
+    for seg in segments:
         if not STATUS_TO_WRITE_RX.search(seg):
             continue
         ids = [x.upper() for x in ISS_ID_RX.findall(seg)]
@@ -339,7 +327,7 @@ def collect_entries(projects=None, home=None, report=None):
             if report is not None:
                 report.append("%s %s: %d entries, %d line(s) outside any entry" % (project, source, len(entries), outside(text, entries)))
         written = set(eid for source, eid, _, _ in rows if source == "issues")
-        to_write = status_entries(root, written)
+        to_write = status_entries(root, written, report)
         for eid, label, body, _ in to_write:
             rows.append(("status", eid, label, body))
         if report is not None and to_write:

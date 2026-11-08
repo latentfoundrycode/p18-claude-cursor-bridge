@@ -45,6 +45,35 @@ import stat
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+_bridge_env_import_err = None
+_bridge_bytecode = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
+try:
+    import bridge_env  # noqa: E402
+except BaseException as err:
+    bridge_env = None
+    _bridge_env_import_err = err
+finally:
+    sys.dont_write_bytecode = _bridge_bytecode
+
+
+def _safe_exc_type_name(err):
+    if err is None:
+        return "ImportError"
+    try:
+        return type(err).__name__
+    except BaseException:
+        return "an exception"
+
+
+def _bridge_env_refuse_line():
+    shown = slash(os.path.join(HERE, "bridge_env.py"))
+    if bridge_env is None:
+        return "%s: cannot be loaded (%s)" % (shown, _safe_exc_type_name(_bridge_env_import_err))
+    if not hasattr(bridge_env, "status_values"):
+        return "%s: cannot be used (%s)" % (shown, "ImportError")
+    return None
 DEFAULT_OPEN = os.path.join(HERE, "workflow", "open-list.md")
 DEFAULT_REGISTRY = os.path.join(HERE, "workflow", "extension-points.md")
 DEFAULT_ROOT = os.path.join(HERE, "workflow")
@@ -575,31 +604,6 @@ def check_item(root, item, tables):
     return findings
 
 
-def prefix_of(rest, multi):
-    """Return (part or None, body, bad).
-
-    bad is the part text (or '-') when the prefix rule fails and the line stops there.
-    The prefix is looked for only in the head, the text before the first traits marker.
-    """
-    mark_at = rest.find(TRAITS_MARK)
-    if mark_at == -1:
-        head = rest
-        tail = ""
-    else:
-        head = rest[:mark_at]
-        tail = rest[mark_at:]
-    if ": " not in head:
-        if multi:
-            return None, None, "-"
-        return None, rest, None
-    cut = head.find(": ")
-    part = head[:cut]
-    invalid = part == "" or part != part.strip() or ";" in part or "→" in part or ":" in part
-    if (not multi) or invalid:
-        return None, None, part or "-"
-    return part, head[cut + 2:] + tail, None
-
-
 def check_head(head, path, tables, findings):
     segments = [segment.strip() for segment in head.split("→")]
     names_by_seg = [[name.strip() for name in segment.split(",")] for segment in segments]
@@ -608,7 +612,7 @@ def check_head(head, path, tables, findings):
     for names in names_by_seg:
         for name in names:
             if name == "":
-                findings.append(("form", path, "-", "empty name in the Workflows head"))
+                findings.append(("form", path, "-", bridge_env.STATUS_WORKFLOWS_PROBLEMS[3]))
                 continue
             if name in tables["workflow_by_name"]:
                 types_found.append(tables["workflow_by_name"][name])
@@ -679,20 +683,24 @@ def check_status(path, text, tables):
     multi = len(lines) > 1
     findings = []
     seen_parts = {}
+    p0, p1, p2, p3 = bridge_env.STATUS_WORKFLOWS_PROBLEMS
     for line in lines:
         rest = line[len("Workflows: "):]
-        part, body, bad = prefix_of(rest, multi)
-        if bad is not None:
-            findings.append(("form", shown, bad, "Workflows line breaks the part-prefix rule"))
+        part, body, bad, line_problems, _parsed = bridge_env.status_workflow_line(rest, multi, seen_parts)
+        for reason in line_problems:
+            if reason == p3:
+                continue
+            if reason == p0:
+                findings.append(("form", shown, bad if bad is not None else "-", reason))
+            elif reason == p1:
+                findings.append(("form", shown, "-", reason))
+            elif reason == p2:
+                findings.append(("e", shown, part or "-", reason))
+        if p0 in line_problems or p1 in line_problems:
             continue
-        if part is not None:
-            seen_parts[part] = seen_parts.get(part, 0) + 1
-            if seen_parts[part] == 2:
-                findings.append(("e", shown, part, "two Workflows lines name the same part"))
+        if len(line_problems) > 1 and p3 not in line_problems:
+            continue
         if body == "not yet classified":
-            continue
-        if body.count(TRAITS_MARK) != 1:
-            findings.append(("form", shown, "-", "Workflows line must contain '; traits: ' exactly once"))
             continue
         head, traits = body.split(TRAITS_MARK, 1)
         check_head(head, shown, tables, findings)
@@ -815,6 +823,17 @@ def main(argv=None):
         if err:
             errors.append((shown, err))
         else:
+            refuse = _bridge_env_refuse_line()
+            if refuse is not None:
+                print(escape_field(refuse))
+                print("RESULT: not checked")
+                return 2
+            _values, malformed, _disagrees = bridge_env.status_values(text)
+            if malformed is not None:
+                line, what = malformed
+                print("HEADER MALFORMED: %s:%d %s" % (escape_field(shown), line, escape_field(what)))
+                print("RESULT: not checked")
+                return 2
             status_texts.append((status, text))
     if errors:
         for path, reason in errors:

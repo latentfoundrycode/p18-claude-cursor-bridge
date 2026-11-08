@@ -277,6 +277,7 @@ def _bridge_copy(tmp_path, with_checker=True, with_rules=True):
     folder.mkdir()
     for name in ("inventory-check.py", "conformance-check.py"):
         shutil.copyfile(BRIDGE / name, folder / name)
+    shutil.copyfile(BRIDGE / "bridge_env.py", folder / "bridge_env.py")
     if with_checker:
         shutil.copyfile(BRIDGE / "workflow-check.py", folder / "workflow-check.py")
     if with_rules:

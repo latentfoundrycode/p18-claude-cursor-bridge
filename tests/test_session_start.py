@@ -186,3 +186,24 @@ def test_never_blocks_on_bad_input(home):
     env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
     p = subprocess.run([sys.executable, PROG], input="not json", capture_output=True, text=True, env=env)
     assert p.returncode == 0
+
+
+def test_bridge_env_that_raises_at_import_prints_one_plain_line(tmp_path, home):
+    """R-058: a broken bridge_env.py beside the hook prints one line and nothing else on --part pointers."""
+    hook_dir = tmp_path / "hook"
+    hook_dir.mkdir()
+    broken = 'raise RuntimeError("broken")\n'
+    (hook_dir / "bridge_env.py").write_text(broken, encoding="utf-8")
+    with open(PROG, encoding="utf-8") as f:
+        (hook_dir / "session-start.py").write_text(f.read(), encoding="utf-8")
+    root = tmp_path / "proj"
+    (root / "Workspace" / "docs").mkdir(parents=True)
+    (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
+    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
+    data = json.dumps({"cwd": str(root / "Workspace"), "hook_event_name": "SessionStart", "source": "compact"})
+    p = subprocess.run(
+        [sys.executable, str(hook_dir / "session-start.py"), "--part", "pointers"],
+        input=data, capture_output=True, text=True, encoding="utf-8", env=env,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    assert p.returncode == 0 and p.stderr == ""
+    assert p.stdout == "~/.claude/cursor-bridge/bridge_env.py: cannot be loaded (RuntimeError)\n"

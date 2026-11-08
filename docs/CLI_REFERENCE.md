@@ -450,8 +450,8 @@ Check the project's current-state record.
 - `--inventory`; default: "docs/INVENTORY.md"; required: false
 - `--status`; default: "docs/PROJECT_STATUS.md"; required: false
 - `--changes`; default: "docs/CHANGES.md"; required: false
-- `--max-lines`; default: 120; required: false
-- `--max-chars`; default: 12000; required: false
+- `--max-lines`; default: 120; required: false; maximum status body lines after the header (default 120)
+- `--max-chars`; default: 12000; required: false; maximum status body characters after the header (default 12000)
 
 ## invisible-check.py
 
