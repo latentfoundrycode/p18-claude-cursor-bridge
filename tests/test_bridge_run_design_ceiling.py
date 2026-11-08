@@ -21,7 +21,7 @@ def design_cmd(name, mode="--mode=ask"):
 
 
 def run_parameters(folder, *lines):
-    (folder / "docs").mkdir(parents=True, exist_ok=True)
+    (folder / "docs").mkdir(exist_ok=True)
     (folder / "docs" / "RUN_PARAMETERS.md").write_text("# Run parameters\n" + "".join(l + "\n" for l in lines),
                                                         encoding="utf-8", newline="\n")
 
@@ -302,6 +302,8 @@ def test_r061_design_lifts_read_header_first_when_agreeing(program, tmp_path):
               "    date: \"2026-11-04\"\nreview_rounds_above_ceiling: []\n---\n")
     plain = tmp_path / "plain"
     headed = tmp_path / "head"
+    plain.mkdir()
+    headed.mkdir()
     run_parameters(plain, line.strip())
     run_parameters(headed, header + line)
     assert br.design_lifts(str(headed)) == br.design_lifts(str(plain)) == {"pace": 8}

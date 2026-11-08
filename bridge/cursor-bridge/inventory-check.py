@@ -82,7 +82,7 @@ def _safe_exc_type_name(err):
 _INVENTORY_BRIDGE_NAMES = (
     "status_values", "read_header", "check_header", "header_agrees",
     "inventory_fallback", "inventory_reflected_through", "inventory_parse_tables",
-    "run_parameters_values", "run_parameters_fallback",
+    "run_parameters_fallback",
 )
 
 
@@ -324,6 +324,11 @@ def main():
 
     rp_path = os.path.join(os.path.dirname(a.inventory) or ".", "RUN_PARAMETERS.md")
     if os.path.isfile(rp_path):
+        refuse = _bridge_env_refuse_line()
+        if refuse is not None:
+            print(escape_field(refuse))
+            print("RESULT: not checked")
+            return 2
         rp_text = read(rp_path)
         shown_rp = rp_path.replace("\\", "/")
         try:

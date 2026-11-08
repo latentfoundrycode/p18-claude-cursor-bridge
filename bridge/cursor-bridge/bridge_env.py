@@ -354,8 +354,8 @@ CEILING_LIFT_RE = re.compile(
 )
 
 AGENT_CEILING_RE = re.compile(
-    r"^\s*[-*]?\s*\**Agent ceiling\**\s*:\s*(\d+)",
-    re.M | re.I,
+    r"^[ \t]*[-*]?[ \t]*\**Agent ceiling\**\s*:\s*(\d+)",
+    re.I,
 )
 
 _RUN_PARAM_VALUE_PREFIXES = (
@@ -703,9 +703,18 @@ def _run_parameters_prose_body(text):
     return text
 
 
+def _run_param_body_lines(body):
+    if not body:
+        return []
+    text = body.replace("\r\n", "\n").replace("\r", "\n")
+    if not text:
+        return []
+    return text.split("\n")
+
+
 def _review_lifts_from_lines(body):
     lifts = {}
-    for line in (body or "").splitlines():
+    for line in _run_param_body_lines(body or ""):
         m = REVIEW_LIFT_RE.match(line.strip())
         if not m:
             continue
@@ -748,9 +757,12 @@ def review_owner_lifts(folder):
         id_part = item.get("id")
         if not id_part or id_part in lifts:
             continue
+        rounds = item.get("rounds")
+        if not isinstance(rounds, int) or rounds <= REVIEW_ROUNDS:
+            continue
         entry = line_lifts.get(id_part)
         line_text = entry[1] if entry else ""
-        lifts[id_part] = (item.get("rounds"), line_text)
+        lifts[id_part] = (rounds, line_text)
     return lifts
 
 
@@ -2768,20 +2780,24 @@ def run_parameters_fallback(text):
     keys = [k for k in schema if k not in ("record", "header")]
     out = {k: ([] if k in ("ceiling_above_twice", "design_rounds_above_five", "review_rounds_above_ceiling")
                else (None if k == "agent_ceiling" else "")) for k in keys}
+    lines = _run_param_body_lines(body)
     for key, prefix in _RUN_PARAM_VALUE_PREFIXES:
-        for line in body.splitlines():
+        for line in lines:
             tok = _run_param_value_token(line, prefix)
             if tok is not None:
                 out[key] = tok
                 break
-    m = AGENT_CEILING_RE.search(body)
-    if m:
+    for line in lines:
+        m = AGENT_CEILING_RE.match(line.strip())
+        if not m:
+            continue
         try:
             out["agent_ceiling"] = int(m.group(1))
+            break
         except ValueError:
-            pass
+            continue
     seen_kind = set()
-    for line in body.splitlines():
+    for line in lines:
         m = CEILING_LIFT_RE.match(line.strip())
         if not m:
             continue
@@ -2798,7 +2814,7 @@ def run_parameters_fallback(text):
         seen_kind.add(kind)
         out["ceiling_above_twice"].append({"kind": kind, "seconds": seconds, "words": words})
     seen_subject = set()
-    for line in body.splitlines():
+    for line in lines:
         m = DESIGN_LIFT_RE.match(line.strip())
         if not m:
             continue
@@ -2820,7 +2836,7 @@ def run_parameters_fallback(text):
             {"subject": subject, "rounds": rounds, "words": words, "date": date}
         )
     seen_id = set()
-    for line in body.splitlines():
+    for line in lines:
         m = REVIEW_LIFT_RE.match(line.strip())
         if not m:
             continue

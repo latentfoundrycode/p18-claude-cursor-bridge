@@ -428,7 +428,7 @@ def design_lifts(folder):
     for item in values.get("design_rounds_above_five") or []:
         subject = item.get("subject")
         rounds = item.get("rounds")
-        if subject and subject not in lifts and isinstance(rounds, int):
+        if subject and subject not in lifts and isinstance(rounds, int) and rounds > DESIGN_DEFAULT_ROUNDS:
             lifts[subject] = rounds
     return lifts
 

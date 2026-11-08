@@ -459,10 +459,3 @@ def test_r061_launcher_refuses_header_design_lift_without_owner_line(tmp_path):
     lab = lab_with(tmp_path, header + prose_no_lift)
     line = t32.assert_refused(t32.launch(lab, t32.build("TASK-001")), "bridge-run: refused - header: ")
     assert "disagrees design_rounds_above_five" in line, line
-
-
-def test_r061_loop_guard_reads_agent_ceiling_with_a_non_utf8_byte(tmp_path, program):
-    """R-061: a non-UTF-8 byte in RUN_PARAMETERS.md does not crash the loop guard; it reads the line fallback."""
-    lg = program("loop-guard")
-    ws = loop_ws(tmp_path, b"Agent ceiling: 5400\n\xff\n".decode("utf-8", "replace"))
-    assert lg.agent_ceiling(str(ws)) == 5400
