@@ -84,7 +84,10 @@ def test_task033r2_a_long_whitespace_run_is_read_in_linear_time(tmp_path, progra
 
 
 def test_task033r2_plan_check_gives_its_git_command_a_limit(tmp_path, program, monkeypatch):
-    """R-044. plan-check.py's git command is given a limit (the security audit's r1 A7).
+    """R-044. plan-check.py's git command is given a limit (the security audit's r1 A7). Since TASK-048 (R-059; the
+    design's retired reading (11)) plan-check.py keeps no merged_ids of its own and reads the merged set through
+    bridge_env.squash_merged_ids(<the current folder>, PLAN_ID_PATTERN, ref=<--base>), which tests/test_header_plan.py
+    pins, so the git command watched is that call's.
     enforces: handoff/TASK-033.md Constraints ("Give every subprocess a timeout"); handoff/TASK-033-r2.md
     Requirement 1."""
     repo = subject_repo(tmp_path, "TASK-100: x (#1)")
@@ -92,7 +95,8 @@ def test_task033r2_plan_check_gives_its_git_command_a_limit(tmp_path, program, m
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", os.devnull)
     monkeypatch.chdir(str(repo))
     watch = GitWatch(monkeypatch)
-    assert program("plan-check").merged_ids("main") == {"TASK-100"}
+    be = program("bridge_env")
+    assert be.squash_merged_ids(os.getcwd(), be.PLAN_ID_PATTERN, ref="main") == {"TASK-100"}
     assert watch.calls, "no git command was seen"
     assert all(t is not None for _, t in watch.calls), watch.calls
 

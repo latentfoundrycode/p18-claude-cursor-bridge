@@ -656,7 +656,11 @@ def builder_review_refusal(argv, folder, kind):
             "revised in place: write handoff/%s-r%d.md" % (id_part, name_round + 1),
             None,
         )
-    brief_text = brief_bytes.decode("utf-8", errors="replace")
+    brief_text = bridge_env.decode_record_bytes(brief_bytes)
+    brief_shown = os.path.join("handoff", brief_name + ".md").replace("\\", "/")
+    header_reason = bridge_env.brief_header_refusal(brief_text, brief_shown)
+    if header_reason:
+        return (_ascii_refusal(header_reason), None)
     merge_ids = bridge_env.merge_unit_ids(brief_text)
     if merge_ids is None and bridge_env.merge_unit_line_present(brief_text):
         return (_brief_rule_refusal("brief rule: Merge unit: line is not valid"), None)
@@ -666,13 +670,32 @@ def builder_review_refusal(argv, folder, kind):
     if merge_ids is not None:
         if not has_plan:
             return (_brief_rule_refusal("brief rule: Merge unit: cannot be checked without docs/BUILD_PLAN.md"), None)
-        plan_ids = bridge_env.plan_increment_ids(ws)
+        import glob as _plan_glob
+
+        for plan_file in sorted(_plan_glob.glob(os.path.join(ws, "docs", "BUILD_PLAN*.md"))):
+            plan_shown = os.path.relpath(plan_file, ws).replace("\\", "/")
+            try:
+                plan_text = bridge_env.read_record_text(plan_file)
+            except OSError:
+                return (
+                    _ascii_refusal("bridge-run: refused - cannot read %s" % plan_shown),
+                    None,
+                )
+            plan_reason = bridge_env.plan_header_refusal(plan_text, plan_shown)
+            if plan_reason:
+                return (_ascii_refusal(plan_reason), None)
+        try:
+            plan_ids = bridge_env.plan_increment_ids(ws)
+        except bridge_env.PlanFileReadRefusal as err:
+            return (_ascii_refusal(err.line), None)
         plan_id_rx = re.compile(bridge_env.PLAN_ID_PATTERN)
         scope_mu = None
         scope_path = os.path.join(ws, "run", "review", "SCOPE-%s.md" % id_part)
         if os.path.isfile(scope_path):
             try:
-                scope_mu = bridge_env.merge_unit_ids(open(scope_path, encoding="utf-8", errors="replace").read())
+                scope_mu = bridge_env._merge_unit_from_prose(
+                    open(scope_path, encoding="utf-8", errors="replace").read()
+                )
             except OSError:
                 scope_mu = None
         for mid in merge_ids:
@@ -711,7 +734,7 @@ def builder_review_refusal(argv, folder, kind):
     if eff_round > bridge_env.REVIEW_ROUNDS:
         if eff_round <= owner_cap:
             lift, lift_line = "owner", owner_entry[1] if owner_entry else ""
-        elif blk:
+        elif blk and blk[1] and blk[2]:
             line = blk[2]
             if line in class_used and not prior:
                 return (_ascii_refusal("review ceiling: class line already used for %s" % id_part), None)

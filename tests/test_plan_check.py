@@ -190,17 +190,18 @@ def _new_merged_ids_per_commit(repo):
     return out
 
 
-def _load_plan_check():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("plan_check_t", PROG)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+def _plan_check_merged(base):
+    """The merged set plan-check.py reads: since TASK-048 (R-059; the design's retired reading (11)) it keeps no
+    merged_ids of its own and calls bridge_env.squash_merged_ids(<the current folder>, PLAN_ID_PATTERN, ref=<--base>),
+    which tests/test_header_plan.py pins."""
+    if CB not in sys.path:
+        sys.path.insert(0, CB)
+    import bridge_env
+    return bridge_env.squash_merged_ids(os.getcwd(), bridge_env.PLAN_ID_PATTERN, ref=base)
 
 
 def test_r044_iss013_subject_merges_nothing_beside_bare_parenthesis(tmp_path, monkeypatch):
     """R-044. 9f6ace6's subject merges nothing; (TASK-100, R-027) merges TASK-100."""
-    pc = _load_plan_check()
     repo = tmp_path / "r"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(repo), env=ENV, check=True, timeout=120)
@@ -216,7 +217,7 @@ def test_r044_iss013_subject_merges_nothing_beside_bare_parenthesis(tmp_path, mo
     git(repo, "commit", "-q", "--allow-empty", "-m", "feat(x): ok (TASK-100, R-027) (#1)")
     git(repo, "commit", "-q", "--allow-empty", "-m", iss.stdout.strip())
     monkeypatch.chdir(str(repo))
-    assert pc.merged_ids("main") == {"TASK-100"}
+    assert _plan_check_merged("main") == {"TASK-100"}
 
 
 @pytest.mark.parametrize(
@@ -228,13 +229,12 @@ def test_r044_iss013_subject_merges_nothing_beside_bare_parenthesis(tmp_path, mo
 )
 def test_r044_non_bare_parenthesis_merges_nothing(tmp_path, subject, monkeypatch):
     """R-044. Non-bare closing parenthesis merges nothing (ISS-013)."""
-    pc = _load_plan_check()
     repo = tmp_path / "r"
     repo.mkdir()
     git(repo, "init", "-q", "-b", "main")
     git(repo, "commit", "-q", "--allow-empty", "-m", subject)
     monkeypatch.chdir(str(repo))
-    assert pc.merged_ids("main") == set()
+    assert _plan_check_merged("main") == set()
 
 
 def test_r044_main_regression_minus_task031(monkeypatch):

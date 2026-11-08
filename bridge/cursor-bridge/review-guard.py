@@ -673,7 +673,7 @@ def scope_blocking_line(root, id_part):
                 text = open(p, encoding="utf-8", errors="replace").read()
             except OSError:
                 continue
-            blk = bridge_env.read_blocking_class_line(text)
+            blk = bridge_env._blocking_class_from_prose(text)
             if blk:
                 return blk
     return None
@@ -686,6 +686,20 @@ def snapshot_review_refusal(nnn, root, common):
     if not parsed:
         return "review-guard: refused - the name cannot be read by the grammar"
     id_part, name_round = parsed
+    brief_path = os.path.join(root, "handoff", id_part + ".md")
+    if os.path.exists(brief_path) and not os.path.isfile(brief_path):
+        return "review-guard: refused - cannot read handoff/%s.md" % id_part
+    if os.path.isfile(brief_path):
+        try:
+            brief_text = bridge_env.read_record_text(brief_path)
+        except OSError:
+            return "review-guard: refused - cannot read handoff/%s.md" % id_part
+        shown = os.path.join("handoff", id_part + ".md").replace("\\", "/")
+        header_reason = bridge_env.brief_header_refusal(
+            brief_text, shown, keys=("merge_unit", "id", "round"),
+        )
+        if header_reason:
+            return "review-guard: refused - %s" % header_reason
     log_folder = bridge_env.launcher_log_folder(common, root)
     id_rx = bridge_env.grammar_id_rx()
     owner_lifts = bridge_env.review_owner_lifts(root)
@@ -735,7 +749,7 @@ def snapshot_review_refusal(nnn, root, common):
             return None
         if recorded and recorded.get("lift"):
             return None
-        if blk and blk[2] not in used_class:
+        if blk and blk[1] and blk[2] and blk[2] not in used_class:
             return None
         return (
             "review-guard: refused - review ceiling: %s (id %s, branch %s, round %d, ceiling %d)"

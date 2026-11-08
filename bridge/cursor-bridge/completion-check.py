@@ -45,6 +45,10 @@ import re
 import subprocess
 import sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env
+
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 ID_RX = re.compile(r"\bR-\d{3,}\b")
@@ -70,8 +74,7 @@ SKIP_PATH = re.compile(r"(^|/)(docs|\.claude|\.cursor|\.github|node_modules|vend
 
 
 def read(path):
-    with open(path, encoding="utf-8-sig", errors="replace") as f:
-        return f.read()
+    return bridge_env.read_record_text(path)
 
 
 def tracked():
@@ -146,15 +149,44 @@ def main():
             reqs = {k: v for k, v in reqs.items() if k in only}
             notes.append("limited to %d of %d requirements (--only %s)" % (len(reqs), total, ", ".join(sorted(only))))
 
-    # plan coverage
     plans = sorted(glob.glob("docs/BUILD_PLAN*.md"))
-    plan_text = "\n".join(read(p) for p in plans)
     if not plans:
         notes.append("no docs/BUILD_PLAN*.md found - plan coverage not checked")
     else:
         satisfied = set()
-        for m in re.finditer(r"^\s*(?:[-*]\s+)?\**Satisfies\**\s*:\s*(.*)$", plan_text, re.M | re.I):
-            satisfied.update(ID_RX.findall(m.group(1)))
+        header_union = set()
+        has_build_plan_header = False
+        for p in plans:
+            text = read(p)
+            fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
+            if fatal:
+                print(fatal[0])
+                return 2
+            if hdr is not None:
+                has_build_plan_header = True
+                for st in hdr.get("stages") or []:
+                    for inc in st.get("increments") or []:
+                        for rid in inc.get("satisfies") or []:
+                            satisfied.add(rid)
+                            header_union.add(rid)
+            else:
+                body = bridge_env.plan_body(text)
+                satisfied.update(bridge_env.plan_collect_satisfies_ids(body))
+        if has_build_plan_header:
+            disagree = False
+            for p in plans:
+                text = read(p)
+                fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
+                if fatal or hdr is None:
+                    continue
+                for rid in bridge_env.plan_r_ids_outside_headers(text):
+                    if rid not in header_union:
+                        disagree = True
+                        break
+                if disagree:
+                    break
+            if disagree:
+                fails.append("HEADER DISAGREES: satisfies")
         for rid, (kind, text) in sorted(reqs.items()):
             if kind == "planned" and rid not in satisfied:
                 fails.append("UNPLANNED: %s (%s) is in no increment's Satisfies: field" % (rid, text[:70]))

@@ -35,7 +35,9 @@ SHIPPED = os.path.join("bridge", "cursor-bridge", "completion-check.py")
 
 def _repo(tmp_path, extra=None):
     """A scratch project complete but for what `extra` adds, shipping a tracked copy of the completion check as the
-    bridge does, and running that copy."""
+    bridge does, and running that copy. Since TASK-048 (R-059; D-002's designed edge completion_check --> bridge_env)
+    the completion check imports bridge_env from its own folder, so the copy ships beside bridge_env.py, as the
+    bridge's folder holds them."""
     r = tmp_path / "ws"
     (r / "docs").mkdir(parents=True)
     (r / "tests").mkdir()
@@ -46,6 +48,7 @@ def _repo(tmp_path, extra=None):
     (r / "tests" / "test_parse.py").write_text("def test_r001():  # R-001\n    assert True\n", encoding="utf-8")
     (r / "src" / "parse.py").write_text("X = 1\n", encoding="utf-8")
     shutil.copyfile(C.PROG, str(r / SHIPPED))
+    shutil.copyfile(os.path.join(os.path.dirname(C.PROG), "bridge_env.py"), str(r / "bridge" / "cursor-bridge" / "bridge_env.py"))
     for rel, text in (extra or {}).items():
         (r / rel).write_text(text, encoding="utf-8")
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(r), check=True, env=C.ENV)
