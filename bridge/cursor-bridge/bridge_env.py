@@ -341,6 +341,33 @@ REVIEW_LIFT_RE = re.compile(
     r"([A-Z][A-Za-z0-9-]*)\s+([0-9]+)\s*\((.+)\)"
 )
 
+DESIGN_DEFAULT_ROUNDS = 5
+
+DESIGN_LIFT_RE = re.compile(
+    r"^\s*[-*]?\s*(?:\*\*(?i:Design rounds above five):\*\*|\*\*(?i:Design rounds above five)\*\*:|(?i:Design rounds above five):)\s*"
+    r"([a-z0-9-]+)\s+([0-9]+)\s*\((.+)\)"
+)
+
+CEILING_LIFT_RE = re.compile(
+    r"^\s*[-*]?\s*\**Ceiling above twice\**\s*:\s*(\w+)\s+(\d+)\s*\((.+)\)",
+    re.I,
+)
+
+AGENT_CEILING_RE = re.compile(
+    r"^\s*[-*]?\s*\**Agent ceiling\**\s*:\s*(\d+)",
+    re.M | re.I,
+)
+
+_RUN_PARAM_VALUE_PREFIXES = (
+    ("stage_pause", "Stage pause: "),
+    ("merge_authority", "Merge authority: "),
+    ("refactoring_pass", "Refactoring pass: "),
+    ("installer_verification", "Installer verification: "),
+    ("parallel_increments", "Parallel increments: "),
+)
+
+_LIFT_DATE_SUFFIX = re.compile(r",\s*(\d{4}-\d{2}-\d{2})\s*$")
+
 BLOCKING_CLASS_RE = re.compile(
     r"^\s*(?:[-*]\s+)?Blocking class:\s*([^-\n]+?)\s*-\s*(.+?)\s*$",
 )
@@ -644,16 +671,41 @@ def read_blocking_class_line(text):
     return _blocking_class_from_prose(src)
 
 
-def review_owner_lifts(folder):
-    """{id: (max_round, line_text)} from the first well-formed owner's line per id."""
-    lifts = {}
-    path = os.path.join(folder, "docs", "RUN_PARAMETERS.md")
+def _lift_words_and_date(paren_text):
+    text = (paren_text or "").strip()
+    m = _LIFT_DATE_SUFFIX.search(text)
+    if m:
+        return text[: m.start()].strip(), m.group(1)
+    return text, ""
+
+
+def _run_param_value_token(line, prefix):
+    if not line.startswith(prefix):
+        return None
+    rest = line[len(prefix) :]
+    if not rest:
+        return ""
+    sp = rest.find(" ")
+    return rest if sp < 0 else rest[:sp]
+
+
+def _run_parameters_prose_body(text):
+    if not isinstance(text, str):
+        return ""
+    if text.startswith("\ufeff"):
+        text = text[1:]
     try:
-        with open(path, encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-    except OSError:
-        return lifts
-    for line in lines:
+        header, body = read_header(text)
+        if header is not None:
+            return body if body is not None else ""
+    except HeaderError:
+        pass
+    return text
+
+
+def _review_lifts_from_lines(body):
+    lifts = {}
+    for line in (body or "").splitlines():
         m = REVIEW_LIFT_RE.match(line.strip())
         if not m:
             continue
@@ -670,6 +722,35 @@ def review_owner_lifts(folder):
         if rounds <= REVIEW_ROUNDS:
             continue
         lifts[id_part] = (rounds, line.strip())
+    return lifts
+
+
+def review_owner_lifts(folder):
+    """{id: (max_round, line_text)} from review lifts, header first when well-formed."""
+    path = os.path.join(folder, "docs", "RUN_PARAMETERS.md")
+    try:
+        text = read_record_text(path)
+    except OSError:
+        return {}
+    body = _run_parameters_prose_body(text)
+    line_lifts = _review_lifts_from_lines(body)
+    values, malformed, _ = run_parameters_values(text)
+    if malformed is not None:
+        return line_lifts
+    try:
+        header, _hb = read_header(text)
+    except HeaderError:
+        return line_lifts
+    if header is None:
+        return line_lifts
+    lifts = {}
+    for item in values.get("review_rounds_above_ceiling") or []:
+        id_part = item.get("id")
+        if not id_part or id_part in lifts:
+            continue
+        entry = line_lifts.get(id_part)
+        line_text = entry[1] if entry else ""
+        lifts[id_part] = (item.get("rounds"), line_text)
     return lifts
 
 
@@ -2678,6 +2759,147 @@ def status_fallback(text):
         "stage": stage,
         "open_issues": open_issues,
     }
+
+
+def run_parameters_fallback(text):
+    """The nine run-parameters fields read from prose lines (one copy each)."""
+    body = _run_parameters_prose_body(text)
+    schema = HEADER_SCHEMAS["run-parameters"]
+    keys = [k for k in schema if k not in ("record", "header")]
+    out = {k: ([] if k in ("ceiling_above_twice", "design_rounds_above_five", "review_rounds_above_ceiling")
+               else (None if k == "agent_ceiling" else "")) for k in keys}
+    for key, prefix in _RUN_PARAM_VALUE_PREFIXES:
+        for line in body.splitlines():
+            tok = _run_param_value_token(line, prefix)
+            if tok is not None:
+                out[key] = tok
+                break
+    m = AGENT_CEILING_RE.search(body)
+    if m:
+        try:
+            out["agent_ceiling"] = int(m.group(1))
+        except ValueError:
+            pass
+    seen_kind = set()
+    for line in body.splitlines():
+        m = CEILING_LIFT_RE.match(line.strip())
+        if not m:
+            continue
+        kind = m.group(1).lower()
+        if kind in seen_kind:
+            continue
+        words = m.group(3).strip()
+        if not words:
+            continue
+        try:
+            seconds = int(m.group(2))
+        except ValueError:
+            continue
+        seen_kind.add(kind)
+        out["ceiling_above_twice"].append({"kind": kind, "seconds": seconds, "words": words})
+    seen_subject = set()
+    for line in body.splitlines():
+        m = DESIGN_LIFT_RE.match(line.strip())
+        if not m:
+            continue
+        subject = m.group(1)
+        if subject in seen_subject:
+            continue
+        paren = m.group(3).strip()
+        if not paren:
+            continue
+        try:
+            rounds = int(m.group(2))
+        except ValueError:
+            continue
+        if rounds <= DESIGN_DEFAULT_ROUNDS:
+            continue
+        words, date = _lift_words_and_date(paren)
+        seen_subject.add(subject)
+        out["design_rounds_above_five"].append(
+            {"subject": subject, "rounds": rounds, "words": words, "date": date}
+        )
+    seen_id = set()
+    for line in body.splitlines():
+        m = REVIEW_LIFT_RE.match(line.strip())
+        if not m:
+            continue
+        id_part = m.group(1)
+        if id_part in seen_id:
+            continue
+        paren = m.group(3).strip()
+        if not paren:
+            continue
+        try:
+            rounds = int(m.group(2))
+        except ValueError:
+            continue
+        if rounds <= REVIEW_ROUNDS:
+            continue
+        words, date = _lift_words_and_date(paren)
+        seen_id.add(id_part)
+        out["review_rounds_above_ceiling"].append(
+            {"id": id_part, "rounds": rounds, "words": words, "date": date}
+        )
+    return out
+
+
+def run_parameters_values(text):
+    """(values, malformed, disagrees) for run-parameters header fields."""
+    fallback = run_parameters_fallback(text)
+    header = None
+    malformed = None
+    try:
+        header, _body = read_header(text)
+    except HeaderError as err:
+        malformed = (err.line, str(err))
+        return fallback, malformed, []
+    if header is None:
+        return fallback, None, []
+    findings = check_header("run-parameters", header)
+    if findings:
+        malformed = (1, "; ".join(findings))
+        return fallback, malformed, []
+    schema = HEADER_SCHEMAS["run-parameters"]
+    list_keys = ("ceiling_above_twice", "design_rounds_above_five", "review_rounds_above_ceiling")
+
+    def _default(key):
+        if key in list_keys:
+            return []
+        if key == "agent_ceiling":
+            return None
+        return ""
+
+    values = {k: header.get(k, _default(k)) for k in schema if k not in ("record", "header")}
+    disagrees = header_agrees("run-parameters", header, fallback)
+    return values, None, disagrees
+
+
+def run_parameters_refusal(folder, keys):
+    """Malformed or disagreeing run-parameters header for the given keys, or None."""
+    path = os.path.join(folder, "docs", "RUN_PARAMETERS.md")
+    if not os.path.isfile(path):
+        return None
+    try:
+        text = read_record_text(path)
+    except OSError:
+        return None
+    shown = "docs/RUN_PARAMETERS.md"
+    try:
+        header, _body = read_header(text)
+    except HeaderError as err:
+        return "header: %s:%d %s" % (shown, err.line, err)
+    if header is None:
+        return None
+    findings = check_header("run-parameters", header)
+    if findings:
+        return "header: %s:1 %s" % (shown, "; ".join(findings))
+    fallback = run_parameters_fallback(text)
+    disagrees = header_agrees("run-parameters", header, fallback)
+    for key in keys:
+        if key in disagrees:
+            return "header: disagrees %s" % key
+    return None
 
 
 def status_values(text):

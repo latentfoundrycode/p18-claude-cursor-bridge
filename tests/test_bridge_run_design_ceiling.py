@@ -21,7 +21,7 @@ def design_cmd(name, mode="--mode=ask"):
 
 
 def run_parameters(folder, *lines):
-    (folder / "docs").mkdir(exist_ok=True)
+    (folder / "docs").mkdir(parents=True, exist_ok=True)
     (folder / "docs" / "RUN_PARAMETERS.md").write_text("# Run parameters\n" + "".join(l + "\n" for l in lines),
                                                         encoding="utf-8", newline="\n")
 
@@ -289,3 +289,19 @@ def test_the_launcher_refuses_with_125_before_it_starts_anything(tmp_path):
     assert p.stderr.startswith("bridge-run: refused - design ceiling: "), p.stderr
     assert "bridge-run: started" not in p.stderr, p.stderr
     assert not (tmp_path / "run" / "launcher" / "runs.jsonl").exists()
+
+
+def test_r061_design_lifts_read_header_first_when_agreeing(program, tmp_path):
+    """R-061: design_lifts returns the same ceiling from a agreeing header as from the owner's line alone."""
+    br = program("bridge-run")
+    line = "Design rounds above five: pace 8 (the owner, 2026-11-04)\n"
+    header = ("---\nrecord: run-parameters\nheader: 1\nstage_pause: \"\"\nmerge_authority: \"\"\n"
+              "refactoring_pass: \"\"\ninstaller_verification: \"\"\nparallel_increments: \"\"\n"
+              "agent_ceiling: null\nceiling_above_twice: []\n"
+              "design_rounds_above_five:\n  - subject: pace\n    rounds: 8\n    words: the owner\n"
+              "    date: \"2026-11-04\"\nreview_rounds_above_ceiling: []\n---\n")
+    plain = tmp_path / "plain"
+    headed = tmp_path / "head"
+    run_parameters(plain, line.strip())
+    run_parameters(headed, header + line)
+    assert br.design_lifts(str(headed)) == br.design_lifts(str(plain)) == {"pace": 8}

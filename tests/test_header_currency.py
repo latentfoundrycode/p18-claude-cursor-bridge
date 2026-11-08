@@ -194,3 +194,10 @@ def test_r057_no_program_keeps_a_retired_reading(number, program, match):
 
 
 # ---------------------------------------------------------------- builder's cases below this line
+
+
+def test_r057_run_parameters_fallback_is_the_only_ceiling_above_twice_reader():
+    """R-057: CEILING_LIFT_RE lives in bridge_env alone; loop-guard does not keep a copy."""
+    assert hasattr(bridge_env, "CEILING_LIFT_RE")
+    lg_tree = code_tree("loop-guard.py")
+    assert not reading_10(lg_tree)

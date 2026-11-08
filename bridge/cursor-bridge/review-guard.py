@@ -700,6 +700,9 @@ def snapshot_review_refusal(nnn, root, common):
         )
         if header_reason:
             return "review-guard: refused - %s" % header_reason
+    rp_reason = bridge_env.run_parameters_refusal(root, ("review_rounds_above_ceiling",))
+    if rp_reason:
+        return "review-guard: refused - %s" % rp_reason
     log_folder = bridge_env.launcher_log_folder(common, root)
     id_rx = bridge_env.grammar_id_rx()
     owner_lifts = bridge_env.review_owner_lifts(root)

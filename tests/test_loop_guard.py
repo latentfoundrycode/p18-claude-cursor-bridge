@@ -441,3 +441,17 @@ def test_bug021_the_clock_change_edges_of_cron_next(lg):
     assert lg.cron_next("30 2 30 2 *", NOW) is None, "the precondition: no time is found for 30 February"
     pending, unscheduled = lg.pending_from_hook({"background_tasks": [], "session_crons": [{"id": "c9", "schedule": "30 2 30 2 *"}]}, NOW, ".")
     assert pending == ["scheduled wake-up c9"] and not unscheduled, (pending, unscheduled)
+
+
+def test_r061_agent_ceiling_by_header_matches_line_when_agreeing(lg, tmp_path):
+    """R-061: agent_ceiling reads the header value when it agrees with the Agent ceiling line."""
+    ws = tmp_path / "ws"
+    (ws / "docs").mkdir(parents=True)
+    line_text = "Agent ceiling: 9900\n"
+    header = ("---\nrecord: run-parameters\nheader: 1\nagent_ceiling: 9900\n"
+              "stage_pause: \"\"\nmerge_authority: \"\"\nrefactoring_pass: \"\"\n"
+              "installer_verification: \"\"\nparallel_increments: \"\"\nceiling_above_twice: []\n"
+              "design_rounds_above_five: []\nreview_rounds_above_ceiling: []\n---\n")
+    (ws / "docs" / "RUN_PARAMETERS.md").write_text(header + line_text, encoding="utf-8")
+    (ws / "docs" / "PROJECT_STATUS.md").write_text("# Status\nPhase: building\nAwaiting user on: none\n", encoding="utf-8")
+    assert lg.agent_ceiling(str(ws)) == 9900

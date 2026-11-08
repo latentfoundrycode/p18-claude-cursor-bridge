@@ -95,3 +95,20 @@ def test_r042_refused_snapshot_writes_no_rounds_file(repo):
     assert rc == 125
     assert not (repo / ".git" / "bridge" / "rounds-TASK-001.json").exists()
     assert not (repo / ".git" / "bridge" / "review-TASK-001-r9.json").exists()
+
+
+def test_r061_guard_refuses_header_review_lift_without_owner_line(repo):
+    """R-061: a header-only review lift must not allow a snapshot before refusal."""
+    params = repo / "docs" / "RUN_PARAMETERS.md"
+    params.parent.mkdir(parents=True, exist_ok=True)
+    prose = "# Run parameters\nStage pause: run\n"
+    header = ("---\nrecord: run-parameters\nheader: 1\nstage_pause: \"run\"\nmerge_authority: \"\"\n"
+              "refactoring_pass: \"\"\ninstaller_verification: \"\"\nparallel_increments: \"\"\n"
+              "agent_ceiling: null\nceiling_above_twice: []\ndesign_rounds_above_five: []\n"
+              "review_rounds_above_ceiling:\n  - id: TASK-001\n    rounds: 9\n    words: \"header only\"\n"
+              "    date: \"\"\n---\n")
+    params.write_text(header + prose, encoding="utf-8")
+    git(repo, "add", "docs/RUN_PARAMETERS.md")
+    git(repo, "commit", "-q", "-m", "header lift")
+    rc, out = guard(repo, "snapshot", "TASK-001-r9")
+    assert rc == 125 and "header: disagrees review_rounds_above_ceiling" in out, out

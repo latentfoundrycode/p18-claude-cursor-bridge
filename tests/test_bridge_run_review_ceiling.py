@@ -333,3 +333,22 @@ def test_bug031_a_refusal_returns_at_once_while_the_slot_is_held(tmp_path):
         kill_tree(waiter)
         kill_tree(holder)
     assert not marker.exists()
+
+
+def test_r061_review_owner_lifts_header_agrees_with_line(program, tmp_path):
+    """R-061: review_owner_lifts returns the same lift from a agreeing header as from the owner's line."""
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(HERE, os.pardir, "bridge", "cursor-bridge"))
+    import bridge_env
+    line = "Review rounds above the ceiling: TASK-099 5 (extra round)\n"
+    header = ("---\nrecord: run-parameters\nheader: 1\nstage_pause: \"\"\nmerge_authority: \"\"\n"
+              "refactoring_pass: \"\"\ninstaller_verification: \"\"\nparallel_increments: \"\"\n"
+              "agent_ceiling: null\nceiling_above_twice: []\ndesign_rounds_above_five: []\n"
+              "review_rounds_above_ceiling:\n  - id: TASK-099\n    rounds: 5\n    words: extra round\n"
+              "    date: \"\"\n---\n")
+    plain, headed = tmp_path / "p", tmp_path / "h"
+    for d in (plain, headed):
+        (d / "docs").mkdir(parents=True)
+    (plain / "docs" / "RUN_PARAMETERS.md").write_text(line, encoding="utf-8")
+    (headed / "docs" / "RUN_PARAMETERS.md").write_text(header + line, encoding="utf-8")
+    assert bridge_env.review_owner_lifts(str(headed)) == bridge_env.review_owner_lifts(str(plain))
