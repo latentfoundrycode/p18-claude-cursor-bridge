@@ -158,49 +158,30 @@ def main():
         header_union = set()
         has_build_plan_header = False
         for p in plans:
-            shown = p.replace("\\", "/")
             text = read(p)
-            try:
-                header, _body = bridge_env.read_header(text)
-            except bridge_env.HeaderError as err:
-                print("HEADER MALFORMED: %s:%d %s" % (shown, err.line, err))
+            fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
+            if fatal:
+                print(fatal[0])
                 return 2
-            if header is not None and header.get("record") == "build-plan":
-                findings = bridge_env.check_header("build-plan", header)
-                if findings:
-                    print("HEADER MALFORMED: %s:1 %s" % (shown, "; ".join(findings)))
-                    return 2
+            if hdr is not None:
                 has_build_plan_header = True
-                for st in header.get("stages") or []:
+                for st in hdr.get("stages") or []:
                     for inc in st.get("increments") or []:
                         for rid in inc.get("satisfies") or []:
                             satisfied.add(rid)
                             header_union.add(rid)
             else:
-                cur = None
-                for line in text.splitlines():
-                    hm = bridge_env.HEAD_RX.match(line)
-                    if hm:
-                        cur = hm.group(1)
-                        continue
-                    if line.startswith("#"):
-                        cur = None
-                        continue
-                    if cur is not None:
-                        fm = bridge_env.FIELD_RX.match(line)
-                        if fm and fm.group(1).lower() == "satisfies":
-                            satisfied.update(ID_RX.findall(fm.group(2) or ""))
+                try:
+                    body = bridge_env.plan_body(text)
+                except bridge_env.HeaderError:
+                    body = text
+                satisfied.update(bridge_env.plan_collect_satisfies_ids(body))
         if has_build_plan_header:
             disagree = False
             for p in plans:
                 text = read(p)
-                try:
-                    header, _ = bridge_env.read_header(text)
-                except bridge_env.HeaderError:
-                    continue
-                if header is None or header.get("record") != "build-plan":
-                    continue
-                if bridge_env.check_header("build-plan", header):
+                fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
+                if fatal or hdr is None:
                     continue
                 for rid in bridge_env.plan_r_ids_outside_headers(text):
                     if rid not in header_union:

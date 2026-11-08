@@ -670,6 +670,17 @@ def builder_review_refusal(argv, folder, kind):
     if merge_ids is not None:
         if not has_plan:
             return (_brief_rule_refusal("brief rule: Merge unit: cannot be checked without docs/BUILD_PLAN.md"), None)
+        import glob as _plan_glob
+
+        for plan_file in sorted(_plan_glob.glob(os.path.join(ws, "docs", "BUILD_PLAN*.md"))):
+            try:
+                plan_text = open(plan_file, encoding="utf-8-sig", errors="replace").read()
+            except OSError:
+                continue
+            plan_shown = os.path.relpath(plan_file, ws).replace("\\", "/")
+            plan_reason = bridge_env.plan_header_refusal(plan_text, plan_shown)
+            if plan_reason:
+                return (_ascii_refusal(plan_reason), None)
         plan_ids = bridge_env.plan_increment_ids(ws)
         plan_id_rx = re.compile(bridge_env.PLAN_ID_PATTERN)
         scope_mu = None
@@ -715,7 +726,7 @@ def builder_review_refusal(argv, folder, kind):
     if eff_round > bridge_env.REVIEW_ROUNDS:
         if eff_round <= owner_cap:
             lift, lift_line = "owner", owner_entry[1] if owner_entry else ""
-        elif blk:
+        elif blk and blk[1] and blk[2]:
             line = blk[2]
             if line in class_used and not prior:
                 return (_ascii_refusal("review ceiling: class line already used for %s" % id_part), None)

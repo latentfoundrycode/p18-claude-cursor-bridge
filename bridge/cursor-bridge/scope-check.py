@@ -98,27 +98,20 @@ def parse_scope(brief_path):
         sys.exit(2)
 
     shown = brief_path.replace("\\", "/")
-    try:
-        header, body = bridge_env.read_header(text)
-    except bridge_env.HeaderError as err:
-        print("HEADER MALFORMED: %s:%d %s" % (shown, err.line, err))
+    name = os.path.basename(brief_path)
+    if name.endswith(".md"):
+        name = name[:-3]
+    result = bridge_env.brief_scope_enforcement(text, name, shown)
+    if result[0] == "malformed":
+        print(result[1])
         sys.exit(2)
-    if header is not None and header.get("record") == "brief":
-        findings = bridge_env.check_header("brief", header)
-        if findings:
-            print("HEADER MALFORMED: %s:1 %s" % (shown, "; ".join(findings)))
-            sys.exit(2)
-        name = os.path.basename(brief_path)
-        if name.endswith(".md"):
-            name = name[:-3]
-        fallback = bridge_env.brief_prose_fallback(text, name)
-        for key in bridge_env.header_agrees("brief", header, fallback):
-            print("HEADER DISAGREES: %s" % key)
-            sys.exit(2)
-    entries, refusal, unread = bridge_env.parse_scope(text)
+    if result[0] == "disagree":
+        print(result[1])
+        sys.exit(2)
+    entries, refusal, unread = result[1], result[2], result[3]
     UNREAD.extend(unread)
-    if refusal == "ellipsis":
-        print("CANNOT VERIFY: a Scope entry carries an ellipsis; name every path or a glob.")
+    if refusal is not None and refusal != "empty":
+        print("CANNOT VERIFY: a Scope entry carries an ellipsis (%s); name every path or a glob." % refusal[:80])
         sys.exit(2)
     if refusal == "empty":
         print("CANNOT VERIFY: no Scope entries found under '## Scope' in %s "

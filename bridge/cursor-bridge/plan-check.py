@@ -117,7 +117,11 @@ def parse(paths):
     stage = None
     for path in paths:
         cur = None
-        for line in read(path).splitlines():
+        try:
+            prose = bridge_env.plan_body(read(path))
+        except bridge_env.HeaderError:
+            prose = read(path)
+        for line in prose.splitlines():
             if line.startswith("## "):
                 stage, cur = line[3:].strip(), None
                 continue
@@ -138,7 +142,7 @@ def parse(paths):
             if cur is not None:
                 f = FIELD_RX.match(line)
                 if f:
-                    cur["fields"][f.group(1).lower()] = f.group(2)
+                    cur["fields"][f.group(1).lower()] = (f.group(2) or "").rstrip()
     return items, order, fails
 
 
@@ -148,7 +152,11 @@ def stages_without_demonstration(paths):
     missing = []
     for path in paths:
         stage, seen, ids = None, False, []
-        for line in read(path).splitlines():
+        try:
+            prose = bridge_env.plan_body(read(path))
+        except bridge_env.HeaderError:
+            prose = read(path)
+        for line in prose.splitlines():
             m = STAGE_RX.match(line)
             if m:
                 if stage is not None and ids and not seen:
@@ -179,29 +187,19 @@ def unreadable(value):
     return re.sub(r"[,;\s]+", " ", rest).strip()
 
 
-def brief_scope_for(text, brief_name):
-    """The brief's Scope paths for plan-check (header first when it agrees with its prose)."""
-    try:
-        header, body = bridge_env.read_header(text)
-    except bridge_env.HeaderError:
-        header, body = None, text
-    if header is not None and header.get("record") == "brief" and not bridge_env.check_header("brief", header):
-        fallback = bridge_env.brief_prose_fallback(text, brief_name)
-        if not bridge_env.header_agrees("brief", header, fallback):
-            scope, _ref, _ = bridge_env.parse_scope(body if body is not None else "")
-            return scope
-        return list(header.get("scope") or [])
-    scope, _ref, _ = bridge_env.parse_scope(text)
-    return scope
-
-
 def brief_findings(path, item):
     """The brief's Scope paths outside the increment's Scope, and the increment's requirements the brief does not name."""
     text = read(path)
     brief_name = os.path.basename(path)
     if brief_name.endswith(".md"):
         brief_name = brief_name[:-3]
-    scope = brief_scope_for(text, brief_name)
+    shown = path.replace("\\", "/")
+    mal = bridge_env.brief_malformed_brief_line(text, shown)
+    if mal:
+        return [mal]
+    scope = bridge_env.brief_enforced_scope_paths(text, brief_name)
+    if scope is None:
+        return []
     found = []
     inc = item["scope"]
     for p in scope:
@@ -213,37 +211,6 @@ def brief_findings(path, item):
         if not re.search(r"\b%s\b" % rid, text):
             found.append("does not name %s, which %s satisfies" % (rid, item["id"]))
     return found
-
-
-def plan_header_findings(path, text, merged):
-    """Malformed and disagreeing plan header findings; (fatal_lines, disagree_lines, header_or_none)."""
-    shown = path.replace("\\", "/")
-    fatal, disagree, header = [], [], None
-    try:
-        header, body = bridge_env.read_header(text)
-    except bridge_env.HeaderError as err:
-        fatal.append("HEADER MALFORMED: %s:%d %s" % (shown, err.line, err))
-        return fatal, disagree, None
-    if header is None or header.get("record") != "build-plan":
-        return fatal, disagree, None
-    findings = bridge_env.check_header("build-plan", header)
-    if findings:
-        fatal.append("HEADER MALFORMED: %s:1 %s" % (shown, "; ".join(findings)))
-        return fatal, disagree, None
-    fallback = bridge_env.plan_prose_fallback(text, merged)
-    for token in bridge_env.header_agrees("build-plan", header, fallback):
-        disagree.append("HEADER DISAGREES: %s" % token)
-    body_ids = set()
-    for st in fallback.get("stages") or []:
-        for inc in st.get("increments") or []:
-            if inc.get("id"):
-                body_ids.add(inc.get("id"))
-    header_ids = set(bridge_env.plan_header_inc_ids(header))
-    for iid in sorted(header_ids - body_ids):
-        disagree.append("SHAPE: %s is declared in the plan header but has no ### heading" % iid)
-    for iid in sorted(body_ids - header_ids):
-        disagree.append("SHAPE: %s has a ### heading but no entry in the plan header" % iid)
-    return fatal, disagree, header
 
 
 def historic_header_ids(header):
@@ -279,7 +246,7 @@ def main():
     header_fatal, headers_by_path = [], {}
     fails = []
     for p in paths:
-        fatal, disagree, hdr = plan_header_findings(p, read(p), merged_set)
+        fatal, disagree, hdr = bridge_env.plan_header_findings(p, read(p), merged_set)
         header_fatal.extend(fatal)
         fails.extend(disagree)
         headers_by_path[p] = hdr
@@ -327,7 +294,7 @@ def main():
             fails.append("SHAPE: %s has no Scope" % tid)
         if not exempt and kind == "group" and scope:
             fails.append("SHAPE: group %s has a Scope (groups are not delegated)" % tid)
-        if not exempt and merged_set is not None and tid not in merged_set:
+        if not exempt and (merged_set is None or tid not in merged_set):
             scope_raw = fl.get("scope")
             if scope_raw:
                 try:
@@ -342,12 +309,11 @@ def main():
 
     children = {}
     for tid in order:
-        if tid in historic_exempt:
-            continue
-        for key in ("parent", "depends on"):
-            rest = unreadable(items[tid]["fields"].get(key))
-            if rest:
-                fails.append("DEPENDS: %s has an unreadable %s value '%s' (IDs are TASK-nnn, three digits or more)" % (tid, key.title(), rest[:40]))
+        if tid not in historic_exempt:
+            for key in ("parent", "depends on"):
+                rest = unreadable(items[tid]["fields"].get(key))
+                if rest:
+                    fails.append("DEPENDS: %s has an unreadable %s value '%s' (IDs are TASK-nnn, three digits or more)" % (tid, key.title(), rest[:40]))
         for p in ids_in(items[tid]["fields"].get("parent")):
             if p not in items:
                 fails.append("PARENT: %s names parent %s, which does not exist" % (tid, p))

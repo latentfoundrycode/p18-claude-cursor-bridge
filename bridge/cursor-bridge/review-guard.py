@@ -687,25 +687,19 @@ def snapshot_review_refusal(nnn, root, common):
         return "review-guard: refused - the name cannot be read by the grammar"
     id_part, name_round = parsed
     brief_path = os.path.join(root, "handoff", id_part + ".md")
+    if os.path.exists(brief_path) and not os.path.isfile(brief_path):
+        return "review-guard: refused - cannot read handoff/%s.md" % id_part
     if os.path.isfile(brief_path):
         try:
             brief_text = open(brief_path, encoding="utf-8", errors="replace").read()
         except OSError:
-            brief_text = ""
-        if brief_text:
-            shown = os.path.join("handoff", id_part + ".md").replace("\\", "/")
-            try:
-                header, _body = bridge_env.read_header(brief_text)
-            except bridge_env.HeaderError as err:
-                return "review-guard: refused - header: %s:%d %s" % (shown, err.line, err)
-            if header is not None and header.get("record") == "brief":
-                findings = bridge_env.check_header("brief", header)
-                if findings:
-                    return "review-guard: refused - header: %s:1 %s" % (shown, "; ".join(findings))
-                fallback = bridge_env.brief_prose_fallback(brief_text, id_part)
-                for key in bridge_env.header_agrees("brief", header, fallback):
-                    if key in ("merge_unit", "id", "round"):
-                        return "review-guard: refused - header: disagrees %s" % key
+            return "review-guard: refused - cannot read handoff/%s.md" % id_part
+        shown = os.path.join("handoff", id_part + ".md").replace("\\", "/")
+        header_reason = bridge_env.brief_header_refusal(
+            brief_text, shown, keys=("merge_unit", "id", "round"),
+        )
+        if header_reason:
+            return "review-guard: refused - %s" % header_reason
     log_folder = bridge_env.launcher_log_folder(common, root)
     id_rx = bridge_env.grammar_id_rx()
     owner_lifts = bridge_env.review_owner_lifts(root)
@@ -755,7 +749,7 @@ def snapshot_review_refusal(nnn, root, common):
             return None
         if recorded and recorded.get("lift"):
             return None
-        if blk and blk[2] not in used_class:
+        if blk and blk[1] and blk[2] and blk[2] not in used_class:
             return None
         return (
             "review-guard: refused - review ceiling: %s (id %s, branch %s, round %d, ceiling %d)"
