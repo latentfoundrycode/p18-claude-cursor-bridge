@@ -173,6 +173,92 @@ def test_r060_r2_the_headerless_index_reading_keeps_the_first_table_check():
     assert selected_ids(renamed, None) == set()
 
 
+# ---------------------------------------------------------------- the mutation sweep's survivors on round 2, closed
+
+def _block_fault(text):
+    assert "header: 1" in text
+    return text.replace("header: 1", "header:\t1", 1)
+
+
+@pytest.mark.parametrize("prog,rel,args", [
+    ("completion-check.py", "docs/REQUIREMENTS.md", ["--mode", "plan"]),
+    ("diagram-check.py", "docs/REQUIREMENTS.md", []),
+    ("diagram-check.py", "docs/diagrams/INDEX.md", []),
+    ("diagram-check.py", "docs/diagrams/DEVIATIONS.md", ["--mode", "code"]),
+    ("plan-check.py", "docs/diagrams/INDEX.md", ["--no-git"]),
+], ids=["completion-check-register", "diagram-check-register", "diagram-check-index", "diagram-check-deviations",
+        "plan-check-index"])
+def test_r060_r2_a_header_block_the_reader_refuses_stops_the_program(tmp_path, prog, rel, args):
+    if rel == "docs/REQUIREMENTS.md":
+        head, body = th.register_header(), th.read_repo(rel)
+    elif rel.endswith("INDEX.md"):
+        head, body = th.roles_header("diagram-index", th.IDX_COLS, th.IDX_ROLES), th.read_repo(rel)
+    else:
+        head, body = th.roles_header("deviations", th.DEV_COLS, th.DEV_ROLES), th.read_repo(rel)
+    full = _block_fault(head) + body
+    if prog == "completion-check.py":
+        ws = th.register_ws(tmp_path)
+    else:
+        ws = th.diagrams_ws(tmp_path, plan=th.PLAN_D % "D-002")
+    th.write(ws / rel, full)
+    rc, out = run(prog, ws, *args)
+    th.assert_malformed(rc, out, rel, full)
+
+
+def test_r060_r2_conformance_check_refuses_an_inventory_header_lacking_a_section(tmp_path):
+    text = th.inventory_header(drop="deferred")
+    rc, out = th.conformance(th.conformance_ws(tmp_path, text))
+    th.assert_malformed(rc, out, "docs/INVENTORY.md", text + th.INVENTORY)
+
+
+COLS_MOVED = ["Requirement", "ID", "Evidence", "Status", "Source"]
+
+
+@pytest.mark.parametrize("mode", ["plan", "done"], ids=["plan", "done"])
+def test_r060_r2_a_headed_register_reads_its_id_and_evidence_by_role(tmp_path, mode):
+    test = "tests/test_thing.py"
+    body = th.register_body().replace("| R-001 | the thing | owner | planned | " + th.DASH + " |",
+                                      "| R-001 | the thing | owner | built | " + test + " |")
+    moved = th.register_body(COLS_MOVED).replace("| the thing | R-001 | " + th.DASH + " | planned |",
+                                                 "| the thing | R-001 | " + test + " | built |")
+    assert body != th.register_body() and moved != th.register_body(COLS_MOVED)
+    rc_p, out_p = run("completion-check.py", th.register_ws(tmp_path / "p", body=body), "--mode", mode)
+    rc_h, out_h = run("completion-check.py", th.register_ws(tmp_path / "h", th.register_header(COLS_MOVED), moved),
+                      "--mode", mode)
+    assert rc_h == rc_p and th.answer(out_h) == th.answer(out_p), (out_p, out_h)
+
+
+def test_r060_r2_the_registers_ids_are_read_by_role():
+    ids = th.need("requirement_ids_from_register")
+    header = {"columns": COLS_MOVED, "roles": th.REG_ROLES}
+    assert ids(th.register_body(COLS_MOVED), header) == {"R-001", "R-002"}
+
+
+def test_r060_r2_the_deviations_keys_are_read_by_role():
+    keys = th.need("parse_deviation_keys")
+    cols = ["From", "To", "Diagram", "As built", "Since", "Resolved by"]
+    body = ("# Known deviations\n\n| " + " | ".join(cols) + " |\n|---|---|---|---|---|---|\n"
+            "| hooks | bridge_env | D-002 | imports by file | 2026-11-01 | TASK-099 |\n")
+    assert keys(body, {"columns": cols, "roles": th.DEV_ROLES}) == {("D-002", "hooks", "bridge_env")}
+
+
+def test_r060_r2_an_inventory_section_is_found_by_its_whole_heading(tmp_path):
+    body = th.INVENTORY.replace("## Decisions\n", "## Decisions (settled)\n")
+    assert "Decisions" not in th.need("inventory_parse_tables")(body)
+    rc, out = run("inventory-check.py", th.inventory_ws(tmp_path, body=body))
+    assert rc == 1 and "SHAPE: section '## Decisions' missing" in out, out
+
+
+def test_r060_r2_diagram_check_selects_every_diagram_of_a_reordered_declared_index(tmp_path):
+    index = th.swap_columns(th.read_repo("docs/diagrams/INDEX.md"), 2, 3)
+    cols = ["ID", "Level", "Status", "Kind", "File", "Refines", "Realizes", "Enforced by", "Why"]
+    rc_p, out_p = th.diagram(th.diagrams_ws(tmp_path / "p"))
+    rc_h, out_h = th.diagram(th.diagrams_ws(tmp_path / "h", index=th.roles_header("diagram-index", cols, th.IDX_ROLES) + index))
+    sel_p = re.findall(r"(\d+) diagrams selected", out_p)
+    assert sel_p and sel_p[0] != "0", out_p
+    assert re.findall(r"(\d+) diagrams selected", out_h) == sel_p, out_h
+
+
 # ---------------------------------------------------------------- builder's cases below this line
 
 
