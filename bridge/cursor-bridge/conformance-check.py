@@ -1237,34 +1237,63 @@ def main():
             add("NOTE", "The product's own tokens in .env", "%s: named after the project, so taken as the product's own per-instance tokens, not an external account; say so in the inventory if that is wrong" % ", ".join(own))
 
     # --- the inventory's tables, by section (release A1b floors)
-    inv = read(os.path.join(ws, "docs", "INVENTORY.md")) or ""
-    sections, current = {}, None
-    for line in inv.splitlines():
-        m = re.match(r"^##\s+(\w+)", line)
-        if m:
-            current = m.group(1)
-            continue
-        if current and line.lstrip().startswith("|"):
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if cells and not set("".join(cells)) <= set("-: ") and not (cells[0].lower() in ("name", "decision", "feature", "item")):
-                sections.setdefault(current, []).append(cells)
+    inv_path = os.path.join(ws, "docs", "INVENTORY.md")
+    inv = read(inv_path) or ""
+    sections = {}
+    inv_dev_from_header = None
+    inv_body_for_dev = inv
+    inv_can_read = (
+        hasattr(bridge_env, "inventory_parse_tables")
+        and hasattr(bridge_env, "read_header")
+        and hasattr(bridge_env, "check_header")
+        and hasattr(bridge_env, "inventory_development_data")
+    )
+    if inv and inv_can_read:
+        inv_body = inv
+        inv_hdr = None
+        try:
+            inv_hdr, inv_body = bridge_env.read_header(inv)
+        except bridge_env.HeaderError as err:
+            shown = "docs/INVENTORY.md"
+            print("HEADER MALFORMED: %s:%d %s" % (_escape_field(shown), err.line, _escape_field(str(err))))
+            return 2
+        if inv_hdr is not None:
+            findings = bridge_env.check_header("inventory", inv_hdr)
+            if findings:
+                shown = "docs/INVENTORY.md"
+                print("HEADER MALFORMED: %s:1 %s" % (_escape_field(shown), _escape_field("; ".join(findings))))
+                return 2
+            inv_dev_from_header = inv_hdr.get("development_data", "")
+        inv_body_for_dev = inv_body if inv_hdr is not None else inv
+        parsed = bridge_env.inventory_parse_tables(inv_body_for_dev)
+        for name, block in parsed.items():
+            sections[name] = block[1]
     if inv:
         # a spending limit at every provider, API or account that can charge: its Resources row says so
-        unlimited = []
-        for cells, name in chargeable_rows(sections, words):
-            if LIMIT_RECORDED.search(" ".join(cells)):
-                continue
-            unlimited.append(name[:40])
-        if unlimited:
-            add("MISSING", "Spending limit recorded", "%d key(s) or account(s) without a spending limit in the Resources row (`limit $20/month, set <date>`, or `no spend possible`): %s%s; the configuration phase asks the owner to set one at each provider (supervisor Phase 5)" % (
-                len(unlimited), ", ".join(unlimited[:6]), " and %d more" % (len(unlimited) - 6) if len(unlimited) > 6 else ""))
+        if not inv_can_read:
+            add("MISSING", "Spending limit recorded", "not checked: %s: cannot be used (ImportError)" % bridge_env_shown)
+            add("MISSING", "Development data kept apart", "not checked: %s: cannot be used (ImportError)" % bridge_env_shown)
         else:
-            add("OK", "Spending limit recorded")
-        # development data kept apart from live data: a Decisions row says how
-        if any(cells and re.match(r"^[\s*_`]*development data", cells[0], re.I) for cells in sections.get("Decisions", [])):
-            add("OK", "Development data kept apart")
-        else:
-            add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
+            unlimited = []
+            for cells, name in chargeable_rows(sections, words):
+                if LIMIT_RECORDED.search(" ".join(cells)):
+                    continue
+                unlimited.append(name[:40])
+            if unlimited:
+                add("MISSING", "Spending limit recorded", "%d key(s) or account(s) without a spending limit in the Resources row (`limit $20/month, set <date>`, or `no spend possible`): %s%s; the configuration phase asks the owner to set one at each provider (supervisor Phase 5)" % (
+                    len(unlimited), ", ".join(unlimited[:6]), " and %d more" % (len(unlimited) - 6) if len(unlimited) > 6 else ""))
+            else:
+                add("OK", "Spending limit recorded")
+            # development data kept apart from live data: a Decisions row says how
+            if inv_dev_from_header is not None:
+                if inv_dev_from_header:
+                    add("OK", "Development data kept apart")
+                else:
+                    add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
+            elif bridge_env.inventory_development_data(inv_body_for_dev):
+                add("OK", "Development data kept apart")
+            else:
+                add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
 
     # --- every adapter of a listed provider is tested against recorded replies (rule 37; A1b item 5):
     #     the providers come from the inventory's chargeable rows, the adapters from the project's own

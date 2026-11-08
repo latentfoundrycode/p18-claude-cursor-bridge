@@ -37,6 +37,10 @@ import re
 import subprocess
 import sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env
+
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 CATALOGUE = {
@@ -596,18 +600,25 @@ DEVIATIONS = os.path.join("docs", "diagrams", "DEVIATIONS.md")
 REVIEWERS = re.compile(r"\b(diff-reviewer|design-auditor|security-auditor|plan-critic|refactor-scout|Review [AB])\b")
 
 
-def known_deviations(path=DEVIATIONS):
+def known_deviations(path=DEVIATIONS, header=None, body=None):
     """{(diagram, from, to)} listed in docs/diagrams/DEVIATIONS.md (release A3, plan 8.7)."""
-    out = set()
     if not os.path.isfile(path):
-        return out
-    header, rows = table_rows(read(path))
-    if not header or not header[0].startswith("diagram"):
-        return out
-    for r in rows:
-        if len(r) >= 3 and r[0] and r[1] and r[2]:
-            out.add((r[0].strip("`* "), r[1].strip("`* "), r[2].strip("`* ")))
-    return out
+        return frozenset()
+    if body is None:
+        text = read(path)
+        hdr, body = bridge_env.read_header(text)
+        header = hdr
+        if hdr is None:
+            body = text
+        elif hdr is not None:
+            findings = bridge_env.check_header("deviations", hdr)
+            if findings:
+                raise bridge_env.HeaderError(1, "; ".join(findings))
+    elif header is not None:
+        findings = bridge_env.check_header("deviations", header)
+        if findings:
+            raise bridge_env.HeaderError(1, "; ".join(findings))
+    return frozenset(bridge_env.parse_deviation_keys(body or "", header))
 
 
 def component_violations(did, fc, emap, files, done, fails, notes, deviations=frozenset()):
@@ -739,6 +750,12 @@ def build_parser():
     return ap
 
 
+def _header_refuse(shown, line, what):
+    print("HEADER MALFORMED: %s:%d %s" % (shown, line, what))
+    print("RESULT: not checked")
+    return 2
+
+
 def main():
     a = build_parser().parse_args()
     code_mode, done = a.mode in ("code", "done"), a.mode == "done"
@@ -748,24 +765,88 @@ def main():
         print("INDEX: %s does not exist" % a.index)
         print("RESULT: 1 problem(s)")
         return 1
-    header, rows = table_rows(read(a.index))
-    want = ["id", "level", "kind", "status", "file", "refines", "realizes", "enforced", "why"]
-    if header is None or [h.split()[0] if h else "" for h in header][:9] != want:
-        fails.append("INDEX: header must be | ID | Level | Kind | Status | File | Refines | Realizes | Enforced by | Why |")
-        rows = []
+    index_text = read(a.index)
+    shown_index = a.index.replace("\\", "/")
+    index_header = None
+    index_body = index_text
+    try:
+        index_header, index_body = bridge_env.read_header(index_text)
+    except bridge_env.HeaderError as err:
+        return _header_refuse(shown_index, err.line, str(err))
+    if index_header is not None:
+        findings = bridge_env.check_header("diagram-index", index_header)
+        if findings:
+            return _header_refuse(shown_index, 1, "; ".join(findings))
+        fallback = bridge_env.diagram_index_fallback(index_body or "")
+        for key in bridge_env.header_agrees("diagram-index", index_header, fallback):
+            fails.append("HEADER DISAGREES: %s" % key)
+        idx_columns = list(index_header.get("columns") or [])
+        idx_roles = index_header.get("roles") or {}
+        _hlow, _horig, rows = bridge_env.diagram_index_body_table(index_body or "")
+    else:
+        idx_columns = None
+        idx_roles = None
+        _hlow, _horig, rows = bridge_env.diagram_index_table(index_text)
+        if _hlow is None:
+            fails.append("INDEX: header must be | ID | Level | Kind | Status | File | Refines | Realizes | Enforced by | Why |")
+            rows = []
 
     reqs = None
+    req_header = None
     if os.path.exists(a.requirements):
-        reqs = set(R_RX.findall(read(a.requirements)))
+        shown_req = a.requirements.replace("\\", "/")
+        req_text = read(a.requirements)
+        req_body = req_text
+        try:
+            req_header, req_body = bridge_env.read_header(req_text)
+        except bridge_env.HeaderError as err:
+            return _header_refuse(shown_req, err.line, str(err))
+        if req_header is not None:
+            findings = bridge_env.check_header("requirements", req_header)
+            if findings:
+                return _header_refuse(shown_req, 1, "; ".join(findings))
+        reqs = bridge_env.requirement_ids_from_register(req_body if req_header is not None else req_text, req_header)
     else:
         notes.append("no %s - requirement IDs not verified" % a.requirements)
 
+    dev_header, dev_body = None, None
+    if code_mode and os.path.isfile(DEVIATIONS):
+        shown_dev = DEVIATIONS.replace("\\", "/")
+        dev_text = read(DEVIATIONS)
+        dev_body = dev_text
+        try:
+            dev_header, dev_body = bridge_env.read_header(dev_text)
+        except bridge_env.HeaderError as err:
+            return _header_refuse(shown_dev, err.line, str(err))
+        if dev_header is not None:
+            findings = bridge_env.check_header("deviations", dev_header)
+            if findings:
+                return _header_refuse(shown_dev, 1, "; ".join(findings))
+            fallback = bridge_env.deviations_fallback(dev_body or "")
+            for key in bridge_env.header_agrees("deviations", dev_header, fallback):
+                fails.append("HEADER DISAGREES: %s" % key)
+
     diagrams, seen_kinds = {}, set()
     for r in rows:
-        if len(r) < 9:
-            fails.append("INDEX: row has %d cells, expected 9: %s" % (len(r), " | ".join(r)[:100]))
-            continue
-        did, level, kind, status, path, refines, realizes, enforced, why = [c.strip() for c in r[:9]]
+        if index_header is not None:
+            fields = bridge_env.diagram_index_row_fields(r, idx_columns, idx_roles)
+            if len(r) < len(idx_columns):
+                fails.append("INDEX: row has %d cells, expected %d: %s" % (len(r), len(idx_columns), " | ".join(r)[:100]))
+                continue
+            did = fields["id"]
+            level = fields["level"]
+            kind = fields["kind"]
+            status = fields["status"]
+            path = fields["file"]
+            refines = fields["refines"]
+            realizes = fields["realizes"]
+            enforced = fields["enforced_by"]
+            why = fields["why"]
+        else:
+            if len(r) < 9:
+                fails.append("INDEX: row has %d cells, expected 9: %s" % (len(r), " | ".join(r)[:100]))
+                continue
+            did, level, kind, status, path, refines, realizes, enforced, why = [c.strip() for c in r[:9]]
         did, kind, status = did.strip("`* "), kind.strip("`* ").lower(), status.strip("`* ").lower()
         if kind not in CATALOGUE:
             fails.append("INDEX: unknown kind '%s' (see the catalogue)" % kind)
@@ -895,7 +976,7 @@ def main():
         files = tracked()
         if files is None:
             notes.append("not a git repository - code conformance not checked")
-    deviations = known_deviations() if code_mode else frozenset()
+    deviations = known_deviations(DEVIATIONS, dev_header, dev_body) if code_mode else frozenset()
     if deviations:
         notes.append("%d known deviation(s) listed in %s; each is resolved when its fix merges" % (len(deviations), DEVIATIONS))
     if done and deviations:

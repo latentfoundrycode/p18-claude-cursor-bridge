@@ -336,11 +336,25 @@ def main():
 
     index = "docs/diagrams/INDEX.md"
     if os.path.exists(index):
-        selected = set()
-        for line in read(index).splitlines():
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if len(cells) >= 4 and D_RX.fullmatch(cells[0].strip("`* ")) and cells[3].lower().startswith("selected"):
-                selected.add(cells[0].strip("`* "))
+        index_text = read(index)
+        shown_index = index.replace("\\", "/")
+        index_header = None
+        index_body = index_text
+        try:
+            index_header, index_body = bridge_env.read_header(index_text)
+        except bridge_env.HeaderError as err:
+            print("HEADER MALFORMED: %s:%d %s" % (shown_index, err.line, str(err)))
+            print("RESULT: not checked")
+            return 2
+        if index_header is not None:
+            findings = bridge_env.check_header("diagram-index", index_header)
+            if findings:
+                print("HEADER MALFORMED: %s:1 %s" % (shown_index, "; ".join(findings)))
+                print("RESULT: not checked")
+                return 2
+            selected = bridge_env.diagram_index_selected_ids(index_body or "", index_header)
+        else:
+            selected = bridge_env.diagram_index_selected_ids(index_text, None)
         for tid in order:
             for d in D_RX.findall(items[tid]["fields"].get("diagrams") or ""):
                 if d not in selected:
