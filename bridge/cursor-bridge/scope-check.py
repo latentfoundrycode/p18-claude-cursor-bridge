@@ -92,7 +92,7 @@ UNREAD = []
 
 def parse_scope(brief_path):
     try:
-        text = open(brief_path, encoding="utf-8-sig").read()
+        text = bridge_env.read_record_text(brief_path)
     except OSError as e:
         print("CANNOT VERIFY: brief not readable: %s (%s)" % (brief_path, e))
         sys.exit(2)

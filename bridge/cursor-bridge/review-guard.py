@@ -673,7 +673,7 @@ def scope_blocking_line(root, id_part):
                 text = open(p, encoding="utf-8", errors="replace").read()
             except OSError:
                 continue
-            blk = bridge_env.read_blocking_class_line(text)
+            blk = bridge_env._blocking_class_from_prose(text)
             if blk:
                 return blk
     return None
@@ -691,7 +691,7 @@ def snapshot_review_refusal(nnn, root, common):
         return "review-guard: refused - cannot read handoff/%s.md" % id_part
     if os.path.isfile(brief_path):
         try:
-            brief_text = open(brief_path, encoding="utf-8", errors="replace").read()
+            brief_text = bridge_env.read_record_text(brief_path)
         except OSError:
             return "review-guard: refused - cannot read handoff/%s.md" % id_part
         shown = os.path.join("handoff", id_part + ".md").replace("\\", "/")

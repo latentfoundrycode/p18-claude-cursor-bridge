@@ -28,6 +28,7 @@ import os
 import re
 import shutil
 import subprocess
+from collections import namedtuple
 import sys
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -385,15 +386,25 @@ def parse_review_name(name):
     return id_part, round_n
 
 
-def brief_body(text):
-    """The prose body of a brief, never the front-matter block; the whole text when there is no header."""
-    try:
-        header, body = read_header(text)
-    except HeaderError:
-        return text
-    if header is not None:
-        return body if body is not None else ""
-    return text
+class PlanFileReadRefusal(Exception):
+    """A docs/BUILD_PLAN*.md file under merge-unit check could not be read."""
+
+    def __init__(self, line):
+        self.line = line
+        super().__init__(line)
+
+
+def read_record_text(path):
+    """Decode a plan or brief record file: UTF-8, drop BOM, replace bytes, universal newlines."""
+    with open(path, "rb") as f:
+        raw = f.read()
+    return decode_record_bytes(raw)
+
+
+def decode_record_bytes(raw):
+    """Decode record bytes the way read_record_text does, without reading a path."""
+    text = raw.decode("utf-8-sig", errors="replace")
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def plan_body(text):
@@ -405,6 +416,208 @@ def plan_body(text):
     if header is not None:
         return body if body is not None else ""
     return text
+
+
+def _brief_fallback_from_body(body, brief_name):
+    scope_paths, refusal, _unread = parse_scope(body)
+    if refusal is not None and refusal != "empty":
+        scope_paths = []
+    if refusal == "empty":
+        scope_paths = []
+    blk = _blocking_class_from_prose(body)
+    blocking = blk[0] if blk else None
+    sat = []
+    for line in (body or "").splitlines():
+        m = FIELD_RX.match(line)
+        if m and m.group(1).lower() == "satisfies":
+            sat = _PLAN_R_RX.findall((m.group(2) or "").rstrip())
+            break
+    return {
+        "name": brief_name,
+        "satisfies": sat,
+        "scope": scope_paths,
+        "merge_unit": _merge_unit_from_prose(body),
+        "blocking_class": blocking,
+    }
+
+
+class BriefRecord(
+    namedtuple("BriefRecord", ("header", "body", "refusal", "fallback", "disagrees"))
+):
+    """One brief reading: header, body, refusal token parts, prose fallback, agreement tokens."""
+
+
+def _brief_refusal_line(shown_path, refusal):
+    if refusal is None:
+        return None
+    kind, line_no, detail = refusal
+    if kind == "malformed":
+        return "header: %s:%d %s" % (shown_path, line_no, detail)
+    if kind == "schema":
+        return "header: %s:%d %s" % (shown_path, line_no, detail)
+    return None
+
+
+def read_brief_record(text, brief_name):
+    """Read a brief once: header or None, body, refusal triple or None, fallback, disagreement tokens."""
+    try:
+        header, body = read_header(text)
+    except HeaderError as err:
+        return BriefRecord(None, None, ("malformed", err.line, str(err)), None, [])
+    if header is None:
+        body = text
+        return BriefRecord(None, body, None, _brief_fallback_from_body(body, brief_name), [])
+    findings = check_header("brief", header)
+    if findings:
+        return BriefRecord(
+            None, None, ("schema", 1, "; ".join(findings)), None, []
+        )
+    body = body if body is not None else ""
+    fallback = _brief_fallback_from_body(body, brief_name)
+    disagrees = header_agrees("brief", header, fallback)
+    return BriefRecord(header, body, None, fallback, disagrees)
+
+
+def walk_plan_prose_body(body):
+    """Walk a plan file body: stages with increments, and increments before the first stage heading."""
+    id_rx = re.compile(PLAN_ID_PATTERN)
+    stages = []
+    outside_stage = []
+    stage_name = None
+    stage_demo = None
+    increments = []
+    cur = None
+    for line in (body or "").splitlines():
+        sm = STAGE_RX.match(line)
+        if sm:
+            if stage_name is not None:
+                stages.append(
+                    {
+                        "name": stage_name,
+                        "demonstration": stage_demo,
+                        "increments": increments,
+                    }
+                )
+            elif increments:
+                outside_stage = list(increments)
+                increments = []
+            stage_name = sm.group(1).strip()
+            stage_demo = None
+            increments = []
+            cur = None
+            continue
+        if stage_name is not None:
+            dm = DEMO_RX.match(line.strip())
+            if dm:
+                stage_demo = dm.group(1).strip()
+                continue
+        hm = HEAD_RX.match(line)
+        if hm:
+            tid = hm.group(1)
+            if id_rx.fullmatch(tid):
+                cur = {
+                    "id": tid,
+                    "title": hm.group(2).strip(),
+                    "fields": {},
+                }
+                increments.append(cur)
+            else:
+                cur = None
+            continue
+        if line.startswith("#"):
+            cur = None
+            continue
+        if cur is not None:
+            fm = FIELD_RX.match(line)
+            if fm:
+                cur["fields"][fm.group(1).lower()] = (fm.group(2) or "").rstrip()
+    if stage_name is not None:
+        stages.append(
+            {
+                "name": stage_name,
+                "demonstration": stage_demo,
+                "increments": increments,
+            }
+        )
+    elif increments:
+        outside_stage = list(increments)
+    return {"stages": stages, "outside_stage": outside_stage}
+
+
+def plan_check_parse(paths, read_text):
+    """Increments and shape failures for plan-check, one body walker per file."""
+    items, order, fails = {}, [], []
+    stage = None
+    for path in paths:
+        text = read_text(path)
+        headed = False
+        body = text
+        try:
+            header, b = read_header(text)
+        except HeaderError:
+            body = text
+        else:
+            if header is not None and not check_header("build-plan", header):
+                body = b if b is not None else ""
+                headed = True
+        walk = walk_plan_prose_body(body)
+        if headed:
+            for inc in walk["outside_stage"]:
+                fails.append(
+                    "SHAPE: %s has a ### heading but stands outside any stage" % inc["id"]
+                )
+        for inc in walk["outside_stage"]:
+            if headed:
+                continue
+            tid = inc["id"]
+            if tid in items:
+                fails.append("SHAPE: duplicate increment ID %s" % tid)
+                continue
+            items[tid] = {
+                "id": tid,
+                "title": inc["title"],
+                "stage": stage,
+                "file": path,
+                "fields": dict(inc["fields"]),
+            }
+            order.append(tid)
+        for st in walk["stages"]:
+            stage = st["name"]
+            for inc in st["increments"]:
+                tid = inc["id"]
+                if tid in items:
+                    fails.append("SHAPE: duplicate increment ID %s" % tid)
+                    continue
+                items[tid] = {
+                    "id": tid,
+                    "title": inc["title"],
+                    "stage": stage,
+                    "file": path,
+                    "fields": dict(inc["fields"]),
+                }
+                order.append(tid)
+    return items, order, fails
+
+
+def plan_stages_without_demonstration(paths, read_text):
+    """Stages that hold increments but no Demonstration: line, per file (release A1b)."""
+    missing = []
+    for path in paths:
+        text = read_text(path)
+        body = text
+        try:
+            header, b = read_header(text)
+        except HeaderError:
+            body = text
+        else:
+            if header is not None and not check_header("build-plan", header):
+                body = b if b is not None else ""
+        walk = walk_plan_prose_body(body)
+        for st in walk["stages"]:
+            inc_ids = [i["id"] for i in st["increments"]]
+            if inc_ids and st.get("demonstration") is None:
+                missing.append((st["name"], inc_ids))
+    return missing
 
 
 def _blocking_class_from_prose(body):
@@ -424,7 +637,11 @@ def read_blocking_class_line(text):
     """The first well-formed `Blocking class:` line in the brief body: (class, finding, full line) or None."""
     if not text:
         return None
-    return _blocking_class_from_prose(brief_body(text))
+    rec = read_brief_record(text, "")
+    if rec.refusal is not None:
+        return None
+    src = rec.body if rec.header is not None else text
+    return _blocking_class_from_prose(src)
 
 
 def review_owner_lifts(folder):
@@ -457,7 +674,7 @@ def review_owner_lifts(folder):
 
 
 def plan_increment_ids(folder):
-    """Every increment ID in each docs/BUILD_PLAN*.md under folder, header first when well-formed."""
+    """Every increment ID in each docs/BUILD_PLAN*.md under folder; raises PlanFileReadRefusal on I/O error."""
     import glob as _glob
 
     ids = set()
@@ -465,29 +682,54 @@ def plan_increment_ids(folder):
     if not os.path.isdir(doc):
         return ids
     paths = sorted(_glob.glob(os.path.join(doc, "BUILD_PLAN*.md")))
-    id_rx = re.compile(PLAN_ID_PATTERN)
     for path in paths:
         try:
-            text = open(path, encoding="utf-8-sig", errors="replace").read()
+            text = read_record_text(path)
         except OSError:
-            continue
+            shown = os.path.relpath(path, folder).replace("\\", "/")
+            raise PlanFileReadRefusal(
+                "bridge-run: refused - cannot read %s" % shown
+            ) from None
+        headed = False
         try:
-            body = plan_body(text)
+            header, body = read_header(text)
         except HeaderError:
+            raise PlanFileReadRefusal(
+                "bridge-run: refused - header: %s"
+                % os.path.relpath(path, folder).replace("\\", "/")
+            ) from None
+        if header is None:
             body = text
-        for line in (body or "").splitlines():
-            m = HEAD_RX.match(line)
-            if m and id_rx.fullmatch(m.group(1)):
-                ids.add(m.group(1))
+        else:
+            if check_header("build-plan", header):
+                raise PlanFileReadRefusal(
+                    "bridge-run: refused - header: %s"
+                    % os.path.relpath(path, folder).replace("\\", "/")
+                )
+            body = body if body is not None else ""
+            headed = True
+        walk = walk_plan_prose_body(body)
+        if headed:
+            for st in walk["stages"]:
+                for inc in st["increments"]:
+                    ids.add(inc["id"])
+        else:
+            for inc in walk["outside_stage"]:
+                ids.add(inc["id"])
+            for st in walk["stages"]:
+                for inc in st["increments"]:
+                    ids.add(inc["id"])
     return ids
 
 
 def merge_unit_line_present(text):
     if not text:
         return False
-    header, body = _brief_well_formed_header(text)
-    prose = body if header is not None else text
-    for line in prose.splitlines():
+    rec = read_brief_record(text, "")
+    if rec.refusal is not None:
+        return False
+    src = rec.body if rec.header is not None else text
+    for line in src.splitlines():
         m = MERGE_UNIT_RE.match(line.strip())
         if m and m.group(1):
             return True
@@ -509,19 +751,6 @@ def _merge_unit_from_prose(text):
             ids.append(tok)
         return tuple(ids)
     return None
-
-
-def _brief_well_formed_header(text):
-    """(header mapping, body) when the brief header is well-formed; (None, body) otherwise."""
-    try:
-        header, body = read_header(text)
-    except HeaderError:
-        return None, text
-    if header is None:
-        return None, body if body is not None else text
-    if check_header("brief", header):
-        return None, body if body is not None else text
-    return header, body if body is not None else ""
 
 
 def _merge_unit_from_header(header):
@@ -547,14 +776,17 @@ def merge_unit_ids(text):
     """IDs from a brief's merge unit (header first when well-formed), or None when absent or invalid."""
     if not text:
         return None
-    header, body = _brief_well_formed_header(text)
-    if header is not None:
-        from_header = _merge_unit_from_header(header)
+    rec = read_brief_record(text, "")
+    if rec.refusal is not None:
+        return None
+    if rec.header is not None:
+        from_header = _merge_unit_from_header(rec.header)
         if from_header is not None:
             return from_header
-        if header.get("merge_unit") is not None:
+        if rec.header.get("merge_unit") is not None:
             return None
-    return _merge_unit_from_prose(body if header is not None else text)
+        return _merge_unit_from_prose(rec.body)
+    return _merge_unit_from_prose(text)
 
 
 def _id_eq(a, b):
@@ -2542,8 +2774,11 @@ def parse_scope(brief_text):
 
 def brief_satisfies(text):
     """R-ids named on the brief's Satisfies: line, in order; empty when there is no line."""
-    body = brief_body(text)
-    for line in body.splitlines():
+    rec = read_brief_record(text, "")
+    if rec.refusal is not None:
+        return []
+    src = rec.body if rec.header is not None else text
+    for line in src.splitlines():
         m = FIELD_RX.match(line)
         if m and m.group(1).lower() == "satisfies":
             return _PLAN_R_RX.findall((m.group(2) or "").rstrip())
@@ -2552,11 +2787,10 @@ def brief_satisfies(text):
 
 def plan_r_ids_outside_headers(text):
     """R-ids on any Satisfies: line in the plan body (header block excluded), in first-appearance order."""
-    body = text
     try:
         body = plan_body(text)
     except HeaderError:
-        body = text
+        return []
     found, out = set(), []
     for line in (body or "").splitlines():
         m = FIELD_RX.match(line)
@@ -2587,10 +2821,24 @@ def plan_scope_agreement_entries(value):
         p = part.strip().strip("`").replace("\\", "/")
         if not p:
             continue
-        if p.count("(") != p.count(")"):
-            raise ScopeAgreementError(_SCOPE_PAREN)
         out.append(p)
     return out
+
+
+def plan_scope_paren_unbalanced(value):
+    """True when a Scope: line has an entry whose ( and ) counts differ (plan-check shape rule)."""
+    if value is None:
+        return False
+    val = (value or "").strip()
+    if not val or val.lower() == "none":
+        return False
+    for part in val.split(";"):
+        p = part.strip().strip("`").replace("\\", "/")
+        if not p:
+            continue
+        if p.count("(") != p.count(")"):
+            return True
+    return False
 
 
 def _plan_normalize_field(key, val):
@@ -2632,61 +2880,30 @@ def _plan_normalize_field(key, val):
 
 def plan_prose_fallback(text, merged=None):
     """Stages and increments read from plan prose for header agreement."""
-    try:
-        body = plan_body(text)
-    except HeaderError:
-        body = text
+    body = plan_body(text)
+    walk = walk_plan_prose_body(body)
     stages = []
-    stage_name, stage_demo, stage_ids = None, None, []
-    increments = []
-    cur = None
-    id_rx = re.compile(PLAN_ID_PATTERN)
-    for line in (body or "").splitlines():
-        sm = STAGE_RX.match(line)
-        if sm:
-            if stage_name is not None:
-                stages.append({
-                    "name": stage_name,
-                    "demonstration": stage_demo,
-                    "increments": increments,
-                })
-            stage_name = sm.group(1).strip()
-            stage_demo = None
-            increments = []
-            cur = None
-            continue
-        if stage_name is None:
-            continue
-        dm = DEMO_RX.match(line.strip())
-        if dm:
-            stage_demo = dm.group(1).strip()
-            continue
-        hm = HEAD_RX.match(line)
-        if hm:
-            tid = hm.group(1)
-            if id_rx.fullmatch(tid):
-                cur = {"id": tid, "title": hm.group(2).strip(), "fields": {}}
-                increments.append(cur)
-            else:
-                cur = None
-            continue
-        if line.startswith("#"):
-            cur = None
-            continue
-        if cur is not None:
-            fm = FIELD_RX.match(line)
-            if fm:
-                cur["fields"][fm.group(1).lower()] = (fm.group(2) or "").rstrip()
-    if stage_name is not None:
-        stages.append({"name": stage_name, "demonstration": stage_demo, "increments": increments})
+    for st in walk["stages"]:
+        increments = []
+        for inc in st["increments"]:
+            cur = {
+                "id": inc["id"],
+                "title": inc["title"],
+                "fields": dict(inc["fields"]),
+            }
+            increments.append(cur)
+        stages.append(
+            {
+                "name": st["name"],
+                "demonstration": st.get("demonstration"),
+                "increments": increments,
+            }
+        )
     for st in stages:
         for inc in st.get("increments") or []:
             norm = {}
             for k, v in (inc.get("fields") or {}).items():
-                try:
-                    nk, nv = _plan_normalize_field(k, v)
-                except ScopeAgreementError:
-                    nk, nv = k, _SCOPE_PAREN
+                nk, nv = _plan_normalize_field(k, v)
                 norm[nk] = nv
             inc["fields"] = norm
     return {"merged": merged, "stages": stages}
@@ -2694,39 +2911,24 @@ def plan_prose_fallback(text, merged=None):
 
 def brief_prose_fallback(text, brief_name):
     """Fallback values for brief header agreement (prose and file name, not the header block)."""
-    body = brief_body(text)
-    scope_paths, refusal, _unread = parse_scope(body)
-    if refusal is not None and refusal != "empty":
-        scope_paths = []
-    if refusal == "empty":
-        scope_paths = []
-    blk = _blocking_class_from_prose(body)
-    blocking = blk[0] if blk else None
-    return {
-        "name": brief_name,
-        "satisfies": brief_satisfies(text),
-        "scope": scope_paths,
-        "merge_unit": _merge_unit_from_prose(body),
-        "blocking_class": blocking,
-    }
+    rec = read_brief_record(text, brief_name)
+    if rec.refusal is not None:
+        return _brief_fallback_from_body("", brief_name)
+    return rec.fallback
 
 
 def brief_header_refusal(text, shown_path, keys=None):
     """A refusal token for a malformed or disagreeing brief header, or None when absent or agreeing."""
-    try:
-        header, _body = read_header(text)
-    except HeaderError as err:
-        return "header: %s:%d %s" % (shown_path, err.line, err)
-    if header is None:
-        return None
-    findings = check_header("brief", header)
-    if findings:
-        return "header: %s:1 %s" % (shown_path, "; ".join(findings))
     base = os.path.basename(shown_path)
     if base.endswith(".md"):
         base = base[:-3]
-    fallback = brief_prose_fallback(text, base)
-    disagrees = header_agrees("brief", header, fallback)
+    rec = read_brief_record(text, base)
+    line = _brief_refusal_line(shown_path, rec.refusal)
+    if line is not None:
+        return line
+    if rec.header is None:
+        return None
+    disagrees = list(rec.disagrees)
     if keys is not None:
         disagrees = [k for k in disagrees if k in keys]
     if disagrees:
@@ -2749,26 +2951,21 @@ def plan_header_inc_ids(header):
 def plan_collect_satisfies_ids(body):
     """R-ids on each increment's own Satisfies: line while walking plan body prose."""
     out = set()
-    cur = None
-    for line in (body or "").splitlines():
-        hm = HEAD_RX.match(line)
-        if hm:
-            cur = hm.group(1)
-            continue
-        if line.startswith("#"):
-            cur = None
-            continue
-        if cur is not None:
-            fm = FIELD_RX.match(line)
-            if fm and fm.group(1).lower() == "satisfies":
-                out.update(_PLAN_R_RX.findall((fm.group(2) or "").rstrip()))
+    walk = walk_plan_prose_body(body)
+    all_incs = list(walk["outside_stage"])
+    for st in walk["stages"]:
+        all_incs.extend(st["increments"])
+    for inc in all_incs:
+        sat = inc.get("fields", {}).get("satisfies")
+        if sat:
+            out.update(_PLAN_R_RX.findall(sat))
     return out
 
 
 def plan_header_refusal(text, shown_path):
     """A refusal token for a malformed or disagreeing plan header, or None when absent or agreeing."""
     try:
-        header, _body = read_header(text)
+        header, body = read_header(text)
     except HeaderError as err:
         return "header: %s:%d %s" % (shown_path, err.line, err)
     if header is None:
@@ -2776,6 +2973,13 @@ def plan_header_refusal(text, shown_path):
     findings = check_header("build-plan", header)
     if findings:
         return "header: %s:1 %s" % (shown_path, "; ".join(findings))
+    body = body if body is not None else ""
+    walk = walk_plan_prose_body(body)
+    for inc in walk["outside_stage"]:
+        return "header: %s:1 %s has a ### heading but stands outside any stage" % (
+            shown_path,
+            inc["id"],
+        )
     fallback = plan_prose_fallback(text, merged=None)
     body_ids = set()
     for st in fallback.get("stages") or []:
@@ -2818,56 +3022,52 @@ def plan_header_findings(path, text, merged):
         disagree.append("SHAPE: %s is declared in the plan header but has no ### heading" % iid)
     for iid in sorted(body_ids - header_ids):
         disagree.append("SHAPE: %s has a ### heading but no entry in the plan header" % iid)
+    try:
+        _header, body = read_header(text)
+        if _header is not None and not check_header("build-plan", _header):
+            body = body if body is not None else ""
+            walk = walk_plan_prose_body(body)
+            for inc in walk["outside_stage"]:
+                disagree.append(
+                    "SHAPE: %s has a ### heading but stands outside any stage" % inc["id"]
+                )
+    except HeaderError:
+        pass
     return fatal, disagree, header
 
 
 def brief_malformed_brief_line(text, shown_path):
     """A plan-check BRIEF finding for a malformed brief header, or None."""
-    try:
-        header, _body = read_header(text)
-    except HeaderError as err:
-        return "header: %s:%d %s" % (shown_path, err.line, err)
-    if header is None:
-        return None
-    findings = check_header("brief", header)
-    if findings:
-        return "header: %s:1 %s" % (shown_path, "; ".join(findings))
-    return None
+    base = os.path.basename(shown_path)
+    if base.endswith(".md"):
+        base = base[:-3]
+    rec = read_brief_record(text, base)
+    return _brief_refusal_line(shown_path, rec.refusal)
 
 
 def brief_enforced_scope_paths(text, brief_name):
-    """Scope paths plan-check enforces: the body's Scope when the header agrees, else None."""
-    try:
-        header, body = read_header(text)
-    except HeaderError:
+    """Scope paths plan-check enforces from the brief body (malformed header gives None)."""
+    rec = read_brief_record(text, brief_name)
+    if rec.refusal is not None:
         return None
-    if header is not None:
-        if check_header("brief", header):
-            return None
-        fallback = brief_prose_fallback(text, brief_name)
-        if header_agrees("brief", header, fallback):
-            scope, _ref, _ = parse_scope(body if body is not None else "")
-            return scope
-        return None
-    scope, _ref, _ = parse_scope(text)
+    scope_src = rec.body if rec.header is not None else text
+    scope, _ref, _ = parse_scope(scope_src)
     return scope
 
 
 def brief_scope_enforcement(text, brief_name, shown_path):
-    """Header checks and body Scope for scope-check; see brief_scope_enforcement_status values."""
-    try:
-        header, body = read_header(text)
-    except HeaderError as err:
-        return ("malformed", "HEADER MALFORMED: %s:%d %s" % (shown_path, err.line, err))
-    if header is not None:
-        findings = check_header("brief", header)
-        if findings:
-            return ("malformed", "HEADER MALFORMED: %s:1 %s" % (shown_path, "; ".join(findings)))
-        fallback = brief_prose_fallback(text, brief_name)
-        disagrees = header_agrees("brief", header, fallback)
-        if disagrees:
-            return ("disagree", "HEADER DISAGREES: %s" % disagrees[0])
-        scope_src = body if body is not None else ""
+    """Header checks and body Scope for scope-check."""
+    rec = read_brief_record(text, brief_name)
+    if rec.refusal is not None:
+        kind, line_no, detail = rec.refusal
+        return (
+            "malformed",
+            "HEADER MALFORMED: %s:%d %s" % (shown_path, line_no, detail),
+        )
+    if rec.header is not None:
+        if rec.disagrees:
+            return ("disagree", "HEADER DISAGREES: %s" % rec.disagrees[0])
+        scope_src = rec.body
     else:
         scope_src = text
     entries, refusal, unread = parse_scope(scope_src)

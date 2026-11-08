@@ -74,8 +74,7 @@ SKIP_PATH = re.compile(r"(^|/)(docs|\.claude|\.cursor|\.github|node_modules|vend
 
 
 def read(path):
-    with open(path, encoding="utf-8-sig", errors="replace") as f:
-        return f.read()
+    return bridge_env.read_record_text(path)
 
 
 def tracked():
@@ -171,10 +170,7 @@ def main():
                             satisfied.add(rid)
                             header_union.add(rid)
             else:
-                try:
-                    body = bridge_env.plan_body(text)
-                except bridge_env.HeaderError:
-                    body = text
+                body = bridge_env.plan_body(text)
                 satisfied.update(bridge_env.plan_collect_satisfies_ids(body))
         if has_build_plan_header:
             disagree = False

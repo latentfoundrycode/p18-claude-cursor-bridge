@@ -61,17 +61,12 @@ import bridge_env
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 ID = bridge_env.PLAN_ID_PATTERN
-HEAD_RX = bridge_env.HEAD_RX
-FIELD_RX = bridge_env.FIELD_RX
-DEMO_RX = bridge_env.DEMO_RX
-STAGE_RX = bridge_env.STAGE_RX
 ID_RX = re.compile(ID)
 D_RX = re.compile(r"\bD-\d{3,}\b")
 
 
 def read(path):
-    with open(path, encoding="utf-8-sig", errors="replace") as f:
-        return f.read()
+    return bridge_env.read_record_text(path)
 
 
 def ids_in(value):
@@ -113,66 +108,11 @@ def overlap(a, b):
 
 
 def parse(paths):
-    items, order, fails = {}, [], []
-    stage = None
-    for path in paths:
-        cur = None
-        try:
-            prose = bridge_env.plan_body(read(path))
-        except bridge_env.HeaderError:
-            prose = read(path)
-        for line in prose.splitlines():
-            if line.startswith("## "):
-                stage, cur = line[3:].strip(), None
-                continue
-            m = HEAD_RX.match(line)
-            if m:
-                tid = m.group(1)
-                if tid in items:
-                    fails.append("SHAPE: duplicate increment ID %s" % tid)
-                    cur = None
-                    continue
-                cur = items[tid] = {"id": tid, "title": m.group(2).strip(), "stage": stage,
-                                    "file": path, "fields": {}}
-                order.append(tid)
-                continue
-            if line.startswith("#"):
-                cur = None
-                continue
-            if cur is not None:
-                f = FIELD_RX.match(line)
-                if f:
-                    cur["fields"][f.group(1).lower()] = (f.group(2) or "").rstrip()
-    return items, order, fails
+    return bridge_env.plan_check_parse(paths, read)
 
 
 def stages_without_demonstration(paths):
-    """[(stage, its increment IDs)] for the stage headings (`## ...`) that hold increments and
-    no `Demonstration:` line (release A1b)."""
-    missing = []
-    for path in paths:
-        stage, seen, ids = None, False, []
-        try:
-            prose = bridge_env.plan_body(read(path))
-        except bridge_env.HeaderError:
-            prose = read(path)
-        for line in prose.splitlines():
-            m = STAGE_RX.match(line)
-            if m:
-                if stage is not None and ids and not seen:
-                    missing.append((stage, ids))
-                stage, seen, ids = m.group(1).strip(), False, []
-                continue
-            if stage is None:
-                continue
-            h = HEAD_RX.match(line)
-            if h:
-                ids.append(h.group(1))
-            elif DEMO_RX.match(line.strip()):
-                seen = True
-        if stage is not None and ids and not seen:
-            missing.append((stage, ids))
-    return missing
+    return bridge_env.plan_stages_without_demonstration(paths, read)
 
 
 BOOKKEEPING = ("docs/BUILDER_NOTES.md", "docs/BOUNDARY_VIOLATIONS.md", "run/")   # every brief names them; no plan lists them
@@ -207,8 +147,12 @@ def brief_findings(path, item):
             continue                                           # the files every brief must name (the packager's constraints)
         if not any(p == s or p.startswith(s + "/") or (s == "" ) for s in inc):
             found.append("names %s in its Scope, outside %s's Scope (%s)" % (p, item["id"], ", ".join(inc) or "none"))
+    body_src = text
+    rec = bridge_env.read_brief_record(text, brief_name)
+    if rec.refusal is None:
+        body_src = rec.body if rec.header is not None else text
     for rid in re.findall(r"\bR-\d{3,}\b", item["fields"].get("satisfies") or ""):
-        if not re.search(r"\b%s\b" % rid, text):
+        if not re.search(r"\b%s\b" % rid, body_src):
             found.append("does not name %s, which %s satisfies" % (rid, item["id"]))
     return found
 
@@ -273,8 +217,10 @@ def main():
             notes.append("addendum %s read with the plan" % p.replace("\\", "/"))
 
     kinds = {}
+    paren_note_ids = []
     for tid in order:
         fl = items[tid]["fields"]
+        scope_raw = fl.get("scope")
         exempt = tid in historic_exempt
         kind = (fl.get("kind") or "increment").strip().lower()
         if not exempt:
@@ -294,13 +240,11 @@ def main():
             fails.append("SHAPE: %s has no Scope" % tid)
         if not exempt and kind == "group" and scope:
             fails.append("SHAPE: group %s has a Scope (groups are not delegated)" % tid)
-        if not exempt and (merged_set is None or tid not in merged_set):
-            scope_raw = fl.get("scope")
-            if scope_raw:
-                try:
-                    bridge_env.plan_scope_agreement_entries(scope_raw)
-                except bridge_env.ScopeAgreementError:
-                    fails.append("SHAPE: %s has an unbalanced parenthesis in its Scope" % tid)
+        if not exempt and scope_raw and merged_set is not None and tid not in merged_set:
+            if bridge_env.plan_scope_paren_unbalanced(scope_raw):
+                fails.append("SHAPE: %s has an unbalanced parenthesis in its Scope" % tid)
+        if not exempt and merged_set is None and scope_raw and bridge_env.plan_scope_paren_unbalanced(scope_raw):
+            paren_note_ids.append(tid)
         items[tid]["scope"] = scope
         items[tid]["parallel"] = par == "yes"
         items[tid]["deferred"] = bool((fl.get("deferred") or "").strip())
@@ -422,6 +366,11 @@ def main():
         if any(t not in merged_ready for t in ids):                 # a closed stage is not noted
             notes.append("stage '%s' names no Demonstration: line; the stage close runs it live (release A1b), add one from the stage's increments" % s[:60])
     ready = [t for t in inc if t not in done and not items[t]["deferred"] and deps[t] <= done]
+    if paren_note_ids:
+        notes.append(
+            "unbalanced parenthesis in Scope not checked against a merged set: %s"
+            % ", ".join(sorted(set(paren_note_ids)))
+        )
     notes.insert(0, "%d increments in %d file(s); %d merged, %d deferred" % (
         len(inc), len(paths), len(done), sum(1 for t in inc if items[t]["deferred"])))
 

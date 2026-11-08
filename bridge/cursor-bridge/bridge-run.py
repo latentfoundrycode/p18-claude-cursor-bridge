@@ -656,7 +656,7 @@ def builder_review_refusal(argv, folder, kind):
             "revised in place: write handoff/%s-r%d.md" % (id_part, name_round + 1),
             None,
         )
-    brief_text = brief_bytes.decode("utf-8", errors="replace")
+    brief_text = bridge_env.decode_record_bytes(brief_bytes)
     brief_shown = os.path.join("handoff", brief_name + ".md").replace("\\", "/")
     header_reason = bridge_env.brief_header_refusal(brief_text, brief_shown)
     if header_reason:
@@ -673,21 +673,29 @@ def builder_review_refusal(argv, folder, kind):
         import glob as _plan_glob
 
         for plan_file in sorted(_plan_glob.glob(os.path.join(ws, "docs", "BUILD_PLAN*.md"))):
-            try:
-                plan_text = open(plan_file, encoding="utf-8-sig", errors="replace").read()
-            except OSError:
-                continue
             plan_shown = os.path.relpath(plan_file, ws).replace("\\", "/")
+            try:
+                plan_text = bridge_env.read_record_text(plan_file)
+            except OSError:
+                return (
+                    _ascii_refusal("bridge-run: refused - cannot read %s" % plan_shown),
+                    None,
+                )
             plan_reason = bridge_env.plan_header_refusal(plan_text, plan_shown)
             if plan_reason:
                 return (_ascii_refusal(plan_reason), None)
-        plan_ids = bridge_env.plan_increment_ids(ws)
+        try:
+            plan_ids = bridge_env.plan_increment_ids(ws)
+        except bridge_env.PlanFileReadRefusal as err:
+            return (_ascii_refusal(err.line), None)
         plan_id_rx = re.compile(bridge_env.PLAN_ID_PATTERN)
         scope_mu = None
         scope_path = os.path.join(ws, "run", "review", "SCOPE-%s.md" % id_part)
         if os.path.isfile(scope_path):
             try:
-                scope_mu = bridge_env.merge_unit_ids(open(scope_path, encoding="utf-8", errors="replace").read())
+                scope_mu = bridge_env._merge_unit_from_prose(
+                    open(scope_path, encoding="utf-8", errors="replace").read()
+                )
             except OSError:
                 scope_mu = None
         for mid in merge_ids:
