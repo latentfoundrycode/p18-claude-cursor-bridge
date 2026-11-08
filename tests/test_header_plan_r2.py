@@ -16,8 +16,8 @@ What each case pins:
 - a header of the wrong `record:` kind, or none, or an empty block, is malformed in each of the five programs,
   never read as no header (Review A, 1);
 - a headed plan whose unmerged `Scope:` carries an unbalanced parenthesis gets the SHAPE line, no traceback, and a
-  merged one is read as today (Review A, 2); under `--no-git` every increment counts as unmerged for that rule
-  (Review A, 7; the supervisor's ruling: `--no-git` treats nothing as merged, as readiness does);
+  merged one is read as today (Review A, 2); under `--no-git` the rule gives a note naming the increment, never
+  silence and never a failure (Review A, 7; the supervisor's ruling as revised at round 3);
 - scope-check's ellipsis refusal quotes its entry as before, and a leading `./` on a Scope bullet is stripped as
   before (Review A, 3 and 4);
 - the historic exemption covers the shape rules and nothing else: a historic child's Parent is still checked and
@@ -161,11 +161,15 @@ def test_r059_r2_a_headed_plan_with_an_unbalanced_merged_scope_is_read_as_today(
     assert not [l for l in hp.lines_starting(out, "SHAPE: TASK-001") if "parenthes" in l], out
 
 
-def test_r059_r2_under_no_git_an_unbalanced_scope_is_a_shape_failure(tmp_path):
+def test_r059_r2_under_no_git_an_unbalanced_scope_is_a_note(tmp_path):
+    # The supervisor's ruling, revised at round 3: with no merged set (--no-git or an unreadable log) the rule
+    # cannot tell history from new work, so an unbalanced parenthesis is a note naming the increment, never a
+    # failure; a SHAPE failure would fail every merged increment of a plan's history (this repository's plan has
+    # fifteen). Silence, as on round 1, is not allowed either.
     prose = hp._variant(lambda s: s[1]["incs"][0]["lines"].__setitem__(3, hp.UNBALANCED))
     rc, out = run(hp.PLAN_CHECK, hp.plan_repo(tmp_path, hp.plan_prose(prose)), "--no-git")
-    hits = [l for l in hp.lines_starting(out, "SHAPE: TASK-003") if "parenthes" in l]
-    assert rc == 1 and hits, out
+    assert rc == 0 and not [l for l in hp.lines_starting(out, "SHAPE: TASK-003") if "parenthes" in l], out
+    assert [l for l in hp.lines_starting(out, "note:") if "TASK-003" in l and "parenthes" in l], out
 
 
 # ---------------------------------------------------------------- Review A 3 and 4: scope-check as before
