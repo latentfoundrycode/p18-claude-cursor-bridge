@@ -8,9 +8,10 @@ items is a bare ID (ISS-013). The brief is handoff/TASK-033.md; the plan clauses
 (c).
 
 How the tests reach the programs:
-- the subject reader through `plan-check.py`'s module-level `merged_ids(base)` (loaded by path, the current folder a
-  fixture repository) and through `bridge_env.squash_merged_ids(folder, pattern)`'s two-argument call, under the plan's
-  pattern and the grammar's;
+- the subject reader through the merged set plan-check.py reads and through `bridge_env.squash_merged_ids(folder,
+  pattern)`'s two-argument call, under the plan's pattern and the grammar's; since TASK-048 (R-059; the design's retired
+  reading (11)) plan-check.py keeps no `merged_ids` of its own and reads `bridge_env.squash_merged_ids(<the current
+  folder>, PLAN_ID_PATTERN, ref=<--base>)`, which `tests/test_header_plan.py` pins, so these tests read that call;
 - `pace-report.py` as a user runs it, `python bridge/cursor-bridge/pace-report.py <root>... [options]`, on project
   roots built in the test (a folder holding Workspace/ with its own git repository; commits dated with
   GIT_AUTHOR_DATE / GIT_COMMITTER_DATE; GIT_CONFIG_GLOBAL and GIT_CONFIG_SYSTEM set to os.devnull);
@@ -397,14 +398,14 @@ def subject_repo(tmp_path, subject, body=None):
 
 
 def readings(tmp_path, program, monkeypatch, subject, body=None):
-    """(plan-check's merged_ids("main"), bridge_env's reader under the plan pattern, under the grammar's) on a
-    repository whose main holds the one commit."""
+    """(the merged set plan-check reads with --base main, bridge_env's reader under the plan pattern, under the
+    grammar's) on a repository whose main holds the one commit."""
     repo = subject_repo(tmp_path, subject, body)
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", os.devnull)
     monkeypatch.chdir(str(repo))
-    pc = program("plan-check").merged_ids("main")
     be = program("bridge_env")
+    pc = be.squash_merged_ids(os.getcwd(), be.PLAN_ID_PATTERN, ref="main")
     plan = be.squash_merged_ids(str(repo), PLAN_PATTERN)
     grammar = be.squash_merged_ids(str(repo), GRAMMAR_PATTERN)
     assert pc is not None and plan is not None and grammar is not None, (pc, plan, grammar)
@@ -1156,8 +1157,9 @@ def test_task033_letter_files_beside_a_real_lettered_increment(tmp_path):
 
 
 def test_task033_iss013_form_merges_nothing_in_both_programs(tmp_path, program, monkeypatch):
-    """R-044. One subject in the ISS-013 form with no leading ID, on one repository: plan-check.py's merged_ids does not
-    read TASK-031 as merged, and pace-report.py counts no merge that week.
+    """R-044. One subject in the ISS-013 form with no leading ID, on one repository: the merged set plan-check.py reads
+    (bridge_env.squash_merged_ids under the plan pattern since TASK-048, the retired reading (11)) does not read
+    TASK-031 as merged, and pace-report.py counts no merge that week.
     enforces: docs/BUILD_PLAN.md TASK-033 (c) ("a subject in the ISS-013 form merging nothing in both programs (one
     test runs both on the same subject)"); handoff/TASK-033.md Context, "The ISS-013 subject"."""
     p = Project(tmp_path / "proj-iss013-q7")
@@ -1172,7 +1174,8 @@ def test_task033_iss013_form_merges_nothing_in_both_programs(tmp_path, program, 
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", os.devnull)
     monkeypatch.chdir(str(p.ws))
-    merged = program("plan-check").merged_ids("main")
+    be = program("bridge_env")
+    merged = be.squash_merged_ids(os.getcwd(), be.PLAN_ID_PATTERN, ref="main")
     assert merged is not None and "TASK-031" not in merged
 
 

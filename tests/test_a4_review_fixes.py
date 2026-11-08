@@ -64,10 +64,24 @@ def test_an_emphasised_note_after_a_plan_folder_is_not_a_path(program):
     assert pc.scope_paths("tests/service/ *(amended 2026-10-10: the service tests; see docs/CHANGES.md)*, src/x.py") == ["tests/service", "src/x.py"], "third pass, T4"
 
 
-def test_the_plan_check_reads_a_brief_as_the_scope_check_does(program):
-    pc = program("plan-check")
-    text = "# TASK-023\n\n## Scope\n- src/a.py\n- A **cassette directory** (recommend\n  tests/cassettes/) for the replays\n- `src/b.py`: the writer\n\n**Limits:**\n- advance.py stays\n\n## Constraints\n- none\n"
-    assert pc.brief_scope(text) == ["src/a.py", "src/b.py"], "a wrapped prose bullet yields no entry and the limits list is not scope (third pass, T7): " + str(pc.brief_scope(text))
+def test_the_plan_check_reads_a_brief_as_the_scope_check_does(tmp_path):
+    """Third pass, T7: a wrapped prose bullet yields no entry and the limits list is not scope. Read through
+    plan-check's own output since TASK-048 (R-059; the design's retired reading (6)): plan-check.py keeps no brief_scope
+    of its own and reads a brief's Scope by bridge_env's one copy of scope-check's reader. The increment allows src/a.py
+    only, so the brief's src/b.py is the one path named outside it, and neither tests/cassettes/ nor advance.py is read
+    as a path."""
+    ws = tmp_path / "ws"
+    (ws / "docs").mkdir(parents=True)
+    (ws / "handoff").mkdir()
+    (ws / "docs" / "BUILD_PLAN.md").write_text("# Plan\n\n## Stage 1\nDemonstration: the replays run.\n\n### TASK-023 — the replays\nSatisfies: R-001\nScope: src/a.py\n", encoding="utf-8")
+    text = "# TASK-023\nSatisfies: R-001\n\n## Scope\n- src/a.py\n- A **cassette directory** (recommend\n  tests/cassettes/) for the replays\n- `src/b.py`: the writer\n\n**Limits:**\n- advance.py stays\n\n## Constraints\n- none\n"
+    (ws / "handoff" / "TASK-023.md").write_text(text, encoding="utf-8")
+    prog = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "plan-check.py")
+    p = subprocess.run([sys.executable, prog, "--no-git"], cwd=str(ws), capture_output=True, text=True, env=ENV, timeout=120,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    briefs = [l for l in (p.stdout + p.stderr).splitlines() if l.startswith("BRIEF: ")]
+    assert len(briefs) == 1 and "names src/b.py in its Scope" in briefs[0], "the brief's Scope read as scope-check reads it (third pass, T7): " + p.stdout + p.stderr
+    assert not any("cassettes" in l or "advance.py" in l for l in briefs), p.stdout
 
 
 def test_a_plan_scope_with_a_parenthesised_list_names_the_files(program):

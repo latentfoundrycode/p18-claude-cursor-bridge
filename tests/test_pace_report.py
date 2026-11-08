@@ -140,7 +140,9 @@ def test_r044_merge_and_start_weeks(tmp_path):
 
 
 def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program, monkeypatch):
-    """R-044. ISS-013-shaped subject counts no merge; plan-check agrees on TASK-031."""
+    """R-044. ISS-013-shaped subject counts no merge; plan-check agrees on TASK-031, read through the merged set it
+    reads since TASK-048 (R-059; the design's retired reading (11)): bridge_env.squash_merged_ids under the plan
+    pattern, which tests/test_header_plan.py pins plan-check.py to."""
     p = MiniProject(tmp_path)
     p.brief("TASK-031")
     p.commit("records: brief", at(10))
@@ -151,9 +153,9 @@ def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program, monk
     row = [line for line in out.splitlines() if "%d-W%02d" % (wk[0], wk[1]) in line][0]
     parts = [c.strip() for c in row.strip("|").split("|")]
     assert parts[2] == "0"
-    pc = program("plan-check")
+    be = program("bridge_env")
     monkeypatch.chdir(str(p.ws))
-    assert "TASK-031" not in (pc.merged_ids("main") or set())
+    assert "TASK-031" not in (be.squash_merged_ids(os.getcwd(), be.PLAN_ID_PATTERN, ref="main") or set())
 
 
 def test_r044_blank_mean_when_no_merge(tmp_path):
