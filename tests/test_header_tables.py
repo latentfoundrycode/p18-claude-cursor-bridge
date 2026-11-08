@@ -509,3 +509,16 @@ def test_r060_diagram_check_reads_no_r_id_from_the_whole_register():
 
 
 # ---------------------------------------------------------------- builder's cases below this line
+
+
+def test_r060_inventory_fallback_reflected_none_string(tmp_path):
+  """R-060: Reflected through: none reads the string none in the inventory fallback mapping."""
+  body = INVENTORY.replace("Reflected through: none\n", "Reflected through: none\n")
+  fb = need("inventory_fallback")(body)
+  assert fb["reflected_through"] == "none", fb
+
+
+def test_r060_register_fallback_keeps_header_cell_case():
+  """R-060: register_fallback keeps the table header row in its original case for agreement."""
+  fb = need("register_fallback")(register_body())
+  assert fb["header_row"] == REG_COLS, fb

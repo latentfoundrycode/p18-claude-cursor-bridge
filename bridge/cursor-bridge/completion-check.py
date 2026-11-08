@@ -85,19 +85,7 @@ def tracked():
 
 
 def parse_register(text):
-    rows, header = [], None
-    for line in text.splitlines():
-        s = line.strip()
-        if not s.startswith("|"):
-            continue
-        cells = [c.strip() for c in s.strip("|").split("|")]
-        if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
-            continue
-        if header is None:
-            header = [c.lower() for c in cells]
-            continue
-        rows.append(cells)
-    return header, rows
+    return bridge_env.parse_register(text)
 
 
 def build_parser():
@@ -118,30 +106,76 @@ def main():
     if not os.path.exists(a.requirements):
         fails.append("REGISTER: %s does not exist" % a.requirements)
     else:
-        header, rows = parse_register(read(a.requirements))
-        want = ["id", "requirement", "source", "status", "evidence"]
-        if header is None or [h.split()[0] if h else "" for h in header][:5] != want:
-            fails.append("REGISTER: header must be | ID | Requirement | Source | Status | Evidence |")
-        for r in rows:
-            if len(r) < 5 or not all(r[:4]):
-                fails.append("REGISTER: malformed row: %s" % " | ".join(r)[:120])
-                continue
-            rid = r[0].strip("`* ")
-            if not re.fullmatch(r"R-\d{3,}", rid):
-                fails.append("REGISTER: bad ID '%s' (use R-001 ...)" % rid)
-                continue
-            if rid in reqs:
-                fails.append("REGISTER: duplicate ID %s" % rid)
-                continue
-            status = r[3].strip("`* ")
-            if not STATUS_OK.match(status):
-                fails.append("REGISTER: %s has status '%s' (planned | built | deferred - owner <date> | dropped - owner <date>)" % (rid, status[:40]))
-                continue
-            kind = status.split()[0].lower()
-            if kind in ("deferred", "dropped") and not OWNER_DATED.search(status):
-                fails.append("UNAPPROVED: %s is %s without the owner's approval and a date (%s)" % (rid, kind, status[:60]))
-            reqs[rid] = (kind, r[1])
-            evidence[rid] = r[4] if len(r) > 4 else ""
+        reg_text = read(a.requirements)
+        shown_reg = a.requirements.replace("\\", "/")
+        reg_header = None
+        reg_body = reg_text
+        try:
+            reg_header, reg_body = bridge_env.read_header(reg_text)
+        except bridge_env.HeaderError as err:
+            print("HEADER MALFORMED: %s:%d %s" % (shown_reg, err.line, str(err)))
+            print("RESULT: not checked")
+            return 2
+        if reg_header is not None:
+            findings = bridge_env.check_header("requirements", reg_header)
+            if findings:
+                print("HEADER MALFORMED: %s:1 %s" % (shown_reg, "; ".join(findings)))
+                print("RESULT: not checked")
+                return 2
+            fallback = bridge_env.register_fallback(reg_body or "")
+            for key in bridge_env.header_agrees("requirements", reg_header, fallback):
+                fails.append("HEADER DISAGREES: %s" % key)
+            columns = list(reg_header.get("columns") or [])
+            roles = reg_header.get("roles") or {}
+            _hl, rows = parse_register(reg_body or "")
+            for r in rows:
+                if len(r) < len(columns) or not all(
+                        bridge_env.register_row_role(r, columns, roles, k).strip("`* ")
+                        for k in ("id", "status")
+                ):
+                    fails.append("REGISTER: malformed row: %s" % " | ".join(r)[:120])
+                    continue
+                rid = bridge_env.register_row_role(r, columns, roles, "id").strip("`* ")
+                if not re.fullmatch(r"R-\d{3,}", rid):
+                    fails.append("REGISTER: bad ID '%s' (use R-001 ...)" % rid)
+                    continue
+                if rid in reqs:
+                    fails.append("REGISTER: duplicate ID %s" % rid)
+                    continue
+                status = bridge_env.register_row_role(r, columns, roles, "status").strip("`* ")
+                if not STATUS_OK.match(status):
+                    fails.append("REGISTER: %s has status '%s' (planned | built | deferred - owner <date> | dropped - owner <date>)" % (rid, status[:40]))
+                    continue
+                kind = status.split()[0].lower()
+                if kind in ("deferred", "dropped") and not OWNER_DATED.search(status):
+                    fails.append("UNAPPROVED: %s is %s without the owner's approval and a date (%s)" % (rid, kind, status[:60]))
+                reqs[rid] = (kind, bridge_env.register_row_role(r, columns, roles, "requirement"))
+                evidence[rid] = bridge_env.register_row_role(r, columns, roles, "evidence")
+        else:
+            header, rows = parse_register(reg_text)
+            want = ["id", "requirement", "source", "status", "evidence"]
+            if header is None or [h.split()[0] if h else "" for h in header][:5] != want:
+                fails.append("REGISTER: header must be | ID | Requirement | Source | Status | Evidence |")
+            for r in rows:
+                if len(r) < 5 or not all(r[:4]):
+                    fails.append("REGISTER: malformed row: %s" % " | ".join(r)[:120])
+                    continue
+                rid = r[0].strip("`* ")
+                if not re.fullmatch(r"R-\d{3,}", rid):
+                    fails.append("REGISTER: bad ID '%s' (use R-001 ...)" % rid)
+                    continue
+                if rid in reqs:
+                    fails.append("REGISTER: duplicate ID %s" % rid)
+                    continue
+                status = r[3].strip("`* ")
+                if not STATUS_OK.match(status):
+                    fails.append("REGISTER: %s has status '%s' (planned | built | deferred - owner <date> | dropped - owner <date>)" % (rid, status[:40]))
+                    continue
+                kind = status.split()[0].lower()
+                if kind in ("deferred", "dropped") and not OWNER_DATED.search(status):
+                    fails.append("UNAPPROVED: %s is %s without the owner's approval and a date (%s)" % (rid, kind, status[:60]))
+                reqs[rid] = (kind, r[1])
+                evidence[rid] = r[4] if len(r) > 4 else ""
         if not reqs and not any(f.startswith("REGISTER") for f in fails):
             fails.append("REGISTER: %s has no requirement rows" % a.requirements)
         if only:

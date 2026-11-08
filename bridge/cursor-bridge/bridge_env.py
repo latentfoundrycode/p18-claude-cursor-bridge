@@ -2708,6 +2708,262 @@ def status_values(text):
     return values, None, disagrees
 
 
+INVENTORY_SECTIONS = {
+    "Features": ["Feature", "What it does", "Where", "Tests", "Since"],
+    "Resources": ["Name", "Kind", "Where it lives", "Used by", "Provided"],
+    "Decisions": ["Decision", "Reason", "Settled", "Revisit only if"],
+    "Deferred": ["Item", "Why deferred", "Since", "Owner decision needed"],
+}
+
+_INVENTORY_SECTION_KEY = {
+    "Features": "features",
+    "Resources": "resources",
+    "Decisions": "decisions",
+    "Deferred": "deferred",
+}
+
+
+def inventory_parse_tables(text):
+    """Return {section: (header_cells or None, [row_cells...])} for the four inventory sections."""
+    out = {}
+    current = None
+    for line in (text or "").splitlines():
+        h = re.match(r"^##\s+(.+?)\s*$", line)
+        if h:
+            current = h.group(1).strip()
+            if current in INVENTORY_SECTIONS:
+                out[current] = [None, []]
+            continue
+        if current not in INVENTORY_SECTIONS or not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
+            continue
+        if out[current][0] is None:
+            out[current][0] = cells
+        else:
+            out[current][1].append(cells)
+    return out
+
+
+def inventory_reflected_through(text):
+    m = re.search(r"^Reflected through:\s*(.+?)\s*$", text or "", re.M)
+    if not m:
+        return None
+    return m.group(1).strip().strip("`")
+
+
+def inventory_development_data(text):
+    tables = inventory_parse_tables(text)
+    block = tables.get("Decisions")
+    if not block:
+        return ""
+    for row in block[1]:
+        if row and re.match(r"^[\s*_`]*development data", row[0], re.I):
+            return row[0].strip()
+    return ""
+
+
+def inventory_fallback(text):
+    """Prose fallback mapping for header_agrees on an inventory record."""
+    tables = inventory_parse_tables(text)
+    sections = {}
+    for name in INVENTORY_SECTIONS:
+        key = _INVENTORY_SECTION_KEY[name]
+        if name in tables:
+            sections[key] = tables[name][0]
+    return {
+        "reflected_through": inventory_reflected_through(text),
+        "development_data": inventory_development_data(text),
+        "sections": sections,
+    }
+
+
+def parse_register(text):
+    """Every table line in text: (header_lower, [data_row_cells...])."""
+    rows, header_lower, header_orig = [], None, None
+    for line in (text or "").splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            continue
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
+            continue
+        if header_lower is None:
+            header_orig = list(cells)
+            header_lower = [c.lower() for c in cells]
+            continue
+        rows.append(cells)
+    return header_lower, rows
+
+
+def register_fallback(text):
+    """Prose fallback mapping for header_agrees on a requirements register."""
+    _, header_orig = None, None
+    for line in (text or "").splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            continue
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
+            continue
+        header_orig = cells
+        break
+    return {"header_row": list(header_orig or [])}
+
+
+def _first_markdown_table(text):
+    """The file's first markdown table: (header_lower, header_orig, [rows])."""
+    header_lower, header_orig, rows = None, None, []
+    for line in (text or "").splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            if header_lower is not None and rows:
+                break
+            continue
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
+            continue
+        if header_lower is None:
+            header_orig = list(cells)
+            header_lower = [c.lower() for c in cells]
+        else:
+            rows.append(cells)
+    return header_lower, header_orig, rows
+
+
+_INDEX_WANT = ["id", "level", "kind", "status", "file", "refines", "realizes", "enforced", "why"]
+
+
+def diagram_index_table(text):
+    """First table in an index file: (header_lower, header_orig, rows) after the prose header check."""
+    header_lower, header_orig, rows = _first_markdown_table(text)
+    if header_lower is None or [h.split()[0] if h else "" for h in header_lower][:9] != _INDEX_WANT:
+        return None, None, []
+    return header_lower, header_orig, rows
+
+
+def diagram_index_fallback(text):
+    """Prose fallback mapping for header_agrees on a diagram index."""
+    _, header_orig, _rows = _first_markdown_table(text)
+    return {"header_row": list(header_orig or [])}
+
+
+def parse_diagram_index_rows(text):
+    """First index table rows when the header matches the normative shape."""
+    _h, _o, rows = diagram_index_table(text)
+    return rows
+
+
+def deviations_table(text):
+    """First table in a deviations file: (header_lower, header_orig, rows)."""
+    return _first_markdown_table(text)
+
+
+def deviations_fallback(text):
+    """Prose fallback mapping for header_agrees on a deviations register."""
+    _, header_orig, _rows = _first_markdown_table(text)
+    return {"header_row": list(header_orig or [])}
+
+
+def parse_deviation_keys(text, header=None):
+    """{(diagram, from, to)} from the deviations table."""
+    out = set()
+    _hl, _orig, rows = deviations_table(text)
+    if header is not None:
+        columns = list(header.get("columns") or [])
+        roles = header.get("roles") or {}
+        for r in rows:
+            d = register_row_role(r, columns, roles, "diagram").strip("`* ")
+            f = register_row_role(r, columns, roles, "from").strip("`* ")
+            t = register_row_role(r, columns, roles, "to").strip("`* ")
+            if d and f and t:
+                out.add((d, f, t))
+        return out
+    if not _hl or not _hl[0].startswith("diagram"):
+        return out
+    for r in rows:
+        if len(r) >= 3 and r[0] and r[1] and r[2]:
+            out.add((r[0].strip("`* "), r[1].strip("`* "), r[2].strip("`* ")))
+    return out
+
+
+def _column_index(columns, name):
+    try:
+        return columns.index(name)
+    except ValueError:
+        return None
+
+
+def register_row_role(cells, columns, roles, role):
+    """One cell from a register row by role name."""
+    col = roles.get(role)
+    if col is None:
+        return ""
+    idx = _column_index(columns, col)
+    if idx is None or idx >= len(cells):
+        return ""
+    return cells[idx]
+
+
+def diagram_index_row_fields(cells, columns, roles):
+    """Nine index fields by role when a header declares columns and roles."""
+    keys = ("id", "level", "kind", "status", "file", "refines", "realizes", "enforced_by", "why")
+    out = {}
+    for key in keys:
+        val = register_row_role(cells, columns, roles, key)
+        out[key] = val
+    return out
+
+
+_D_ID_RX = re.compile(r"D-\d{3,}")
+
+
+def diagram_index_selected_ids(text, header=None):
+    """Diagram IDs with status selected, from an index body and optional header."""
+    _hl, _ho, rows = _first_markdown_table(text)
+    selected = set()
+    if header is not None:
+        columns = list(header.get("columns") or [])
+        roles = header.get("roles") or {}
+        for r in rows:
+            fields = diagram_index_row_fields(r, columns, roles)
+            did = fields.get("id", "").strip("`* ")
+            status = fields.get("status", "").strip("`* ").lower()
+            if did and status.startswith("selected") and _D_ID_RX.fullmatch(did):
+                selected.add(did)
+        return selected
+    for r in rows:
+        if len(r) >= 4:
+            did = r[0].strip("`* ")
+            status = r[3].strip("`* ").lower()
+            if _D_ID_RX.fullmatch(did) and status.startswith("selected"):
+                selected.add(did)
+    return selected
+
+
+def requirement_ids_from_register(text, header=None):
+    """R-ids listed in the register's id column (not prose mentions)."""
+    id_rx = re.compile(r"\bR-\d{3,}\b")
+    ids = set()
+    if header is not None:
+        columns = list(header.get("columns") or [])
+        roles = header.get("roles") or {}
+        _hl, rows = parse_register(text)
+        for r in rows:
+            rid = register_row_role(r, columns, roles, "id").strip("`* ")
+            if re.fullmatch(r"R-\d{3,}", rid):
+                ids.add(rid)
+        return ids
+    _hl, rows = parse_register(text)
+    for r in rows:
+        if r:
+            rid = r[0].strip("`* ")
+            if re.fullmatch(r"R-\d{3,}", rid):
+                ids.add(rid)
+    return ids
+
+
 class ScopeAgreementError(ValueError):
     """A Scope field line has an unbalanced parenthesis (plan header agreement)."""
 

@@ -164,7 +164,8 @@ def fingerprint_like(cell):
 
 
 def parse_tables(text):
-    """Return {section: (header_cells or None, [row_cells...])} for the four sections."""
+    if bridge_env is not None and hasattr(bridge_env, "inventory_parse_tables"):
+        return bridge_env.inventory_parse_tables(text)
     out = {}
     current = None
     for line in text.splitlines():
@@ -343,11 +344,45 @@ def main():
     # 2. shape
     if not os.path.exists(a.inventory):
         fails.append("MISSING: %s does not exist" % a.inventory)
-        inv_text, tables = "", {}
+        inv_text, tables, inv_header, reflected_marker = "", {}, None, None
     else:
         inv_text = read(a.inventory)
-        tables = parse_tables(inv_text)
-        for sec, cols in SECTIONS.items():
+        shown_inv = a.inventory.replace("\\", "/")
+        inv_header = None
+        inv_body = inv_text
+        try:
+            inv_header, inv_body = bridge_env.read_header(inv_text)
+        except bridge_env.HeaderError as err:
+            print("HEADER MALFORMED: %s:%d %s" % (escape_field(shown_inv), err.line, escape_field(str(err))))
+            print("RESULT: not checked")
+            return 2
+        if inv_header is not None:
+            findings = bridge_env.check_header("inventory", inv_header)
+            if findings:
+                print("HEADER MALFORMED: %s:1 %s" % (escape_field(shown_inv), escape_field("; ".join(findings))))
+                print("RESULT: not checked")
+                return 2
+            fallback = bridge_env.inventory_fallback(inv_body or "")
+            for key in bridge_env.header_agrees("inventory", inv_header, fallback):
+                fails.append("HEADER DISAGREES: %s" % key)
+            reflected_marker = inv_header.get("reflected_through")
+        else:
+            reflected_marker = bridge_env.inventory_reflected_through(inv_text)
+        tables = parse_tables(inv_body or inv_text)
+        section_defs = SECTIONS
+        if inv_header is not None:
+            section_defs = {}
+            _sec_names = {
+                "features": "Features",
+                "resources": "Resources",
+                "decisions": "Decisions",
+                "deferred": "Deferred",
+            }
+            for key, shape in (inv_header.get("tables") or {}).items():
+                name = _sec_names.get(key)
+                if name:
+                    section_defs[name] = list(shape.get("columns") or [])
+        for sec, cols in section_defs.items():
             if sec not in tables:
                 fails.append("SHAPE: section '## %s' missing" % sec)
                 continue
@@ -364,11 +399,16 @@ def main():
                                  % (sec, i, " | ".join(r)[:120]))
 
     # 3. absorbed change-log entries
-    m = re.search(r"^Reflected through:\s*(.+?)\s*$", inv_text, re.M)
-    if inv_text and not m:
-        fails.append("SHAPE: no 'Reflected through:' line")
-    if m and os.path.exists(a.changes):
-        marker = m.group(1).strip().strip("`")
+    if inv_text and reflected_marker is None and inv_header is None:
+        m = re.search(r"^Reflected through:\s*(.+?)\s*$", inv_text, re.M)
+        if not m:
+            fails.append("SHAPE: no 'Reflected through:' line")
+        else:
+            reflected_marker = m.group(1).strip().strip("`")
+    elif inv_text and reflected_marker is None and inv_header is not None:
+        pass
+    if inv_text and reflected_marker is not None and os.path.exists(a.changes):
+        marker = reflected_marker
         heads = changes_headings(read(a.changes))
         if marker.lower() == "none":
             pending = heads
@@ -385,7 +425,7 @@ def main():
                 fails.append("    ## " + h[:110])
             if len(pending) > 15:
                 fails.append("    ... and %d more" % (len(pending) - 15))
-    elif m:
+    elif inv_text and reflected_marker is not None:
         notes.append("changes: %s not found (absorption not checked)" % a.changes)
 
     # 4 + 5. resources
