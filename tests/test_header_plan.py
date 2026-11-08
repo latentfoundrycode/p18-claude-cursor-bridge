@@ -662,3 +662,14 @@ def test_r059_plan_check_compiles_no_heading_or_field_regex_of_its_own():
 
 
 # ---------------------------------------------------------------- builder's cases below this line
+
+
+def test_r059_plan_r_ids_outside_headers_matches_retired_whole_text_search(tmp_path):
+    """R-059: plan_r_ids_outside_headers finds R-ids on body Satisfies lines, not in titles alone."""
+    read = need("plan_r_ids_outside_headers")
+    body = (
+        "# Plan\n\n**Satisfies**: R-099\n\n### TASK-010 %s title mentions R-098\n\n"
+        "Satisfies: R-097\n" % DASH
+    )
+    assert read(body) == ["R-099", "R-097"]
+    assert "R-098" not in read(body)

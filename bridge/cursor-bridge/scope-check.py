@@ -53,6 +53,10 @@ import re
 import subprocess
 import sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env
+
 # Windows: never pop a console window (bridge windowless-by-default policy).
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -83,24 +87,6 @@ def bookkeeping(path):
     return bool(REPORT_RX.match(path)) or any(path == b or (b.endswith("/") and path.startswith(b)) for b in BOOKKEEPING)
 
 
-def split_entry(entry):
-    """The paths one bullet names: `a.py`, `b.py` and "c.py" -> three; prose after a path dropped."""
-    entry = re.split(r"\s+(?:\(|#|--|-\s|—)", entry, maxsplit=1)[0]
-    out = []
-    for piece in re.split(r"\s*,\s*|\s+and\s+|\s*;\s*", entry):
-        piece = piece.strip().strip("`'\"").strip()
-        if not piece:
-            continue
-        tok = piece.split()[0].rstrip(",;:").strip("`'\"").rstrip(",;:")
-        if "..." in tok or "\u2026" in tok:
-            return None
-        if tok and PATH_RX.match(tok) and re.search(r"[./*?\[]", tok):   # a path has a slash, a dot or a glob; a bare word is prose
-            out.append(tok)
-        else:
-            UNREAD.append(piece[:60])                          # reported, never dropped in silence
-    return out
-
-
 UNREAD = []
 
 
@@ -111,32 +97,33 @@ def parse_scope(brief_path):
         print("CANNOT VERIFY: brief not readable: %s (%s)" % (brief_path, e))
         sys.exit(2)
 
-    # Collect bullet lines under the "## Scope" heading, up to the next "## " heading.
-    in_scope, entries, raw = False, [], []
-    for line in text.splitlines():
-        if re.match(r"^##\s+Scope\b", line, re.IGNORECASE):
-            in_scope = True
-            continue
-        if in_scope and re.match(r"^#+\s+", line):
-            break                                          # any heading ends the Scope, a `### Out of scope` included
-        if in_scope:
-            if line.strip() and line[0] in " \t":
-                if raw and not re.match(r"^\s*[-*]\s", line):
-                    raw[-1] += " " + line.strip()          # an indented line continues its bullet (third pass, T2)
-                continue                                   # an indented bullet is a sub-bullet, not a path
-            if raw and line.strip() and not re.match(r"^[-*]\s", line):
-                break                                      # a bold note or prose after the path list ends the Scope (N8)
-            m = re.match(r"^[-*]\s+(.+?)\s*$", line)      # top-level bullets only
-            if m:
-                raw.append(m.group(1).strip())
-    for entry in raw:
-        if entry.lower().startswith("do not"):
-            continue
-        paths = split_entry(entry)
-        if paths is None:
-            print("CANNOT VERIFY: a Scope entry carries an ellipsis (%s); name every path or a glob." % entry[:80])
+    shown = brief_path.replace("\\", "/")
+    try:
+        header, body = bridge_env.read_header(text)
+    except bridge_env.HeaderError as err:
+        print("HEADER MALFORMED: %s:%d %s" % (shown, err.line, err))
+        sys.exit(2)
+    if header is not None and header.get("record") == "brief":
+        findings = bridge_env.check_header("brief", header)
+        if findings:
+            print("HEADER MALFORMED: %s:1 %s" % (shown, "; ".join(findings)))
             sys.exit(2)
-        entries.extend(_norm(p) for p in paths)
+        name = os.path.basename(brief_path)
+        if name.endswith(".md"):
+            name = name[:-3]
+        fallback = bridge_env.brief_prose_fallback(text, name)
+        for key in bridge_env.header_agrees("brief", header, fallback):
+            print("HEADER DISAGREES: %s" % key)
+            sys.exit(2)
+    entries, refusal, unread = bridge_env.parse_scope(text)
+    UNREAD.extend(unread)
+    if refusal == "ellipsis":
+        print("CANNOT VERIFY: a Scope entry carries an ellipsis; name every path or a glob.")
+        sys.exit(2)
+    if refusal == "empty":
+        print("CANNOT VERIFY: no Scope entries found under '## Scope' in %s "
+              "(spec-packager defect - the brief must fence its scope)." % brief_path)
+        sys.exit(2)
     if not entries:
         print("CANNOT VERIFY: no Scope entries found under '## Scope' in %s "
               "(spec-packager defect - the brief must fence its scope)." % brief_path)

@@ -60,9 +60,11 @@ import bridge_env
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
-ID = r"TASK-\d{3,}[a-z]?"
-HEAD_RX = re.compile(r"^###\s+(%s)\s*(?:[-:—–]+)?\s*(.*)$" % ID)
-FIELD_RX = re.compile(r"^\s*(?:[-*]\s+)?(Kind|Parent|Depends on|Parallel|Satisfies|Diagrams|Scope|Deferred)\s*:\s*(.*?)\s*$", re.I)
+ID = bridge_env.PLAN_ID_PATTERN
+HEAD_RX = bridge_env.HEAD_RX
+FIELD_RX = bridge_env.FIELD_RX
+DEMO_RX = bridge_env.DEMO_RX
+STAGE_RX = bridge_env.STAGE_RX
 ID_RX = re.compile(ID)
 D_RX = re.compile(r"\bD-\d{3,}\b")
 
@@ -140,10 +142,6 @@ def parse(paths):
     return items, order, fails
 
 
-STAGE_RX = re.compile(r"^##\s+(\S.*?)\s*$")
-DEMO_RX = re.compile(r"^(?:[-*]\s+)?\**Demonstration\**\s*:\s*(\S.*)$", re.I)
-
-
 def stages_without_demonstration(paths):
     """[(stage, its increment IDs)] for the stage headings (`## ...`) that hold increments and
     no `Demonstration:` line (release A1b)."""
@@ -173,32 +171,6 @@ BOOKKEEPING = ("docs/BUILDER_NOTES.md", "docs/BOUNDARY_VIOLATIONS.md", "run/")  
 REPORT_RX = re.compile(r"handoff/[A-Z]+-\w+-r\d+-report\.md$")                 # the builder's report file, named in every Scope (2026.10.11d)
 
 
-def merged_ids(base):
-    folder = os.getcwd()
-    try:
-        p = subprocess.run(
-            ["git", "log", base, "--format=%s%n%(trailers:key=Merges,valueonly)"],
-            cwd=folder,
-            capture_output=True,
-            creationflags=NO_WINDOW,
-            timeout=120,
-        )
-    except subprocess.TimeoutExpired:
-        return None
-    except OSError:
-        raise
-    if p.returncode != 0:
-        return None
-    raw = p.stdout
-    if isinstance(raw, bytes):
-        text = raw.decode("utf-8", errors="replace")
-    else:
-        text = raw
-    return bridge_env.squash_merged_ids_from_lines(
-        text.split("\n"), bridge_env.PLAN_ID_PATTERN, plan_style=True
-    )
-
-
 def unreadable(value):
     """What is left of a Depends on / Parent value once the IDs and the fillers are removed."""
     rest = re.sub(r"\([^()]*\)", "", value or "")                          # a dated note in parentheses is not an ID
@@ -207,48 +179,29 @@ def unreadable(value):
     return re.sub(r"[,;\s]+", " ", rest).strip()
 
 
-def brief_scope(text):
-    """The paths of a brief's Scope, read as scope-check.py reads them (third pass, T7): top-level
-    bullets up to the first non-indented line that is no bullet, an indented line continuing its
-    bullet, a sub-bullet ignored; several paths per bullet; a token without a slash, a dot or a
-    glob is prose, not a path."""
-    raw, in_scope = [], False
-    for line in text.splitlines():
-        if re.match(r"^##\s+Scope\b", line, re.I):
-            in_scope = True
-            continue
-        if not in_scope:
-            continue
-        if re.match(r"^#+\s", line):
-            break
-        if line.strip() and line[0] in " \t":
-            if raw and not re.match(r"^\s*[-*]\s", line):
-                raw[-1] += " " + line.strip()
-            continue
-        if raw and line.strip() and not re.match(r"^[-*]\s", line):
-            break
-        m = re.match(r"^[-*]\s+(.+?)\s*$", line)
-        if m:
-            raw.append(m.group(1).strip())
-    out = []
-    for entry in raw:
-        if entry.lower().startswith("do not"):
-            continue
-        entry = re.split(r"\s+(?:\(|#|--|-\s|\u2014)", entry, maxsplit=1)[0]
-        for piece in re.split(r"\s*,\s*|\s+and\s+|\s*;\s*", entry):
-            piece = piece.strip().strip("`'\"").strip()
-            if not piece:
-                continue
-            tok = piece.split()[0].rstrip(",;:").strip("`'\"").rstrip(",;:")
-            if tok and re.match(r"^[\w.@~\[\]()*?/-]+$", tok) and re.search(r"[./*?\[]", tok):
-                out.append(tok.replace("\\", "/"))
-    return out
+def brief_scope_for(text, brief_name):
+    """The brief's Scope paths for plan-check (header first when it agrees with its prose)."""
+    try:
+        header, body = bridge_env.read_header(text)
+    except bridge_env.HeaderError:
+        header, body = None, text
+    if header is not None and header.get("record") == "brief" and not bridge_env.check_header("brief", header):
+        fallback = bridge_env.brief_prose_fallback(text, brief_name)
+        if not bridge_env.header_agrees("brief", header, fallback):
+            scope, _ref, _ = bridge_env.parse_scope(body if body is not None else "")
+            return scope
+        return list(header.get("scope") or [])
+    scope, _ref, _ = bridge_env.parse_scope(text)
+    return scope
 
 
 def brief_findings(path, item):
     """The brief's Scope paths outside the increment's Scope, and the increment's requirements the brief does not name."""
     text = read(path)
-    scope = brief_scope(text)
+    brief_name = os.path.basename(path)
+    if brief_name.endswith(".md"):
+        brief_name = brief_name[:-3]
+    scope = brief_scope_for(text, brief_name)
     found = []
     inc = item["scope"]
     for p in scope:
@@ -262,6 +215,46 @@ def brief_findings(path, item):
     return found
 
 
+def plan_header_findings(path, text, merged):
+    """Malformed and disagreeing plan header findings; (fatal_lines, disagree_lines, header_or_none)."""
+    shown = path.replace("\\", "/")
+    fatal, disagree, header = [], [], None
+    try:
+        header, body = bridge_env.read_header(text)
+    except bridge_env.HeaderError as err:
+        fatal.append("HEADER MALFORMED: %s:%d %s" % (shown, err.line, err))
+        return fatal, disagree, None
+    if header is None or header.get("record") != "build-plan":
+        return fatal, disagree, None
+    findings = bridge_env.check_header("build-plan", header)
+    if findings:
+        fatal.append("HEADER MALFORMED: %s:1 %s" % (shown, "; ".join(findings)))
+        return fatal, disagree, None
+    fallback = bridge_env.plan_prose_fallback(text, merged)
+    for token in bridge_env.header_agrees("build-plan", header, fallback):
+        disagree.append("HEADER DISAGREES: %s" % token)
+    body_ids = set()
+    for st in fallback.get("stages") or []:
+        for inc in st.get("increments") or []:
+            if inc.get("id"):
+                body_ids.add(inc.get("id"))
+    header_ids = set(bridge_env.plan_header_inc_ids(header))
+    for iid in sorted(header_ids - body_ids):
+        disagree.append("SHAPE: %s is declared in the plan header but has no ### heading" % iid)
+    for iid in sorted(body_ids - header_ids):
+        disagree.append("SHAPE: %s has a ### heading but no entry in the plan header" % iid)
+    return fatal, disagree, header
+
+
+def historic_header_ids(header):
+    ids = []
+    for st in header.get("stages") or []:
+        for inc in st.get("increments") or []:
+            if inc.get("historic") and inc.get("id"):
+                ids.append(inc["id"])
+    return ids
+
+
 def build_parser():
     ap = argparse.ArgumentParser(description="Validate the build plan and list ready increments.")
     ap.add_argument("--plan", default="docs/BUILD_PLAN*.md")
@@ -273,12 +266,41 @@ def build_parser():
 
 def main():
     a = build_parser().parse_args()
+    if a.base.startswith("-"):
+        print("plan-check: refusing --base %s (a base must not begin with '-')" % a.base)
+        return 2
     paths = sorted(glob.glob(a.plan))
     if not paths:
         print("plan-check: no plan matches %s" % a.plan)
         return 1
-    items, order, fails = parse(paths)
+    merged_set = None
+    if not a.no_git:
+        merged_set = bridge_env.squash_merged_ids(os.getcwd(), bridge_env.PLAN_ID_PATTERN, ref=a.base)
+    header_fatal, headers_by_path = [], {}
+    fails = []
+    for p in paths:
+        fatal, disagree, hdr = plan_header_findings(p, read(p), merged_set)
+        header_fatal.extend(fatal)
+        fails.extend(disagree)
+        headers_by_path[p] = hdr
+    if header_fatal:
+        for line in header_fatal:
+            print(line)
+        return 2
+
+    items, order, parse_fails = parse(paths)
+    fails.extend(parse_fails)
     notes = []
+    historic_exempt = set()
+    historic_marked = []
+    for p, hdr in headers_by_path.items():
+        if hdr is not None:
+            for iid in historic_header_ids(hdr):
+                historic_marked.append(iid)
+                if merged_set is None or iid in merged_set:
+                    historic_exempt.add(iid)
+    if merged_set is None and historic_marked:
+        notes.append("historic increments not re-checked against a merged set: %s" % ", ".join(sorted(set(historic_marked))))
     for p in paths:
         if re.search(r"\d{4}-\d{2}-\d{2}", os.path.basename(p)):
             notes.append("addendum %s read with the plan" % p.replace("\\", "/"))
@@ -286,19 +308,32 @@ def main():
     kinds = {}
     for tid in order:
         fl = items[tid]["fields"]
+        exempt = tid in historic_exempt
         kind = (fl.get("kind") or "increment").strip().lower()
-        if kind not in ("increment", "group"):
-            fails.append("SHAPE: %s has Kind '%s' (increment | group)" % (tid, kind))
+        if not exempt:
+            if kind not in ("increment", "group"):
+                fails.append("SHAPE: %s has Kind '%s' (increment | group)" % (tid, kind))
+                kind = "increment"
+        else:
             kind = "increment"
         kinds[tid] = kind
         par = (fl.get("parallel") or "no").strip().lower()
-        if par not in ("yes", "no"):
+        if not exempt and par not in ("yes", "no"):
             fails.append("SHAPE: %s has Parallel '%s' (yes | no)" % (tid, par))
-        scope = scope_paths(fl.get("scope"))
-        if kind == "increment" and not scope:
+        if exempt:
+            par = "no"
+        scope = scope_paths(fl.get("scope")) if not exempt else []
+        if not exempt and kind == "increment" and not scope:
             fails.append("SHAPE: %s has no Scope" % tid)
-        if kind == "group" and scope:
+        if not exempt and kind == "group" and scope:
             fails.append("SHAPE: group %s has a Scope (groups are not delegated)" % tid)
+        if not exempt and merged_set is not None and tid not in merged_set:
+            scope_raw = fl.get("scope")
+            if scope_raw:
+                try:
+                    bridge_env.plan_scope_agreement_entries(scope_raw)
+                except bridge_env.ScopeAgreementError:
+                    fails.append("SHAPE: %s has an unbalanced parenthesis in its Scope" % tid)
         items[tid]["scope"] = scope
         items[tid]["parallel"] = par == "yes"
         items[tid]["deferred"] = bool((fl.get("deferred") or "").strip())
@@ -307,6 +342,8 @@ def main():
 
     children = {}
     for tid in order:
+        if tid in historic_exempt:
+            continue
         for key in ("parent", "depends on"):
             rest = unreadable(items[tid]["fields"].get(key))
             if rest:
@@ -401,15 +438,11 @@ def main():
     else:
         notes.append("no docs/diagrams/INDEX.md - diagram references not checked")
 
-    merged = set()
-    if not a.no_git:
-        m = merged_ids(a.base)
-        if m is None:
-            notes.append("could not read git log of %s - readiness assumes nothing merged" % a.base)
-        else:
-            merged = m
+    merged_ready = set() if merged_set is None else merged_set
+    if merged_set is None and not a.no_git:
+        notes.append("could not read git log of %s - readiness assumes nothing merged" % a.base)
     inc = [t for t in order if kinds[t] == "increment"]
-    done = {t for t in inc if t in merged}
+    done = {t for t in inc if t in merged_ready}
     if a.briefs and os.path.isdir(a.briefs):
         for bp in sorted(glob.glob(os.path.join(a.briefs, "TASK-*.md"))):
             if bp.endswith("-report.md"):                    # the builder's report beside its brief (2026.10.11d)
@@ -420,7 +453,7 @@ def main():
                 for finding in brief_findings(bp, items[tid]):
                     fails.append("BRIEF: %s %s" % (bp.replace("\\", "/"), finding))
     for s, ids in stages_without_demonstration(paths):
-        if any(t not in merged for t in ids):                 # a closed stage is not noted
+        if any(t not in merged_ready for t in ids):                 # a closed stage is not noted
             notes.append("stage '%s' names no Demonstration: line; the stage close runs it live (release A1b), add one from the stage's increments" % s[:60])
     ready = [t for t in inc if t not in done and not items[t]["deferred"] and deps[t] <= done]
     notes.insert(0, "%d increments in %d file(s); %d merged, %d deferred" % (

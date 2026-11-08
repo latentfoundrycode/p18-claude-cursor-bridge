@@ -686,6 +686,26 @@ def snapshot_review_refusal(nnn, root, common):
     if not parsed:
         return "review-guard: refused - the name cannot be read by the grammar"
     id_part, name_round = parsed
+    brief_path = os.path.join(root, "handoff", id_part + ".md")
+    if os.path.isfile(brief_path):
+        try:
+            brief_text = open(brief_path, encoding="utf-8", errors="replace").read()
+        except OSError:
+            brief_text = ""
+        if brief_text:
+            shown = os.path.join("handoff", id_part + ".md").replace("\\", "/")
+            try:
+                header, _body = bridge_env.read_header(brief_text)
+            except bridge_env.HeaderError as err:
+                return "review-guard: refused - header: %s:%d %s" % (shown, err.line, err)
+            if header is not None and header.get("record") == "brief":
+                findings = bridge_env.check_header("brief", header)
+                if findings:
+                    return "review-guard: refused - header: %s:1 %s" % (shown, "; ".join(findings))
+                fallback = bridge_env.brief_prose_fallback(brief_text, id_part)
+                for key in bridge_env.header_agrees("brief", header, fallback):
+                    if key in ("merge_unit", "id", "round"):
+                        return "review-guard: refused - header: disagrees %s" % key
     log_folder = bridge_env.launcher_log_folder(common, root)
     id_rx = bridge_env.grammar_id_rx()
     owner_lifts = bridge_env.review_owner_lifts(root)

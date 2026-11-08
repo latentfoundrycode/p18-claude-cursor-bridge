@@ -657,6 +657,10 @@ def builder_review_refusal(argv, folder, kind):
             None,
         )
     brief_text = brief_bytes.decode("utf-8", errors="replace")
+    brief_shown = os.path.join("handoff", brief_name + ".md").replace("\\", "/")
+    header_reason = bridge_env.brief_header_refusal(brief_text, brief_shown)
+    if header_reason:
+        return (_ascii_refusal(header_reason), None)
     merge_ids = bridge_env.merge_unit_ids(brief_text)
     if merge_ids is None and bridge_env.merge_unit_line_present(brief_text):
         return (_brief_rule_refusal("brief rule: Merge unit: line is not valid"), None)

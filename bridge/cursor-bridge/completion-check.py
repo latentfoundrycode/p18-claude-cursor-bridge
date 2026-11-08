@@ -45,6 +45,10 @@ import re
 import subprocess
 import sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import bridge_env
+
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 ID_RX = re.compile(r"\bR-\d{3,}\b")
@@ -146,15 +150,66 @@ def main():
             reqs = {k: v for k, v in reqs.items() if k in only}
             notes.append("limited to %d of %d requirements (--only %s)" % (len(reqs), total, ", ".join(sorted(only))))
 
-    # plan coverage
     plans = sorted(glob.glob("docs/BUILD_PLAN*.md"))
-    plan_text = "\n".join(read(p) for p in plans)
     if not plans:
         notes.append("no docs/BUILD_PLAN*.md found - plan coverage not checked")
     else:
         satisfied = set()
-        for m in re.finditer(r"^\s*(?:[-*]\s+)?\**Satisfies\**\s*:\s*(.*)$", plan_text, re.M | re.I):
-            satisfied.update(ID_RX.findall(m.group(1)))
+        header_union = set()
+        has_build_plan_header = False
+        for p in plans:
+            shown = p.replace("\\", "/")
+            text = read(p)
+            try:
+                header, _body = bridge_env.read_header(text)
+            except bridge_env.HeaderError as err:
+                print("HEADER MALFORMED: %s:%d %s" % (shown, err.line, err))
+                return 2
+            if header is not None and header.get("record") == "build-plan":
+                findings = bridge_env.check_header("build-plan", header)
+                if findings:
+                    print("HEADER MALFORMED: %s:1 %s" % (shown, "; ".join(findings)))
+                    return 2
+                has_build_plan_header = True
+                for st in header.get("stages") or []:
+                    for inc in st.get("increments") or []:
+                        for rid in inc.get("satisfies") or []:
+                            satisfied.add(rid)
+                            header_union.add(rid)
+            else:
+                cur = None
+                for line in text.splitlines():
+                    hm = bridge_env.HEAD_RX.match(line)
+                    if hm:
+                        cur = hm.group(1)
+                        continue
+                    if line.startswith("#"):
+                        cur = None
+                        continue
+                    if cur is not None:
+                        fm = bridge_env.FIELD_RX.match(line)
+                        if fm and fm.group(1).lower() == "satisfies":
+                            satisfied.update(ID_RX.findall(fm.group(2) or ""))
+        if has_build_plan_header:
+            disagree = False
+            for p in plans:
+                text = read(p)
+                try:
+                    header, _ = bridge_env.read_header(text)
+                except bridge_env.HeaderError:
+                    continue
+                if header is None or header.get("record") != "build-plan":
+                    continue
+                if bridge_env.check_header("build-plan", header):
+                    continue
+                for rid in bridge_env.plan_r_ids_outside_headers(text):
+                    if rid not in header_union:
+                        disagree = True
+                        break
+                if disagree:
+                    break
+            if disagree:
+                fails.append("HEADER DISAGREES: satisfies")
         for rid, (kind, text) in sorted(reqs.items()):
             if kind == "planned" and rid not in satisfied:
                 fails.append("UNPLANNED: %s (%s) is in no increment's Satisfies: field" % (rid, text[:70]))
