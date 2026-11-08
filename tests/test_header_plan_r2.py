@@ -289,8 +289,9 @@ def test_r059_r2_the_launcher_refuses_a_plan_header_whose_increments_have_no_hea
         _inc("TASK-016", "two", ["Kind: increment", "Scope: src/two.py"], scope=["src/two.py"])]}]
     (lab.root / "docs" / "BUILD_PLAN-2026-11-04.md").write_bytes(
         (hp.plan_header(stages) + hp.plan_prose(prose)).encode("utf-8"))
-    t32.write_brief(lab.root, "TASK-010", "\nMerge unit: TASK-010 TASK-015\n")
-    t32.assert_refused(t32.launch(lab, t32.build("TASK-010")), "bridge-run: refused - ")
+    # TASK-016 has a heading and no header entry: only the header comparison refuses it (the ID reading accepts it)
+    t32.write_brief(lab.root, "TASK-010", "\nMerge unit: TASK-010 TASK-016\n")
+    t32.assert_refused(t32.launch(lab, t32.build("TASK-010")), "bridge-run: refused - header: ")
 
 
 def test_r059_r2_completion_check_walks_no_plan_of_its_own():

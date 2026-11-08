@@ -98,7 +98,8 @@ def test_r059_r3_the_launcher_accepts_no_merge_unit_id_outside_any_stage(tmp_pat
     (lab.root / "docs" / "BUILD_PLAN-2026-11-04.md").write_bytes(
         (hp.plan_header(stages) + _with_orphan(hp.plan_prose(stages))).encode("utf-8"))
     t32.write_brief(lab.root, "TASK-010", "\nMerge unit: TASK-010 TASK-009\n")
-    t32.assert_refused(t32.launch(lab, t32.build("TASK-010")), "bridge-run: refused - ")
+    line = t32.assert_refused(t32.launch(lab, t32.build("TASK-010")), "bridge-run: refused - header: ")
+    assert "outside any stage" in line, line                   # the plan's refusal, not the ID reading's
 
 
 # ---------------------------------------------------------------- a merged Scope with an unbalanced parenthesis
