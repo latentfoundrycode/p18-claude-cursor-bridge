@@ -135,3 +135,48 @@ def test_r061_r2_the_fallback_of_a_whitespace_padded_file_takes_linear_time(pad)
     got = fallback(text)
     took = time.perf_counter() - start
     assert took < 2.0 and got["agent_ceiling"] is None, took
+
+
+# ---------------------------------------------------------------- R5: a carriage return is part of no value
+
+@pytest.mark.parametrize("ending", ["crlf", "cr"], ids=["crlf", "cr"])
+def test_r061_r2_text_with_crlf_or_lone_cr_line_ends_reads_as_with_line_feeds(ending):
+    fallback = need("run_parameters_fallback")
+    sep = {"crlf": chr(13) + chr(10), "cr": chr(13)}[ending]
+    got = fallback(t1.PROSE.replace(chr(10), sep))
+    assert got == t1.VALUES, got
+
+
+# ---------------------------------------------------------------- the mutation run's gaps (R1, R3, R4, R8 of round 1)
+
+SCHEMA_BAD = t1.rp_header().replace("agent_ceiling: 7200", 'agent_ceiling: "7200"', 1)
+
+
+def test_r061_r2_a_header_with_a_schema_finding_is_malformed_and_reads_the_lines():
+    values = need("run_parameters_values")
+    assert SCHEMA_BAD != t1.rp_header()  # the precondition: the header holds a string where an integer stands
+    got, malformed, disagrees = values(SCHEMA_BAD + t1.PROSE)
+    assert got == t1.VALUES and disagrees == [] and malformed is not None and malformed[0] == 1, malformed
+
+
+def test_r061_r2_the_refusal_names_a_schema_finding_at_line_one(tmp_path):
+    refusal = need("run_parameters_refusal")
+    t1.write(tmp_path / "docs" / "RUN_PARAMETERS.md", SCHEMA_BAD + t1.PROSE)
+    got = refusal(str(tmp_path), ("ceiling_above_twice",))
+    assert got is not None and got.startswith("header: docs/RUN_PARAMETERS.md:1 "), got
+
+
+def test_r061_r2_inventory_check_refuses_a_header_with_a_schema_finding(tmp_path):
+    need("run_parameters_values")  # the header path is new: red on the checkpoint
+    rc, out = t1.inventory_check(t1.inventory_ws(tmp_path, SCHEMA_BAD + t1.PROSE))
+    assert rc == 2 and "HEADER MALFORMED: " in out and "docs/RUN_PARAMETERS.md:1 " in out, out
+    assert "RESULT: not checked" in out, out
+
+
+@pytest.mark.parametrize("rounds,lifted", [(3, False), (4, True)], ids=["three", "four"])
+def test_r061_r2_review_owner_lifts_on_lines_lift_only_above_three(tmp_path, rounds, lifted):
+    lifts = need("review_owner_lifts")
+    need("run_parameters_values")  # the header path is new: red on the checkpoint
+    line = "Review rounds above the ceiling: TASK-001 %d (the owner, 2026-11-04)" % rounds
+    t1.write(tmp_path / "docs" / "RUN_PARAMETERS.md", "# Run parameters\n" + line + "\n")
+    assert lifts(str(tmp_path)) == ({"TASK-001": (rounds, line)} if lifted else {})
