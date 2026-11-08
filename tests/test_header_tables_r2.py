@@ -155,6 +155,24 @@ def test_r060_r2_conformance_check_on_its_stand_in_gives_no_false_inventory_verd
         assert re.match(r"\s+MISSING\s", line) and "not checked" in line, (name, out)
 
 
+# ---------------------------------------------------------------- A5 and SF-1b, added after round 2's review
+
+def test_r060_r2_a_headed_inventory_reads_its_sections_from_the_body_alone(tmp_path):
+    hdr = th.inventory_header(replace=("tables:", "## Features\ntables:"))
+    rc, out = run("inventory-check.py", th.inventory_ws(tmp_path, hdr, body=""))
+    assert rc == 1 and "SHAPE: section '## Features' missing" in out, out
+    assert "has no table header" not in out, out
+
+
+def test_r060_r2_the_headerless_index_reading_keeps_the_first_table_check():
+    selected_ids = th.need("diagram_index_selected_ids")
+    index = th.read_repo("docs/diagrams/INDEX.md")
+    assert selected_ids(index, None), "precondition: the repository's index selects diagrams"
+    renamed = re.sub(r"^\|\s*ID\s*\|", "| Diagram |", index, count=1, flags=re.M)
+    assert renamed != index
+    assert selected_ids(renamed, None) == set()
+
+
 # ---------------------------------------------------------------- builder's cases below this line
 
 
