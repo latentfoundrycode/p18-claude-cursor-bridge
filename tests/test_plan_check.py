@@ -194,6 +194,8 @@ def _plan_check_merged(base):
     """The merged set plan-check.py reads: since TASK-048 (R-059; the design's retired reading (11)) it keeps no
     merged_ids of its own and calls bridge_env.squash_merged_ids(<the current folder>, PLAN_ID_PATTERN, ref=<--base>),
     which tests/test_header_plan.py pins."""
+    if CB not in sys.path:
+        sys.path.insert(0, CB)
     import bridge_env
     return bridge_env.squash_merged_ids(os.getcwd(), bridge_env.PLAN_ID_PATTERN, ref=base)
 
