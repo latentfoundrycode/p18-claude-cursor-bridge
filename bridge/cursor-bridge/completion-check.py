@@ -127,11 +127,17 @@ def main():
                 fails.append("HEADER DISAGREES: %s" % key)
             columns = list(reg_header.get("columns") or [])
             roles = reg_header.get("roles") or {}
+            role_cols = set(roles.values())
+            evidence_col = roles.get("evidence")
             _hl, rows = parse_register(reg_body or "")
             for r in rows:
-                if len(r) < len(columns) or not all(
-                        bridge_env.register_row_role(r, columns, roles, k).strip("`* ")
-                        for k in ("id", "status")
+                if len(r) < len(columns):
+                    fails.append("REGISTER: malformed row: %s" % " | ".join(r)[:120])
+                    continue
+                if any(
+                        not r[i]
+                        for i, col in enumerate(columns)
+                        if col != evidence_col
                 ):
                     fails.append("REGISTER: malformed row: %s" % " | ".join(r)[:120])
                     continue
@@ -149,7 +155,13 @@ def main():
                 kind = status.split()[0].lower()
                 if kind in ("deferred", "dropped") and not OWNER_DATED.search(status):
                     fails.append("UNAPPROVED: %s is %s without the owner's approval and a date (%s)" % (rid, kind, status[:60]))
-                reqs[rid] = (kind, bridge_env.register_row_role(r, columns, roles, "requirement"))
+                req_text = ""
+                for col in columns:
+                    if col not in role_cols:
+                        idx = columns.index(col)
+                        req_text = r[idx] if idx < len(r) else ""
+                        break
+                reqs[rid] = (kind, req_text)
                 evidence[rid] = bridge_env.register_row_role(r, columns, roles, "evidence")
         else:
             header, rows = parse_register(reg_text)

@@ -513,7 +513,7 @@ def test_r060_diagram_check_reads_no_r_id_from_the_whole_register():
 
 def test_r060_inventory_fallback_reflected_none_string(tmp_path):
   """R-060: Reflected through: none reads the string none in the inventory fallback mapping."""
-  body = INVENTORY.replace("Reflected through: none\n", "Reflected through: none\n")
+  body = INVENTORY
   fb = need("inventory_fallback")(body)
   assert fb["reflected_through"] == "none", fb
 

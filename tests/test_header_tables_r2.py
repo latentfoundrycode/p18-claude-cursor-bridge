@@ -156,3 +156,45 @@ def test_r060_r2_conformance_check_on_its_stand_in_gives_no_false_inventory_verd
 
 
 # ---------------------------------------------------------------- builder's cases below this line
+
+
+def test_r060_r2_headed_inventory_tables_read_from_body_only(tmp_path):
+    """R-060: a headed inventory reads tables from the body alone, not the YAML header block."""
+    hdr = th.inventory_header()
+    rc, out = run("inventory-check.py", th.inventory_ws(tmp_path, hdr, body=""))
+    assert rc != 0 or "SHAPE: section" in out, out
+
+
+def test_r060_r2_headed_inventory_column_count_uses_template(tmp_path):
+    """R-060: column-count SHAPE under an agreeing header matches the header-less template rule."""
+    bad_tables = [
+        ("features", ["Feature", "What it does"], "Feature"),
+        ("resources", ["Name", "Kind", "Where it lives", "Used by", "Provided"], "Name"),
+        ("decisions", ["Decision", "Reason", "Settled", "Revisit only if"], "Decision"),
+        ("deferred", ["Item", "Why deferred", "Since", "Owner decision needed"], "Item"),
+    ]
+    body = th.INVENTORY.replace(
+        "| Feature | What it does | Where | Tests | Since |\n|---|---|---|---|---|",
+        "| Feature | What it does |\n|---|---|",
+    ).replace(
+        "| Search | finds things | app/search.py | tests/test_search.py | TASK-001 |",
+        "| Search | finds things |",
+    )
+    rc_p, out_p = run("inventory-check.py", th.inventory_ws(tmp_path / "p", body=body))
+    rc_h, out_h = run("inventory-check.py", th.inventory_ws(tmp_path / "h", th.inventory_header(tables=bad_tables), body=body))
+    assert "SHAPE:" in out_p and "Features" in out_p, out_p
+    assert rc_h == rc_p and th.answer(out_h) == th.answer(out_p), out_h
+
+
+def test_r060_r2_conformance_development_data_uses_bridge_env_reading(tmp_path):
+    """R-060: conformance-check reads header-less development data through bridge_env, not a local regex."""
+    tree = _tree("conformance-check.py")
+    pats = [p for p in th.re_patterns(tree) if isinstance(p, str) and "development data" in p.lower()]
+    assert not pats, "conformance-check.py keeps a local development-data pattern at %s" % pats
+
+
+def test_r060_r2_plan_check_headerless_index_applies_first_table_check(tmp_path):
+    """R-060: plan-check's header-less index reading refuses a table that fails the normative header check."""
+    index = th.swap_columns(th.read_repo("docs/diagrams/INDEX.md"), 2, 3)
+    rc, out = th.plan_check(th.diagrams_ws(tmp_path, index=index, plan=th.PLAN_D % "D-002"))
+    assert rc == 1 and re.search(r"DIAGRAMS:", out), out

@@ -79,22 +79,22 @@ def _safe_exc_type_name(err):
         return "an exception"
 
 
+_INVENTORY_BRIDGE_NAMES = (
+    "status_values", "read_header", "check_header", "header_agrees",
+    "inventory_fallback", "inventory_reflected_through", "inventory_parse_tables",
+)
+
+
 def _bridge_env_refuse_line():
     shown = os.path.join(HERE, "bridge_env.py").replace("\\", "/")
     if bridge_env is None:
         return "%s: cannot be loaded (%s)" % (shown, _safe_exc_type_name(_bridge_env_import_err))
-    if not hasattr(bridge_env, "status_values"):
-        return "%s: cannot be used (%s)" % (shown, "ImportError")
+    for name in _INVENTORY_BRIDGE_NAMES:
+        if not hasattr(bridge_env, name):
+            return "%s: cannot be used (%s)" % (shown, "ImportError")
     return None
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-
-SECTIONS = {
-    "Features":  ["Feature", "What it does", "Where", "Tests", "Since"],
-    "Resources": ["Name", "Kind", "Where it lives", "Used by", "Provided"],
-    "Decisions": ["Decision", "Reason", "Settled", "Revisit only if"],
-    "Deferred":  ["Item", "Why deferred", "Since", "Owner decision needed"],
-}
 
 CODE_EXT = {".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".ps1", ".psm1", ".cs",
             ".rs", ".go", ".java", ".kt", ".rb", ".php", ".vue", ".svelte"}
@@ -164,27 +164,7 @@ def fingerprint_like(cell):
 
 
 def parse_tables(text):
-    if bridge_env is not None and hasattr(bridge_env, "inventory_parse_tables"):
-        return bridge_env.inventory_parse_tables(text)
-    out = {}
-    current = None
-    for line in text.splitlines():
-        h = re.match(r"^##\s+(.+?)\s*$", line)
-        if h:
-            current = h.group(1).strip()
-            if current in SECTIONS:
-                out[current] = [None, []]
-            continue
-        if current not in SECTIONS or not line.strip().startswith("|"):
-            continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
-            continue
-        if out[current][0] is None:
-            out[current][0] = cells
-        else:
-            out[current][1].append(cells)
-    return out
+    return bridge_env.inventory_parse_tables(text)
 
 
 def changes_headings(text):
@@ -348,6 +328,11 @@ def main():
     else:
         inv_text = read(a.inventory)
         shown_inv = a.inventory.replace("\\", "/")
+        refuse = _bridge_env_refuse_line()
+        if refuse is not None:
+            print(escape_field(refuse))
+            print("RESULT: not checked")
+            return 2
         inv_header = None
         inv_body = inv_text
         try:
@@ -365,23 +350,14 @@ def main():
             fallback = bridge_env.inventory_fallback(inv_body or "")
             for key in bridge_env.header_agrees("inventory", inv_header, fallback):
                 fails.append("HEADER DISAGREES: %s" % key)
-            reflected_marker = inv_header.get("reflected_through")
+            if inv_header.get("reflected_through") is not None:
+                reflected_marker = inv_header.get("reflected_through")
+            else:
+                reflected_marker = bridge_env.inventory_reflected_through(inv_body or "")
         else:
             reflected_marker = bridge_env.inventory_reflected_through(inv_text)
-        tables = parse_tables(inv_body or inv_text)
-        section_defs = SECTIONS
-        if inv_header is not None:
-            section_defs = {}
-            _sec_names = {
-                "features": "Features",
-                "resources": "Resources",
-                "decisions": "Decisions",
-                "deferred": "Deferred",
-            }
-            for key, shape in (inv_header.get("tables") or {}).items():
-                name = _sec_names.get(key)
-                if name:
-                    section_defs[name] = list(shape.get("columns") or [])
+        tables = parse_tables(inv_body if inv_header is not None else (inv_body or inv_text))
+        section_defs = bridge_env.INVENTORY_SECTIONS
         for sec, cols in section_defs.items():
             if sec not in tables:
                 fails.append("SHAPE: section '## %s' missing" % sec)
@@ -399,14 +375,8 @@ def main():
                                  % (sec, i, " | ".join(r)[:120]))
 
     # 3. absorbed change-log entries
-    if inv_text and reflected_marker is None and inv_header is None:
-        m = re.search(r"^Reflected through:\s*(.+?)\s*$", inv_text, re.M)
-        if not m:
-            fails.append("SHAPE: no 'Reflected through:' line")
-        else:
-            reflected_marker = m.group(1).strip().strip("`")
-    elif inv_text and reflected_marker is None and inv_header is not None:
-        pass
+    if inv_text and reflected_marker is None:
+        fails.append("SHAPE: no 'Reflected through:' line")
     if inv_text and reflected_marker is not None and os.path.exists(a.changes):
         marker = reflected_marker
         heads = changes_headings(read(a.changes))

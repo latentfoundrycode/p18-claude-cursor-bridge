@@ -2781,7 +2781,7 @@ def inventory_fallback(text):
 
 def parse_register(text):
     """Every table line in text: (header_lower, [data_row_cells...])."""
-    rows, header_lower, header_orig = [], None, None
+    rows, header_lower = [], None
     for line in (text or "").splitlines():
         s = line.strip()
         if not s.startswith("|"):
@@ -2790,7 +2790,6 @@ def parse_register(text):
         if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
             continue
         if header_lower is None:
-            header_orig = list(cells)
             header_lower = [c.lower() for c in cells]
             continue
         rows.append(cells)
@@ -2799,7 +2798,7 @@ def parse_register(text):
 
 def register_fallback(text):
     """Prose fallback mapping for header_agrees on a requirements register."""
-    _, header_orig = None, None
+    header_orig = None
     for line in (text or "").splitlines():
         s = line.strip()
         if not s.startswith("|"):
@@ -2833,6 +2832,11 @@ def _first_markdown_table(text):
 
 
 _INDEX_WANT = ["id", "level", "kind", "status", "file", "refines", "realizes", "enforced", "why"]
+
+
+def diagram_index_body_table(text):
+    """First table in an index file: (header_lower, header_orig, rows), with no normative header check."""
+    return _first_markdown_table(text)
 
 
 def diagram_index_table(text):
@@ -2921,9 +2925,9 @@ _D_ID_RX = re.compile(r"D-\d{3,}")
 
 def diagram_index_selected_ids(text, header=None):
     """Diagram IDs with status selected, from an index body and optional header."""
-    _hl, _ho, rows = _first_markdown_table(text)
     selected = set()
     if header is not None:
+        _hl, _ho, rows = diagram_index_body_table(text)
         columns = list(header.get("columns") or [])
         roles = header.get("roles") or {}
         for r in rows:
@@ -2932,6 +2936,9 @@ def diagram_index_selected_ids(text, header=None):
             status = fields.get("status", "").strip("`* ").lower()
             if did and status.startswith("selected") and _D_ID_RX.fullmatch(did):
                 selected.add(did)
+        return selected
+    _hl, _ho, rows = diagram_index_table(text)
+    if _hl is None:
         return selected
     for r in rows:
         if len(r) >= 4:

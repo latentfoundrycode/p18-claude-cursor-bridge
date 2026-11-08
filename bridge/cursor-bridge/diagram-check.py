@@ -606,13 +606,18 @@ def known_deviations(path=DEVIATIONS, header=None, body=None):
         return frozenset()
     if body is None:
         text = read(path)
-        try:
-            hdr, body = bridge_env.read_header(text)
-        except bridge_env.HeaderError:
-            return frozenset()
+        hdr, body = bridge_env.read_header(text)
         header = hdr
         if hdr is None:
             body = text
+        elif hdr is not None:
+            findings = bridge_env.check_header("deviations", hdr)
+            if findings:
+                raise bridge_env.HeaderError(1, "; ".join(findings))
+    elif header is not None:
+        findings = bridge_env.check_header("deviations", header)
+        if findings:
+            raise bridge_env.HeaderError(1, "; ".join(findings))
     return frozenset(bridge_env.parse_deviation_keys(body or "", header))
 
 
@@ -777,16 +782,12 @@ def main():
             fails.append("HEADER DISAGREES: %s" % key)
         idx_columns = list(index_header.get("columns") or [])
         idx_roles = index_header.get("roles") or {}
-        _hlow, _horig, rows = bridge_env.diagram_index_table(index_body or "")
-        if _hlow is None:
-            fails.append("INDEX: header must be | ID | Level | Kind | Status | File | Refines | Realizes | Enforced by | Why |")
-            rows = []
+        _hlow, _horig, rows = bridge_env.diagram_index_body_table(index_body or "")
     else:
         idx_columns = None
         idx_roles = None
-        header, rows = table_rows(index_text)
-        want = ["id", "level", "kind", "status", "file", "refines", "realizes", "enforced", "why"]
-        if header is None or [h.split()[0] if h else "" for h in header][:9] != want:
+        _hlow, _horig, rows = bridge_env.diagram_index_table(index_text)
+        if _hlow is None:
             fails.append("INDEX: header must be | ID | Level | Kind | Status | File | Refines | Realizes | Enforced by | Why |")
             rows = []
 

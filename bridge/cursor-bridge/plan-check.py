@@ -354,11 +354,7 @@ def main():
                 return 2
             selected = bridge_env.diagram_index_selected_ids(index_body or "", index_header)
         else:
-            _hl, _ho, _rows = bridge_env.diagram_index_table(index_text)
-            if _hl is None:
-                selected = set()
-            else:
-                selected = bridge_env.diagram_index_selected_ids(index_text, None)
+            selected = bridge_env.diagram_index_selected_ids(index_text, None)
         for tid in order:
             for d in D_RX.findall(items[tid]["fields"].get("diagrams") or ""):
                 if d not in selected:
