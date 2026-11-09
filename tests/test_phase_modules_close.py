@@ -281,8 +281,9 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
 # its increments stood in the design's review file from round 1 (design.md's T1): 7,291 characters. TASK-041 (R-052's
 # T12) adds one sentence to item 1, after the register's: a project supervised after it was built runs the conformance
 # check before the first delegation, its MISSING floors configuration increments (tests/test_release_t_floor.py
-# pins it): 7,673 characters
-PROCEDURE_SHA256 = "fbc09eca6489033d4d89887ed70700fd09b36600091ac51f8aea6efe28b5e454"
+# pins it): 7,673 characters. HOTFIX-003 (hotfix 2026.11.09a) rewords item 1's form: the change's intake in the same
+# form as intake.md's sorting of questions (tests/test_hotfix_intake.py pins it): 7,844 characters
+PROCEDURE_SHA256 = "d1c7da9bcba70710a1b85427c1bde7e95c43dbd739899bd87dd0c8d92d09bde7"
 
 
 def test_the_change_cycles_procedure_is_pinned():
@@ -290,7 +291,7 @@ def test_the_change_cycles_procedure_is_pinned():
     one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
     text = module("change-cycle")
     proc = text[text.index("### The procedure"):].rstrip()
-    assert len(proc) == 7673 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
+    assert len(proc) == 7844 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
 
 
 def test_r004_the_positions_the_survival_lists_name_are_kept():
@@ -364,7 +365,9 @@ def test_the_glossary_names_the_modules_as_files():
 # section, so CI holds each section's text here (Review A, TASK-014, should-fix 3). A change to a pin is reviewed as a
 # new trace exception. TASK-022 wrote the command and contract designs' bodies under headings of their own, with
 # entries of their own, left the declaring sections as they were and added its four sections here; an entry without
-# its section here fails the last assertion below, so every new excused section of a variant file reaches a reviewer
+# its section here fails the last assertion below, so every new excused section of a variant file reaches a reviewer.
+# HOTFIX-003 (hotfix 2026.11.09a) adds mockups.md's procedure, under its `new` entry: the iteration as a conversation
+# (tests/test_hotfix_intake.py pins the paragraph)
 EXCUSED_SECTIONS = {
     ("interface/mockups.md", "What this variant is"): (620, "6d539112c3b10ecf7e20bdc5b76fcbcd6fdb2e4786212f2af947176914ce1298"),
     ("interface/mockups.md", "The design-tooling flow"): (3200, "d878dbcca05094b316960040e468e376b8b5bf76b9c64908a3be88c9efa5416e"),
@@ -375,6 +378,7 @@ EXCUSED_SECTIONS = {
     ("interface/command-design.md", "Approving the command design"): (1036, "814476197c6b11d00b55d5e9462cdec2997109939fdd8775275e8400a6fd10a5"),
     ("interface/contract-design.md", "Writing the contract design"): (4482, "fe7807a0db32c3648a8368cdfcf1394e4ab65f61aed36111079c03124f172280"),
     ("interface/contract-design.md", "Approving the contract design"): (892, "1ca4a7e12410b7242cb6ad88854563a6bc919266fc61e0c5f3166f36ba7f50f6"),
+    ("interface/mockups.md", "The procedure"): (2081, "ff3cd8bbc0066eba410632af5159c759faed540bd1206b08ca9b9742907829c9"),
 }
 
 
