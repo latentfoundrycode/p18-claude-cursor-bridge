@@ -6,7 +6,11 @@ enforces: docs/DESIGN.md, Change: the intake hotfix, "What changes - the text by
 its sentence in its home) and "Non-goals" (the places that keep the form, pinned as invariants, one assert per place).
 
 KP-052: the one non-ASCII character these pins need, the em dash, is built with chr(), never typed."""
+import importlib.util
+import json
 import os
+import re
+import sys
 
 from phase_modules import flat, read, rule, section
 
@@ -24,6 +28,17 @@ INTERFACE = os.path.join(PHASES, "interface.md")
 RUN_PARAMETERS = os.path.join(PHASES, "run-parameters.md")
 CONFIGURATION = os.path.join(PHASES, "configuration.md")
 PITFALLS = os.path.join(BRIDGE, "cursor-bridge", "Known-Pitfalls.md")
+CB = os.path.join(BRIDGE, "cursor-bridge")
+CHANGELOG = os.path.join(CB, "CHANGELOG.md")
+VERSION_FILE = os.path.join(CB, "VERSION")
+MANIFEST = os.path.join(CB, "MANIFEST.json")
+INSTALL = os.path.join(CB, "bridge-install.py")
+PROJECT = os.path.join(ROOT, "project.json")
+STATUS = os.path.join(ROOT, "docs", "PROJECT_STATUS.md")
+HOTFIX = "2026.11.09a"
+STAMPED_FROM = "2026.11.03a"
+PARTS = ("**What changed**", "**Running projects must**", "**If rolled back**")
+PHASES_NAMED = ("intake", "design", "mockups", "planning", "configuration", "building", "done", "changing")
 DASH = chr(0x2014)
 
 
@@ -224,3 +239,67 @@ def test_hotfix003_the_kind_the_gates_the_run_parameters_the_figure_and_the_sign
     assert ("each as a question of its own in the app's question form** (`AskUserQuestion`,") in flat(read(RUN_PARAMETERS))
     assert ("A limit the owner names is theirs: ask for the figure in the question form.") in flat(read(CONFIGURATION))
     assert ("each as a question of its own in the app's question form; nothing of that kind changes before they do") in flat(read(EVALUATE))
+
+
+# --- the stamp 2026.11.09a (CHANGELOG, VERSION, MANIFEST.json, project.json, the status file's version line)
+
+def headings():
+    return re.findall(r"^## (\d{4}\.\d{2}\.\d{2}[a-z]?)[ \t]*$", read(CHANGELOG), re.M)
+
+
+def entry():
+    text = read(CHANGELOG)
+    start = text.index("\n## " + HOTFIX + "\n")
+    return text[start + 1:text.index("\n---\n", start)]
+
+
+def items(title):
+    lines = entry().split("\n")
+    i = lines.index(title)
+    j = next((k for k in range(i + 1, len(lines)) if lines[k] in PARTS), len(lines))
+    return [l for l in lines[i + 1:j] if l.startswith("- ")]
+
+
+def test_hotfix003_the_stamp_agrees_everywhere():
+    version = open(VERSION_FILE, encoding="utf-8").read().strip()
+    assert version == HOTFIX
+    found = headings()
+    assert found[0] == HOTFIX and found[1] == STAMPED_FROM, "the hotfix's entry stands directly above %s" % STAMPED_FROM
+    assert json.load(open(MANIFEST, encoding="utf-8"))["version"] == HOTFIX
+    project = json.load(open(PROJECT, encoding="utf-8"))
+    assert project["version"] == HOTFIX and project["state"]["bridge"] == HOTFIX
+    assert re.search(r"^Bridge version: %s$" % re.escape(HOTFIX), read(STATUS), re.M)
+
+
+def test_hotfix003_the_entry_has_its_parts_and_every_item_is_phase_marked():
+    lines = entry().split("\n")
+    at = [lines.index(p) for p in PARTS]
+    assert at == sorted(at), "the parts on lines of their own, in order"
+    for p in PARTS:
+        assert items(p), p
+    for item in items("**Running projects must**") + items("**If rolled back**"):
+        m = re.match(r"- \*\(([^)]*)\)\* ", item)
+        assert m, "every item names its phase: " + item[:60]
+        if m.group(1) != "all phases":
+            named = m.group(1).split(", ")
+            assert set(named) <= set(PHASES_NAMED), m.group(1)
+            assert "building" not in named or "changing" in named, "building with changing: " + item[:60]
+    joined = flat(" ".join(items("**Running projects must**")))
+    assert "`RESULT: INSTALLED TREE MATCHES bridge " + HOTFIX + "`" in joined
+    assert "`release/2026.11.03`" in joined
+    assert "KP-075" in lines[2] and "R-065" in lines[2], "the lead names the pitfall and the register's row"
+
+
+def test_hotfix003_a_rollback_to_the_stamp_it_fixes_writes_its_items():
+    spec = importlib.util.spec_from_file_location("bridge_install_for_hotfix003", INSTALL)
+    inst = importlib.util.module_from_spec(spec)
+    before = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec.loader.exec_module(inst)
+    finally:
+        sys.dont_write_bytecode = before
+    note, found = inst.rolled_back_note(CHANGELOG, HOTFIX, STAMPED_FROM)
+    assert found and "## " + HOTFIX in note
+    for item in items("**If rolled back**"):
+        assert item in note
