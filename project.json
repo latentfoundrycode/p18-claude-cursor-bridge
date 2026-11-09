@@ -5,7 +5,7 @@
   "version": "2026.11.09a",
   "state": {
     "phase": "changing",
-    "stage": "hotfix 2026.11.09a (HOTFIX-003) stamped on release/2026.11.03, the owner's install next, then its carry onto main; release B2's stage H1 built on main; release T complete",
+    "stage": "hotfix 2026.11.09a (HOTFIX-003) stamped on release/2026.11.03, the owner's install next, then its carry onto main; release B2's stage H1 built on main, whose status file holds the project's position",
     "bridge": "2026.11.09a",
     "updated": "2026-11-09"
   }

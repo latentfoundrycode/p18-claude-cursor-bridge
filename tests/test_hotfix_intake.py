@@ -106,8 +106,9 @@ def test_hotfix003_the_mockup_iteration_is_a_conversation():
             "points are open, answered in their own words, your follow-ups building on the answers; variants of a "
             "screen you guessed are never put as options to tick. The question form is kept for the gate's approval "
             "(`interface.md`, \"The gate\") and for a parameter in a fixed form that a screen turns on (one of "
-            "intake.md's closed list: the smallest screen width the design must fit, a figure); how a screen should "
-            "behave is never such a parameter, however short its answer.") in procedure
+            "intake.md's closed list: the platform and runtime context, such as the smallest screen width the design "
+            "must fit, or the figure of a limit); how a screen should behave is never such a parameter, however "
+            "short its answer.") in procedure
     assert "for discrete choices" not in procedure
 
 
@@ -210,7 +211,7 @@ def test_hotfix003_the_decision_brief_puts_options_only_where_answers_exist():
 
 def test_hotfix003_kp075_names_the_pitfall_its_places_and_its_sign():
     text = read(PITFALLS)
-    assert "### KP-075 " + DASH + " A question's sort left to the supervisor licensed guessed feature options at intake" in text
+    assert "### KP-075 " + DASH + " A question's sort left to the supervisor invited guessed feature options at intake" in text
     entry = text[text.index("### KP-075"):]
     assert "**Correction (2026.11.09a):**" in entry
     assert ("(one of intake.md's closed list of facts the bridge's own procedures consume in a fixed form: the kind, the "
