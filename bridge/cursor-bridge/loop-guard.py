@@ -52,7 +52,7 @@ _bridge_bytecode = sys.dont_write_bytecode
 sys.dont_write_bytecode = True
 try:
     import bridge_env as _bridge_env_mod  # noqa: E402
-    if not hasattr(_bridge_env_mod, "status_values"):
+    if not hasattr(_bridge_env_mod, "status_values") or not hasattr(_bridge_env_mod, "run_parameters_values"):
         raise ImportError("incomplete")
     bridge_env = _bridge_env_mod
 except BaseException as err:
@@ -347,29 +347,37 @@ def wakes(tur, content, uses):
     return True
 
 
-def agent_ceiling(cwd):
-    """`Agent ceiling: <seconds>` from docs/RUN_PARAMETERS.md beside the status file, else the default."""
+def _run_parameters_beside_status(cwd):
     for status in status_candidates(cwd):
+        path = os.path.join(os.path.dirname(os.path.dirname(status)), "docs", "RUN_PARAMETERS.md")
         try:
-            with open(os.path.join(os.path.dirname(os.path.dirname(status)), "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
-                m = re.search(r"^\s*[-*]?\s*\**Agent ceiling\**\s*:\s*(\d+)", f.read(), re.M | re.I)
-            if m:
-                return int(m.group(1))
+            with open(path, encoding="utf-8", errors="replace") as f:
+                return f.read(), path
         except OSError:
             continue
-    return AGENT_CEILING
+    return None, None
+
+
+def agent_ceiling(cwd):
+    """`Agent ceiling: <seconds>` from docs/RUN_PARAMETERS.md beside the status file, else the default."""
+    text, _path = _run_parameters_beside_status(cwd)
+    if text is None or bridge_env is None:
+        return AGENT_CEILING
+    values, _, _ = bridge_env.run_parameters_values(text)
+    ac = values.get("agent_ceiling")
+    return ac if ac is not None else AGENT_CEILING
 
 
 def owner_ceiling(cwd, kind):
-    """`Ceiling above twice: <kind> <seconds> (...)` from the run parameters beside the status file."""
-    for status in status_candidates(cwd):
-        try:
-            with open(os.path.join(os.path.dirname(os.path.dirname(status)), "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
-                for m in re.finditer(r"^\s*[-*]?\s*\**Ceiling above twice\**\s*:\s*(\w+)\s+(\d+)\s*\(", f.read(), re.M | re.I):
-                    if m.group(1).lower() == kind:
-                        return int(m.group(2))
-        except OSError:
-            continue
+    """The owner's raised ceiling for a kind from the run parameters beside the status file."""
+    text, _path = _run_parameters_beside_status(cwd)
+    if text is None or bridge_env is None:
+        return None
+    values, _, _ = bridge_env.run_parameters_values(text)
+    kind_l = kind.lower()
+    for item in values.get("ceiling_above_twice") or []:
+        if (item.get("kind") or "").lower() == kind_l:
+            return item.get("seconds")
     return None
 
 
@@ -599,6 +607,14 @@ def main():
             if key in ("phase", "awaiting_user_on"):
                 sys.stderr.write("header disagrees: %s\n" % key)
         if any(k in disagrees for k in ("phase", "awaiting_user_on")):
+            sys.exit(2)
+    rp_text, _rp_path = _run_parameters_beside_status(cwd)
+    if rp_text is not None:
+        _rp_values, _rp_malformed, rp_disagrees = bridge_env.run_parameters_values(rp_text)
+        for key in ("agent_ceiling", "ceiling_above_twice"):
+            if key in rp_disagrees:
+                sys.stderr.write("header disagrees: %s\n" % key)
+        if any(k in rp_disagrees for k in ("agent_ceiling", "ceiling_above_twice")):
             sys.exit(2)
     phase_raw = values.get("phase") or ""
     phase = phase_raw.split()[0] if phase_raw else ""

@@ -131,9 +131,7 @@ DESIGN_PATH_NORM = bridge_env.DESIGN_PATH_NORM
 DESIGN_MARK = bridge_env.DESIGN_MARK
 DESIGN_NAME_RE = re.compile(r"^(?:([a-z0-9-]*)-)?(R?)([1-9][0-9]*)$")
 DESIGN_TOKEN_RE = bridge_env.DESIGN_TOKEN_RE
-DESIGN_LIFT_RE = re.compile(
-    r"^\s*[-*]?\s*(?:\*\*(?i:Design rounds above five):\*\*|\*\*(?i:Design rounds above five)\*\*:|(?i:Design rounds above five):)\s*"
-    r"([a-z0-9-]+)\s+([0-9]+)\s*\((.+)\)")
+DESIGN_LIFT_RE = bridge_env.DESIGN_LIFT_RE
 DESIGN_TRIM_BEFORE_SEP = bridge_env.DESIGN_TRIM_BEFORE_SEP
 
 
@@ -392,6 +390,16 @@ def write_log(folder, entry):
         sys.stderr.write("bridge-run: run log not written (%s)\n" % e)
 
 
+def _run_parameters_values(folder):
+    path = os.path.join(folder, "docs", "RUN_PARAMETERS.md")
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            text = f.read()
+    except OSError:
+        text = ""
+    return bridge_env.run_parameters_values(text)
+
+
 def cap_for(kind, folder):
     """(cap, note): twice the default, or the owner's recorded value when it is above that."""
     default = KINDS[kind]
@@ -405,41 +413,23 @@ def cap_for(kind, folder):
 
 def owner_cap(kind, folder):
     """The owner's recorded words lifting a kind's cap above twice its default, or None."""
-    try:
-        with open(os.path.join(folder, "docs", "RUN_PARAMETERS.md"), encoding="utf-8", errors="replace") as f:
-            for line in f:
-                m = re.match(r"^\s*[-*]?\s*\**Ceiling above twice\**\s*:\s*(\w+)\s+(\d+)\s*\((.+)\)", line.strip(), re.I)
-                if m and m.group(1).lower() == kind and m.group(3).strip():
-                    try:
-                        return int(m.group(2))
-                    except ValueError:
-                        continue
-    except (OSError, UnicodeDecodeError, ValueError):
-        pass
+    values, _, _ = _run_parameters_values(folder)
+    kind_l = kind.lower()
+    for item in values.get("ceiling_above_twice") or []:
+        if (item.get("kind") or "").lower() == kind_l:
+            return item.get("seconds")
     return None
 
 
 def design_lifts(folder):
     """{subject: max numbered round} from the first well-formed owner's line per subject."""
+    values, _, _ = _run_parameters_values(folder)
     lifts = {}
-    try:
-        with open(os.path.join(folder, "docs", "RUN_PARAMETERS.md"), encoding="utf-8") as f:
-            for line in f:
-                m = DESIGN_LIFT_RE.match(line.strip())
-                if not m or m.group(1) in lifts:
-                    continue
-                words = m.group(3).strip()
-                if not words:
-                    continue
-                try:
-                    rounds = int(m.group(2))
-                except ValueError:
-                    continue
-                if rounds <= DESIGN_DEFAULT_ROUNDS:
-                    continue
-                lifts[m.group(1)] = rounds
-    except (OSError, UnicodeDecodeError):
-        pass
+    for item in values.get("design_rounds_above_five") or []:
+        subject = item.get("subject")
+        rounds = item.get("rounds")
+        if subject and subject not in lifts and isinstance(rounds, int) and rounds > DESIGN_DEFAULT_ROUNDS:
+            lifts[subject] = rounds
     return lifts
 
 
@@ -1495,6 +1485,12 @@ def main():
         return 125
     if "--key-file" in flags and is_agent_argv(cmd):
         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
+        return 125
+    rp_reason = bridge_env.run_parameters_refusal(
+        folder, ("ceiling_above_twice", "design_rounds_above_five", "review_rounds_above_ceiling")
+    )
+    if rp_reason:
+        sys.stderr.write("bridge-run: refused - %s\n" % rp_reason)
         return 125
     reason = design_ceiling(cmd, folder)
     if reason:

@@ -82,6 +82,7 @@ def _safe_exc_type_name(err):
 _INVENTORY_BRIDGE_NAMES = (
     "status_values", "read_header", "check_header", "header_agrees",
     "inventory_fallback", "inventory_reflected_through", "inventory_parse_tables",
+    "run_parameters_fallback",
 )
 
 
@@ -320,6 +321,31 @@ def main():
                 fails.append("WORKFLOWS LINE: not checked: %s" % reason)
     else:
         notes.append("status: %s not found (skipped)" % a.status)
+
+    rp_path = os.path.join(os.path.dirname(a.inventory) or ".", "RUN_PARAMETERS.md")
+    if os.path.isfile(rp_path):
+        refuse = _bridge_env_refuse_line()
+        if refuse is not None:
+            print(escape_field(refuse))
+            print("RESULT: not checked")
+            return 2
+        rp_text = read(rp_path)
+        shown_rp = rp_path.replace("\\", "/")
+        try:
+            rp_header, _rp_body = bridge_env.read_header(rp_text)
+        except bridge_env.HeaderError as err:
+            print("HEADER MALFORMED: %s:%d %s" % (escape_field(shown_rp), err.line, escape_field(str(err))))
+            print("RESULT: not checked")
+            return 2
+        if rp_header is not None:
+            rp_findings = bridge_env.check_header("run-parameters", rp_header)
+            if rp_findings:
+                print("HEADER MALFORMED: %s:1 %s" % (escape_field(shown_rp), escape_field("; ".join(rp_findings))))
+                print("RESULT: not checked")
+                return 2
+            rp_fallback = bridge_env.run_parameters_fallback(rp_text)
+            for key in bridge_env.header_agrees("run-parameters", rp_header, rp_fallback):
+                fails.append("HEADER DISAGREES: %s" % key)
 
     # 2. shape
     if not os.path.exists(a.inventory):

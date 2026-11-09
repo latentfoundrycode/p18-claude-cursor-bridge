@@ -12,11 +12,15 @@ import json
 import os
 import pathlib
 import re
+import sys
 
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
+BRIDGE = ROOT / "bridge" / "cursor-bridge"
+sys.path.insert(0, str(BRIDGE))
+import bridge_env  # noqa: E402
 
 
 def _read(p):
@@ -258,9 +262,11 @@ def test_r001_run_parameters_owner_values():
     """R-001 (rule 52, a value the owner chose is fixed in a test): RUN_PARAMETERS.md holds the owner's answers. A
     change of one is the owner's, made with this test (stage B1's review round 3, Review A: a flipped parameter
     passed every test)."""
+    header_keys = {"Stage pause": "stage_pause", "Merge authority": "merge_authority",
+                   "Refactoring pass": "refactoring_pass", "Parallel increments": "parallel_increments"}
+    values, _, _ = bridge_env.run_parameters_values(_read("docs/RUN_PARAMETERS.md"))
     for key, value in OWNER_RUN_PARAMETERS.items():
-        lines = [line for line in _read("docs/RUN_PARAMETERS.md").splitlines() if line.startswith(key + ": ")]
-        assert len(lines) == 1 and re.match(re.escape(value) + r"( |$)", lines[0][len(key) + 2:]), f"R-001: {key}: {lines}"
+        assert values[header_keys[key]] == value, f"R-001: {key}: {values.get(header_keys[key])}"
 
 
 def _own_pull_request(env):
@@ -336,3 +342,20 @@ def test_r001_status_position_parse(tmp_path):
                      ("In flight: none", "In flight: nonesuch builder running"),
                      ("Increment: none — at the merge", "Increment: BUG-016 on branch bug-016, before its merge")):
         assert len(_position_faults(good.replace(old, new), 45)) == 1, new
+
+
+def test_r061_bootstrap_owner_values_from_header_match_lines(tmp_path):
+    """R-061: with a agreeing header, run_parameters_values gives the same owner tokens as the prose lines."""
+    prose = "\n".join("%s: %s" % (k, v) for k, v in OWNER_RUN_PARAMETERS.items()) + "\n"
+    header = "---\nrecord: run-parameters\nheader: 1\n"
+    for line_key, hdr_key in (("Stage pause", "stage_pause"), ("Merge authority", "merge_authority"),
+                              ("Refactoring pass", "refactoring_pass"), ("Parallel increments", "parallel_increments")):
+        header += "%s: \"%s\"\n" % (hdr_key, OWNER_RUN_PARAMETERS[line_key])
+    header += "agent_ceiling: null\nceiling_above_twice: []\ndesign_rounds_above_five: []\nreview_rounds_above_ceiling: []\n---\n"
+    path = tmp_path / "docs" / "RUN_PARAMETERS.md"
+    path.parent.mkdir(parents=True)
+    path.write_text(header + prose, encoding="utf-8")
+    got, _, _ = bridge_env.run_parameters_values(path.read_text(encoding="utf-8"))
+    for key, value in OWNER_RUN_PARAMETERS.items():
+        assert got[{"Stage pause": "stage_pause", "Merge authority": "merge_authority",
+                    "Refactoring pass": "refactoring_pass", "Parallel increments": "parallel_increments"}[key]] == value
