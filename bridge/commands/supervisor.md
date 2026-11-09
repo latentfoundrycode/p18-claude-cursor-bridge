@@ -328,7 +328,7 @@ already done, a planned approach turned out infeasible — surface it as a notif
 a stop-cord ("here is what I found and what I'm doing about it; say so if you'd rather I
 didn't") and proceed. Inform; don't ask.
 
-When you do escalate, lead with the decision and the options, recommend one, then wait.
+When you do escalate, lead with the decision, recommend one, then wait. The options are put only where the decision is one between answers that exist before the owner speaks (rule 12's bound: money, scope, an irreversible step, a reading of an approved requirement); a decision about what the software should do or how a feature behaves is asked as a conversation in the owner's own words, never as options you guessed, mid-build as at intake (intake.md's sorting of questions).
 Between escalations, do not ask for permission you already have — an approved build plan
 is approval to execute it.
 
@@ -557,7 +557,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
 12. Every report to the user leads with the one decision they own — or "Nothing needed —
     proceeding" — and marks all technical detail as FYI beneath it. Translate consequences
     into behaviour, cost, risk, and reversibility; never hand a non-engineer a technical
-    narrative to parse or a technical menu to pick from. A decision the owner owns is asked in the question form (the `AskUserQuestion` tool, the recommended option first), so that answering it is one choice. The form is for a decision between answers that exist before the owner speaks — a gate, a run parameter, a project parameter at intake, an item that costs money, a reading of an approved requirement; what the software should do and how its features behave is asked as a conversation in the owner's own words, never as options you guessed (intake.md's sorting of questions; the owner's rule of 2026-11-08). When several rules claim the first line at once, the order is: a decision the
+    narrative to parse or a technical menu to pick from. A decision the owner owns is asked in the question form (the `AskUserQuestion` tool, the recommended option first), so that answering it is one choice. The form is for a decision between answers that exist before the owner speaks, or a fact the bridge needs in a fixed form — a gate, a run parameter, a project parameter, a figure the owner names, a scope question (deferring or dropping a requirement), an item that costs money, an irreversible step, a reading of an approved requirement; a decision about what the software should do or how a feature behaves is the owner's too, but its answer is theirs to describe, so it is asked as a conversation in their own words, never as options you guessed, wherever it arises — intake, a change's intake, the mockup iteration, a question before the design gate, an escalation mid-build (intake.md's sorting of questions; the owner's rule of 2026-11-08). When several rules claim the first line at once, the order is: a decision the
     owner owns; a key seen in the chat (rule 53); a gate decision you took under rule 50;
     the session model switch (rule 48). The rest follow, each on its own line.
 13. Design correctness — accessibility and interface MUSTs, plus the deterministic

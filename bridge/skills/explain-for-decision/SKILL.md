@@ -226,7 +226,12 @@ where it belongs:
 3. **What you need to know** — the load-bearing concepts, at most three, each under guards
    1–8 by its class. Parts before whole; one instance; one stake.
 4. **The options** — for each: what it means for the product in use; what it costs; what it
-   forecloses or whether it can be reversed later. Same terms as in 3 (guard 2).
+   forecloses or whether it can be reversed later. Same terms as in 3 (guard 2). Options are
+   for a decision between answers that exist before the user speaks (a gate, money, scope, an
+   irreversible step, a reading of an approved requirement); when the decision is what the
+   software should do or how a feature behaves, this part is the question itself, in prose,
+   answered in the user's own words — never options you guessed for them to tick
+   (`intake.md`, the sorting of questions; the owner's rule of 2026-11-08). The other parts stand.
 5. **Recommendation** — which one, and the reason in the user's currency.
 6. **Decided regardless** — the technical choices you make either way, one line each, so
    the user sees the boundary of what they are deciding and does not reach past it.
