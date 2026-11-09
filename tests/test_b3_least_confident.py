@@ -114,9 +114,11 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
 # as trace-check.py reads them, LF, the whitespace at its end stripped; (length, sha256). trace-check.py excuses new
 # text anywhere in such a section, so CI holds each section's text here. An increment that edits an excused section
 # re-takes its pin in the same diff as its `reword` entry, and a reviewer reads the change to a pin as a new trace
-# exception; an increment that adds an entry adds its section's pin.
+# exception; an increment that adds an entry adds its section's pin. HOTFIX-003 (hotfix 2026.11.09a) re-takes three:
+# change-cycle.md's procedure (item 1's form of the change's intake), design.md's gate (the paragraph on a question
+# before the gate) and intake.md's procedure (the batches paragraph's sorting of questions).
 EXCUSED_MODULE_SECTIONS = {
-    ("change-cycle.md", "The procedure"): (7673, "fbc09eca6489033d4d89887ed70700fd09b36600091ac51f8aea6efe28b5e454"),
+    ("change-cycle.md", "The procedure"): (7844, "d1c7da9bcba70710a1b85427c1bde7e95c43dbd739899bd87dd0c8d92d09bde7"),
     ("change-cycle.md", "What must survive a compaction"): (2143, "3cb57dbda1906c93b20e17a0e3cd13e38c2a3084fad1db978ce6ae888c08fada"),
     ("configuration.md", "Extension points"): (760, "036bd6b825c833494bbddbe5557f3cf70dfaa3b1cbc5c65c7bba1fa3ef31bae2"),
     ("configuration.md", "Keeping the position"): (613, "17547dab86d8b5b275f703e7380a6999d2aa31e414b8a85bfe9595d818135f10"),
@@ -149,14 +151,14 @@ EXCUSED_MODULE_SECTIONS = {
     ("design.md", "A part without screens"): (268, "2a16dc74e42feea8823e7d580109fbed8dd2783aae9e58b8ea9fc36058211446"),
     ("design.md", "Extension points"): (761, "0084dfd13bf170a046f673a2312ed9580521c8be2a0a428b167b06aca65ffeb1"),
     ("design.md", "The delivery kind"): (494, "6b32868830fa9a36639468c4485c247450ad5d9337993b315eaed2480bf51dd5"),
-    ("design.md", "The gate"): (3276, "811efda0ecdbcc72898697ee0027efe24d7e9a09c5263ab4919bb976cd5c8768"),
+    ("design.md", "The gate"): (3727, "1b916ecf69566bef622d72d3c83416aa2e680c606a80ec43571e7a55720a890b"),
     ("design.md", "The procedure"): (17003, "78c8814af6b1548c34772b0fb46453ba1a8a38ab9eb6dd0642ed4d305233dca8"),
     ("design.md", "Traits at the design gate"): (3403, "653036f6b84c11afd94a9900be1477d23e9b839bc1c9e2eb933a0d03860a617b"),
     ("design.md", "What must survive a compaction"): (1906, "c02f83be92ac4da84e33cffdcafd0117448fae2be656e6685b11e1a6e4d11f9e"),
     ("intake.md", "Classifying each part"): (3506, "e1c84b276fbe04b3d5b331daa6b65c04dfd5101550786fd874e49b8477150192"),
     ("intake.md", "Extension points"): (1254, "4a0f40bda97f5ba7ea20d260c0262f88783a2018a5fb15d709625fe991c1bada"),
     ("intake.md", "The intake notes"): (495, "6a874f5d940b89189e58ee2ee281f3467a7571cf3b9d83d09076a3e02a6a3d25"),
-    ("intake.md", "The procedure"): (4183, "90a3eafdf3022b97a09fb96e49fd95f4cca16620fa142a83101ed90266259e20"),
+    ("intake.md", "The procedure"): (5732, "3407e8f3eb12f765128e8d2dde614d878947a7ccea9ba1c0d5c066d0c32dca98"),
     ("intake.md", "What must survive a compaction"): (1000, "7ea9c66e9a79abfbc187608754d2454ab2bf4a043998034b3778eeeaec15a533"),
     ("interface.md", "Extension points"): (694, "daf47b7c33ff4b4e4205551e1bf2a41e169e632c977c0412ec0a8e98820a2ca7"),
     ("interface.md", "The gate"): (687, "556436a8cbfa4707a771bc709bb8a33102b43c6643f60c90362503c0d748708a"),

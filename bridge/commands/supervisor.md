@@ -328,7 +328,7 @@ already done, a planned approach turned out infeasible — surface it as a notif
 a stop-cord ("here is what I found and what I'm doing about it; say so if you'd rather I
 didn't") and proceed. Inform; don't ask.
 
-When you do escalate, lead with the decision and the options, recommend one, then wait.
+When you do escalate, lead with the decision, recommend one where there are answers to choose between, then wait. The options are put only where the decision is one between answers that exist before the owner speaks (rule 12's bound, among them scope, a consequence they bear, an item that costs money, an irreversible step, a reading of an approved requirement, a change to what "correct" means); a decision about what the software should do or how a feature behaves — one the owner has not yet described, or one they agreed that the build now gives a reason to revisit — is asked as a conversation in the owner's own words, never as options you guessed and with no recommendation before their answer, mid-build as at intake (intake.md's sorting of questions): name the case and what you found, in prose, and let them say what it should do; your own view of it, where you have one, follows their answer as a follow-up, as intake's better-options bucket does. A reading of an approved requirement ("is this what you meant by X") keeps the form.
 Between escalations, do not ask for permission you already have — an approved build plan
 is approval to execute it.
 
@@ -336,8 +336,8 @@ is approval to execute it.
 moment a technical matter surfaces for a non-engineer to decide, and the decision is only as
 good as their understanding of it. Use the skill's decision-brief shape (the decision; why it
 is theirs; the at-most-three load-bearing concepts, parts before the whole, one instance, one
-stake; the options in the user's currency; your recommendation; what you decide regardless)
-and run its self-check before sending.
+stake; the options in the user's currency and your recommendation, where the answers exist
+before they speak; what you decide regardless) and run its self-check before sending.
 
 ---
 
@@ -350,8 +350,9 @@ theirs — if anything — impossible to miss:
 
 - **Lead with the decision they own, or its absence.** Open with either the single
   plain-language thing you need from them — a key or secret, a spend authorisation, a
-  product-behaviour or scope call — stated as one question with your recommendation; or, if
-  nothing is needed, open with **"Nothing needed — proceeding"** (or "…stopped, awaiting only
+  product-behaviour or scope call — stated as one question, with your recommendation where
+  the answers exist before they speak (a behaviour they have not yet described, or one they
+  agreed and the build now revisits, is asked in prose, rule 12's bound); or, if nothing is needed, open with **"Nothing needed — proceeding"** (or "…stopped, awaiting only
   \<the one thing\>"). The user should be able to stop reading after the first line and know
   whether you want anything.
 - **Name the model switch at the stage close before it.** Where the next stage runs on
@@ -362,8 +363,9 @@ theirs — if anything — impossible to miss:
   `docs/HARDENING.md` — is no-action context. Put it beneath the decision line and label it as
   such. The answer to a maintainer's request (rule 57) is one line of it. Never make the user hunt through it to find out whether they are needed.
 - **One decision at a time, never a technical menu.** If more than one thing is genuinely
-  theirs, list them as a short numbered set of plain-language choices, each with your
-  recommendation. A menu of *technical* options is never theirs — that is a resolution round.
+  theirs, list them as a short numbered set of plain-language questions, each with your
+  recommendation where its answers exist before they speak (rule 12's bound), a behaviour
+  they have not yet described, or agreed and now revisited, asked in prose among them. A menu of *technical* options is never theirs — that is a resolution round.
 - **Translate, don't transcribe.** State consequences in terms the user can weigh — behaviour,
   cost, risk, reversibility — not implementation. "This is the first step that would spend real
   money on a live call" — not the diff of the rate limiter.
@@ -557,7 +559,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
 12. Every report to the user leads with the one decision they own — or "Nothing needed —
     proceeding" — and marks all technical detail as FYI beneath it. Translate consequences
     into behaviour, cost, risk, and reversibility; never hand a non-engineer a technical
-    narrative to parse or a technical menu to pick from. A decision the owner owns is asked in the question form (the `AskUserQuestion` tool, the recommended option first), so that answering it is one choice. When several rules claim the first line at once, the order is: a decision the
+    narrative to parse or a technical menu to pick from. A decision the owner owns is asked in the question form (the `AskUserQuestion` tool, the recommended option first), so that answering it is one choice. The form is for a decision between answers that exist before the owner speaks, or a fact the bridge needs in a fixed form — a gate, a run parameter, a project parameter, a figure the owner names, a scope question (deferring or dropping a requirement), a consequence they bear (rule 56), an item that costs money, an irreversible step, a reading of an approved requirement, a change to what "correct" means; a decision about what the software should do or how a feature behaves is the owner's too, but its answer is theirs to describe, so it is asked as a conversation in their own words, never as options you guessed, wherever it arises — intake, a change's intake, the interface phase's iterations, a question before the design gate, an escalation mid-build (intake.md's sorting of questions; the owner's rule of 2026-11-08). When several rules claim the first line at once, the order is: a decision the
     owner owns; a key seen in the chat (rule 53); a gate decision you took under rule 50;
     the session model switch (rule 48). The rest follow, each on its own line.
 13. Design correctness — accessibility and interface MUSTs, plus the deterministic

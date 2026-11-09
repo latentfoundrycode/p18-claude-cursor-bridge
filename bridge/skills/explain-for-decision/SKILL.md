@@ -36,7 +36,8 @@ them on the few concepts that carry the decision. Find those first.
 asked. If nothing is being decided or asked, it is a status report — the "Reporting to the
 user" rules apply and this skill only touches the terms a report cannot avoid.
 
-**2. Trace the load-bearing chain.** From each option, through the mechanism, to the
+**2. Trace the load-bearing chain.** From each option (or, for a behaviour question put in
+prose, from the case the software must settle), through the mechanism, to the
 consequence the user will live with (behaviour, cost, risk, reversibility, time). The
 concepts on that chain are **load-bearing**. The test for each concept: *if the user
 misunderstood this, could they choose wrongly, or choose rightly for a wrong reason?* If
@@ -216,18 +217,31 @@ becoming overblown while still landing.
 ## The decision brief — when a decision is put to the user
 
 Use this shape for every escalation and every phase-gate presentation. It is the "lead with
-the decision, recommend one, then wait" rule of `supervisor.md`, with the explanation slotted
-where it belongs:
+the decision, recommend one where there are answers to choose between, then wait" rule of
+`supervisor.md`, with the explanation slotted where it belongs:
 
-1. **The decision** — one sentence: what you are choosing between.
+1. **The decision** — one sentence: what you are choosing between, or, for a behaviour
+   decision asked in prose (part 4's two cases), the case the software must settle.
 2. **Why it is yours** — one sentence: which user-owned factor it turns on (product
    behaviour, scope, a cost or exposure you bear, something only you can provide, an
    irreversible step, a change to what "correct" means).
 3. **What you need to know** — the load-bearing concepts, at most three, each under guards
    1–8 by its class. Parts before whole; one instance; one stake.
 4. **The options** — for each: what it means for the product in use; what it costs; what it
-   forecloses or whether it can be reversed later. Same terms as in 3 (guard 2).
-5. **Recommendation** — which one, and the reason in the user's currency.
+   forecloses or whether it can be reversed later. Same terms as in 3 (guard 2). Options are
+   for a decision between answers that exist before the user speaks (a gate's approval of what
+   the design or the mockup already writes down, scope, a consequence they bear, money, an
+   irreversible step, a reading of an approved requirement, a change to what "correct" means);
+   when the decision is what the software should do or how a feature behaves — one the user
+   has not yet described, or one they agreed that the build now gives a reason to revisit —
+   this part is the question itself, in prose: name the case and what you found, and let them
+   say what it should do, in their own words — never options you guessed for them to tick
+   (`intake.md`, the sorting of questions; the owner's rule of 2026-11-08) — and part 5 waits
+   for their answer: your view comes as a follow-up building on it, as intake's better-options
+   bucket does. A gate's approval of a behaviour the design or the mockup writes down is not
+   that question: the user approves it or asks for a change, and the form carries that.
+5. **Recommendation** — which one, and the reason in the user's currency; withheld for a
+   behaviour decision asked in prose (part 4's two cases).
 6. **Decided regardless** — the technical choices you make either way, one line each, so
    the user sees the boundary of what they are deciding and does not reach past it.
 
