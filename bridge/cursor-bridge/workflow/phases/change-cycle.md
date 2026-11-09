@@ -23,7 +23,7 @@ Keep the step the change has reached on the `Change cycle:` line, rewritten as e
 1. **Intake of the change** (Phase 1, scaled). The session is on Opus 5.5 from the build:
    your first report leads with *set this session to Fable 5.1 before the design work* (rule
    48), and the design gate's report says *back to Opus 5.5*. Interrogate the request the
-   same way as a new project's description — gaps, contradictions, better options — but only about the
+   same way as a new project's description — gaps, contradictions, better options, and in the same form (intake.md's sorting of questions: the change's features and behaviour as a conversation in the owner's own words, a parameter in the question form) — but only about the
    delta: what changes, what explicitly stays, and the **impact on existing behaviour**
    (which current features, screens, data, or commands the change touches, and whether any
    existing behaviour is altered or removed). Read this project's own Issues file in place

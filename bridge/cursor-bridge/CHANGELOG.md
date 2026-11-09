@@ -15,6 +15,27 @@ project must show before the other projects resume.
 
 ---
 
+## 2026.11.09a
+
+**The software's features and behaviour asked as a conversation, never as guessed options** (a hotfix of 2026.11.03a, cut from its release state, on the owner's rule and order of 2026-11-08; KP-075; R-065): at intake a project supervisor put a question about a feature's behaviour to the owner as options it had guessed; the owner rejected them as too rigid and ruled that the fixed questions setting a project's parameters may keep the question form, while the software's features and their behaviour are discussed as a conversation, numbered questions in prose answered in the owner's own words, follow-ups building on the answers. Text only, no program changes. Against 2026.11.03a: no file new or removed, no settings change.
+
+**What changed**
+- **Intake sorts each question by what it asks** (`workflow/phases/intake.md`, "The procedure"): a question about the project's parameters, one of a closed list (the kind, the platform and runtime context, the delivery kind, the confirmation of a part's product type or sub-type as classified from the owner's answers, the figure of a budget or a limit), may take the question form; a question about the software itself is a conversation, never guessed answers to tick; a question that is both, the open list's deciding questions among them, is a conversation; a short answer never makes a question a parameter. The old sort, by whether the answer is a choice among options, is gone.
+- **The same form in the mockup iteration, a change's intake and before the design gate** (`interface/mockups.md`, `change-cycle.md` item 1, `design.md` "The gate"): guessed variants of a screen are never options to tick; every gate's approval of what is already written down keeps the form.
+- **Escalations and reports** (the core's "Escalate to the user when" and "Reporting to the user"; the `explain-for-decision` skill's decision brief, its introduction, parts 1, 4 and 5 and the heuristic's chain): options and a recommendation only where the answers exist before the owner speaks; a behaviour decision, one the owner has not yet described or one they agreed that the build now gives a reason to revisit, is asked in prose, the case and what was found named, with no recommendation before their answer, the supervisor's view following it as a follow-up.
+- **Rule 12's bound** (the core): the question form is for a decision between answers that exist before the owner speaks or a fact the bridge needs in a fixed form (a gate, a run parameter, a project parameter, a figure, a scope question, a consequence they bear, money, an irreversible step, a reading of an approved requirement, a change to what "correct" means); what the software should do is asked as a conversation wherever it arises. The digest's rule 12 is unchanged (R-048's D7).
+- **The pitfall** (`Known-Pitfalls.md`): KP-075, a question's sort left to the supervisor invited guessed feature options at intake. Its sign: options for a behaviour the owner has not described or has agreed and now revisits, a recommendation before they have answered, or an intake batch whose feature questions carry answer lists.
+
+**Running projects must**
+- *(all phases)* Install from the release branch `release/2026.11.03`, restart, `/calibrate-bridge`; the installer's last line is `RESULT: INSTALLED TREE MATCHES bridge 2026.11.09a`.
+- *(intake, design, mockups, changing)* From the install, every question still to be asked about the software is asked as the conversation the text now describes; nothing already answered is re-asked; a batch already sent in the question form is answered as the owner chooses.
+- *(building, changing)* An escalation about product behaviour, one the owner has not yet described or one they agreed that the build now gives a reason to revisit, is asked as a conversation, with no options and no recommendation before their answer.
+
+**If rolled back**
+- *(all phases)* Nothing to restore. The older text falls back to sorting a question by whether its answer is a choice among options, so the owner's rule of 2026-11-08 is then held by the supervisor alone until the reinstall.
+
+---
+
 ## 2026.11.03a
 
 **Release T, the report cycle's text follow-ups, the weekly dependency scan and the diagram retrofit** (the bridge's first change cycle, the owner's word of 2026-11-01, design and plan gates passed that day; built on the bridge's own branches, its stage reviews before this stamp): the maintainer's text items of the evaluations of 2026-10-18 and 2026-10-25, the 14 text-only proposals of this project's promotion pass, a weekly OSV-Scanner run for every project with Dependabot alerts read beside it, the minimum set of diagrams drawn as built, and three fixes of programs. Mostly text. The programs that change: `review-guard.py` (BUG-039, BUG-041), `conformance-check.py` (BUG-042) and `session-start.py`'s digest. Against 2026.10.30d: one file new (`workflow/phases/delegation-loop/merge.md`), none removed, six allow entries and two deny entries new.
