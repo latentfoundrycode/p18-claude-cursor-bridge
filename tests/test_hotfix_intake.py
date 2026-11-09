@@ -46,9 +46,10 @@ def test_hotfix003_intake_a_parameter_question_may_take_the_question_form():
     procedure = flat(section(read(INTAKE), "The procedure", 3))
     assert ("**A question about the project's parameters** " + DASH + " a fact the bridge's own procedures consume in "
             "a fixed form, one of this closed list: the kind (`private` or `commercial`), the platform and runtime "
-            "context, the delivery kind, a part's product type or sub-type where the owner must choose between the "
-            "open list's definitions, the figure of a budget or a limit " + DASH + " may be asked in the question form "
-            "(`AskUserQuestion`, the default or the recommended answer first), so that answering it is one choice.") in procedure
+            "context, the delivery kind, the confirmation of a part's product type or sub-type as you classified it "
+            "from their answers (each definition in one line), the figure of a budget or a limit " + DASH + " may be "
+            "asked in the question form (`AskUserQuestion`, the default or the recommended answer first), so that "
+            "answering it is one choice.") in procedure
 
 
 def test_hotfix003_intake_a_question_about_the_software_is_a_conversation():
@@ -57,9 +58,8 @@ def test_hotfix003_intake_a_question_about_the_software_is_a_conversation():
             "behaves, who uses it and how, what happens in a case the description leaves open; the gaps, contradictions "
             "and better options above " + DASH + " is a conversation: numbered questions in prose, batched, each "
             "answered in the owner's own words, your follow-ups building on their answers; never a list of answers you "
-            "guessed for the owner to tick " + DASH + " the owner's rule of 2026-11-08, who found such options too rigid "
-            "when a supervisor offered them at intake: a guessed option frames the feature before the owner has "
-            "described it, and their answer then measures your guess, not their intent.") in procedure
+            "guessed for the owner to tick (the owner's rule of 2026-11-08, who found such options too rigid when a "
+            "supervisor offered them at intake).") in procedure
 
 
 def test_hotfix003_intake_a_question_that_is_both_is_a_conversation():
@@ -89,9 +89,9 @@ def test_hotfix003_the_mockup_iteration_is_a_conversation():
             "are (`intake.md`, the sorting of questions): ask what they would change and why, numbered where several "
             "points are open, answered in their own words, your follow-ups building on the answers; variants of a "
             "screen you guessed are never put as options to tick. The question form is kept for the gate's approval "
-            "(`interface.md`, \"The gate\") and for a parameter in a fixed form that a screen turns on (the smallest "
-            "screen width the design must fit, say); how a screen should behave is never such a parameter, however "
-            "short its answer.") in procedure
+            "(`interface.md`, \"The gate\") and for a parameter in a fixed form that a screen turns on (one of "
+            "intake.md's closed list: the smallest screen width the design must fit, a figure); how a screen should "
+            "behave is never such a parameter, however short its answer.") in procedure
     assert "for discrete choices" not in procedure
 
 
@@ -113,19 +113,34 @@ def test_hotfix003_a_question_before_the_design_gate_is_a_conversation():
             "feature behaves " + DASH + " a case the description left open that the design has to settle, an open "
             "question the critique raised " + DASH + " is asked as intake.md's sorting of questions says: a "
             "conversation in their own words, never options you guessed. The gate's decisions above keep the question "
-            "form, since each approves a behaviour the design has already written down.") in gate
+            "form, since each approves something the design has already written down.") in gate
 
 
-# --- the core: the escalation passage and rule 12's bound
+# --- the core: the escalation passage, its skill summary, the reporting rule and rule 12's bound
 
 def test_hotfix003_an_escalation_about_behaviour_is_a_conversation():
     passage = flat(section(read(CORE), "Escalate to the user when", 2))
-    assert ("When you do escalate, lead with the decision, recommend one, then wait. The options are put only where "
-            "the decision is one between answers that exist before the owner speaks (rule 12's bound: money, scope, an "
-            "irreversible step, a reading of an approved requirement); a decision about what the software should do or "
-            "how a feature behaves is asked as a conversation in the owner's own words, never as options you guessed, "
-            "mid-build as at intake (intake.md's sorting of questions).") in passage
+    assert ("When you do escalate, lead with the decision, recommend one where there are answers to choose between, "
+            "then wait. The options are put only where the decision is one between answers that exist before the owner "
+            "speaks (rule 12's bound, among them scope, a consequence they bear, an item that costs money, an "
+            "irreversible step, a reading of an approved requirement, a change to what \"correct\" means); a decision "
+            "about what the software should do or how a feature behaves, which the owner has not yet described, is "
+            "asked as a conversation in the owner's own words, never as options you guessed and with no recommendation "
+            "before their answer, mid-build as at intake (intake.md's sorting of questions): your own view of it, where "
+            "you have one, follows their answer as a follow-up, as intake's better-options bucket does.") in passage
     assert "lead with the decision and the options" not in passage
+
+
+def test_hotfix003_the_recommendation_comes_only_where_answers_exist():
+    """Round 2 (plan-critic S2, Review B's first Should fix): the skill summary in the escalation section and the
+    reporting rule's first bullet bound the recommendation as the passage and the brief do."""
+    passage = flat(section(read(CORE), "Escalate to the user when", 2))
+    assert ("the options in the user's currency and your recommendation, where the answers exist before they speak; "
+            "what you decide regardless") in passage
+    reporting = flat(section(read(CORE), "Reporting to the user", 2))
+    assert ("a product-behaviour or scope call " + DASH + " stated as one question, with your recommendation where the "
+            "answers exist before they speak (a behaviour they have not yet described is asked in prose, rule 12's "
+            "bound); or, if nothing is needed,") in reporting
 
 
 def test_hotfix003_rule_12_bounds_the_question_form():
@@ -134,23 +149,30 @@ def test_hotfix003_rule_12_bounds_the_question_form():
             "option first), so that answering it is one choice.") in text
     assert ("The form is for a decision between answers that exist before the owner speaks, or a fact the bridge needs "
             "in a fixed form " + DASH + " a gate, a run parameter, a project parameter, a figure the owner names, a scope "
-            "question (deferring or dropping a requirement), an item that costs money, an irreversible step, a reading "
-            "of an approved requirement; a decision about what the software should do or how a feature behaves is the "
-            "owner's too, but its answer is theirs to describe, so it is asked as a conversation in their own words, "
-            "never as options you guessed, wherever it arises " + DASH + " intake, a change's intake, the mockup "
-            "iteration, a question before the design gate, an escalation mid-build (intake.md's sorting of questions; "
-            "the owner's rule of 2026-11-08).") in text
+            "question (deferring or dropping a requirement), a consequence they bear (rule 56), an item that costs "
+            "money, an irreversible step, a reading of an approved requirement, a change to what \"correct\" means; a "
+            "decision about what the software should do or how a feature behaves is the owner's too, but its answer is "
+            "theirs to describe, so it is asked as a conversation in their own words, never as options you guessed, "
+            "wherever it arises " + DASH + " intake, a change's intake, the mockup iteration, a question before the "
+            "design gate, an escalation mid-build (intake.md's sorting of questions; the owner's rule of 2026-11-08).") in text
 
 
-# --- the explain-for-decision brief, part 4
+# --- the explain-for-decision brief, parts 1, 4 and 5
 
 def test_hotfix003_the_decision_brief_puts_options_only_where_answers_exist():
     brief = flat(section(read(SKILL), "The decision brief " + DASH + " when a decision is put to the user", 2))
-    assert ("Options are for a decision between answers that exist before the user speaks (a gate, money, scope, an "
-            "irreversible step, a reading of an approved requirement); when the decision is what the software should do "
-            "or how a feature behaves, this part is the question itself, in prose, answered in the user's own words "
-            + DASH + " never options you guessed for them to tick (`intake.md`, the sorting of questions; the owner's "
-            "rule of 2026-11-08). The other parts stand.") in brief
+    assert ("1. **The decision** " + DASH + " one sentence: what you are choosing between, or, for a behaviour the user "
+            "has not yet described, the case the software must settle.") in brief
+    assert ("Options are for a decision between answers that exist before the user speaks (a gate's approval of what "
+            "the design or the mockup already writes down, scope, a consequence they bear, money, an irreversible step, "
+            "a reading of an approved requirement, a change to what \"correct\" means); when the decision is what the "
+            "software should do or how a feature behaves and the user has not yet described it, this part is the "
+            "question itself, in prose, answered in the user's own words " + DASH + " never options you guessed for them "
+            "to tick (`intake.md`, the sorting of questions; the owner's rule of 2026-11-08) " + DASH + " and part 5 "
+            "waits for their answer: your view comes as a follow-up building on it, as intake's better-options bucket "
+            "does.") in brief
+    assert ("5. **Recommendation** " + DASH + " which one, and the reason in the user's currency; withheld for a "
+            "behaviour the user has not yet described (part 4).") in brief
 
 
 # --- Known-Pitfalls: KP-075
@@ -160,8 +182,14 @@ def test_hotfix003_kp075_names_the_pitfall_its_places_and_its_sign():
     assert "### KP-075 " + DASH + " A question's sort left to the supervisor licensed guessed feature options at intake" in text
     entry = text[text.index("### KP-075"):]
     assert "**Correction (2026.11.09a):**" in entry
+    assert ("(one of intake.md's closed list of facts the bridge's own procedures consume in a fixed form: the kind, the "
+            "platform and runtime context, the delivery kind, the confirmation of a classification, a figure) may take "
+            "the question form, the default or recommended answer first, and a short answer never makes a question a "
+            "parameter") in entry
     assert ("(intake.md, change-cycle.md item 1, interface/mockups.md, design.md \"The gate\", the core's \"Escalate to "
             "the user when\", the explain-for-decision brief's part 4)") in entry
+    assert ("**Applies:** every intake, every question before the design gate, every mockup iteration, every change "
+            "cycle's intake, every escalation about product behaviour.") in entry
     assert ("The sign: a message to the owner offering options for a feature they have not yet described, or an intake "
             "batch whose feature questions carry answer lists.") in entry
 

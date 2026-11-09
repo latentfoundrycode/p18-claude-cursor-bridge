@@ -199,3 +199,4 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - reword HOTFIX-003 bridge/commands/supervisor.md Phase 3 — UI mockups
 - new HOTFIX-003 bridge/cursor-bridge/workflow/phases/interface/mockups.md The procedure
 - reword HOTFIX-003 bridge/commands/supervisor.md Escalate to the user when
+- reword HOTFIX-003 bridge/commands/supervisor.md Reporting to the user

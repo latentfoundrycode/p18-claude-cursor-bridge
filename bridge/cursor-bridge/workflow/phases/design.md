@@ -212,7 +212,7 @@ one round and one that needed four are visibly different things); and, apart fro
 item that costs money or needs an account (code signing, a paid driver, a provider) — never
 one presentation of everything (plan 8.8). The **Level 1 diagrams** (use cases, operational workflows) state what the software does, so present them as part of what the owner approves; the other levels are technical, named in the brief and available to read (they render in Markdown viewers that support Mermaid), not put to the owner as questions.
 
-A question the design must put to the owner before the gate about what the software does or how a feature behaves — a case the description left open that the design has to settle, an open question the critique raised — is asked as intake.md's sorting of questions says: a conversation in their own words, never options you guessed. The gate's decisions above keep the question form, since each approves a behaviour the design has already written down.
+A question the design must put to the owner before the gate about what the software does or how a feature behaves — a case the description left open that the design has to settle, an open question the critique raised — is asked as intake.md's sorting of questions says: a conversation in their own words, never options you guessed. The gate's decisions above keep the question form, since each approves something the design has already written down.
 
 Once approved, write **`Documents/<Name> Project Summary.md`** — the human-facing account
 of what is being built, for whom, the architecture in plain language, the key decisions and

@@ -219,7 +219,8 @@ Use this shape for every escalation and every phase-gate presentation. It is the
 the decision, recommend one, then wait" rule of `supervisor.md`, with the explanation slotted
 where it belongs:
 
-1. **The decision** — one sentence: what you are choosing between.
+1. **The decision** — one sentence: what you are choosing between, or, for a behaviour the
+   user has not yet described, the case the software must settle.
 2. **Why it is yours** — one sentence: which user-owned factor it turns on (product
    behaviour, scope, a cost or exposure you bear, something only you can provide, an
    irreversible step, a change to what "correct" means).
@@ -227,12 +228,16 @@ where it belongs:
    1–8 by its class. Parts before whole; one instance; one stake.
 4. **The options** — for each: what it means for the product in use; what it costs; what it
    forecloses or whether it can be reversed later. Same terms as in 3 (guard 2). Options are
-   for a decision between answers that exist before the user speaks (a gate, money, scope, an
-   irreversible step, a reading of an approved requirement); when the decision is what the
-   software should do or how a feature behaves, this part is the question itself, in prose,
-   answered in the user's own words — never options you guessed for them to tick
-   (`intake.md`, the sorting of questions; the owner's rule of 2026-11-08). The other parts stand.
-5. **Recommendation** — which one, and the reason in the user's currency.
+   for a decision between answers that exist before the user speaks (a gate's approval of what
+   the design or the mockup already writes down, scope, a consequence they bear, money, an
+   irreversible step, a reading of an approved requirement, a change to what "correct" means);
+   when the decision is what the software should do or how a feature behaves and the user has
+   not yet described it, this part is the question itself, in prose, answered in the user's own
+   words — never options you guessed for them to tick (`intake.md`, the sorting of questions;
+   the owner's rule of 2026-11-08) — and part 5 waits for their answer: your view comes as a
+   follow-up building on it, as intake's better-options bucket does.
+5. **Recommendation** — which one, and the reason in the user's currency; withheld for a
+   behaviour the user has not yet described (part 4).
 6. **Decided regardless** — the technical choices you make either way, one line each, so
    the user sees the boundary of what they are deciding and does not reach past it.
 
