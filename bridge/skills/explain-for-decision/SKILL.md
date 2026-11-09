@@ -220,8 +220,8 @@ Use this shape for every escalation and every phase-gate presentation. It is the
 the decision, recommend one where there are answers to choose between, then wait" rule of
 `supervisor.md`, with the explanation slotted where it belongs:
 
-1. **The decision** — one sentence: what you are choosing between, or, for a behaviour the
-   user has not yet described, the case the software must settle.
+1. **The decision** — one sentence: what you are choosing between, or, for a behaviour
+   decision asked in prose (part 4's two cases), the case the software must settle.
 2. **Why it is yours** — one sentence: which user-owned factor it turns on (product
    behaviour, scope, a cost or exposure you bear, something only you can provide, an
    irreversible step, a change to what "correct" means).
@@ -241,7 +241,7 @@ the decision, recommend one where there are answers to choose between, then wait
    bucket does. A gate's approval of a behaviour the design or the mockup writes down is not
    that question: the user approves it or asks for a change, and the form carries that.
 5. **Recommendation** — which one, and the reason in the user's currency; withheld for a
-   behaviour the user has not yet described (part 4).
+   behaviour decision asked in prose (part 4's two cases).
 6. **Decided regardless** — the technical choices you make either way, one line each, so
    the user sees the boundary of what they are deciding and does not reach past it.
 

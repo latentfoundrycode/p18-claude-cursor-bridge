@@ -351,8 +351,8 @@ theirs — if anything — impossible to miss:
 - **Lead with the decision they own, or its absence.** Open with either the single
   plain-language thing you need from them — a key or secret, a spend authorisation, a
   product-behaviour or scope call — stated as one question, with your recommendation where
-  the answers exist before they speak (a behaviour they have not yet described is asked in
-  prose, rule 12's bound); or, if nothing is needed, open with **"Nothing needed — proceeding"** (or "…stopped, awaiting only
+  the answers exist before they speak (a behaviour they have not yet described, or one they
+  agreed and the build now revisits, is asked in prose, rule 12's bound); or, if nothing is needed, open with **"Nothing needed — proceeding"** (or "…stopped, awaiting only
   \<the one thing\>"). The user should be able to stop reading after the first line and know
   whether you want anything.
 - **Name the model switch at the stage close before it.** Where the next stage runs on
@@ -365,7 +365,7 @@ theirs — if anything — impossible to miss:
 - **One decision at a time, never a technical menu.** If more than one thing is genuinely
   theirs, list them as a short numbered set of plain-language questions, each with your
   recommendation where its answers exist before they speak (rule 12's bound), a behaviour
-  they have not yet described asked in prose among them. A menu of *technical* options is never theirs — that is a resolution round.
+  they have not yet described, or agreed and now revisited, asked in prose among them. A menu of *technical* options is never theirs — that is a resolution round.
 - **Translate, don't transcribe.** State consequences in terms the user can weigh — behaviour,
   cost, risk, reversibility — not implementation. "This is the first step that would spend real
   money on a live call" — not the diff of the rate limiter.

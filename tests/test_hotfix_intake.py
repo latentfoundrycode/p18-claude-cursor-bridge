@@ -144,11 +144,11 @@ def test_hotfix003_the_recommendation_comes_only_where_answers_exist():
             "what you decide regardless") in passage
     reporting = flat(section(read(CORE), "Reporting to the user", 2))
     assert ("a product-behaviour or scope call " + DASH + " stated as one question, with your recommendation where the "
-            "answers exist before they speak (a behaviour they have not yet described is asked in prose, rule 12's "
-            "bound); or, if nothing is needed,") in reporting
+            "answers exist before they speak (a behaviour they have not yet described, or one they agreed and the build "
+            "now revisits, is asked in prose, rule 12's bound); or, if nothing is needed,") in reporting
     assert ("list them as a short numbered set of plain-language questions, each with your recommendation where its "
-            "answers exist before they speak (rule 12's bound), a behaviour they have not yet described asked in prose "
-            "among them.") in reporting
+            "answers exist before they speak (rule 12's bound), a behaviour they have not yet described, or agreed and "
+            "now revisited, asked in prose among them.") in reporting
 
 
 def test_hotfix003_rule_12_bounds_the_question_form():
@@ -172,8 +172,8 @@ def test_hotfix003_the_decision_brief_puts_options_only_where_answers_exist():
     brief = flat(section(read(SKILL), "The decision brief " + DASH + " when a decision is put to the user", 2))
     assert ("It is the \"lead with the decision, recommend one where there are answers to choose between, then wait\" "
             "rule of `supervisor.md`") in brief
-    assert ("1. **The decision** " + DASH + " one sentence: what you are choosing between, or, for a behaviour the user "
-            "has not yet described, the case the software must settle.") in brief
+    assert ("1. **The decision** " + DASH + " one sentence: what you are choosing between, or, for a behaviour decision "
+            "asked in prose (part 4's two cases), the case the software must settle.") in brief
     assert ("Options are for a decision between answers that exist before the user speaks (a gate's approval of what "
             "the design or the mockup already writes down, scope, a consequence they bear, money, an irreversible step, "
             "a reading of an approved requirement, a change to what \"correct\" means); when the decision is what the "
@@ -185,7 +185,7 @@ def test_hotfix003_the_decision_brief_puts_options_only_where_answers_exist():
             "as intake's better-options bucket does. A gate's approval of a behaviour the design or the mockup writes "
             "down is not that question: the user approves it or asks for a change, and the form carries that.") in brief
     assert ("5. **Recommendation** " + DASH + " which one, and the reason in the user's currency; withheld for a "
-            "behaviour the user has not yet described (part 4).") in brief
+            "behaviour decision asked in prose (part 4's two cases).") in brief
     heuristic = flat(section(read(SKILL), "The selection heuristic " + DASH + " what to explain, what to leave out", 2))
     assert ("**2. Trace the load-bearing chain.** From each option (or, for a behaviour question put in prose, from the "
             "case the software must settle), through the mechanism, to the consequence the user will live with") in heuristic
@@ -209,9 +209,9 @@ def test_hotfix003_kp075_names_the_pitfall_its_places_and_its_sign():
             "the user when\", the explain-for-decision brief's part 4)") in entry
     assert ("**Applies:** every intake, every question before the design gate, every iteration of the interface phase, "
             "every change cycle's intake, every escalation about product behaviour.") in entry
-    assert ("The sign: a message to the owner offering options for a feature they have not yet described, a "
-            "recommendation given before they have described it, or an intake batch whose feature questions carry "
-            "answer lists.") in entry
+    assert ("The sign: a message to the owner offering options for a behaviour they have not yet described or have "
+            "agreed and now revisit, a recommendation given before they have answered, or an intake batch whose feature "
+            "questions carry answer lists.") in entry
 
 
 # --- the places that keep the form (invariants of the hotfix's non-goals, one assert per place)

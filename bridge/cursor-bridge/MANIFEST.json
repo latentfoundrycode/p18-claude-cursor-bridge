@@ -1,6 +1,6 @@
 {
   "version": "2026.11.03a",
-  "generated": "2026-11-09 03:21",
+  "generated": "2026-11-09 03:58",
   "files": {
     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
@@ -14,14 +14,14 @@
     "agents/test-runner.md": "a78bde0415f53108f50ef206114d365a9e1b56c55aacafc48f0fc83e8ccbbd24",
     "commands/calibrate-bridge.md": "4019373a2a8e938cca4d275a5e58970f3b018ef1bd5d8004eac99f82150564dd",
     "commands/evaluate-reports.md": "3a72fa1647401c9bec9dfd267ee93fe2651dd3fdc9ede571674a502dae543383",
-    "commands/supervisor.md": "544b59bea38204c7e4b048579f22b576e2b79a9350014feedbfad7a2a19d6d6d",
+    "commands/supervisor.md": "0132be2651f1b29f58e3a5a7f57b50cd7c399b5fb3e0f654f2e7e294d046ede0",
     "cursor-bridge/CHANGELOG.md": "cd688447f80f4f46b0d31f8eee0aff5b63214e4dcebc1a661761b0b9c5bcd5ce",
     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
     "cursor-bridge/Cursor-Project-Configuration.md": "e901421ce9a49abc76f0d254738143eb96d3b46caadaa7ea5227dead252bb734",
     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
     "cursor-bridge/Diagram-Planning-Conventions.md": "04413b1084588cf1cde57ebc7ecea901c97e4aaec73a9216ddcbbcf2f4e856cc",
     "cursor-bridge/Glossary.md": "604c984d05dc3b1478555471e8c96ee5785ce996a006aa1aa81781c5af26826a",
-    "cursor-bridge/Known-Pitfalls.md": "eb161954fff1ce83d12d18586a5572339ed22ba7a241b02681d5cc81da8d4abe",
+    "cursor-bridge/Known-Pitfalls.md": "b26119e292437385366a35b2ba5cdb5bb0f4c801184ebd2bdfaac9be028fc905",
     "cursor-bridge/Merge-Verification-Policy.md": "e7523b4966dd2b47cdcd3f99eb11672637160dc5d3b196667bb22b3366166ff7",
     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
@@ -145,7 +145,7 @@
     "cursor-bridge/workflow/types/web-app/local-web-app.md": "42e71c3d697a80e1a593733de42b5a6b4f8d442fa39910eb43ef0c25bbf6b852",
     "cursor-bridge/worktree-teardown.py": "9cbedb0e79d63a6c717772fe515bb7c4ab1c03d24e789ef1095bad322f3e0c53",
     "skills/design-sense/SKILL.md": "e5ba79eb01185c44dec5382f7891e5646c70531620c6657dde215139ed101516",
-    "skills/explain-for-decision/SKILL.md": "186a5ea9d4604daeab72019909fbb92771870f35342afcc80c0b750ba8bca695",
+    "skills/explain-for-decision/SKILL.md": "74ead59eda731e7d5ed23082a1bd6908359944a5246624777672cc029a635e11",
     "skills/root-cause-first/SKILL.md": "66947ffda99c58a8b2216003a8412135157773e96458ed4c40500c3e5cecb347"
   }
 }
