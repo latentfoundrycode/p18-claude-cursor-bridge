@@ -175,13 +175,13 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 # (BUG-043: four more move from traced to excused, which the earlier entries excuse: step 3's parallel item 4, under
 # TASK-030's, and step 3b's exit-124 paragraph and restart item and step 7's last-resort reset, under TASK-034's: each
 # now says step 4's read of `.git/config` comes before its git command)
-# (HOTFIX-003, hotfix 2026.11.09a: five more move from traced to excused, under HOTFIX-003's own `reword` entries:
+# (HOTFIX-003, hotfix 2026.11.09a: six more move from traced to excused, under HOTFIX-003's own `reword` entries:
 # intake's batches paragraph, which now sorts a question by what it asks (labelled BUG-042, whose earlier entry on
 # "Phase 1 — Intake" matches first), the mockups' iteration paragraph, under "Phase 3 — UI mockups", the escalation
 # passage "When you do escalate" and its "How you explain it" paragraph, which now put options and a recommendation only
 # where the answers exist before the owner speaks, under "Escalate to the user when", and the reporting rule's first
-# bullet, whose recommendation is bounded the same way, under "Reporting to the user")
-TRACED = "TRACED: 424 passages of baseline 0a186da; 135 in supervisor.md, 201 under workflow/, 0 dropped, 88 excused"
+# and fourth bullets, whose recommendations are bounded the same way, under "Reporting to the user")
+TRACED = "TRACED: 424 passages of baseline 0a186da; 134 in supervisor.md, 201 under workflow/, 0 dropped, 89 excused"
 NOTES = [
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Role.** The supervising architect: design, plan, package b",
     "NOTE (reword TASK-034) bridge/commands/supervisor.md: The core, in brief - **Founding rules.** N1 The loop's truth lives in files; one-",
@@ -257,6 +257,7 @@ NOTES = [
     "NOTE (reword HOTFIX-003) bridge/commands/supervisor.md: Escalate to the user when - When you do escalate, lead with the decision and the options",
     "NOTE (reword HOTFIX-003) bridge/commands/supervisor.md: Escalate to the user when - **How you explain it is governed by the `explain-for-decisio",
     "NOTE (reword HOTFIX-003) bridge/commands/supervisor.md: Reporting to the user - - **Lead with the decision they own, or its absence.** Open ",
+    "NOTE (reword HOTFIX-003) bridge/commands/supervisor.md: Reporting to the user - - **One decision at a time, never a technical menu.** If mor",
     "NOTE (reword TASK-035) bridge/commands/supervisor.md: Project state - ```markdown\\x0a# Project Status\\x0aLast updated: <timestamp>\\x0aPhase",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 6. Judge re-delegation by defect class, not a round count. N",
     "NOTE (reword TASK-015) bridge/commands/supervisor.md: Standing rules - 8. Never chain shell commands with `&&`, `|`, or `;`, and ne",
@@ -286,8 +287,8 @@ def test_r003_the_carve_traces_with_exactly_its_excuses():
     pass's step 6 and rule 39; and five passages BUG-033 reworded, which those entries excuse: the refactoring
     pass's step 4 and the run parameters' Parallel increments item and its `on` option, under TASK-035's, step 3's
     Parallel increments paragraph, under TASK-030's, and rule 46, under TASK-015's; and six passages TASK-037 reworded, which those entries excuse: three under "Phase 2 \u2014 Design" (the critique's round paragraph, its stop rule and its record), the change cycle's item 2, and rules 12 and 48, under TASK-012's, TASK-014's and TASK-015's; and three passages TASK-038 reworded, which those entries excuse: the design critique's launch block under "Phase 2 \u2014 Design", and step 8's title paragraph and its after-merge paragraph, under TASK-012's and TASK-034's; and six passages TASK-039 reworded: step 3b's restart item and step 7's Accept bullet, which TASK-034's entries excuse, step 5's paragraph, under TASK-039's own entry, and, at its Review A's round 1, the design critique's convergence paragraph under "Phase 2 — Design", step 4's reviewers paragraph and rule 36, under TASK-012's, TASK-030's and TASK-015's; and four passages TASK-040 reworded, which those entries excuse: the stage review's step 8, the demonstration's paragraph and item 5, under TASK-034's, and the refactoring pass's step 2, under TASK-035's; and one passage BUG-040 reworded, the change cycle's item 4, under TASK-014's; and four passages BUG-043 reworded, which those entries excuse: step 3's parallel item 4, under TASK-030's, and step 3b's exit-124 paragraph and restart item and step 7's last-resort reset, under TASK-034's), so an increment that excuses anything more changes this test. It
-    and five passages HOTFIX-003 reworded (hotfix 2026.11.09a): intake's batches paragraph, under BUG-042's entry, and
-    the mockups' iteration paragraph, the two escalation paragraphs and the reporting bullet, under HOTFIX-003's own.
+    and six passages HOTFIX-003 reworded (hotfix 2026.11.09a): intake's batches paragraph, under BUG-042's entry, and
+    the mockups' iteration paragraph, the two escalation paragraphs and the two reporting bullets, under HOTFIX-003's own.
     needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
