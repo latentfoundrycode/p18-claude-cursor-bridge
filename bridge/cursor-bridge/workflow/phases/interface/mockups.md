@@ -24,9 +24,7 @@ product rather than a default layout, and actively avoid the tells that make a U
 machine-generated — including this model's own persistent house style. A mockup that looks
 like the generic default is a signal to reconsider, not to present.
 
-Iterate with the user until they are satisfied — expect change requests; this is where UI
-decisions are cheap to make. Use `AskUserQuestion` for discrete choices, plain discussion
-otherwise.
+Iterate with the user until they are satisfied — expect change requests; this is where UI decisions are cheap to make. The iteration is a conversation, as intake's questions about the software are (`intake.md`, the sorting of questions): ask what they would change and why, numbered where several points are open, answered in their own words, your follow-ups building on the answers; variants of a screen you guessed are never put as options to tick. The question form is kept for the gate's approval (`interface.md`, "The gate") and for a parameter in a fixed form that a screen turns on (the target platform, say).
 
 ### The design-tooling flow
 

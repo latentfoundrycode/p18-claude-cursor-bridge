@@ -557,7 +557,7 @@ has to ride PRs to reach the remote; decide per project which you need and keep 
 12. Every report to the user leads with the one decision they own — or "Nothing needed —
     proceeding" — and marks all technical detail as FYI beneath it. Translate consequences
     into behaviour, cost, risk, and reversibility; never hand a non-engineer a technical
-    narrative to parse or a technical menu to pick from. A decision the owner owns is asked in the question form (the `AskUserQuestion` tool, the recommended option first), so that answering it is one choice. When several rules claim the first line at once, the order is: a decision the
+    narrative to parse or a technical menu to pick from. A decision the owner owns is asked in the question form (the `AskUserQuestion` tool, the recommended option first), so that answering it is one choice. The form is for a decision between answers that exist before the owner speaks — a gate, a run parameter, a project parameter at intake, an item that costs money, a reading of an approved requirement; what the software should do and how its features behave is asked as a conversation in the owner's own words, never as options you guessed (intake.md's sorting of questions; the owner's rule of 2026-11-08). When several rules claim the first line at once, the order is: a decision the
     owner owns; a key seen in the chat (rule 53); a gate decision you took under rule 50;
     the session model switch (rule 48). The rest follow, each on its own line.
 13. Design correctness — accessibility and interface MUSTs, plus the deterministic

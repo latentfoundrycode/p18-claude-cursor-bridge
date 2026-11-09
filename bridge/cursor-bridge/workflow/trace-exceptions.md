@@ -194,3 +194,7 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new BUG-042 bridge/cursor-bridge/workflow/phases/intake.md The procedure
 - new BUG-042 bridge/cursor-bridge/workflow/phases/configuration.md The procedure
 - new BUG-043 bridge/cursor-bridge/workflow/phases/delegation-loop.md 4. Inspect
+- reword HOTFIX-003 bridge/commands/supervisor.md Phase 1 — Intake
+- new HOTFIX-003 bridge/cursor-bridge/workflow/phases/intake.md The procedure
+- reword HOTFIX-003 bridge/commands/supervisor.md Phase 3 — UI mockups
+- new HOTFIX-003 bridge/cursor-bridge/workflow/phases/interface/mockups.md The procedure
