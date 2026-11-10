@@ -1,6 +1,6 @@
 {
   "version": "2026.11.09a",
-  "generated": "2026-11-10 20:42",
+  "generated": "2026-11-10 20:56",
   "files": {
     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
@@ -34,8 +34,8 @@
     "cursor-bridge/bridge-run.py": "181cc38601870768024e811b41dbb66a481b12f5db485c9173eef245b46d0226",
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
     "cursor-bridge/bridge_env.py": "1e309d3b94ef8207214532ca4342696178a3eed5c1844cbcdc41189a37be15b7",
-    "cursor-bridge/completion-check.py": "ef8fe3187e109d8aeb118378f6484185d2e8b33c4e6860cafb415f4253d52169",
-    "cursor-bridge/conformance-check.py": "db4cf5109276b8d81fde9649cbff6c619045a4e3af1ebcf1457c1e5484f8e91f",
+    "cursor-bridge/completion-check.py": "aa78770b851b64ae3ec9046e80a029cdfe74b000b9e2d1253cd7a7673176ed1b",
+    "cursor-bridge/conformance-check.py": "2aaeb9a7230c15bc32ca78c5532a62bfec3b29976211a40744e1a3631247d7b8",
     "cursor-bridge/cursor-agent.shim": "913f3a0214b76c5a92fca21b8bfe8f9ea63979af412df30dc47509a0accbf8e2",
     "cursor-bridge/design-seeds/airbnb/DESIGN.md": "add34130d67209ad105346d60fe2b290728b9711683969db4b7760e29477a5fe",
     "cursor-bridge/design-seeds/airbnb/README.md": "9ecfc8b2441c9d0e483e82c60cc9948d4c0abefe66beaeb08e674eb5ad11248d",
