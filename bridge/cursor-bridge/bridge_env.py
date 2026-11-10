@@ -329,7 +329,6 @@ _PLAN_TASK_RX = re.compile(PLAN_ID_PATTERN)
 _PLAN_R_RX = re.compile(r"\bR-\d{3,}\b")
 _PLAN_D_RX = re.compile(r"\bD-\d{3,}\b")
 _BRIEF_PATH_RX = re.compile(r"^[\w.@~\[\]()*?/-]+$")
-_SCOPE_PAREN = "ScopeAgreementError"
 
 _REVIEW_ROUND_SUFFIX = re.compile(r"-r([1-9][0-9]*)$")
 _REVIEW_R_IN_ID = re.compile(r"-r[0-9]")
@@ -3091,17 +3090,6 @@ def diagram_index_fallback(text):
     return {"header_row": list(header_orig or [])}
 
 
-def parse_diagram_index_rows(text):
-    """First index table rows when the header matches the normative shape."""
-    _h, _o, rows = diagram_index_table(text)
-    return rows
-
-
-def deviations_table(text):
-    """First table in a deviations file: (header_lower, header_orig, rows)."""
-    return _first_markdown_table(text)
-
-
 def deviations_fallback(text):
     """Prose fallback mapping for header_agrees on a deviations register."""
     _, header_orig, _rows = _first_markdown_table(text)
@@ -3111,7 +3099,7 @@ def deviations_fallback(text):
 def parse_deviation_keys(text, header=None):
     """{(diagram, from, to)} from the deviations table."""
     out = set()
-    _hl, _orig, rows = deviations_table(text)
+    _hl, _orig, rows = _first_markdown_table(text)
     if header is not None:
         columns = list(header.get("columns") or [])
         roles = header.get("roles") or {}
@@ -3207,10 +3195,6 @@ def requirement_ids_from_register(text, header=None):
             if re.fullmatch(r"R-\d{3,}", rid):
                 ids.add(rid)
     return ids
-
-
-class ScopeAgreementError(ValueError):
-    """A Scope field line has an unbalanced parenthesis (plan header agreement)."""
 
 
 def split_entry(entry):

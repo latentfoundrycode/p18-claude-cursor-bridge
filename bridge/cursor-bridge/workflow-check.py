@@ -698,8 +698,6 @@ def check_status(path, text, tables):
                 findings.append(("e", shown, part or "-", reason))
         if p0 in line_problems or p1 in line_problems:
             continue
-        if len(line_problems) > 1 and p3 not in line_problems:
-            continue
         if body == "not yet classified":
             continue
         head, traits = body.split(TRAITS_MARK, 1)
