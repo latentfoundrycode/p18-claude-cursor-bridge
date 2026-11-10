@@ -1,0 +1,1152 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 46216bd..90b476e 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.09a",
+-  "generated": "2026-11-09 17:52",
++  "generated": "2026-11-10 20:56",
+   "files": {
+     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
+     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
+@@ -33,9 +33,9 @@
+     "cursor-bridge/bridge-install.py": "705f1de0f6957343524fa5c0b885ba18f3963325d707296a0d7c6e301c2f812f",
+     "cursor-bridge/bridge-run.py": "181cc38601870768024e811b41dbb66a481b12f5db485c9173eef245b46d0226",
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+-    "cursor-bridge/bridge_env.py": "fe1c6871ec9bca97a7fb4a35d10a3cf7c6fda9cad3d5e3ccfc3e836416839875",
+-    "cursor-bridge/completion-check.py": "ef8fe3187e109d8aeb118378f6484185d2e8b33c4e6860cafb415f4253d52169",
+-    "cursor-bridge/conformance-check.py": "db4cf5109276b8d81fde9649cbff6c619045a4e3af1ebcf1457c1e5484f8e91f",
++    "cursor-bridge/bridge_env.py": "1e309d3b94ef8207214532ca4342696178a3eed5c1844cbcdc41189a37be15b7",
++    "cursor-bridge/completion-check.py": "aa78770b851b64ae3ec9046e80a029cdfe74b000b9e2d1253cd7a7673176ed1b",
++    "cursor-bridge/conformance-check.py": "2aaeb9a7230c15bc32ca78c5532a62bfec3b29976211a40744e1a3631247d7b8",
+     "cursor-bridge/cursor-agent.shim": "913f3a0214b76c5a92fca21b8bfe8f9ea63979af412df30dc47509a0accbf8e2",
+     "cursor-bridge/design-seeds/airbnb/DESIGN.md": "add34130d67209ad105346d60fe2b290728b9711683969db4b7760e29477a5fe",
+     "cursor-bridge/design-seeds/airbnb/README.md": "9ecfc8b2441c9d0e483e82c60cc9948d4c0abefe66beaeb08e674eb5ad11248d",
+@@ -77,7 +77,7 @@
+     "cursor-bridge/design-seeds/wired/README.md": "8652da786876950547c6dd9508903381228c7cacc6588a492dc7b544d680d09d",
+     "cursor-bridge/design-seeds/x.ai/DESIGN.md": "9c9ef45d8c0c3b9a7622833cdff8bd125ed6bf296a82cc7274215276706e52eb",
+     "cursor-bridge/design-seeds/x.ai/README.md": "8560245632010049402a9aaab516e47b1876c660e9fabe2220c7a2be52470e40",
+-    "cursor-bridge/diagram-check.py": "8291403c9886c89253d234684865c1fbb25866cba0163188c2879e521f953736",
++    "cursor-bridge/diagram-check.py": "d8bc790a1196f1f290f410fe8ceb4eee3d812b1c9d903129ba5923cd47b8d015",
+     "cursor-bridge/evaluate-reports.py": "4e4eb6a41b95093a62905fcc8e2fc9d9cafc74ffe41ea17cb46eb6485934e50a",
+     "cursor-bridge/installer-check.ps1": "a662ab0f1d707234d5b1b58de7584b812099cddcec78274b8f15599a3e026cb5",
+     "cursor-bridge/inventory-check.py": "17f71879b6cd68dd20b898d72aab70284761835376ed390a88b5ecf83abef477",
+@@ -98,7 +98,7 @@
+     "cursor-bridge/scope-check.py": "0c9377dbd74236d256a4cbee74b082d0c4a2cd03ab20b2ad6e15a5a40d32b9d5",
+     "cursor-bridge/secure-coding.snapshot.md": "3f41667754917ffef6fb47308645356be6a5fd2fc362cc9c3dedf92a9457324e",
+     "cursor-bridge/semgrep-bridge-rules.yml": "924db9d2386c850dafd4e3f829a693dc0fef0d1409ef7f5887302a930c8192ec",
+-    "cursor-bridge/session-start.py": "fb408f83191fb04a72a3ca7b445de1a8364988d0a270462cfa427a8bdc66f975",
++    "cursor-bridge/session-start.py": "c656993c08b011726c1df8ef3aaccc23d5aed7210f2cd95735c84ed208807ada",
+     "cursor-bridge/settings.bridge.json": "618ed5cbc2c3fa28b8238cde6ad64577427fb48ca454b2ff4696349e61b2549c",
+     "cursor-bridge/shell-guard.py": "6abdc15bd149afdf1561997512b75253a154f58ddb05355577b4ebbcec36c67b",
+     "cursor-bridge/stage-diff.py": "167685045331b10e550679eb28fd51e7d829603310bde841bafb3a1cdd9a1ecc",
+@@ -108,7 +108,7 @@
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+     "cursor-bridge/windowless-default.snapshot.md": "b3c59981f63e2c3f450f2acd378bab995df9a8363f50fe2d833c1e797d0ed20e",
+-    "cursor-bridge/workflow-check.py": "c7498f3deadc7ba537808bf154a4336a265f68d51b2097f41e1d4f68f99e8177",
++    "cursor-bridge/workflow-check.py": "727eefb2af70cb099aa1b5480c9541bede67fc30c86469fdcb60fc8d7d1cc064",
+     "cursor-bridge/workflow/extension-points.md": "b3973253f2bdf38fe9f329f1a0fb13604a221453c1d7f7bdfbd227013c0592d0",
+     "cursor-bridge/workflow/open-list.md": "96fdb79af315c2a575c480140c7a2e60c8e1380199bf03df7f501e597168ea2b",
+     "cursor-bridge/workflow/phases/change-cycle.md": "862b50d63a3cc0d79663963947982ebdb87a85120e3cf10b44bbe0612b6a8462",
+diff --git a/bridge/cursor-bridge/bridge_env.py b/bridge/cursor-bridge/bridge_env.py
+index 6425120..b96fd51 100644
+--- a/bridge/cursor-bridge/bridge_env.py
++++ b/bridge/cursor-bridge/bridge_env.py
+@@ -329,7 +329,6 @@ _PLAN_TASK_RX = re.compile(PLAN_ID_PATTERN)
+ _PLAN_R_RX = re.compile(r"\bR-\d{3,}\b")
+ _PLAN_D_RX = re.compile(r"\bD-\d{3,}\b")
+ _BRIEF_PATH_RX = re.compile(r"^[\w.@~\[\]()*?/-]+$")
+-_SCOPE_PAREN = "ScopeAgreementError"
+ 
+ _REVIEW_ROUND_SUFFIX = re.compile(r"-r([1-9][0-9]*)$")
+ _REVIEW_R_IN_ID = re.compile(r"-r[0-9]")
+@@ -3091,17 +3090,6 @@ def diagram_index_fallback(text):
+     return {"header_row": list(header_orig or [])}
+ 
+ 
+-def parse_diagram_index_rows(text):
+-    """First index table rows when the header matches the normative shape."""
+-    _h, _o, rows = diagram_index_table(text)
+-    return rows
+-
+-
+-def deviations_table(text):
+-    """First table in a deviations file: (header_lower, header_orig, rows)."""
+-    return _first_markdown_table(text)
+-
+-
+ def deviations_fallback(text):
+     """Prose fallback mapping for header_agrees on a deviations register."""
+     _, header_orig, _rows = _first_markdown_table(text)
+@@ -3111,7 +3099,7 @@ def deviations_fallback(text):
+ def parse_deviation_keys(text, header=None):
+     """{(diagram, from, to)} from the deviations table."""
+     out = set()
+-    _hl, _orig, rows = deviations_table(text)
++    _hl, _orig, rows = _first_markdown_table(text)
+     if header is not None:
+         columns = list(header.get("columns") or [])
+         roles = header.get("roles") or {}
+@@ -3209,10 +3197,6 @@ def requirement_ids_from_register(text, header=None):
+     return ids
+ 
+ 
+-class ScopeAgreementError(ValueError):
+-    """A Scope field line has an unbalanced parenthesis (plan header agreement)."""
+-
+-
+ def split_entry(entry):
+     """The paths one brief Scope bullet names; None when the bullet holds an ellipsis."""
+     entry = re.split(r"\s+(?:\(|#|--|-\s|\u2014)", entry, maxsplit=1)[0]
+diff --git a/bridge/cursor-bridge/completion-check.py b/bridge/cursor-bridge/completion-check.py
+index 54ce53c..b94db50 100644
+--- a/bridge/cursor-bridge/completion-check.py
++++ b/bridge/cursor-bridge/completion-check.py
+@@ -202,6 +202,7 @@ def main():
+         satisfied = set()
+         header_union = set()
+         has_build_plan_header = False
++        headed_texts = []
+         for p in plans:
+             text = read(p)
+             fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
+@@ -210,6 +211,7 @@ def main():
+                 return 2
+             if hdr is not None:
+                 has_build_plan_header = True
++                headed_texts.append(text)
+                 for st in hdr.get("stages") or []:
+                     for inc in st.get("increments") or []:
+                         for rid in inc.get("satisfies") or []:
+@@ -220,11 +222,7 @@ def main():
+                 satisfied.update(bridge_env.plan_collect_satisfies_ids(body))
+         if has_build_plan_header:
+             disagree = False
+-            for p in plans:
+-                text = read(p)
+-                fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
+-                if fatal or hdr is None:
+-                    continue
++            for text in headed_texts:
+                 for rid in bridge_env.plan_r_ids_outside_headers(text):
+                     if rid not in header_union:
+                         disagree = True
+diff --git a/bridge/cursor-bridge/conformance-check.py b/bridge/cursor-bridge/conformance-check.py
+index 81cb9be..92a7ca4 100644
+--- a/bridge/cursor-bridge/conformance-check.py
++++ b/bridge/cursor-bridge/conformance-check.py
+@@ -1285,12 +1285,8 @@ def main():
+             else:
+                 add("OK", "Spending limit recorded")
+             # development data kept apart from live data: a Decisions row says how
+-            if inv_dev_from_header is not None:
+-                if inv_dev_from_header:
+-                    add("OK", "Development data kept apart")
+-                else:
+-                    add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
+-            elif bridge_env.inventory_development_data(inv_body_for_dev):
++            dev_ok = bool(inv_dev_from_header) if inv_dev_from_header is not None else bridge_env.inventory_development_data(inv_body_for_dev)
++            if dev_ok:
+                 add("OK", "Development data kept apart")
+             else:
+                 add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
+diff --git a/bridge/cursor-bridge/diagram-check.py b/bridge/cursor-bridge/diagram-check.py
+index fa923e3..daba51f 100644
+--- a/bridge/cursor-bridge/diagram-check.py
++++ b/bridge/cursor-bridge/diagram-check.py
+@@ -610,7 +610,7 @@ def known_deviations(path=DEVIATIONS, header=None, body=None):
+         header = hdr
+         if hdr is None:
+             body = text
+-        elif hdr is not None:
++        else:
+             findings = bridge_env.check_header("deviations", hdr)
+             if findings:
+                 raise bridge_env.HeaderError(1, "; ".join(findings))
+diff --git a/bridge/cursor-bridge/session-start.py b/bridge/cursor-bridge/session-start.py
+index d7357a0..5bd017b 100644
+--- a/bridge/cursor-bridge/session-start.py
++++ b/bridge/cursor-bridge/session-start.py
+@@ -185,12 +185,12 @@ def status_candidates(cwd):
+     return out
+ 
+ 
+-def read_status(cwd):
++def read_status_file(cwd):
+     for p in status_candidates(cwd):
+         if os.path.isfile(p):
+             with open(p, encoding="utf-8-sig", errors="replace") as f:
+-                return f.read()
+-    return None
++                return p, f.read()
++    return None, None
+ 
+ 
+ def installed_version():
+@@ -609,14 +609,7 @@ def main():
+     if not isinstance(data, dict):
+         data = {}
+     cwd = data.get("cwd") or os.getcwd()
+-    status_path = None
+-    status = None
+-    for p in status_candidates(cwd):
+-        if os.path.isfile(p):
+-            status_path = p
+-            with open(p, encoding="utf-8-sig", errors="replace") as f:
+-                status = f.read()
+-            break
++    status_path, status = read_status_file(cwd)
+     if status is None:
+         return 0
+     sv = supervisor_path()
+diff --git a/bridge/cursor-bridge/workflow-check.py b/bridge/cursor-bridge/workflow-check.py
+index df55fe6..c496a10 100644
+--- a/bridge/cursor-bridge/workflow-check.py
++++ b/bridge/cursor-bridge/workflow-check.py
+@@ -698,8 +698,6 @@ def check_status(path, text, tables):
+                 findings.append(("e", shown, part or "-", reason))
+         if p0 in line_problems or p1 in line_problems:
+             continue
+-        if len(line_problems) > 1 and p3 not in line_problems:
+-            continue
+         if body == "not yet classified":
+             continue
+         head, traits = body.split(TRAITS_MARK, 1)
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 811f5ef..86a8bb3 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1830,3 +1830,19 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ - **The merge sub-file's watch for a release branch.** merge.md names only the `--required` watch. Check: a sentence for a pull request into a release branch, the all-checks watch, at the next release that edits merge.md.
+ - **A run sheet that pulls a branch.** The setup guide's pull assumes `main`, which tracks its remote. Check: an install run sheet from a release branch names the remote and the branch in its pull, at the next release that edits calibrate-bridge.md's run sheet.
+ - **The Guide on Starting Up a New Project** (Documents/) says only that intake interrogates the description; a sentence on the conversation's form is stage H1's reflection-point patch (rule 23).
++
++## Release B2's stage H1 — the close (2026-11-10)
++
++### Stage H1's refactoring pass (REFAC-005, REFAC-006, 2026-11-10, PR #144)
++- **Inputs:** jscpd 5.4.2 over bridge and tests (175 clones, 1.75%), filtered to the files stage H1 changed (990251b to 855a8e9, its five squash commits a7b52fd 3555c51 4dac0f8 52d18be 855a8e9, consecutive on main; HOTFIX-003's carry, 6426650, merged after them and is not the stage's): 67 clones, ranked by refactor-scout against the 400-line budget: nine candidates, about 205 lines, nothing cut.
++- **Taken, tests lane (cc9d664):** tests/test_header_status.py, test_header_plan.py and test_header_tables.py import the retired-reading syntax-tree helpers from tests/test_header_currency.py in place of their copies (import-as aliases keep each file's own names); tests/test_header_run_parameters.py takes `write` from its sibling and test_header_run_parameters_r2.py takes `need` from its. Collected set identical, 4,988 ids; `refactor-check.py --lane tests` PURE, 5 files, 100 lines; the eight header test files 491 passed.
++- **Taken, REFAC-005 (1f124de), the dead code the stage left:** bridge_env.py's `parse_diagram_index_rows`, `_SCOPE_PAREN` and `ScopeAgreementError` (no caller) deleted and `deviations_table`, a bare alias, inlined; session-start.py's uncalled `read_status` became `read_status_file(cwd)`, which `main` now calls in place of its own copy of the loop; workflow-check.py's unreachable `len(line_problems) > 1 and p3 not in line_problems` continue deleted; diagram-check.py's `elif hdr is not None:` after `if hdr is None:` became `else:`. The brief's 13 test files 1,910 passed, 8 skipped; 47 changed lines.
++- **Taken, REFAC-006 (2354ade), the repeats the stage added:** conformance-check.py computes the Development data verdict once (the header's value where the inventory carries one, else `inventory_development_data`'s, called only then, as before) and writes its OK and MISSING lines once each, their text unchanged; completion-check.py keeps each headed plan's text from its first loop, so each plan is read and its header checked once, the second loop's dead `fatal` test gone with the second read. The brief's 13 test files 531 passed, 2 skipped; 22 changed lines.
++- **Purity:** `refactor-check.py cc9d664 --max-lines 400` PURE for the production lane (11 files, 67 lines); the tests lane's commit changes test files only. As at stage T2's pass, `refactor-check.py main` reads the whole branch IMPURE by the tests lane's commit; the readings that hold are the two per lane.
++- **Dropped:** the scout's no-op branches in `header_agrees`, `plan_body` and `_brief_fallback_from_body` (`header_agrees` feeds the refusals, a safety-adjacent comparison kept out of a refactoring pass); its `_fallback_list` and `_fallback_string` hoist with the run parameters' default table (14 lines for three mutant edits); conformance-check loading workflow-check.py twice (it predates the stage, and the not-checked rows' text must stay identical). Optimization: none (no budgets). Beyond budget: none.
++- **D1:** REFAC-005 deleted the text TASK-049's k05 was anchored on, and five TASK-047 anchors (r01, r02, r04, r10, k-fallback-drops-stage) had become ambiguous through TASK-048 to TASK-050's later code, each found two or three times, before this pass; all six were re-anchored on the code they were written for (`status_values`, loop-guard's status keys, inventory-check's status disagreement, `status_fallback`, `diagram_index_fallback`), every anchor of the stage then found once (316 of 316), and the two files run again: TASK-047's first run errored on one mutant, c04 (the skip of a prefix or traits fault removed), which now also failed `test_r058_r3_workflow_check_refuses_a_part_named_twice_as_bridge_env_does[no-traits-mark]`: the line REFAC-005 deleted had caught a duplicate part without its traits mark once c04 removed the skip before it, dead in the code as built (Review A's reading) and alive only under the mutant. Reproduced on an export of the branch (3 failed, 154 passed) and the test added to c04's expected failures; then TASK-047 "counts: run=2 cached=46 killed=47 survived=0 not applied=0 error=0 expected survive=1" and TASK-049 "counts: run=49 cached=0 killed=49 survived=0 not applied=0 error=0 expected survive=0". The stage's other drivers on the files the pass moved were run again too, cut none: TASK-046 "counts: run=149 cached=0 killed=131 survived=0 not applied=0 error=0 expected survive=18", TASK-048 "counts: run=37 cached=0 killed=37 survived=0 not applied=0 error=0 expected survive=0", TASK-050 "counts: run=33 cached=0 killed=29 survived=0 not applied=0 error=0 expected survive=4".
++- **Review A, refactoring mode:** APPROVE, nothing blocking and nothing to fix, behaviour preserved on every path it checked: workflow-check's deleted guard could never fire (`status_workflow_line` returns only [p0], [], [p2], [p1], [p2,p1], [p3] or [p2,p3], and after the p0/p1 continue the one two-item list holds p3); no caller of the four bridge_env deletions remains, by name or by string; `read_status_file` keeps the first-file-wins order and the encoding; completion-check's second-loop `fatal` could never be true and `plan_header_findings` has no side effect; the manifest SOURCES MATCH (145 OK). It collected the six affected test files at origin/main and at HEAD, 432 ids each, the diff empty, and ran them (432 passed) and ten more of the changed programs' files (1,511 passed, 8 skipped). One advisory, of no class of the five, recorded: the shared `code_tree` that tests/test_header_tables.py now imports drops a leading string only from a module, function or class body, where its old copy dropped one from any node with a body, and the shared `re_patterns` returns a list of strings where the old returned a set of any constant; every existing use is unaffected (they look for `Call`, `List` or `Assign` nodes or filter strings), but a future check there that scans `ast.Constant` could see strings the old copy dropped. Its other note: HARDENING's TASK-048 and TASK-049 sections still describe these four names as dead code that remains, history this section closes.
++- **The supervisor's own, stated:** spec-packager reached its turn limit once before writing handoff/REFAC-005.md and was resumed to write it; REFAC-005's builder report quoted a computer path, replaced before the commit (rule 54).
++- **Leads (recorded, not taken; each for its file's next edit):**
++  - The scout's: the header read-validate-refuse block repeated about eight times across diagram-check, inventory-check, completion-check, plan-check and conformance-check, each printing a slightly different line, about twelve mutants anchored on the refusal paths; plan-check's `brief_findings` reads the brief record three times, with two dead checks after the malformed return (TASK-048's h05 relies on `brief_enforced_scope_paths`); scope-check's `refusal == "empty"` block and its malformed and disagree branches identical (TASK-048's r07, r08); the by-kind lookup in bridge-run's `owner_cap` and loop-guard's `owner_ceiling` (TASK-050's f04, f06); bridge-run and review-guard calling bridge_env's private `_blocking_class_from_prose` and `_merge_unit_from_prose` (TASK-048's H-6, an interface question); `no_hooks_dir(common)` still ignoring its argument (stage T2's lead, its trigger not reached).
++  - `tools/make-manifest.py` writes `bridge/cursor-bridge/VERSION` with LF where the committed file has CRLF, so every regeneration leaves VERSION modified with no content change (the builder of REFAC-006 left it so; restored by the supervisor each time). Check: a program release writes it with the file's own line ending, or .gitattributes fixes VERSION's.
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index dda5934..0156fb5 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -1,6 +1,6 @@
+ # Inventory — Claude-Cursor Bridge
+ Reflected through: none
+-Updated: 2026-11-09
++Updated: 2026-11-10
+ 
+ The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
+ 
+@@ -63,7 +63,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | Python 3.12 + pytest 9.1.1 + pyyaml 6.0.3 (with their closure) | tool | requirements.lock (CI installs from it since TASK-002); Python pinned in .github/workflows/tests.yml | the bridge's CI | pre-B; lockfile since TASK-002 |
+ | GitHub repository (public; protected `main`, required checks: the tests jobs and `security floor`) | config | github.com/latentfoundrycode/p18-claude-cursor-bridge | the gate, every PR | pre-B |
+ | Semgrep 1.176.1 / OSV-Scanner 2.7.0 / Socket CLI 1.7.0 | tool | .github/workflows/tests.yml, job `security floor` (Semgrep through pipx at its version; OSV-Scanner's binary checked by SHA-256; Socket CLI at its version) | the bridge's CI gate | TASK-002 |
+-| jscpd 5.4.1 | tool | run by `npx --yes jscpd@5.4.1` at stage B4's refactoring pass (2026-10-25), again at stage B5's (2026-10-28) and at release T's stage T1's (2026-11-02) and stage T2's (2026-11-03), the newest release then older than two weeks (2026-10-09; 5.4.2 was five days old on 2026-10-25, eight on 2026-10-28, thirteen on 2026-11-02 and two weeks to the day on 2026-11-03, so not yet older), with no dependencies beyond its platform binaries, each pinned to 5.4.1 and without dependencies of their own (npm, read 2026-10-25); before it 5.4.0, run at stage B3's refactoring pass (2026-10-22), the newest release then older than two weeks (5.4.1 was 13 days old), with no dependencies beyond its platform binaries, each pinned to 5.4.0 (npm, read 2026-10-22); before it 5.3.3, run at stage B2's refactoring pass, chosen as a release older than two weeks (5.4.1 was eight days old); 5.4.0 (2026-09-30) was also old enough and was overlooked, so the next pass takes the newest release then older than two weeks; jscpd 5.3.3 has no dependencies beyond its platform binaries, each pinned to 5.3.3 and without dependencies of their own, so the pin fixes the whole tree (npm, read 2026-10-17) | the stage-close refactoring pass (bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md) | 2026-10-17, 2026-10-22, 2026-10-25, 2026-10-28, 2026-11-02 and 2026-11-03, supervisor |
++| jscpd 5.4.2 | tool | run by `npx --yes jscpd@5.4.2` at release B2's stage H1's refactoring pass (2026-11-10), the newest release then older than two weeks (2026-10-20; 5.4.3 was two days old), with no dependencies beyond its eight platform binaries, each pinned to 5.4.2 (npm, read 2026-11-10); before it 5.4.1, run at stage B4's refactoring pass (2026-10-25), again at stage B5's (2026-10-28) and at release T's stage T1's (2026-11-02) and stage T2's (2026-11-03), the newest release then older than two weeks (2026-10-09; 5.4.2 was five days old on 2026-10-25, eight on 2026-10-28, thirteen on 2026-11-02 and two weeks to the day on 2026-11-03, so not yet older), with no dependencies beyond its platform binaries, each pinned to 5.4.1 and without dependencies of their own (npm, read 2026-10-25); before it 5.4.0, run at stage B3's refactoring pass (2026-10-22), the newest release then older than two weeks (5.4.1 was 13 days old), with no dependencies beyond its platform binaries, each pinned to 5.4.0 (npm, read 2026-10-22); before it 5.3.3, run at stage B2's refactoring pass, chosen as a release older than two weeks (5.4.1 was eight days old); 5.4.0 (2026-09-30) was also old enough and was overlooked, so the next pass takes the newest release then older than two weeks; jscpd 5.3.3 has no dependencies beyond its platform binaries, each pinned to 5.3.3 and without dependencies of their own, so the pin fixes the whole tree (npm, read 2026-10-17) | the stage-close refactoring pass (bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md) | 2026-10-17, 2026-10-22, 2026-10-25, 2026-10-28, 2026-11-02, 2026-11-03 and 2026-11-10, supervisor |
+ | SOCKET_SECURITY_API_KEY | repo secret | GitHub repository secrets (name only) | the Socket step of the security floor (`SOCKET_CLI_API_TOKEN`) | the owner, 2026-10-12; free tier, no spend possible. 5 characters of its secret part were in public CI logs of PR #16 (ISS-005): those logs deleted and the key replaced by the owner 2026-10-18 (Socket allows one token, so the old one is void) |
+ | SEMGREP_APP_TOKEN | repo secret | GitHub repository secrets (name only) | nothing: Semgrep runs the OSS engine without a token (owner, 2026-10-12) | the owner; unused, no spend possible |
+ | SOCKET_ORG_SLUG, SOCKET_CLI_ORG_SLUG | repo variable (an identifier, public) | SOCKET_ORG_SLUG is a GitHub repository variable, value `latent-foundry`; SOCKET_CLI_ORG_SLUG is only the Socket step's environment name for it | the Socket step of the security floor: `socket ci` 1.7.0 reads SOCKET_CLI_ORG_SLUG before it asks the API (handoff/TASK-002-r6-report.md) | the owner, 2026-10-12 |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 05917f9..edfa2c1 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -1,12 +1,12 @@
+ # Project Status
+-Last updated: 2026-11-09
++Last updated: 2026-11-10
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: release B2 (machine-readable headers on the dual-read records), begun 2026-11-04; intake confirmed 2026-11-04; the design revision and its plan addendum (one subject, release-b2) approved at one gate 2026-11-04 (items 2 and 4; no interface variant, item 3; the run parameters kept, item 5); at item 6, the loop, stages H1 and H2 (TASK-046 to TASK-054), on Opus 5.5
+-Increment: none — at the merge of HOTFIX-003's carry
+-Last accepted: HOTFIX-003 (PR #143, at its merge): the intake hotfix 2026.11.09a (release/2026.11.03, PR #142, installed 2026-11-09) carried onto main, the software's features and behaviour asked as a conversation, R-065 built; before it TASK-046 to TASK-050 (PRs #137 to #141): the header reader and schemas and the status file's, plan's, briefs', tabular records' and run parameters' headers read first, R-057 to R-061 built; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-050, BUG-001 to BUG-043, the refactoring passes of B2 to B5, T1 and T2, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Increment: none — at the merge of stage H1's refactoring pass
++Last accepted: REFAC-005 and REFAC-006 (PR #144, at its merge): stage H1's refactoring pass, the dead code the stage left and the two repeats it added, behaviour unchanged, with the header tests' helpers in one copy; before it HOTFIX-003 (PR #143): the intake hotfix 2026.11.09a carried onto main, R-065 built; before it TASK-046 to TASK-050 (PRs #137 to #141): the header reader and schemas and the status file's, plan's, briefs', tabular records' and run parameters' headers read first, R-057 to R-061 built; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-050, BUG-001 to BUG-043, the refactoring passes of B2 to B5, T1, T2 and H1, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: nothing
+-Next: stage H1's close on Opus 5.5 (the refactoring pass, the stage review, the demonstration, the reflection items), then TASK-051 to TASK-054 as plan-check.py gives them; TASK-046's to TASK-050's leads for later briefs in docs/HARDENING.md. After release B2, one at a time on the owner's word: the progress graph, W, G, E, F, then C and D, which wait for the TDP's code map (INVENTORY, Decisions, 2026-11-02). The TDP calibrated to 2026.11.03a on 2026-11-04, on its branch task-172 (its main reads 2026.10.30d until that branch merges), and stays paused at the owner's word; of release T's field acceptance on it, the first stripped suite and no gate reopened are read at its TASK-172, and the weekly workflow stays open until a bridge release's frozen block carries checkout v7.0.1 or newer and the TDP's increment for its OSV-Scanner action follows (HARDENING, Correction to project end; Feedback PT10); reAngle and the video factory calibrate when the owner resumes them (R-031, R-037). A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: stage H1's close on Opus 5.5 (the stage review, the demonstration, the reflection items), then TASK-051 to TASK-054 as plan-check.py gives them; TASK-046's to TASK-050's leads for later briefs in docs/HARDENING.md. After release B2, one at a time on the owner's word: the progress graph, W, G, E, F, then C and D, which wait for the TDP's code map (INVENTORY, Decisions, 2026-11-02). The TDP calibrated to 2026.11.03a on 2026-11-04, on its branch task-172 (its main reads 2026.10.30d until that branch merges), and stays paused at the owner's word; of release T's field acceptance on it, the first stripped suite and no gate reopened are read at its TASK-172, and the weekly workflow stays open until a bridge release's frozen block carries checkout v7.0.1 or newer and the TDP's increment for its OSV-Scanner action follows (HARDENING, Correction to project end; Feedback PT10); reAngle and the video factory calibrate when the owner resumes them (R-031, R-037). A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions); stage T2's demonstration ran after the install, where the plan says before (HARDENING, Stage T2's demonstration)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -16,7 +16,7 @@ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); intake-notes.md (release T's intake: what was read, the questions and the owner's answers); intake-notes-b2.md and b2_*.py (release B2's); release T's rt_*.py (the item scan, the records writer, the critique's file) and rt0nn_*.py; each increment's mutants file <ID>-mutants.json; each closed gate's own files, named by its ID (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*, bug0nn_*, cal30b_*.py, the stage reviews' stage_b<n>_* and stage-b<n>-*, the fix and refactoring passes' fix*, refac_* and refactor*, the plan revision maintainer-text's plan_text_*.py, design_text_file.py and *-PLAN-TEXT.md); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); b5close_docs.py and b5close_records.py (stage B5's); b6close_docs.py and b6close_records*.py (stage B6's, run once each), write_stage_b6.py and refactor_b6_clones.py; the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py to demo_b5.py (run with python -X utf8), demo_b6.py (PYTHONUTF8=1 through --kind driver) and demo_t2.py (through --kind driver); release T's close, t2close_*.py and t2corr_*.py, run once each; drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md; pins.py, carve_diff.py
+ Delegated gates: none
+ Remote sync: local main fast-forwarded after every merge (sync-check.py --apply)
+-Stage: release B2's stage H1's increments merged (TASK-046 to TASK-050), the intake hotfix carried onto main (HOTFIX-003), H1's close next, then H2 (TASK-051 to TASK-054); release T's T1 closed 2026-11-02, T2 closed 2026-11-04 (HARDENING); project end of release T 2026-11-04 (HARDENING, Project end of release T); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29; B6 (release B's install) 2026-10-31; release B's project end 2026-10-31 (docs/archive/STATUS_HISTORY.md). Last reflection: release B2's design gate, 2026-11-04 (Project Summary patched); before it stage T2's close, 2026-11-04 (demonstration passed live on main 91c2efb; conformance 25 OK, 0 MISSING, 5 NOTE; Issues ISS-024 recurred, ISS-027 completed, ISS-028 added; Feedback FB-075 to FB-083; Project Summary patched)
++Stage: release B2's stage H1's increments merged (TASK-046 to TASK-050), the intake hotfix carried onto main (HOTFIX-003), H1's refactoring pass merged (REFAC-005, REFAC-006), the rest of H1's close next, then H2 (TASK-051 to TASK-054); release T's T1 closed 2026-11-02, T2 closed 2026-11-04 (HARDENING); project end of release T 2026-11-04 (HARDENING, Project end of release T); B1 and B2 closed 2026-10-19; B3 2026-10-24; B4 2026-10-25; B5 2026-10-29; B6 (release B's install) 2026-10-31; release B's project end 2026-10-31 (docs/archive/STATUS_HISTORY.md). Last reflection: release B2's design gate, 2026-11-04 (Project Summary patched); before it stage T2's close, 2026-11-04 (demonstration passed live on main 91c2efb; conformance 25 OK, 0 MISSING, 5 NOTE; Issues ISS-024 recurred, ISS-027 completed, ISS-028 added; Feedback FB-075 to FB-083; Project Summary patched)
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-031 open (invisible-check misses U+2028, U+2029, U+0085 and the C0 controls; entry at the next reflection). ISS-030 fixed (TASK-047: a builder ran the full tree asynchronously and reached its limit, its work kept; briefs now forbid it). ISS-029 fixed (TASK-046). ISS-028 fixed (BUG-043, TASK-045). ISS-027 fixed, worked around (the prompts' wording, FB-075). ISS-024 recurred, counter 2. ISS-026 fixed (BUG-041, installed 2026-11-04). ISS-025 fixed (BUG-039's three rounds). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-023 fixed (BUG-038, 2026.10.30d, installed 2026-10-31); ISS-021's field check passed (2026-10-31); ISS-011, ISS-015 and ISS-022 closed at stage B6's close, ISS-020 completed there (worked around; the roster check's sign-in advice to release T, HARDENING). Earlier: docs/archive/STATUS_HISTORY.md
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+diff --git a/handoff/REFAC-005-r1-report.md b/handoff/REFAC-005-r1-report.md
+new file mode 100644
+index 0000000..4a54a43
+--- /dev/null
++++ b/handoff/REFAC-005-r1-report.md
+@@ -0,0 +1,195 @@
++# REFAC-005 round-1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/bridge_env.py`
++- `bridge/cursor-bridge/session-start.py`
++- `bridge/cursor-bridge/workflow-check.py`
++- `bridge/cursor-bridge/diagram-check.py`
++- `bridge/cursor-bridge/MANIFEST.json`
++- `handoff/REFAC-005-r1-report.md`
++
++`bridge/cursor-bridge/VERSION` appears in `git status --short` after `make-manifest.py` (content remains `2026.11.09a`; likely line-ending normalization). Per brief, reported here, not restored.
++
++## Summary
++
++REFAC-005 removed dead symbols and a bare alias from `bridge_env.py`, replaced session-start's unused `read_status` with `read_status_file` matching the inlined `main()` loop, dropped unreachable workflow-check logic after `status_workflow_line`'s problem sets, simplified a redundant branch in diagram-check `known_deviations`, and regenerated `MANIFEST.json` at version `2026.11.09a`; loop-guard.py was left untouched.
++
++## Git at start
++
++```
++git status --short
++
++(empty — clean working tree)
++
++git rev-parse HEAD
++c2f3ef2667a650ddbdf07c5335e9845faeb8015c
++```
++
++Uncommitted changes at start: no.
++
++## Pre-edit grep checks (Requirement 1)
++
++Command (per symbol):
++
++```
++git grep -n -e <name> -- . ":(exclude)run"
++```
++
++**parse_diagram_index_rows** — no caller in `bridge/`, `tests/`, or `docs/diagrams/`:
++
++```
++bridge/cursor-bridge/bridge_env.py:3094:def parse_diagram_index_rows(text):
++docs/HARDENING.md:1802:... `bridge_env.parse_diagram_index_rows` is unused ...
++handoff/REFAC-005.md:...
++```
++
++**_SCOPE_PAREN** — definition only in bridge:
++
++```
++bridge/cursor-bridge/bridge_env.py:332:_SCOPE_PAREN = "ScopeAgreementError"
++docs/HARDENING.md:1791:...
++handoff/...
++```
++
++**ScopeAgreementError** — in `bridge/` only at the constant string and class definition (lines 332, 3212); no `tests/` use:
++
++```
++bridge/cursor-bridge/bridge_env.py:332:...
++bridge/cursor-bridge/bridge_env.py:3212:class ScopeAgreementError(ValueError):
++...
++```
++
++**deviations_table** — one caller at `bridge_env.py:3114`:
++
++```
++bridge/cursor-bridge/bridge_env.py:3100:def deviations_table(text):
++bridge/cursor-bridge/bridge_env.py:3114:    _hl, _orig, rows = deviations_table(text)
++...
++```
++
++**read_status** — session-start definition only (no caller); loop-guard's `read_status` used by `tests/test_loop_guard.py:83`; `read_status_file` used by loop-guard `main()` line 595:
++
++```
++bridge/cursor-bridge/loop-guard.py:175:def read_status(cwd):
++bridge/cursor-bridge/session-start.py:188:def read_status(cwd):
++tests/test_loop_guard.py:83:        status = lg.read_status(str(cwd))
++bridge/cursor-bridge/loop-guard.py:595:    status_path, status = read_status_file(cwd)
++...
++```
++
++**status_workflow_line** problem lists (item 4): confirmed in code — `[p0]` via bad prefix; `[]` on successful parse; `[p2]` duplicate part; `[p1]` traits marker; `[p2,p1]` both; `[p3]` empty name; `[p2,p3]` duplicate + empty name. After `if p0 in line_problems or p1 in line_problems: continue`, the only two-item list remaining is `[p2,p3]`, which includes `p3`.
++
++## Items
++
++| Item | Status |
++|------|--------|
++| 1a | Done — deleted `parse_diagram_index_rows` |
++| 1b | Done — deleted `_SCOPE_PAREN` |
++| 1c | Done — deleted `ScopeAgreementError` |
++| 1d | Done — deleted `deviations_table`; `parse_deviation_keys` calls `_first_markdown_table` |
++| 2 | Done — `read_status_file(cwd)`; `main()` calls it |
++| 3 | Not applicable — loop-guard `read_status` and `read_status_file` both have callers; file not edited |
++| 4 | Done — removed lines 701-702 in `workflow-check.py` |
++| 5 | Done — `elif hdr is not None` → `else` |
++| 6 | Done — manifest regenerated |
++
++Post-edit: `git grep` under `bridge/` finds none of `parse_diagram_index_rows`, `_SCOPE_PAREN`, `ScopeAgreementError`, `deviations_table`, `len(line_problems) > 1`, or `elif hdr is not None`. `session-start.py` has `read_status_file` at definition and `main()` call only.
++
++## Pytest (before edit)
++
++```
++python -m pytest -p no:cacheprovider -q -rs tests/test_header_reader.py tests/test_header_tables.py tests/test_header_tables_r2.py tests/test_header_status.py tests/test_session_start.py tests/test_session_start_module.py tests/test_loop_guard.py tests/test_workflow_check.py tests/test_workflows_line_check.py tests/test_diagram_check.py tests/test_diagram_check_a4.py tests/test_header_currency.py tests/test_header_plan.py
++```
++
++```
++1910 passed, 8 skipped in 139.24s (0:02:19)
++```
++
++## Pytest (after edit)
++
++Same command as above.
++
++```
++1910 passed, 8 skipped in 151.72s (0:02:31)
++```
++
++## Post-edit verification commands
++
++```
++python tools/make-manifest.py --version 2026.11.09a
++```
++
++```
++make-manifest: version 2026.11.09a, 145 files hashed, VERSION + MANIFEST.json written
++```
++
++```
++python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet
++```
++
++```
++bridge-check: version 2026.11.09a (2026-11-10 20:42) at <the Workspace>\bridge
++bridge-check: 145 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.09a
++```
++
++```
++python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge
++```
++
++```
++windowless-check: 35 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++```
++python bridge/cursor-bridge/refactor-check.py HEAD --max-lines 400
++```
++
++```
++base: HEAD | lane: production | files: 5 | changed lines: 47 (budget 400) | allowed test files: 0
++PURE: no test change, no CHANGES.md entry, within size budget.
++```
++
++## Git at end
++
++```
++git status --short
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/VERSION
++ M bridge/cursor-bridge/bridge_env.py
++ M bridge/cursor-bridge/diagram-check.py
++ M bridge/cursor-bridge/session-start.py
++ M bridge/cursor-bridge/workflow-check.py
++?? handoff/REFAC-005-r1-report.md
++```
++
++```
++git diff --stat
++ bridge/cursor-bridge/MANIFEST.json     | 10 +++++-----
++ bridge/cursor-bridge/bridge_env.py     | 18 +-----------------
++ bridge/cursor-bridge/diagram-check.py  |  2 +-
++ bridge/cursor-bridge/session-start.py  | 15 ++++-----------
++ bridge/cursor-bridge/workflow-check.py |  2 --
++ 5 files changed, 11 insertions(+), 36 deletions(-)
++```
++
++```
++git rev-parse HEAD
++c2f3ef2667a650ddbdf07c5335e9845faeb8015c
++```
++
++Uncommitted changes at end: yes (this increment only).
++
++## Behaviour identical
++
++Every edit removes unused definitions, inlines equivalent logic (`read_status_file` matches the former loop byte-for-byte on paths and encoding), deletes a branch that cannot run given `status_workflow_line`'s return sets, or swaps a tautological `elif` for `else` with the same body; callers and public signatures outside the listed sites are unchanged.
++
++## Noticed but not changed
++
++- `diagram_index_body_table` remains a bare alias of `_first_markdown_table` (noted in `docs/HARDENING.md`; out of scope for this brief).
++- `bridge/cursor-bridge/VERSION` listed modified by git after manifest rewrite though content is still `2026.11.09a`.
++
++## Assumed, not verified
++
++Assumed, not verified: none.
+diff --git a/handoff/REFAC-005.md b/handoff/REFAC-005.md
+new file mode 100644
+index 0000000..90a3c6c
+--- /dev/null
++++ b/handoff/REFAC-005.md
+@@ -0,0 +1,149 @@
++# REFAC-005: stage H1's dead code goes from bridge_env.py, session-start.py, workflow-check.py and diagram-check.py
++
++## Objective
++Refactoring — remove duplication / simplify **without any change in behaviour**.
++
++This brief carries stage H1's refactoring pass of release B2 (the refactor scout's items 3 and 5): dead code and one bare alias left by TASK-046 to TASK-050 in four bridge programs, and the manifest regenerated after them. Behaviour stays exactly the same: every printed line, every exit code, every return value, the same order of reads. Line numbers below are as the files stand on branch `refactor/h1` (cut from origin/main `6426650`; the branch's commits before yours change only test files and this brief), before your edit.
++
++**Item 1, `bridge/cursor-bridge/bridge_env.py`, the sites:**
++- (1a) `def parse_diagram_index_rows(text):`, lines 3094-3097, deleted. A grep of the Workspace (run/ excluded) for `parse_diagram_index_rows` found only its definition and two mentions in `docs/HARDENING.md` naming it unused; no caller in `bridge/`, `tests/` or `docs/diagrams/`.
++- (1b) `_SCOPE_PAREN = "ScopeAgreementError"`, line 332, deleted. The grep found `_SCOPE_PAREN` on that line only.
++- (1c) `class ScopeAgreementError(ValueError):` with its docstring line, lines 3212-3213, deleted. The grep found `ScopeAgreementError` in `bridge/` only at line 332 (the string above) and line 3212, and nowhere under `tests/`; the other mentions are old briefs and reports under `handoff/`, which are history and stay.
++- (1d) `def deviations_table(text):`, lines 3100-3102, a bare alias (`return _first_markdown_table(text)`), deleted, and its one caller, line 3114 in `parse_deviation_keys`, `    _hl, _orig, rows = deviations_table(text)`, becomes `    _hl, _orig, rows = _first_markdown_table(text)`. Nothing else in that line or that function changes.
++- `diagram_index_body_table` (lines 3075-3077) stays exactly as it is: `diagram-check.py` line 785 and `bridge_env.py` line 3168 call it.
++
++**Item 2, `bridge/cursor-bridge/session-start.py`:** `read_status(cwd)`, lines 188-193, has no caller (the grep found none in `bridge/` or `tests/`; `tests/test_loop_guard.py` line 83 calls the loop guard's own `read_status`, not this one), while `main()`, lines 612-619, inlines the same loop over `status_candidates(cwd)`, keeping the path too. Today's lines 612-619 read exactly:
++
++```python
++    status_path = None
++    status = None
++    for p in status_candidates(cwd):
++        if os.path.isfile(p):
++            status_path = p
++            with open(p, encoding="utf-8-sig", errors="replace") as f:
++                status = f.read()
++            break
++```
++
++`read_status` is replaced by one function `read_status_file(cwd)` returning `(path, text)` for the first candidate that is a file, read as that loop reads it (`encoding="utf-8-sig", errors="replace"`), or `(None, None)` when none is; and those eight lines of `main()` become one call of it binding `status_path` and `status`. Line 620, `    if status is None:`, and everything after it stay as they are. For reference, the loop guard already holds a function of exactly this contract (`bridge/cursor-bridge/loop-guard.py` lines 183-188); do not import it or move anything into `bridge_env` (the two hooks share no module but `bridge_env`, and `docs/HARDENING.md` line 322 records that a shared import for these helpers is not a candidate).
++
++**Item 3, `bridge/cursor-bridge/loop-guard.py`: not in Scope.** It holds `read_status(cwd)` (lines 175-180), called by `tests/test_loop_guard.py` line 83, and `read_status_file(cwd)` (lines 183-188), called by `main()` line 595. Neither is dead, so this pass leaves the file untouched. Your first check (Requirements 1) confirms this and reports item 3 as not applicable with that reason; if you find code in loop-guard.py that is dead, report it, do not edit the file.
++
++**Item 4, `bridge/cursor-bridge/workflow-check.py`, `check_status`:** lines 701-702 are deleted:
++
++```python
++        if len(line_problems) > 1 and p3 not in line_problems:
++            continue
++```
++
++They cannot fire: `bridge_env.status_workflow_line` (bridge_env.py lines 2704-2728) returns one of these problem lists: `[p0]`, `[]`, `[p2]`, `[p1]`, `[p2, p1]`, `[p3]`, `[p2, p3]`. After lines 699-700 (`if p0 in line_problems or p1 in line_problems: continue`) the only list of two items left is `[p2, p3]`, which holds `p3` (docs/HARDENING.md, TASK-047's round 3 notes). Lines 699 and 700 and line 703 (`        if body == "not yet classified":`) stay byte-identical; a mutant anchors on line 700.
++
++**Item 5, `bridge/cursor-bridge/diagram-check.py`, `known_deviations`:** line 613, `        elif hdr is not None:`, becomes `        else:` at the same eight-space indentation. The branch before it (line 611, `if hdr is None:`) makes `hdr is not None` always true there (docs/HARDENING.md, TASK-049's leads: "a redundant `elif` in diagram-check's `known_deviations`"). Lines 614-616 keep their text and indentation. Line 617, `    elif header is not None:`, is a different test (of `header`, not `hdr`) and does not change.
++
++**Item 6, `bridge/cursor-bridge/MANIFEST.json`:** regenerated once, after your last source edit, by `python tools/make-manifest.py --version 2026.11.09a`. The version stays `2026.11.09a`.
++
++**Callers to update:** `parse_deviation_keys` (item 1d) and `main()` in session-start.py (item 2). No other caller exists of anything this brief deletes; no public signature outside these sites changes.
++
++Satisfies: no new requirement. This keeps as they are R-058 (the status file's header read first by its six readers) and R-060 (the tabular records' headers read first by their readers), built by TASK-047 and TASK-049.
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/bridge_env.py
++- bridge/cursor-bridge/session-start.py
++- bridge/cursor-bridge/workflow-check.py
++- bridge/cursor-bridge/diagram-check.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/BUILDER_NOTES.md
++- handoff/REFAC-005-r1-report.md
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration, pre-commit configuration, anything under `tools/` (you run `tools/make-manifest.py`; you do not edit it)
++- docs/ and handoff/, except the files the Scope section names; `docs/diagrams/` included: this change needs no diagram change (see Diagrams)
++- every file under `tests/`: no test file may be edited, renamed or created (`refactor-check.py` fails the branch on any test edit). The working tree may already show test files as modified by the supervisor before your run; leave them exactly as they are
++- `bridge/cursor-bridge/loop-guard.py` (item 3)
++- `bridge/cursor-bridge/VERSION`: it must still read `2026.11.09a` after `make-manifest.py` rewrites it; if `git status` then shows it modified, report it, do not try to restore it
++- `run/supervisor/TASK-046-mutants.json` to `run/supervisor/TASK-050-mutants.json` and everything else under `run/`: the supervisor's, gitignored; they anchor exact text in these files and the supervisor re-anchors them after your run
++- `docs/CHANGES.md` and `bridge/cursor-bridge/CHANGELOG.md`: a refactoring has no change entry
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md`: no command changes
++- in bridge_env.py: `diagram_index_body_table`, `diagram_index_table`, `diagram_index_fallback`, `deviations_fallback`, `_first_markdown_table`, `split_entry` and every other line not named in the Objective
++- every other file under `bridge/`
++
++## Context
++**What the code is today** (branch `refactor/h1`, head `6426650`). All five product files have CRLF line endings on every line; keep them, and add no trailing whitespace. The facts in the Objective were checked against the code for this brief; the caller greps are re-run by you (Requirements 1) before you delete anything.
++
++**Byte-identical neighbours.** The supervisor's mutants (`run/supervisor/TASK-046-mutants.json` to `TASK-050-mutants.json`) anchor exact text in these files. Every line you do not need to change stays byte-identical, in particular the lines next to each deletion: in bridge_env.py lines 331 and 333 around 1b, the end of `diagram_index_fallback` (3088-3091) and the whole of `deviations_fallback` (3105-3108) around 1a and 1d, the end of `requirement_ids_from_register` (ending `    return ids`, 3209) and `def split_entry(entry):` (3216) around 1c; in workflow-check.py lines 699-700 and 703; in diagram-check.py lines 611-612 and 614-617; in session-start.py the end of `status_candidates` (185) and `def installed_version():` (196), and lines 611 and 620 in `main()`. Top-level definitions stay separated by exactly two blank lines, as the file already does: when you delete a function or the class, delete it with the two blank lines that follow it, so the blank lines between the remaining neighbours are two.
++
++**How the tests reach this code.** The test files in the Constraints load the Workspace sources (the programs by path, `bridge_env` from `bridge/cursor-bridge/`) and run them against folders under pytest's `tmp_path`. `tests/test_session_start.py` and `tests/test_session_start_module.py` drive session-start.py's `main()` through its stdin JSON; `tests/test_workflow_check.py` and `tests/test_workflows_line_check.py` reach `check_status`; `tests/test_header_tables.py`, `tests/test_header_tables_r2.py`, `tests/test_diagram_check.py` and `tests/test_diagram_check_a4.py` reach `known_deviations` and `parse_deviation_keys`; `tests/test_loop_guard.py` is run because it calls the loop guard's `read_status`, which this change must not disturb.
++
++**The manifest.** `MANIFEST.json` holds a normalized sha256 (CRLF folded to LF, BOM dropped) of every file under `bridge/`. After your source edits it is stale for the four programs; `tools/make-manifest.py --version 2026.11.09a` rewrites `VERSION` (to `2026.11.09a` and a line feed) and the manifest, whose `generated` stamp changes. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` then compares the tree with it and prints `RESULT: SOURCES MATCH bridge 2026.11.09a`.
++
++**Security context.** These are logic surfaces (record parsing, the session-start hook): `.cursor/rules/secure-coding.mdc` is in force for you, and the project's ASVS level is 2 (`docs/INVENTORY.md`, Decisions). The trust boundary here is the records a session or a builder writes (`docs/PROJECT_STATUS.md`, `docs/diagrams/DEVIATIONS.md`), which these programs read; this change moves no boundary: every header check (`check_header`, the `HeaderError` raise in `known_deviations`) runs on the same paths as today.
++
++**Development data** (`docs/INVENTORY.md`, Decisions): "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: the tests run the Workspace sources against pytest's temporary folders. Never run session-start.py, loop-guard.py, workflow-check.py or diagram-check.py yourself against this repository's own records, and never run `bridge-install.py`.
++
++## Diagrams
++`docs/diagrams/D-002-components.md` — the elements `session_start`, `workflow_check`, `diagram_check` and `bridge_env`. Each program keeps its existing import of `bridge_env` and gains no other; no edge is added or removed, so the diagram does not change. `docs/diagrams/D-005-header-schemas.md` (the header schemas) is untouched: no schema or reader of a header changes. **If the task cannot be done within them, stop and report the conflict (an objection) instead of deviating.**
++
++## Requirements
++1. **Checks first, before any edit; paste each command and its output in the report.** From the Workspace root, grep the Workspace for each of `parse_diagram_index_rows`, `_SCOPE_PAREN`, `ScopeAgreementError`, `deviations_table` and `read_status`, excluding `run/` (for example `git grep -n -e <name> -- . ":(exclude)run"`), and confirm: no caller of 1a, 1b or 1c anywhere in `bridge/`, `tests/` or `docs/diagrams/`; `deviations_table` called once, at bridge_env.py line 3114; session-start.py's `read_status` called nowhere; loop-guard.py's `read_status` called by `tests/test_loop_guard.py` and its `read_status_file` by its `main()`, so nothing in loop-guard.py is dead (item 3 not applicable). Also confirm in `bridge_env.status_workflow_line` the list of problem lists the Objective gives for item 4. Where a check does not hold, leave that item undone, say so in the report, and go on with the others.
++2. **Item 1.** Delete 1a, 1b and 1c, and delete 1d with its caller changed as the Objective says. `diagram_index_body_table` stays.
++3. **Item 2.** session-start.py's `read_status` becomes `read_status_file(cwd)` with the contract the Objective states, at the same place in the file, and `main()` calls it in place of lines 612-619. `main()` prints, for every input, exactly what it prints today, and exits 0 as today.
++4. **Item 4.** Delete workflow-check.py lines 701-702 only.
++5. **Item 5.** diagram-check.py line 613 becomes `        else:` only.
++6. **Item 6.** After your last edit to a source file, run `python tools/make-manifest.py --version 2026.11.09a` once, then the bridge-check command in the Constraints.
++7. No other line of the four programs changes. Every file keeps its CRLF line endings and gains no trailing whitespace.
++
++## Acceptance criteria
++- [ ] Behaviour is identical: the same printed lines, exit codes and return values for every input.
++- [ ] The named test files pass before and after the edit with the **same** test set: the same count passed, none failed, none newly skipped; both summary lines quoted in the report. None edited.
++- [ ] Each item is done, or reported as not applicable with the reason (item 3 expected not applicable).
++- [ ] `parse_diagram_index_rows`, `_SCOPE_PAREN`, `ScopeAgreementError` and `deviations_table` appear nowhere under `bridge/`; `read_status` appears in session-start.py nowhere, `read_status_file` in it twice (its definition and the one call in `main()`); `len(line_problems) > 1` appears nowhere in workflow-check.py; `elif hdr is not None` appears nowhere in diagram-check.py.
++- [ ] Every caller now uses the single implementation: `parse_deviation_keys` calls `_first_markdown_table`; `main()` calls `read_status_file`. No public signature outside the listed sites changed.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` ends with `0 FAIL` and exit 0.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH bridge 2026.11.09a`.
++- [ ] `python bridge/cursor-bridge/refactor-check.py HEAD --max-lines 400` prints a line starting `PURE:` (the base is the commit you were launched on: the branch already holds the supervisor's tests-lane commit, which a base of `origin/main` would count as a test edit).
++- [ ] `git diff --stat` shows only the five Scope product files (plus the report and, if you wrote one, the builder-notes line); `bridge/cursor-bridge/loop-guard.py`, every file under `tests/` you did not find already modified, `docs/CHANGES.md` and `bridge/cursor-bridge/CHANGELOG.md` unchanged; no mutation script in the diff.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it. Run the Workspace copies of the bridge programs, as the commands below do, never a copy under a home folder.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms; `windowsHide: true` in Node). Capturing output does not prevent the window. A window is allowed only when it serves the user (they watch it or type into it); then write the reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path. This change launches no process and must not add one.
++- Never start a server, a watcher or a daemon that outlives a test: a test that needs the product running starts it through the test framework's own fixture and stops it there. A server left running keeps your run from ending (plan 10.3, release A2).
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. A development build uses the development data the design names (the inventory's `Development data` decision, stated in Context) and refuses the installed product's data. Here that means the Workspace sources and pytest's temporary folders only.
++- No value in this task is marked as the owner's.
++- Follow existing conventions in the files you touch.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff`, `git grep` and `git log` only.
++- Numbers from text, a file, a reply or an environment variable are parsed with the language's own parser, never by slicing or splitting a string. This change parses no number.
++- An increment that starts a process meets the process checklist (windowless, stopped in a `finally` or a fixture's teardown with its whole tree, nothing outlives the test or the command, a browser on Windows launched attached, pipes closed or drained). This change starts none.
++- Every verification command is written here in full. Run exactly these, each from the Workspace root (the folder you were started in), each in the foreground, never in the background:
++  - At the start: `git status --short` and `git rev-parse HEAD`, pasted into the report (they show which test files, if any, were already modified before your run).
++  - Before the edit, and again after the last edit: `python -m pytest -p no:cacheprovider -q -rs tests/test_header_reader.py tests/test_header_tables.py tests/test_header_tables_r2.py tests/test_header_status.py tests/test_session_start.py tests/test_session_start_module.py tests/test_loop_guard.py tests/test_workflow_check.py tests/test_workflows_line_check.py tests/test_diagram_check.py tests/test_diagram_check_a4.py tests/test_header_currency.py tests/test_header_plan.py`
++  - After the last source edit, in this order: `python tools/make-manifest.py --version 2026.11.09a`; `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`; `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`; `python bridge/cursor-bridge/refactor-check.py HEAD --max-lines 400`.
++  - At the end: `git status --short`, `git diff --stat` and `git rev-parse HEAD`, pasted into the report.
++  - Do not run the whole `tests/` tree or any other test file (a builder of this release that ran the whole tree reached its limit, ISS-030); the supervisor runs the full suite after your run. If a test fails before your edit, stop and report it; do not fix it. If `refactor-check.py` prints IMPURE naming only test files that `git status --short` already showed modified at the start, quote it, say so, and touch nothing.
++- Mutation checking is the supervisor's in this task: it re-anchors and re-runs its mutants after your run. Run no mutation, write no mutation script, and let none land in the diff.
++- Prefer reuse over new code and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability, or accessibility requirement stated above.
++- **Refactoring constraints.** Do not edit any test file. Do not add an entry to `docs/CHANGES.md`. Do not "improve" behaviour, messages, edge cases, or defaults you notice along the way; report them in your summary instead. Do not introduce an abstraction beyond what the listed duplicates need: the one new name is `read_status_file` in session-start.py; no helper in `bridge_env`, no import between the two hooks.
++
++## Done
++Your report is the file `handoff/REFAC-005-r1-report.md`, which you write as you go (what you did, what you changed, what you ran and what it printed, what you could not do) so that nothing of it is lost when your run ends early. When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- for each of items 1a, 1b, 1c, 1d, 2, 3, 4, 5 and 6: done, or not applicable with the reason; every deletion with its grep command and output as the evidence of no caller;
++- the before and after outputs of the pytest command, with both summary lines;
++- the outputs of make-manifest, bridge-check, windowless-check and refactor-check, each line that shows the result quoted;
++- `git status --short`, `git diff --stat` and `git rev-parse HEAD` at the start and at the end, and whether the working tree held uncommitted changes then;
++- one sentence stating why the behaviour is identical;
++- anything you noticed but did not change (per the refactoring constraints);
++- a final section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm (an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose). One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. A command you did not run is written `not run`, never described as run.
++
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/REFAC-006-r1-report.md b/handoff/REFAC-006-r1-report.md
+new file mode 100644
+index 0000000..50cef2c
+--- /dev/null
++++ b/handoff/REFAC-006-r1-report.md
+@@ -0,0 +1,186 @@
++# REFAC-006 r1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/conformance-check.py`
++- `bridge/cursor-bridge/completion-check.py`
++- `bridge/cursor-bridge/MANIFEST.json`
++- `bridge/cursor-bridge/VERSION` (rewritten by make-manifest with LF line ending; left modified, reported below)
++- `handoff/REFAC-006-r1-report.md`
++
++## Summary
++
++REFAC-006 deduplicated the Development data verdict in `conformance-check.py` via a single `dev_ok` assignment and one OK/MISSING pair, and removed the second plan read and second `plan_header_findings` pass in `completion-check.py` by caching headed plan text in `headed_texts` during the first loop; the manifest was regenerated at version `2026.11.09a` and all listed verification commands passed.
++
++## Items
++
++### Item 1 — done
++
++Consolidated lines 1288–1296 in `conformance-check.py` to the `dev_ok` conditional expression plus one `if dev_ok` / `else` with byte-identical `add(...)` strings.
++
++### Item 2 — done
++
++Added `headed_texts`, append on headed plans in the first loop, and the disagreement loop iterates `headed_texts` only.
++
++### Item 3 — done
++
++Ran `python tools/make-manifest.py --version 2026.11.09a` and `bridge-check`; `RESULT: SOURCES MATCH bridge 2026.11.09a`.
++
++## Requirements 1 — grep evidence
++
++### Before edit
++
++```text
++$ git grep -n -e inventory_development_data -e inv_dev_from_header -- bridge/cursor-bridge/conformance-check.py
++bridge/cursor-bridge/conformance-check.py:1243:    inv_dev_from_header = None
++bridge/cursor-bridge/conformance-check.py:1249:        and hasattr(bridge_env, "inventory_development_data")
++bridge/cursor-bridge/conformance-check.py:1266:            inv_dev_from_header = inv_hdr.get("development_data", "")
++bridge/cursor-bridge/conformance-check.py:1288:            if inv_dev_from_header is not None:
++bridge/cursor-bridge/conformance-check.py:1289:                if inv_dev_from_header:
++bridge/cursor-bridge/conformance-check.py:1293:            elif bridge_env.inventory_development_data(inv_body_for_dev):
++```
++
++Confirmed: `inv_dev_from_header` assigned at 1243 and 1266; `inventory_development_data` called once at 1293 as `elif` condition.
++
++```text
++$ git grep -n -e plan_header_findings -e plan_r_ids_outside_headers -e headed_texts -- bridge/cursor-bridge/completion-check.py
++bridge/cursor-bridge/completion-check.py:207:            fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
++bridge/cursor-bridge/completion-check.py:225:                fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
++bridge/cursor-bridge/completion-check.py:228:                for rid in bridge_env.plan_r_ids_outside_headers(text):
++```
++
++Confirmed: `plan_header_findings` at 207 and 225; `plan_r_ids_outside_headers` at 228; `headed_texts` not present.
++
++### After edit
++
++```text
++$ git grep -n -e inventory_development_data -e inv_dev_from_header -- bridge/cursor-bridge/conformance-check.py
++bridge/cursor-bridge/conformance-check.py:1243:    inv_dev_from_header = None
++bridge/cursor-bridge/conformance-check.py:1249:        and hasattr(bridge_env, "inventory_development_data")
++bridge/cursor-bridge/conformance-check.py:1266:            inv_dev_from_header = inv_hdr.get("development_data", "")
++bridge/cursor-bridge/conformance-check.py:1288:            dev_ok = bool(inv_dev_from_header) if inv_dev_from_header is not None else bridge_env.inventory_development_data(inv_body_for_dev)
++```
++
++```text
++$ git grep -n -e plan_header_findings -e plan_r_ids_outside_headers -e headed_texts -- bridge/cursor-bridge/completion-check.py
++bridge/cursor-bridge/completion-check.py:205:        headed_texts = []
++bridge/cursor-bridge/completion-check.py:208:            fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
++bridge/cursor-bridge/completion-check.py:214:                headed_texts.append(text)
++bridge/cursor-bridge/completion-check.py:225:            for text in headed_texts:
++bridge/cursor-bridge/completion-check.py:226:                for rid in bridge_env.plan_r_ids_outside_headers(text):
++```
++
++## Pytest (before edit)
++
++```text
++$ python -m pytest -p no:cacheprovider -q -rs tests/test_conformance_check.py tests/test_conformance_check_a4.py tests/test_conformance_windowless.py tests/test_b2_least_confident.py tests/test_completion_check.py tests/test_bug038.py tests/test_header_tables.py tests/test_header_tables_r2.py tests/test_header_plan.py tests/test_header_plan_r2.py tests/test_header_plan_r3.py tests/test_header_status.py tests/test_header_currency.py
++.................................................................s.s.... [ 13%]
++........................................................................ [ 27%]
++........................................................................ [ 40%]
++........................................................................ [ 54%]
++........................................................................ [ 67%]
++........................................................................ [ 81%]
++........................................................................ [ 94%]
++.............................                                            [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_conformance_windowless.py:526: creating a file symbolic link needs a privilege here
++SKIPPED [1] tests\test_conformance_windowless.py:551: Windows collapses `..` before it follows a link
++531 passed, 2 skipped in 98.21s (0:01:38)
++```
++
++## Pytest (after edit)
++
++```text
++$ python -m pytest -p no:cacheprovider -q -rs tests/test_conformance_check.py tests/test_conformance_check_a4.py tests/test_conformance_windowless.py tests/test_b2_least_confident.py tests/test_completion_check.py tests/test_bug038.py tests/test_header_tables.py tests/test_header_tables_r2.py tests/test_header_plan.py tests/test_header_plan_r2.py tests/test_header_plan_r3.py tests/test_header_status.py tests/test_header_currency.py
++.................................................................s.s.... [ 13%]
++........................................................................ [ 27%]
++........................................................................ [ 40%]
++........................................................................ [ 54%]
++........................................................................ [ 67%]
++........................................................................ [ 81%]
++........................................................................ [ 94%]
++.............................                                            [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_conformance_windowless.py:526: creating a file symbolic link needs a privilege here
++SKIPPED [1] tests\test_conformance_windowless.py:551: Windows collapses `..` before it follows a link
++531 passed, 2 skipped in 96.22s (0:01:36)
++```
++
++## Post-edit verification
++
++### make-manifest
++
++```text
++$ python tools/make-manifest.py --version 2026.11.09a
++make-manifest: version 2026.11.09a, 145 files hashed, VERSION + MANIFEST.json written
++```
++
++### bridge-check
++
++```text
++$ python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet
++bridge-check: version 2026.11.09a (2026-11-10 20:56) at <the Workspace>/bridge
++bridge-check: 145 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.09a
++```
++
++### windowless-check
++
++```text
++$ python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge
++windowless-check: 35 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++### refactor-check
++
++```text
++$ python bridge/cursor-bridge/refactor-check.py HEAD --max-lines 400
++base: HEAD | lane: production | files: 4 | changed lines: 22 (budget 400) | allowed test files: 0
++PURE: no test change, no CHANGES.md entry, within size budget.
++```
++
++## Git at start
++
++```text
++$ git status --short
++(empty)
++
++$ git rev-parse HEAD
++0723dc2ac9146a1f2a2c486cf7b3600ef99c4f2c
++```
++
++Working tree was clean at start (no uncommitted changes).
++
++## Git at end
++
++```text
++$ git status --short
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/VERSION
++ M bridge/cursor-bridge/completion-check.py
++ M bridge/cursor-bridge/conformance-check.py
++?? handoff/REFAC-006-r1-report.md
++
++$ git diff --stat
++ bridge/cursor-bridge/MANIFEST.json        | 6 +++---
++ bridge/cursor-bridge/completion-check.py  | 8 +++-----
++ bridge/cursor-bridge/conformance-check.py | 8 ++------
++ 3 files changed, 8 insertions(+), 14 deletions(-)
++
++$ git rev-parse HEAD
++0723dc2ac9146a1f2a2c486cf7b3600ef99c4f2c
++```
++
++Working tree holds uncommitted changes. `bridge/cursor-bridge/VERSION` shows as modified (make-manifest LF line ending); left as written.
++
++## Behaviour identical
++
++The Development data branch still uses the header value when present (`bool(inv_dev_from_header)` for OK versus empty for MISSING) and calls `inventory_development_data` only when the header field was not supplied, with the same OK and MISSING messages; the header-disagreement pass still walks each headed plan in original glob order with the same `plan_r_ids_outside_headers` logic and the same `HEADER DISAGREES: satisfies` outcome, using the text already read in the first pass rather than re-reading files mid-run (the brief's undefended concurrent-edit case unchanged).
++
++## Noticed, not changed
++
++Nothing beyond the scoped duplicates; `VERSION` LF-only diff from make-manifest is expected and was not reverted.
++
++## Assumed, not verified
++
++Assumed, not verified: none.
+diff --git a/handoff/REFAC-006.md b/handoff/REFAC-006.md
+new file mode 100644
+index 0000000..b40bd72
+--- /dev/null
++++ b/handoff/REFAC-006.md
+@@ -0,0 +1,152 @@
++# REFAC-006: stage H1's two repeats go from conformance-check.py and completion-check.py
++
++## Objective
++Refactoring — remove duplication / simplify **without any change in behaviour**.
++
++This brief carries the second half of stage H1's refactoring pass of release B2 (the refactor scout's items 4 and 6): two repeats that TASK-048 and TASK-049 added to two bridge programs, and the manifest regenerated after them. Behaviour stays exactly the same: every printed line, every exit code. Line numbers below are as the files stand on branch `refactor/h1` at `1f124de` (the REFAC-005 commit), before your edit.
++
++**Item 1, `bridge/cursor-bridge/conformance-check.py`, `main`, lines 1287-1296.** The Development data verdict is decided along two paths, and the identical OK line and the identical MISSING line (with its long detail) are each written twice. Today's lines 1287-1296 read exactly:
++
++```python
++            # development data kept apart from live data: a Decisions row says how
++            if inv_dev_from_header is not None:
++                if inv_dev_from_header:
++                    add("OK", "Development data kept apart")
++                else:
++                    add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
++            elif bridge_env.inventory_development_data(inv_body_for_dev):
++                add("OK", "Development data kept apart")
++            else:
++                add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
++```
++
++They become: the comment line 1287 unchanged; one boolean, `dev_ok = bool(inv_dev_from_header) if inv_dev_from_header is not None else bridge_env.inventory_development_data(inv_body_for_dev)` (the conditional expression evaluates `bridge_env.inventory_development_data` only when `inv_dev_from_header is None`, exactly as the `elif` does today; keep that property); then one `if dev_ok:` with the `add("OK", "Development data kept apart")` line and one `else:` with the `add("MISSING", ...)` line, each written once, its text byte-identical to today's. The indentation stays that of the block (twelve spaces for the comment, the assignment and the `if`/`else`, sixteen for the `add` calls). Line 1297 (blank) and line 1298 (`    # --- every adapter of a listed provider ...`) stay byte-identical. Facts checked for this brief: `inv_dev_from_header` starts as `None` (line 1243) and is set only at line 1266 (`inv_dev_from_header = inv_hdr.get("development_data", "")`); `bridge_env.inventory_development_data(text)` (bridge_env.py lines 2993-3001) returns a string, `""` or the row's first cell stripped, and its one call in conformance-check.py, line 1293, uses that return for truthiness only. So `dev_ok` may be a string on the second path; it is only ever tested by `if dev_ok:`, never printed or compared.
++
++**Item 2, `bridge/cursor-bridge/completion-check.py`, `main`, lines 198-235.** When any plan carries a header, a second loop (lines 223-233) re-reads every plan file and re-runs `bridge_env.plan_header_findings` on it; its `if fatal or hdr is None: continue` can fire only on `hdr is None`, since the first loop (lines 205-220) has already returned 2 on any fatal finding. Today's lines 221-235 read exactly:
++
++```python
++        if has_build_plan_header:
++            disagree = False
++            for p in plans:
++                text = read(p)
++                fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
++                if fatal or hdr is None:
++                    continue
++                for rid in bridge_env.plan_r_ids_outside_headers(text):
++                    if rid not in header_union:
++                        disagree = True
++                        break
++                if disagree:
++                    break
++            if disagree:
++                fails.append("HEADER DISAGREES: satisfies")
++```
++
++It becomes: the first loop keeps, for each plan whose `hdr is not None`, its `text` in a list (one new local, for example `headed_texts`, initialised beside `satisfied`, `header_union` and `has_build_plan_header`); the disagreement loop iterates that list, calling `bridge_env.plan_r_ids_outside_headers(text)` on each as today, in the same plan order, with no second `read(p)` and no second `bridge_env.plan_header_findings` call. Everything else stays byte-identical: line 198 to line 210 (the glob, the first loop's read, its `plan_header_findings` call, `if fatal:`, `print(fatal[0])`, `return 2`), the header and body branches of the first loop apart from the one added append, `if has_build_plan_header:`, `disagree = False`, the line `                    if rid not in header_union:` at its present indentation (twenty spaces; a mutant anchors on it, so if the loop's nesting would change that indentation, keep the nesting that keeps it), `disagree = True`, the `break` lines, `if disagree:` and `fails.append("HEADER DISAGREES: satisfies")`, and the UNPLANNED loop (lines 236-238) and everything after it.
++
++**Item 3, `bridge/cursor-bridge/MANIFEST.json`:** regenerated once, after your last source edit, by `python tools/make-manifest.py --version 2026.11.09a`. The version stays `2026.11.09a`.
++
++**Callers to update:** none outside the two functions; both items change code inside `main` of each program only. No public signature changes, and no new function.
++
++Satisfies: no new requirement. This keeps as they are R-059 (the build plan's header read first by its readers, completion-check among them) and R-060 (the tabular records' headers read first by their readers, conformance-check's inventory reading among them), built by TASK-048 and TASK-049.
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/conformance-check.py
++- bridge/cursor-bridge/completion-check.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/BUILDER_NOTES.md
++- handoff/REFAC-006-r1-report.md
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration, pre-commit configuration, anything under `tools/` (you run `tools/make-manifest.py`; you do not edit it)
++- docs/ and handoff/, except the files the Scope section names; `docs/diagrams/` included: this change needs no diagram change (see Diagrams)
++- every file under `tests/`: no test file may be edited, renamed or created (`refactor-check.py` fails the branch on any test edit). The working tree may already show test files as modified by the supervisor before your run; leave them exactly as they are
++- `bridge/cursor-bridge/bridge_env.py`: `inventory_development_data`, `plan_header_findings`, `plan_r_ids_outside_headers` and everything else in it stay as they are
++- `bridge/cursor-bridge/VERSION`: it must still read `2026.11.09a` after `make-manifest.py` rewrites it; make-manifest writes it with an LF line ending, so `git status` may show it modified with no content change: report it, do not try to restore it
++- `run/supervisor/TASK-048-mutants.json`, `run/supervisor/TASK-049-mutants.json` and everything else under `run/`: the supervisor's, gitignored; they anchor exact text in these files and the supervisor re-anchors them after your run
++- `docs/CHANGES.md` and `bridge/cursor-bridge/CHANGELOG.md`: a refactoring has no change entry
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md`: no command changes
++- every other line of the two programs not named in the Objective, and every other file under `bridge/`
++
++## Context
++**What the code is today** (branch `refactor/h1`, head `1f124de`). Both product files have CRLF line endings on every line; keep them, and add no trailing whitespace. The facts in the Objective were checked against the code for this brief; you re-check them (Requirements 1) before you edit.
++
++**Byte-identical neighbours.** The supervisor's mutants anchor exact text in these files: `run/supervisor/TASK-048-mutants.json` (mutants c03, r10 and f03, in completion-check.py's plan block) and `run/supervisor/TASK-049-mutants.json` (mutants f05 and r20, in conformance-check.py above the Development data block). Every line you do not need to change stays byte-identical, in particular the lines next to each change: in conformance-check.py lines 1282-1287 (the Spending limit verdict and the comment) and 1297-1298; in completion-check.py lines 198-220 apart from the one added append and initialisation, and lines 221-222, 229-238 as they read today.
++
++**The one behaviour difference not defended.** Today the disagreement loop reads each plan file a second time; after this change it uses the text of the first read. The two differ only if a plan file changes on disk between the two reads within one run of the program. The program does not defend that case (it is a one-shot check over files that nothing writes during its run), so this is not a behaviour change this brief protects; do not add anything for it.
++
++**How the tests reach this code.** The test files in the Constraints load the Workspace sources (the programs by path, `bridge_env` from `bridge/cursor-bridge/`) and run them against folders under pytest's `tmp_path`. `tests/test_conformance_check.py` (lines 365, 386, 389), `tests/test_header_tables.py` (lines 205-206) and `tests/test_header_tables_r2.py` (line 153) read the `Development data kept apart` verdict on both paths; `tests/test_conformance_check_a4.py`, `tests/test_conformance_windowless.py` and `tests/test_b2_least_confident.py` run conformance-check.py on other fixtures. `tests/test_completion_check.py`, `tests/test_header_plan.py` (which also asserts by syntax tree that completion-check calls `bridge_env.plan_r_ids_outside_headers`, line 621), `tests/test_header_plan_r2.py` (a syntax-tree check of the `bridge_env` attributes completion-check uses, line 298), `tests/test_header_plan_r3.py` and `tests/test_bug038.py` run completion-check.py; `tests/test_header_status.py` and `tests/test_header_currency.py` cover the header readings of both.
++
++**The manifest.** `MANIFEST.json` holds a normalized sha256 (CRLF folded to LF, BOM dropped) of every file under `bridge/`. After your source edits it is stale for the two programs; `tools/make-manifest.py --version 2026.11.09a` rewrites `VERSION` (to `2026.11.09a` and a line feed) and the manifest, whose `generated` stamp changes. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` then compares the tree with it and prints `RESULT: SOURCES MATCH bridge 2026.11.09a`.
++
++**Security context.** These are logic surfaces (record parsing in two checks): `.cursor/rules/secure-coding.mdc` is in force for you, and the project's ASVS level is 2 (`docs/INVENTORY.md`, Decisions). The trust boundary here is the records a session or a builder writes (`docs/INVENTORY.md`, `docs/BUILD_PLAN*.md`), which these programs read; this change moves no boundary: every header check (the inventory header's reading, `plan_header_findings` with its `return 2` on a fatal finding) runs on the same input as today.
++
++**Development data** (`docs/INVENTORY.md`, Decisions): "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: the tests run the Workspace sources against pytest's temporary folders. Never run conformance-check.py or completion-check.py yourself against this repository's own records, and never run `bridge-install.py`.
++
++## Diagrams
++`docs/diagrams/D-002-components.md` — the elements `conformance_check`, `completion_check` and `bridge_env`. Each program keeps its existing import of `bridge_env` and gains no other; no edge is added or removed, so the diagram does not change. `docs/diagrams/D-005-header-schemas.md` (the header schemas) is untouched: no schema or reader of a header changes. **If the task cannot be done within them, stop and report the conflict (an objection) instead of deviating.**
++
++## Requirements
++1. **Checks first, before any edit; paste each command and its output in the report.** From the Workspace root, run `git grep -n -e inventory_development_data -e inv_dev_from_header -- bridge/cursor-bridge/conformance-check.py` and `git grep -n -e plan_header_findings -e plan_r_ids_outside_headers -e headed_texts -- bridge/cursor-bridge/completion-check.py`, and confirm: `inv_dev_from_header` is assigned only at lines 1243 and 1266; `inventory_development_data` is called once, at line 1293, as an `elif` condition; in completion-check.py `plan_header_findings` is called at lines 207 and 225 only and `plan_r_ids_outside_headers` at line 228 only; the name you choose for the new list is not already used in the file. Where a check does not hold, leave that item undone, say so in the report, and go on with the other.
++2. **Item 1.** conformance-check.py lines 1288-1296 become the one `dev_ok` assignment and the one `if`/`else` the Objective states; the comment line 1287 stays; each `add(...)` text stays byte-identical.
++3. **Item 2.** completion-check.py's first plan loop keeps the text of each headed plan; the disagreement loop iterates those texts with no second read and no second `plan_header_findings` call; every line the Objective names as staying, stays byte-identical.
++4. **Item 3.** After your last edit to a source file, run `python tools/make-manifest.py --version 2026.11.09a` once, then the bridge-check command in the Constraints.
++5. No other line of the two programs changes. Each file keeps its CRLF line endings and gains no trailing whitespace.
++
++## Acceptance criteria
++- [ ] Behaviour is identical: the same printed lines and exit codes for every input (the one undefended case is a plan file changed on disk during a run, see Context).
++- [ ] The named test files pass before and after the edit with the **same** test set: the same count passed, none failed, none newly skipped; both summary lines quoted in the report. None edited.
++- [ ] Each item is done, or reported as not applicable with the reason.
++- [ ] In conformance-check.py the string `"Development data kept apart"` appears exactly three times (the ImportError line 1275, the one OK line, the one MISSING line), and `rule 55; the design states it` once; `inventory_development_data` is called once, and only when `inv_dev_from_header is None`.
++- [ ] In completion-check.py `bridge_env.plan_header_findings` is called once, `read(p)` appears once, and `bridge_env.plan_r_ids_outside_headers` is called once; `fails.append("HEADER DISAGREES: satisfies")` and `                    if rid not in header_union:` are present byte-identical.
++- [ ] No public signature changed; no new function, no new import.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` ends with `0 FAIL` and exit 0.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH bridge 2026.11.09a`.
++- [ ] `python bridge/cursor-bridge/refactor-check.py HEAD --max-lines 400` prints a line starting `PURE:` (the base is the commit you were launched on: the branch already holds the supervisor's tests-lane commit, which a base of `origin/main` would count as a test edit).
++- [ ] `git diff --stat` shows only the three Scope product files (plus the report, if you wrote one the builder-notes line, and `bridge/cursor-bridge/VERSION` if make-manifest's LF rewrite shows it, reported as such); `bridge/cursor-bridge/bridge_env.py`, every file under `tests/` you did not find already modified, `docs/CHANGES.md` and `bridge/cursor-bridge/CHANGELOG.md` unchanged; no mutation script in the diff.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it. Run the Workspace copies of the bridge programs, as the commands below do, never a copy under a home folder.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms; `windowsHide: true` in Node). Capturing output does not prevent the window. A window is allowed only when it serves the user (they watch it or type into it); then write the reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path. This change launches no process and must not add one.
++- Never start a server, a watcher or a daemon that outlives a test: a test that needs the product running starts it through the test framework's own fixture and stops it there. A server left running keeps your run from ending (plan 10.3, release A2).
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. A development build uses the development data the design names (the inventory's `Development data` decision, stated in Context) and refuses the installed product's data. Here that means the Workspace sources and pytest's temporary folders only.
++- No value in this task is marked as the owner's.
++- Follow existing conventions in the files you touch.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff`, `git grep` and `git log` only.
++- Numbers from text, a file, a reply or an environment variable are parsed with the language's own parser, never by slicing or splitting a string. This change parses no number.
++- An increment that starts a process meets the process checklist (windowless, stopped in a `finally` or a fixture's teardown with its whole tree, nothing outlives the test or the command, a browser on Windows launched attached, pipes closed or drained). This change starts none.
++- Every verification command is written here in full. Run exactly these, each from the Workspace root (the folder you were started in), each in the foreground, never in the background; run pytest directly as written, never through a launcher:
++  - At the start: `git status --short` and `git rev-parse HEAD`, pasted into the report (they show which test files, if any, were already modified before your run).
++  - Before the edit, and again after the last edit: `python -m pytest -p no:cacheprovider -q -rs tests/test_conformance_check.py tests/test_conformance_check_a4.py tests/test_conformance_windowless.py tests/test_b2_least_confident.py tests/test_completion_check.py tests/test_bug038.py tests/test_header_tables.py tests/test_header_tables_r2.py tests/test_header_plan.py tests/test_header_plan_r2.py tests/test_header_plan_r3.py tests/test_header_status.py tests/test_header_currency.py`
++  - After the last source edit, in this order: `python tools/make-manifest.py --version 2026.11.09a`; `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`; `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`; `python bridge/cursor-bridge/refactor-check.py HEAD --max-lines 400`.
++  - At the end: `git status --short`, `git diff --stat` and `git rev-parse HEAD`, pasted into the report.
++  - Do not run the whole `tests/` tree or any other test file (a builder of this release that ran the whole tree reached its limit, ISS-030); the supervisor runs the full suite after your run. If a test fails before your edit, stop and report it; do not fix it. If `refactor-check.py` prints IMPURE naming only test files that `git status --short` already showed modified at the start, quote it, say so, and touch nothing.
++- Mutation checking is the supervisor's in this task: it re-anchors and re-runs its mutants after your run. Run no mutation, write no mutation script, and let none land in the diff.
++- Prefer reuse over new code and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability, or accessibility requirement stated above.
++- **Refactoring constraints.** Do not edit any test file. Do not add an entry to `docs/CHANGES.md`. Do not "improve" behaviour, messages, edge cases, or defaults you notice along the way; report them in your summary instead. Do not introduce an abstraction beyond what the listed duplicates need: the new names are the local `dev_ok` in conformance-check.py's `main` and one local list in completion-check.py's `main`; no helper function, nothing new in `bridge_env`.
++- **No computer path in the report.** Where quoted output holds the repository's absolute folder, write `<the Workspace>` in its place; paste no other absolute path of this machine.
++
++## Done
++Your report is the file `handoff/REFAC-006-r1-report.md`, which you write as you go (what you did, what you changed, what you ran and what it printed, what you could not do) so that nothing of it is lost when your run ends early. When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- for each of items 1, 2 and 3: done, or not applicable with the reason; the Requirements 1 grep commands with their output as the evidence;
++- the before and after outputs of the pytest command, with both summary lines;
++- the outputs of make-manifest, bridge-check, windowless-check and refactor-check, each line that shows the result quoted;
++- `git status --short`, `git diff --stat` and `git rev-parse HEAD` at the start and at the end, and whether the working tree held uncommitted changes then (say whether `bridge/cursor-bridge/VERSION` shows as modified, and that you left it);
++- one sentence stating why the behaviour is identical;
++- anything you noticed but did not change (per the refactoring constraints);
++- a final section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm (an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose). One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Every command you ran is quoted in the report with the lines it printed, verbatim (with `<the Workspace>` in place of the repository's folder), in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. A command you did not run is written `not run`, never described as run.
++
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_header_plan.py b/tests/test_header_plan.py
+index 26dff4f..060535c 100644
+--- a/tests/test_header_plan.py
++++ b/tests/test_header_plan.py
+@@ -609,27 +609,10 @@ def test_r059_the_guard_refuses_a_malformed_first_brief(tmp_path):
+ 
+ # ---------------------------------------------------------------- the retired readings (5), (6) and (11), as uses
+ 
+-def _tree(name):
+-    with open(os.path.join(BRIDGE, name), encoding="utf-8") as f:
+-        tree = ast.parse(f.read())
+-    for node in ast.walk(tree):                     # docstrings out: a description never matches (KP-073)
+-        if isinstance(node, (ast.Module, ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)) and node.body:
+-            first = node.body[0]
+-            if isinstance(first, ast.Expr) and isinstance(getattr(first, "value", None), ast.Constant) and isinstance(
+-                    first.value.value, str):
+-                node.body = node.body[1:] or [ast.Pass()]
+-    return tree
+-
+-
+-def _re_patterns(tree):
+-    out = []
+-    for node in ast.walk(tree):
+-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(
+-                node.func.value, ast.Name) and node.func.value.id == "re" and node.args:
+-            arg = node.args[0]
+-            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+-                out.append(arg.value)
+-    return out
++# The one copy of the syntax-tree helpers, docstrings out so a description never matches (KP-073; stage H1's
++# refactoring pass): tests/test_header_currency.py.
++from test_header_currency import code_tree as _tree  # noqa: E402
++from test_header_currency import re_patterns as _re_patterns  # noqa: E402
+ 
+ 
+ def test_r059_completion_check_keeps_no_satisfies_search_of_its_own():
+diff --git a/tests/test_header_run_parameters.py b/tests/test_header_run_parameters.py
+index ab00b70..b91b86b 100644
+--- a/tests/test_header_run_parameters.py
++++ b/tests/test_header_run_parameters.py
+@@ -77,10 +77,7 @@ def need(name):
+     return obj
+ 
+ 
+-def write(path, text):
+-    os.makedirs(os.path.dirname(str(path)), exist_ok=True)
+-    with open(str(path), "w", encoding="utf-8", newline="") as fh:
+-        fh.write(text)
++write = th.write  # one copy of the writer (stage H1's refactoring pass)
+ 
+ 
+ # ---------------------------------------------------------------- the fixture, prose and header from one table
+diff --git a/tests/test_header_run_parameters_r2.py b/tests/test_header_run_parameters_r2.py
+index de853e1..7a2738e 100644
+--- a/tests/test_header_run_parameters_r2.py
++++ b/tests/test_header_run_parameters_r2.py
+@@ -25,10 +25,7 @@ import test_header_run_parameters as t1  # noqa: E402  (round 1's fixtures, reus
+ INVENTORY_CHECK = os.path.join(BRIDGE, "inventory-check.py")
+ 
+ 
+-def need(name):
+-    obj = getattr(bridge_env, name, None)
+-    assert obj is not None, "bridge_env.%s is missing (TASK-050)" % name
+-    return obj
++need = t1.need  # one copy, the same TASK-050 message (stage H1's refactoring pass)
+ 
+ 
+ def without(prefix):
+diff --git a/tests/test_header_status.py b/tests/test_header_status.py
+index a81afb7..971fd4d 100644
+--- a/tests/test_header_status.py
++++ b/tests/test_header_status.py
+@@ -270,44 +270,10 @@ def test_r058_the_four_projects_fixtures_read_alike_by_header_and_by_fallback(na
+ 
+ # --- the retired readings, matched as uses (KP-073) -------------------------------------------------------------
+ 
+-def code_tree(program):
+-    with open(os.path.join(BRIDGE, program), encoding="utf-8") as f:
+-        tree = ast.parse(f.read())
+-    for node in ast.walk(tree):
+-        body = getattr(node, "body", None)
+-        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and body:
+-            first = body[0]
+-            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+-                node.body = body[1:] or [ast.Pass()]
+-    return tree
+-
+-
+-def names_used(tree):
+-    out = set()
+-    for node in ast.walk(tree):
+-        if isinstance(node, ast.Name):
+-            out.add(node.id)
+-        elif isinstance(node, ast.Attribute):
+-            out.add(node.attr)
+-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+-            out.add(node.name)
+-    return out
+-
+-
+-def constant_sets(tree):
+-    for node in ast.walk(tree):
+-        if isinstance(node, (ast.Tuple, ast.List, ast.Set)) and node.elts and \
+-                all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in node.elts):
+-            yield frozenset(e.value for e in node.elts)
+-
+-
+-def calls(tree, name):
+-    for node in ast.walk(tree):
+-        if isinstance(node, ast.Call):
+-            f = node.func
+-            called = f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else None)
+-            if called == name:
+-                yield [a.value for a in node.args if isinstance(a, ast.Constant)]
++# The one copy of the syntax-tree helpers (stage H1's refactoring pass): tests/test_header_currency.py.
++from test_header_currency import code_tree, constant_sets  # noqa: E402
++from test_header_currency import call_args as calls  # noqa: E402
++from test_header_currency import names as names_used  # noqa: E402
+ 
+ 
+ def test_r058_retired_1_session_starts_forgiving_workflows_parse():
+diff --git a/tests/test_header_tables.py b/tests/test_header_tables.py
+index 955ae3b..c485e25 100644
+--- a/tests/test_header_tables.py
++++ b/tests/test_header_tables.py
+@@ -472,26 +472,9 @@ def test_r060_a_malformed_table_header_is_refused(tmp_path, prog, record, args):
+ 
+ # ---------------------------------------------------------------- the retired readings, matched as uses
+ 
+-def code_tree(prog):
+-    """The program's syntax tree with its docstrings removed, so a comment or a docstring naming a reading never matches."""
+-    with open(PROGS[prog], encoding="utf-8") as fh:
+-        tree = ast.parse(fh.read())
+-    for node in ast.walk(tree):
+-        body = getattr(node, "body", None)
+-        if isinstance(body, list) and body and isinstance(body[0], ast.Expr) and isinstance(
+-                getattr(body[0], "value", None), ast.Constant) and isinstance(body[0].value.value, str):
+-            body.pop(0)
+-    return tree
+-
+-
+-def re_patterns(tree):
+-    """The constant first arguments of re.<function>(...) calls."""
+-    out = set()
+-    for n in ast.walk(tree):
+-        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) \
+-                and n.func.value.id == "re" and n.args and isinstance(n.args[0], ast.Constant):
+-            out.add(n.args[0].value)
+-    return out
++# The one copy of the syntax-tree helpers, docstrings out so a description never matches (KP-073; stage H1's
++# refactoring pass): tests/test_header_currency.py. PROGS' keys are the programs' file names under BRIDGE.
++from test_header_currency import code_tree, re_patterns  # noqa: E402
+ 
+ 
+ def test_r060_conformance_check_keeps_no_heading_word_guess():
