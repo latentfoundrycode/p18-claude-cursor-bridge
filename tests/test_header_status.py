@@ -270,44 +270,10 @@ def test_r058_the_four_projects_fixtures_read_alike_by_header_and_by_fallback(na
 
 # --- the retired readings, matched as uses (KP-073) -------------------------------------------------------------
 
-def code_tree(program):
-    with open(os.path.join(BRIDGE, program), encoding="utf-8") as f:
-        tree = ast.parse(f.read())
-    for node in ast.walk(tree):
-        body = getattr(node, "body", None)
-        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and body:
-            first = body[0]
-            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
-                node.body = body[1:] or [ast.Pass()]
-    return tree
-
-
-def names_used(tree):
-    out = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Name):
-            out.add(node.id)
-        elif isinstance(node, ast.Attribute):
-            out.add(node.attr)
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            out.add(node.name)
-    return out
-
-
-def constant_sets(tree):
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Tuple, ast.List, ast.Set)) and node.elts and \
-                all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in node.elts):
-            yield frozenset(e.value for e in node.elts)
-
-
-def calls(tree, name):
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call):
-            f = node.func
-            called = f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else None)
-            if called == name:
-                yield [a.value for a in node.args if isinstance(a, ast.Constant)]
+# The one copy of the syntax-tree helpers (stage H1's refactoring pass): tests/test_header_currency.py.
+from test_header_currency import code_tree, constant_sets  # noqa: E402
+from test_header_currency import call_args as calls  # noqa: E402
+from test_header_currency import names as names_used  # noqa: E402
 
 
 def test_r058_retired_1_session_starts_forgiving_workflows_parse():

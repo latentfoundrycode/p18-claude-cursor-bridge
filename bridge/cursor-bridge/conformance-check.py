@@ -1285,12 +1285,8 @@ def main():
             else:
                 add("OK", "Spending limit recorded")
             # development data kept apart from live data: a Decisions row says how
-            if inv_dev_from_header is not None:
-                if inv_dev_from_header:
-                    add("OK", "Development data kept apart")
-                else:
-                    add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")
-            elif bridge_env.inventory_development_data(inv_body_for_dev):
+            dev_ok = bool(inv_dev_from_header) if inv_dev_from_header is not None else bridge_env.inventory_development_data(inv_body_for_dev)
+            if dev_ok:
                 add("OK", "Development data kept apart")
             else:
                 add("MISSING", "Development data kept apart", "no Decisions row `Development data: ...` saying where the live data lives and how a development build is kept from it (rule 55; the design states it, every brief carries it); a product that has live data gets one increment that makes its development build refuse the installed data")

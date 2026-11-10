@@ -610,7 +610,7 @@ def known_deviations(path=DEVIATIONS, header=None, body=None):
         header = hdr
         if hdr is None:
             body = text
-        elif hdr is not None:
+        else:
             findings = bridge_env.check_header("deviations", hdr)
             if findings:
                 raise bridge_env.HeaderError(1, "; ".join(findings))

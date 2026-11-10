@@ -472,26 +472,9 @@ def test_r060_a_malformed_table_header_is_refused(tmp_path, prog, record, args):
 
 # ---------------------------------------------------------------- the retired readings, matched as uses
 
-def code_tree(prog):
-    """The program's syntax tree with its docstrings removed, so a comment or a docstring naming a reading never matches."""
-    with open(PROGS[prog], encoding="utf-8") as fh:
-        tree = ast.parse(fh.read())
-    for node in ast.walk(tree):
-        body = getattr(node, "body", None)
-        if isinstance(body, list) and body and isinstance(body[0], ast.Expr) and isinstance(
-                getattr(body[0], "value", None), ast.Constant) and isinstance(body[0].value.value, str):
-            body.pop(0)
-    return tree
-
-
-def re_patterns(tree):
-    """The constant first arguments of re.<function>(...) calls."""
-    out = set()
-    for n in ast.walk(tree):
-        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) \
-                and n.func.value.id == "re" and n.args and isinstance(n.args[0], ast.Constant):
-            out.add(n.args[0].value)
-    return out
+# The one copy of the syntax-tree helpers, docstrings out so a description never matches (KP-073; stage H1's
+# refactoring pass): tests/test_header_currency.py. PROGS' keys are the programs' file names under BRIDGE.
+from test_header_currency import code_tree, re_patterns  # noqa: E402
 
 
 def test_r060_conformance_check_keeps_no_heading_word_guess():

@@ -25,10 +25,7 @@ import test_header_run_parameters as t1  # noqa: E402  (round 1's fixtures, reus
 INVENTORY_CHECK = os.path.join(BRIDGE, "inventory-check.py")
 
 
-def need(name):
-    obj = getattr(bridge_env, name, None)
-    assert obj is not None, "bridge_env.%s is missing (TASK-050)" % name
-    return obj
+need = t1.need  # one copy, the same TASK-050 message (stage H1's refactoring pass)
 
 
 def without(prefix):

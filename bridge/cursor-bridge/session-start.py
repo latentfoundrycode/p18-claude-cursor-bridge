@@ -185,12 +185,12 @@ def status_candidates(cwd):
     return out
 
 
-def read_status(cwd):
+def read_status_file(cwd):
     for p in status_candidates(cwd):
         if os.path.isfile(p):
             with open(p, encoding="utf-8-sig", errors="replace") as f:
-                return f.read()
-    return None
+                return p, f.read()
+    return None, None
 
 
 def installed_version():
@@ -609,14 +609,7 @@ def main():
     if not isinstance(data, dict):
         data = {}
     cwd = data.get("cwd") or os.getcwd()
-    status_path = None
-    status = None
-    for p in status_candidates(cwd):
-        if os.path.isfile(p):
-            status_path = p
-            with open(p, encoding="utf-8-sig", errors="replace") as f:
-                status = f.read()
-            break
+    status_path, status = read_status_file(cwd)
     if status is None:
         return 0
     sv = supervisor_path()

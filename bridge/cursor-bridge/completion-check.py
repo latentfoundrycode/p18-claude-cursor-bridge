@@ -202,6 +202,7 @@ def main():
         satisfied = set()
         header_union = set()
         has_build_plan_header = False
+        headed_texts = []
         for p in plans:
             text = read(p)
             fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
@@ -210,6 +211,7 @@ def main():
                 return 2
             if hdr is not None:
                 has_build_plan_header = True
+                headed_texts.append(text)
                 for st in hdr.get("stages") or []:
                     for inc in st.get("increments") or []:
                         for rid in inc.get("satisfies") or []:
@@ -220,11 +222,7 @@ def main():
                 satisfied.update(bridge_env.plan_collect_satisfies_ids(body))
         if has_build_plan_header:
             disagree = False
-            for p in plans:
-                text = read(p)
-                fatal, _, hdr = bridge_env.plan_header_findings(p, text, None)
-                if fatal or hdr is None:
-                    continue
+            for text in headed_texts:
                 for rid in bridge_env.plan_r_ids_outside_headers(text):
                     if rid not in header_union:
                         disagree = True
