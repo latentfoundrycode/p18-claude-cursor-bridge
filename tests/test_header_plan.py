@@ -609,27 +609,10 @@ def test_r059_the_guard_refuses_a_malformed_first_brief(tmp_path):
 
 # ---------------------------------------------------------------- the retired readings (5), (6) and (11), as uses
 
-def _tree(name):
-    with open(os.path.join(BRIDGE, name), encoding="utf-8") as f:
-        tree = ast.parse(f.read())
-    for node in ast.walk(tree):                     # docstrings out: a description never matches (KP-073)
-        if isinstance(node, (ast.Module, ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)) and node.body:
-            first = node.body[0]
-            if isinstance(first, ast.Expr) and isinstance(getattr(first, "value", None), ast.Constant) and isinstance(
-                    first.value.value, str):
-                node.body = node.body[1:] or [ast.Pass()]
-    return tree
-
-
-def _re_patterns(tree):
-    out = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(
-                node.func.value, ast.Name) and node.func.value.id == "re" and node.args:
-            arg = node.args[0]
-            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                out.append(arg.value)
-    return out
+# The one copy of the syntax-tree helpers, docstrings out so a description never matches (KP-073; stage H1's
+# refactoring pass): tests/test_header_currency.py.
+from test_header_currency import code_tree as _tree  # noqa: E402
+from test_header_currency import re_patterns as _re_patterns  # noqa: E402
 
 
 def test_r059_completion_check_keeps_no_satisfies_search_of_its_own():

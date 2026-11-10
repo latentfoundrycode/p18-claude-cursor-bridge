@@ -77,10 +77,7 @@ def need(name):
     return obj
 
 
-def write(path, text):
-    os.makedirs(os.path.dirname(str(path)), exist_ok=True)
-    with open(str(path), "w", encoding="utf-8", newline="") as fh:
-        fh.write(text)
+write = th.write  # one copy of the writer (stage H1's refactoring pass)
 
 
 # ---------------------------------------------------------------- the fixture, prose and header from one table
