@@ -29,7 +29,9 @@ project.json are checked against the newest heading.
   the older programs reading the prose and never the header, and the lines the installed checkers printed over the
   migrated scratch copy (run/supervisor/task053_rollback_observe.py, run 2026-11-11), quoted: completion-check's search
   finding the same IDs, inventory-check's whole-file count before and after under both caps, and conformance-check's one
-  more NOTE; and that the allow entry it names is in settings.bridge.json.
+  more NOTE; the four older programs that read header lines as prose lines (the loop guard's and the session-start
+  hook's `phase:`, the conformance check's `phase:` and `stage:`, completion-check's `satisfies:`; Review A, round 1, B1)
+  and what a running project writes while rolled back; and that the allow entry it names is in settings.bridge.json.
 - test_r064_the_field_acceptance_names_its_stand_in enforces: the TDP's trial and its stand-in while it has no
   increment at the gate, and the two projects that calibrate when the owner resumes them.
 - test_r064_the_items_for_the_maintainer_are_listed enforces: the plan's three items.
@@ -177,6 +179,7 @@ def test_r064_every_running_projects_item_is_phase_marked_and_the_items_are_name
         "the status file's caps count the body after the header",
         "`HEADER DISAGREES: <key>`",
         "`HEADER MALFORMED: <path>:<line> <what>`",
+        "at the line the message names for a header that cannot be read, at the keys it names for one that breaks its schema",
         "`refused - header: `",
         "a stop, never a model's failure",
         "`historic: true`",
@@ -194,7 +197,7 @@ def test_r064_if_rolled_back_quotes_the_observed_lines():
         "`bridge-install.py --rollback`",
         "`" + MIGRATE_RULE + "`",
         "falls to the classifier until the reinstall",
-        "read the prose and never the header",
+        "The older programs know nothing of the header and read the prose, but four of them read lines of the header as prose lines",
         "a scratch copy of this repository's records",
         "never the live records",
         "the same IDs",
@@ -205,6 +208,13 @@ def test_r064_if_rolled_back_quotes_the_observed_lines():
         "`conformance-check: 24 OK, 0 MISSING, 2 NOTE`",
         "`conformance-check: 24 OK, 0 MISSING, 3 NOTE`",
         "`HEADER DISAGREES: <key>`",
+        "read the status header's `phase:` line as its `Phase:` line",
+        "reads that line and the header's `stage:` line as `Phase:` and `Stage:`",
+        "reads the plan header's `satisfies:` lists beside the prose's `Satisfies:` lines",
+        "shaped first as TASK-054 will shape this repository's",
+        "where header and prose held the same values",
+        "is written in the header's `phase:` or `stage:` line as well as its prose line",
+        "the loop guard refusing stops as in the old phase and the hook naming the old phase's modules",
     ):
         assert words in joined, words
     for checker in ("`completion-check.py --mode plan`", "`plan-check.py`", "`diagram-check.py --mode code`",
