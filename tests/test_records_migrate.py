@@ -60,7 +60,6 @@ PROGRAM = os.path.join(BRIDGE, "records-migrate.py")
 DASH = "—"
 ARROW = "→"
 PREFIXES = ("would write ", "has a header ", "cannot read ", "cannot write ")
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def git_env():
@@ -72,14 +71,13 @@ def migrate(cwd, *args):
     """Run records-migrate.py from cwd; (exit code, stdout and stderr)."""
     assert os.path.isfile(PROGRAM), "bridge/cursor-bridge/records-migrate.py is missing (TASK-051)"
     p = subprocess.run([sys.executable, PROGRAM] + [str(a) for a in args], cwd=str(cwd), capture_output=True,
-                       text=True, encoding="utf-8", errors="replace", env=git_env(), timeout=120,
-                       creationflags=NO_WINDOW)
+                       text=True, encoding="utf-8", errors="replace", env=git_env(), timeout=120)
     return p.returncode, p.stdout + p.stderr
 
 
 def git(repo, *args):
     p = subprocess.run(["git"] + list(args), cwd=str(repo), capture_output=True, text=True, env=git_env(),
-                       timeout=120, creationflags=NO_WINDOW)
+                       timeout=120)
     assert p.returncode == 0, p.stderr
     return p.stdout.strip()
 
@@ -1048,3 +1046,189 @@ def test_r062_a_failed_read_back_exits_3_and_leaves_the_records_untouched(tmp_pa
 
 
 # ---------------------------------------------------------------- builder's cases below this line
+
+
+def test_r062_ruling7_folder_and_record_paths_together_refused(tmp_path):
+    """R16 / ruling 7: a project root and record paths together exit 2."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    before = snapshot(root)
+    code, out = migrate(root, root, "docs/INVENTORY.md")
+    assert code == 2, out
+    assert "not both" in out
+    assert snapshot(root) == before
+
+
+def test_r062_ruling6_report_and_resolution_are_not_record_kinds(tmp_path):
+    """R16 / ruling 6: report and resolution paths are not a record kind; exit unchanged."""
+    root = project(tmp_path, list(NOT_BRIEFS))
+    targets = ("handoff/TASK-007-report.md", "handoff/RESOLUTION-x.md")
+    code, out = migrate(root, *targets)
+    assert code == 0, out
+    for rel in targets:
+        assert "cannot read %s: not a record kind" % rel in out, out
+
+
+def test_r062_ruling1_wrote_line_on_enumerated_run(tmp_path):
+    """R16 / ruling 1: a successful run prints wrote for an enumerated record (relative path)."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    code, out = migrate(root)
+    assert code == 0, out
+    assert listed(out, "wrote ", "docs/INVENTORY.md") == [""], out
+
+
+def test_r062_ruling2_given_path_shown_as_given(tmp_path):
+    """R16 / ruling 2: a given record path is shown exactly as given."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    given = "docs\\INVENTORY.md"
+    code, out = migrate(root, given)
+    assert code == 0, out
+    assert any(line.startswith("wrote ") and given.replace("\\", "/") in line.replace("\\", "/") for line in out.splitlines()), out
+
+
+def test_r062_ruling8_disagreeing_header_left_unchanged(tmp_path):
+    """R16 / ruling 8: a well-formed header that disagrees with prose stays byte-identical."""
+    disagree = ("---\nrecord: brief\nheader: 1\nid: TASK-007\nround: 1\nsatisfies: [R-999]\nscope: []\n"
+                "merge_unit: null\nblocking_class: null\n---\n").encode("utf-8") + b(BRIEF)
+    root = project(tmp_path, [("handoff/TASK-007.md", disagree)])
+    code, out = migrate(root, "handoff/TASK-007.md")
+    assert code == 0, out
+    assert read(root, "handoff/TASK-007.md") == disagree
+    assert listed(out, "has a header ", "handoff/TASK-007.md") == [""], out
+
+
+def test_r062_ruling10_header_malformed_line_form(tmp_path):
+    """R16 / ruling 10: HEADER MALFORMED uses path and finding after a colon."""
+    bad = MALFORMED["schema"]
+    root = project(tmp_path, [("handoff/TASK-009.md", bad)])
+    code, out = migrate(root, "handoff/TASK-009.md")
+    assert code == 2, out
+    line = next(l for l in out.splitlines() if l.startswith("HEADER MALFORMED:"))
+    assert line.startswith("HEADER MALFORMED: handoff/TASK-009.md:"), line
+
+
+def test_r062_ruling3_lines_cap_message_exact(tmp_path):
+    """R16 / ruling 3: the lines cap message names lines and the older cap."""
+    rel = "docs/PROJECT_STATUS.md"
+    root = project(tmp_path, [(rel, status_over_lines())])
+    code, out = migrate(root, rel)
+    assert code == 1, out
+    reason = listed(out, "cannot write ", rel)[0]
+    m = re.fullmatch(r"(\d+) lines with the header, over the older cap; trim the body first", reason)
+    assert m and int(m.group(1)) > 120, out
+
+
+def test_r062_ruling5_scope_refusal_carries_parse_scope_value(tmp_path):
+    """R16 / ruling 5: a brief Scope refusal prints parse_scope's refusal string."""
+    root = project(tmp_path, [("handoff/TASK-020.md", ELLIPSIS_BRIEF)])
+    _paths, refusal, _u = bridge_env.parse_scope(ELLIPSIS_BRIEF.decode("utf-8"))
+    code, out = migrate(root, "handoff/TASK-020.md")
+    assert code == 0, out
+    assert listed(out, "cannot read ", "handoff/TASK-020.md") == [refusal], out
+
+
+def test_r062_r062_brief_name_grammar_refused(tmp_path):
+    """R16: a brief whose file name parse_review_name refuses is cannot-read."""
+    bad_name = "TASK-001-r0.md"
+    root = project(tmp_path, [(("handoff/%s" % bad_name).replace("\\", "/"), b("# TASK\n\n## Scope\n- a.py\n"))])
+    rel = "handoff/TASK-001-r0.md"
+    code, out = migrate(root, rel)
+    assert code == 0, out
+    assert "grammar" in listed(out, "cannot read ", rel)[0], out
+
+
+def test_r062_ruling4_historic_increment_keeps_satisfies_list(tmp_path):
+    """R16 / ruling 4: a merged historic increment with Satisfies in prose keeps that list in the header."""
+    plan = b("""# Build plan
+
+## Stage 1
+Demonstration: x
+
+### TASK-003 — old work
+Depends on: none
+Satisfies: R-003
+Parent: none
+""".replace("\n", "\n"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    git(repo, "checkout", "-q", "-b", "main")
+    (repo / "README.md").write_bytes(b"x\n")
+    git(repo, "add", "README.md")
+    git(repo, "commit", "-q", "-m", "initial")
+    git(repo, "checkout", "-q", "-b", "done")
+    git(repo, "commit", "--allow-empty", "-q", "-m", "TASK-003: merged (#1)")
+    git(repo, "checkout", "-q", "main")
+    write(repo, "docs/BUILD_PLAN.md", plan)
+    code, out = migrate(repo, "--base", "done", "docs/BUILD_PLAN.md")
+    assert code == 0, out
+    header, _ = assert_migrated("build-plan", "docs/BUILD_PLAN.md", plan, read(repo, "docs/BUILD_PLAN.md"))
+    inc = header["stages"][0]["increments"][0]
+    assert inc["historic"] is True
+    assert inc["satisfies"] == ["R-003"]
+
+
+def test_r062_os_replace_failure_exits_3(tmp_path, monkeypatch):
+    """R16: os.replace OSError exits 3, record untouched, no temp file left."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    record = os.path.join(str(root), "docs", "INVENTORY.md")
+    before = read(root, "docs/INVENTORY.md")
+    mod = load_migrate()
+    folder = os.path.dirname(record)
+
+    def boom(src, dst, *a, **k):
+        raise PermissionError(13, "denied")
+
+    monkeypatch.chdir(str(root))
+    monkeypatch.setattr(os, "replace", boom)
+    code = call_main(mod, ["docs/INVENTORY.md"])
+    monkeypatch.undo()
+    assert code == 3
+    assert read(root, "docs/INVENTORY.md") == before
+    left = [n for n in os.listdir(folder) if n.startswith(".records-migrate-")]
+    assert not left
+
+
+def test_r062_failed_read_back_removes_temporary(tmp_path, monkeypatch):
+    """R16: a failed read-back removes the temporary file and leaves the record unchanged."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    before = read(root, "docs/INVENTORY.md")
+    mod = load_migrate()
+    folder = os.path.dirname(os.path.join(str(root), "docs", "INVENTORY.md"))
+    real_open = builtins.open
+    calls = {"n": 0}
+
+    def count_open(file, mode="r", *args, **kwargs):
+        if any(c in mode for c in "wax+"):
+            if os.path.dirname(os.path.abspath(str(file))) == os.path.abspath(folder):
+                if ".records-migrate-" in str(file):
+                    calls["n"] += 1
+        return real_open(file, mode, *args, **kwargs)
+
+    def bad_check(kind, header):
+        if calls["n"] >= 1:
+            return ["synthetic failure"]
+        return bridge_env.check_header(kind, header)
+
+    monkeypatch.chdir(str(root))
+    monkeypatch.setattr(builtins, "open", count_open)
+    monkeypatch.setattr(bridge_env, "check_header", bad_check)
+    code = call_main(mod, ["docs/INVENTORY.md"])
+    monkeypatch.undo()
+    assert code == 3
+    assert read(root, "docs/INVENTORY.md") == before
+    assert not [n for n in os.listdir(folder) if n.startswith(".records-migrate-")]
+
+
+@pytest.mark.parametrize("rel", ["docs/INVENTORY.md", "docs/RUN_PARAMETERS.md"], ids=["inventory", "run-parameters"])
+def test_r062_check_would_write_only_when_write_succeeds(tmp_path, rel):
+    """R16: --check prints would write only for records the run can write."""
+    root = project(tmp_path, [rel])
+    code_chk, out_chk = migrate(root, "--check")
+    assert code_chk == 1
+    assert listed(out_chk, "would write ", rel) == [""]
+    before = snapshot(root)
+    code_run, out_run = migrate(root)
+    assert code_run == 0
+    assert snapshot(root) != before
+    assert not listed(out_run, "would write ", rel)
+    assert not listed(out_run, "cannot write ", rel)

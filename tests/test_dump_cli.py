@@ -31,7 +31,7 @@ MD_REL = "docs/CLI_REFERENCE.md"
 EXTRACTED = ("completion-check.py", "diagram-check.py", "evaluate-reports.py", "inventory-check.py", "plan-check.py",
              "sync-check.py")
 ARGPARSE = EXTRACTED + ("workflow-check.py", "trace-check.py", "records-check.py", "stage-diff.py", "mutation-run.py",
-             "pace-report.py")
+             "pace-report.py", "records-migrate.py")
 ACTION_KEYS = {"option_strings", "dest", "nargs", "type", "default", "required", "choices", "help"}
 CHECK_CMD = "python tools/dump-cli.py --check"
 BRIDGE_PLACEHOLDER = "<bridge folder>/"
