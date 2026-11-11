@@ -1045,6 +1045,348 @@ def test_r062_a_failed_read_back_exits_3_and_leaves_the_records_untouched(tmp_pa
         assert after[rel] == before[rel], rel
 
 
+# ---------------------------------------------------------------- round 2: the reviewers' findings on round 1
+
+BOM = b"\xef\xbb\xbf"
+
+
+def temporaries_under(root):
+    """Every file under root whose name marks it as the migration's temporary file."""
+    found = []
+    for dirpath, _dirs, files in os.walk(str(root)):
+        found += [os.path.join(dirpath, n) for n in files if ".records-migrate-" in n]
+    return found
+
+
+def cannot_read_reasons(out, given):
+    """The reasons of every `cannot read <path>: <reason>` line whose path is `given` (slashes and a trailing
+    separator aside)."""
+    want = given.replace("\\", "/").rstrip("/")
+    hits = []
+    for line in out.splitlines():
+        if not line.startswith("cannot read "):
+            continue
+        rest = line[len("cannot read "):]
+        cut = rest.find(": ")
+        if cut >= 0 and rest[:cut].replace("\\", "/").rstrip("/") == want:
+            hits.append(rest[cut + 2:])
+    return hits
+
+
+def test_r062_r2_a_bom_before_a_valid_header_is_a_header(tmp_path):
+    """Security audit and Review A, round 1 (convergent, blocking): a record beginning with a byte-order mark and
+    then a well-formed header was read as header-less and a second header stacked above it. Enforces R-062, the
+    brief's R5 and R12: such a record `has a header <path>`, --check exits 0, the run leaves it byte-identical."""
+    data = BOM + HEADED_REQUIREMENTS
+    root = project(tmp_path, [("docs/REQUIREMENTS.md", data)])
+    code, out = migrate(root, "--check")
+    assert code == 0, out
+    assert listed(out, "has a header ", "docs/REQUIREMENTS.md") == [""], out
+    code, out = migrate(root)
+    assert code == 0, out
+    assert listed(out, "has a header ", "docs/REQUIREMENTS.md") == [""], out
+    assert read(root, "docs/REQUIREMENTS.md") == data
+
+
+def test_r062_r2_a_bom_before_a_malformed_header_is_refused(tmp_path):
+    """Security audit and Review A, round 1 (convergent, blocking): a byte-order mark before a malformed header hid
+    it, and a good header was stacked over the malformed one. Enforces R-062, the brief's R5: `HEADER MALFORMED`
+    naming the path, exit 2, the record byte-identical, with and without --check."""
+    data = BOM + b("---\nrecord: bogus\nheader: 1\n---\n" + REQUIREMENTS)
+    root = project(tmp_path, [("docs/REQUIREMENTS.md", data)])
+    for args in (("--check",), ()):
+        code, out = migrate(root, *args)
+        assert code == 2, out
+        assert [l for l in out.splitlines() if "HEADER MALFORMED" in l and "REQUIREMENTS.md" in l], out
+        assert read(root, "docs/REQUIREMENTS.md") == data
+
+
+def test_r062_r2_a_bom_stays_first_above_the_written_header(tmp_path):
+    """Review A, round 1: a header-less record beginning with a byte-order mark got its header above the mark, so
+    the mark ended mid-file (U+FEFF at the start of the body). Enforces R-062, the brief's R7: the mark stays the
+    file's first bytes, the header follows it, everything after the original mark is byte-identical below the
+    header, and the body read back (decode_record_bytes, read_header) holds no U+FEFF."""
+    original = BOM + FIXTURES["docs/INVENTORY.md"][1]
+    root = project(tmp_path, [("docs/INVENTORY.md", original)])
+    code, out = migrate(root)
+    assert code == 0, out
+    new = read(root, "docs/INVENTORY.md")
+    assert new.startswith(BOM + b"---"), new[:40]
+    assert_migrated("inventory", "docs/INVENTORY.md", original[len(BOM):], new[len(BOM):])
+    header, body = bridge_env.read_header(bridge_env.decode_record_bytes(new))
+    assert header is not None
+    assert "\ufeff" not in body
+
+
+def test_r062_r2_a_value_the_subset_refuses_stops_with_exit_3_and_no_traceback(tmp_path):
+    """Security audit and Review A, round 1 (convergent, blocking): a composed value the subset reader refuses (a
+    control character in a status field) raised HeaderError out of the read-back: a traceback, the temporary file
+    left, --check exiting 1. Enforces R-062, the brief's R10 and R12: the run exits 3 with no traceback, the record
+    byte-identical, no temporary file left under the root; --check exits 3, not 1, with no traceback."""
+    text = STATUS.replace("Stage: H2 %s the migration" % DASH, "Stage: H2" + chr(0x0B) + "two")
+    assert chr(0x0B) in text
+    data = b(text)
+    root = project(tmp_path, [("docs/PROJECT_STATUS.md", data)])
+    code, out = migrate(root)
+    assert code == 3, out
+    assert "Traceback" not in out, out
+    assert read(root, "docs/PROJECT_STATUS.md") == data
+    assert temporaries_under(root) == []
+    code, out = migrate(root, "--check")
+    assert code == 3, out
+    assert "Traceback" not in out, out
+    assert read(root, "docs/PROJECT_STATUS.md") == data
+    assert temporaries_under(root) == []
+
+
+@pytest.mark.parametrize("case", ["missing-record", "missing-root"], ids=["missing-record", "missing-root"])
+def test_r062_r2_a_given_path_that_does_not_exist_is_listed(tmp_path, case):
+    """Review A, round 1 (blocking): a given record path or root folder that does not exist was skipped in
+    silence, exit 0. Enforces R-062, the brief's R2 and R12: it is listed `cannot read <path>: <reason>` (a
+    non-empty reason), the exit unchanged (0 for --check and for the run when nothing else is listed)."""
+    root = project(tmp_path, [])
+    given = "docs/INVENTORY.md" if case == "missing-record" else str(tmp_path / "absent-root")
+    for args in (("--check", given), (given,)):
+        code, out = migrate(root, *args)
+        assert code == 0, out
+        reasons = cannot_read_reasons(out, given)
+        assert len(reasons) == 1 and reasons[0].strip(), out
+    assert snapshot(root) == {}
+
+
+STATUS_MIN = "# Project Status\nPhase: building\nAwaiting user on: nothing\n"
+STATUS_MIN_HEADER = ('---\nrecord: project-status\nheader: 1\nphase: building\nworkflows: []\nawaiting_user_on: ""\n'
+                     'bridge_version: ""\nstage: ""\nopen_issues: []\n---\n')
+
+
+def status_lf_total(total):
+    """A small status file of 100 lines whose text with its header (STATUS_MIN_HEADER, the subset's one form for
+    these values) counts `total` characters with universal newlines."""
+    lines = 97
+    room = total - len(STATUS_MIN_HEADER) - len(STATUS_MIN) - lines * len("Note 001: \n")
+    q, r = divmod(room, lines)
+    body = STATUS_MIN + "".join("Note %03d: %s\n" % (i + 1, "x" * (q + (1 if i < r else 0))) for i in range(lines))
+    assert len(body) + len(STATUS_MIN_HEADER) == total and body.count("\n") == 100
+    return body
+
+
+def test_r062_r2_the_older_cap_counts_a_crlf_status_with_universal_newlines(tmp_path):
+    """Review A, round 1 (blocking): the older cap counted a CRLF line ending as two characters, where the older
+    inventory-check read the file with universal newlines. Enforces R-062, the brief's R11: a CRLF status file of
+    11,950 characters with its header, counted with universal newlines (over 12,000 with the CRs), is written; one
+    of 12,050 is still refused, `cannot write <path>: <n> characters ...`, unchanged."""
+    rel = "docs/PROJECT_STATUS.md"
+    under = b(status_lf_total(11950), crlf=True)
+    assert len(under.decode("utf-8")) + len(STATUS_MIN_HEADER) + STATUS_MIN_HEADER.count("\n") > 12000
+    root = project(tmp_path, [(rel, under)])
+    code, out = migrate(root)
+    assert code == 0, out
+    assert not listed(out, "cannot write ", rel), out
+    assert_migrated("project-status", rel, under, read(root, rel))
+    over = b(status_lf_total(12050), crlf=True)
+    root = project(tmp_path, [(rel, over)], name="over")
+    code, out = migrate(root)
+    assert code == 1, out
+    got = listed(out, "cannot write ", rel)
+    assert len(got) == 1 and re.match(r"\d+ characters with the header", got[0]), out
+    assert read(root, rel) == over
+
+
+DIGIT_CASES = {
+    "status-stage": ("docs/PROJECT_STATUS.md", "project-status",
+                     b(STATUS.replace("Stage: H2 %s the migration" % DASH, "Stage: 3"))),
+    "plan-stage": ("docs/BUILD_PLAN.md", "build-plan",
+                   b("# Build plan\n\n## 3\nDemonstration: it runs.\n\n### TASK-001 %s the reader\nDepends on: none\n"
+                     "Scope: src/reader.py\nSatisfies: R-001\n" % DASH)),
+}
+
+
+@pytest.mark.parametrize("case", list(DIGIT_CASES), ids=list(DIGIT_CASES))
+def test_r062_r2_a_string_of_digits_is_written_as_a_string(tmp_path, case):
+    """Review A, round 1: a string of digits (a status `Stage: 3`, a plan stage `## 3`) was written plain, read
+    back as an integer, and the read-back failed. Enforces R-062, the brief's R7: it is migrated, exit 0, the header
+    value the string "3"."""
+    rel, kind, data = DIGIT_CASES[case]
+    root = project(tmp_path, [(rel, data)])
+    code, out = migrate(root)
+    assert code == 0, out
+    header, _head = assert_migrated(kind, rel, data, read(root, rel))
+    value = header["stage"] if kind == "project-status" else header["stages"][0]["name"]
+    assert type(value) is str and value == "3", repr(value)
+
+
+def test_r062_r2_a_second_folder_is_refused_with_a_line(tmp_path):
+    """Review A, round 1: a second folder exited 2 in silence. Enforces R-062, the brief's R2 and R12: exit 2 and a
+    non-empty line saying why."""
+    one = project(tmp_path, ["docs/INVENTORY.md"], name="one")
+    two = project(tmp_path, ["docs/INVENTORY.md"], name="two")
+    code, out = migrate(tmp_path, one, two)
+    assert code == 2, out
+    assert [l for l in out.splitlines() if l.strip()], "exit 2 with no line"
+
+
+def test_r062_r2_an_unbalanced_scope_is_reported_before_the_merged_set_is_read(tmp_path):
+    """Review A, round 1: the merged set was read before the unbalanced-parenthesis check, so a plan holding both an
+    unbalanced Scope and a field-less increment, in a folder with no git history, was listed `merged set
+    unreadable`. Enforces R-062, the brief's R8 ("Before any of this"): `cannot read <path>: unbalanced parenthesis
+    in TASK-001's Scope`, not `merged set unreadable`, the plan untouched."""
+    data = UNBALANCED_PLAN + b("\n### TASK-002 %s an old one\nWritten before the plan had fields.\n" % DASH)
+    root = project(tmp_path, [("docs/BUILD_PLAN.md", data)])
+    for args in (("--check",), ()):
+        code, out = migrate(root, *args)
+        assert code == 0, out
+        assert listed(out, "cannot read ", "docs/BUILD_PLAN.md") == ["unbalanced parenthesis in TASK-001's Scope"], out
+        assert "merged set unreadable" not in out, out
+        assert read(root, "docs/BUILD_PLAN.md") == data
+
+
+@pytest.mark.parametrize("first", ["----", "--- "], ids=["four-dashes", "dashes-space"])
+def test_r062_r2_a_first_line_like_a_header_opening_is_never_silent(tmp_path, first):
+    """Review A, round 1: a file whose first line starts with `---` but is not `---` exactly (`----`, `--- `) was
+    skipped in silence. Enforces R-062, the brief's R12 (one line per record): --check lists it with one of the four
+    line kinds, and the run names it on a line."""
+    data = b(first + "\n" + INVENTORY)
+    root = project(tmp_path, [("docs/INVENTORY.md", data)])
+    code, out = migrate(root, "--check")
+    assert len(every_listing(out, "docs/INVENTORY.md")) == 1, out
+    code, out = migrate(root)
+    assert [l for l in out.splitlines() if "INVENTORY.md" in l], out
+
+
+class _FullDiskFile:
+    """A file opened for writing whose every write fails as on a full disk."""
+
+    def __init__(self, f):
+        self._f = f
+
+    def write(self, data):
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    def writelines(self, lines):
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    def close(self):
+        self._f.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self._f.close()
+        return False
+
+    def __getattr__(self, name):
+        return getattr(self._f, name)
+
+
+def test_r062_r2_a_write_failing_after_the_open_leaves_no_temporary_file(tmp_path, monkeypatch, capsys):
+    """Review A, round 1: the temporary file was not removed when its write failed after the open had created it.
+    Enforces R-062, the brief's R10: exit 3, the record byte-identical, no temporary file left."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    record = norm(os.path.join(str(root), "docs", "INVENTORY.md"))
+    folder = os.path.dirname(record)
+    before = read(root, "docs/INVENTORY.md")
+    mod = load_migrate()
+    real_open = builtins.open
+    hits = []
+
+    def open_then_fail(file, mode="r", *args, **kwargs):
+        f = real_open(file, mode, *args, **kwargs)
+        if any(c in mode for c in "wax+") and (isinstance(file, int) or
+                                                (norm(file) != record and os.path.dirname(norm(file)) == folder)):
+            hits.append(file)
+            return _FullDiskFile(f)
+        return f
+
+    monkeypatch.chdir(str(root))
+    monkeypatch.setattr(builtins, "open", open_then_fail)
+    monkeypatch.setattr(io, "open", open_then_fail)
+    try:
+        code = call_main(mod, ["docs/INVENTORY.md"])
+    finally:
+        monkeypatch.undo()
+    capsys.readouterr()
+    assert hits, "no temporary file was opened for writing in the record's folder"
+    assert code == 3
+    assert read(root, "docs/INVENTORY.md") == before
+    assert sorted(os.listdir(os.path.join(str(root), "docs"))) == ["INVENTORY.md"]
+
+
+def test_r062_r2_a_record_that_cannot_be_opened_is_listed(tmp_path, monkeypatch, capsys):
+    """Review A, round 1: an OSError opening a record (PermissionError) escaped as a traceback. Enforces R-062, the
+    brief's R12: `cannot read <path>: <reason>`, no exception out of main, the exit unchanged (0)."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    record = norm(os.path.join(str(root), "docs", "INVENTORY.md"))
+    before = read(root, "docs/INVENTORY.md")
+    mod = load_migrate()
+    real_open = builtins.open
+
+    def denied_open(file, mode="r", *args, **kwargs):
+        if not isinstance(file, int) and not any(c in mode for c in "wax+") and norm(file) == record:
+            raise PermissionError(errno.EACCES, "Permission denied", os.fspath(file))
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.chdir(str(root))
+    monkeypatch.setattr(builtins, "open", denied_open)
+    monkeypatch.setattr(io, "open", denied_open)
+    try:
+        code = call_main(mod, ["docs/INVENTORY.md"])
+    except Exception as exc:  # the finding: the exception escaped
+        monkeypatch.undo()
+        pytest.fail("main raised %r" % (exc,))
+    monkeypatch.undo()
+    out = capsys.readouterr().out
+    reasons = listed(out, "cannot read ", "docs/INVENTORY.md")
+    assert len(reasons) == 1 and reasons[0].strip(), out
+    assert code == 0
+    assert read(root, "docs/INVENTORY.md") == before
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="a backslash separates folders on Windows only")
+def test_r062_r2_a_given_path_with_backslashes_is_shown_as_given(tmp_path):
+    """Review A, round 1: a given path written with backslashes was shown with forward slashes. Enforces R-062, the
+    brief's R4 (ruling 2): its line shows the path exactly as given, backslashes kept."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    code, out = migrate(root, "--check", "docs\\INVENTORY.md")
+    assert code == 1, out
+    assert "would write docs\\INVENTORY.md" in out.splitlines(), out
+
+
+def test_r062_r2_a_build_plan_name_below_a_subfolder_of_docs_is_no_kind(tmp_path):
+    """Review A, round 1: the kind rule took any `docs/**/BUILD_PLAN*.md` as a plan. Enforces R-062, the brief's R3
+    (every `docs/BUILD_PLAN*.md`, directly under docs/): a given `docs/sub/BUILD_PLAN.md` is listed `cannot read
+    <path>: not a record kind`, the exit unchanged, the file untouched."""
+    rel = "docs/sub/BUILD_PLAN.md"
+    root = project(tmp_path, [(rel, FIXTURES["docs/BUILD_PLAN.md"][1])])
+    for args in (("--check", rel), (rel,)):
+        code, out = migrate(root, *args)
+        assert code == 0, out
+        assert listed(out, "cannot read ", rel) == ["not a record kind"], out
+        assert read(root, rel) == FIXTURES["docs/BUILD_PLAN.md"][1]
+
+
+def test_r062_r2_a_record_that_is_a_symbolic_link_is_not_followed(tmp_path):
+    """The supervisor's round 2 case list, on the security audit's boundary (the program writes no file but the
+    record and its temporary file): a record that is a symbolic link was read through the link and replaced.
+    Enforces R-062, the brief's R10 and R12: it is listed `cannot read <path>: <reason>`, the link and its target
+    untouched, the exit unchanged."""
+    root = project(tmp_path, [("store/inventory-target.md", FIXTURES["docs/INVENTORY.md"][1])])
+    target = os.path.join(str(root), "store", "inventory-target.md")
+    link = os.path.join(str(root), "docs", "INVENTORY.md")
+    os.makedirs(os.path.dirname(link))
+    try:
+        os.symlink(target, link)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip("this account cannot create a symbolic link: %s" % exc)
+    for args in (("--check",), ()):
+        code, out = migrate(root, *args)
+        assert code == 0, out
+        reasons = listed(out, "cannot read ", "docs/INVENTORY.md")
+        assert len(reasons) == 1 and reasons[0].strip(), out
+        assert os.path.islink(link)
+        assert read(root, "store/inventory-target.md") == FIXTURES["docs/INVENTORY.md"][1]
+
+
 # ---------------------------------------------------------------- builder's cases below this line
 
 
