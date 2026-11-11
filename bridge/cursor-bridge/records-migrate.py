@@ -104,6 +104,10 @@ def _format_flow_list(items):
     return "[%s]" % ", ".join(parts)
 
 
+def _list_or_null_spec(spec):
+    return spec == "list of string or null"
+
+
 def _dump_lines(mapping, schema_name, indent=0):
     table = bridge_env.HEADER_SCHEMAS[schema_name]
     lines = []
@@ -115,6 +119,9 @@ def _dump_lines(mapping, schema_name, indent=0):
         spec = table[key]
         prefix = pad + key + ":"
         if spec.startswith("list of "):
+            if _list_or_null_spec(spec) and value is None:
+                lines.append(prefix + " null")
+                continue
             inner = spec[len("list of "):]
             if inner in bridge_env.HEADER_SCHEMAS:
                 if not value:
@@ -153,7 +160,10 @@ def _dump_list_of_mappings(items, schema_name, indent):
             lines.append(pad + "- " + first + ":")
             lines.extend(_dump_lines(val0, spec0, indent + 4))
         elif spec0.startswith("list of "):
-            lines.append(pad + "- " + first + ": " + _format_flow_list(val0 or []))
+            if _list_or_null_spec(spec0) and val0 is None:
+                lines.append(pad + "- " + first + ": null")
+            else:
+                lines.append(pad + "- " + first + ": " + _format_flow_list(val0 or []))
         else:
             lines.append(pad + "- " + first + ": " + _format_scalar(val0))
         for key in rest:
@@ -161,19 +171,22 @@ def _dump_list_of_mappings(items, schema_name, indent):
             val = item.get(key)
             col = " " * (indent + 2)
             if spec.startswith("list of "):
-                inner = spec[len("list of "):]
-                if inner in bridge_env.HEADER_SCHEMAS:
-                    if not val:
-                        lines.append(col + key + ": []")
+                if _list_or_null_spec(spec) and val is None:
+                    lines.append(col + key + ": null")
+                else:
+                    inner = spec[len("list of "):]
+                    if inner in bridge_env.HEADER_SCHEMAS:
+                        if not val:
+                            lines.append(col + key + ": []")
+                        else:
+                            lines.append(col + key + ":")
+                            lines.extend(_dump_list_of_mappings(val, inner, indent + 4))
+                    elif _use_flow_list(val or []):
+                        lines.append(col + key + ": " + _format_flow_list(val or []))
                     else:
                         lines.append(col + key + ":")
-                        lines.extend(_dump_list_of_mappings(val, inner, indent + 4))
-                elif _use_flow_list(val or []):
-                    lines.append(col + key + ": " + _format_flow_list(val or []))
-                else:
-                    lines.append(col + key + ":")
-                    for x in val or []:
-                        lines.append(col + "  - " + _format_scalar(x))
+                        for x in val or []:
+                            lines.append(col + "  - " + _format_scalar(x))
             elif spec in bridge_env.HEADER_SCHEMAS:
                 lines.append(col + key + ":")
                 if isinstance(val, dict):
@@ -228,7 +241,7 @@ def enumerate_records(root):
     for rel in fixed:
         if os.path.isfile(os.path.join(root, *rel.split("/"))):
             out.append((rel, False))
-    for path in sorted(glob.glob(os.path.join(root, "docs", "BUILD_PLAN*.md"))):
+    for path in sorted(glob.glob(os.path.join(glob.escape(root), "docs", "BUILD_PLAN*.md"))):
         out.append((os.path.relpath(path, root).replace("\\", "/"), False))
     handoff = os.path.join(root, "handoff")
     if os.path.isdir(handoff):
@@ -257,6 +270,34 @@ def _plan_needs_merged(text):
             if "scope" not in fields and "kind" not in fields:
                 return True
     return False
+
+
+def _plan_satisfies_union(header):
+    out = set()
+    for st in header.get("stages") or []:
+        for inc in st.get("increments") or []:
+            for rid in inc.get("satisfies") or []:
+                out.add(rid)
+    return out
+
+
+def _plan_outside_stage_refusal(text):
+    try:
+        body = bridge_env.plan_body(text)
+    except bridge_env.HeaderError:
+        body = text
+    walk = bridge_env.walk_plan_prose_body(body)
+    if walk["outside_stage"]:
+        return walk["outside_stage"][0]["id"]
+    return None
+
+
+def _plan_satisfies_coverage_refusal(text, header):
+    union = _plan_satisfies_union(header)
+    for rid in bridge_env.plan_r_ids_outside_headers(text):
+        if rid not in union:
+            return rid
+    return None
 
 
 def _plan_unbalanced_id(text):
@@ -466,7 +507,23 @@ def _status_cap_text(new_file):
     return len(text), len(text.splitlines())
 
 
-def _validate_read_back(kind, new_bytes, text, rel, merged):
+def _validate_plan_readers(decoded, shown):
+    refusal = bridge_env.plan_header_refusal(decoded, shown)
+    if refusal:
+        return refusal
+    try:
+        header, _body = bridge_env.read_header(decoded)
+    except bridge_env.HeaderError as err:
+        return "read_header: %s" % err
+    if header is None:
+        return "read_header found no header"
+    for rid in bridge_env.plan_r_ids_outside_headers(decoded):
+        if rid not in _plan_satisfies_union(header):
+            return "plan_satisfies: %s" % rid
+    return None
+
+
+def _validate_read_back(kind, new_bytes, text, rel, merged, shown):
     decoded = bridge_env.decode_record_bytes(new_bytes)
     try:
         header, body = bridge_env.read_header(decoded)
@@ -481,6 +538,10 @@ def _validate_read_back(kind, new_bytes, text, rel, merged):
     disagree = bridge_env.header_agrees(kind, header, fb)
     if disagree:
         return "header_agrees: " + ", ".join(disagree)
+    if kind == "build-plan":
+        err = _validate_plan_readers(decoded, shown)
+        if err:
+            return err
     return None
 
 
@@ -507,7 +568,7 @@ def _write_record(path, shown, kind, header, raw_body, check_mode, crlf, origina
             return "cannot_write", 0
 
     if check_mode:
-        err = _validate_read_back(kind, new_file, original_text, rel, merged)
+        err = _validate_read_back(kind, new_file, original_text, rel, merged, shown)
         if err:
             print("records-migrate: %s: in-memory check failed: %s" % (shown, err))
             return "fail", 3
@@ -553,7 +614,7 @@ def _write_record(path, shown, kind, header, raw_body, check_mode, crlf, origina
         except OSError:
             pass
         return "fail", 3
-    err = _validate_read_back(kind, on_disk, original_text, rel, merged)
+    err = _validate_read_back(kind, on_disk, original_text, rel, merged, shown)
     if err:
         print("records-migrate: %s: read-back failed: %s" % (shown, err))
         try:
@@ -669,6 +730,11 @@ def main(argv):
             if bad:
                 print("cannot read %s: unbalanced parenthesis in %s's Scope" % (shown, bad))
                 continue
+            outside = _plan_outside_stage_refusal(text)
+            if outside:
+                print("cannot read %s: %s stands outside any stage; move its heading under a ## stage heading" % (
+                    shown, outside))
+                continue
             merged_key = root
             if _plan_needs_merged(text):
                 if merged_key not in merged_cache:
@@ -686,6 +752,13 @@ def main(argv):
         if header is None:
             print("cannot read %s: %s" % (shown, err))
             continue
+
+        if kind == "build-plan":
+            missing_rid = _plan_satisfies_coverage_refusal(text, header)
+            if missing_rid:
+                print("cannot read %s: %s is on a Satisfies line the header would not hold; write each increment's "
+                       "IDs on one plain Satisfies: line under its ### heading" % (shown, missing_rid))
+                continue
 
         plan_merged = merged if kind == "build-plan" else None
         if kind == "build-plan" and not _plan_needs_merged(text):

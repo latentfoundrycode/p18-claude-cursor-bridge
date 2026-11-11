@@ -119,6 +119,8 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
 # before the gate) and intake.md's procedure (the batches paragraph's sorting of questions). TASK-052 re-takes four: step 3b
 # (the header refusal among the stops), design.md's gate (the register's header), planning.md's plan (the plan
 # file's header and its example) and run-parameters.md's procedure (the fence's header and its lists).
+# BUG-044 re-takes one: run-parameters.md's procedure (the lift lists' first line
+# per kind, subject or id, and a design or review line at or below its default omitted).
 EXCUSED_MODULE_SECTIONS = {
     ("change-cycle.md", "The procedure"): (7844, "d1c7da9bcba70710a1b85427c1bde7e95c43dbd739899bd87dd0c8d92d09bde7"),
     ("change-cycle.md", "What must survive a compaction"): (2143, "3cb57dbda1906c93b20e17a0e3cd13e38c2a3084fad1db978ce6ae888c08fada"),
@@ -185,7 +187,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("reflection.md", "What must survive a compaction"): (1836, "87bdea3faeda10fa68f51d4fa10b4459fa6b5b62e0dff6c155cac05dd8da7c21"),
     ("reflection.md", "Whether a compaction preceded it"): (897, "ebc5c943f5efaf88ed526fe33cf0e9ffa9364891949c853d27f525a674969be4"),
     ("run-parameters.md", "Extension points"): (683, "5ef8d017187dfd16f8fa971a8e7ef3551136b497387f14e9477562f84331976c"),
-    ("run-parameters.md", "The procedure"): (7469, "e2bdac6ed9305ec6c79e11ede9c0c68686482621899e8f7aad543fa14902fd01"),
+    ("run-parameters.md", "The procedure"): (7680, "8a97d94c9afa945cd0bf39134d6a0906ebebd919b904cfc1f8e4d330399c421b"),
     ("run-parameters.md", "What must survive a compaction"): (821, "d67698de27c0e6d55d3d347079911111df122fb0b3cb667fcb937b4ff1f55979"),
     ("run-parameters.md", "Writing the answers down"): (779, "ed3fe29e9fe1c96fa0348e57540a525572f2a646250b2adae046fc231b17b731"),
     ("traits/ai-models.md", "Add at configuration.items"): (1640, "4fd6accd73dbe9210a071eac20aff8753b354f0e990ce4d5398eee7c5674ee69"),

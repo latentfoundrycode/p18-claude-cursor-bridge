@@ -80,7 +80,7 @@ Installer verification: local | ci-only | n/a (nothing installs)
 Parallel increments: off | on
 ```
 
-The header above the lines holds the same answers (the core's "Project state", "The header"): each of the five as its line gives it, one word, `on`, `off` and `n/a` double-quoted; `agent_ceiling` the `Agent ceiling:` line's seconds, or `null` where none stands; and each of the three lists below one block-form entry per line the owner's word wrote, `[]` where none stands: `ceiling_above_twice` entries of `kind`, `seconds` and `words` (the parenthesis's text whole), `design_rounds_above_five` of `subject`, `rounds`, `words` and `date`, `review_rounds_above_ceiling` of `id`, `rounds`, `words` and `date`, for example
+The header above the lines holds the same answers (the core's "Project state", "The header"): each of the five as its line gives it, one word, `on`, `off` and `n/a` double-quoted; `agent_ceiling` the `Agent ceiling:` line's seconds, or `null` where none stands; and each of the three lists below one block-form entry per line the owner's word wrote, only the first line with its words taken for each kind, and for each subject or id the first line with its words above its default (a design or review line at or below its default lifts nothing and is omitted), `[]` where none stands: `ceiling_above_twice` entries of `kind`, `seconds` and `words` (the parenthesis's text whole), `design_rounds_above_five` of `subject`, `rounds`, `words` and `date`, `review_rounds_above_ceiling` of `id`, `rounds`, `words` and `date`, for example
 
 ```
 ceiling_above_twice:

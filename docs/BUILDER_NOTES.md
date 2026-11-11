@@ -38,4 +38,4 @@
 
 2026-10-31 BUG-038-r1: `tests/test_bug038.py` test 3 uses `text[:text.index('"""', 3)]`, which on `completion-check.py` (shebang then opening `"""` on line 2) slices only the shebang line, so `STAND-IN` is never in `doc` and the test fails before and after the docstring fix; keyword checks pass with `ast.get_docstring`-style extraction.
 
-2026-11-11 TASK-051: `test_fix001_no_test_starts_a_program_around_the_default` fails on supervisor `tests/test_records_migrate.py` lines 76 and 81 (`creationflags=NO_WINDOW`); Scope forbids editing above the builder marker, so the supervisor should spell `getattr(subprocess, "CREATE_NO_WINDOW", 0)` there.
+2026-11-11 TASK-051: `test_fix001_no_test_starts_a_program_around_the_default` fails on supervisor `tests/test_records_migrate.py` lines 76 and 81 (`creationflags=NO_WINDOW`); Scope forbids editing above the builder marker, so the supervisor should spell `getattr(subprocess, "CREATE_NO_WINDOW", 0)` there. Closed 2026-11-11 (stage H2's review): the file no longer holds those lines.
