@@ -551,6 +551,25 @@ def test_r059_the_launcher_refuses_a_disagreeing_brief_header(tmp_path):
     assert line.startswith("bridge-run: refused - header: disagrees scope"), line
 
 
+def test_r059_the_launcher_refuses_a_disagreeing_merge_unit(tmp_path):
+    """R-059: a brief whose header's merge_unit disagrees with its `Merge unit:` line is refused, exit 125, nothing
+    launched; the same brief with the header agreeing runs (the control). Stage H1's review, least confident 1: shown
+    live and by a reviewer's probe, held by no test until now.
+
+    enforces: docs/DESIGN.md, "Change: release B2", the brief's header and its agreement rule; R-059."""
+    line = "Merge unit: TASK-001 TASK-002\n"
+    agree = t32.Lab(tmp_path / "agree")
+    t32.write_plan(agree, "TASK-001", "TASK-002")
+    lab_brief(agree, "TASK-001", brief_header(satisfies=(), scope=("a.py",), merge_unit=("TASK-001", "TASK-002")),
+              extra=line)
+    t32.assert_ran(t32.launch(agree, t32.build("TASK-001")))
+    lab = t32.Lab(tmp_path / "disagree")
+    t32.write_plan(lab, "TASK-001", "TASK-002")
+    lab_brief(lab, "TASK-001", brief_header(satisfies=(), scope=("a.py",), merge_unit=("TASK-001",)), extra=line)
+    refused = t32.assert_refused(t32.launch(lab, t32.build("TASK-001")), "bridge-run: refused - header: ")
+    assert refused.startswith("bridge-run: refused - header: disagrees merge_unit"), refused
+
+
 def test_r059_the_launcher_refuses_a_malformed_brief_header(tmp_path):
     lab = t32.Lab(tmp_path)
     lab_brief(lab, "TASK-001", brief_header(satisfies=(), scope=("a.py",)).replace("round: 1", "round:\t1"))
