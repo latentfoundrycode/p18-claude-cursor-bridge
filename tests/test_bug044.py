@@ -491,3 +491,31 @@ def test_bug044_f4_a_sibling_folder_the_raw_pattern_matches_is_never_listed(tmp_
     assert len(lines_naming(out, "would write ", PLAN_REL)) == 1, out
     assert "BUILD_PLAN_x" not in out, out
     assert code == 1, out
+
+
+import re  # noqa: E402
+
+SCHEMA_BREAK_BRIEF ="---\nrecord: brief\nheader: 1\n---\n" + BRIEF_NO_MERGE_UNIT
+
+
+def test_bug044_the_calibration_s_malformed_stop_says_what_the_message_names(tmp_path):
+    """enforces: bridge/commands/calibrate-bridge.md, step 4, the stop on HEADER MALFORMED (Review B, BUG-044 round 1):
+    a header that breaks its schema stops the run with exit 2 and a message naming the keys, with no line number, so
+    the text names the keys for that case and the line only for a header that cannot be read."""
+    rel = "handoff/TASK-009.md"
+    root = project(tmp_path, [(rel, SCHEMA_BREAK_BRIEF)])
+    code, out = migrate(root, "--check")
+    assert code == 2, out
+    hits = [ln for ln in out.splitlines() if ln.startswith("HEADER MALFORMED: ") and rel in ln]
+    assert len(hits) == 1 and "missing key id" in hits[0], out
+    assert not re.search(r"\bline \d", hits[0]), out
+    unreadable = "---\nrecord: brief\nheader: 1\nid:\tTASK-009\n---\n" + BRIEF_NO_MERGE_UNIT
+    root2 = project(tmp_path, [(rel, unreadable)], name="proj2")
+    code, out = migrate(root2, "--check")
+    assert code == 2, out
+    hits = [ln for ln in out.splitlines() if ln.startswith("HEADER MALFORMED: ") and rel in ln]
+    assert len(hits) == 1 and re.search(r"HEADER MALFORMED: handoff/TASK-009\.md: line \d+: ", hits[0]), out
+    with open(os.path.join(ROOT, "bridge", "commands", "calibrate-bridge.md"), encoding="utf-8") as fh:
+        text = " ".join(fh.read().split())
+    assert "a header that cannot be read, the message naming its line, or one that breaks its schema, the message " \
+           "naming the keys" in text

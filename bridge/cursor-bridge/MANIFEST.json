@@ -1,6 +1,6 @@
 {
   "version": "2026.11.09a",
-  "generated": "2026-11-11 10:05",
+  "generated": "2026-11-11 11:01",
   "files": {
     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
@@ -12,7 +12,7 @@
     "agents/security-auditor.md": "8f7c3e9b3b6467accf81ffe6c4904966789e251ef0ac2bbab23fdca3c8b903ce",
     "agents/spec-packager.md": "ca7afd21649ded44545eccd83dc1642501ea09200e0dad52af2694a9ed042463",
     "agents/test-runner.md": "a78bde0415f53108f50ef206114d365a9e1b56c55aacafc48f0fc83e8ccbbd24",
-    "commands/calibrate-bridge.md": "7319ed441002bf3ae06427304c6385eedca6bc1d19915c78ceb119a2bfaa1d28",
+    "commands/calibrate-bridge.md": "b770834d7729329b202ff05cfd5b4cdf0895eb198bbb9dc6addf9c108259f68e",
     "commands/evaluate-reports.md": "3a72fa1647401c9bec9dfd267ee93fe2651dd3fdc9ede571674a502dae543383",
     "commands/supervisor.md": "f3f0597bef7271319c9c14134aaa58fe00ce914ae1fe3514e021ce9bd4c724ac",
     "cursor-bridge/CHANGELOG.md": "90c4f14746f2ce1d91e654a7753465250260ebe299537a45f007a91a2316af5f",
