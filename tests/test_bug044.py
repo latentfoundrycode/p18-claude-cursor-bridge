@@ -280,3 +280,214 @@ def test_bug044_a_brief_with_no_merge_unit_line_is_written_merge_unit_null(tmp_p
 
 
 # ---------------------------------------------------------------- the builder adds its cases below this line and edits nothing above it
+
+import importlib.util
+
+BRIEF_WITH_MERGE_UNIT = """# TASK-008: merge unit held (R-062)
+
+## Objective
+Hold merge unit.
+
+Satisfies: R-008
+
+Merge unit: TASK-008 TASK-009
+
+## Scope
+- src/a.py
+
+## Out of scope
+- secrets/
+"""
+
+F2_STAGE_SATISFIES = """# Build plan {d} stage line
+
+## Stage A1 {d} the stage
+Demonstration: none.
+Satisfies: R-050
+
+### TASK-001 {d} one
+Depends on: none
+Parallel: no
+Scope: a.py
+Satisfies: R-004
+""".format(d=DASH)
+
+F2_H4_SATISFIES = """# Build plan {d} h4 line
+
+## Stage A1 {d} the stage
+Demonstration: none.
+
+### TASK-001 {d} one
+Depends on: none
+Parallel: no
+Scope: a.py
+Satisfies: R-004
+#### Note
+Satisfies: R-051
+""".format(d=DASH)
+
+F2_DOUBLE_SATISFIES = """# Build plan {d} two lines
+
+## Stage A1 {d} the stage
+Demonstration: none.
+
+### TASK-001 {d} one
+Depends on: none
+Parallel: no
+Scope: a.py
+Satisfies: R-004
+Satisfies: R-099
+""".format(d=DASH)
+
+
+def load_migrate():
+    spec = importlib.util.spec_from_file_location("records_migrate_bug044", PROGRAM)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def call_main(mod, argv):
+    return mod.main(list(argv))
+
+
+def no_temps_under(root, subdir):
+    folder = os.path.join(str(root), *subdir.split("/"))
+    return not any(n.startswith(".records-migrate-") for n in os.listdir(folder))
+
+
+def test_bug044_r062_f3_outside_stage_read_back_fails_with_f1_patched(tmp_path, monkeypatch):
+    """BUG-044 F3: with F1's pre-compose refusal patched away, a headed plan the readers refuse still fails read-back."""
+    root = project(tmp_path, [(PLAN_REL, OUTSIDE_STAGE_PLAN)])
+    before = read(root, PLAN_REL)
+    mod = load_migrate()
+    monkeypatch.setattr(mod, "_plan_outside_stage_refusal", lambda _text: None)
+    monkeypatch.setattr(mod, "_plan_satisfies_coverage_refusal", lambda _text, _header: None)
+    monkeypatch.chdir(str(root))
+    code = call_main(mod, [])
+    assert code == 3
+    assert read(root, PLAN_REL) == before
+    assert no_temps_under(root, "docs")
+
+
+def test_bug044_r062_f3_bold_satisfies_read_back_fails_with_f2_patched(tmp_path, monkeypatch):
+    """BUG-044 F3: with F2's pre-write refusal patched away, satisfies coverage still fails read-back."""
+    root = project(tmp_path, [(PLAN_REL, BOLD_SATISFIES_PLAN)])
+    before = read(root, PLAN_REL)
+    mod = load_migrate()
+    monkeypatch.setattr(mod, "_plan_satisfies_coverage_refusal", lambda _text, _header: None)
+    monkeypatch.chdir(str(root))
+    code = call_main(mod, [])
+    assert code == 3
+    assert read(root, PLAN_REL) == before
+    assert no_temps_under(root, "docs")
+
+
+def test_bug044_r062_f3_outside_stage_in_memory_check_fails_under_check(tmp_path, monkeypatch):
+    """BUG-044 F3: the in-memory check under --check also runs the readers' rules."""
+    root = project(tmp_path, [(PLAN_REL, OUTSIDE_STAGE_PLAN)])
+    mod = load_migrate()
+    monkeypatch.setattr(mod, "_plan_outside_stage_refusal", lambda _text: None)
+    monkeypatch.setattr(mod, "_plan_satisfies_coverage_refusal", lambda _text, _header: None)
+    monkeypatch.chdir(str(root))
+    code = call_main(mod, ["--check"])
+    assert code == 3
+
+
+@pytest.mark.parametrize("plan,rel,needle", [
+    (OUTSIDE_STAGE_PLAN, "docs/BUILD_PLAN.md", "outside any stage"),
+    (BOLD_SATISFIES_PLAN, "docs/BUILD_PLAN.md", "Satisfies line"),
+    (OUTSIDE_STAGE_PLAN, "docs/BUILD_PLAN-b.md", "outside any stage"),
+    (BOLD_SATISFIES_PLAN, "docs/BUILD_PLAN-b.md", "Satisfies line"),
+], ids=["f1-main", "f2-main", "f1-addendum", "f2-addendum"])
+def test_bug044_f1_f2_cannot_read_on_crlf_and_addendum(tmp_path, plan, rel, needle):
+    """BUG-044 F1/F2: refusal on CRLF plans and on enumerated addendum files."""
+    crlf = plan.replace("\n", "\r\n")
+    files = [(rel, crlf)]
+    if rel.endswith("BUILD_PLAN-b.md"):
+        files.insert(0, (PLAN_REL, PLAIN_PLAN))
+    root = project(tmp_path, files)
+    path = os.path.join(str(root), *rel.split("/"))
+    before = read(root, rel)
+    code, out = migrate(root)
+    assert read(root, rel) == before
+    hits = lines_naming(out, "cannot read ", rel)
+    assert len(hits) == 1 and needle in hits[0], hits
+    assert code == 0
+    with open(path, "rb") as f:
+        assert b"\r\n" in f.read()
+
+
+@pytest.mark.parametrize("plan,rid", [
+    (F2_STAGE_SATISFIES, "R-050"),
+    (F2_H4_SATISFIES, "R-051"),
+    (F2_DOUBLE_SATISFIES, "R-004"),
+], ids=["stage-before-heading", "below-h4", "second-plain-line"])
+def test_bug044_f2_other_satisfies_shapes_listed_cannot_read(tmp_path, plan, rid):
+    """BUG-044 F2: every Satisfies shape plan_r_ids_outside_headers reads is covered before write."""
+    root = project(tmp_path, [(PLAN_REL, plan)])
+    before = read(root, PLAN_REL)
+    code, out = migrate(root)
+    assert read(root, PLAN_REL) == before
+    hits = lines_naming(out, "cannot read ", PLAN_REL)
+    assert len(hits) == 1 and rid in hits[0], hits
+    assert code == 0
+
+
+def test_bug044_f5_brief_with_merge_unit_line_keeps_list_not_null(tmp_path):
+    """BUG-044 F5: a brief that has Merge unit: still writes the list, not null."""
+    rel = "handoff/TASK-008.md"
+    root = project(tmp_path, [(rel, BRIEF_WITH_MERGE_UNIT)])
+    code, out = migrate(root)
+    assert code == 0, out
+    text = bridge_env.decode_record_bytes(read(root, rel))
+    header, _body = bridge_env.read_header(text)
+    assert header["merge_unit"] == ["TASK-008", "TASK-009"]
+    block = text.split("\n---", 1)[0]
+    assert "merge_unit: [TASK-008, TASK-009]" in block
+    assert "merge_unit: null" not in block
+    brief_name = "TASK-008"
+    fb = bridge_env.brief_prose_fallback(bridge_env.decode_record_bytes(BRIEF_WITH_MERGE_UNIT.encode("utf-8")),
+                                         brief_name)
+    assert bridge_env.check_header("brief", header) == []
+    assert bridge_env.header_agrees("brief", header, fb) == []
+
+
+# ---------------------------------------------------------------- the supervisor's case after the builder's run
+
+OUTSIDE_STAGE_NO_SATISFIES_PLAN = OUTSIDE_STAGE_PLAN.replace("Satisfies: R-001\n", "")
+
+
+def test_bug044_f3_the_read_back_runs_the_readers_shape_rule_on_its_own(tmp_path, monkeypatch, capsys):
+    """enforces: handoff/BUG-044.md, F3 (the read-back runs plan_header_refusal, not only the satisfies coverage). The
+    outside-stage increment carries no Satisfies line, so the coverage alone passes; with F1's and F2's refusals
+    patched away, only the readers' shape rule stops the write: exit 3, the read-back line naming the increment that
+    stands outside any stage, the plan byte-identical and no temporary file left."""
+    root = project(tmp_path, [(PLAN_REL, OUTSIDE_STAGE_NO_SATISFIES_PLAN)])
+    before = read(root, PLAN_REL)
+    mod = load_migrate()
+    monkeypatch.setattr(mod, "_plan_outside_stage_refusal", lambda _text: None)
+    monkeypatch.setattr(mod, "_plan_satisfies_coverage_refusal", lambda _text, _header: None)
+    monkeypatch.chdir(str(root))
+    code = call_main(mod, [])
+    out = capsys.readouterr().out
+    assert code == 3, out
+    lines = [ln for ln in out.splitlines() if "read-back failed" in ln]
+    assert len(lines) == 1 and "TASK-001" in lines[0] and "outside any stage" in lines[0], out
+    assert read(root, PLAN_REL) == before
+    assert no_temps_under(root, "docs")
+
+
+def test_bug044_f4_a_sibling_folder_the_raw_pattern_matches_is_never_listed(tmp_path):
+    """enforces: handoff/BUG-044.md, F4 (the plan glob escapes the root); the security audit's advisory of BUG-044
+    round 1. Beside the root `proj[1]` stands a sibling `proj1` whose plan the unescaped pattern matches (shown first,
+    the precondition); the migration lists the root's own plan once and names nothing of the sibling's."""
+    import glob as glob_module
+    root = project(tmp_path, [(PLAN_REL, PLAIN_PLAN)], name="proj[1]")
+    project(tmp_path, [("docs/BUILD_PLAN_x.md", PLAIN_PLAN)], name="proj1")
+    raw = glob_module.glob(os.path.join(str(root), "docs", "BUILD_PLAN*.md"))
+    assert any(p.endswith("BUILD_PLAN_x.md") for p in raw), raw
+    code, out = migrate(root, "--check")
+    assert len(lines_naming(out, "would write ", PLAN_REL)) == 1, out
+    assert "BUILD_PLAN_x" not in out, out
+    assert code == 1, out
