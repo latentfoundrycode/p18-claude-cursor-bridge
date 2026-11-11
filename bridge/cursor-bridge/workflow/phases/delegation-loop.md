@@ -129,7 +129,7 @@ describes. Nor is the launcher's and the guard's `header: ` refusal a model's fa
 the run parameters or, where a merge unit is checked, of the plan that the reader cannot read or the
 schema refuses, a brief's header that disagrees with the brief's prose, a run parameters' lift list (the
 launcher's three, the guard's `review_rounds_above_ceiling`) that disagrees with its lines, or a plan header
-whose increments differ from the plan's headings, is put right, the header and the prose made to agree, a
+whose increments differ from the plan's headings or a plan heading standing outside any stage, is put right, the header and the prose made to agree, a
 brief by a new numbered brief where a run of it completed; it is never a failed launch or a model's failure, and no
 `--record-failure` follows it. Nor is a refusal of the code gate's programs a model's failure: the launcher's
 `review ceiling: `, `brief rule: `, `revised in place: ` and `branch rule: ` refusals (a fourth round

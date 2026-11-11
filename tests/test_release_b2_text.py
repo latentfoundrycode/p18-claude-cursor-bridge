@@ -191,3 +191,15 @@ def test_r062_step_3b_names_the_header_refusal_among_the_stops():
     assert "the launcher's and the guard's `header: ` refusal" in para, "step 3b does not name the header refusal"
     tail = para[para.index("`header: ` refusal"):]
     assert "never a failed launch" in tail and "model's failure" in tail
+    # Review B, TASK-052 round 1: worded as the launcher and the guard refuse, not as any disagreement
+    for words in ("a run parameters' lift list", "`review_rounds_above_ceiling`", "where a merge unit is checked",
+                  "whose increments differ from the plan's headings", "outside any stage"):
+        assert words in " ".join(tail.split()), words
+
+
+def test_r062_the_plan_template_says_historic_is_the_migration_s_true_mark():
+    """R-062 (Review B, TASK-052 round 1): planning.md says `historic` is true only where the migration marks an
+    increment merged before the fields existed, as bridge_env._derived_historic derives it."""
+    text = " ".join(read(PLANNING).split())
+    assert ("`historic` `false`, and `true` only where the migration marks an increment merged before the fields "
+            "existed (no `Scope:` and no `Kind:` line, its ID in the merged set)") in text
