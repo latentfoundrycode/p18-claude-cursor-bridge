@@ -125,16 +125,17 @@ ceiling: ` is the design critique's ceiling holding, never a model's failure: it
 and no `--record-failure` follows it; Phase 2. A design-critique reply that names nothing from
 its file is recorded like any failed call and follows the exits below, which Phase 2 counts: the
 exit-4 retry, the exit-3 re-resolve and one run on the profile it gives, then the wait Phase 2
-describes. Nor is a refusal of the code gate's programs a model's failure: the launcher's
+describes. Nor is the launcher's and the guard's `header: ` refusal a model's failure: a header the reader
+cannot read, or one that disagrees with its record's prose (a brief's, the run parameters' or, where a merge
+unit is checked, the plan's), is put right, the header and the prose made to agree, a brief by a new
+numbered brief where a run of it completed; it is never a failed launch or a model's failure, and no
+`--record-failure` follows it. Nor is a refusal of the code gate's programs a model's failure: the launcher's
 `review ceiling: `, `brief rule: `, `revised in place: ` and `branch rule: ` refusals (a fourth round
 with no lift, no brief or two, a builder launch on `main`, a brief revised after a completed run, a
 brief under another ID on a counted branch) and the guard's `review ceiling: ` and `branch rule: `
 refusals and its refusals of a round off its count or already reviewed are the ceiling's
 programs holding, neither a failed launch nor a model's failure, handled as step 7's "The review
-ceiling" says; the launcher's and the guard's `header: ` refusal (a brief whose header the reader
-cannot read, or that disagrees with the brief's prose) is a record to put right, the header and the prose
-made to agree, by a new numbered brief where a run of the brief completed, never a failed launch or a
-model's failure; every other `bridge-run: refused - ` of a builder or review launch (the slot's
+ceiling" says; every other `bridge-run: refused - ` of a builder or review launch (the slot's
 `heavy.lock`, a limit, a key file) and every other `review-guard: refused - ` is no model's failure
 either, and is read and fixed as its message says.)
 

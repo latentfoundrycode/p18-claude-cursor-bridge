@@ -118,8 +118,8 @@ def test_r062_each_tabular_template_header_declares_its_table_s_columns(label, r
     findings = bridge_env.header_agrees(kind, header, getattr(bridge_env, fallback)(body))
     if kind == "inventory":
         # the template's Decisions table shows a placeholder row, not a Development data row, and its Reflected
-        # through line a placeholder: only the tables' declared shape is compared here
-        findings = [f for f in findings if str(f).startswith("tables")]
+        # through line a placeholder: those two values are not compared, every table's declared shape is
+        findings = [f for f in findings if f not in ("reflected_through", "development_data")]
     assert findings == [], (label, findings)
 
 

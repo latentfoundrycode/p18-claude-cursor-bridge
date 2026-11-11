@@ -405,8 +405,8 @@ workflows:
     traits: ["<Trait name>"]
 awaiting_user_on: ""
 bridge_version: "<contents of ~/.claude/cursor-bridge/VERSION when last calibrated>"
-stage: "<current stage name>"
-open_issues: ["<ISS-nnn>"]
+stage: "<the Stage: line's whole value>"
+open_issues: ["<each segment of the Open issues: line>"]
 ---
 # Project Status
 Last updated: <timestamp>
@@ -436,6 +436,8 @@ Calibration pending: <items still to apply, each with the phase that triggers it
 Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refactoring pass / installer verification / parallel increments)
 ```
 
+The header holds each line's value as the record's checker reads it from the prose: `phase` the `Phase:` value; one `workflows` entry per `Workflows:` line (`subtype: null` where the part has none, `[]` while a part is not yet classified); `awaiting_user_on` `""` where the line begins with nothing, none or n/a; `bridge_version` the stamp, or `""`; `stage` the `Stage:` line's whole value, its `Last reflection:` part included; `open_issues` one entry per segment of the `Open issues:` line, split at `;` and at `. `, so `none` is `["none"]` and `ISS-001, ISS-002` one entry.
+
 **Awaiting user on** is read by the `loop-guard` Stop hook (rule 43): `nothing` means the loop is running and must not stop without a pending background task to wake it; anything else means you are legitimately waiting for the owner. Set it whenever you stop for them — an escalation, a gate, a pause they asked for, a stage pause — and clear it when they answer. A stale entry either traps the loop in idleness or hides a real wait, so it is rewritten at every stop.
 
 **Workflows** records, for each part, the conditional workflows it runs: one `Workflows:` line per part, directly after `Phase:`; with the `Phase:` line they name exactly what a resumed session must read (see "Main and conditional workflows"). A line has this grammar:
@@ -458,7 +460,7 @@ fresh session reads it to know what needs re-anchoring and what can simply be na
 Write it so a fresh session with no memory of this conversation can pick up the work
 from this file and the inventory alone. That is the actual test of whether it is good enough. **Claude Code's private memory is not project state:** it is tied to one machine and one folder path, the next session may not read it, and nothing checks it. Anything a later session must know goes into these two files, never only into memory.
 
-**The inventory — `docs/INVENTORY.md`** is the project's current-state record of what the software *is*: its features, the resources it depends on, the decisions that shaped it, and what was deferred. Where `CHANGES.md` is the history, the inventory is the present — rows are edited in place when a feature changes and removed when it is removed, so the file stays proportional to the product, not to the time spent on it. It is AI-facing, committed, and rides each increment's PR like `CHANGES.md`; it never holds a secret value, only a secret's name and where it lives. The format, which `inventory-check.py` parses, its header first:
+**The inventory — `docs/INVENTORY.md`** is the project's current-state record of what the software *is*: its features, the resources it depends on, the decisions that shaped it, and what was deferred. Where `CHANGES.md` is the history, the inventory is the present — rows are edited in place when a feature changes and removed when it is removed, so the file stays proportional to the product, not to the time spent on it. It is AI-facing, committed, and rides each increment's PR like `CHANGES.md`; it never holds a secret value, only a secret's name and where it lives. The format, which `inventory-check.py` parses, its header first (`reflected_through` the `Reflected through:` line's text, `none` included; `development_data` the first cell of the Decisions row that begins `Development data:`; each table's columns in order and the column that names a row):
 
 ```markdown
 ---

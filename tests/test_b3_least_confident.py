@@ -129,7 +129,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("configuration.md", "What must survive a compaction"): (963, "338b5c4e338a41c95c7b9b2e1a110ed4e1473a8ad4ed04298359f8b21fd0984a"),
     ("delegation-loop.md", "2. Package the brief"): (964, "5394e345e8d43f10f2f9d98db2d5b092b96d0deea6e2dd75a4d3bb47b45e7e2e"),
     ("delegation-loop.md", "3. Delegate to Cursor"): (7786, "f53b36612879c3d100add48cabde59781aff6374b28a08bb3dc27f71f2cd3d00"),
-    ("delegation-loop.md", "3b. A model fails mid-step — switch automatically, restart the step, never wait"): (9438, "31bea3b5bb8817d79ea34c98f5dfc6daeb8d32e4e2d24fed11676b2f13a1028f"),
+    ("delegation-loop.md", "3b. A model fails mid-step — switch automatically, restart the step, never wait"): (9568, "2335e23b6d184f56dfa41e9650ae9f025f78f3cb9a06f9e716d28bb1caef007c"),
     ("delegation-loop.md", "4. Inspect"): (16968, "eb909f117a45fa28fc1b773e4a140b2d3c313c202091513d75e3d1fa0839e0e8"),
     ("delegation-loop.md", "5. Scan"): (954, "f43c63ec4a4be8ab8fa53e691d96d613479f7db171215ae3b4e7d9c4fa6a1a56"),
     ("delegation-loop.md", "7. Decide — in a sub-file"): (241, "9146216638749b537ebdd42d28bdad75eb7ecfdafea1f8236bf90c7bb07c55ee"),
