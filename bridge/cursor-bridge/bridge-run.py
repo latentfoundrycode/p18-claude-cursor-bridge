@@ -364,6 +364,7 @@ UNITTEST_VALUE_OPTIONS = ("--pattern", "--durations")                     # -p a
 
 
 INI_PATH_SETTINGS = ("testpaths", "pythonpath")        # what `-o <name>=<paths>` makes pytest collect, or import from
+PYTEST_FLAG_LETTERS = "xvqslVh"                        # pytest's own one-letter options that take no value: another option may follow one in the same word
 
 
 def ini_override(a):
@@ -378,7 +379,7 @@ def ini_override(a):
         if ch == "o":
             rest = a[j + 1:]
             return rest[1:] if rest.startswith("=") else rest
-        if ch not in "xvqsl":                              # no flag of pytest's: read no further
+        if ch not in PYTEST_FLAG_LETTERS:                  # no flag of pytest's: read no further
             return None
     return None
 
@@ -392,7 +393,7 @@ def hidden_escape(a):
     for j, ch in enumerate(a[1:], 1):
         if ch in "cp":
             return j > 1
-        if ch not in "xvqsl":
+        if ch not in PYTEST_FLAG_LETTERS:
             return False
     return False
 

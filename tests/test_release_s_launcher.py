@@ -288,6 +288,8 @@ def test_what_review_a_s_delta_read_found_in_the_target_rule(program, tmp_path):
                  ["pytest", "--", "-x/../../elsewhere/test_probe.py"], ["python", "-m", "unittest", "discover", "--", "-x/../../elsewhere"],
                  ["python", "-m", "pytest", "-vc" + os.path.join(out, "pytest.ini"), "tests"], ["pytest", "-qc", "pytest.ini", "tests"],
                  ["pytest", "-xp", "probeplugin", "tests"], ["uv", "run", "pytest", "-vc" + os.path.join(out, "pytest.ini")],
+                 ["python", "-m", "pytest", "-Vc" + os.path.join(out, "pytest.ini"), "tests"], ["pytest", "-hc" + os.path.join(out, "pytest.ini")],
+                 ["pytest", "-Vo", "testpaths=" + out],
                  ["python", "-m", "pytest", "-k", "@" + os.path.join(out, "args.txt"), "tests"], ["pytest", "--junitxml", "@args.txt"],
                  ["pytest", "-o", "@args.txt", "tests"], ["uv", "run", "--project", "pytest", "pytest", out]):
         assert br.outside_target(argv, str(base)) is not None, argv

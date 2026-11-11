@@ -167,12 +167,14 @@ def is_test_path(path):
     them; one that climbs (`..`) or starts at a root, a drive or the home folder names no file of
     the Workspace by its own words and is no test either. The path is taken out of what a cell
     wraps it in first: a Markdown link's target, quotes, brackets, and the punctuation after it."""
-    path = path.replace("\\", "/")
+    path = path.strip("`*, ").replace("\\", "/")
+    if not TEST_PATH.search(path):                         # what reads as a test's path is what read as one before release S: the unwrapping only ever refuses
+        return False
     if "](" in path:                                       # [words](the path)
         path = path.rsplit("](", 1)[1]
     path = path.lstrip(EVIDENCE_WRAP).rstrip(EVIDENCE_WRAP + ".:;!?")
-    if not TEST_PATH.search(path):
-        return False
+    if "://" in path:                                      # an address: no file of the Workspace by its own words; a record's is no test
+        return not re.search(r"/(?:docs|handoff|run)/", path.lower())
     parts = [p.rstrip(". ") if p.strip(".") else p for p in path.split("::", 1)[0].split("/")]
     if ".." in parts or path.startswith(("/", "~")) or re.match(r"[A-Za-z]:", path):
         return False

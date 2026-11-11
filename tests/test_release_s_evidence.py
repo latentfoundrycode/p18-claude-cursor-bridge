@@ -205,13 +205,16 @@ def test_a_document_about_tests_under_a_record_folder_is_no_test(tmp_path):
                                    "docs./test_plan.md", "../elsewhere/tests/test_a.py", "/tests/test_a.py", "C:/x/tests/test_a.py",
                                    # wrapped as a cell wraps a path (Review A's delta read: each counted as a test)
                                    "[plan](docs/test_plan.md)", "(docs/test_plan.md)", '"docs/test_plan.md"', "<docs/test_plan.md>",
-                                   "'docs/test_plan.md'", "(`docs/test_plan.md`).", "~/docs/test_plan.md"])
+                                   "'docs/test_plan.md'", "(`docs/test_plan.md`).", "~/docs/test_plan.md",
+                                   "https://example.invalid/o/r/blob/main/docs/test_plan.md"])
 def test_a_record_by_another_spelling_of_its_path_is_no_test_either(program, tmp_path, token):
     """Review B, round 1: `./docs/test_plan.md` and a path that climbs and comes back counted as a test in plan mode. The
     path is read as the file system reads it, and one that climbs or starts at a root names no file of the Workspace."""
     cc = program("completion-check")
     assert not cc.is_test_path(token), token
     assert cc.is_test_path("tests/test_import.py::test_import") and cc.is_test_path("`./tests/test_import.py`,") and cc.is_test_path("src/app.test.ts")
+    assert cc.is_test_path("(tests/test_a.py)") and cc.is_test_path("https://example.invalid/o/r/blob/main/tests/test_a.py"), "as before release S"
+    assert not cc.is_test_path("[test") and not cc.is_test_path("(tests)"), "the unwrapping only ever refuses: a link's words read as they did before"
     r = make(tmp_path, "| R-001 | the user exports their rows as a CSV file | owner | built | %s |\n" % token, texts=None)
     rc, out = run(r, "plan")
     assert rc == 1 and "R-001" in out and "names no test file" in out, out
