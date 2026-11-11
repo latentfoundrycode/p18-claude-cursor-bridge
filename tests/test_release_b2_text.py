@@ -134,6 +134,12 @@ def test_r062_the_brief_template_header_carries_the_name_s_id_and_round_and_the_
     end = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("## "))
     bullets = [l[2:].strip() for l in lines[start:end] if l.startswith("- ")]
     assert header["scope"] == bullets, (header["scope"], bullets)
+    # Review B, TASK-052 round 1: the header agrees with the prose as the launcher reads it, once the template's
+    # placeholders are filled (a path holding < or > is no path parse_scope reads)
+    filled = fence.replace("TASK-<nnn>", "TASK-012").replace("-r<N>-", "-r1-")
+    fh, _ = bridge_env.read_header(filled)
+    assert bridge_env.header_agrees("brief", fh, bridge_env.brief_prose_fallback(filled, "TASK-012")) == []
+    assert bridge_env.brief_header_refusal(filled, "handoff/TASK-012.md") is None
 
 
 def paragraphs(text):
