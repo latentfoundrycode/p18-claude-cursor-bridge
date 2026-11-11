@@ -5,8 +5,9 @@ enforces: docs/REQUIREMENTS.md R-063 (this repository's records gain their heade
 the prose unchanged); docs/BUILD_PLAN.md, TASK-054's Done when: every file of the eight kinds opens with `---` and a
 `record:` key of its kind but for the merged briefs the fallback refuses, which stay header-less by rule; every
 migrated header parsed by `yaml.safe_load` equals `read_header`'s value (R-057's cross-check over this repository's
-records); and the token measure: a brief's bytes minus its header's equal its bytes before the migration (the migration
-adds only the header), and the status file's bytes at the last commit before the migration and at the migration's,
+records); and the token measure: a brief's bytes minus its header's equal its bytes before the migration, and hash the
+same (the migration adds only the header), and the status file's bytes at the last commit before the migration and at
+the migration's,
 read by `git show`, skipped where either commit is absent (the branch's commits squashed away on main; CI's depth-1
 checkout; a copy with no repository).
 
@@ -14,6 +15,7 @@ The records are read from the working tree, line endings normalised to LF as git
 migration enumerates them (records_migrate.enumerate_records), so the test reads the same files in a checkout, in CI
 and in the mutation engine's copy.
 """
+import hashlib
 import importlib.util
 import os
 import subprocess
@@ -37,14 +39,17 @@ REFUSED = ("handoff/TASK-002-r2.md", "handoff/TASK-002-r3.md", "handoff/TASK-002
 
 # The token measure, taken once in the supervisor's checkout by `git show <sha>:<path>` (quoted in the accept commit
 # and in docs/INVENTORY.md's growth row).
-TRIM_SHA = "5473fc6200ef404b0903f29967833866525e9f97"        # the repairs, the last commit before the migration
-MIGRATION_SHA = "9199d048a1d35689286849fbc7577cf80eae1864"   # the installed program's write
+# The status file is measured at the last commit before the migration (the repairs, after the trim), since its prose
+# is compared byte for byte with what follows the migration's header.
+PRE_MIGRATION_SHA = "5473fc6200ef404b0903f29967833866525e9f97"   # the repairs, the last commit before the migration
+MIGRATION_SHA = "9199d048a1d35689286849fbc7577cf80eae1864"       # the installed program's write
 STATUS = "docs/PROJECT_STATUS.md"
-STATUS_BYTES_AT_TRIM = 9124
+STATUS_BYTES_BEFORE_MIGRATION = 9124
 STATUS_BYTES_AT_MIGRATION = 10523
 STATUS_HEADER_BYTES = 1399
 BRIEF = "handoff/TASK-046.md"
 BRIEF_PROSE_BYTES = 31392
+BRIEF_PROSE_SHA256 = "86a17ad7c8a02b75059b54520a8f82140a288f03210a5fd0c992200407090fec"   # git show at PRE_MIGRATION_SHA
 BRIEF_HEADER_BYTES = 357
 
 
@@ -111,7 +116,9 @@ def test_r063_every_migrated_header_reads_the_same_through_yaml_and_read_header(
 def test_r063_the_brief_s_prose_is_unchanged_by_the_migration():
     data = lf_bytes(BRIEF)
     assert header_bytes(data) == BRIEF_HEADER_BYTES
-    assert len(data) - BRIEF_HEADER_BYTES == BRIEF_PROSE_BYTES
+    prose = data[BRIEF_HEADER_BYTES:]
+    assert len(prose) == BRIEF_PROSE_BYTES
+    assert hashlib.sha256(prose).hexdigest() == BRIEF_PROSE_SHA256
 
 
 def git(*args):
@@ -123,13 +130,13 @@ def git(*args):
 
 
 def test_r063_the_status_file_s_growth_over_the_two_commits():
-    for sha in (TRIM_SHA, MIGRATION_SHA):
+    for sha in (PRE_MIGRATION_SHA, MIGRATION_SHA):
         if git("cat-file", "-e", "%s^{commit}" % sha)[0] != 0:
             pytest.skip("commit %s is absent (the branch's commits squashed away on main, CI's depth-1 checkout, or a "
                         "copy with no repository); the numbers are quoted in TASK-054's accept commit" % sha)
-    before = git("show", "%s:%s" % (TRIM_SHA, STATUS))[1]
+    before = git("show", "%s:%s" % (PRE_MIGRATION_SHA, STATUS))[1]
     after = git("show", "%s:%s" % (MIGRATION_SHA, STATUS))[1]
-    assert len(before) == STATUS_BYTES_AT_TRIM
+    assert len(before) == STATUS_BYTES_BEFORE_MIGRATION
     assert len(after) == STATUS_BYTES_AT_MIGRATION
     assert header_bytes(after) == STATUS_HEADER_BYTES
     assert after[STATUS_HEADER_BYTES:] == before
