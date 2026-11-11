@@ -517,8 +517,25 @@ def _write_record(path, shown, kind, header, raw_body, check_mode, crlf, origina
     folder = os.path.dirname(os.path.abspath(path))
     tmp = os.path.join(folder, ".records-migrate-%s.tmp" % uuid.uuid4().hex)
     try:
-        with open(tmp, "xb") as f:
-            f.write(new_file)
+        f = open(tmp, "xb")
+    except OSError as exc:
+        print("records-migrate: %s: temporary write failed: %s" % (shown, exc))
+        return "fail", 3
+    try:
+        f.write(new_file)
+    except OSError as exc:
+        print("records-migrate: %s: temporary write failed: %s" % (shown, exc))
+        try:
+            f.close()
+        except OSError:
+            pass
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return "fail", 3
+    try:
+        f.close()
     except OSError as exc:
         print("records-migrate: %s: temporary write failed: %s" % (shown, exc))
         try:
@@ -555,23 +572,6 @@ def _write_record(path, shown, kind, header, raw_body, check_mode, crlf, origina
         return "fail", 3
     print("wrote %s" % shown)
     return "wrote", 0
-
-
-def _handle_headed(path, shown, kind, raw, check_mode):
-    text = bridge_env.decode_record_bytes(raw)
-    try:
-        header, _body = bridge_env.read_header(text)
-    except bridge_env.HeaderError as err:
-        print("HEADER MALFORMED: %s: %s" % (shown, err))
-        return "malformed", 2
-    if header is None:
-        return None, 0
-    findings = bridge_env.check_header(kind, header)
-    if findings:
-        print("HEADER MALFORMED: %s: %s" % (shown, "; ".join(findings)))
-        return "malformed", 2
-    print("has a header %s" % shown)
-    return "has_header", 0
 
 
 def main(argv):
@@ -622,10 +622,6 @@ def main(argv):
             rel = shown_arg
             shown = rel
 
-        if os.path.islink(abspath):
-            print("cannot read %s: a symbolic link" % shown)
-            continue
-
         if not os.path.isfile(abspath):
             if not os.path.exists(abspath):
                 reason = "no such file"
@@ -637,6 +633,11 @@ def main(argv):
         kind = record_kind(rel)
         if kind is None:
             print("cannot read %s: not a record kind" % shown)
+            continue
+
+        joined = os.path.normpath(os.path.join(os.path.realpath(root), *rel.split("/")))
+        if os.path.normcase(os.path.realpath(abspath)) != os.path.normcase(joined):
+            print("cannot read %s: a symbolic link" % shown)
             continue
 
         try:
