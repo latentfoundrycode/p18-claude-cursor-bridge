@@ -269,3 +269,7 @@ Last accepted: stage H1's close records (PR #145, at its merge): the stage revie
 ## Moved 2026-11-11 (TASK-052's records, PR #147)
 
 Last accepted: TASK-051 (PR #146, at its merge): records-migrate.py, R-062's program (three builder rounds, HARDENING, Release B2's stage H2); before it stage H1's close records (PR #145), REFAC-005 and REFAC-006 (PR #144), HOTFIX-003 (PR #143); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-051, BUG-001 to BUG-043, the refactoring passes of B2 to B5, T1, T2 and H1, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+
+## Moved 2026-11-11 (BUG-044's records, PR #148)
+
+Last accepted: TASK-052 (PR #147, at its merge): R-062's text half, the eight templates' headers, the core's header rule, calibrate-bridge.md's migration item, step 3b's header refusal; before it TASK-051 (PR #146), records-migrate.py; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-052, BUG-001 to BUG-043, the refactoring passes of B2 to B5, T1, T2 and H1, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
