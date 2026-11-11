@@ -195,6 +195,73 @@ def test_an_ini_override_that_names_an_outside_folder_is_a_target_by_another_wor
         assert br.outside_target(argv, str(base)) is None, argv
 
 
+def test_an_ini_value_is_read_as_pytest_reads_it_by_the_shell_s_rules(program, tmp_path):
+    """Review B, round 2: `-o testpaths="../elsewhere"` with the quote marks inside the value ran the outside test, since the
+    value was split at white space and pytest splits it as a shell does. Both readings are held to the rule, and a value
+    the shell's rules cannot read (an open quote) is refused."""
+    br = program("bridge-run")
+    base = tmp_path / "ws"
+    (base / "tests").mkdir(parents=True)
+    out = str(tmp_path / "elsewhere").replace("\\", "/")
+    for setting in ('testpaths="../elsewhere"', "testpaths='../elsewhere'", 'pythonpath="%s"' % out, 'testpaths=tests "../else where"',
+                    'testpaths="../elsewhere', "pythonpath=tests '%s'" % out):
+        for words in (["-o", setting], ["--override-ini=" + setting], ["-o" + setting]):
+            assert br.outside_target(["python", "-m", "pytest"] + words, str(base)) is not None, words
+    for setting in ('testpaths="tests"', "pythonpath='.' tests", 'testpaths="tests/sub dir"'):
+        assert br.outside_target(["python", "-m", "pytest", "-o", setting], str(base)) is None, setting
+    # pytest reads an ini path against the folder of the configuration file it found, which may lie deeper than the launch
+    # folder: a relative one that climbs is refused wherever it lands when read from here.
+    for setting in ("pythonpath=../ws/tests", 'testpaths="../ws/tests"', "pythonpath=tests/../../ws"):
+        assert br.outside_target(["python", "-m", "pytest", "-o", setting, "tests"], str(base)) is not None, setting
+
+
+def test_options_pytest_reads_from_the_environment_are_held_to_the_command_line_s_rules(program, tmp_path):
+    """Review B, round 2: `PYTEST_ADDOPTS=../elsewhere` with a plain `python -m pytest` ran the outside test. Its words are
+    read both ways a value's words can be and held to the escape list and the target rule; `PYTEST_PLUGINS` is `-p` by
+    another route; names are compared as Windows reads them. A unittest run reads neither."""
+    br = program("bridge-run")
+    base = tmp_path / "ws"
+    (base / "tests").mkdir(parents=True)
+    out = str(tmp_path / "elsewhere").replace("\\", "/")
+    run = ["python", "-m", "pytest", "-q"]
+    for env in ({"PYTEST_ADDOPTS": "../elsewhere"}, {"PYTEST_ADDOPTS": '"%s"' % out}, {"PYTEST_ADDOPTS": "-p probeplugin"}, {"PYTEST_ADDOPTS": "--rootdir " + out},
+                {"PYTEST_ADDOPTS": "-c %s/pytest.ini" % out}, {"PYTEST_ADDOPTS": "-o testpaths=" + out}, {"PYTEST_ADDOPTS": '-k "open'},
+                {"pytest_addopts": "../elsewhere"}, {"PYTEST_PLUGINS": "probeplugin"}, {"Pytest_Plugins": "a,b"}):
+        for argv in (run, ["pytest"], ["uv", "run", "--frozen", "pytest", "tests"]):
+            assert br.outside_by_environment(argv, env, str(base)) == list(env)[0], (env, argv)
+    for env in ({}, {"PYTEST_ADDOPTS": ""}, {"PYTEST_ADDOPTS": "  "}, {"PYTEST_ADDOPTS": "--color=yes -p no:cacheprovider -q"}, {"PYTEST_ADDOPTS": '-k "a or b" tests'},
+                {"PYTEST_PLUGINS": ""}, {"PYTHONPATH": out}):
+        assert br.outside_by_environment(run, env, str(base)) is None, env
+    (base / "sub").mkdir()
+    there = ["uv", "run", "--directory", "sub", "pytest"]                  # the environment's targets are read against the folder the run's own are
+    assert br.outside_by_environment(there, {"PYTEST_ADDOPTS": "../tests"}, str(base)) is None
+    assert br.outside_by_environment(there, {"PYTEST_ADDOPTS": "../../elsewhere"}, str(base)) == "PYTEST_ADDOPTS"
+    assert br.outside_by_environment(["python", "-m", "unittest", "discover"], {"PYTEST_ADDOPTS": "../elsewhere"}, str(base)) is None
+    assert br.outside_by_environment(["npm", "test"], {"PYTEST_PLUGINS": "x"}, str(base)) is None
+
+
+@pytest.mark.parametrize("route", ["environment", "key file"])
+def test_an_outside_target_in_the_environment_is_refused_before_the_run_starts(project, route):
+    """Through the program, by the launcher's own environment and by a key file's line: exit 125, the variable named and
+    its value not printed, nothing started, the probe not run."""
+    ws, outside = project
+    env = dict(os.environ, LOCALAPPDATA=str(ws.parent / "localappdata"))
+    for name in ("BRIDGE_RUN_ALLOW_ANY", "PYTEST_ADDOPTS", "PYTEST_PLUGINS"):
+        env.pop(name, None)
+    flags = ["--limit", "120", "--kind", "test"]
+    if route == "environment":
+        env["PYTEST_ADDOPTS"] = str(outside).replace("\\", "/")
+    else:
+        keys = ws.parent / "keys.env"
+        keys.write_text("PYTEST_ADDOPTS=%s\n" % str(outside).replace("\\", "/"), encoding="utf-8")
+        flags += ["--key-file", str(keys)]
+    p = subprocess.run([sys.executable, PROG] + flags + ["--", "python", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
+                       capture_output=True, text=True, cwd=str(ws), env=env)
+    assert p.returncode == 125 and "refused - PYTEST_ADDOPTS in this run's environment" in p.stderr, p.stderr
+    assert "elsewhere" not in p.stderr, "the value is not printed"
+    assert "bridge-run: started" not in p.stderr and not (outside / "probe-ran.txt").exists(), "the probe ran"
+
+
 def test_a_unittest_discovery_started_outside_is_refused_before_it_runs(project):
     """The same through the program: the form that ran in the review exits 125 and the outside case never starts."""
     ws, outside = project

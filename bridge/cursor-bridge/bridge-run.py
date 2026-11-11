@@ -94,6 +94,7 @@ import json
 import math
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -367,6 +368,16 @@ INI_PATH_SETTINGS = ("testpaths", "pythonpath")        # what `-o <name>=<paths>
 PYTEST_FLAG_LETTERS = "xvqslVh"                        # pytest's own one-letter options that take no value: another option may follow one in the same word
 
 
+def value_words(value):
+    """Every reading of a value that holds several words: split at white space, and split as pytest
+    splits an ini value and `PYTEST_ADDOPTS`, by the shell's rules, where quotes join and leave and a
+    backslash escapes. A list of lists; None where the shell's rules cannot read it (an open quote)."""
+    try:
+        return [value.split(), shlex.split(value)]
+    except ValueError:
+        return None
+
+
 def ini_override(a):
     """The `<name>=<value>` an option word of a pytest run sets by `-o` or `--override-ini`: "" where
     the setting is the next word, None where the word is no such option. Read as argparse reads
@@ -455,6 +466,56 @@ def launch_roots(folder):
     return roots
 
 
+def runner_word(argv):
+    """(`pytest` or `unittest`, the index of the first word after it) for a run of one of the two,
+    read where `named_suite` reads it; (None, 0) for any other command."""
+    head = head_of(argv)
+    if head == "pytest":
+        return "pytest", 1
+    if head in ("python", "python3", "py"):                 # `python -m pytest` and `python -m unittest`, the two forms `named_suite` takes
+        if argv[1:2] == ["-m"] and argv[2:3] in (["pytest"], ["unittest"]):
+            return argv[2], 3
+        return None, 0
+    if head == "uv":                                        # the runner's word is the first that is no option of uv's and no option's value
+        start = 2
+        while start < len(argv) and argv[start] != "pytest":
+            start += 2 if argv[start] in UV_VALUE_OPTIONS else 1
+        return "pytest", start + 1
+    return None, 0
+
+
+PYTEST_ENV_WORDS = "PYTEST_ADDOPTS"                    # options pytest reads from the environment, in front of the command's own
+PYTEST_ENV_PLUGINS = "PYTEST_PLUGINS"                  # plugins pytest loads by name from the environment, as `-p` does
+
+
+def outside_by_environment(argv, environ, folder=None):
+    """The name of a variable in the environment a pytest run is about to get that would have it
+    load a plugin or take an option or a target the launcher refuses on the command line, or None
+    (release S). `PYTEST_ADDOPTS` is read in both ways a value's words can be (`value_words`) and
+    held to `test_suite`'s escape list for pytest and to `outside_target`, behind the command's own
+    words up to `pytest` (uv's `--directory` is the folder its targets are read against);
+    `PYTEST_PLUGINS` set at all is `-p` by another route. Names are compared without regard to
+    case, as Windows reads them. The value is never printed: a key file's lines reach this
+    environment (`--key-file`). What the interpreter itself reads from the environment
+    (`PYTHONPATH` and its kin) is no word of the run and is not read here."""
+    word, start = runner_word(argv)
+    if word != "pytest":
+        return None
+    for name, value in environ.items():
+        if not (value or "").strip():
+            continue
+        if name.upper() == PYTEST_ENV_PLUGINS:
+            return name
+        if name.upper() == PYTEST_ENV_WORDS:
+            readings = value_words(value)
+            if readings is None:
+                return name
+            for words in readings:
+                if not test_suite(["pytest"] + words, folder) or outside_target(argv[:start] + words, folder) is not None:
+                    return name
+    return None
+
+
 def outside_target(argv, folder=None):
     """The first word of a pytest or unittest run that leads outside the project, or None (release
     S). A test run reads the project's own tests: a probe written in a temporary folder and run
@@ -470,18 +531,8 @@ def outside_target(argv, folder=None):
     a bare `--` as a target; an `@file` of arguments, which hides its targets and is refused
     whatever it holds, for pytest in an option's value too."""
     head = head_of(argv)
-    if head == "pytest":
-        word, start = "pytest", 1
-    elif head in ("python", "python3", "py"):               # `python -m pytest` and `python -m unittest`, the two forms `named_suite` takes
-        if argv[1:2] != ["-m"] or argv[2:3] not in (["pytest"], ["unittest"]):
-            return None
-        word, start = argv[2], 3
-    elif head == "uv":                                      # the runner's word is the first that is no option of uv's and no option's value
-        word, start = "pytest", 2
-        while start < len(argv) and argv[start] != "pytest":
-            start += 2 if argv[start] in UV_VALUE_OPTIONS else 1
-        start += 1
-    else:
+    word, start = runner_word(argv)
+    if word is None:
         return None
     roots = launch_roots(folder)
     base = folder or os.getcwd()
@@ -489,6 +540,9 @@ def outside_target(argv, folder=None):
     def inside(path, against):
         full = _real_path(os.path.join(against, path))
         return any(full == r or full.startswith(r.rstrip(os.sep) + os.sep) for r in roots)
+
+    def climbs(path):                                      # pytest reads an ini path against the folder of the configuration file it found, which may lie deeper than the launch folder
+        return os.path.normpath(path).split(os.sep)[0] == os.pardir
 
     if head == "uv":
         i = 2
@@ -528,8 +582,9 @@ def outside_target(argv, folder=None):
                     shown = "%s %s" % (a, setting)
                     i += 1
                 key, _, paths = setting.partition("=")
-                if key.strip() in INI_PATH_SETTINGS and any(not inside(p, base) for p in paths.split()):
-                    return shown
+                readings = value_words(paths)
+                if key.strip() in INI_PATH_SETTINGS and (readings is None or any(not inside(p, base) or climbs(p) for words in readings for p in words)):
+                    return shown                           # pytest reads the value by the shell's rules: `testpaths="../elsewhere"` is that folder
                 if key.strip() == "addopts" and paths.strip():   # options inside a value are read by no rule here: on the command line, or not at all
                     return shown
                 continue
@@ -1708,11 +1763,24 @@ def main():
     elif not accepted(cmd, folder):
         sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
         return 125
+    read_keys = None
     if kind != "driver" and named_suite(cmd):
         outside = outside_target(cmd, folder)
         if outside is not None:
             sys.stderr.write("bridge-run: refused - the test target %r lies outside the folder the launcher runs in; a test run reads the project's own tests: "
                              "write a probe under the project's tests folder and run it from there\n" % outside)
+            return 125
+        coming = dict(os.environ)                          # what the run is about to get: a stripped run keeps every name that is no key, and the key file's lines join it
+        if "--key-file" in flags:
+            try:
+                read_keys = key_file_env(flags[flags.index("--key-file") + 1], folder)
+                coming.update(read_keys)                   # read once: the lines checked here are the lines the run gets
+            except (IndexError, OSError, ValueError):
+                pass                                       # refused below, where the key file is read for the run
+        by_environment = outside_by_environment(cmd, coming, folder)
+        if by_environment is not None:
+            sys.stderr.write("bridge-run: refused - %s in this run's environment would have pytest load a plugin, or take an option or a target the launcher refuses "
+                             "on the command line; a test run reads the project's own tests: unset it, or write its words on the command line\n" % by_environment)
             return 125
     if "--key-file" in flags and is_agent_argv(cmd):
         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
@@ -1806,7 +1874,7 @@ def main():
         return 125
     if "--key-file" in flags:
         try:
-            keys = key_file_env(flags[flags.index("--key-file") + 1], folder)
+            keys = read_keys if read_keys is not None else key_file_env(flags[flags.index("--key-file") + 1], folder)
         except (IndexError, OSError, ValueError) as e:
             sys.stderr.write("bridge-run: refused - key file: %s\n" % e)
             return 125
