@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-016
+round: 2
+satisfies: [R-029]
+scope: ["bridge/cursor-bridge/trace-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-016-r2-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-016 round 2: containment of references, citation chains, output order, error handling
 
 ## Objective

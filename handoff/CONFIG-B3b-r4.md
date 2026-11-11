@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: CONFIG-B3b
+round: 4
+satisfies: []
+scope: ["tools/dump-cli.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/CONFIG-B3b-r4-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # CONFIG-B3b round 4: every written form of a folder; dict keys, choices, the type field and non-JSON numbers
 
 ## Objective

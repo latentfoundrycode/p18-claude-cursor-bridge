@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-029
+round: 3
+satisfies: [R-040]
+scope: ["bridge/cursor-bridge/bridge-run.py", "docs/BUILDER_NOTES.md", "handoff/TASK-029-r3-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-029, round 3: One heavy job at a time: the launcher's machine-wide slot (code-only fixes)
 
 ## Objective

@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-033
+round: 4
+satisfies: [R-044]
+scope: ["bridge/cursor-bridge/pace-report.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-033-r4-report.md"]
+merge_unit: null
+blocking_class: "safety mechanism"
+---
 Blocking class: safety mechanism - the session read's deadline is not acted on while an over-cap transcript line is drained (pace-report.py:476-484, `if past_deadline(): pass`; Review A round 3 B1 and the security audit's round 3 B, converged), with two findings of the class behaviour in the same round: the letter rule's tracked list and R-nnn under the grammar
 
 # TASK-033-r4: One reading of a squash subject — round 4, past the ceiling, three findings of the blocking classes

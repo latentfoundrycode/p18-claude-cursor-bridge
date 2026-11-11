@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-043
+round: 2
+satisfies: [R-042, R-055]
+scope: ["bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-043-r2-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-043, round 2: BUG-039, what round 1's reviews confirmed beyond the four sites
 
 ## Objective

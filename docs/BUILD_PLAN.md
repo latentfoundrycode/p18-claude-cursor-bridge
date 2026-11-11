@@ -1,3 +1,721 @@
+---
+record: build-plan
+header: 1
+stages:
+  - name: "Standing constraints (every increment)"
+    demonstration: false
+    increments: []
+  - name: "Prior-project lessons"
+    demonstration: false
+    increments: []
+  - name: "Stage B1 — Supervised-project bootstrap"
+    demonstration: true
+    increments:
+      - id: TASK-001
+        title: "Intake and configuration records"
+        kind: increment
+        parent: null
+        depends_on: []
+        parallel: false
+        diagrams: []
+        scope: [project.json, "docs/PROJECT_STATUS.md", "docs/REQUIREMENTS.md", "docs/INVENTORY.md", "docs/RUN_PARAMETERS.md", "docs/ROSTER.json", "docs/ROSTER.resolved.json", "docs/BUILD_PLAN.md", "docs/DESIGN_CRITIQUE.md", "tests/test_release_b_bootstrap.py"]
+        satisfies: [R-001]
+        deferred: null
+        historic: false
+      - id: TASK-002
+        title: "The security floor in the bridge's CI"
+        kind: increment
+        parent: null
+        depends_on: [TASK-001]
+        parallel: false
+        diagrams: []
+        scope: [".github/workflows/tests.yml", ".semgrep.yml", osv-scanner.toml, socket.yml, requirements.lock, "tests/test_release_b_ci_floor.py"]
+        satisfies: [R-002]
+        deferred: null
+        historic: false
+  - name: "Stage B2 — The conditional-workflow framework"
+    demonstration: true
+    increments:
+      - id: TASK-003
+        title: "The conditional-workflow model in the core"
+        kind: increment
+        parent: null
+        depends_on: [TASK-001]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/commands/supervisor.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_workflow_model.py"]
+        satisfies: [R-007, R-008, R-009, R-034]
+        deferred: null
+        historic: false
+      - id: TASK-004
+        title: "The open list"
+        kind: increment
+        parent: null
+        depends_on: [TASK-003]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/open-list.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_open_list.py"]
+        satisfies: [R-011]
+        deferred: null
+        historic: false
+      - id: TASK-005
+        title: "The extension-point registry"
+        kind: increment
+        parent: null
+        depends_on: [TASK-003]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/extension-points.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_extension_points.py"]
+        satisfies: [R-006]
+        deferred: null
+        historic: false
+      - id: TASK-006
+        title: "The workflow check"
+        kind: increment
+        parent: null
+        depends_on: [TASK-002, TASK-004, TASK-005]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow-check.py", ".github/workflows/tests.yml", "tests/fixtures/workflows/", "bridge/cursor-bridge/MANIFEST.json", "tests/test_workflow_check.py"]
+        satisfies: [R-014, R-033]
+        deferred: null
+        historic: false
+      - id: TASK-007
+        title: "The Workflows status line: template and semantics"
+        kind: increment
+        parent: null
+        depends_on: [TASK-003]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/commands/supervisor.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_workflows_line_text.py"]
+        satisfies: [R-015]
+        deferred: null
+        historic: false
+      - id: TASK-008
+        title: "The Workflows status line: enforced"
+        kind: increment
+        parent: null
+        depends_on: [TASK-007]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/workflow-check.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_workflows_line_check.py", "tests/test_conformance_check.py"]
+        satisfies: [R-015]
+        deferred: null
+        historic: false
+      - id: TASK-009
+        title: "The glossary gains the plan's terms"
+        kind: increment
+        parent: null
+        depends_on: [TASK-003]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/Glossary.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_glossary_terms.py"]
+        satisfies: [R-028]
+        deferred: null
+        historic: false
+  - name: "Stage B3 — The core and phase-module split"
+    demonstration: true
+    increments:
+      - id: TASK-016
+        title: "The traceability comparison (built first)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-003, TASK-005, TASK-007]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/trace-check.py", "bridge/cursor-bridge/workflow/trace-baseline.txt", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_trace_check.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_dump_cli.py (widened 2026-10-23, recorded at stage B3's review: the supervisor's commit with the increment added trace-check.py to that test's list of argparse programs, which the generated command reference reads, a later increment that adds an argparse program, TASK-031's mutation-run.py among them, names the file in its Scope, as TASK-031's now does, the same commit added docs/cli-reference.json and docs/CLI_REFERENCE.md to the Scopes of TASK-016, TASK-015 and TASK-024, a widening its message records)"]
+        satisfies: [R-029]
+        deferred: null
+        historic: false
+      - id: TASK-010
+        title: "Carve the core and move the phase sections"
+        kind: increment
+        parent: null
+        depends_on: [TASK-003, TASK-005, TASK-006, TASK-007, TASK-016]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/commands/supervisor.md", "bridge/cursor-bridge/workflow/phases/intake.md", ".../design.md", ".../interface.md", ".../planning.md", ".../run-parameters.md", ".../configuration.md", ".../delegation-loop.md", ".../change-cycle.md", ".../reflection.md", ".../project-end.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_core_carve.py", "tests/test_session_start.py", "tests/instructions.py", "tests/test_allowlist.py", "tests/test_a5_followups.py", "tests/test_text_consistency.py", "tests/test_workflow_model.py (widened at the carve, 2026-10-20: the tests that read the supervisor's instructions read the core and its modules, through tests/instructions.py, so a passage that moves keeps its test, test_workflow_model.py's two assertions of the transitional reading become the carved one's)"]
+        satisfies: [R-003, R-032]
+        deferred: null
+        historic: false
+      - id: TASK-011
+        title: "Enrich phase modules: intake, design"
+        kind: increment
+        parent: null
+        depends_on: [TASK-010]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/phases/intake.md", "bridge/cursor-bridge/workflow/phases/design.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_phase_modules_intake_design.py", "bridge/cursor-bridge/Merge-Verification-Policy.md", "bridge/agents/plan-critic.md (widened 2026-10-20 for the carve's pointer sweep, docs/HARDENING.md, Stage B3: the two files' pointers to the design phase named `supervisor.md` and now name `workflow/phases/design.md`)", "bridge/cursor-bridge/settings.bridge.json (widened 2026-10-20: intake now runs `workflow-check.py --status`, so the read-only checker gets the allow rule every other checker the instructions name has, tests/test_allowlist.py)"]
+        satisfies: [R-004, R-006, R-013, R-032, R-035, R-036]
+        deferred: null
+        historic: false
+      - id: TASK-012
+        title: "Enrich phase modules: interface, planning"
+        kind: increment
+        parent: null
+        depends_on: [TASK-010]
+        parallel: false
+        diagrams: []
+        scope:
+          - "bridge/cursor-bridge/workflow/phases/interface.md"
+          - ".../interface/mockups.md"
+          - ".../interface/command-design.md"
+          - ".../interface/contract-design.md"
+          - ".../interface/playable-prototype.md"
+          - ".../planning.md"
+          - "bridge/cursor-bridge/workflow/trace-exceptions.md"
+          - "bridge/cursor-bridge/MANIFEST.json"
+          - "tests/test_phase_modules_interface_planning.py"
+          - "bridge/commands/supervisor.md"
+          - "bridge/cursor-bridge/workflow/phases/design.md"
+          - "tests/test_core_carve.py"
+          - "tests/test_workflow_model.py"
+          - "tests/test_session_start_module.py"
+          - "tests/test_phase_modules_intake_design.py"
+          - "bridge/cursor-bridge/Merge-Verification-Policy.md (widened 2026-10-20 for the pointer sweep, docs/HARDENING.md, Stage B3: the core's module table and its Phase 3 sentence, and design.md's gate sentence, named Phase 3 \"the UI mockups\", now one variant of four, rule 13 and the merge policy named the approved-mockup rule's old home, the tests that pin the interface module's heading, the trace counts and the hook's names for Phase: mockups follow, and for Review B's should-fix at PR #53, design.md's resume sentence, with the TASK-011 test that pins it)"
+        satisfies: [R-004, R-006, R-010, R-012, R-032]
+        deferred: null
+        historic: false
+      - id: TASK-013
+        title: "Enrich phase modules: run parameters, configuration, the delegation loop"
+        kind: increment
+        parent: null
+        depends_on: [TASK-010]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/phases/run-parameters.md", ".../configuration.md", ".../delegation-loop.md", ".../delegation-loop/", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_phase_modules_build.py", "bridge/commands/supervisor.md", "tests/test_session_start_module.py (widened 2026-10-20 for the split: the core's module table names the delegation loop's sub-file folder and the sentence under it where a split module's step keeps its heading, the hook's tests expect the sub-file after delegation-loop.md for `Phase: building` and `Phase: changing`, and the tests of the pointer-line grammar write a delegation-loop module of their own, since the installed one now has a `Sub-files:` line)"]
+        satisfies: [R-004, R-006, R-032]
+        deferred: null
+        historic: false
+      - id: TASK-014
+        title: "Enrich phase modules: change cycle, reflection, project end"
+        kind: increment
+        parent: null
+        depends_on: [TASK-010]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/phases/change-cycle.md", ".../reflection.md", ".../project-end.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_phase_modules_close.py", "bridge/cursor-bridge/workflow/phases/interface/mockups.md", ".../interface/command-design.md", ".../interface/contract-design.md", ".../interface/playable-prototype.md", "tests/test_phase_modules_interface_planning.py", "tests/test_core_carve.py", "bridge/cursor-bridge/Glossary.md", "bridge/commands/supervisor.md (widened 2026-10-20 for docs/HARDENING.md's Stage B3 leads that name TASK-014: the variant files' declaring paragraphs moved under headings of their own, so that their trace entries excuse nothing else in the file, with the interface test that pins the variant files' headings, the traceability check's pin in the carve test, three of the change cycle's passages being reworded, and rule 34, which states the change cycle's steps and gates, with them (bridge/commands/supervisor.md, Review B's round 3), and the pointer sweep's one stale pointer to these modules, the glossary's phase-module entry, which still said project end was part of the reflection points)"]
+        satisfies: [R-004, R-006, R-032, R-036]
+        deferred: null
+        historic: false
+      - id: TASK-015
+        title: "The compaction hook names the phase module"
+        kind: increment
+        parent: null
+        depends_on: [TASK-010, TASK-006, TASK-007]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/session-start.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_session_start_module.py", "tests/test_session_start.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md"]
+        satisfies: [R-005]
+        deferred: null
+        historic: false
+  - name: "Stage B4 — The first conditional workflows"
+    demonstration: true
+    increments:
+      - id: TASK-017
+        title: "Trait files: has screens, installable, performance budgets, external services"
+        kind: increment
+        parent: null
+        depends_on: [TASK-011, TASK-012, TASK-013, TASK-014, TASK-006]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/traits/has-screens.md", ".../installable.md", ".../performance-budgets.md", ".../external-services.md", "bridge/cursor-bridge/workflow/phases/intake.md", ".../design.md", ".../planning.md", ".../configuration.md", ".../delegation-loop.md", ".../project-end.md", "bridge/cursor-bridge/workflow/extension-points.md", "bridge/agents/plan-critic.md", "bridge/cursor-bridge/workflow/open-list.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_traits_existing.py", "tests/test_extension_points.py", "tests/test_phase_modules_intake_design.py", "tests/test_phase_modules_interface_planning.py", "tests/test_phase_modules_build.py", "tests/test_phase_modules_close.py", "tests/test_session_start_module.py", "tests/test_text_consistency.py", "tests/test_b2_least_confident.py", "tests/test_core_carve.py", "tests/test_b3_least_confident.py", "tests/instructions.py (the Scope as revised 2026-10-24, subject `traits`, tests/instructions.py added at PR #67's Review A: every file the reality check found holding or pinning a passage this increment moves, run/supervisor/task017-reality-check.md, reflection.md, interface.md, run-parameters.md and the delegation loop's sub-file folder left out, none of them changing, the widenings of 2026-10-24 kept, tests/test_core_carve.py from the pace plan revision, whose trace pin the `reword` entries change, and tests/test_b3_least_confident.py from FIX-004)"]
+        satisfies: [R-010, R-016, R-017, R-018, R-019]
+        deferred: null
+        historic: false
+      - id: TASK-018
+        title: "Trait files: spends money, long-running process, AI models"
+        kind: increment
+        parent: null
+        depends_on: [TASK-011, TASK-013, TASK-005, TASK-006, TASK-017]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/traits/spends-money.md", ".../long-running-process.md", ".../ai-models.md", "bridge/cursor-bridge/workflow/open-list.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_traits_new.py", "tests/test_b3_least_confident.py"]
+        satisfies: [R-020, R-021, R-022]
+        deferred: null
+        historic: false
+      - id: TASK-019
+        title: "Type workflow: web app and local web app"
+        kind: increment
+        parent: null
+        depends_on: [TASK-012, TASK-014, TASK-006, TASK-017, TASK-018]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/types/web-app.md", "bridge/cursor-bridge/workflow/types/web-app/local-web-app.md", "bridge/cursor-bridge/workflow/open-list.md", "tests/fixtures/workflows/reangle.status.md", "tests/fixtures/workflows/video-factory.status.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_type_web_app.py", "bridge/cursor-bridge/workflow/trace-exceptions.md", "tests/test_b3_least_confident.py (the last two added 2026-10-24, subject `traits`: a type file's text is new to the trace check, which counts the type files as modules)"]
+        satisfies: [R-023]
+        deferred: null
+        historic: false
+      - id: TASK-020
+        title: "Type workflow: software on your own computer and local service"
+        kind: increment
+        parent: null
+        depends_on: [TASK-012, TASK-013, TASK-014, TASK-006, TASK-017, TASK-018]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/types/own-computer.md", "bridge/cursor-bridge/workflow/types/own-computer/local-service.md", "bridge/cursor-bridge/workflow/open-list.md", "tests/fixtures/workflows/tdp.status.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_type_own_computer.py", "bridge/cursor-bridge/workflow/trace-exceptions.md", "tests/test_b3_least_confident.py (the last two added 2026-10-24, subject `traits`, as for TASK-019)"]
+        satisfies: [R-024]
+        deferred: null
+        historic: false
+      - id: TASK-021
+        title: "Type workflow: host extension and Claude Code extension"
+        kind: increment
+        parent: null
+        depends_on: [TASK-013, TASK-014, TASK-006, TASK-017]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/types/host-extension.md", "bridge/cursor-bridge/workflow/types/host-extension/claude-code-extension.md", "bridge/cursor-bridge/workflow/open-list.md", "tests/fixtures/workflows/bridge.status.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_type_host_extension.py", "tests/test_b2_least_confident.py", "bridge/cursor-bridge/workflow/trace-exceptions.md", "tests/test_b3_least_confident.py (the last two added 2026-10-24, subject `traits`, as for TASK-019)", "tests/test_session_start_module.py (added at PR #67's Review A: its cases that write their own host-extension file, or make a link at its path, are re-taken where the installed file now exists)"]
+        satisfies: [R-025]
+        deferred: null
+        historic: false
+      - id: TASK-022
+        title: "Interface text: contract design and command design"
+        kind: increment
+        parent: null
+        depends_on: [TASK-012]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/phases/interface/contract-design.md", "bridge/cursor-bridge/workflow/phases/interface/command-design.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_interface_text.py", "tests/test_phase_modules_close.py", "tests/test_b3_least_confident.py"]
+        satisfies: [R-026]
+        deferred: null
+        historic: false
+  - name: "Stage B5 — Calibration and acceptance"
+    demonstration: true
+    increments:
+      - id: TASK-023
+        title: "Calibration aware of conditional workflows (text)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-015, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/commands/calibrate-bridge.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_calibrate_text.py"]
+        satisfies: [R-027]
+        deferred: null
+        historic: false
+      - id: TASK-024
+        title: "Calibration aware of conditional workflows (program)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-023, TASK-006, TASK-008]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_calibrate_program.py", "tests/test_workflows_line_check.py", "tests/test_b2_least_confident.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md"]
+        satisfies: [R-027, R-033]
+        deferred: null
+        historic: false
+      - id: TASK-028
+        title: "Windowless launches enforced by the bridge: the launcher's driver kind and the suite's frozen default"
+        kind: increment
+        parent: null
+        depends_on: [TASK-024]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/windowless-default.snapshot.md", "bridge/cursor-bridge/settings.bridge.json", "bridge/cursor-bridge/MANIFEST.json", "tests/conftest.py", "tests/test_bridge_run_driver.py", "tests/test_conformance_windowless.py", "tests/test_allowlist.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md"]
+        satisfies: [R-039]
+        deferred: null
+        historic: false
+      - id: TASK-029
+        title: "One heavy job at a time: the launcher's machine-wide slot"
+        kind: increment
+        parent: null
+        depends_on: [TASK-028]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/loop-guard.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_bridge_run_slot.py", "tests/test_loop_guard.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md"]
+        satisfies: [R-040]
+        deferred: null
+        historic: false
+      - id: TASK-031
+        title: "Mutation reruns that skip what is unchanged: `mutation-run.py`"
+        kind: increment
+        parent: null
+        depends_on: [TASK-028]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/mutation-run.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_mutation_run.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_dump_cli.py (widened 2026-10-23, at stage B3's review: the new program's build_parser() joins that test's list of argparse programs, which the generated command reference reads, as TASK-016's widening notes)"]
+        satisfies: [R-041]
+        deferred: null
+        historic: false
+      - id: TASK-030
+        title: "The loop's text for windowless runs and the rate limit"
+        kind: increment
+        parent: null
+        depends_on: [TASK-029, TASK-031, TASK-017, TASK-018, TASK-023]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/phases/delegation-loop.md", "bridge/cursor-bridge/workflow/phases/delegation-loop/", "bridge/cursor-bridge/workflow/phases/configuration.md", "bridge/commands/supervisor.md", "bridge/commands/calibrate-bridge.md", "bridge/agents/test-runner.md", "bridge/agents/cursor-configurator.md", "bridge/agents/diff-reviewer.md", "bridge/agents/spec-packager.md", "bridge/cursor-bridge/Known-Pitfalls.md", "bridge/cursor-bridge/Cursor-Project-Configuration.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_loop_text_windowless.py", "tests/test_core_carve.py", "tests/test_phase_modules_build.py", "tests/test_session_start_module.py (the three widened 2026-10-24, at the pace plan revision: the two `reword` entries change the trace pin test_core_carve.py holds, a split of delegation-loop.md changes the sub-file pins at test_phase_modules_build.py:214-228 and test_session_start_module.py:96, the fixtures case of TASK-015's note, stage B3's review, round 4)", "tests/test_b3_least_confident.py"]
+        satisfies: [R-039, R-040, R-041, R-043]
+        deferred: null
+        historic: false
+      - id: TASK-032
+        title: "The code-review ceiling held by the launcher and the guard"
+        kind: increment
+        parent: null
+        depends_on: [TASK-029]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/permission-guard.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_bridge_run_review_ceiling.py", "tests/test_review_guard_ceiling.py", "tests/test_bridge_run_design_ceiling.py", "tests/test_permission_guard.py", "tests/test_review_guard.py", "tests/test_review_guard_a4.py", "tests/test_bridge_run.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_hotfix25a_guard_scope_invisible.py *(widened 2026-10-28 at the brief's reality check: its guard snapshots use the bare names `001` and `003`, which the grammar refuses, so they move to the grammar as tests/test_review_guard.py's do, the same check found the agent-home refusal after the launcher's `started` line, so the order clause a states is read as after the key-file and design-ceiling refusals, before the `started` line, the agent-home check left where it is)*"]
+        satisfies: [R-042]
+        deferred: null
+        historic: false
+      - id: TASK-033
+        title: "One reading of a squash subject: the plan check's title rule and `pace-report.py`"
+        kind: increment
+        parent: null
+        depends_on: [TASK-032]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/plan-check.py", "bridge/cursor-bridge/pace-report.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_plan_check.py", "tests/test_pace_report.py", "tests/test_dump_cli.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md"]
+        satisfies: [R-044]
+        deferred: null
+        historic: false
+      - id: TASK-035
+        title: "Stage B3's review leads: the pointers, the labels and the project-end pass"
+        kind: increment
+        parent: null
+        depends_on: [TASK-030]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/commands/supervisor.md", "bridge/cursor-bridge/Glossary.md", "bridge/cursor-bridge/workflow/phases/intake.md", "bridge/cursor-bridge/workflow/phases/design.md", "bridge/cursor-bridge/workflow/phases/planning.md", "bridge/cursor-bridge/workflow/phases/run-parameters.md", "bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md", "bridge/cursor-bridge/workflow/phases/change-cycle.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_leads_b3.py", "tests/test_phase_modules_close.py", "tests/test_workflow_model.py", "tests/test_core_carve.py", "tests/test_phase_modules_intake_design.py", "tests/test_phase_modules_interface_planning.py", "tests/test_b3_least_confident.py", "tests/test_phase_modules_build.py *(widened 2026-10-28 at the increment's own reality check: tests/test_phase_modules_build.py holds step 9 of refactoring-pass.md verbatim, its passage list and its sha256, so the project-end sentence's reword re-takes both there)*"]
+        satisfies: [R-003]
+        deferred: null
+        historic: false
+      - id: TASK-034
+        title: "The loop's text for the review ceiling and the pace report"
+        kind: increment
+        parent: null
+        depends_on: [TASK-030, TASK-032, TASK-033, TASK-035]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/commands/supervisor.md", "bridge/commands/evaluate-reports.md", "bridge/cursor-bridge/workflow/phases/delegation-loop.md", "bridge/cursor-bridge/workflow/phases/delegation-loop/", "bridge/cursor-bridge/workflow/phases/reflection.md", "bridge/cursor-bridge/workflow/phases/run-parameters.md", "bridge/cursor-bridge/Merge-Verification-Policy.md", "bridge/cursor-bridge/Known-Pitfalls.md", "bridge/agents/diff-reviewer.md", "bridge/agents/security-auditor.md", "bridge/agents/design-auditor.md", "bridge/agents/spec-packager.md", "bridge/skills/root-cause-first/SKILL.md", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_loop_text_pace.py", "tests/test_core_carve.py", "tests/test_phase_modules_build.py", "tests/test_phase_modules_close.py", "tests/test_allowlist.py", "tests/test_session_start_module.py", "tests/test_session_start.py", "tests/test_b3_least_confident.py", "tests/test_a5_followups.py *(widened 2026-10-28 at the increment's full suite: it pins the stage review's part name `run/review/STAGE-<name>-<part>.diff`, which the round's name makes `STAGE-<name>-r<N>-<part>.diff`)*"]
+        satisfies: [R-042, R-043, R-044]
+        deferred: null
+        historic: false
+      - id: TASK-025
+        title: "Acceptance: reads-only, classification, and full trace"
+        kind: increment
+        parent: null
+        depends_on: [TASK-023, TASK-024, TASK-030, TASK-031, TASK-034, TASK-009, TASK-015, TASK-011, TASK-016]
+        parallel: false
+        diagrams: []
+        scope: ["tests/test_reads_only_applicable.py", "tests/test_running_projects_classify.py", "tests/test_trace_full_split.py"]
+        satisfies: [R-029, R-030, R-031]
+        deferred: null
+        historic: false
+  - name: "Stage B6 — Release and install"
+    demonstration: true
+    increments:
+      - id: TASK-026
+        title: "Release-level review and fixes"
+        kind: increment
+        parent: null
+        depends_on: [TASK-022, TASK-025, TASK-035]
+        parallel: false
+        diagrams: []
+        scope: ["Reports/Reviews/ (outside Workspace/, human-facing — the review record)", "its working inputs stay under run/review/ (KP-016)"]
+        satisfies: [R-037]
+        deferred: null
+        historic: false
+      - id: TASK-027
+        title: "Install run-sheet, stamp, install, and the trial"
+        kind: increment
+        parent: null
+        depends_on: [TASK-026]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/commands/calibrate-bridge.md", "bridge/cursor-bridge/CHANGELOG.md", "bridge/cursor-bridge/VERSION", "bridge/cursor-bridge/MANIFEST.json", "docs/PROJECT_STATUS.md", "docs/INVENTORY.md", "tests/test_release_b_stamp.py"]
+        satisfies: [R-031, R-037, R-038]
+        deferred: null
+        historic: false
+  - name: "Release T — the plan addendum (2026-11-01)"
+    demonstration: false
+    increments: []
+  - name: "Stage T1 — Release T: the text, pinned"
+    demonstration: true
+    increments:
+      - id: TASK-036
+        title: "The pitfalls (R-054), and D-004's first deviation closed by the corrected text"
+        kind: increment
+        parent: null
+        depends_on: []
+        parallel: false
+        diagrams: [D-004]
+        scope: ["bridge/cursor-bridge/Known-Pitfalls.md", "bridge/cursor-bridge/MANIFEST.json", "docs/diagrams/D-004-context-dfd.md", "docs/diagrams/DEVIATIONS.md", "tests/test_release_t_pitfalls.py", "tests/test_a5_followups.py (re-taken only if KP-061's heading changes: it pins the heading and its uniqueness, not the outcome line D5 corrects, no other test pins a sentence of KP-052, KP-061 or KP-038 — a pin the reality check finds is a plan revision)"]
+        satisfies: [R-054]
+        deferred: null
+        historic: false
+      - id: TASK-037
+        title: "Reports, run sheets, the critique's record and project state (R-047, R-048, R-053)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-036]
+        parallel: false
+        diagrams: []
+        scope:
+          - "bridge/commands/supervisor.md (rules 12, 43 and 48, \"Project state\": the Decisions row's sentence and the status template)"
+          - "bridge/cursor-bridge/session-start.py (the digest's rule 12 in the question form, the digest within 9,500 characters with every rule number kept, trimmed elsewhere as TASK-034 trimmed it, the trims named in the trace entry)"
+          - "bridge/skills/explain-for-decision/SKILL.md (the run sheet: a vendor console from documentation fetched at the time, with the exact path)"
+          - "bridge/commands/calibrate-bridge.md (step 5: the `Calibrated:` line rewritten at each calibration, the earlier text living in git)"
+          - "bridge/cursor-bridge/workflow/phases/design.md (T1 one subject for a design with its addendum, T3 the record's definitions, T7 the snapshot id `DESIGN-<subject>-<round>` and the `.err` name from it, P9 the worked-scenario lens)"
+          - "bridge/cursor-bridge/workflow/phases/change-cycle.md (item 2: the pause before planning work, the model named, a push notification where Remote Control is on, T26)"
+          - "bridge/agents/plan-critic.md (P9's lens)"
+          - "bridge/cursor-bridge/Diagram-Planning-Conventions.md (§8: the all-omitted index, the minimum set binding every project whose code has components, the calibration's retrofit reading the same rows, P20)"
+          - "bridge/cursor-bridge/workflow/trace-exceptions.md"
+          - "bridge/cursor-bridge/MANIFEST.json"
+          - "tests/test_release_t_records.py"
+          - "tests/test_session_start.py"
+          - "tests/test_core_carve.py"
+          - "tests/test_phase_modules_intake_design.py"
+          - "tests/test_phase_modules_close.py"
+          - "tests/test_b3_least_confident.py"
+          - "tests/test_calibrate_text.py"
+          - "tests/test_leads_b3.py (pins re-taken, the last where T7's rewrite of the snapshot id touches design.md's snapshot-hash bullet it pins, checked before the brief)"
+        satisfies: [R-047, R-048, R-053]
+        deferred: null
+        historic: false
+      - id: TASK-038
+        title: "The merge step in its own sub-file; the merge mechanics and where reviewers write (R-045, R-046)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-037]
+        parallel: false
+        diagrams: []
+        scope:
+          - "bridge/cursor-bridge/workflow/phases/delegation-loop.md"
+          - "bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md (new)"
+          - "bridge/commands/supervisor.md (rule 43 and the status template: the status file as at the merge, `in-flight.md` between merges, T11 and T17)"
+          - "bridge/cursor-bridge/session-start.py (the hook's text on `in-flight.md`, T17, its module table unchanged, the sub-file read from the pointer line)"
+          - "bridge/cursor-bridge/Merge-Verification-Policy.md (\"Invocation\": T5's clauses, T8's bare commands, T4's title form, its convergence paragraph untouched here)"
+          - "bridge/cursor-bridge/workflow/phases/design.md (the constant prompt and the receipt check: T5, T2)"
+          - "bridge/cursor-bridge/workflow/phases/reflection.md (steps 4 and 6: T16, T25)"
+          - "bridge/agents/diff-reviewer.md (T5, T2)"
+          - "bridge/agents/secret-sentinel.md (P5: every pushed commit scanned for computer paths and account names)"
+          - "bridge/cursor-bridge/settings.bridge.json (the allow rules `Bash(git branch -D:*)`, `Bash(gh pr list:*)` and `Bash(gh issue list:*)`, the test kind's `--key-file` form where TASK-036's launch was prompted)"
+          - "bridge/cursor-bridge/workflow/trace-exceptions.md"
+          - "bridge/cursor-bridge/MANIFEST.json"
+          - "tests/test_release_t_merge.py"
+          - "tests/test_allowlist.py"
+          - "tests/permission_rules.py (in that case)"
+          - "tests/test_phase_modules_build.py"
+          - "tests/test_session_start_module.py"
+          - "tests/test_session_start.py"
+          - "tests/test_core_carve.py"
+          - "tests/test_b3_least_confident.py"
+          - "tests/test_loop_text_pace.py"
+          - "tests/test_phase_modules_close.py"
+          - "tests/test_a5_followups.py (pins re-taken: the sub-file pointers, step 8's names and sentences, the stage review's part sentence T25 edits)"
+        satisfies: [R-045, R-046]
+        deferred: null
+        historic: false
+      - id: TASK-039
+        title: "Rule 6, convergence and the ceiling's text; briefs, reports and the accept step (R-050, R-051; R-042 revised)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-038]
+        parallel: false
+        diagrams: []
+        scope:
+          - "bridge/commands/supervisor.md (rule 6)"
+          - "bridge/cursor-bridge/Merge-Verification-Policy.md (the re-delegation paragraph's threat model, the convergence paragraph, the invocation's fifth clause)"
+          - "bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md (step 8's convergence paragraph, the directive's clauses)"
+          - "bridge/cursor-bridge/workflow/phases/delegation-loop.md (steps 3b, 4 and 5 and the survival list: T15, T24, P6, P13)"
+          - "bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md (\"When to stop re-delegating\", \"The review ceiling\", the Accept bullet: P1, P2, P3, T20, T18, T10)"
+          - "bridge/cursor-bridge/workflow/phases/reflection.md (step 7)"
+          - "bridge/agents/diff-reviewer.md"
+          - "bridge/agents/security-auditor.md"
+          - "bridge/agents/design-auditor.md (the five first, the threat model with the diff, P11's count check)"
+          - "bridge/agents/spec-packager.md (T21, P12, T13, P6)"
+          - "bridge/agents/secret-sentinel.md (T24, P6)"
+          - "bridge/cursor-bridge/workflow/trace-exceptions.md"
+          - "bridge/cursor-bridge/MANIFEST.json"
+          - "tests/test_release_t_ceiling.py"
+          - "tests/test_loop_text_pace.py (the `test_bug033_` and `test_r042_` convergence tests rewritten first, each red on the increment's checkpoint by the by-id run)"
+          - "tests/test_phase_modules_build.py"
+          - "tests/test_phase_modules_close.py"
+          - "tests/test_core_carve.py"
+          - "tests/test_session_start.py"
+          - "tests/test_b3_least_confident.py (pins re-taken)"
+        satisfies: [R-050, R-051, R-042]
+        deferred: null
+        historic: false
+      - id: TASK-040
+        title: "The stage close and the stage review (R-049)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-039]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/workflow/phases/reflection.md (steps 2, 4 and the demonstration: D1, D2, D3, step 8's tag: D4, item 5: P4's text, the remote branches with no open pull request listed and the merged ones deleted, the stage's change as the union of its squash commits by `stage-diff.py`: T11)", "bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md (where step 9 names the stage's change)", "bridge/cursor-bridge/workflow/types/host-extension.md and bridge/cursor-bridge/workflow/traits/installable.md (P17's `planning.stages` sentence, in each the type's kind host-installation and the trait's kinds `installer` and `install-script`: the last stage's review before the stamp, a text-only correction riding with the next release unless it changes what a project does, the field acceptance's stand-in named)", "bridge/cursor-bridge/settings.bridge.json (the allow rules `Bash(git tag stage-review/*)`, `Bash(git cat-file -p stage-review/*)` and `Bash(git branch -r)`)", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_release_t_stage_close.py", "tests/test_allowlist.py", "tests/test_phase_modules_close.py", "tests/test_phase_modules_build.py", "tests/test_traits_existing.py", "tests/test_type_host_extension.py", "tests/test_b3_least_confident.py", "tests/test_a5_followups.py (pins re-taken, the last for the stage review's part sentence D2 rewrites)"]
+        satisfies: [R-049]
+        deferred: null
+        historic: false
+  - name: "Stage T2 — Release T: the scan, the fix, the retrofit's teeth and the stamp"
+    demonstration: true
+    increments:
+      - id: TASK-041
+        title: "The configuration guide, the security floor's conventions, the stripped launches and the weekly scan's text (R-052's text)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-040]
+        parallel: false
+        diagrams: [D-004]
+        scope: ["bridge/cursor-bridge/Cursor-Project-Configuration.md (the security-floor section: T9's conventions, T22's ignore line, the weekly scan as every project's workflow)", "bridge/agents/cursor-configurator.md (the weekly workflow as a configuration item written from the frozen block, its one fill-in)", "bridge/commands/evaluate-reports.md (the Sunday step: the workflow state and the window's runs in the three kinds, the Dependabot two calls)", "bridge/cursor-bridge/workflow/phases/change-cycle.md (item 1: the conformance check before the first delegation of a project supervised after it was built, T12)", "bridge/commands/supervisor.md (the status template's `Layout:` line relative to the project root, T19)", "bridge/cursor-bridge/workflow/phases/delegation-loop.md (step 4), bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md (step 7), bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md (P7's suite command), bridge/commands/calibrate-bridge.md (step 1b) and bridge/cursor-bridge/Known-Pitfalls.md (KP-061) — the `--strip` launch commands, the driver's with `--scratch ~/.cursor-bridge/scratch/<the project root's folder name>", "bridge/cursor-bridge/settings.bridge.json (only where the observed launch does not run on the heavy-launch rules: the two rules' `--strip` forms)", "tests/permission_rules.py and tests/test_allowlist.py (in that case: the model narrowed, every documented command re-run under it, the rule of any failing command widened, then the observed case recorded, otherwise the documented `--strip` commands pinned as matching)", "docs/diagrams/DEVIATIONS.md (the row `p_bridge_run` → `p_test_suite` removed)", "docs/diagrams/D-004-context-dfd.md (that edge's label and the note on it redrawn as built, `diagram-specialist`'s as-built variant)", "docs/DESIGN.md (the host table's row for the observed launch)", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_release_t_floor.py", "tests/test_release_t_strip.py (the strip test, an environment test and not a pin, outside `new_tests`)", "tests/test_loop_text_windowless.py", "tests/test_calibrate_text.py", "tests/test_release_t_merge.py (P7's command pin)", "tests/test_core_carve.py", "tests/test_phase_modules_build.py", "tests/test_phase_modules_close.py", "tests/test_b3_least_confident.py (pins re-taken)"]
+        satisfies: [R-052]
+        deferred: null
+        historic: false
+      - id: TASK-042
+        title: "The weekly dependency scan in this repository (R-052's workflow)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-041]
+        parallel: false
+        diagrams: [D-004]
+        scope: [".github/workflows/dependency-scan.yml", "tests/test_dependency_scan.py", "tests/test_release_b_ci_floor.py (`test_r002_workflow_is_the_only_one` widened to the two files, the pin, one-secret and trigger tests still read `tests.yml` alone, the new file's secret-freedom being `tests/test_dependency_scan.py`'s)", "docs/diagrams/D-004-context-dfd.md (`p_dependency_scan`'s `designed` labels, its element-map row and the note's sentence redrawn as in the tree, `diagram-specialist`'s as-built variant)"]
+        satisfies: [R-052]
+        deferred: null
+        historic: false
+      - id: TASK-043
+        title: "BUG-039: the review guard's four sites (the early flags void the launch; the void during the run; premerge's git call through the helper; the re-snapshot keeps the flag)"
+        kind: increment
+        parent: null
+        depends_on: []
+        parallel: false
+        diagrams: [D-003, D-004]
+        scope: ["bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_bug039.py", "docs/BUILDER_NOTES.md", "docs/debug/BUG-039.md", "docs/diagrams/DEVIATIONS.md (the three D-003 rows and D-004's `p_review_guard` → `ds_checkout` row removed)", "docs/diagrams/D-003-review-round-states.md (the labels that say the behaviour is a deviation redrawn as built, `diagram-specialist`'s as-built variant, D-004's file is unchanged, its `p_review_guard` → `ds_checkout` edge carrying no deviation clause)", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "handoff/TASK-043-r<N>-report.md"]
+        satisfies: [R-042, R-055]
+        deferred: null
+        historic: false
+      - id: TASK-044
+        title: "The retrofit's enforcement: the tests that name D-002, D-003 and D-004 (R-055)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-043, TASK-042]
+        parallel: false
+        diagrams: [D-002, D-003, D-004]
+        scope: ["tests/test_dump_cli.py", "tests/test_review_guard_ceiling.py", "tests/test_bug036.py", "tests/test_review_guard.py", "tests/test_account_keys.py", "tests/test_bridge_run.py", "tests/test_d003_review_round_states.py (new)", "docs/diagrams/INDEX.md (the Enforced-by cells naming the new file, D-003's naming `tests/test_bug039.py` beside it)"]
+        satisfies: [R-055]
+        deferred: null
+        historic: false
+      - id: TASK-045
+        title: "The stamp, the install run sheet and the trial's calibration (R-056)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-036, TASK-037, TASK-038, TASK-039, TASK-040, TASK-041, TASK-042, TASK-043, TASK-044]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/VERSION", "bridge/cursor-bridge/CHANGELOG.md", "bridge/cursor-bridge/MANIFEST.json", "bridge/cursor-bridge/workflow/trace-exceptions.md (the release's entries complete)", "bridge/commands/calibrate-bridge.md (the install run sheet's sentence, where one changes)", "tests/test_release_t_stamp.py", "docs/REQUIREMENTS.md (R-056's flip and Evidence, in the accept commit)", "project.json (the version, in the accept commit)", "the records the increment writes in its records-only commit, outside Scope by the RECORDS rule: docs/PROJECT_STATUS.md, docs/INVENTORY.md"]
+        satisfies: [R-056]
+        deferred: null
+        historic: false
+  - name: "Release B2 — the plan addendum (2026-11-04)"
+    demonstration: false
+    increments: []
+  - name: "Stage H1 — Release B2: the reader, the schemas and the programs"
+    demonstration: true
+    increments:
+      - id: TASK-046
+        title: "The header reader and the schemas in bridge_env (R-057)"
+        kind: increment
+        parent: null
+        depends_on: []
+        parallel: false
+        diagrams: [D-002, D-005]
+        scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_header_reader.py", "tests/test_header_schemas.py", "tests/fixtures/headers/", "docs/BUILDER_NOTES.md", "handoff/TASK-046-r<N>-report.md"]
+        satisfies: [R-057]
+        deferred: null
+        historic: false
+      - id: TASK-047
+        title: "The status file's header in its six readers (R-058)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-046]
+        parallel: false
+        diagrams: [D-002]
+        scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/loop-guard.py", "bridge/cursor-bridge/session-start.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/workflow-check.py", "bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/evaluate-reports.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_header_status.py", "tests/test_loop_guard.py", "tests/test_session_start.py", "tests/test_session_start_module.py", "tests/test_conformance_check.py", "tests/test_workflows_line_check.py", "tests/test_workflow_check.py", "tests/test_evaluate_reports.py", "docs/BUILDER_NOTES.md", "handoff/TASK-047-r<N>-report.md"]
+        satisfies: [R-058]
+        deferred: null
+        historic: false
+      - id: TASK-048
+        title: "The plan's and the briefs' headers (R-059)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-046]
+        parallel: false
+        diagrams: [D-002]
+        scope: ["bridge/cursor-bridge/plan-check.py", "bridge/cursor-bridge/scope-check.py", "bridge/cursor-bridge/completion-check.py", "bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_header_plan.py", "tests/test_plan_check.py", "tests/test_scope_check.py", "tests/test_completion_check.py", "tests/test_bridge_run_review_ceiling.py", "tests/test_review_guard_ceiling.py", "tests/test_task032_supervisor_launcher.py", "docs/BUILDER_NOTES.md", "handoff/TASK-048-r<N>-report.md"]
+        satisfies: [R-059]
+        deferred: null
+        historic: false
+      - id: TASK-049
+        title: "The tabular records' headers (R-060)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-047, TASK-048]
+        parallel: false
+        diagrams: [D-002]
+        scope: ["bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/completion-check.py", "bridge/cursor-bridge/diagram-check.py", "bridge/cursor-bridge/plan-check.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_header_tables.py", "tests/test_conformance_check.py", "tests/test_completion_check.py", "tests/test_diagram_check.py", "tests/test_plan_check.py", "tests/test_text_consistency.py", "docs/BUILDER_NOTES.md", "handoff/TASK-049-r<N>-report.md"]
+        satisfies: [R-060]
+        deferred: null
+        historic: false
+      - id: TASK-050
+        title: "The run parameters' header (R-061)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-049]
+        parallel: false
+        diagrams: [D-002]
+        scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/loop-guard.py", "bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_header_run_parameters.py", "tests/test_header_currency.py", "tests/test_loop_guard.py", "tests/test_bridge_run_design_ceiling.py", "tests/test_bridge_run_review_ceiling.py", "tests/test_review_guard_ceiling.py", "tests/test_release_b_bootstrap.py", "docs/BUILDER_NOTES.md", "handoff/TASK-050-r<N>-report.md"]
+        satisfies: [R-061, R-057]
+        deferred: null
+        historic: false
+  - name: "Stage H2 — Release B2: the migration, the templates, the stamp and this repository's records"
+    demonstration: true
+    increments:
+      - id: TASK-051
+        title: "records-migrate.py (R-062's program)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-050]
+        parallel: false
+        diagrams: [D-002]
+        scope: ["bridge/cursor-bridge/records-migrate.py", "bridge/cursor-bridge/MANIFEST.json", "bridge/cursor-bridge/settings.bridge.json", "docs/diagrams/D-002-components.md", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_records_migrate.py", "tests/test_dump_cli.py", "tests/test_allowlist.py", "docs/BUILDER_NOTES.md", "handoff/TASK-051-r<N>-report.md"]
+        satisfies: [R-062]
+        deferred: null
+        historic: false
+      - id: TASK-052
+        title: "The texts: the templates, the rule in the core, the calibration's step (R-062's text)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-051]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/commands/supervisor.md", "bridge/cursor-bridge/workflow/phases/design.md", "bridge/cursor-bridge/workflow/phases/planning.md", "bridge/agents/spec-packager.md", "bridge/cursor-bridge/Diagram-Planning-Conventions.md", "bridge/cursor-bridge/workflow/phases/run-parameters.md", "bridge/commands/calibrate-bridge.md", "bridge/cursor-bridge/workflow/phases/delegation-loop.md", "bridge/cursor-bridge/session-start.py", "bridge/cursor-bridge/workflow/trace-exceptions.md", "bridge/cursor-bridge/MANIFEST.json", "tests/test_release_b2_text.py", "tests/test_core_carve.py", "tests/test_phase_modules_intake_design.py", "tests/test_phase_modules_interface_planning.py", "tests/test_phase_modules_build.py", "tests/test_calibrate_text.py", "tests/test_session_start.py", "tests/test_b3_least_confident.py", "tests/test_workflows_line_text.py"]
+        satisfies: [R-062]
+        deferred: null
+        historic: false
+      - id: TASK-053
+        title: "The stamp and the install run sheet (R-064)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-046, TASK-047, TASK-048, TASK-049, TASK-050, TASK-051, TASK-052]
+        parallel: false
+        diagrams: []
+        scope: ["bridge/cursor-bridge/VERSION", "bridge/cursor-bridge/CHANGELOG.md", "bridge/cursor-bridge/MANIFEST.json", "bridge/cursor-bridge/workflow/trace-exceptions.md", "tests/test_release_b2_stamp.py", "docs/REQUIREMENTS.md", project.json]
+        satisfies: [R-064]
+        deferred: null
+        historic: false
+      - id: TASK-054
+        title: "This repository's records migrated at its calibration to the release (R-063)"
+        kind: increment
+        parent: null
+        depends_on: [TASK-053]
+        parallel: false
+        diagrams: []
+        scope: ["docs/PROJECT_STATUS.md", "docs/BUILD_PLAN.md", "handoff/", "docs/INVENTORY.md", "docs/REQUIREMENTS.md", "docs/diagrams/INDEX.md", "docs/diagrams/DEVIATIONS.md", "docs/RUN_PARAMETERS.md", "docs/HARDENING.md", "run/supervisor/working-files.md", "tests/test_release_b2_records.py", "tests/test_release_b_bootstrap.py", "tests/test_text_consistency.py", "tests/test_b2_least_confident.py"]
+        satisfies: [R-063]
+        deferred: null
+        historic: false
+---
 # Build plan — Claude-Cursor Bridge, Release B
 
 The design is the Restructuring Plan's release B (§16) and the sections it rests on (§6, §15). This plan decomposes that scope into increments. Per §15 condition 3, **governance text is design: the supervisor authors it, gated by the two-critic design review; programs are implementation: the builder writes them, gated by the delegation loop.** Each increment marks its author. Status is derived from `origin/main` by `plan-check.py`, never written here. Revised 2026-10-11 after two-critic rounds 1–3 (converging: Blocking 7→6→1 and 5→1→2). Revised 2026-10-20 at the owner's decision on the window flood of 2026-10-19/20 (ISS-011; R-039 to R-041): TASK-028 to TASK-031 added to stage B5 before TASK-025, the fix made in the bridge and installed by calibration rather than per project, as a planned update and not a hotfix (INVENTORY, Decisions); critiqued as the subject `windowless` (docs/DESIGN_CRITIQUE.md). Revised 2026-10-24 at the owner's placement of the pace update (2026-10-22, "a"; the maintainer's request of 2026-10-20 relaying the owner's three approved solutions; R-042 to R-044): TASK-032 to TASK-035 added to stage B5 beside TASK-028 to TASK-031 (TASK-035 split from TASK-034 at the critique's round 1), TASK-030's mutation text moved to one run per increment, the leads of stage B3's review placed (docs/HARDENING.md, Stage B3, "Placed by the pace plan revision") and the Scopes that review found short widened; critiqued as the subject `pace` (docs/DESIGN_CRITIQUE.md: four rounds and the confirming read) and approved at the owner's gate on 2026-10-24 with the ceiling at three rounds ("I choose three"). Revised 2026-10-24, before stage B4's TASK-017, at the supervisor's reality check of the text as built (the delegation loop's step 2 rule applied to its own text; run/supervisor/task017-reality-check.md, quoted in the critique's file): TASK-017's Scope widened to every file that holds or pins a passage it moves (project-end.md, the plan critic, the registry, seven test files) and narrowed of reflection.md and interface.md, its Done when rewritten passage by passage with the extension point each goes to, two §6.4 refinements of the registry made in the same change as planning.md (`planning.stages` widened to increments, `planning.acceptance-criteria` new), the passages no point places kept in the main workflow, the deployed-layout and bounded-remote-wait checks placed as external services' new text, the `Installer verification` parameter kept among the five, and TASK-018 to TASK-021 re-read for the same class of problem (TASK-018 depends on TASK-017 for the pointer it makes; TASK-019 and TASK-021 name their delivery kinds by key and add the kind's procedure at `project-end.delivery`); kept as one increment, since the registry refinement is made with planning.md, which every trait's planning move edits too, and each increment costs a gate pass (INVENTORY, Decisions); critiqued as the subject `traits` (docs/DESIGN_CRITIQUE.md: four rounds, the confirming read and a resolution round) and approved at the owner's gate on 2026-10-24 ("I approve of the plan"). Revised 2026-10-27 at stage B5's plan revision point (after TASK-031's merge, before TASK-030), at the owner's word of 2026-10-26 to integrate the four text items the maintainer's evaluation of 2026-10-25 gave release B (decision D4: T14, T23, FB-036, FB-040; INVENTORY, Decisions), each into the increment whose Scope already holds the text it amends, no increment added and two requirement rows extended (R-042 with T14's sentences, R-043 with the estimate): T14 (the class is the defect, not the operator that exposed it; below the ceiling a stage round ending with no REJECT but with findings the convergence rule makes blocking puts them into one fix increment through its own gate, no further stage round, and at and above it such a finding outside the five goes to HARDENING and opens no fix increment) into TASK-034's Done when; T23 (the change cycle's item 1 ends with a confirmation inside intake, not a gate) into TASK-035, its Scope widened to change-cycle.md and tests/test_phase_modules_close.py, whose pin on the procedure's bytes it re-takes, and, for FB-036, to bridge/cursor-bridge/Glossary.md and tests/test_workflow_model.py; FB-040 (the process count of a mutation run estimated before the increment's first run and any `--all` run, the duplicates the mutants file shows cut before the launch) into TASK-030's Done when and as a clause of R-043; FB-036 (the core read in parts to its end, the current phase's modules named) satisfied at calibration by TASK-023 (PR #85), the four "read whole" statements (the core's two, rule 28's and the Glossary's) made to say in parts by TASK-035 and TASK-026's "one read" clause reworded, no bound for the core taken; critiqued as the subject `maintainer-text` (docs/DESIGN_CRITIQUE.md): four rounds and a confirming read, nothing Blocking left open, no resolution round due; approved by the owner at the gate on 2026-10-27 ("Approve"). Revised 2026-11-01 for release T, the project's first change cycle (change-cycle.md, item 4; docs/DESIGN.md, "Change: release T", approved at its design gate on 2026-11-01): stages T1 and T2 appended below, TASK-036 to TASK-045, each increment drawn from the register's rows R-045 to R-056 and R-042's revision, the author marked as release B marked it (governance text and tests the supervisor's; the one program fix, BUG-039 as TASK-043, the builder's); critiqued as the subject `release-t-plan` (docs/DESIGN_CRITIQUE.md). Revised 2026-11-04 for release B2, the second change cycle (change-cycle.md, item 4; docs/DESIGN.md, "Change: release B2"): stages H1 and H2 appended below, TASK-046 to TASK-054, each drawn from the register's rows R-057 to R-064, the programs the builder's and the texts, the migration of this repository's records and the stamp the supervisor's; the addendum stood in the design's round-1 file, so it is criticised and gated with the design as one subject, `release-b2` (docs/DESIGN_CRITIQUE.md).
@@ -122,7 +840,7 @@ Parent: none
 Depends on: TASK-003, TASK-005, TASK-007
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_trace_check.py; docs/cli-reference.json; docs/CLI_REFERENCE.md; tests/test_dump_cli.py (widened 2026-10-23, recorded at stage B3's review: the supervisor's commit with the increment added trace-check.py to that test's list of argparse programs, which the generated command reference reads; a later increment that adds an argparse program, TASK-031's mutation-run.py among them, names the file in its Scope, as TASK-031's now does; the same commit added docs/cli-reference.json and docs/CLI_REFERENCE.md to the Scopes of TASK-016, TASK-015 and TASK-024, a widening its message records)
+Scope: bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_trace_check.py; docs/cli-reference.json; docs/CLI_REFERENCE.md; tests/test_dump_cli.py (widened 2026-10-23, recorded at stage B3's review: the supervisor's commit with the increment added trace-check.py to that test's list of argparse programs, which the generated command reference reads, a later increment that adds an argparse program, TASK-031's mutation-run.py among them, names the file in its Scope, as TASK-031's now does, the same commit added docs/cli-reference.json and docs/CLI_REFERENCE.md to the Scopes of TASK-016, TASK-015 and TASK-024, a widening its message records)
 Satisfies: R-029
 Done when: `trace-baseline.txt` pins the commit before the carve (after TASK-003/005/007's core edits); `trace-check.py` maps every standing rule and conditional passage (the project-layout/Workspace-boundary section included) from that baseline to its home — a home is `supervisor.md` (for a rule that stays in the core) or any file under `workflow/**`; a passage found verbatim in **more than one** home fails as a **COPY** unless a `reword`/`new` entry explains it (so "moves, not copies" is enforced for every increment, not only where a per-increment test asserts absence); a two-hop move (baseline→module→trait, the source emptied) passes; verbatim moves are required except `reword` entries in `trace-exceptions.md`; text new to the modules is flagged unless a `new` entry declares it; every `~/.claude/...` reference and cited section still resolves; it runs incrementally; the empty `trace-exceptions.md` is scaffolded here; `test_trace_check.py` (names R-029) covers a clean move, a two-hop move, a **copy into two homes (fails)**, a silent reword (fails), an undeclared new passage (fails), a dropped boundary section (fails), a dangling reference (fails), and both exception kinds.
 
@@ -133,7 +851,7 @@ Depends on: TASK-003, TASK-005, TASK-006, TASK-007, TASK-016
 Parallel: no
 Diagrams: none
 Merge unit: TASK-010 and TASK-015 are built on one stage branch and merged as one PR whose title **starts with** `TASK-010 TASK-015:` (so `plan-check` derives both as merged) — the test suite is never red on `main` between the carve and the hook, and no release ships between them.
-Scope: bridge/commands/supervisor.md; bridge/cursor-bridge/workflow/phases/intake.md; .../design.md; .../interface.md; .../planning.md; .../run-parameters.md; .../configuration.md; .../delegation-loop.md; .../change-cycle.md; .../reflection.md; .../project-end.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_core_carve.py; tests/test_session_start.py; tests/instructions.py; tests/test_allowlist.py; tests/test_a5_followups.py; tests/test_text_consistency.py; tests/test_workflow_model.py (widened at the carve, 2026-10-20: the tests that read the supervisor's instructions read the core and its modules, through tests/instructions.py, so a passage that moves keeps its test; test_workflow_model.py's two assertions of the transitional reading become the carved one's)
+Scope: bridge/commands/supervisor.md; bridge/cursor-bridge/workflow/phases/intake.md; .../design.md; .../interface.md; .../planning.md; .../run-parameters.md; .../configuration.md; .../delegation-loop.md; .../change-cycle.md; .../reflection.md; .../project-end.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_core_carve.py; tests/test_session_start.py; tests/instructions.py; tests/test_allowlist.py; tests/test_a5_followups.py; tests/test_text_consistency.py; tests/test_workflow_model.py (widened at the carve, 2026-10-20: the tests that read the supervisor's instructions read the core and its modules, through tests/instructions.py, so a passage that moves keeps its test, test_workflow_model.py's two assertions of the transitional reading become the carved one's)
 Satisfies: R-003, R-032
 Done when: every phase section moves verbatim out of `supervisor.md` into its module in one commit; project-end is carved out of the `## Reflection points` block into `project-end.md` as a declared split recorded in `trace-exceptions.md`; the core keeps only roles/division, founding rules, loop shape, escalation/reporting, project state, and the standing rules that hold in every phase, pointing at the modules; `trace-check` green for the moved sections; the digest stays within `test_session_start.py`'s limit; the core's post-carve size is recorded as a measurement; a proof test shows `workflow/**` installs from the regenerated manifest with no `bridge-install.py` change; `test_core_carve.py` (names R-003, R-032) asserts the core's section set, that no phase procedure remains, and the modules exist. (`test_session_start.py`'s heading/line-range assertions are updated for the module table in the combined TASK-010+TASK-015 change, never weakened; the carve alone does not leave the suite red on `main` because the two land as one PR.)
 
@@ -153,7 +871,7 @@ Parent: none
 Depends on: TASK-010
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/phases/interface.md; .../interface/mockups.md; .../interface/command-design.md; .../interface/contract-design.md; .../interface/playable-prototype.md; .../planning.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_interface_planning.py; bridge/commands/supervisor.md; bridge/cursor-bridge/workflow/phases/design.md; tests/test_core_carve.py; tests/test_workflow_model.py; tests/test_session_start_module.py; tests/test_phase_modules_intake_design.py; bridge/cursor-bridge/Merge-Verification-Policy.md (widened 2026-10-20 for the pointer sweep, docs/HARDENING.md, Stage B3: the core's module table and its Phase 3 sentence, and design.md's gate sentence, named Phase 3 "the UI mockups", now one variant of four; rule 13 and the merge policy named the approved-mockup rule's old home; the tests that pin the interface module's heading, the trace counts and the hook's names for Phase: mockups follow; and for Review B's should-fix at PR #53, design.md's resume sentence, with the TASK-011 test that pins it)
+Scope: bridge/cursor-bridge/workflow/phases/interface.md; .../interface/mockups.md; .../interface/command-design.md; .../interface/contract-design.md; .../interface/playable-prototype.md; .../planning.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_interface_planning.py; bridge/commands/supervisor.md; bridge/cursor-bridge/workflow/phases/design.md; tests/test_core_carve.py; tests/test_workflow_model.py; tests/test_session_start_module.py; tests/test_phase_modules_intake_design.py; bridge/cursor-bridge/Merge-Verification-Policy.md (widened 2026-10-20 for the pointer sweep, docs/HARDENING.md, Stage B3: the core's module table and its Phase 3 sentence, and design.md's gate sentence, named Phase 3 "the UI mockups", now one variant of four, rule 13 and the merge policy named the approved-mockup rule's old home, the tests that pin the interface module's heading, the trace counts and the hook's names for Phase: mockups follow, and for Review B's should-fix at PR #53, design.md's resume sentence, with the TASK-011 test that pins it)
 Satisfies: R-004, R-006, R-010, R-012, R-032
 Done when: interface.md declares all four variants once, each variant's text in its own file; `interface/mockups.md` holds the Phase-3 mockup procedure (today's `## Phase 3 — UI mockups`), declared an *addition* activated by the trait *has screens* (R-010) — the build-phase interface passages (the frozen-rule brief constraint, the design-auditor review step, the observability tests) are NOT here; they are gathered by the has-screens trait (TASK-017) from the build modules; planning.md and interface.md each open with their compaction-survival list and declare their extension points; the playable-prototype file is a declared pointer to the Game Development workflow (release E), worded to avoid `completion-check`'s stand-in patterns (verified by `completion-check --mode plan` reporting no stand-in on `workflow/**`; corrected at the gate, 2026-10-20: completion-check reads code files only, so the test applies its patterns to the interface module and the variant files directly); within the R-032 bound; `trace-check` green; `test_phase_modules_interface_planning.py` (names R-004, R-006, R-010, R-012, R-032) asserts both files' structure, the four variants, and the mockup-as-addition.
 
@@ -163,7 +881,7 @@ Parent: none
 Depends on: TASK-010
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_build.py; bridge/commands/supervisor.md; tests/test_session_start_module.py (widened 2026-10-20 for the split: the core's module table names the delegation loop's sub-file folder and the sentence under it where a split module's step keeps its heading; the hook's tests expect the sub-file after delegation-loop.md for `Phase: building` and `Phase: changing`, and the tests of the pointer-line grammar write a delegation-loop module of their own, since the installed one now has a `Sub-files:` line)
+Scope: bridge/cursor-bridge/workflow/phases/run-parameters.md; .../configuration.md; .../delegation-loop.md; .../delegation-loop/; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_build.py; bridge/commands/supervisor.md; tests/test_session_start_module.py (widened 2026-10-20 for the split: the core's module table names the delegation loop's sub-file folder and the sentence under it where a split module's step keeps its heading, the hook's tests expect the sub-file after delegation-loop.md for `Phase: building` and `Phase: changing`, and the tests of the pointer-line grammar write a delegation-loop module of their own, since the installed one now has a `Sub-files:` line)
 Satisfies: R-004, R-006, R-032
 Done when: each module opens with its compaction-survival list, declares its extension points, and is within the R-032 bound — the delegation-loop module split into sub-files under `workflow/phases/delegation-loop/` if it would exceed the bound, each sub-file named by the module's own pointer line; `trace-check` green; `test_phase_modules_build.py` (names R-004, R-006, R-032) asserts the structure and, if split, the sub-file pointer.
 
@@ -173,7 +891,7 @@ Parent: none
 Depends on: TASK-010
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/phases/change-cycle.md; .../reflection.md; .../project-end.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_close.py; bridge/cursor-bridge/workflow/phases/interface/mockups.md; .../interface/command-design.md; .../interface/contract-design.md; .../interface/playable-prototype.md; tests/test_phase_modules_interface_planning.py; tests/test_core_carve.py; bridge/cursor-bridge/Glossary.md; bridge/commands/supervisor.md (widened 2026-10-20 for docs/HARDENING.md's Stage B3 leads that name TASK-014: the variant files' declaring paragraphs moved under headings of their own, so that their trace entries excuse nothing else in the file, with the interface test that pins the variant files' headings; the traceability check's pin in the carve test, three of the change cycle's passages being reworded, and rule 34, which states the change cycle's steps and gates, with them (bridge/commands/supervisor.md, Review B's round 3); and the pointer sweep's one stale pointer to these modules, the glossary's phase-module entry, which still said project end was part of the reflection points)
+Scope: bridge/cursor-bridge/workflow/phases/change-cycle.md; .../reflection.md; .../project-end.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_phase_modules_close.py; bridge/cursor-bridge/workflow/phases/interface/mockups.md; .../interface/command-design.md; .../interface/contract-design.md; .../interface/playable-prototype.md; tests/test_phase_modules_interface_planning.py; tests/test_core_carve.py; bridge/cursor-bridge/Glossary.md; bridge/commands/supervisor.md (widened 2026-10-20 for docs/HARDENING.md's Stage B3 leads that name TASK-014: the variant files' declaring paragraphs moved under headings of their own, so that their trace entries excuse nothing else in the file, with the interface test that pins the variant files' headings, the traceability check's pin in the carve test, three of the change cycle's passages being reworded, and rule 34, which states the change cycle's steps and gates, with them (bridge/commands/supervisor.md, Review B's round 3), and the pointer sweep's one stale pointer to these modules, the glossary's phase-module entry, which still said project end was part of the reflection points)
 Satisfies: R-004, R-006, R-032, R-036
 Done when: each module opens with its compaction-survival list, declares its extension points (reflection/project-end declare Definition of done and Delivery); project-end.md carries the promotion-pass route (R-036); reflection.md's issues rule gains the line that an incident records whether a compaction preceded it (the baseline follow-up); within the R-032 bound; `trace-check` green; **the tree-wide registry↔module cross-check passes (every registry point is declared by its named module and every module declaration is in the registry)**; `test_phase_modules_close.py` (names R-004, R-006, R-032, R-036) asserts the structure, the promotion pass, and the cross-check.
 
@@ -197,7 +915,7 @@ Parent: none
 Depends on: TASK-011, TASK-012, TASK-013, TASK-014, TASK-006
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/traits/has-screens.md; .../installable.md; .../performance-budgets.md; .../external-services.md; bridge/cursor-bridge/workflow/phases/intake.md; .../design.md; .../planning.md; .../configuration.md; .../delegation-loop.md; .../project-end.md; bridge/cursor-bridge/workflow/extension-points.md; bridge/agents/plan-critic.md; bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_traits_existing.py; tests/test_extension_points.py; tests/test_phase_modules_intake_design.py; tests/test_phase_modules_interface_planning.py; tests/test_phase_modules_build.py; tests/test_phase_modules_close.py; tests/test_session_start_module.py; tests/test_text_consistency.py; tests/test_b2_least_confident.py; tests/test_core_carve.py; tests/test_b3_least_confident.py; tests/instructions.py (the Scope as revised 2026-10-24, subject `traits`, tests/instructions.py added at PR #67's Review A: every file the reality check found holding or pinning a passage this increment moves, run/supervisor/task017-reality-check.md; reflection.md, interface.md, run-parameters.md and the delegation loop's sub-file folder left out, none of them changing; the widenings of 2026-10-24 kept, tests/test_core_carve.py from the pace plan revision, whose trace pin the `reword` entries change, and tests/test_b3_least_confident.py from FIX-004)
+Scope: bridge/cursor-bridge/workflow/traits/has-screens.md; .../installable.md; .../performance-budgets.md; .../external-services.md; bridge/cursor-bridge/workflow/phases/intake.md; .../design.md; .../planning.md; .../configuration.md; .../delegation-loop.md; .../project-end.md; bridge/cursor-bridge/workflow/extension-points.md; bridge/agents/plan-critic.md; bridge/cursor-bridge/workflow/open-list.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_traits_existing.py; tests/test_extension_points.py; tests/test_phase_modules_intake_design.py; tests/test_phase_modules_interface_planning.py; tests/test_phase_modules_build.py; tests/test_phase_modules_close.py; tests/test_session_start_module.py; tests/test_text_consistency.py; tests/test_b2_least_confident.py; tests/test_core_carve.py; tests/test_b3_least_confident.py; tests/instructions.py (the Scope as revised 2026-10-24, subject `traits`, tests/instructions.py added at PR #67's Review A: every file the reality check found holding or pinning a passage this increment moves, run/supervisor/task017-reality-check.md, reflection.md, interface.md, run-parameters.md and the delegation loop's sub-file folder left out, none of them changing, the widenings of 2026-10-24 kept, tests/test_core_carve.py from the pace plan revision, whose trace pin the `reword` entries change, and tests/test_b3_least_confident.py from FIX-004)
 Satisfies: R-010, R-016, R-017, R-018, R-019
 Done when: each trait file is one `#` title and `## Add at <point key>` sections, with nothing between them but the `###` sub-headings inside a section named below, each `###` heading unique within its file (the trace check matches a heading's text anywhere in a section's chain, and the derivation test wants one heading per excused section), and `workflow-check.py` passes over `workflow/`. Each file gathers its passages by **moving** them out of the phase modules and the plan critic: the modules shrink, `trace-check` maps baseline→module→trait, and a moved unit keeps its words. **Units and the trace check.** The check's unit is a paragraph, a list item, a table or a fenced block; a unit of a phase module moves whole, into a section that holds moved units only, so the copy check still reads it. Three units are split at the sentence, each part keeping its words, each under the standing core `reword` "Phase 2 — Design" (TASK-012) or a new one at the unit's narrowest baseline heading, and each half that is not a baseline unit under a heading of its own with a `new` entry naming it: design's performance-mechanism and code-signing paragraph leaves design.md whole, its first two sentences (the mechanism and the hot path; the choices cheap now and expensive after the build, which the performance lens checks) to performance budgets and its code-signing sentence to installable, each half under a `###` of its own in its `## Add at design.sections` section (the standing reword excuses the drop; design.md keeps no remainder and takes no entry for it); design's Observability & Verifiability paragraph, whose UI sentences go to has screens under a `###` of their own in its `## Add at design.sections` section with a `new` entry (a fragment is new text to the check), and whose closing sentences stay in design.md as new text under a `####` of their own inside "The procedure", placed directly before `### The delivery kind` so that no other paragraph falls under it, with a `new` entry naming that heading, reworded to name what they opt out of: a part without the trait *has screens* writes no Observability & Verifiability section and notes that it did not, and the driver dependency sentence stays as a pointer to has screens' addition (the standing reword excuses the baseline unit); step 2's brief paragraph, whose UI-bearing sentence (the mockup files, the DESIGN.md sections and the frozen rule) goes to has screens under a `###` in its `## Add at delegation-loop.brief-constraints` section, with a new core `reword` at "2. Package the brief" and a `new` entry for delegation-loop.md "2. Package the brief", the section that holds only that paragraph. The four `## Add at planning.critic-lenses` sections hold the lens bullets moved from bridge/agents/plan-critic.md, which the trace check does not read, so each takes a `new` entry naming the trait file and that heading, and test_traits_existing.py asserts their words equal the bullets plan-critic.md loses, against its pre-move text. Every other mixed unit stays whole in the main workflow, because its narrowest baseline heading is a whole phase or because no point places it (INVENTORY, Decisions): the configurator paragraph with its performance-floor clause, the reviewer-routing table with its UI-bearing row, intake's security-context paragraph (its "Alongside it" unchanged), planning's two-critic paragraph with its UI clause, project end's User Manual item with the install and command-reference chapters, run-parameters.md's template fence with its `Installer verification` gloss (as it stands; a lead), the refactoring pass's performance inputs and optimization candidates, the promotion pass's Performance-Patterns entries, the change cycle's re-run of the packaging stage, reflection item 2b's external-service clause, interface.md's sentences naming what activates each variant, and step 6's title and first sentence, which stand as they are. New text in a trait file stands in a section, or a `###` sub-section, of its own with a `new` entry naming the trait file and that heading. **Placement:** in a trait file every `###` sub-section stands last in its `## Add at` section, after every moved unit, since a unit after a heading falls under it and an excused heading in a unit's chain switches its checks off; test_traits_existing.py asserts that no moved unit lies under a `###`, every `###` section of a trait file holding new text only. Two pointers in sections already excused and pinned are reworded for the moves and their pins re-taken: planning.md's sentence in "What the interface phase hands to the plan" that sends a screen's citation rule to "The plan" (now the trait's addition at `planning.acceptance-criteria`) and project-end.md's survival-list line on the installer's last verification (now installable's delivery addition); configuration.md's security-tooling paragraph keeps "the same way", which pointed at the moved design-tooling paragraph, since the unit is a baseline unit under a whole-phase heading and its own list of files states the work (a lead, docs/HARDENING.md, stage B4). **The registry's two §6.4 refinements**, made in this change with planning.md as the registry requires: `planning.stages` reads mandatory stages and increments (a packaging stage, a benchmark increment, a contract capture), its key kept and its declaring line reworded: a stage addition is written beside the stages "The plan" asks for, with its increments and its `Demonstration:` line, and an increment addition is written into the stage its own words name; a new row `planning.acceptance-criteria` (Planning; add; part) between `planning.stages` and `planning.critic-lenses`, in the registry's table and in planning.md's `## Extension points` (the table's order), holding the acceptance criteria every increment of a part with a stated surface carries beside its functional ones, the security criteria staying the module's own content there; the registry's paragraph on the points added to §6.4's list names the new point and the widened one, and its pin in tests/test_extension_points.py is re-taken with the S64 list; tests/test_phase_modules_close.py's cross-check takes both. **Has screens** adds at `interface.variants`, as new text, the mockups' activation naming `interface/mockups.md` (interface.md's sentences stay, R-010's built half; the variant's procedure stays in `interface/mockups.md`, TASK-012) and moves: intake's screen-and-state inventory (`intake.questions`); design's interface-ruleset and styling decision and the UI sentences of its Observability & Verifiability paragraph (`design.sections`); planning's design and observability acceptance criteria (`planning.acceptance-criteria`) and the plan critic's design-criteria and observability-criteria lenses (`planning.critic-lenses`); configuration's design-tooling and observability steps (`configuration.items`); the delegation loop's frozen-rule brief sentences out of step 2 (`delegation-loop.brief-constraints`, the split above), step 4's design-auditor paragraph (`delegation-loop.inspect-checks`; the routing table stays) and step 6's observability tests (`delegation-loop.test-checks`); it **points at** founding rules N7 and N9, which stay in the core; reflection.md holds no has-screens passage. **Installable** moves: intake's delivery passage (`intake.questions`; `intake.delivery-kind` stays the main workflow's, every part having a kind), the paragraph untouched and, after it, under a `###` with a `new` entry, one scoping sentence: the passage confirms the kind first; what follows the confirmation is for the kinds `installer` and `install-script`, and a part whose confirmed kind is another takes its delivery questions from its type workflow, if any; design's Delivery section (`design.sections`), then the code-signing sentence of the split paragraph under its `###`, then under a `###` of its own one scoping sentence: the toolchain and the installer behaviour as written are for the kinds `installer` and `install-script`, and a part of another kind records its kind's delivery as its type workflow says; planning's Packaging & installer stage with its command-reference sentences (`planning.stages`), the paragraph untouched and, after it, under a `###` of its own with a `new` entry, one scoping sentence: the stage as written is for the delivery kinds `installer` and `install-script`, a part of another kind takes the packaging stage its type workflow adds, if any (INVENTORY, Decisions: the bridge's own release has none by design), and an `Installer verification` answer of `n/a` passes the lifecycle check over; the plan critic's packaging and command-reference lenses (`planning.critic-lenses`); project end's "Deliver the installer" item, word for word, as `## Add at project-end.delivery for installer`, and as `## Add at project-end.delivery for install-script` one new sentence, the same without the dialog and with the project's `install-check.ps1` as the verification (the registry: an addition there names one kind and reaches only parts of it; the sentences both kinds share stand once); project-end.md's `project-end.delivery` declaring line no longer anchors on that item: an addition there is the delivery for the kind it names, run after the User Manual item and before the promotion pass, its pin in tests/test_phase_modules_close.py re-taken. The `Installer verification` run parameter stays one of the five in run-parameters.md, its template as it stands (INVENTORY, Decisions). **Performance budgets** moves: intake's budgets passage whole, cost budgets included (`intake.questions`; `intake.budget-kind` stays the main workflow's); the first two sentences of design's split paragraph (`design.sections`, under their `###`); planning's benchmark increment (`planning.stages`) and the plan critic's benchmark-increments lens (`planning.critic-lenses`; the design-document performance lens stays in plan-critic.md, where the design critique reads it, INVENTORY, Decisions); step 6's benchmark floor (`delegation-loop.test-checks`); step 6 keeps its title and its first sentence as they stand, its declaring line already placing the additions, and its title pin in tests/test_phase_modules_build.py stands. **External services** moves planning's contract-capture increment (`planning.stages`) and the plan critic's external-service-integrations lens (`planning.critic-lenses`), and adds as new text (R-019, the plan's P11) the bounded remote wait as a brief constraint and an inspect check (`delegation-loop.brief-constraints`, `delegation-loop.inspect-checks`) and the deployed layout tested before any deployment as a test check (`delegation-loop.test-checks`). bridge/agents/plan-critic.md keeps every design-document lens and every plan lens the main workflow needs, and gains one sentence that catches an absence, not a presence: a part whose `Delivery kind:` row is `installer` or `install-script` whose plan's critique file carries no packaging lens, a design or intake note naming a service run by others (a third-party API, SDK or provider) whose plan's critique file carries no external-service lens, a design that shows screens whose plan's critique file carries no design-criteria lens, or a design naming a budget whose plan's critique file carries no benchmark-increments lens, is a finding that a trait is missing; design.md says, in "Traits at the design gate" (a section already excused), that a plan critique's file carries, beside plan-critic's own sections, the lenses the part's conditional workflows add at `planning.critic-lenses`, each once for the project (the point applies per project; traits are settled at that gate, before the plan), and that a trait added at that gate has its additions at `intake.questions` asked, the answers written to the intake notes, its additions at `design.sections` and `design.mandatory-diagrams` written (the Select step run again for a mandatory kind), and the design and the register revised from the new answers, before the design is presented again, since this increment is the first to move intake questions and design sections into trait files. The four rows flip to written; `workflow-check.py` passes; every module stays within R-032's bound; the pins the moves break are re-taken, never weakened: tests/test_phase_modules_interface_planning.py's three delegation-loop phrases (now in has-screens.md, and absent from the loop), tests/test_phase_modules_build.py's and tests/test_phase_modules_close.py's section and point pins (the reworded project-end line among them), tests/test_phase_modules_interface_planning.py's planning point keys and tests/test_b3_least_confident.py's pin of planning.md's extension points (the new planning line), tests/test_phase_modules_intake_design.py's readings of the plan critic and its STRUCTURE pin of design.md, which gains the `####` before `The delivery kind`, tests/test_text_consistency.py's reading of the plan critic, tests/test_b3_least_confident.py's excused-section pins and its derivation of every new trace entry (the trait files' entries included, FIX-004's lead: its reading keeps `workflow/phases/` entries only today and is widened to `traits/`), tests/test_phase_modules_close.py's whole-file-entry test extended to `traits/` and `types/` so that no `new` entry on a conditional file's title heading excuses the file whole, tests/test_extension_points.py's assertion message counting the refinements, tests/test_core_carve.py's trace pin with its NOTE lines and excused count; tests/instructions.py's instruction_paths() widened to the trait and type files (workflow/traits/ and workflow/types/, after the phase modules), so that tests/test_allowlist.py and tests/test_text_consistency.py, which read the instructions through it, still read the passages that move (the bench-check command among them) and neither fails nor passes because a passage moved; tests/test_session_start_module.py's unwritten-workflow case names a type and a trait that release B leaves unwritten (Mobile App Development; personal data), so that TASK-021's host-extension file, which sets at `intake.delivery-kind`, cannot be named there, and a new case shows installable.md named for a phase it adds at. `test_traits_existing.py` (names R-010, R-016–R-019) asserts each file adds only, at the points above and no other, names its content, that each `## Add at` section is either moved units, with new text only under a following `###`, or new text throughout under its own `new` entry, that the source modules and the plan critic no longer hold the moved passages, that the lens sections equal the bullets plan-critic.md lost and each of the four split fragments (the two halves of design's performance-and-code-signing paragraph, the Observability UI sentences, step 2's UI-bearing sentence, which names the mockup files, the DESIGN.md sections and the frozen rule) equals the sentences it was cut from, the pre-move text held as constants in the test and never read from git history, and, so that a transcription error shared by a constant and a trait file cannot pass, each split's parts put back in the baseline unit's sentence order equal that unit as trace-check.py reads it: design's performance-and-code-signing paragraph as performance budgets' two sentences, then installable's code-signing sentence; step 2's brief paragraph as the remainder's first two sentences, then has screens' sentence, then the remainder's rest; the Observability paragraph, whose remainder is reworded, as has screens' UI sentences equal to the unit's sentences up to the cut, the reworded remainder held as a constant of its own, that the two checks of R-019 exist only in external-services.md, and that N7/N9 remain in the core. With Installable written, the pin of `tests/test_b2_least_confident.py` (the bridge's own status line, FIX-002) drops its FLAG line: the two (f) findings and `RESULT: 2 problem(s)` remain.
 
@@ -310,7 +1028,7 @@ Parent: none
 Depends on: TASK-029, TASK-031, TASK-017, TASK-018, TASK-023
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/phases/delegation-loop.md; bridge/cursor-bridge/workflow/phases/delegation-loop/; bridge/cursor-bridge/workflow/phases/configuration.md; bridge/commands/supervisor.md; bridge/commands/calibrate-bridge.md; bridge/agents/test-runner.md; bridge/agents/cursor-configurator.md; bridge/agents/diff-reviewer.md; bridge/agents/spec-packager.md; bridge/cursor-bridge/Known-Pitfalls.md; bridge/cursor-bridge/Cursor-Project-Configuration.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_loop_text_windowless.py; tests/test_core_carve.py; tests/test_phase_modules_build.py; tests/test_session_start_module.py (the three widened 2026-10-24, at the pace plan revision: the two `reword` entries change the trace pin test_core_carve.py holds; a split of delegation-loop.md changes the sub-file pins at test_phase_modules_build.py:214-228 and test_session_start_module.py:96; the fixtures case of TASK-015's note; stage B3's review, round 4); tests/test_b3_least_confident.py
+Scope: bridge/cursor-bridge/workflow/phases/delegation-loop.md; bridge/cursor-bridge/workflow/phases/delegation-loop/; bridge/cursor-bridge/workflow/phases/configuration.md; bridge/commands/supervisor.md; bridge/commands/calibrate-bridge.md; bridge/agents/test-runner.md; bridge/agents/cursor-configurator.md; bridge/agents/diff-reviewer.md; bridge/agents/spec-packager.md; bridge/cursor-bridge/Known-Pitfalls.md; bridge/cursor-bridge/Cursor-Project-Configuration.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_loop_text_windowless.py; tests/test_core_carve.py; tests/test_phase_modules_build.py; tests/test_session_start_module.py (the three widened 2026-10-24, at the pace plan revision: the two `reword` entries change the trace pin test_core_carve.py holds, a split of delegation-loop.md changes the sub-file pins at test_phase_modules_build.py:214-228 and test_session_start_module.py:96, the fixtures case of TASK-015's note, stage B3's review, round 4); tests/test_b3_least_confident.py
 Satisfies: R-039, R-040, R-041, R-043
 Done when: the delegation loop's step 4 says what a suite is — the project's recorded suite command, or any run of more than the increment's own test files — that every suite runs through the launcher in the background and `test-runner` reads its output file (the foreground run of a suite under ten minutes ends; KP-061's bound no longer chooses the path), while a run of the increment's own test files alone may run in the foreground from the session, whose console is hidden (the probe of 2026-10-20, ISS-011); that the mutant list is `run/supervisor/<id>-mutants.json` and every mutation run is a `mutation-run.py` run through the launcher's driver kind, launched in the background under the heavy launch's `timeout` like a suite (a foreground launcher call ends at ten minutes, KP-061), the step resuming when its completion arrives — the applying-and-running engine is the bridge's program, reviewed at the bridge's gate; the mutant list, the expected tests and the criterion tests stay the supervisor's, never the builder's — this being the reword of the settled sentence that the supervisor writes the driver and never the builder, named in `trace-exceptions.md`; that the new tests' run against the checkpoint is `mutation-run.py --checkpoint <the increment's checkpoint>` with the increment's new tests listed in the mutants file — a new file by name, a changed file by its new tests' ids — and staged first, which copies the tree and so needs no `old-<nnn>` worktree (the reword named in `trace-exceptions.md`; rule 39's allowance of that worktree stands unused), and what each result does: exit 4 sends each listed new test back to be rewritten before any reviewer (a test that passes on the old code proves nothing, the settled consequence kept), a `not run` test is said; exit 3 stops the step and is recorded as the run's own result, never a model failure; that the mutation run is launched at step 7 on every pass through it — once Review A and the auditors have accepted the increment's behaviour and before step 8's snapshot, never at every round's step 4 (the owner's words of 2026-10-20, R-043) — the cache skipping the mutants whose keyed inputs are unchanged since their last kill (a kept kill holds for those inputs, R-041; `--all` is the full run the supervisor chooses where a round changed files outside every key); that at step 7, before the increment's first mutation run, before any `--all` run and whenever the mutants file has changed since its last estimate, the supervisor first cuts the redundancy the mutants file itself shows, which needs no run and no kill — a mutant whose `file`, `pairs` and expectations (`tests`, `expect_fail`, `expect`) equal another's is a duplicate under a second `id`, and its entry is removed from the mutants file before the launch, so that `mutation-run.py` never applies it — never a criterion test, and nothing on the strength of a kept kill (the cache's skipping is R-041's own, and an `--all` run is chosen where a kept kill is distrusted), and then estimates the run's process count to its order of magnitude from the file as it stands after the removal: for each distinct `tests` list among the mutants the run will apply (every mutant for `--all`; otherwise those with no kept kill; two lists naming the same test files, in any order, are one list), the processes one completed run of that list starts (the pytest process, plus every launch the tests make counted once per pass the run makes through it — each parametrization, each loop iteration — and plus the programs those launched programs start in turn; read from the launcher's run log where the launches go through the launcher, which holds launcher runs and nothing else, and from the tests' and the launched programs' launch sites with their pass counts otherwise; the counting run launched the way step 4 launches a run of its kind), that count reused for every mutant that lists it, the sum over the mutants to apply plus the one collection check being the estimate; the cuts made and the estimate go on `run/supervisor/in-flight.md` with the mutants file's name (R-043; FB-040: the driver of TASK-015, rerun whole between review rounds, launched session-start.py 52,000 times in one morning, ISS-011; the owner's words of 2026-10-20, INVENTORY, Decisions: the fix "must not cut down on quality or certainty of proper test coverage. Redundancy should be cut"), and what its exit 1 — any survived, not-applied or killed `expect: survive` mutant — does there: where the larger of the two next counts — the guard's opened rounds plus one, and the launcher's round of the brief that would carry a code fix (R-042; the ceiling, its programs and its lifts are TASK-032's and TASK-034's) — is at or below the ceiling, a criterion test's fix is the supervisor's and no round, a code fix a re-delegation and a round; above it the mutant goes to `docs/HARDENING.md` under the increment, never to a re-delegation, unless the untested code is a safety mechanism the increment relies on or the result shows a blocking-class defect; while the `--checkpoint` run of the increment's new tests stays at step 4, before any reviewer; that the module's survival list says where the increment's verdicts are kept (Review A's, the auditors', Review B's reply, each written to run/supervisor/in-flight.md as it returns), as reflection.md does for the stage review (stage B3's review, round 4); and that a driver is a Python program under `run/supervisor/` or a `mutation-run.py` run and nothing else (`# wake` is not available for a driver; it stays for a benchmark or a runner the launcher does not know, each named with its reason in the status file); step 3 names the heavy launch's duration once, in seconds — the kind's cap plus the slot wait's bound (the builder's cap, 14,400 s, plus the grace of 120 s) plus the waiter's reporting minute — and writes the Bash tool's `timeout` on every heavy launch and on its wake-timer as that duration in milliseconds, the loop guard counting the same duration with its own notification grace on top, said once and the figures repeated nowhere else; step 3b says a wait that ends unmet (exit 123) means the command never started — the holder's end is waited for with `wake-timer.py <seconds>`, the seconds being the time left until the `ends by` time the exit line printed, or zero when it has passed, then one relaunch; a second 123 naming a holder is retried twice more the same way and then the owner is told, the line naming the holder's kind and run id; a 123 reading `held by unknown` (the launcher already waited the provisional bound and never read a live record) relaunches at once, and a second such 123 in a row tells the owner at once, naming `~/.cursor-bridge/heavy.lock` — a sign of a defect, not a busy computer; no 123 is passed to `roster-check.py`, it is never a model failure — that a waiter killed from outside (an `.err` with waiting lines and neither `slot taken` nor `bridge-run: exit`, KP-053) is relaunched, nothing spent; that a driver run ended at its limit (124), or killed from outside after `slot taken` (no `bridge-run: exit` line), is relaunched once and continues from its cache, not a model failure either; and that a run waiting for the slot is the launcher's business, never a reason to start it another way; `bridge/agents/test-runner.md` says the suite is always the launcher's background run whose file it reads; `bridge/agents/diff-reviewer.md` and `bridge/agents/spec-packager.md` say the same of the driver as the loop — the engine is `mutation-run.py`, which works on a scratch copy and so restores nothing in the Workspace, and the reviewer reads the supervisor's mutants file against each mutant's name as it read a driver's mutants, and `bridge/cursor-bridge/Known-Pitfalls.md`'s KP-056 says it in its correction too (its driver "written on the supervisor's side with the criterion tests, never by the builder" becomes the supervisor's mutants file and criterion tests, applied by `mutation-run.py` on a scratch copy); the mutant list and the criterion tests stay the supervisor's; `configuration.md`, `Cursor-Project-Configuration.md` (§2 and the order of operations) and `bridge/agents/cursor-configurator.md` (its set of items, the `secure-coding.mdc` pattern) gain the windowless default as a configuration item: the configurator creates the test root's `conftest.py` from the snapshot's fenced block only when the test root has none (`tests/conftest.py` with its folder when the project has no test root yet), and when one exists inserts the block once if the three tokens are absent and leaves every other line, with the conformance floor that checks it and the NOTE a Node suite gets; `calibrate-bridge.md` says the `Windowless test suite` floor is written the same way from the snapshot during the calibration itself, before the project resumes, with the project's recorded suite run once before the write and once after, each a background `--kind test` launch under step 3's `timeout` (in the slot) whose output file is read when its completion arrives, the two results written on the `Calibrated:` line — the two `-rA` reports' failed test ids compared: a failure present before the write is the project's own and is recorded; a failure present only after the write is the insert's, the report's first line, and the insert is reverted, the reverted tree committed as the calibration's checkpoint and the floor left MISSING and named — and that otherwise the write is committed as the calibration's checkpoint (a configuration item, no gate reopened; a Node suite's NOTE recorded in the status file); the core's rule 8 names the suite and the mutation runs and excepts the driver kind's `python <program>` from its prohibition of options that run another program, the launcher's path check being the guard, and rule 24 names the suite's default; `delegation-loop.md` stays within the R-032 bound, another step moved into a sub-file first if it would not (TASK-013's precedent, the pointer line extended); `trace-check` green with the increment's `reword` and `new` entries; `tests/test_loop_text_windowless.py` (names R-039, R-040, R-041, R-043) asserts each sentence (the estimate's sentence and its cut among them), the one place the timeout figures stand, and that the snapshot the text names is the one TASK-028 ships; `tests/test_session_start_module.py` gains one case that runs the hook over `tests/fixtures/workflows/pass/` (TASK-015's note, its two triggers settled on this increment, whose Scope names the file).
 
@@ -320,7 +1038,7 @@ Parent: none
 Depends on: TASK-029
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/bridge_env.py; bridge/cursor-bridge/bridge-run.py; bridge/cursor-bridge/review-guard.py; bridge/cursor-bridge/permission-guard.py; bridge/cursor-bridge/MANIFEST.json; tests/test_bridge_run_review_ceiling.py; tests/test_review_guard_ceiling.py; tests/test_bridge_run_design_ceiling.py; tests/test_permission_guard.py; tests/test_review_guard.py; tests/test_review_guard_a4.py; tests/test_bridge_run.py; docs/cli-reference.json; docs/CLI_REFERENCE.md; tests/test_hotfix25a_guard_scope_invisible.py *(widened 2026-10-28 at the brief's reality check: its guard snapshots use the bare names `001` and `003`, which the grammar refuses, so they move to the grammar as tests/test_review_guard.py's do; the same check found the agent-home refusal after the launcher's `started` line, so the order clause a states is read as after the key-file and design-ceiling refusals, before the `started` line, the agent-home check left where it is)*
+Scope: bridge/cursor-bridge/bridge_env.py; bridge/cursor-bridge/bridge-run.py; bridge/cursor-bridge/review-guard.py; bridge/cursor-bridge/permission-guard.py; bridge/cursor-bridge/MANIFEST.json; tests/test_bridge_run_review_ceiling.py; tests/test_review_guard_ceiling.py; tests/test_bridge_run_design_ceiling.py; tests/test_permission_guard.py; tests/test_review_guard.py; tests/test_review_guard_a4.py; tests/test_bridge_run.py; docs/cli-reference.json; docs/CLI_REFERENCE.md; tests/test_hotfix25a_guard_scope_invisible.py *(widened 2026-10-28 at the brief's reality check: its guard snapshots use the bare names `001` and `003`, which the grammar refuses, so they move to the grammar as tests/test_review_guard.py's do, the same check found the agent-home refusal after the launcher's `started` line, so the order clause a states is read as after the key-file and design-ceiling refusals, before the `started` line, the agent-home check left where it is)*
 Satisfies: R-042
 Done when: (a) `bridge_env.py`, which the launcher imports already, holds the one copy of the ceiling (`REVIEW_ROUNDS = 3`), the five blocking classes, the name grammar and the readers of the `Blocking class:` line and of the owner's line, imported by the launcher, the guard and TASK-033's `pace-report.py`; the grammar: a name is `<ID>` or `<ID>-r<N>`, `<N>` a positive integer without a leading zero, `<ID>` a token of letters, digits and hyphens that starts with a capital and holds no other `-r<digits>` part (`TASK-010c`, `CONFIG-B3b`, `HOTFIX-001` and `B3-CLOSE` read; `-r0`, `-r05`, `-R2` and a space cannot, and are refused wherever a name is read); the class line is `Blocking class: <class> - <the finding>`, `<class>` exactly one of `behaviour`, `security`, `data integrity`, `safety mechanism` and `failing test`, the finding not empty; the owner's line is `Review rounds above the ceiling: <ID> <rounds> (<their words>, <date>)` in `docs/RUN_PARAMETERS.md`, `<rounds>` above the ceiling, the first well-formed line per ID standing and a later one ignored, as the design lift's; the existing tests' names move to the grammar (`tests/test_review_guard.py`'s and `tests/test_review_guard_a4.py`'s bare `001` and `002` become `TASK-001` and `TASK-002`, the second on a branch of its own), and the brief and ceiling refusals come after the launcher's existing refusals (the agent home, the key file, the design ceiling), so that `tests/test_bridge_run.py`'s no-brief launches keep the messages they expect; (b) `bridge-run.py`: a `cursor-agent` launch that is not `--kind review` names exactly one brief `handoff/<ID>[-r<N>].md` in its arguments, found as the design files are found (anywhere, with either separator and the Windows spellings) and read from the folder a `--workspace` argument names, else the launcher's folder (the parallel variant's builder runs in its worktree), or is refused with exit 125 (the constant pointer names one); `BRIDGE_RUN_ALLOW_ANY=1` keeps the tests' helpers running as today and never exempts a command whose head is `cursor-agent`, and a `--kind review` launch whose `--model` is the resolved roster's builder (`docs/ROSTER.resolved.json`), or whose arguments name a `handoff/<ID>[-r<N>].md` by the grammar (`handoff/RESOLUTION-<id>.md`, the resolution round's file, excepted by its prefix; `handoff/<ID>-r<N>-report.md`, no brief by the grammar, never read as one), is refused, so neither switch runs a builder past the brief rule and no review launch runs a brief uncounted; the run's line in `run/launcher/runs.jsonl` records `brief` (the ID), `round` (`<N>`, or 1 for a brief without one), `brief_sha256` (the brief's bytes at the launch) and `lift` (`class`, `owner` or none), never the prompt; a launch of a brief name that has a completed run on record — a logged run of that name with exit 0 — with a different `brief_sha256` is refused ("revised in place: write `handoff/<ID>-r<N+1>.md`"), identical bytes relaunching freely (KP-038's exit 0 with no work done) and any other exit leaving the name open; the branch the line records, and whose rounds are counted, is the `--workspace` folder's where the launch names one, else the launcher's folder's — the folder the brief is read from — as `git rev-parse --abbrev-ref HEAD` gives it, the one form the guard's record uses too; the launcher and the guard count a branch by one rule, held in `bridge_env.py` and read from both records together (`runs.jsonl` and the guard's `rounds-*.json`): a branch carries the IDs the first brief launched or snapshotted on it declares — one ID, or the set a `Merge unit: <ID> <ID> ...` line in that brief names (the loop's merge units, `TASK-010 TASK-015`; for a records subject the line in its `run/review/SCOPE-<ID>.md`), each ID counted under its own budget — a brief or a snapshot under an ID outside that set is refused with the counted IDs — lifted only by the owner's line naming the outside ID, never by a class line (which no reviewer confirms below the ceiling), the lift allowing that ID's briefs and snapshots on the branch and leaving the declared set as the first brief wrote it — a later brief naming more IDs refused, and each declared ID an increment heading of `docs/BUILD_PLAN.md` (read as `plan-check.py` reads them) or the line refused, the claim lapsing once a commit on `main` merges the counted IDs under the squash-subject reader this increment places in `bridge_env.py` (the plan check's four forms as they stand, taking the ID pattern as a parameter — `plan-check.py` passes its own `TASK-\d{3,}[a-z]?`; the launcher, the guard and `pace-report.py` pass the grammar's, under which the `Merge pull request ... from x/<branch>` form reads the branch name's lower-cased ID, `bug-019`, `refac-b3` or `config-b3b`, compared with the brief's ID ignoring case and keeping a trailing letter (as `plan-check.py` keeps it today; a test with `config-b3b`), and `(BUG-019)` is a bare ID — imported by the launcher and the guard; TASK-033 narrows the closing-parenthesis form there and makes `plan-check.py` import it) or the branch no longer exists; `main` itself is never counted, and a builder launch (a `cursor-agent` launch that is not `--kind review`) from a checkout on `main` is refused naming the rule (the loop never builds on `main`), while `--kind test` and `--kind driver` launches start there as anywhere (TASK-030's calibration runs the suite on whatever branch is checked out); the launcher's round is the larger of the name's `<N>` and one plus the distinct completed brief names (ID and `<N>`) of that ID on the branch, so that an identical-bytes relaunch adds no round and a fix brief or a renamed increment opens no fresh budget; a round above the ceiling is refused with exit 125 and a message that begins `bridge-run: refused - review ceiling: ` and names the brief, the ID, the branch, the round, the ceiling and the two lifts, unless the brief holds a class line or the owner's line allows the round, the lift then recorded with the line's text, a later, different brief whose class line repeats a text already recorded for the increment refused (a class line lifts one round, in the launcher as in the guard), an identical-bytes relaunch of the same brief name excepted, since it adds no round (KP-038); a refusal happens before anything starts, logs nothing but itself, and is neither a failed launch nor a model's failure; (b2) `permission-guard.py` refuses a `cursor-agent` head that is not inside a `bridge-run.py ... -- cursor-agent` command when its arguments name `handoff/` or `run/review/` with either separator (`handoff\TASK-010.md` too; a brief, a review's diff or `.err` file), the message pointing at the launcher, while a probe (`--version`, a one-word `-p`, KP-024) still runs, so that a builder or a reviewer started around the launcher is counted or stopped, never silently uncounted; `tests/test_permission_guard.py` gains the refused and the allowed case, its existing allowed cases of a raw `cursor-agent ... "Read handoff/TASK-0nn.md"` (today at :140 and :181) becoming refusals; (c) `review-guard.py snapshot <name>`: a name beginning `DESIGN-` is the design ceiling's and is not counted; every other name is read by the grammar, one that cannot be read refused with exit 125; per `<ID>` the guard keeps `rounds-<ID>.json` under `.git/bridge/` beside its snapshot files (round, name, branch, tree hash, time, lift and the lifting line's text; written to a temporary file and moved into place) and counts the rounds opened — a round is spent when its reply arrived: `verify` writes the reply into the round's entry of `rounds-<ID>.json` (the Review B run's exit from the `.err` file; a reply is one with exit 0), a record `snapshot` never clears, where today's `verified-<name>.json` mark is removed by the next `snapshot` and so cannot carry it; a name without `-r<N>` is round 1; `<N>` equal to the current round re-snapshots it while it has no reply (the relaunch of a failed launch, a records commit in between allowed) or while the tree hash equals the round's (the re-run after an APPROVE-shaped reply that read nothing, step 8's failed launch), and is refused once it has a reply on another tree ("round <N> is reviewed: write `<ID>-r<N+1>`"); `<N>` equal to the current round plus one opens the next; any other `<N>` is refused with the count; the branch is counted by the one rule of (b): the rounds file records the branch as `git rev-parse --abbrev-ref HEAD` gives it, and a snapshot under an `<ID>` outside the branch's declared set (either record naming that branch, the launcher's or the guard's, whose claim has not lapsed; the set the branch's first brief declares, or, for a records subject that has no brief, its `SCOPE-<ID>.md` — an increment's scope file, which carries the class line, never supplies the set) is refused with the counted IDs unless the owner's line names the outside ID, so that a renamed snapshot (`TASK-006b` for `TASK-006`'s branch, `STAGE-B2k` on `stage/B2`) opens no fresh budget, while a sub-increment with its own brief on its own branch (`TASK-010c`) and a records subject with no brief (`B3-CLOSE`) are counted under their own IDs; a missing `rounds-<ID>.json` beside a present `review-<ID>.json` or `review-<ID>-r<N>.json` is refused where any of them carries a `round` field, and seeded where none does, from the larger of two readings — the letter sub-round snapshots of today's convention, `review-<ID>.json` and `review-<ID>[a-z].json` with the same recorded branch (today's snapshots store it as `refs/heads/<branch>`, the prefix stripped before the comparison, the test's fixture written as today's `snapshot` writes it), letters in order, a trailing letter read as a sub-round only where the longer token has no brief and the shorter ID has one (`TASK-010c` with its own brief is an ID; `TASK-010b` without one is `TASK-010`'s second round), and the greatest `<N>` of the tracked `handoff/<ID>-r<N>[a-z]?-report.md` files — one round each in order, marked `seeded`, which is how an increment in flight when the release installs is counted without a step of its own (the guard keeps one snapshot file per name and overwrites it, so a count of files alone would undercount); a round above the ceiling is refused with exit 125 and a message that begins `review-guard: refused - review ceiling: ` unless `run/review/SCOPE-<ID>.md` holds a class line or the owner's line allows the round, the lift recorded with the line's text on the round it lifted; the scope file carries one class line, the next round's replacing it, and a later round is refused while the file holds the text already recorded (a class line lifts the one round it was written for; the owner's line lifts to its `<rounds>`), the same for `SCOPE-STAGE-<name>.md`; a refused snapshot writes no round record and no snapshot file, as the launcher's refusal logs nothing; `verify <name>` and `premerge <name>` load the snapshot by the name given, as today, so one name — `<ID>-r<N>`, `STAGE-<name>-r<N>` — serves the snapshot, `verify`, `premerge` and the `.err` file; (d) the design-ceiling refusal's pointer (bridge-run.py:278, `supervisor.md, Phase 2`) names `design.md, "The launcher holds the ceiling"`, pinned by `tests/test_bridge_run_design_ceiling.py` (the pointer sweep's last program lead, stage B3's review); (e) `tests/test_bridge_run_review_ceiling.py` (names R-042), under a temporary launch folder so that no real `runs.jsonl` is read or written: the accepted and the refused name forms, a launch naming no brief or two refused, a brief read from the `--workspace` folder, `BRIDGE_RUN_ALLOW_ANY=1` refusing a `cursor-agent` head without a brief, a `--kind review` launch on the roster's builder model refused, rounds 1 to 3 allowed with no line, round 4 refused without a class line and run with one, each of the five classes accepted and a sixth word or an empty finding refused, the owner's line lifting to its `<rounds>` and a second line ignored, a revised brief refused after a run with exit 0 and relaunched after any other exit (1, 124), identical bytes relaunching and leaving the next numbered brief's round unchanged, a brief under another ID on a counted branch refused without a lift and allowed once the counted ID is merged on `main`, a two-ID merge unit's briefs allowed and a third ID without the line refused (refused under a class line too, allowed under the owner's line naming it with the set unchanged), a later brief naming more IDs refused, a unit naming an ID that is no increment heading refused, a snapshot of one ID (the guard's record) refusing a launch of another on that branch, a repeated class-line text refused in a different brief and the identical-bytes relaunch of the lifted brief allowed, a `--kind review` launch naming a brief refused and one naming `handoff/RESOLUTION-<id>.md` or `handoff/<ID>-r<N>-report.md` allowed, two launches from one folder naming two worktrees on two branches each counted as round 1, a builder launch from a checkout on `main` refused while a `--kind test` and a `--kind driver` launch there start, the `runs.jsonl` fields and the absence of the prompt, the message's names, the refusal starting no process, and `bridge_env.REVIEW_ROUNDS` 3 with the five classes; `tests/test_review_guard_ceiling.py` (names R-042), on temporary repositories: rounds 1 to 3 opened in order, a re-snapshot of an unreviewed round with a changed tree allowed, of a reviewed round on the same tree hash allowed and on another tree refused (the sequence reply, re-snapshot on the same tree, snapshot of a changed tree under the same `<N>` refused at its last step: the reply survives the re-snapshot), `<N>` off the count refused, the fourth round refused without the class line and allowed with it, the same line refusing a fifth round and the next round's line, replacing it, allowing it, the owner's line, `STAGE-<name>-r<N>` counted, a snapshot under another ID on a counted branch refused, allowed once the counted ID is merged on `main`, a merge unit's two IDs allowed (with `SCOPE-TASK-010.md` present and holding no merge line, a snapshot of `TASK-015` on that branch allowed) and a third refused under a class line and allowed under the owner's line, a launch of one ID (the launcher's record) refusing a snapshot of another, and a records subject allowed, a `DESIGN-` name not counted, a missing rounds file refused beside a snapshot with a `round` field and seeded beside ones without (four letter snapshots, their branch stored as today's `snapshot` stores it, seeding four rounds so that the next `<N>` is 5; `TASK-010`'s letters `a` and `b` beside a real `TASK-010c` with its own brief; five report files outranking two snapshots), a refused snapshot writing nothing, `tests/test_permission_guard.py`'s refused case in the backslash form too, the record written atomically and surviving `verify`, and `verify` and `premerge` under the full name; the command reference regenerated; `windowless-check.py` green; no new dependency.
 
@@ -403,7 +1121,7 @@ Parent: none
 Depends on: none
 Parallel: no
 Diagrams: D-004
-Scope: bridge/cursor-bridge/Known-Pitfalls.md; bridge/cursor-bridge/MANIFEST.json; docs/diagrams/D-004-context-dfd.md; docs/diagrams/DEVIATIONS.md; tests/test_release_t_pitfalls.py; tests/test_a5_followups.py (re-taken only if KP-061's heading changes: it pins the heading and its uniqueness, not the outcome line D5 corrects; no other test pins a sentence of KP-052, KP-061 or KP-038 — a pin the reality check finds is a plan revision)
+Scope: bridge/cursor-bridge/Known-Pitfalls.md; bridge/cursor-bridge/MANIFEST.json; docs/diagrams/D-004-context-dfd.md; docs/diagrams/DEVIATIONS.md; tests/test_release_t_pitfalls.py; tests/test_a5_followups.py (re-taken only if KP-061's heading changes: it pins the heading and its uniqueness, not the outcome line D5 corrects, no other test pins a sentence of KP-052, KP-061 or KP-038 — a pin the reality check finds is a plan revision)
 Satisfies: R-054
 Done when: `Known-Pitfalls.md` holds, each in the catalogue's four-part shape (misconception or mistake, how it surfaced, the correction, where it applies): KP-061's outcome line corrected (D5: the app moved the suite's command to the background and the result was waited for; the rule stands); KP-063 to KP-065 (D13: a provider's bill in its own unit, failed attempts included; a harness below the product's entry point; a driver anchored on a moved line); KP-066 to KP-070 in R-054's order (T27: a security floor trusted before it ran; `git show --output` creates the file empty, KP-067 being the number `review-guard.py` already cites for its refusal of an empty review input; a vendor banner's partial key in a public log; a squash-merged pre-gate status file; a naive local-time schedule walk) and the KP-058 addendum (working-folder defaults read the live folder); KP-052 corrected (T13: no tool is safe for a typed backslash-u escape: `chr()` in a test, the code point in a document, a byte search after a write that quotes one); KP-071 to KP-074 from release B's Issues (P21: a test that patches a standard-library function records the library's own calls; a count seeded from files another mechanism also writes; a check that scans shipped code found its own description; status-file tests gated on CI variables skip locally); and KP-038 narrowed to what the code does (the stores under the profile root are not found by default; a store reached through `APPDATA` or `LOCALAPPDATA` is, until a probed release redirects them, the redirect a program item for the maintainer named in TASK-045's entry; D-004's first deviation). D-004's note on the edge `p_bridge_env` → the agents' environment says the same, drawn as built, and DEVIATIONS.md's row for it is removed (the design corrected to the code, conventions §8's second case). `tests/test_release_t_pitfalls.py` (names R-054, D-004) pins each entry's number and title, one sentence of each (KP-061's the corrected outcome line, not its command line, which TASK-041 rewrites) and KP-038's narrowed sentence, written first and red on the checkpoint; the increment's first P7 suite launch, in TASK-038's documented `--key-file` form (the three `GITHUB_` lines in a file outside the Workspace), observed running with no prompt and no refusal, the observation recorded in the accept commit and in the design's host table as the `--key-file` word's row in the records-only commit (`docs/DESIGN.md` a record), a prompt or a refusal recorded there the same way and repaired by TASK-038's (c); `diagram-check.py --mode design` OK; MANIFEST regenerated; no program changed.
 
@@ -413,7 +1131,7 @@ Parent: none
 Depends on: TASK-036
 Parallel: no
 Diagrams: none
-Scope: bridge/commands/supervisor.md (rules 12, 43 and 48; "Project state": the Decisions row's sentence and the status template); bridge/cursor-bridge/session-start.py (the digest's rule 12 in the question form, the digest within 9,500 characters with every rule number kept, trimmed elsewhere as TASK-034 trimmed it, the trims named in the trace entry); bridge/skills/explain-for-decision/SKILL.md (the run sheet: a vendor console from documentation fetched at the time, with the exact path); bridge/commands/calibrate-bridge.md (step 5: the `Calibrated:` line rewritten at each calibration, the earlier text living in git); bridge/cursor-bridge/workflow/phases/design.md (T1 one subject for a design with its addendum; T3 the record's definitions; T7 the snapshot id `DESIGN-<subject>-<round>` and the `.err` name from it; P9 the worked-scenario lens); bridge/cursor-bridge/workflow/phases/change-cycle.md (item 2: the pause before planning work, the model named, a push notification where Remote Control is on, T26); bridge/agents/plan-critic.md (P9's lens); bridge/cursor-bridge/Diagram-Planning-Conventions.md (§8: the all-omitted index, the minimum set binding every project whose code has components, the calibration's retrofit reading the same rows, P20); bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_release_t_records.py; tests/test_session_start.py; tests/test_core_carve.py; tests/test_phase_modules_intake_design.py; tests/test_phase_modules_close.py; tests/test_b3_least_confident.py; tests/test_calibrate_text.py; tests/test_leads_b3.py (pins re-taken, the last where T7's rewrite of the snapshot id touches design.md's snapshot-hash bullet it pins, checked before the brief)
+Scope: bridge/commands/supervisor.md (rules 12, 43 and 48, "Project state": the Decisions row's sentence and the status template); bridge/cursor-bridge/session-start.py (the digest's rule 12 in the question form, the digest within 9,500 characters with every rule number kept, trimmed elsewhere as TASK-034 trimmed it, the trims named in the trace entry); bridge/skills/explain-for-decision/SKILL.md (the run sheet: a vendor console from documentation fetched at the time, with the exact path); bridge/commands/calibrate-bridge.md (step 5: the `Calibrated:` line rewritten at each calibration, the earlier text living in git); bridge/cursor-bridge/workflow/phases/design.md (T1 one subject for a design with its addendum, T3 the record's definitions, T7 the snapshot id `DESIGN-<subject>-<round>` and the `.err` name from it, P9 the worked-scenario lens); bridge/cursor-bridge/workflow/phases/change-cycle.md (item 2: the pause before planning work, the model named, a push notification where Remote Control is on, T26); bridge/agents/plan-critic.md (P9's lens); bridge/cursor-bridge/Diagram-Planning-Conventions.md (§8: the all-omitted index, the minimum set binding every project whose code has components, the calibration's retrofit reading the same rows, P20); bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_release_t_records.py; tests/test_session_start.py; tests/test_core_carve.py; tests/test_phase_modules_intake_design.py; tests/test_phase_modules_close.py; tests/test_b3_least_confident.py; tests/test_calibrate_text.py; tests/test_leads_b3.py (pins re-taken, the last where T7's rewrite of the snapshot id touches design.md's snapshot-hash bullet it pins, checked before the brief)
 Satisfies: R-047, R-048, R-053
 Done when: each item's sentence stands in the home the design's table names (R-047: T1, T3, T7, T26; R-048: D11 in rule 43, D10 in the run sheet, D7 in the digest's rule 12 and the core's, D6 in step 5 and the template; R-053: P10's Decisions-row sentence, the next report naming every decided-but-unbuilt rule, and the `Running projects must` sentence for a release that adds a safety mechanism, in "Project state"; P9's lens in design.md's critics' lenses and in plan-critic.md; P20 in the conventions' §8), the digest within its cap and its rule numbers all present (`tests/test_session_start.py`), every reworded passage with its `reword` entry and every new section with its `new` entry, `trace-check` green; `tests/test_release_t_records.py` (names R-047, R-048, R-053) pins each sentence, written first and red on the checkpoint; the pins on the reworded sentences re-taken; MANIFEST regenerated; no program's behaviour changed (`session-start.py`'s digest text only).
 
@@ -423,7 +1141,7 @@ Parent: none
 Depends on: TASK-037
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/phases/delegation-loop.md; bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md (new); bridge/commands/supervisor.md (rule 43 and the status template: the status file as at the merge, `in-flight.md` between merges, T11 and T17); bridge/cursor-bridge/session-start.py (the hook's text on `in-flight.md`, T17; its module table unchanged, the sub-file read from the pointer line); bridge/cursor-bridge/Merge-Verification-Policy.md ("Invocation": T5's clauses, T8's bare commands, T4's title form; its convergence paragraph untouched here); bridge/cursor-bridge/workflow/phases/design.md (the constant prompt and the receipt check: T5, T2); bridge/cursor-bridge/workflow/phases/reflection.md (steps 4 and 6: T16, T25); bridge/agents/diff-reviewer.md (T5, T2); bridge/agents/secret-sentinel.md (P5: every pushed commit scanned for computer paths and account names); bridge/cursor-bridge/settings.bridge.json (the allow rules `Bash(git branch -D:*)`, `Bash(gh pr list:*)` and `Bash(gh issue list:*)`; the test kind's `--key-file` form where TASK-036's launch was prompted); bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_release_t_merge.py; tests/test_allowlist.py; tests/permission_rules.py (in that case); tests/test_phase_modules_build.py; tests/test_session_start_module.py; tests/test_session_start.py; tests/test_core_carve.py; tests/test_b3_least_confident.py; tests/test_loop_text_pace.py; tests/test_phase_modules_close.py; tests/test_a5_followups.py (pins re-taken: the sub-file pointers, step 8's names and sentences, the stage review's part sentence T25 edits)
+Scope: bridge/cursor-bridge/workflow/phases/delegation-loop.md; bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md (new); bridge/commands/supervisor.md (rule 43 and the status template: the status file as at the merge, `in-flight.md` between merges, T11 and T17); bridge/cursor-bridge/session-start.py (the hook's text on `in-flight.md`, T17, its module table unchanged, the sub-file read from the pointer line); bridge/cursor-bridge/Merge-Verification-Policy.md ("Invocation": T5's clauses, T8's bare commands, T4's title form, its convergence paragraph untouched here); bridge/cursor-bridge/workflow/phases/design.md (the constant prompt and the receipt check: T5, T2); bridge/cursor-bridge/workflow/phases/reflection.md (steps 4 and 6: T16, T25); bridge/agents/diff-reviewer.md (T5, T2); bridge/agents/secret-sentinel.md (P5: every pushed commit scanned for computer paths and account names); bridge/cursor-bridge/settings.bridge.json (the allow rules `Bash(git branch -D:*)`, `Bash(gh pr list:*)` and `Bash(gh issue list:*)`, the test kind's `--key-file` form where TASK-036's launch was prompted); bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_release_t_merge.py; tests/test_allowlist.py; tests/permission_rules.py (in that case); tests/test_phase_modules_build.py; tests/test_session_start_module.py; tests/test_session_start.py; tests/test_core_carve.py; tests/test_b3_least_confident.py; tests/test_loop_text_pace.py; tests/test_phase_modules_close.py; tests/test_a5_followups.py (pins re-taken: the sub-file pointers, step 8's names and sentences, the stage review's part sentence T25 edits)
 Satisfies: R-045, R-046
 Done when: (a) step 8 (the verified gate) is moved verbatim into `delegation-loop/merge.md` in the increment's first commit, whose sha the accept commit names and whose diff shows the passage leaving `delegation-loop.md` and arriving unchanged (TASK-030's shape for step 7), the rewording of (b) in later commits so a reviewer tells the move from the change; the module's `Sub-files:` line naming it third, `delegation-loop.md` holding a one-paragraph pointer where step 8 stood and standing within R-032's bound with room for this release's additions (today 57,894 bytes, fewer characters since the module holds non-ASCII, the bound's test measuring characters; the new size recorded in INVENTORY's Decisions row on the modules' sizes), `merge.md` added to the R-032 bound test's parametrised list in `tests/test_phase_modules_build.py` (rewritten first; listed by its bracketed id for the new parameter alone and red on the checkpoint, where the file is absent), `trace-check` finding every moved passage under `workflow/**`, and `session-start.py` naming the sub-file after the module (a run over `tests/fixtures/workflows/pass/`; `tests/test_session_start_module.py`'s and `tests/test_phase_modules_build.py`'s sub-file pins re-taken); (b) R-045's sentences as the row gives them: T4 (the title form, with the squash-message fact that this repository's squash message is the commit messages, so the `Merges:` trailer form holds only where the squash message is the description), T8 (push and merge bare), P7 (the suite before the first push of a pull request changing the status file, `project.json` or a `VERSION`, in the documented form `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --key-file <a file outside the Workspace> --kind test -- python -m pytest -q tests`, the key file holding the three lines `GITHUB_REF=refs/pull/<n>/merge`, `GITHUB_BASE_REF=main` and `GITHUB_EVENT_NAME=pull_request` — the launcher's `--key-file` applies a file of `NAME=value` lines whatever `--strip` says, and the form sits in the heavy-launch rule's slot, where an environment prefix before `python` would match no rule and `tests/test_allowlist.py` would never collect it (KP-019); TASK-041 adds `--strip` to it — `<n>` predicted as the design says, the run repeated with the real number where GitHub issues another), P5 (every pushed commit scanned, a leak removed from the commit, in step 8 and `secret-sentinel.md`), P4's text (the merged branch deleted locally and on the remote with the two bare commands, the armed form skipped where the repository refuses auto-merge), T11 and T17 (the status file as at the merge, the live position in `in-flight.md`, a pull request overtaken by another's merge rewritten and re-reviewed; rule 43, the template, the hook's text, KP-069 cited); R-046's: T5 (where a reviewer or critic may write and that it edits nothing: the directive's clauses, the policy's invocation, design.md's constant prompt), T16 (single test files beside Review B, mutation runs on a copy outside the checkout), T25 (each stage-review part's turn budget in its prompt), T2 (a clean reply's three verified statements, the receipt check reading them); (c) `settings.bridge.json` gains `Bash(git branch -D:*)` beside the narrower `Bash(git branch -D stage/*)` it subsumes, which stays (the rule list is append-only; `tests/test_allowlist.py` pins both), and `Bash(gh pr list:*)` and `Bash(gh issue list:*)` for P7's two prediction reads, `gh pr list --state all --limit 1` and `gh issue list --state all --limit 1` (R-045's `<n>`), which `merge.md` documents and the test would otherwise fail; the test pinning the three new rules, the two documented delete commands (the remote delete on the existing `Bash(git push:*)`) and the two reads, the install merging the rules (no program change); and where TASK-036's first P7 launch was prompted or refused, the test kind's heavy-launch rule gains the `--key-file` form (`--limit * --key-file * --kind test -- *`) and the suite's rule model is narrowed and every documented command re-run as TASK-041's (a) describes, in this increment (`tests/permission_rules.py` in Scope), TASK-041 then observing `--strip` under the widened rule, its form carrying both words; (d) `tests/test_release_t_merge.py` (names R-045, R-046) pins each sentence, P7's command among them so `tests/test_allowlist.py` reads it, written first and red on the checkpoint; the trace entries (the move adds none; each reword its entry); MANIFEST regenerated.
 
@@ -443,7 +1161,7 @@ Parent: none
 Depends on: TASK-039
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/workflow/phases/reflection.md (steps 2, 4 and the demonstration: D1, D2, D3; step 8's tag: D4; item 5: P4's text, the remote branches with no open pull request listed and the merged ones deleted; the stage's change as the union of its squash commits by `stage-diff.py`: T11); bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md (where step 9 names the stage's change); bridge/cursor-bridge/workflow/types/host-extension.md and bridge/cursor-bridge/workflow/traits/installable.md (P17's `planning.stages` sentence, in each the type's kind host-installation and the trait's kinds `installer` and `install-script`: the last stage's review before the stamp, a text-only correction riding with the next release unless it changes what a project does, the field acceptance's stand-in named); bridge/cursor-bridge/settings.bridge.json (the allow rules `Bash(git tag stage-review/*)`, `Bash(git cat-file -p stage-review/*)` and `Bash(git branch -r)`); bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_release_t_stage_close.py; tests/test_allowlist.py; tests/test_phase_modules_close.py; tests/test_phase_modules_build.py; tests/test_traits_existing.py; tests/test_type_host_extension.py; tests/test_b3_least_confident.py; tests/test_a5_followups.py (pins re-taken, the last for the stage review's part sentence D2 rewrites)
+Scope: bridge/cursor-bridge/workflow/phases/reflection.md (steps 2, 4 and the demonstration: D1, D2, D3, step 8's tag: D4, item 5: P4's text, the remote branches with no open pull request listed and the merged ones deleted, the stage's change as the union of its squash commits by `stage-diff.py`: T11); bridge/cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md (where step 9 names the stage's change); bridge/cursor-bridge/workflow/types/host-extension.md and bridge/cursor-bridge/workflow/traits/installable.md (P17's `planning.stages` sentence, in each the type's kind host-installation and the trait's kinds `installer` and `install-script`: the last stage's review before the stamp, a text-only correction riding with the next release unless it changes what a project does, the field acceptance's stand-in named); bridge/cursor-bridge/settings.bridge.json (the allow rules `Bash(git tag stage-review/*)`, `Bash(git cat-file -p stage-review/*)` and `Bash(git branch -r)`); bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_release_t_stage_close.py; tests/test_allowlist.py; tests/test_phase_modules_close.py; tests/test_phase_modules_build.py; tests/test_traits_existing.py; tests/test_type_host_extension.py; tests/test_b3_least_confident.py; tests/test_a5_followups.py (pins re-taken, the last for the stage review's part sentence D2 rewrites)
 Satisfies: R-049
 Done when: each sentence as R-049 gives it — D1 (every driver re-checked at HEAD before a stage review; a fix that moves product code re-anchors or re-runs every driver anchored on the moved file in the same pull request; a ruling naming surfaces gets one test per surface), D2 (every stage-review part bounded alike: a test part at most 25 files, a product part per package, a drivers-and-records part per driver family; a part without a verdict re-run on what it had not reached), D3 (the live stack with the schema check at the first increment of a stage that adds tables; the development database's rebuild run sheet before the demonstration; a harness driving the product's own entry points), D4 (the local tag `stage-review/<name>-<n>` before `git branch -D stage/<name>`, never pushed; records citing `<tag>:<path>`, read with `git cat-file -p <tag>:<path>`), T11 (the union of squash commits by `stage-diff.py` where stages interleave; a later stage's ready increments merging before an earlier closes), P4's text (item 5: the remote branches read with `git branch -r` after the fetch, the open pull requests with `gh pr list --state open --limit 100` on TASK-038's rule, the merged ones deleted), P17 (both files, each for its kinds) — in the homes named; item 5's `git branch -r` admitted by the exact rule `Bash(git branch -r)`, the increment's third; D4's two commands, `git tag stage-review/<name>-<n>` and the read `git cat-file -p stage-review/<name>-<n>:<path>` (not `git show`: its `--output` form, KP-067's empty file, would ride on any `git show stage-review/*` rule, a `*` matching any text so an appended option passes, while `cat-file` has no such option), admitted by two allow rules `settings.bridge.json` gains, `Bash(git tag stage-review/*)` and `Bash(git cat-file -p stage-review/*)`, narrow to the tag's namespace, append-only, the install merging them (R-045's precedent for `git branch -D`: `tests/test_allowlist.py` fails a backticked command no rule allows), `tests/test_allowlist.py` pinning the rules and the documented commands, that `git show stage-review/<name>-<n>:<path> --output=<file>` matches no rule, and its guard test showing the permission guard treats the bare `git tag` of that name as it treats the loop's other state commands (`tag` is in its `STATE_GIT` list beside `commit` and `push`); `workflow-check.py` exit 0 over the two conditional files; `tests/test_release_t_stage_close.py` (names R-049) pins each sentence, written first and red on the checkpoint; the trace entries (the conditional files' new sentences under `new` entries, as TASK-017's were); the pins re-taken; MANIFEST regenerated.
 
@@ -457,7 +1175,7 @@ Parent: none
 Depends on: TASK-040
 Parallel: no
 Diagrams: D-004
-Scope: bridge/cursor-bridge/Cursor-Project-Configuration.md (the security-floor section: T9's conventions, T22's ignore line, the weekly scan as every project's workflow); bridge/agents/cursor-configurator.md (the weekly workflow as a configuration item written from the frozen block, its one fill-in); bridge/commands/evaluate-reports.md (the Sunday step: the workflow state and the window's runs in the three kinds, the Dependabot two calls); bridge/cursor-bridge/workflow/phases/change-cycle.md (item 1: the conformance check before the first delegation of a project supervised after it was built, T12); bridge/commands/supervisor.md (the status template's `Layout:` line relative to the project root, T19); bridge/cursor-bridge/workflow/phases/delegation-loop.md (step 4), bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md (step 7), bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md (P7's suite command), bridge/commands/calibrate-bridge.md (step 1b) and bridge/cursor-bridge/Known-Pitfalls.md (KP-061) — the `--strip` launch commands, the driver's with `--scratch ~/.cursor-bridge/scratch/<the project root's folder name>`; bridge/cursor-bridge/settings.bridge.json (only where the observed launch does not run on the heavy-launch rules: the two rules' `--strip` forms); tests/permission_rules.py and tests/test_allowlist.py (in that case: the model narrowed, every documented command re-run under it, the rule of any failing command widened, then the observed case recorded; otherwise the documented `--strip` commands pinned as matching); docs/diagrams/DEVIATIONS.md (the row `p_bridge_run` → `p_test_suite` removed); docs/diagrams/D-004-context-dfd.md (that edge's label and the note on it redrawn as built, `diagram-specialist`'s as-built variant); docs/DESIGN.md (the host table's row for the observed launch); bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_release_t_floor.py; tests/test_release_t_strip.py (the strip test, an environment test and not a pin, outside `new_tests`); tests/test_loop_text_windowless.py; tests/test_calibrate_text.py; tests/test_release_t_merge.py (P7's command pin); tests/test_core_carve.py; tests/test_phase_modules_build.py; tests/test_phase_modules_close.py; tests/test_b3_least_confident.py (pins re-taken)
+Scope: bridge/cursor-bridge/Cursor-Project-Configuration.md (the security-floor section: T9's conventions, T22's ignore line, the weekly scan as every project's workflow); bridge/agents/cursor-configurator.md (the weekly workflow as a configuration item written from the frozen block, its one fill-in); bridge/commands/evaluate-reports.md (the Sunday step: the workflow state and the window's runs in the three kinds, the Dependabot two calls); bridge/cursor-bridge/workflow/phases/change-cycle.md (item 1: the conformance check before the first delegation of a project supervised after it was built, T12); bridge/commands/supervisor.md (the status template's `Layout:` line relative to the project root, T19); bridge/cursor-bridge/workflow/phases/delegation-loop.md (step 4), bridge/cursor-bridge/workflow/phases/delegation-loop/decide.md (step 7), bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md (P7's suite command), bridge/commands/calibrate-bridge.md (step 1b) and bridge/cursor-bridge/Known-Pitfalls.md (KP-061) — the `--strip` launch commands, the driver's with `--scratch ~/.cursor-bridge/scratch/<the project root's folder name>`; bridge/cursor-bridge/settings.bridge.json (only where the observed launch does not run on the heavy-launch rules: the two rules' `--strip` forms); tests/permission_rules.py and tests/test_allowlist.py (in that case: the model narrowed, every documented command re-run under it, the rule of any failing command widened, then the observed case recorded, otherwise the documented `--strip` commands pinned as matching); docs/diagrams/DEVIATIONS.md (the row `p_bridge_run` → `p_test_suite` removed); docs/diagrams/D-004-context-dfd.md (that edge's label and the note on it redrawn as built, `diagram-specialist`'s as-built variant); docs/DESIGN.md (the host table's row for the observed launch); bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; tests/test_release_t_floor.py; tests/test_release_t_strip.py (the strip test, an environment test and not a pin, outside `new_tests`); tests/test_loop_text_windowless.py; tests/test_calibrate_text.py; tests/test_release_t_merge.py (P7's command pin); tests/test_core_carve.py; tests/test_phase_modules_build.py; tests/test_phase_modules_close.py; tests/test_b3_least_confident.py (pins re-taken)
 Satisfies: R-052
 Done when: (a) before the commands are written, one launch is observed from this session running with no classifier prompt and no refusal — the absence of a prompt is the observable, since a command the classifier allowed looks the same as one the rule allowed: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind test -- python -m pytest -q tests/test_release_t_strip.py` (one test file, within a foreground command's ten minutes; the `.err` file's `started` and `exit` lines read — the launcher prints no strip line — and the strip shown by `tests/test_release_t_strip.py`, one test that, where `GH_CONFIG_DIR` is set and `HOME` is not the owner's profile, asserts `HOME` is the agent home and every name D-004's note lists as withheld is absent, and skips otherwise with the reason — an environment test and not a pin, so it is not listed in `new_tests` and the red-on-checkpoint proof does not apply to it, as the constraints' exceptions say; its pass read in the output; `tests/test_bridge_run.py::test_stripped_environment_reaches_the_child` the program's own proof; the `--key-file` word's slot was observed at TASK-036's first P7 launch), the observation recorded in the accept commit and in the design's host table (`docs/DESIGN.md`, in Scope) as a row with its version; where a prompt or a refusal appears instead (the launch fell to the classifier or was denied), the two heavy-launch rules gain the `--strip` forms and the suite's rule model is narrowed as the design's host assumption says, in this increment; (b) the frozen block in `cursor-configurator.md` is the workflow's text whole — `on: schedule` with `cron: '17 6 * * 0'` and `workflow_dispatch`, `permissions: contents: read` and nothing else, the checkout action at the floor's pin with `persist-credentials: false`, OSV-Scanner at the floor's version and SHA-256 (stated twice, the structural test asserting the two equal), `osv-scanner scan source --config=osv-scanner.toml --lockfile=<fill-in>` with the floor's exit-code handling (0 clean; 128 fails; every other code fails as it is) and the line `dependency-scan: OSV-Scanner exit <code>` on every non-zero exit, no `secrets.` reference and no token handed to a step — with one fill-in, the `--lockfile=` list copied from the project's floor step; the guide's security-floor section carries T9's conventions (teeth proved by a planted finding on a real CI run before a review is trusted; every pin checked for deprecation; a vendor token enabling no paid engine; the floor's test the supervisor's; vendor CLIs with banner, spinner and telemetry off; the CLI installed in a step without the key and with `--ignore-scripts`; the first CI log of a step holding a secret read for any part of it), T22's `docs/BOUNDARY_VIOLATIONS.md` ignore line and the weekly workflow as every project's, added to a running project at its calibration; `evaluate-reports.md`'s Sunday step reads each project as the design's weekly section says (`gh workflow list --all` first, any disabled state the third kind; `gh run list --workflow dependency-scan.yml --created ">=<the ledger's _meta.last_extract>"`, read before this run overwrites it; `gh run view <id> --log-failed` for the exit line; the three kinds with their remedies; the Dependabot two calls, a 403 the login's scope); change-cycle.md's item 1 runs the conformance check before the first delegation of a project supervised after it was built, its MISSING floors a configuration increment (T12); the template's `Layout:` line (T19); the `--strip` commands in the five homes, P7's suite command in `delegation-loop/merge.md` among them (`tests/test_release_t_merge.py`'s pin re-taken), each standing in a fenced ```bash block in the three homes the collector of `tests/test_allowlist.py` reads, the loop's module and its two sub-files (it reads ```bash and ```sh blocks whole, an untagged block not at all, and inline code only under 220 characters, which the driver's stripped form with its scratch folder exceeds), while `calibrate-bridge.md` and `Known-Pitfalls.md` it never reads and `test_documented_matching_examples` asserts on literal rule strings, so `tests/test_release_t_floor.py` pins the five commands as one text, each home's equal to the loop's; the core's rule 43 unchanged; (c) `tests/test_release_t_floor.py` (names R-052, D-004) pins each sentence and the frozen block's text, written first and red on the checkpoint; the DEVIATIONS row removed and D-004's edge `p_bridge_run` → `p_test_suite` with the note on it redrawn to what the launch commands then do (its `(DEVIATIONS)` clause gone); `diagram-check.py --mode design` OK; the trace entries; the pins re-taken; MANIFEST regenerated; no program changed (`settings.bridge.json` is the installer's data).
 
@@ -467,7 +1185,7 @@ Parent: none
 Depends on: TASK-041
 Parallel: no
 Diagrams: D-004
-Scope: .github/workflows/dependency-scan.yml; tests/test_dependency_scan.py; tests/test_release_b_ci_floor.py (`test_r002_workflow_is_the_only_one` widened to the two files; the pin, one-secret and trigger tests still read `tests.yml` alone, the new file's secret-freedom being `tests/test_dependency_scan.py`'s); docs/diagrams/D-004-context-dfd.md (`p_dependency_scan`'s `designed` labels, its element-map row and the note's sentence redrawn as in the tree, `diagram-specialist`'s as-built variant)
+Scope: .github/workflows/dependency-scan.yml; tests/test_dependency_scan.py; tests/test_release_b_ci_floor.py (`test_r002_workflow_is_the_only_one` widened to the two files, the pin, one-secret and trigger tests still read `tests.yml` alone, the new file's secret-freedom being `tests/test_dependency_scan.py`'s); docs/diagrams/D-004-context-dfd.md (`p_dependency_scan`'s `designed` labels, its element-map row and the note's sentence redrawn as in the tree, `diagram-specialist`'s as-built variant)
 Satisfies: R-052
 Done when: `.github/workflows/dependency-scan.yml` equals TASK-041's frozen block but for its fill-in, `--lockfile=requirements.txt:requirements.lock` (the floor's form in `.github/workflows/tests.yml`, since OSV-Scanner finds a lockfile by its standard name alone); `tests/test_dependency_scan.py` (names R-052, D-004) asserts, in the style of `tests/test_release_b_ci_floor.py`, the frozen part equal to the block in `cursor-configurator.md`, the `--lockfile=` list equal to the floor step's, the OSV-Scanner version and SHA-256 equal to the floor's two pins (the two statements of each pin equal), `permissions:` holding `contents: read` and nothing else, the schedule `17 6 * * 0` and `workflow_dispatch`, `persist-credentials: false` on the checkout, the exit-code handling with the `dependency-scan: OSV-Scanner exit` line on every non-zero exit, and no secret (no `secrets.` reference, no `GITHUB_TOKEN` or token handed to a step), the test red on the checkpoint (the file absent) and green after, and `tests/test_release_b_ci_floor.py`'s `test_r002_workflow_is_the_only_one` rewritten to the two files, listed in `new_tests` by its node id and red on the checkpoint beside it, both named in the accept commit; D-004's `p_dependency_scan` redrawn as in the tree (no `designed` label or sentence left), `diagram-check.py --mode design` OK; the pull request's own CI green (the new workflow runs on no pull-request event); the stage's refactoring scout reads nothing of it (configuration, no code). The workflow's proof is a `workflow_dispatch` run, which GitHub runs only for a file on the default branch (the design's weekly section), so it is TASK-044's criterion and stage T2's demonstration, not this increment's, and R-052 stays planned until TASK-044's accept.
 
@@ -477,7 +1195,7 @@ Parent: none
 Depends on: none
 Parallel: no
 Diagrams: D-003, D-004
-Scope: bridge/cursor-bridge/review-guard.py; bridge/cursor-bridge/MANIFEST.json; tests/test_bug039.py; docs/BUILDER_NOTES.md; docs/debug/BUG-039.md; docs/diagrams/DEVIATIONS.md (the three D-003 rows and D-004's `p_review_guard` → `ds_checkout` row removed); docs/diagrams/D-003-review-round-states.md (the labels that say the behaviour is a deviation redrawn as built, `diagram-specialist`'s as-built variant; D-004's file is unchanged, its `p_review_guard` → `ds_checkout` edge carrying no deviation clause); docs/cli-reference.json; docs/CLI_REFERENCE.md; handoff/TASK-043-r<N>-report.md
+Scope: bridge/cursor-bridge/review-guard.py; bridge/cursor-bridge/MANIFEST.json; tests/test_bug039.py; docs/BUILDER_NOTES.md; docs/debug/BUG-039.md; docs/diagrams/DEVIATIONS.md (the three D-003 rows and D-004's `p_review_guard` → `ds_checkout` row removed); docs/diagrams/D-003-review-round-states.md (the labels that say the behaviour is a deviation redrawn as built, `diagram-specialist`'s as-built variant, D-004's file is unchanged, its `p_review_guard` → `ds_checkout` edge carrying no deviation clause); docs/cli-reference.json; docs/CLI_REFERENCE.md; handoff/TASK-043-r<N>-report.md
 Satisfies: R-042, R-055
 Done when: (1) `cmd_verify`'s four early GATE-INTEGRITY returns (the snapshot rewritten; `.git/config` or a hook changed; the branch held in another worktree; the branch not put back) each call `record_flagged_launch` before returning, so the round's launch is voided and the round spends nothing; (2) `record_flagged_launch` records the void by the launch's start time whatever the `.err` file's exit so far (an `.err` with no exit line included), so a flag raised while the Review B run still goes on voids the launch that later exits 0, and the next snapshot of the same round on a changed tree is admitted; (3) `cmd_premerge`'s `git merge-base --is-ancestor` runs through the guard's git helper, with the hooks folder emptied and `core.fsmonitor=false` like every other git command of the guard, and a test pins that no `subprocess.run` of git in `review-guard.py` bypasses the helper, the helper's own call site (`_git_proc`) the one exemption and nothing else; (4) `cmd_snapshot`'s replacement of a round's entry, on a re-snapshot of the same round, keeps `flagged_launch` beside `reply`, `lift`, `lift_line` and `time`, so a flagged round taken again counts no reply and spends nothing (found by Review B of PR #116); `tests/test_bug039.py` (names R-042, R-055, D-003, D-004) holds the four reproduction tests on temporary repositories, each listed by its node id (the file is committed before the brief's checkpoint) and red on the checkpoint (`mutation-run.py --checkpoint`), green after, and joins R-042's Evidence in this increment's records-only commit; every existing guard test green (`tests/test_review_guard.py`, `tests/test_review_guard_a4.py`, `tests/test_review_guard_ceiling.py`, `tests/test_bug036.py`, `tests/test_hotfix25a_guard_scope_invisible.py`); the four DEVIATIONS rows removed and D-003's labels that said so redrawn as built (its `flagged_gate_integrity` and `resnapshotted` rows and its three transitions' `as built not` clauses; D-004's `p_review_guard` → `ds_checkout` edge already reads as the design and needs no redraw, the row's removal closing it); `docs/debug/BUG-039.md` holds the confirmed cause at each site with its evidence (the code as read at the retrofit's draft and the critique's rounds 2 and 3, each site its own cause, the fourth by Review B's reproduction on PR #116, so the brief is one fix brief naming four causes and no instrumentation round is needed); the change is to the gate's own program, so `security-auditor` reads the diff with the recorded threat model and `tests/test_bug039.py` holds, written by the supervisor beside the reproduction tests before the brief, one negative case per site (a flag once recorded is cleared by no path of the fix; a flagged round's launch is admitted by no path; premerge's call runs with a planted hook that is shown not to have run; a re-snapshot of a flagged round, on the same tree and on a changed one, keeps `flagged_launch` and counts no reply) — each listed in `new_tests` by node id where it is red on the unfixed guard (the planted hook runs there; the re-snapshot drops the flag there) and otherwise, holding on the unfixed guard too, an invariant exempt from the red proof (the constraints' exception) and shown strong by one hand mutation of the fixed guard named in the accept commit — the brief copying from `docs/debug/BUG-039.md` the names those cases call, `record_flagged_launch`, `_git_proc` and the record's launch-start key, as fixed points of the fix, so the builder's shape of it cannot strand a case it may not edit; the command reference regenerated; `windowless-check.py` green; no new dependency.
 

@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-015
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/session-start.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-015-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-015: The compaction hook names the phase module
 
 ## Objective

@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-033
+round: 2
+satisfies: [R-044]
+scope: ["bridge/cursor-bridge/plan-check.py", "bridge/cursor-bridge/pace-report.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_plan_check.py", "tests/test_pace_report.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-033-r2-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-033-r2: One reading of a squash subject — round 2, the fixes from round 1's reviews
 
 ## Objective

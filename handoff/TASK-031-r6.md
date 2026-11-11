@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-031
+round: 6
+satisfies: []
+scope: ["bridge/cursor-bridge/mutation-run.py", "tests/test_mutation_run.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-031-r6-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-031 round 6: the blocking findings of the gate's reviews on rounds 4 and 5
 
 ## Objective

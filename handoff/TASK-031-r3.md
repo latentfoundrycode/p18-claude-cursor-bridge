@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-031
+round: 3
+satisfies: []
+scope: ["bridge/cursor-bridge/mutation-run.py", "tests/test_mutation_run.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-031-r3-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-031 round 3: one code defect, and the tests the supervisor's mutants showed missing
 
 ## Objective

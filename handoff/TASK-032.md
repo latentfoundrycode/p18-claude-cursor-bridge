@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-032
+round: 1
+satisfies: [R-042, R-042]
+scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/permission-guard.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_bridge_run_review_ceiling.py", "tests/test_review_guard_ceiling.py", "tests/test_bridge_run_design_ceiling.py", "tests/test_permission_guard.py", "tests/test_review_guard.py", "tests/test_review_guard_a4.py", "tests/test_bridge_run.py", "tests/test_hotfix25a_guard_scope_invisible.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-032-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-032: The code-review ceiling held by the launcher and the guard
 
 ## Objective

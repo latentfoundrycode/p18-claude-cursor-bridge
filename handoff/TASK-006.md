@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-006
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/workflow-check.py", ".github/workflows/tests.yml", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-006-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-006: The workflow check
 
 ## Objective

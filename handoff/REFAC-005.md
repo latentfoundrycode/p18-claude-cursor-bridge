@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: REFAC-005
+round: 1
+satisfies: [R-058, R-060]
+scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/session-start.py", "bridge/cursor-bridge/workflow-check.py", "bridge/cursor-bridge/diagram-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/REFAC-005-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # REFAC-005: stage H1's dead code goes from bridge_env.py, session-start.py, workflow-check.py and diagram-check.py
 
 ## Objective

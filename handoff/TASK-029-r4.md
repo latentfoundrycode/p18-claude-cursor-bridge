@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-029
+round: 4
+satisfies: []
+scope: ["bridge/cursor-bridge/bridge-run.py", "docs/BUILDER_NOTES.md", "handoff/TASK-029-r4-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-029, round 4: One heavy job at a time: a driver's program checked again after the slot's wait (code-only fix)
 
 ## Objective

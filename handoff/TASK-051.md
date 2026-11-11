@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-051
+round: 1
+satisfies: [R-062]
+scope: ["bridge/cursor-bridge/records-migrate.py", "bridge/cursor-bridge/MANIFEST.json", "bridge/cursor-bridge/settings.bridge.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_records_migrate.py", "tests/test_dump_cli.py", "tests/test_allowlist.py", "docs/BUILDER_NOTES.md", "handoff/TASK-051-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-051: records-migrate.py, the migration program
 
 ## Objective

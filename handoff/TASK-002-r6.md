@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-002
+round: 6
+satisfies: [R-002]
+scope: [".github/workflows/tests.yml", "docs/BUILDER_NOTES.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-002 — round 6 (the Socket CLI must not print part of its key)
 
 Satisfies: R-002 (the security floor runs in the bridge's CI gate). Everything else in the floor is accepted: Review A and Review B approved the merged head 0517c5b, and CI ran green on it. **Fix only the Socket step**, in `.github/workflows/tests.yml`.

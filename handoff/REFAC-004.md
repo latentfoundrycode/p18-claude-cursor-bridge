@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: REFAC-004
+round: 1
+satisfies: [R-042, R-055]
+scope: ["bridge/cursor-bridge/review-guard.py", "docs/BUILDER_NOTES.md", "handoff/REFAC-004-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # REFAC-004: review-guard.py reads the rounds record once when it records a flagged launch, and four dead lines go
 
 ## Objective

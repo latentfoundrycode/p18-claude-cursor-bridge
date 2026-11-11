@@ -1,3 +1,16 @@
+---
+record: run-parameters
+header: 1
+stage_pause: run
+merge_authority: supervisor
+refactoring_pass: "on"
+installer_verification: "n/a"
+parallel_increments: "on"
+agent_ceiling: null
+ceiling_above_twice: []
+design_rounds_above_five: []
+review_rounds_above_ceiling: []
+---
 # Run parameters
 Set: 2026-10-11   (owner may change any of these at any time by saying so; update this file)
 Stage pause: run

@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: HOTFIX-002
+round: 3
+satisfies: []
+scope: ["bridge/cursor-bridge/conformance-check.py", "handoff/HOTFIX-002-r3-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # HOTFIX-002 round 3: the docstring names the backslash form of a drive-letter path
 
 ## Objective

@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: REFAC-003
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/pace-report.py", "docs/BUILDER_NOTES.md", "handoff/REFAC-003-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # REFAC-003: pace-report.py prints the over-ceiling and stage-review lines from one loop
 
 ## Objective

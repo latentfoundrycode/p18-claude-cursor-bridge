@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-016
+round: 3
+satisfies: [R-029]
+scope: ["bridge/cursor-bridge/trace-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-016-r3-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-016 round 3: links refused everywhere, every printed path escaped, file order for references
 
 ## Objective

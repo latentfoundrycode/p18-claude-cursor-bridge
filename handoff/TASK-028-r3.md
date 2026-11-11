@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-028
+round: 3
+satisfies: [R-039]
+scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/windowless-default.snapshot.md", "bridge/cursor-bridge/settings.bridge.json", "bridge/cursor-bridge/MANIFEST.json", "tests/conftest.py", "tests/test_bridge_run_driver.py", "tests/test_conformance_windowless.py", "tests/test_allowlist.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-028-r3-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-028 (round 3): Windowless launches enforced by the bridge: the launcher's driver kind and the suite's frozen default
 
 ## Objective

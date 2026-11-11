@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-002
+round: 5
+satisfies: []
+scope: [".github/workflows/tests.yml", "docs/BUILDER_NOTES.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-002 — round 5 (fix the Socket step after the first live CI run)
 
 Everything else in the floor is accepted (Review A and Review B approved; Semgrep and OSV-Scanner passed on the PR). **Fix only the Socket step**, in `.github/workflows/tests.yml`.

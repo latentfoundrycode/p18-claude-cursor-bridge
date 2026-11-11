@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-043
+round: 3
+satisfies: [R-042, R-055]
+scope: ["bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-043-r3-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-043, round 3: BUG-039, four corrections of round 2
 
 ## Objective
