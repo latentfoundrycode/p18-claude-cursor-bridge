@@ -1,6 +1,6 @@
 {
   "version": "2026.11.09a",
-  "generated": "2026-11-11 03:26",
+  "generated": "2026-11-11 03:57",
   "files": {
     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
@@ -91,7 +91,7 @@
     "cursor-bridge/plan-check.py": "3ea5043f668348dba7155679c9a4b5cef41f7768887d4fe54c293d14a202fd5c",
     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
-    "cursor-bridge/records-migrate.py": "33324674610783e43aa7189aef671e6c867fa36bd342abcdb2c2a8e0ea6ffe91",
+    "cursor-bridge/records-migrate.py": "3352f99b27a1fd32d5600c7fe76bc726d689e6eba6bba222fd7b8f58df6fdf0b",
     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
     "cursor-bridge/review-guard.py": "cc3fda39f0fd05761d29119fa84706ac91ea4d39518b0cc267efa45d3f8ecd59",
     "cursor-bridge/roster-check.py": "dea99884ac6d57a5f661f272a90e1920c38f8e110d5a261dc7f7bc67e0a01d7c",

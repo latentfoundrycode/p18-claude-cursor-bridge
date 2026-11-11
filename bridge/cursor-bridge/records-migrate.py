@@ -45,9 +45,7 @@ def _needs_quote(s):
     if s == "":
         return True
     if re.fullmatch(r"[0-9]+", s):
-        if len(s) > 1 and s[0] == "0":
-            return True
-        return False
+        return True
     if re.fullmatch(r"^-?[0-9]+$", s):
         return True
     if re.search(r"[0-9]", s) and s[0].isdigit():
@@ -195,7 +193,10 @@ def record_kind(rel):
     base = os.path.basename(norm)
     if norm == "docs/PROJECT_STATUS.md":
         return "project-status"
-    if norm.startswith("docs/") and base.startswith("BUILD_PLAN") and base.endswith(".md"):
+    if base.startswith("BUILD_PLAN") and base.endswith(".md") and norm.startswith("docs/"):
+        rest = norm[len("docs/"):]
+        if "/" in rest:
+            return None
         return "build-plan"
     if norm.startswith("handoff/") and "/" not in norm[len("handoff/"):]:
         if bridge_env.HANDOFF_REPORT_NAME.search(base):
@@ -461,13 +462,16 @@ def fallback_for(kind, text, rel, merged):
 
 
 def _status_cap_text(new_file):
-    text = new_file.decode("utf-8-sig", errors="replace")
+    text = bridge_env.decode_record_bytes(new_file)
     return len(text), len(text.splitlines())
 
 
 def _validate_read_back(kind, new_bytes, text, rel, merged):
     decoded = bridge_env.decode_record_bytes(new_bytes)
-    header, body = bridge_env.read_header(decoded)
+    try:
+        header, body = bridge_env.read_header(decoded)
+    except bridge_env.HeaderError as err:
+        return "read_header: %s" % err
     if header is None:
         return "read_header found no header"
     findings = bridge_env.check_header(kind, header)
@@ -484,10 +488,12 @@ def _write_record(path, shown, kind, header, raw_body, check_mode, crlf, origina
     le = _line_ending(crlf)
     header_lines = _serialize_header(header, kind)
     new_body = le.join(["---"] + header_lines + ["---"]) + le
-    if isinstance(raw_body, bytes):
-        new_file = new_body.encode("utf-8") + raw_body
-    else:
-        new_file = new_body.encode("utf-8") + raw_body
+    bom_prefix = b""
+    body_bytes = raw_body
+    if raw_body.startswith(b"\xef\xbb\xbf"):
+        bom_prefix = b"\xef\xbb\xbf"
+        body_bytes = raw_body[3:]
+    new_file = bom_prefix + new_body.encode("utf-8") + body_bytes
 
     if kind == "project-status":
         nchars, nlines = _status_cap_text(new_file)
@@ -511,10 +517,14 @@ def _write_record(path, shown, kind, header, raw_body, check_mode, crlf, origina
     folder = os.path.dirname(os.path.abspath(path))
     tmp = os.path.join(folder, ".records-migrate-%s.tmp" % uuid.uuid4().hex)
     try:
-        with open(tmp, "wb") as f:
+        with open(tmp, "xb") as f:
             f.write(new_file)
     except OSError as exc:
         print("records-migrate: %s: temporary write failed: %s" % (shown, exc))
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
         return "fail", 3
     try:
         with open(tmp, "rb") as f:
@@ -573,6 +583,7 @@ def main(argv):
     dirs = [p for p in args.paths if os.path.isdir(p)]
     files = [p for p in args.paths if not os.path.isdir(p)]
     if len(dirs) > 1:
+        print("records-migrate: only one project root may be given")
         return 2
     if dirs and files:
         print("records-migrate: give a project root or record paths, not both")
@@ -600,65 +611,93 @@ def main(argv):
 
     for shown_arg, explicit, abspath in work:
         abspath = os.path.normpath(abspath if os.path.isabs(abspath) else os.path.join(cwd, abspath))
-        if not os.path.isfile(abspath):
-            continue
         if explicit:
-            shown = shown_arg.replace("\\", "/")
-            rel = os.path.relpath(abspath, root).replace("\\", "/")
+            shown = shown_arg
+            try:
+                rel = os.path.relpath(abspath, root).replace("\\", "/")
+            except ValueError as exc:
+                print("cannot read %s: %s" % (shown, exc))
+                continue
         else:
             rel = shown_arg
             shown = rel
+
+        if os.path.islink(abspath):
+            print("cannot read %s: a symbolic link" % shown)
+            continue
+
+        if not os.path.isfile(abspath):
+            if not os.path.exists(abspath):
+                reason = "no such file"
+            else:
+                reason = "not a file"
+            print("cannot read %s: %s" % (shown, reason))
+            continue
 
         kind = record_kind(rel)
         if kind is None:
             print("cannot read %s: not a record kind" % shown)
             continue
 
-        with open(abspath, "rb") as f:
-            raw = f.read()
-
-        if raw.startswith(b"---"):
-            _outcome, code = _handle_headed(abspath, shown, kind, raw, check_mode)
-            if code == 2:
-                return 2
+        try:
+            with open(abspath, "rb") as f:
+                raw = f.read()
+        except OSError as exc:
+            print("cannot read %s: %s" % (shown, exc))
             continue
 
-        if not raw.startswith(b"---"):
-            text = bridge_env.decode_record_bytes(raw)
-            crlf = _crlf_body(raw)
+        text = bridge_env.decode_record_bytes(raw)
+        try:
+            header, _body = bridge_env.read_header(text)
+        except bridge_env.HeaderError as err:
+            print("HEADER MALFORMED: %s: %s" % (shown, err))
+            return 2
+        if header is not None:
+            findings = bridge_env.check_header(kind, header)
+            if findings:
+                print("HEADER MALFORMED: %s: %s" % (shown, "; ".join(findings)))
+                return 2
+            print("has a header %s" % shown)
+            continue
 
-            merged = None
-            if kind == "build-plan":
-                merged_key = root
-                if _plan_needs_merged(text):
-                    if merged_key not in merged_cache:
-                        merged_cache[merged_key] = bridge_env.squash_merged_ids(
-                            root, bridge_env.PLAN_ID_PATTERN, ref=args.base)
-                    merged = merged_cache[merged_key]
-                    if merged is None:
-                        print("cannot read %s: merged set unreadable (git ref %s)" % (shown, args.base))
-                        continue
+        crlf = _crlf_body(raw)
 
-            header, err = compose_header(kind, text, rel, merged)
-            if err == "merged_set_unreadable":
-                print("cannot read %s: merged set unreadable (git ref %s)" % (shown, args.base))
+        merged = None
+        if kind == "build-plan":
+            bad = _plan_unbalanced_id(text)
+            if bad:
+                print("cannot read %s: unbalanced parenthesis in %s's Scope" % (shown, bad))
                 continue
-            if header is None:
-                print("cannot read %s: %s" % (shown, err))
-                continue
+            merged_key = root
+            if _plan_needs_merged(text):
+                if merged_key not in merged_cache:
+                    merged_cache[merged_key] = bridge_env.squash_merged_ids(
+                        root, bridge_env.PLAN_ID_PATTERN, ref=args.base)
+                merged = merged_cache[merged_key]
+                if merged is None:
+                    print("cannot read %s: merged set unreadable (git ref %s)" % (shown, args.base))
+                    continue
 
-            plan_merged = merged if kind == "build-plan" else None
-            if kind == "build-plan" and not _plan_needs_merged(text):
-                plan_merged = None
+        header, err = compose_header(kind, text, rel, merged)
+        if err == "merged_set_unreadable":
+            print("cannot read %s: merged set unreadable (git ref %s)" % (shown, args.base))
+            continue
+        if header is None:
+            print("cannot read %s: %s" % (shown, err))
+            continue
 
-            result, code = _write_record(
-                abspath, shown, kind, header, raw, check_mode, crlf, text, rel, plan_merged)
-            if code == 3:
-                return 3
-            if result == "cannot_write":
-                had_cannot_write = True
-            elif result in ("would_write", "wrote"):
-                had_would_or_write = True
+        plan_merged = merged if kind == "build-plan" else None
+        if kind == "build-plan" and not _plan_needs_merged(text):
+            plan_merged = None
+
+        result, code = _write_record(
+            abspath, shown, kind, header, raw, check_mode, crlf, text, rel, plan_merged)
+        if code == 3:
+            return 3
+        if result == "cannot_write":
+            had_cannot_write = True
+        elif result in ("would_write", "wrote"):
+            had_would_or_write = True
 
     if check_mode:
         return 1 if (had_would_or_write or had_cannot_write) else 0

@@ -1390,6 +1390,26 @@ def test_r062_r2_a_record_that_is_a_symbolic_link_is_not_followed(tmp_path):
 # ---------------------------------------------------------------- builder's cases below this line
 
 
+def test_r062_r2_a_given_path_on_another_drive_is_listed(tmp_path, monkeypatch, capsys):
+    """R-062 / F15: ValueError from os.path.relpath for a given path is cannot read, exit unchanged, no traceback."""
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    mod = load_migrate()
+    monkeypatch.chdir(str(root))
+
+    def relpath_different_drive(path, start):
+        raise ValueError("path is on mount 'X:', start on mount 'C:'")
+
+    monkeypatch.setattr(os.path, "relpath", relpath_different_drive)
+    try:
+        code = call_main(mod, ["docs/INVENTORY.md"])
+    except Exception as exc:
+        pytest.fail("main raised %r" % (exc,))
+    out = capsys.readouterr().out
+    reasons = listed(out, "cannot read ", "docs/INVENTORY.md")
+    assert len(reasons) == 1 and "mount" in reasons[0], out
+    assert code == 0
+
+
 def test_r062_ruling7_folder_and_record_paths_together_refused(tmp_path):
     """R16 / ruling 7: a project root and record paths together exit 2."""
     root = project(tmp_path, ["docs/INVENTORY.md"])
