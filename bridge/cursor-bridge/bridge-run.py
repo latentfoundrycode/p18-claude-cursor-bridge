@@ -487,30 +487,40 @@ def runner_word(argv):
 PYTEST_ENV_WORDS = "PYTEST_ADDOPTS"                    # options pytest reads from the environment, in front of the command's own
 PYTEST_ENV_PLUGINS = "PYTEST_PLUGINS"                  # plugins pytest loads by name from the environment, as `-p` does
 UV_ENV_FOLDERS = (("UV_WORKING_DIR", "--directory"), ("UV_PROJECT", "--project"))   # uv reads each as that option where the command gives none
-UV_ENV_FILE = "UV_ENV_FILE"                            # a file of variables uv hands the run, as `--env-file` does: its lines are read by no rule here
+# uv's other variables a test run may carry, as `uv_run_pytest` lists the options it may: how uv syncs, links and reports, and
+# where the computer keeps uv's cache and its managed interpreters. Any other `UV_` name is refused: the interpreter
+# (`UV_PYTHON`), its environment (`UV_PROJECT_ENVIRONMENT`), a file of variables or of settings (`UV_ENV_FILE`,
+# `UV_CONFIG_FILE`) and whatever a later uv adds stand for options the command line refuses, or for none it knows.
+UV_ENV_PLAIN = ("UV_CACHE_DIR", "UV_NO_CACHE", "UV_PYTHON_INSTALL_DIR", "UV_FROZEN", "UV_LOCKED", "UV_NO_SYNC", "UV_OFFLINE", "UV_NO_PROGRESS",
+                "UV_LINK_MODE", "UV_COMPILE_BYTECODE", "UV_MANAGED_PYTHON", "UV_NO_MANAGED_PYTHON")
 
 
 def outside_by_environment(argv, environ, folder=None):
     """The name of a variable in the environment a pytest run is about to get that carries a word
-    the launcher refuses on the command line, or None (release S). The variables by which the two
-    runners take the command line's own words, and no others: for a uv run `UV_WORKING_DIR` and
-    `UV_PROJECT`, read as `--directory` and `--project` in front of the command's own (which win
-    where both are given), and `UV_ENV_FILE` set at all; `PYTEST_PLUGINS` set at all, `-p` by
+    the launcher refuses on the command line, or None (release S). pytest's and uv's own
+    variables, and no others: for a uv run every `UV_` name is held to a list as the command's
+    options are (`uv_run_pytest`): `UV_WORKING_DIR` and `UV_PROJECT` are read as `--directory`
+    and `--project` in front of the command's own (which win where both are given), the names of
+    `UV_ENV_PLAIN` pass, any other set at all is refused; `PYTEST_PLUGINS` set at all, `-p` by
     another route; `PYTEST_ADDOPTS`, read in both ways a value's words can be (`value_words`) and
     held to `test_suite`'s escape list for pytest and to `outside_target` behind the command's
     words up to `pytest` (so uv's folder is the one its targets are read against), a bare `--`
     among them refused, since it would turn the command's own option values into targets. Names
-    are compared without regard to case, as Windows reads them. The value is never printed: a key
-    file's lines reach this environment (`--key-file`). What the interpreter itself reads from the
-    environment (`PYTHONPATH` and its kin) is no word of the run and is not read here."""
+    are compared without regard to case, as Windows reads them, and of two spellings of one name
+    the later is read, the one a child process gets on Windows (a key file's line after the
+    launcher's own). The value is never printed: a key file's lines reach this environment
+    (`--key-file`). What decides which program a bare name starts (`PATH`) and what the
+    interpreter itself reads from the environment (`PYTHONPATH` and its kin) are no words of the
+    run and are not read here."""
     word, start = runner_word(argv)
     if word != "pytest":
         return None
     env = {name.upper(): value for name, value in environ.items() if (value or "").strip()}
     lead = argv[:start]
     if head_of(argv) == "uv":
-        if UV_ENV_FILE in env:
-            return UV_ENV_FILE
+        unknown = sorted(name for name in env if name.startswith("UV_") and name not in dict(UV_ENV_FOLDERS) and name not in UV_ENV_PLAIN)
+        if unknown:
+            return unknown[0]
         for name, option in UV_ENV_FOLDERS:
             if name in env:
                 lead = lead[:2] + [option, env[name]] + lead[2:]
@@ -1790,8 +1800,9 @@ def main():
             coming.update(read_keys)
         by_environment = outside_by_environment(cmd, coming, folder)
         if by_environment is not None:
-            sys.stderr.write("bridge-run: refused - %s in this run's environment carries a word the launcher refuses on the command line (a plugin, an option, a folder "
-                             "or a target outside the project); a test run reads the project's own tests: unset it, or write its words on the command line\n" % by_environment)
+            sys.stderr.write("bridge-run: refused - %s in this run's environment: it carries a word the launcher refuses on the command line (a plugin, an option, a folder "
+                             "or a target outside the project), or it is a variable of uv's that a test run through the launcher does not take; a test run reads the "
+                             "project's own tests: unset it for the launch, or write its words on the command line\n" % by_environment)
             return 125
     if "--key-file" in flags and is_agent_argv(cmd):
         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")

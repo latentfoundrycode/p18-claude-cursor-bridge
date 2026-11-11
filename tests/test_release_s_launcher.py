@@ -237,16 +237,20 @@ def test_options_pytest_reads_from_the_environment_are_held_to_the_command_line_
     there = ["uv", "run", "--directory", "sub", "pytest"]                  # the environment's targets are read against the folder the run's own are
     assert br.outside_by_environment(there, {"PYTEST_ADDOPTS": "../tests"}, str(base)) is None
     assert br.outside_by_environment(there, {"PYTEST_ADDOPTS": "../../elsewhere"}, str(base)) == "PYTEST_ADDOPTS"
-    # Review A's read of the round's fix: uv reads `UV_WORKING_DIR` as `--directory` and `UV_PROJECT` as `--project` where the
-    # command gives none, and `UV_ENV_FILE` as a file of variables for the run; a run without uv reads none of the three.
+    # Review A's reads of the round's fix: uv reads `UV_WORKING_DIR` as `--directory` and `UV_PROJECT` as `--project` where the
+    # command gives none; its other variables are held to a list as the command's options are, so the interpreter, its
+    # environment, a file of variables or of settings and a name the launcher does not know are refused. A run without uv
+    # reads none of them.
     uv = ["uv", "run", "--frozen", "pytest", "tests"]
     for env, name in (({"UV_WORKING_DIR": out}, "UV_WORKING_DIR"), ({"UV_PROJECT": "../elsewhere"}, "UV_PROJECT"), ({"uv_working_dir": out}, "UV_WORKING_DIR"),
-                      ({"UV_ENV_FILE": ".env"}, "UV_ENV_FILE"), ({"UV_WORKING_DIR": "sub", "PYTEST_ADDOPTS": "../../elsewhere"}, "PYTEST_ADDOPTS")):
+                      ({"UV_ENV_FILE": ".env"}, "UV_ENV_FILE"), ({"UV_WORKING_DIR": "sub", "PYTEST_ADDOPTS": "../../elsewhere"}, "PYTEST_ADDOPTS"),
+                      ({"UV_PYTHON": out + "/Scripts/python.exe"}, "UV_PYTHON"), ({"uv_project_environment": out}, "UV_PROJECT_ENVIRONMENT"),
+                      ({"UV_CONFIG_FILE": "uv.toml"}, "UV_CONFIG_FILE"), ({"UV_A_LATER_NAME": "1"}, "UV_A_LATER_NAME")):
         assert br.outside_by_environment(uv, env, str(base)) == name, env
     for env in ({"UV_WORKING_DIR": "sub"}, {"UV_PROJECT": "."}, {"UV_WORKING_DIR": "sub", "PYTEST_ADDOPTS": "../tests"}, {"UV_CACHE_DIR": out}, {"UV_FROZEN": "1"},
-                {"UV_ENV_FILE": ""}):
+                {"UV_ENV_FILE": ""}, {"UV_LINK_MODE": "copy", "UV_PYTHON_INSTALL_DIR": out, "UV_NO_PROGRESS": "1"}, {"UVICORN_PORT": "1"}):
         assert br.outside_by_environment(uv, env, str(base)) is None, env
-    assert br.outside_by_environment(run, {"UV_WORKING_DIR": out, "UV_ENV_FILE": ".env"}, str(base)) is None
+    assert br.outside_by_environment(run, {"UV_WORKING_DIR": out, "UV_ENV_FILE": ".env", "UV_PYTHON": out}, str(base)) is None
     assert br.outside_by_environment(["python", "-m", "unittest", "discover"], {"PYTEST_ADDOPTS": "../elsewhere"}, str(base)) is None
     assert br.outside_by_environment(["npm", "test"], {"PYTEST_PLUGINS": "x"}, str(base)) is None
 
