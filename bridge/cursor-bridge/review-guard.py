@@ -67,7 +67,8 @@ What each step does:
             full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*, docs/ROSTER*,
             everything under docs/diagrams/, a removed status file, inventory, register or
             project file, the register where a Status cell changed, a row left, a new row is
-            not `planned` or a built row's Evidence changed, the inventory where a line naming
+            not `planned` or a built row changed in any cell, a tool's configuration or a
+            hidden file under a record folder, the inventory where a line naming
             the threat model or under a heading naming it changed, the project file where
             `instruction_texts` changed, a pull request into another branch than main, and
             every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the
@@ -1216,14 +1217,17 @@ FULL_GATE_RECORDS = (("docs/run_parameters.md", "the run parameters decide the c
                      ("docs/build_plan", "the plan decides what is built and in what order"),
                      ("docs/roster", "the roster decides which model builds and which reviews"),
                      ("docs/diagrams/", "the diagrams, their index and the deviations decide what the diagram check allows"))   # compared in lower case
+TOOL_FILES = ("package.json", "package-lock.json", "tsconfig.json", "jsconfig.json", "composer.json", "deno.json", "lerna.json", "nx.json",
+              "turbo.json", "vercel.json", "firebase.json")   # a tool's own configuration, which it runs or builds from, whatever folder holds it; with them every `requirements*.txt`, which an installer reads
 KEPT_RECORDS = ("docs/project_status.md", "docs/inventory.md", "docs/requirements.md", "project.json")   # the guards test that the status file exists; the checks read the others
 PLAIN_MODES = ("100644", "000000")                      # a plain file, or no file on that side; a link (120000), a submodule (160000) and an executable (100755) are no record
 PR_FILES_MAX = 100                                      # gh lists a pull request's first hundred files
 
 
 def register_rows(text):
-    """{requirement ID: (Status cell, Evidence cell)} of a register's text, read as completion-check.py reads
-    it; None when it cannot be read row for row (a malformed header or row, an ID twice)."""
+    """{requirement ID: (Status cell, the whole row with its white space folded)} of a register's text, read
+    as completion-check.py reads it; None when it cannot be read row for row (a malformed header or row,
+    an ID twice)."""
     try:
         header, body = bridge_env.read_header(text)
     except bridge_env.HeaderError:
@@ -1235,15 +1239,14 @@ def register_rows(text):
             if len(r) < len(columns):
                 return None
             count += 1
-            evidence = bridge_env.register_row_role(r, columns, roles, "evidence") if roles.get("evidence") else ""
             out[bridge_env.register_row_role(r, columns, roles, "id").strip("`* ")] = (
-                bridge_env.register_row_role(r, columns, roles, "status").strip("`* "), " ".join((evidence or "").split()))
+                bridge_env.register_row_role(r, columns, roles, "status").strip("`* "), " ".join(" | ".join(r).split()))
     else:
         for r in bridge_env.parse_register(text)[1]:
             if len(r) < 4:
                 return None
             count += 1
-            out[r[0].strip("`* ")] = (r[3].strip("`* "), " ".join(" | ".join(r[4:]).split()))
+            out[r[0].strip("`* ")] = (r[3].strip("`* "), " ".join(" | ".join(r).split()))
     return out if len(out) == count else None
 
 
@@ -1256,11 +1259,16 @@ def _at(rev, path, root, common):
 def threat_model_lines(text):
     """The inventory's lines that bound what a finding blocks: every line that names the threat model, and
     every line of a section whose heading names it, each with its white space folded."""
-    out, inside = [], False
+    out, depth = [], 0                                     # depth: the level of the open heading that names the model, 0 outside one
     for line in (text or "").splitlines():
-        if line.lstrip().startswith("#"):
-            inside = "threat model" in line.lower()
-        if inside or "threat model" in line.lower():
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            level = len(stripped) - len(stripped.lstrip("#"))
+            if "threat model" in line.lower():
+                depth = level if not depth else min(depth, level)
+            elif depth and level <= depth:                 # a sub-heading stays inside; a heading of the same or a higher level ends it
+                depth = 0
+        if depth or "threat model" in line.lower():
             out.append(" ".join(line.split()))
     return sorted(l for l in out if l)
 
@@ -1282,7 +1290,8 @@ def full_gate_reasons(paths, base, head, root, common):
     is a record by its folder, by its type and by its mode, and is none of the records a program reads to
     decide a gate: the run parameters, a plan, the roster, anything under docs/diagrams/, a removed status
     file, inventory, register or project file, the register where a Status cell changed, a row left, a new
-    row is not `planned` or a built row's Evidence changed, the inventory where the threat model changed,
+    row is not `planned` or a built row changed in any cell, a tool's configuration or a hidden file
+    under a record folder, the inventory where the threat model changed,
     the project file where its `instruction_texts` changed. Empty when every path takes the short gate."""
     out, modes = [], changed_modes(base, head, root, common)
     for path in sorted(set(p.replace("\\", "/") for p in paths)):
@@ -1296,6 +1305,11 @@ def full_gate_reasons(paths, base, head, root, common):
             continue
         if os.path.splitext(low)[1] not in RECORD_TYPES:
             out.append((path, "not a record by its type: a record is one of %s; a program, a page or a tool's configuration under a record folder is read by both reviewers" % ", ".join(RECORD_TYPES)))
+            continue
+        name = low.rsplit("/", 1)[-1]
+        if path != "project.json" and (name in TOOL_FILES or (name.startswith("requirements") and name.endswith(".txt"))
+                                       or any(part.startswith(".") for part in low.split("/"))):
+            out.append((path, "a tool's configuration or a hidden file or folder: a tool may run or build from it, so both reviewers read it"))
             continue
         named = [why for prefix, why in FULL_GATE_RECORDS if low.startswith(prefix)]
         if named:
@@ -1315,7 +1329,7 @@ def full_gate_reasons(paths, base, head, root, common):
                 continue
             proved = sorted(i for i in new if new[i][0].lower() == "built" and i in old and new[i][1] != old[i][1])
             if proved:
-                out.append((path, "the Evidence of a built row changed, which is what the completion check accepts as its proof: %s" % ", ".join(proved[:8])))
+                out.append((path, "a built row changed, its sentence or its Evidence, which is what the completion check holds the build to: %s" % ", ".join(proved[:8])))
         elif low == "docs/inventory.md":
             if threat_model_lines(_at(base, path, root, common)) != threat_model_lines(_at(head, path, root, common)):
                 out.append((path, "a line that names the threat model, or one under a heading that names it, changed: it bounds what a reviewer's finding blocks"))

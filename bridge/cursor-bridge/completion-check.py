@@ -156,6 +156,14 @@ class Merged(object):
         return self.files[number]
 
 
+def is_test_path(path):
+    """A test file by its path, and never a record: `docs/test_plan.md` is a document about tests,
+    and a record can reach main by the short gate, which nothing that counts as evidence may
+    (release S; until then such a file named a row for done mode)."""
+    path = path.strip("`*, ").replace("\\", "/")
+    return bool(TEST_PATH.search(path)) and not path.lower().startswith(RECORD_FOLDERS)
+
+
 def instruction_texts():
     """The folders this project declares as holding its instruction texts, each as `folder/`:
     `instruction_texts` in project.json, a list of folders under the Workspace root. A folder of
@@ -238,7 +246,7 @@ def text_evidence(rid, requirement, cell, merged, roots):
     program = PROGRAM_NAME.search(requirement or "")
     if program:
         rest = TEXT_EVIDENCE.sub(" ", cell)
-        if not fails and not any(TEST_PATH.search(tok.strip("`*, ").replace("\\", "/")) for tok in rest.split()):
+        if not fails and not any(is_test_path(tok) for tok in rest.split()):
             fails.append("NO EVIDENCE: %s names a program (%s): a text entry alone is no evidence of what a program does, name its test beside it" % (rid, program.group(0)))
         return 0, fails, notes
     return valid, fails, notes
@@ -400,14 +408,14 @@ def main():
         if valid and not text_fails:
             by_text.add(rid)
         cell = TEXT_EVIDENCE.sub(" ", evidence.get(rid, ""))    # a text's own path is no test file, whatever folder holds it
-        if not valid and not text_fails and not any(TEST_PATH.search(tok.strip("`*, ").replace("\\", "/")) for tok in cell.split()):
+        if not valid and not text_fails and not any(is_test_path(tok) for tok in cell.split()):
             fails.append("NO EVIDENCE: %s (%s) is marked built but its Evidence names no test file" % (rid, text[:60]))
 
     files = tracked()
     if files is None:
         notes.append("not a git repository - evidence and stand-ins not checked")
         files = []
-    tests = [f for f in files if TEST_PATH.search(f.replace("\\", "/"))]
+    tests = [f for f in files if is_test_path(f)]
     shipped = [f for f in files if os.path.splitext(f)[1].lower() in CODE_EXT
                and not TEST_PATH.search(f.replace("\\", "/")) and not SKIP_PATH.search(f.replace("\\", "/"))]
 

@@ -837,7 +837,8 @@ What each step does:
             full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*, docs/ROSTER*,
             everything under docs/diagrams/, a removed status file, inventory, register or
             project file, the register where a Status cell changed, a row left, a new row is
-            not `planned` or a built row's Evidence changed, the inventory where a line naming
+            not `planned` or a built row changed in any cell, a tool's configuration or a
+            hidden file under a record folder, the inventory where a line naming
             the threat model or under a heading naming it changed, the project file where
             `instruction_texts` changed, a pull request into another branch than main, and
             every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the

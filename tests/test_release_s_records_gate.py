@@ -113,6 +113,12 @@ def test_records_alone_take_the_short_gate_and_nothing_is_written_without_a_pull
     ("docs/mockups/first.html", "<script>x()</script>\n", "not a record by its type"),
     ("docs/notes", "no type at all\n", "not a record by its type"),
     ("docs/mkdocs.yml", "plugins: [x]\n", "not a record by its type"),
+    ("docs/package.json", '{"scripts": {"postinstall": "node x.js"}}\n', "a tool's configuration or a hidden file"),   # Review A, round 2
+    ("docs/site/tsconfig.json", "{}\n", "a tool's configuration or a hidden file"),
+    ("docs/requirements.txt", "requests==2.0\n", "a tool's configuration or a hidden file"),
+    ("docs/Requirements-dev.txt", "pytest\n", "a tool's configuration or a hidden file"),
+    ("docs/.vitepress/config.md", "# x\n", "a tool's configuration or a hidden file"),
+    ("handoff/.notes.md", "# x\n", "a tool's configuration or a hidden file"),
 ])
 def test_a_path_that_is_no_record_or_decides_a_gate_keeps_the_full_gate(repo, path, text, why):
     """One such file beside a plain record is enough: the whole pull request takes the round."""
@@ -134,13 +140,20 @@ def test_the_register_keeps_the_full_gate_where_a_status_changed(repo, register,
     assert rc == 1 and "FULL GATE  docs/REQUIREMENTS.md: a Status cell changed, a row left, or a new row is not `planned`: %s" % named in out, out
 
 
-@pytest.mark.parametrize("evidence", ["tests/test_parse.py; tests/test_more.py", "text: guide/loop.md :: The pause (#7)", "-"])
-def test_the_register_keeps_the_full_gate_where_a_built_row_s_evidence_changed(repo, evidence):
-    """The Evidence of a built row is what completion-check.py accepts as its proof: a test named, a text entry written in
-    its place, or the cell emptied, each is read by both reviewers (Review A, round 1: a text entry alone once passed here)."""
-    change(repo, "docs/REQUIREMENTS.md", REGISTER.replace("| built | tests/test_parse.py |", "| built | %s |" % evidence))
+@pytest.mark.parametrize("old,new", [
+    ("| built | tests/test_parse.py |", "| built | tests/test_parse.py; tests/test_more.py |"),
+    ("| built | tests/test_parse.py |", "| built | text: guide/loop.md :: The pause (#7) |"),
+    ("| built | tests/test_parse.py |", "| built | - |"),
+    ("| R-001 | parse the file |", "| R-001 | open the file |"),                         # the sentence the build is held to (Review A, round 2)
+    ("| R-001 | parse the file | owner |", "| R-001 | parse the file | the supervisor |"),
+])
+def test_the_register_keeps_the_full_gate_where_a_built_row_changed(repo, old, new):
+    """A built row's sentence and its Evidence are what completion-check.py holds the build to: a test named, a text entry
+    written in its place, the cell emptied, the sentence reworded, each is read by both reviewers (Review A, round 1: a text
+    entry alone once passed here; round 2: a reworded sentence did)."""
+    change(repo, "docs/REQUIREMENTS.md", REGISTER.replace(old, new))
     rc, out = run(repo, "premerge-records")
-    assert rc == 1 and "FULL GATE  docs/REQUIREMENTS.md: the Evidence of a built row changed" in out and "R-001" in out, out
+    assert rc == 1 and "FULL GATE  docs/REQUIREMENTS.md: a built row changed, its sentence or its Evidence" in out and "R-001" in out, out
 
 
 @pytest.mark.parametrize("path", ["docs/PROJECT_STATUS.md", "docs/INVENTORY.md", "docs/REQUIREMENTS.md", "project.json"])
@@ -203,6 +216,20 @@ def test_the_inventory_keeps_the_full_gate_where_a_line_under_a_threat_model_hea
     rc, out = run(repo, "premerge-records")
     assert rc == 0 and "SHORT GATE" in out, out
     change(repo, "docs/INVENTORY.md", section.replace("is inside it", "is outside it"))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 1 and "or one under a heading that names it, changed" in out, out
+
+
+def test_a_sub_heading_stays_inside_the_threat_model_s_section(repo):
+    """`## Threat model` with `### The review guard` under it and bullets under that (Review A, round 2: the sub-heading ended
+    the section and its bullets changed on the short gate); a heading of the same level ends it."""
+    section = INVENTORY + "\n## Threat model\n\n### The review guard\n\n- a finding outside it is recorded\n\n## Dates\n\n### Zones\n\n- UTC\n"
+    change(repo, "docs/INVENTORY.md", section)
+    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    change(repo, "docs/INVENTORY.md", section.replace("- UTC", "- UTC, always"))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 0 and "SHORT GATE" in out, out
+    change(repo, "docs/INVENTORY.md", section.replace("a finding outside it is recorded", "every finding blocks"))
     rc, out = run(repo, "premerge-records")
     assert rc == 1 and "or one under a heading that names it, changed" in out, out
 

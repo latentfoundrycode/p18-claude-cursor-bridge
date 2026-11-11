@@ -159,7 +159,8 @@ def test_an_option_s_value_is_no_target_wherever_it_points(program, tmp_path):
     not refused for it (Review A, round 1: each was refused with 125, which stops the loop)."""
     br = program("bridge-run")
     out = str(tmp_path.parent / "x" / "report.xml")
-    for option in ("--junitxml", "--junit-xml", "--log-file", "--ignore", "--deselect", "--cov-report", "-o", "-W", "-k", "-m"):
+    for option in ("--junitxml", "--junit-xml", "--log-file", "--ignore", "--deselect", "--cov-report", "-o", "-W", "-k", "-m", "--html", "--alluredir",
+                   "--json-report-file", "--benchmark-json"):
         assert br.outside_target(["python", "-m", "pytest", "tests", option, out, "tests/test_a.py"], str(tmp_path)) is None, option
     assert br.outside_target(["pytest", "--junitxml", out, out], str(tmp_path)) == out, "the word after the value is a target again"
 
@@ -202,6 +203,13 @@ def test_a_worktree_of_the_same_repository_is_inside(program, tmp_path):
                  ["pytest", os.path.join("..", "Worktrees", "task-002", "tests", "test_a.py") + "::test_a"]):
         assert br.outside_target(argv, str(ws)) is None, argv
     assert br.outside_target(["pytest", str(tmp_path / "Worktrees" / "probe" / "test_a.py")], str(ws)) is not None
+    # a worktree registered anywhere else, as a run could make one in a temporary folder in passing, is outside (Review A, round 2)
+    stray = tmp_path / "elsewhere" / "scratch"
+    p = subprocess.run(["git", "worktree", "add", "-q", "--detach", str(stray)], cwd=str(ws), capture_output=True, text=True, env=env)
+    assert p.returncode == 0, p.stderr
+    assert br.outside_target(["pytest", str(stray / "tests")], str(ws)) is not None
+    assert br.outside_target(["uv", "run", "--directory", str(stray), "pytest"], str(ws)) is not None
+    assert br.outside_target(["python", "-m", "pytest", str(tree / "tests")], str(ws)) is None, "the one under Worktrees/ still is inside"
 
 
 # ---------------------------------------------------------------- M1: the round's cause

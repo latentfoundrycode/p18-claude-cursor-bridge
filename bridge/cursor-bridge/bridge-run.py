@@ -356,7 +356,7 @@ def test_suite(argv, folder=None):
 PYTEST_VALUE_OPTIONS = ("-k", "-m", "-p", "-o", "--override-ini", "-W", "--pythonwarnings", "-n", "-r", "--junitxml", "--junit-xml", "--junit-prefix",
                         "--log-file", "--log-level", "--log-cli-level", "--log-file-level", "--ignore", "--ignore-glob", "--deselect", "--maxfail",
                         "--tb", "--durations", "--durations-min", "--cov", "--cov-report", "--cov-config", "--cov-fail-under", "--timeout",
-                        "--import-mode", "--color", "--capture", "--show-capture")
+                        "--import-mode", "--color", "--capture", "--show-capture", "--html", "--alluredir", "--json-report-file", "--benchmark-json")
 # The word after each of these is the option's value, never a target: a report or a log written to a temporary folder is ordinary.
 PYTEST_FOLDER_OPTIONS = ("--config-file", "--confcutdir")   # these name what pytest loads: inside the project like a target
 
@@ -366,19 +366,27 @@ def _real_path(path):
 
 
 def launch_roots(folder):
-    """The folders a test run may name: the launch folder and the repository's worktrees (rule 39
-    keeps a second live branch under `<root>/Worktrees/`, outside the Workspace), each resolved
-    through its links."""
+    """The folders a test run may name, each resolved through its links: the launch folder, and
+    the repository's worktrees where rule 39 keeps them, under `Worktrees/` beside the Workspace.
+    A worktree registered anywhere else (one a run made in a temporary folder in passing) and
+    one git calls prunable are not among them."""
     base = folder or os.getcwd()
-    roots = [base]
+    roots = [_real_path(base)]
+    home = _real_path(os.path.join(base, os.pardir, "Worktrees")).rstrip(os.sep) + os.sep
     try:
         p = subprocess.run(["git", "-C", base, "worktree", "list", "--porcelain"], capture_output=True, text=True, encoding="utf-8",
                            errors="replace", creationflags=NO_WINDOW, timeout=bridge_env.GIT_TIMEOUT)
-        if p.returncode == 0:
-            roots += [line[len("worktree "):].strip() for line in p.stdout.splitlines() if line.startswith("worktree ")]
     except (OSError, subprocess.TimeoutExpired):
-        pass
-    return [_real_path(r) for r in roots if r]
+        return roots
+    if p.returncode != 0:
+        return roots
+    for block in p.stdout.split("\n\n"):
+        lines = block.strip().splitlines()
+        if lines and lines[0].startswith("worktree ") and not any(l.split(" ", 1)[0] == "prunable" for l in lines[1:]):
+            tree = _real_path(lines[0][len("worktree "):].strip())
+            if tree.startswith(home):
+                roots.append(tree)
+    return roots
 
 
 def outside_target(argv, folder=None):

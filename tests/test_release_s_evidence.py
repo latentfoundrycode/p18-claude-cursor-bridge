@@ -181,6 +181,24 @@ def test_a_text_s_own_path_under_a_tests_folder_is_no_test_file(tmp_path):
     assert rc == 1 and len(no_evidence(out)) == 1 and "names the heading 'No such heading'" in out, out
 
 
+def test_a_document_about_tests_under_a_record_folder_is_no_test(tmp_path):
+    """Review A, round 2: `docs/test_plan.md` matched the test-path pattern, so a traceability table naming R-001 satisfied
+    done mode, and a records pull request could add it on the short gate. Neither the cell's token nor the file counts."""
+    r = make(tmp_path, "| R-001 | the user exports their rows as a CSV file | owner | built | docs/test_plan.md |\n"
+                       "| R-002 | the user imports a CSV file | owner | built | tests/test_import.py |\n", texts=None)
+    (r / "docs" / "test_plan.md").write_text("| R-001 | exported by hand |\n| R-002 | imported by hand |\n", encoding="utf-8")
+    (r / "tests").mkdir()
+    (r / "tests" / "test_import.py").write_text("def test_import():\n    assert True\n", encoding="utf-8")
+    git(r, "add", "-A")
+    git(r, "commit", "-q", "-m", "a plan of tests and one test (#8)")
+    rc, out = run(r, "done")
+    lines = no_evidence(out)
+    assert rc == 1 and len(lines) == 3, out
+    assert "R-001" in lines[0] and "names no test file" in lines[0]
+    assert "R-001" in lines[1] and "no tracked test names it" in lines[1]
+    assert "R-002" in lines[2] and "no tracked test names it" in lines[2], "the plan's mention of R-002 is no trace; the test file does not name it"
+
+
 def test_a_shallow_clone_checks_file_and_heading_and_notes_the_rest(tmp_path):
     """CI's checkout holds one commit: the squash cannot be looked up there, which is a note and never a failure, while a
     missing heading still fails."""
