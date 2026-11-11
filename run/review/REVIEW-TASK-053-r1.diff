@@ -1,0 +1,461 @@
+diff --git a/bridge/cursor-bridge/CHANGELOG.md b/bridge/cursor-bridge/CHANGELOG.md
+index 56120fe..678bbb5 100644
+--- a/bridge/cursor-bridge/CHANGELOG.md
++++ b/bridge/cursor-bridge/CHANGELOG.md
+@@ -15,6 +15,43 @@ project must show before the other projects resume.
+ 
+ ---
+ 
++## 2026.11.11a
++
++**Release B2, machine-readable headers on the dual-read records** (the bridge's second change cycle, begun 2026-11-04, its design and plan addendum approved at one gate that day as the subject `release-b2`; built on the bridge's own branches in stages H1 and H2, stage H2's review of this text before the stamp): each of the eight records programs read, the status file, every build plan, every brief, the inventory, the register, the diagram index, the deviations file and the run parameters, gains a YAML front-matter header the programs read first; the prose stays, for the owner and for every instruction that quotes it, and the record's own checker fails a header that disagrees with it; a new program, `records-migrate.py`, writes each record's header from its prose. The programs that change: `bridge_env.py` (the reader, the schemas and the one copy of every fallback reading), `loop-guard.py`, `session-start.py`, `conformance-check.py`, `workflow-check.py`, `inventory-check.py`, `evaluate-reports.py`, `plan-check.py`, `scope-check.py`, `completion-check.py`, `diagram-check.py`, `bridge-run.py` and `review-guard.py`. Against 2026.11.09a: one file new (`records-migrate.py`), none removed, one allow entry new.
++
++**What changed**
++- **The header reader and the schemas** (`bridge_env.py`; R-057, TASK-046, TASK-050): `read_header` reads a stated subset of YAML and refuses, naming the line, every form outside it, a plain value YAML would type (a date, `yes`, a number with a point) among them, to be double-quoted; `HEADER_SCHEMAS` holds the eight kinds' keys and types (D-005); `check_header` lists a header's schema faults and `header_agrees` the keys whose values differ from the prose's reading; every field two programs read two ways is read by one copy in `bridge_env.py`, the eleven second readings retired and a test holding that no program keeps one; `pyyaml` stays a test-only dependency.
++- **The status file's header, read first** (R-058, TASK-047): by the loop guard, the session-start hook, the conformance, workflow and inventory checks and the evaluation, each falling back to the prose for a file with no header; the inventory check's caps count the body after the header.
++- **The plan's and the briefs' headers** (R-059, TASK-048): `plan-check.py` compares each increment's and stage's header fields with the prose, exempts a `historic: true` increment the merged set holds from the shape rules and reports an unbalanced parenthesis in an unmerged increment's Scope; `scope-check.py` compares every brief key with its prose or the file's name; `completion-check.py` reads `satisfies` from the plan's header; the launcher and the guard refuse a malformed or disagreeing brief header.
++- **The tabular records' headers** (R-060, TASK-049): the inventory, the register, the index and the deviations file declare their sections, columns and role columns, never their rows; each table's owning checker compares the declaration with the table, and every reader splits a row by the declared columns.
++- **The run parameters' header** (R-061, TASK-050): the five values and the four owner lines programs read, read first by the launcher, the review guard and the loop guard, each lift compared with its line before it governs a launch, a snapshot or a stop.
++- **The migration, a program and a text** (R-062; TASK-051, TASK-052, BUG-044): `records-migrate.py [--check] [--base <ref>]` writes each header-less record's header from its prose, each write atomic and read back through the reader, the schema and the agreement before it replaces the record; `--check` writes nothing and lists what it would write, what it cannot and what has a header; a plan its headed readers would refuse, an increment heading outside any stage or an R-id on a Satisfies line the header would not hold, is listed `cannot read` and left as it is (BUG-044); the templates of the eight records carry the header, the core's "Project state" states the rule, and calibration's step 4 runs the migration.
++- **This repository's records** (R-063, TASK-054, the increment after this stamp): migrated by the installed program at this project's calibration to the release.
++- **The release** (R-064, TASK-053): this stamp, its test and its run sheet.
++
++**Running projects must**
++- *(all phases)* Install with every project paused at a merge boundary, everything committed, restart, run `/calibrate-bridge` before the next increment, as 2026.10.30b's entry says. On the real install the installer ends 0 with `RESULT: INSTALLED TREE MATCHES bridge 2026.11.11a`; over 2026.11.09a installed whole it also prints its `previous` line, `previous 2026.11.09a kept at <folder>`. The installer keeps one release as the way back.
++- *(all phases)* The text is in force from the calibration, reopening no gate: re-read as calibration's step 2 says; the `Calibrated:` line is rewritten, the earlier text living in git.
++- *(all phases)* The migration is a record-keeping addition of calibration's step 4, made at the next checkpoint: `python ~/.claude/cursor-bridge/records-migrate.py --check` from the Workspace root first, its lines in the calibration's report; a status file listed `cannot write` is trimmed first, since an older release's check counts header and body together against 12,000 characters and 120 lines; each repairable `cannot read` record is repaired in its prose and the check run again; a merged brief the program cannot read is never repaired: it stays header-less and is named in the report; then the migration itself, after which `--check` lists nothing to write, the result committed as the calibration's checkpoint in a records-only commit of its own. Every record written from then on is written from its template, header and all.
++- *(all phases)* From the migration on, a record's header and its prose say the same thing: a prose line a header mirrors is edited with its header key in the same commit. The record's checker prints `HEADER DISAGREES: <key>` where they differ, a finding (exit 1) fixed before the next checkpoint, and `HEADER MALFORMED: <path>:<line> <what>` for a header the reader refuses or the schema fails, exit 2, the check unable to verify until the header is repaired: at the line the message names for a header that cannot be read, at the keys it names for one that breaks its schema; the status file's caps count the body after the header.
++- *(building, changing)* The launcher's and the guard's `refused - header: ` (a brief's or the run parameters' header malformed or disagreeing with its prose) is a stop, never a model's failure: the header is corrected to agree with the prose and the launch or the snapshot made again. An owner's lift line is mirrored in the run parameters' header, and a lift in the header that no owner's line holds lifts nothing. The session-start hook's `header malformed: <path>:<line>` and `header disagrees: <key>`, and the loop guard's refused stop on `header disagrees: <key>`, are fixed in the record before the next action.
++- *(planning, building, changing)* A plan increment marked `historic: true` is a merged increment written before the plan's fields existed: `plan-check.py` exempts it from the shape rules while the merged set holds its ID, and a mark on an unmerged increment is a finding.
++- *(all phases)* The retired second readings: where two programs read one field two ways, the reading kept is the stricter one (the `Workflows:` line in the workflow check's grammar, the register's R-ids from its id column alone, a brief's Scope as `scope-check.py` reads it), so a record only a retired reading accepted shows as a finding at the first check after the calibration, fixed in its prose, reopening no gate.
++- *(all phases)* The `Bridge version:` line is written by calibration's step 5 alone. A project whose line already reads 2026.11.11a, this bridge's own among them, takes the no-delta path, which runs no step 4; this repository's records are migrated by its TASK-054.
++
++**If rolled back**
++- *(all phases)* `bridge-install.py --rollback` restores the kept copy of 2026.11.09a: it removes `records-migrate.py`, the one file only this release ships, and its allow entry, `Bash(python ~/.claude/cursor-bridge/records-migrate.py:*)`, so the program falls to the classifier until the reinstall. The older programs know nothing of the header and read the prose, but four of them read lines of the header as prose lines, since their readers ignore case and the header comes first: `loop-guard.py` and `session-start.py` read the status header's `phase:` line as its `Phase:` line, `conformance-check.py` reads that line and the header's `stage:` line as `Phase:` and `Stage:`, and `completion-check.py`'s search reads the plan header's `satisfies:` lists beside the prose's `Satisfies:` lines. Observed on 2026-11-11 over a scratch copy of this repository's records in the system temporary folder, never the live records, shaped first as TASK-054 will shape this repository's (the status file's `Working files:` line made one sentence, 15 of the plan's `Scope:` lines repaired) and migrated by this release's program (121 records written; the three merged briefs it cannot read left header-less), where header and prose held the same values, the installed 2026.11.09a checkers printed the same lines before and after the migration for `completion-check.py --mode plan` and `--mode done`, `plan-check.py`, `diagram-check.py --mode design` and `diagram-check.py --mode code`, `workflow-check.py --status`, `session-start.py` and `loop-guard.py`: the header's `satisfies:` lists carry the same IDs as the prose's `Satisfies:` lines, so `completion-check.py`'s search finds the same set. `inventory-check.py` counts the status file whole, `note: status: 39 lines / 9943 chars (cap 120 / 12000)` before the migration and `note: status: 52 lines / 11986 chars (cap 120 / 12000)` after it, under both caps, since the migration refuses a status file that would exceed either. `conformance-check.py` reads the header's `stage:` line as the status file's `Stage:`, its opening quote with it, and adds one NOTE, its line ending `is not the status file's ("release b2's stage h1 closed 2026-11-11): bring it up to date at this reflection point`, the count moving from `conformance-check: 24 OK, 0 MISSING, 2 NOTE` to `conformance-check: 24 OK, 0 MISSING, 3 NOTE`; while rolled back, that NOTE is the header's quote and not a stale `project.json`.
++- *(all phases)* While rolled back, a change of the status file's phase or stage is written in the header's `phase:` or `stage:` line as well as its prose line, and a plan increment's `Satisfies:` line with its header's `satisfies:` list: the older loop guard and session-start hook act on the header's phase, so a phase changed in the prose alone (`done` at project end, say) leaves the loop guard refusing stops as in the old phase and the hook naming the old phase's modules. Every other header line stays in its record, read as a field by no older program; a prose line edited while rolled back without its header key gives `HEADER DISAGREES: <key>` at the reinstall, fixed by bringing the header to the prose. A brief packaged under the older template carries no header and is read as before.
++
++**Field acceptance**
++- The TDP, the trial, pauses once at a merge boundary, calibrates and resumes: its calibration's `records-migrate.py --check` lines in its report, every record it can read migrated in one records-only commit, `--check` listing nothing to write after it, its checks green with no `HEADER` line, the increments written before the plan's fields existed marked `historic: true` and its plan check's shape noise about them gone, no gate reopened. While it has no increment at the gate, that migration and its checks stand in; its first brief packaged and launched under the new template is recorded when its next increment comes. reAngle and the video factory calibrate when the owner resumes them (R-031, R-037, deferred by the owner on 2026-10-31).
++
++**For the maintainer**
++- Program items, none in this release: `pyyaml` at run time once the installed programs have a declared environment; a header for `run/supervisor/in-flight.md` and the SCOPE files where a second reader appears; the leads recorded in this repository's `docs/HARDENING.md` under TASK-046 to TASK-052, BUG-044 and stage H2's review, round 2 (among them two of calibration's step 4: its exit-3 stop names no repair for a failed temporary write, read or replace, and its list of `cannot read` repairs reads as complete while the program prints other reasons too).
++- Two halves outside `bridge/`, yours to place: the CHANGELOG template's and the release procedure's migration sentence (a release that adds a header key or a record kind says how a running project's records gain it).
++
++---
++
+ ## 2026.11.09a
+ 
+ **The software's features and behaviour asked as a conversation, never as guessed options** (a hotfix of 2026.11.03a, cut from its release state, on the owner's rule and order of 2026-11-08; KP-075; R-065): at intake a project supervisor put a question about a feature's behaviour to the owner as options it had guessed; the owner rejected them as too rigid and ruled that the fixed questions setting a project's parameters may keep the question form, while the software's features and their behaviour are discussed as a conversation, numbered questions in prose answered in the owner's own words, follow-ups building on the answers. Text only, no program changes. Against 2026.11.03a: no file new or removed, no settings change.
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 3212a51..75b0d3e 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+-  "version": "2026.11.09a",
+-  "generated": "2026-11-11 11:01",
++  "version": "2026.11.11a",
++  "generated": "2026-11-11 13:04",
+   "files": {
+     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
+     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
+@@ -15,7 +15,7 @@
+     "commands/calibrate-bridge.md": "b770834d7729329b202ff05cfd5b4cdf0895eb198bbb9dc6addf9c108259f68e",
+     "commands/evaluate-reports.md": "3a72fa1647401c9bec9dfd267ee93fe2651dd3fdc9ede571674a502dae543383",
+     "commands/supervisor.md": "f3f0597bef7271319c9c14134aaa58fe00ce914ae1fe3514e021ce9bd4c724ac",
+-    "cursor-bridge/CHANGELOG.md": "90c4f14746f2ce1d91e654a7753465250260ebe299537a45f007a91a2316af5f",
++    "cursor-bridge/CHANGELOG.md": "7cf1a662377bed99007d13d09b0969b81fd5d6e1fddacf07fe8d8bef0977cece",
+     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
+     "cursor-bridge/Cursor-Project-Configuration.md": "e901421ce9a49abc76f0d254738143eb96d3b46caadaa7ea5227dead252bb734",
+     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
+@@ -26,7 +26,7 @@
+     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
+     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
+     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
+-    "cursor-bridge/VERSION": "bb3dd1febc69da7fc4eb3bd53a8d7446f269c302c37d47687dff837fef99df6a",
++    "cursor-bridge/VERSION": "0e59042035b480e48ed737c84e5e76f03c6b89c6ac60fe58660670bcee128823",
+     "cursor-bridge/bench-check.py": "ea34fa87a1f3383cd34600f48a817a23b6fc0cd4ad461a77b796baf05ef2643e",
+     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
+     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
+diff --git a/bridge/cursor-bridge/VERSION b/bridge/cursor-bridge/VERSION
+index 012c36b..e71ac69 100644
+--- a/bridge/cursor-bridge/VERSION
++++ b/bridge/cursor-bridge/VERSION
+@@ -1 +1 @@
+-2026.11.09a
++2026.11.11a
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index d8663b5..9cabd25 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -1900,3 +1900,13 @@ Snapshot STAGE-B2l (d62eb2d on stage/B2, deleted after verify OK, hash 4f2b4e46f
+ - **Review B** (grok-4.7-medium). Round 1 (BUG-044-r1) REJECT on one sentence of the supervisor's text, behaviour: calibrate-bridge.md said a `HEADER MALFORMED` stop is repaired at the line the message names, while a schema break's message names keys and no line (records-migrate.py prints check_header's findings); it confirmed the program's repair of the cause at the read-back, the reproduction tests unedited and run-parameters.md's sentence. The supervisor's fix (round 2, no builder run) names the line for a header that cannot be read and the keys for a schema break, with a test running the program on a schema-broken brief (red on the earlier text); Review A read the fix; round 2's verdict in the pull request's description.
+ - **Recorded, none of the five (each for the program's next edit):** bridge-run.py and bridge_env's `plan_increment_ids` glob `BUILD_PLAN*.md` with the root unescaped (the audit's advisory; a root the operator chooses, not untrusted input; the same `glob.escape` fixes both); `_validate_plan_readers`' `read_header` error and no-header branches cannot be reached (the read-back returns first) and its coverage loop recomputes the union per R-id; the null branches of `_dump_list_of_mappings` cannot be reached by today's schemas (`merge_unit` is the one list-or-null key, top-level in the brief), the brief having asked for both; the `--check` in-memory case asserts only exit 3; F2 refuses per file, stricter than completion-check's union across plan files (a plan whose bold-line R-id another plan file holds plainly stays header-less, its gate as before); the F3 cases' red at the checkpoint is an AttributeError on the names they patch, their precondition shown by mutants m03 to m05; the builder's report says the reproduction cases were added below the marker (they are the supervisor's, above it) and elides its progress lines.
+ - **Proofs:** the fix's own test files "1021 passed, 1 skipped in 54.09s"; the new tests against the checkpoint 2770867, all 12 "failing" (`mutation-run.py --checkpoint`, exit 0); the mutation run (7 mutants, run/supervisor/BUG-044-mutants.json) "counts: run=7 cached=0 killed=7 survived=0 not applied=0 error=0 expected survive=0", exit 0; the texts and the fix "202 passed in 4.68s"; Review A's runs "148 passed in 3.72s" and "186 passed, 1 skipped in 112.10s", "RESULT: SOURCES MATCH bridge 2026.11.09a"; the full suite with the pull request's variables in the pull request's description.
++
++### Stage H2's review, round 2 (2026-11-11): approved by both, the review done
++- **Verdicts.** The stage's whole change with BUG-044 (f32f54f^..54c849f, 39 files, run/review/STAGE-H2-r2.diff in four parts; tag stage-review/H2-2, never pushed), snapshot STAGE-H2-r2. Review A in four parts, bridge, tests, records and briefs: APPROVE each, nothing of the five, no should-fix. Review B (grok-4.7-medium, launch 10:47:08Z, exit 0): APPROVE, round 1's two findings gone, the migration run on a temporary copy of this plan's shape writing every kind with the readers passing; its full suite "5079 passed, 42 skipped, 1 failed", the failure tests/test_release_t_strip.py:71 from the review's own `HOME` redirect, not the stage. `verify` OK. No finding sends work back (reflection step 7): the stage review is done before the stamp, as the type's rule asks.
++- **Recorded, none of the five (the close's records and the next edits):** calibrate-bridge.md:146's exit-3 stop names no repair for the cases where a temporary write, read or replace failed, and its list of `cannot read` repairs reads as complete while the program prints other reasons (a missing inventory section, too few columns, a brief name refused, a symbolic link, not a record kind) (the bridge part; named for the maintainer in 2026.11.11a's entry); `assert_migrated` in tests/test_records_migrate.py checks `header_agrees` only, never the readers' refusals for the other kinds, round 1's cause class; the builder's `r062_f3` cases assert the exit only; `test_r062_a_failed_temporary_write_leaves_the_record_whole` tolerates an escaping OSError where exit 3 now holds; `test_r062_check_would_write_only_when_write_succeeds`' name claims more than it checks; the single-file link case runs on CI only (the tests part); an example a brief names that its report's assumption list omits (TASK-051.md's increment outside any stage, BUG-044's first reproduction) is dispositioned like a listed item (the briefs part, a lead); DESIGN.md:188's migration refusals omit BUG-044's two plan refusals, the status file's Next omitted BUG-044's leads, this file's round-1 "S1 and S2 above" (the records part, wording, for the close); D-002:21 still opens "`records-migrate.py` will have a `build_parser`" (Review B); the reviewer's suite wrote test rows into run/launcher/runs.jsonl and left run/launcher/pids/2026-11-11T11-05-37Z (pids not running): the suite writes into the real launcher log (a lead). R-062's Evidence gains tests/test_bug044.py (the records part), in TASK-053's records.
++
++### TASK-053: the stamp, 2026.11.11a (2026-11-11)
++- **What.** Supervisor records, tests first (tests/test_release_b2_stamp.py, 11 cases, "8 failed, 3 passed" before the stamp; two then tightened so that none passes on the old tree, the allow-rule pin folded into the rolled-back test, 10 cases, "10 passed in 0.32s"): `VERSION` 2026.11.11a, the CHANGELOG entry above 2026.11.09a (What changed by row R-057 to R-064; Running projects must, phase-marked; If rolled back with the observed lines; Field acceptance with its stand-in; For the maintainer), MANIFEST.json regenerated, project.json's version and state, R-064 built in the accept commit, the status file's `Bridge version:` moved with the stamp (the Decisions row on release B's install). trace-exceptions.md unchanged: "RESULT: OK", 424 passages, 0 dropped, 93 excused.
++- **The rollback observation** (run/supervisor/task053_rollback_observe.py, through the launcher's driver kind, 11:43:07Z, exit 0): a clone of the branch's HEAD in the system temporary folder, never the live records, shaped as TASK-054 will shape them (the status file's `Working files:` line one sentence; the semicolons inside a parenthesis on 15 of the plan's `Scope:` lines, 125, 136, 156, 166, 176, 200, 313, 323, 406, 416, 426, 446, 460, 470 and 480, made commas), the installed 2026.11.09a checkers run before and after the clone's own `records-migrate.py` (`--check` exit 1, then the write exit 0: 121 records written, `cannot read handoff/TASK-002-r2.md: empty` and the same for -r3 and -r4), the clone removed after a link check. Differences: inventory-check "note: status: 39 lines / 9943 chars (cap 120 / 12000)" to "note: status: 52 lines / 11986 chars (cap 120 / 12000)"; conformance-check one more NOTE, `project.json state`, its `status_field` reading the header's `stage:` line, opening quote included, "24 OK, 0 MISSING, 2 NOTE" to "24 OK, 0 MISSING, 3 NOTE". Identical: completion-check `--mode plan` and `--mode done`, plan-check, diagram-check `--mode design` and `--mode code`, workflow-check `--status`, session-start and the loop guard. TASK-054 runs the installed release's checkers over the live migrated records and compares them with these lines.
++- **Review A**, round 1: REJECT, two findings of behaviour in the entry's text, fixed by the supervisor before any snapshot (no round): B1, the If rolled back part said the older programs read past the header, while four read its lines as prose lines where their readers ignore case (the loop guard's and the session-start hook's `field` and the conformance check's `status_field` the status header's `phase:`, the conformance check its `stage:`, completion-check's search the plan header's `satisfies:`), which the observation could not show since header and prose held the same values; so a phase changed in the prose alone while rolled back would leave the older hooks on the header's phase, and the entry now says to write both; B2, the `HEADER MALFORMED` sentence said a header is repaired at the line the message names, BUG-044 round 1's rejected wording, now the step's (the line for a header that cannot be read, the keys for a schema break). Its should-fix taken: this section's test count, and the entry saying the copy was shaped first; its considers: "exceed" for "pass", the R-063 wording below. Noted by it: project.json's `state.stage` rewritten beside the version (the supervisor's ruling: the stage is state the reflection keeps current, its first token unchanged).
++- **For TASK-054:** the three refused briefs print `empty`, where the plan's TASK-054 entry says `no Scope entries found`; the driver's own line "status file after migration: 12037 characters" counts the raw CRLF bytes, where the checkers count 11,986 on newline-normalised text; the 15 Scope lines above are the repairs its first `--check` will list; the migrated status file counted 11,986 characters with the trimmed `Working files:` line, 14 under the older cap, so its trim keeps room for the header (TASK-054's records add text).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index f0cd4b8..eb73cf4 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -55,6 +55,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The tabular records' headers, read first | `docs/INVENTORY.md`'s `record: inventory` header (`reflected_through`, `development_data`, `tables` with each section's `columns` and `key`), `docs/REQUIREMENTS.md`'s `record: requirements` (`columns`, `roles` id, status and evidence, `statuses`), `docs/diagrams/INDEX.md`'s `record: diagram-index` and `docs/diagrams/DEVIATIONS.md`'s `record: deviations` (`columns`, `roles`) are read first, each row split by the declared columns, through bridge_env's one copy of each reading (`inventory_parse_tables`, `inventory_reflected_through`, `inventory_development_data`, `parse_register`, `requirement_ids_from_register`, `diagram_index_table` with its header-less first-table check, `diagram_index_selected_ids`, `parse_deviation_keys`, each with its fallback for `header_agrees`); each table's owning checker prints `HEADER DISAGREES` (inventory-check the inventory's columns, sections, `reflected_through` and `development_data`; completion-check the register's; diagram-check the index's and the deviations'), the other reader trusting it (conformance-check, diagram-check on the register, plan-check on the index); a malformed header `HEADER MALFORMED: <path>:<line>`, exit 2; conformance-check's heading-word guess, plan-check's column-position read and diagram-check's whole-text R-id search retired; a file with no header reads as before | bridge/cursor-bridge/bridge_env.py; inventory-check.py; conformance-check.py; completion-check.py; diagram-check.py; plan-check.py | tests/test_header_tables.py; tests/test_header_tables_r2.py | release B2 (TASK-049) |
+ | The run parameters' header, read first | `docs/RUN_PARAMETERS.md`'s `record: run-parameters` header (the five values, `agent_ceiling`, `ceiling_above_twice` as `{kind, seconds, words}` lifts, `design_rounds_above_five` and `review_rounds_above_ceiling` as `{subject or id, rounds, words, date}` lifts) is read first by the launcher, the review guard and the loop guard through bridge_env (`run_parameters_values`, `run_parameters_fallback`, the one copy of each line reading, lines ending at a line feed only); the launcher refuses a malformed header or one whose lifts disagree with their lines (`bridge-run: refused - header: `, exit 125) before any lift governs a launch, the review guard the same on its review lift before a snapshot, the loop guard refuses the stop on a disagreeing `agent_ceiling` or `ceiling_above_twice` (`header disagrees: <key>`); inventory-check compares all nine keys (`HEADER DISAGREES`, exit 1; `HEADER MALFORMED`, exit 2); a lift at or below its default lifts nothing; the loop guard's own ceiling reading retired; a file with no header reads as before | bridge/cursor-bridge/bridge_env.py; bridge-run.py; review-guard.py; loop-guard.py; inventory-check.py | tests/test_header_run_parameters.py; tests/test_header_run_parameters_r2.py; tests/test_header_currency.py | release B2 (TASK-050) |
+ | The migration program | `records-migrate.py [--check] [--base <ref>]` with a project root or record paths enumerates the eight kinds' records from a project root (the current folder by default) or takes given record paths, and writes each header-less record's header from bridge_env's fallback reading of its prose: the whole file to a `.records-migrate-<hex>.tmp` created exclusively in the record's folder, read back through `read_header`, `check_header` and `header_agrees`, then `os.replace`; the header's lines end as the file's do and a byte-order mark stays first; `historic` from the one merged set (`--base`, default `origin/main`); a headed record `has a header` and is left unchanged, a malformed one `HEADER MALFORMED` (exit 2, the run stopping); `cannot read` for a record it cannot read, a missing or unopenable given path, one not of a kind, one below a link or junction (its resolved path not the root's joined with its relative path) and a Scope the fallback refuses; `cannot write` over the status file's older cap; a plan with an increment heading outside any stage, or whose header would not hold every R-id completion-check reads on a `Satisfies` line, `cannot read` (BUG-044); the read-back and the in-memory check also run `plan_header_refusal` and that coverage; the plan glob escapes the root; a brief with no `Merge unit:` line written `merge_unit: null`; a failed write or read-back exits 3 with the record byte-identical and no temporary file left (a close failure's removal may itself fail, docs/HARDENING.md, TASK-051); `--check` writes nothing and exits 1 where a record would be or cannot be written; its tests run only on fixtures, never this repository's records (TASK-054 runs the installed program) | bridge/cursor-bridge/records-migrate.py | tests/test_records_migrate.py; tests/test_bug044.py | release B2 (TASK-051; BUG-044) |
++| Release B2's stamp | The release as one version: `2026.11.11a` in VERSION, the manifest, project.json and the status file; a CHANGELOG entry with What changed by row, Running projects must by phase (the migration at the next checkpoint, `--check` first, a records-only commit), If rolled back with the lines the installed 2026.11.09a checkers printed over a migrated scratch copy of this repository's records, the field acceptance and the items for the maintainer | bridge/cursor-bridge/VERSION; .../CHANGELOG.md; .../MANIFEST.json | tests/test_release_b2_stamp.py | release B2 (TASK-053) |
+ 
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 5e96840..b3b5deb 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -3,10 +3,10 @@ Last updated: 2026-11-11
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable
+ Change cycle: release B2 (machine-readable headers on the dual-read records), begun 2026-11-04; intake confirmed 2026-11-04; the design revision and its plan addendum (one subject, release-b2) approved at one gate 2026-11-04 (items 2 and 4; no interface variant, item 3; the run parameters kept, item 5); at item 6, the loop, stages H1 and H2 (TASK-046 to TASK-054), on Opus 5.5
+-Increment: none — at the merge of BUG-044
+-Last accepted: BUG-044 (PR #148, at its merge): the migration refuses a plan its headed readers would refuse (stage H2's review, round 1), with that round's text corrections; before it TASK-052 (PR #147), R-062's text half, and TASK-051 (PR #146), records-migrate.py; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-052, BUG-001 to BUG-044, the refactoring passes of B2 to B5, T1, T2 and H1, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
++Increment: none — at the merge of TASK-053
++Last accepted: TASK-053 (PR #149, at its merge): the stamp, 2026.11.11a, after stage H2's review round 2 (both approved); before it BUG-044 (PR #148), the migration refusing a plan its headed readers would refuse, TASK-052 (PR #147) and TASK-051 (PR #146); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-053, BUG-001 to BUG-044, the refactoring passes of B2 to B5, T1, T2 and H1, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+ Awaiting user on: nothing
+-Next: stage H2's review of the release's text, round 2 (both reviewers, the stage's whole change with BUG-044, before the stamp), then TASK-053 the stamp and the owner's install run sheet, TASK-054 after the install (stage H2, on Opus 5.5); TASK-046's to TASK-052's leads for later briefs in docs/HARDENING.md. After release B2, one at a time on the owner's word: the progress graph, W, G, E, F, then C and D, which wait for the TDP's code map (INVENTORY, Decisions, 2026-11-02). The TDP calibrated to 2026.11.03a on 2026-11-04, on its branch task-172 (its main reads 2026.10.30d until that branch merges), and stays paused at the owner's word; of release T's field acceptance on it, the first stripped suite and no gate reopened are read at its TASK-172, and the weekly workflow stays open until a bridge release's frozen block carries checkout v7.0.1 or newer and the TDP's increment for its OSV-Scanner action follows (HARDENING, Correction to project end; Feedback PT10); reAngle and the video factory calibrate when the owner resumes them (R-031, R-037). A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: the owner's install of 2026.11.11a from the run sheet (the TDP paused at a merge boundary; bridge-install.py; RESULT: INSTALLED TREE MATCHES bridge 2026.11.11a; restart; /calibrate-bridge in the TDP's session), then TASK-054 at this project's calibration, then stage H2's close and project end (on Opus 5.5); TASK-046's to TASK-053's and BUG-044's leads in docs/HARDENING.md. After release B2, one at a time on the owner's word: the progress graph, W, G, E, F, then C and D, which wait for the TDP's code map (INVENTORY, Decisions, 2026-11-02). The TDP calibrated to 2026.11.03a on 2026-11-04, on its branch task-172 (its main reads 2026.10.30d until that branch merges), and stays paused at the owner's word; of release T's field acceptance on it, the first stripped suite and no gate reopened are read at its TASK-172, and the weekly workflow stays open until a bridge release's frozen block carries checkout v7.0.1 or newer and the TDP's increment for its OSV-Scanner action follows (HARDENING, Correction to project end; Feedback PT10); reAngle and the video factory calibrate when the owner resumes them (R-031, R-037). A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions); stage T2's demonstration ran after the install, where the plan says before (HARDENING, Stage T2's demonstration)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -16,11 +16,11 @@ In flight: none
+ Working files: run/supervisor/ (local, gitignored; this file carries what a resume needs, those files hold the detail): in-flight.md, the scratch log while a review runs (read it first on a resume); intake-notes.md (release T's intake: what was read, the questions and the owner's answers); intake-notes-b2.md and b2_*.py (release B2's); release T's rt_*.py (the item scan, the records writer, the critique's file) and rt0nn_*.py; each increment's mutants file <ID>-mutants.json; each closed gate's own files, named by its ID (write_review_<id>.py, SCOPE-<id>.md, pr-<id>.md, msg-<id>*.txt, task0nn_*, bug0nn_*, cal30b_*.py, the stage reviews' stage_b<n>_* and stage-b<n>-*, the fix and refactoring passes' fix*, refac_* and refactor*, the plan revision maintainer-text's plan_text_*.py, design_text_file.py and *-PLAN-TEXT.md); task017_b3pins.py, which re-takes every excused section's pin; b4close_docs.py and b4close_records.py (stage B4's reflection); b5close_docs.py and b5close_records.py (stage B5's); b6close_docs.py and b6close_records*.py (stage B6's, run once each), write_stage_b6.py and refactor_b6_clones.py; the pace and traits critiques' files (maintainer-pace.md, design_pace_file.py, pace_r2/, pace_shares.py, task017-reality-check.md, design_traits_*.py, plan_traits_*.py); the mutation drivers fix002_, task016_ and task015_mutants.py (re-anchor the last on session-start.py's text before reuse); demo_b2.py to demo_b5.py (run with python -X utf8), demo_b6.py (PYTHONUTF8=1 through --kind driver), demo_t2.py (through --kind driver) and demo_h1.py (stage H1's, from the Workspace); split_stage_h1.py, h1close_docs.py and h1close_records.py (stage H1's close, run once each); release T's close, t2close_*.py and t2corr_*.py, run once each; drafts/task022-notes.md; runsheet-socket-key-2026-10-16.md; maintainer-b2.md, maintainer-windowless.md; pins.py, carve_diff.py
+ Delegated gates: none
+ Remote sync: local main fast-forwarded after every merge (sync-check.py --apply)
+-Stage: release B2's stage H1 closed 2026-11-11 (HARDENING, Release B2's stage H1 — the close), stage H2 in progress (TASK-051, TASK-052 and BUG-044 merged; the stage review's round 2, TASK-053, TASK-054); release T's T1 closed 2026-11-02, T2 2026-11-04, its project end 2026-11-04; release B's stages and project end: docs/archive/STATUS_HISTORY.md. Last reflection: stage H1's close, 2026-11-11 (stage review STAGE-H1-r1 approved by both; demonstration live on main d40e6d2, 54 of 54 checks passed; conformance 25 OK, 0 MISSING, 5 NOTE; Issues ISS-031 and ISS-032 added; Feedback FB-085 to FB-091; Project Summary, User Manual and the Guide patched); before it release B2's design gate, 2026-11-04
++Stage: release B2's stage H1 closed 2026-11-11 (HARDENING, Release B2's stage H1 — the close), stage H2 in progress (TASK-051, TASK-052, BUG-044 and TASK-053 merged; the stage review's round 2 approved by both 2026-11-11; the owner's install, TASK-054); release T's T1 closed 2026-11-02, T2 2026-11-04, its project end 2026-11-04; release B's stages and project end: docs/archive/STATUS_HISTORY.md. Last reflection: stage H1's close, 2026-11-11 (stage review STAGE-H1-r1 approved by both; demonstration live on main d40e6d2, 54 of 54 checks passed; conformance 25 OK, 0 MISSING, 5 NOTE; Issues ISS-031 and ISS-032 added; Feedback FB-085 to FB-091; Project Summary, User Manual and the Guide patched); before it release B2's design gate, 2026-11-04
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-031 open (invisible-check misses U+2028, U+2029, U+0085 and the C0 controls; a program item for the maintainer). ISS-032 fixed (a required check GitHub never created, HOTFIX-003's carry; every required context confirmed in the rollup before a merge). ISS-030 fixed (TASK-047: a builder ran the full tree asynchronously and reached its limit, its work kept; briefs now forbid it). ISS-029 fixed (TASK-046). ISS-028 fixed (BUG-043, TASK-045). ISS-027 fixed, worked around (the prompts' wording, FB-075). ISS-024 recurred, counter 2. ISS-026 fixed (BUG-041, installed 2026-11-04). ISS-025 fixed (BUG-039's three rounds). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-013 mitigated (the plan check's rule, TASK-033, installed). ISS-023 fixed (BUG-038, 2026.10.30d, installed 2026-10-31); ISS-021's field check passed (2026-10-31); ISS-011, ISS-015 and ISS-022 closed at stage B6's close, ISS-020 completed there (worked around; the roster check's sign-in advice to release T, HARDENING). Earlier: docs/archive/STATUS_HISTORY.md
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+-Bridge version: 2026.11.09a
++Bridge version: 2026.11.11a
+ Calibrated: 2026-11-09 from 2026.11.03a to 2026.11.09a — applied: the owner's install (bridge-check 148 OK; 2026.11.03a kept as the way back); the governing files re-read whole (step 2's list); the release's items for changing: questions about the software and escalations about its behaviour asked as a conversation (none open); roster native; memory notes 3 read, 0 reduced; pending: as below; not applied (gate passed): none.
+ Calibration pending: reAngle and the video factory calibrate when the owner resumes them, from 2026.10.25a through every entry (R-031, R-037, deferred - owner 2026-10-31); the TDP calibrated on 2026-11-04, on its branch task-172, this release's two items left on its own Calibration pending line: the weekly scan, waiting for the block's newer pin, and the first stripped suite, at its TASK-172.
+ Conformance notes (2026-11-04, project end, on the installed 2026.11.03a: 25 OK, 0 MISSING, 5 NOTE, RESULT CONFORMANT): NOTE the repository is public; NOTE the boundary-check hook is configured, not engaging (ISS-010; the launcher's BOUNDARY lines are the detection); NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, two lines: this project's, reviewed at calibration step 2b, and the maintainer session's, left to the maintainer
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index ccbb463..cae0621 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -71,7 +71,7 @@ Revised 2026-11-09 (the intake hotfix 2026.11.09a, HOTFIX-003; docs/DESIGN.md, "
+ | R-059 | The plan's and the briefs' headers: every `docs/BUILD_PLAN*.md` file carries `record: build-plan` with its `stages` (name, demonstration, increments with `id`, `title`, `kind`, `parent`, `depends_on`, `parallel`, `diagrams`, `scope`, `satisfies`, `deferred`, `historic`), read first by `plan-check.py` (which compares each increment's header fields with its prose field lines where the prose has them, `parallel`'s `yes` and `no` as `true` and `false`, an absent optional scalar's line as `null` and an absent list's line as the empty list, the filler `none` as an absent line, `kind` against `increment` where the `Kind:` line is absent, an increment's `title` with its heading's title, and each stage's `name` and `demonstration` with its heading and the presence of its `Demonstration:` line, fails a difference, reports a `Scope:` entry with an unbalanced parenthesis as a shape failure for an unmerged increment, and exempts a `historic: true` increment from the shape rules (a missing `Scope:` line; the `Kind:` value check) and from nothing else — its `kind` `increment` and `parallel` `false`, the absent lines' defaults, never null, its lists empty — only where the merged set holds the ID, read by the one function `bridge_env.squash_merged_ids(folder, PLAN_ID_PATTERN, ref=<--base>)`, `origin/main` by default, its own `merged_ids` retired, a mark on an unmerged increment a finding, the mark accepted with a note under `--no-git` or an unreadable log, a `--base` beginning with `-` refused), by `completion-check.py` (`satisfies`, with the agreement rule that every R-id its retired whole-text search would have found in a plan file stands in some increment's header `satisfies`, else `HEADER DISAGREES: satisfies`, the sweep one function in `bridge_env`, every R-id in the file's body outside the header by the one R-id pattern, the program's own whole-text regex gone) and by `bridge_env.plan_increment_ids`, the one reader over every plan file, for `bridge-run.py`; every brief carries `record: brief` with `id` and `round` (an integer, equal to the file's name as `parse_review_name` reads it, 1 for a plain name), `satisfies` (its prose the brief's `Satisfies:` line), `scope`, `merge_unit` and `blocking_class` (their prose the `Merge unit:` and `Blocking class:` lines), read first by `scope-check.py` (which, as the brief's checker, compares every key with its prose or the file's name — `scope` with the `## Scope` section's bullets as `parse_scope` reads them, with its refusals — and fails a difference `HEADER DISAGREES: <key>`), by `plan-check.py` (`scope`, `satisfies`; its own `brief_scope` retired) and by `bridge_env`'s merge-unit and blocking-class readers for `bridge-run.py` and `review-guard.py`, which refuse a malformed brief header with exit 125 and a message beginning `bridge-run: refused - header: ` or `review-guard: refused - header: `, and refuse the same way a brief whose header disagrees with its prose or its name (`bridge-run: refused - header: disagrees <key>`, `review-guard: refused - header: disagrees <key>`), the launcher every key before any builder is launched on it, the guard the keys it reads of the branch's first brief (`merge_unit`, `id`, `round`; its `Blocking class:` line is the SCOPE file's) before a snapshot; each program's fallback kept in `bridge_env` and tested on a header-less plan and brief; a malformed header refused by the checkers as R-058 says, `scope-check.py`'s `HEADER DISAGREES` exiting 2 as an unreadable Scope does. | DESIGN.md, Change: release B2, "The records and their headers", "The fallback readers, one copy each" | built | tests/test_header_plan.py; tests/test_header_plan_r2.py; tests/test_header_plan_r3.py |
+ | R-060 | The tabular records' headers declare the table's shape, never its rows: `docs/INVENTORY.md` carries `record: inventory` with `reflected_through`, `development_data` and `tables` (the four sections, each its `columns` and `key`), read first by `inventory-check.py` and `conformance-check.py`; `docs/REQUIREMENTS.md` carries `record: requirements` with `columns`, `roles` (`id`, `status`, `evidence`) and `statuses` (the allowed set, exactly the four words `planned`, `built`, `deferred`, `dropped` in this release, a list of fewer or other words malformed, a Status cell opening with a word outside them the register check's finding as today), read first by `completion-check.py`, its owning checker, and `diagram-check.py` (the R-ids traced read from the id column, its whole-text `R_RX` over the file retired); `docs/diagrams/INDEX.md` carries `record: diagram-index` with `columns` and `roles` (every column), read first by `diagram-check.py`, its owning checker, and `plan-check.py` (its column-position read retired); `docs/diagrams/DEVIATIONS.md` carries `record: deviations` with `columns` and `roles` (`diagram`, `from`, `to`, `as_built`, `since`, `resolved_by`), read first by `diagram-check.py`, its owning checker; `development_data` is the first cell of the Decisions row that begins `Development data:`, the one value a tabular header copies from its table; each program splits a row by the declared columns; each table's owning checker (`inventory-check.py` the inventory's) compares the declared columns with the table's own header row (`HEADER DISAGREES: columns`, a role's column absent from the header row `HEADER DISAGREES: roles.<role>`, each a finding, exit 1; a role naming a column absent from the header's own `columns` malformed) and the declared sections with the file's headings (`HEADER DISAGREES: tables.<section>`), `inventory-check.py` comparing `reflected_through` with the `Reflected through:` line and `development_data` with its row too, and fails a difference, the other reader trusting that check; each keeps the one fallback `bridge_env` holds for a file with no header (`conformance-check.py`'s heading-word guess of the inventory's sections retired), tested on a header-less record, and refuses a malformed header as R-058 says. | DESIGN.md, Change: release B2, "The records and their headers" (the third kind), "The fallback readers, one copy each" | built | tests/test_header_tables.py; tests/test_header_tables_r2.py |
+ | R-061 | `docs/RUN_PARAMETERS.md` carries `record: run-parameters` with the five values (`stage_pause`, `merge_authority`, `refactoring_pass`, `installer_verification`, `parallel_increments`) and the four owner lines programs read (`agent_ceiling`, an integer or null; `ceiling_above_twice`, a list of `{kind, seconds, words}` mappings, one per `Ceiling above twice: <kind> <seconds> (<words>)` line as `bridge-run.py`'s `owner_cap` reads them, the parenthesis whole as `words`; `design_rounds_above_five` and `review_rounds_above_ceiling`, lists of lifts), read first by `loop-guard.py`, `bridge-run.py` and `review-guard.py` through `bridge_env`, and by `inventory-check.py` for the agreement check, the launcher and the loop guard reading the cap lift by kind from the list, each falling back to the one reading of the lines `bridge_env` keeps for a file with no header (the readers of `agent_ceiling`, `ceiling_above_twice` and `design_rounds_above_five` moved there from the two programs, `loop-guard.py`'s second reading of `Ceiling above twice:` retired); the loop guard falls back to the lines on a malformed header and refuses the stop with `header disagrees: <key>` where `agent_ceiling` or `ceiling_above_twice` differs from its line; the launcher and the guard refuse a malformed header with exit 125 and a message beginning `bridge-run: refused - header: ` or `review-guard: refused - header: `, and compare each lift they read (the launcher the three lists, the guard `review_rounds_above_ceiling`) with its line before it governs a launch or a snapshot, refusing a difference the same way (`header: disagrees <key>`), so a lift absent from the owner's lines never lifts a ceiling; `inventory-check.py` compares the header with the fallback's reading of the lines (each of the five values the token the owner-values test's regex reads from its line) and fails a difference; the owner's lift lines are still written only on the owner's own words, the header mirroring them; the fallback tested on a header-less file. | DESIGN.md, Change: release B2 (the owner's intake answer of 2026-11-04: all nine lines), "The fallback readers, one copy each" | built | tests/test_header_run_parameters.py; tests/test_header_run_parameters_r2.py |
+-| R-062 | Migration is a program and a text: `records-migrate.py` (`bridge/cursor-bridge/`, with its command-reference entry) enumerates, from a project root (the current folder by default; a given folder is the root, one at most) or from given record paths, the eight kinds' records by the kind rule (the status file, every `docs/BUILD_PLAN*.md`, every `handoff/*.md` other than a report, by `bridge_env.HANDOFF_REPORT_NAME`, or a resolution file, by `HANDOFF_RESOLUTION`, the inventory, the register, the index, the deviations file, the run parameters) and writes, for each that has no header, the header from `bridge_env`'s fallback reading of its prose (a given path under no kind listed `cannot read <path>: not a record kind`, affecting no exit, the run going on; a brief's `id` and `round` from its file name; every string the plain form would refuse, and the empty string as `""`, written double-quoted; every list of mappings in block form; an absent list line, or a filler `none`, the empty list), each write atomic — the whole file to a temporary file beside the record, read back and checked by `read_header`, `check_header` and the agreement for every key under its normalisation, `historic` by its derivation, then moved into place with `os.replace`, so a crash or a full disk leaves the record as it was — marks `historic: true` on a plan increment the fallback reads with no Scope or Kind whose ID the merged set holds, read lazily, only for a plan file holding such an increment, by the one function `plan-check.py` calls, `bridge_env.squash_merged_ids(folder, PLAN_ID_PATTERN, ref=<--base>)`, `origin/main` by default (a `--base` beginning with `-` refused), the plan file listed `cannot read <path>: merged set unreadable (<reason>)` and left untouched where the set cannot be read, leaves a record with a header unchanged, refuses a malformed one (exit 2, the run stopping at that record, the records before it written and listed) and stops at a failed read-back (exit 3, that record untouched), lists and leaves header-less a record the fallback refuses (`cannot read <path>: <reason>`, a plan `Scope:` entry with an unbalanced parenthesis among them; a merged brief among them is never repaired and stays header-less) and a status file whose header and body together would exceed either older cap, 12,000 characters or 120 lines (`cannot write <path>: ...; trim the body first`), the run's exit 1 where a `cannot write` stands and 0 otherwise, a `cannot read` affecting it not at all, and with `--check` writes nothing and lists what it would write, what it cannot and what has a header (exit 1 where an enumerated record would be written or cannot be written, else 0, a `cannot read` line affecting that exit not at all either), so that `python ~/.claude/cursor-bridge/records-migrate.py --check` from the Workspace root is the one command the calibration, TASK-054 and the stage's demonstration run; `calibrate-bridge.md`'s step 4 runs that `--check` first, then the migration over a project's records at the next checkpoint, and commits the result as the calibration's checkpoint in a records-only commit, append-only, reopening no gate; the templates of the eight records (the core's "Project state" for the status file and the inventory, `design.md`'s register format, `planning.md`'s increment format, `spec-packager.md`'s brief, `Diagram-Planning-Conventions.md` §3's index and deviations file, `run-parameters.md`'s fence) carry the header with every string the plain form would refuse quoted (a date, a typed word, a path holding `/`, `n/a`, a value with a space), each template's header read by `read_header` and checked by `check_header` in a test, and the core's "Project state" states the rule: a program reads the header first, falls back for a record without one, and the record's checker fails a header that disagrees with its prose. | DESIGN.md, Change: release B2, "Writing" and "Migration" | built | tests/test_records_migrate.py; tests/test_release_b2_text.py |
++| R-062 | Migration is a program and a text: `records-migrate.py` (`bridge/cursor-bridge/`, with its command-reference entry) enumerates, from a project root (the current folder by default; a given folder is the root, one at most) or from given record paths, the eight kinds' records by the kind rule (the status file, every `docs/BUILD_PLAN*.md`, every `handoff/*.md` other than a report, by `bridge_env.HANDOFF_REPORT_NAME`, or a resolution file, by `HANDOFF_RESOLUTION`, the inventory, the register, the index, the deviations file, the run parameters) and writes, for each that has no header, the header from `bridge_env`'s fallback reading of its prose (a given path under no kind listed `cannot read <path>: not a record kind`, affecting no exit, the run going on; a brief's `id` and `round` from its file name; every string the plain form would refuse, and the empty string as `""`, written double-quoted; every list of mappings in block form; an absent list line, or a filler `none`, the empty list), each write atomic — the whole file to a temporary file beside the record, read back and checked by `read_header`, `check_header` and the agreement for every key under its normalisation, `historic` by its derivation, then moved into place with `os.replace`, so a crash or a full disk leaves the record as it was — marks `historic: true` on a plan increment the fallback reads with no Scope or Kind whose ID the merged set holds, read lazily, only for a plan file holding such an increment, by the one function `plan-check.py` calls, `bridge_env.squash_merged_ids(folder, PLAN_ID_PATTERN, ref=<--base>)`, `origin/main` by default (a `--base` beginning with `-` refused), the plan file listed `cannot read <path>: merged set unreadable (<reason>)` and left untouched where the set cannot be read, leaves a record with a header unchanged, refuses a malformed one (exit 2, the run stopping at that record, the records before it written and listed) and stops at a failed read-back (exit 3, that record untouched), lists and leaves header-less a record the fallback refuses (`cannot read <path>: <reason>`, a plan `Scope:` entry with an unbalanced parenthesis among them; a merged brief among them is never repaired and stays header-less) and a status file whose header and body together would exceed either older cap, 12,000 characters or 120 lines (`cannot write <path>: ...; trim the body first`), the run's exit 1 where a `cannot write` stands and 0 otherwise, a `cannot read` affecting it not at all, and with `--check` writes nothing and lists what it would write, what it cannot and what has a header (exit 1 where an enumerated record would be written or cannot be written, else 0, a `cannot read` line affecting that exit not at all either), so that `python ~/.claude/cursor-bridge/records-migrate.py --check` from the Workspace root is the one command the calibration, TASK-054 and the stage's demonstration run; `calibrate-bridge.md`'s step 4 runs that `--check` first, then the migration over a project's records at the next checkpoint, and commits the result as the calibration's checkpoint in a records-only commit, append-only, reopening no gate; the templates of the eight records (the core's "Project state" for the status file and the inventory, `design.md`'s register format, `planning.md`'s increment format, `spec-packager.md`'s brief, `Diagram-Planning-Conventions.md` §3's index and deviations file, `run-parameters.md`'s fence) carry the header with every string the plain form would refuse quoted (a date, a typed word, a path holding `/`, `n/a`, a value with a space), each template's header read by `read_header` and checked by `check_header` in a test, and the core's "Project state" states the rule: a program reads the header first, falls back for a record without one, and the record's checker fails a header that disagrees with its prose. | DESIGN.md, Change: release B2, "Writing" and "Migration" | built | tests/test_records_migrate.py; tests/test_release_b2_text.py; tests/test_bug044.py |
+ | R-063 | This repository's own records are migrated by the installed program at this project's calibration to the release, after the stamp and the owner's install (the addendum's last increment, so the development-data decision holds: no unreleased program runs on a running project's live records): every dual-read record of the bridge's repository (the status file, `docs/BUILD_PLAN.md`, every brief under `handoff/`, the inventory, the register, the diagram index, the deviations file, the run parameters) carries its header, written by `records-migrate.py`, but for a record the fallback refuses, which the migration lists (`cannot read`) and the supervisor repairs in its prose before a second run, or, a merged brief never being repaired, leaves header-less (`handoff/TASK-002-r2.md`, `-r3.md` and `-r4.md` today), every such record named in the accept commit; the status file's `Working files:` line moves to `run/supervisor/working-files.md`, named there in one sentence, in the commit before the migration, so that body and header together stay under 12,000 characters and 120 lines; every check of the loop runs green over the migrated records with no `HEADER` finding and no shape or brief noise, and the installed release's checkers (the programs a rollback puts back) are run over them and their lines quoted; the token measure — the status file's and `handoff/TASK-046.md`'s bytes at the trim's commit and at the migration's commit and their headers' bytes, measured once before the push by `git show <sha>:<path>`, quoted in the accept commit and written as constants into the test and the inventory's growth row; the lasting assertion the brief's, whose prose never changes after its merge (the committed brief's bytes minus its header's equal the constant), the status file's over the two commits skipped where either is absent, the skip reason naming the squash — is a test, which also parses every migrated header of this repository with `yaml.safe_load` against the subset reader (R-057's cross-check over this repository's records), and the plan's growth is recorded in the inventory. | the Restructuring Plan, Release B2, "Accepted when"; DESIGN.md, Change: release B2, "Migration", "Testing strategy" | planned | — |
+-| R-064 | Release B2 ships as one release of the bridge: every behaviour above built through the gate with its tests (each program's header path and fallback; the reader's cross-check; the agreement checks; the malformed cases; the mutants over the reader and the agreement checks), the version stamped (`VERSION` as `2026.11.<dd>a`, the CHANGELOG entry with **What changed** by row, **Running projects must** — the migration run at the next checkpoint by the calibration, `--check` first, in a records-only commit, the status file's cap on the body, the `HEADER` finding class, the launcher's and the guard's `header:` refusal — and **If rolled back** naming the effects of a header on the installed release's programs as observed over a migrated scratch copy of this repository's records, their lines quoted, `MANIFEST.json`, `bridge-check.py --sources` OK) by the plan's stamp increment, the last that changes the release's text, after the stage review of that text; installed by the owner's run sheet with the TDP paused once at a merge boundary, installed, calibrated and its records migrated, reAngle and the video factory deferred (R-031, R-037), this project calibrating by the no-delta path and migrating its records at that calibration (R-063, the addendum's last increment); the User Manual's install chapter patched for the entry at project end. | the Restructuring Plan, Release B2; DESIGN.md, Change: release B2, "Delivery" | planned | — |
++| R-064 | Release B2 ships as one release of the bridge: every behaviour above built through the gate with its tests (each program's header path and fallback; the reader's cross-check; the agreement checks; the malformed cases; the mutants over the reader and the agreement checks), the version stamped (`VERSION` as `2026.11.<dd>a`, the CHANGELOG entry with **What changed** by row, **Running projects must** — the migration run at the next checkpoint by the calibration, `--check` first, in a records-only commit, the status file's cap on the body, the `HEADER` finding class, the launcher's and the guard's `header:` refusal — and **If rolled back** naming the effects of a header on the installed release's programs as observed over a migrated scratch copy of this repository's records, their lines quoted, `MANIFEST.json`, `bridge-check.py --sources` OK) by the plan's stamp increment, the last that changes the release's text, after the stage review of that text; installed by the owner's run sheet with the TDP paused once at a merge boundary, installed, calibrated and its records migrated, reAngle and the video factory deferred (R-031, R-037), this project calibrating by the no-delta path and migrating its records at that calibration (R-063, the addendum's last increment); the User Manual's install chapter patched for the entry at project end. | the Restructuring Plan, Release B2; DESIGN.md, Change: release B2, "Delivery" | built | tests/test_release_b2_stamp.py |
+ | R-065 | A question to the owner about what the software does or how a feature behaves — at intake, in a change cycle's intake, in the interface phase's iterations, before the design gate and in an escalation mid-build — is asked as a conversation: numbered questions in prose answered in the owner's own words, follow-ups building on the answers, never options the supervisor guessed, and no recommendation before the owner's answer; a question that is both a fact about the software and a parameter is a conversation, and a short answer never makes a question a parameter; a project parameter of intake.md's closed list (the kind, the platform and runtime context, the delivery kind, the confirmation of a part's product type or sub-type, the figure of a budget or a limit), a gate, a run parameter and the other decisions rule 12's bound names keep the question form; KP-075 records the pitfall. | the owner's rule of 2026-11-08 (INVENTORY, Decisions), approved for the register at the hotfix's design gate 2026-11-09; DESIGN.md, Change: the intake hotfix | built | tests/test_hotfix_intake.py; tests/test_core_carve.py |
+diff --git a/project.json b/project.json
+index dd9f740..c534656 100644
+--- a/project.json
++++ b/project.json
+@@ -2,11 +2,11 @@
+   "name": "Claude-Cursor Bridge",
+   "purpose": "A governance framework under which a Claude supervisor designs, plans, briefs, and reviews software that a headless Cursor builder implements, merged only through a verified cross-family gate.",
+   "kind": "private",
+-  "version": "2026.11.09a",
++  "version": "2026.11.11a",
+   "state": {
+     "phase": "changing",
+-    "stage": "release B2: stage H2 in progress (TASK-051, TASK-052 and BUG-044 merged); the stage review's round 2, TASK-053 and TASK-054 next",
+-    "bridge": "2026.11.09a",
++    "stage": "release B2: stage H2 in progress (TASK-051, TASK-052, BUG-044 and the stamp TASK-053 merged); the owner's install and TASK-054 next",
++    "bridge": "2026.11.11a",
+     "updated": "2026-11-11"
+   }
+ }
+diff --git a/tests/test_release_b2_stamp.py b/tests/test_release_b2_stamp.py
+new file mode 100644
+index 0000000..ea906aa
+--- /dev/null
++++ b/tests/test_release_b2_stamp.py
+@@ -0,0 +1,274 @@
++"""TASK-053: release B2's stamp (R-064).
++
++enforces: docs/BUILD_PLAN.md TASK-053 (its Done when: VERSION reads 2026.11.<dd>a, sorting after 2026.11.09a; the
++CHANGELOG entry naming release B2 with What changed by row, R-057 to R-064, R-063 as the increment after the stamp,
++Running projects must with its phase-marked items, If rolled back as `bridge-install.py --rollback` does it with the
++effects observed over a migrated scratch copy of this repository's records, their lines quoted, and the items for the
++maintainer; every row R-057 to R-062 and R-064 built with an Evidence cell in the constraints' grammar, R-063 planned or
++built); docs/REQUIREMENTS.md R-064; bridge/cursor-bridge/workflow/types/host-extension.md, `planning.stages` (the field
++acceptance names its stand-in while the trial project has no increment at the gate). Supervisor-written; no builder run.
++The entry is read by its heading, so a later release above it leaves these tests standing; VERSION, the manifest and
++project.json are checked against the newest heading.
++
++- test_r064_version_entry_manifest_and_project_agree enforces: VERSION is the newest heading, the version make-manifest.py
++  stamps, MANIFEST.json's, project.json's `version` and `state.bridge` and the status file's `Bridge version:`, with the
++  manifest's fingerprints of VERSION and CHANGELOG.md those of the files as they stand.
++- test_r064_the_version_is_the_stamp_s_form_and_sorts_after_2026_11_09a enforces: `2026.11.<dd>a`, directly above
++  2026.11.09a, the newest sorting after every other as the installer compares versions.
++- test_r064_the_entry_has_its_parts_and_its_rolled_back_items_reach_the_installer enforces: the parts on lines of their own
++  in order, the lead naming release B2 and the one new file, and bridge-install.py's rolled_back_note holding every If
++  rolled back item.
++- test_r064_what_changed_names_every_row enforces: What changed by row, R-057 to R-064, R-063 as TASK-054 after the
++  stamp, BUG-044 with R-062.
++- test_r064_every_running_projects_item_is_phase_marked_and_the_items_are_named enforces: the phase marks and the items
++  the plan names (the migration at the next checkpoint, `--check` first, a repairable `cannot read` record repaired, a
++  merged brief left header-less, a `cannot write` status file trimmed first, the records-only commit, the caps on the
++  body, the two findings and the refusal and what each asks, `historic: true`, the retired second readings, the text in
++  force from the calibration reopening no gate), each by words a reader acts on.
++- test_r064_if_rolled_back_quotes_the_observed_lines enforces: the program and its allow entry removed with the release,
++  the older programs reading the prose and never the header, and the lines the installed checkers printed over the
++  migrated scratch copy (run/supervisor/task053_rollback_observe.py, run 2026-11-11), quoted: completion-check's search
++  finding the same IDs, inventory-check's whole-file count before and after under both caps, and conformance-check's one
++  more NOTE; the four older programs that read header lines as prose lines (the loop guard's and the session-start
++  hook's `phase:`, the conformance check's `phase:` and `stage:`, completion-check's `satisfies:`; Review A, round 1, B1)
++  and what a running project writes while rolled back; and that the allow entry it names is in settings.bridge.json.
++- test_r064_the_field_acceptance_names_its_stand_in enforces: the TDP's trial and its stand-in while it has no
++  increment at the gate, and the two projects that calibrate when the owner resumes them.
++- test_r064_the_items_for_the_maintainer_are_listed enforces: the plan's three items.
++- test_r064_every_row_is_built_with_evidence_in_the_grammar enforces: R-057 to R-062 and R-064 built, R-063 planned or
++  built, each built row's labels read as the grammar says (tests/test_release_t_stamp.py's reading), a `<label>: <test>`
++  entry for each, at least one test, every test named existing.
++- test_r064_the_completion_check_passes_in_plan_mode enforces: `completion-check.py --mode plan`, RESULT OK; it skips
++  only where no repository exists, a mutation run's copy, and never on CI.
++"""
++import json
++import os
++import re
++import subprocess
++import sys
++
++import pytest
++
++from phase_modules import read
++from workflow_files import BRIDGE, flat
++from test_release_t_stamp import labels_of, load, named_tests
++
++ROOT = os.path.dirname(BRIDGE)
++CB = os.path.join(BRIDGE, "cursor-bridge")
++CHANGELOG = os.path.join(CB, "CHANGELOG.md")
++VERSION_FILE = os.path.join(CB, "VERSION")
++MANIFEST = os.path.join(CB, "MANIFEST.json")
++SETTINGS = os.path.join(CB, "settings.bridge.json")
++MAKE_MANIFEST = os.path.join(ROOT, "tools", "make-manifest.py")
++INSTALL = os.path.join(CB, "bridge-install.py")
++COMPLETION = os.path.join(CB, "completion-check.py")
++REGISTER = os.path.join(ROOT, "docs", "REQUIREMENTS.md")
++STATUS = os.path.join(ROOT, "docs", "PROJECT_STATUS.md")
++PROJECT = os.path.join(ROOT, "project.json")
++PREVIOUS = "2026.11.09a"
++RELEASE_B2 = "2026.11.11a"
++PARTS = ("**What changed**", "**Running projects must**", "**If rolled back**", "**Field acceptance**", "**For the maintainer**")
++GLOSSARY_PHASES = ("intake", "design", "mockups", "planning", "configuration", "building", "done", "changing")
++BUILT_ROWS = ["R-%03d" % n for n in range(57, 63)] + ["R-064"]
++MIGRATE_RULE = "Bash(python ~/.claude/cursor-bridge/records-migrate.py:*)"
++
++
++def version():
++    return open(VERSION_FILE, encoding="utf-8").read().strip()
++
++
++def headings():
++    return re.findall(r"^## (\d{4}\.\d{2}\.\d{2}[a-z]?)[ \t]*$", read(CHANGELOG), re.M)
++
++
++def entry():
++    text = read(CHANGELOG)
++    start = text.index("\n## " + RELEASE_B2 + "\n")
++    end = text.index("\n---\n", start)
++    return text[start + 1:end]
++
++
++def part(title):
++    lines = entry().split("\n")
++    i = lines.index(title)
++    j = next((k for k in range(i + 1, len(lines)) if lines[k] in PARTS), len(lines))
++    return lines[i + 1:j]
++
++
++def items(title):
++    return [l for l in part(title) if l.startswith("- ")]
++
++
++def test_r064_version_entry_manifest_and_project_agree():
++    mm = load(MAKE_MANIFEST, "make_manifest_for_b2_stamp")
++    v = version()
++    assert v >= RELEASE_B2, "the stamp in force is release B2's or a later release's"
++    assert mm.pick_version(None) == headings()[0] == v, "VERSION is the newest CHANGELOG heading"
++    manifest = json.load(open(MANIFEST, encoding="utf-8"))
++    assert manifest["version"] == v, "MANIFEST.json carries VERSION's version"
++    for rel, path in (("cursor-bridge/VERSION", VERSION_FILE), ("cursor-bridge/CHANGELOG.md", CHANGELOG)):
++        assert manifest["files"].get(rel) == mm.norm_hash(path), "the manifest is regenerated after %s" % rel
++    project = json.load(open(PROJECT, encoding="utf-8"))
++    assert project["version"] == v, "project.json's version"
++    assert project["state"]["bridge"] == v, "project.json's state.bridge"
++    assert re.search(r"^Bridge version: %s$" % re.escape(v), read(STATUS), re.M), "the status file's Bridge version line"
++
++
++def test_r064_the_version_is_the_stamp_s_form_and_sorts_after_2026_11_09a():
++    found = headings()
++    assert re.fullmatch(r"2026\.11\.\d{2}a", RELEASE_B2) and re.fullmatch(r"\d{4}\.\d{2}\.\d{2}[a-z]", version())
++    assert len(found) == len(set(found)), "one entry per release"
++    assert found.index(RELEASE_B2) + 1 == found.index(PREVIOUS), "release B2's entry stands directly above %s" % PREVIOUS
++    assert RELEASE_B2 > PREVIOUS and version() >= RELEASE_B2
++    assert found[0] == version() and all(found[0] > other for other in found[1:]), "the newest version sorts last"
++
++
++def test_r064_the_entry_has_its_parts_and_its_rolled_back_items_reach_the_installer():
++    body = entry()
++    lines = body.split("\n")
++    at = [lines.index(p) for p in PARTS]                    # ValueError: a part not on a line of its own
++    assert at == sorted(at), "the parts in order"
++    for p in PARTS:
++        assert body.count(p) == 1, p
++        assert items(p), "%s holds items" % p
++    assert "Release B2" in lines[2], "the lead names release B2"
++    assert "one file new (`records-migrate.py`), none removed, one allow entry new" in lines[2]
++    inst = load(INSTALL, "bridge_install_for_b2_stamp")
++    note, found = inst.rolled_back_note(CHANGELOG, RELEASE_B2, PREVIOUS)
++    assert found and "## " + RELEASE_B2 in note, "a rollback to %s writes this entry's items" % PREVIOUS
++    assert "This release's entry names nothing to restore." not in note
++    for item in items("**If rolled back**"):
++        assert item in note, "the installer's ROLLED-BACK.md holds every If rolled back item"
++
++
++def test_r064_what_changed_names_every_row():
++    joined = flat(" ".join(items("**What changed**")))
++    for row in ["R-%03d" % n for n in range(57, 65)]:
++        assert row in joined, row
++    assert "R-063, TASK-054, the increment after this stamp" in joined
++    assert "BUG-044" in joined and "R-062" in joined
++    for program in ("`bridge_env.py`", "`records-migrate.py"):
++        assert program in joined, program
++
++
++def marks_are_phases(lines):
++    for l in lines:
++        m = re.match(r"- \*\(([^)]*)\)\* ", l)
++        assert m, "every item names its phase: " + l[:60]
++        if m.group(1) == "all phases":
++            continue
++        named = m.group(1).split(", ")
++        assert set(named) <= set(GLOSSARY_PHASES), "a phase the Glossary names: " + m.group(1)
++        assert "building" not in named or "changing" in named, "building with changing: " + l[:60]
++
++
++def test_r064_every_running_projects_item_is_phase_marked_and_the_items_are_named():
++    lines = [l for l in part("**Running projects must**") if l.strip()]
++    assert lines and all(l.startswith("- ") for l in lines), "every line an item"
++    marks_are_phases(lines)
++    marks_are_phases(items("**If rolled back**"))
++    joined = flat(" ".join(lines))
++    for words in (
++        "`RESULT: INSTALLED TREE MATCHES bridge " + RELEASE_B2 + "`",
++        "`python ~/.claude/cursor-bridge/records-migrate.py --check` from the Workspace root first",
++        "at the next checkpoint",
++        "a status file listed `cannot write` is trimmed first",
++        "each repairable `cannot read` record is repaired in its prose",
++        "a merged brief the program cannot read is never repaired: it stays header-less and is named in the report",
++        "committed as the calibration's checkpoint in a records-only commit of its own",
++        "the status file's caps count the body after the header",
++        "`HEADER DISAGREES: <key>`",
++        "`HEADER MALFORMED: <path>:<line> <what>`",
++        "at the line the message names for a header that cannot be read, at the keys it names for one that breaks its schema",
++        "`refused - header: `",
++        "a stop, never a model's failure",
++        "`historic: true`",
++        "a lift in the header that no owner's line holds lifts nothing",
++        "The retired second readings",
++        "reopening no gate",
++        "takes the no-delta path",
++    ):
++        assert words in joined, words
++
++
++def test_r064_if_rolled_back_quotes_the_observed_lines():
++    joined = flat(" ".join(items("**If rolled back**")))
++    for words in (
++        "`bridge-install.py --rollback`",
++        "`" + MIGRATE_RULE + "`",
++        "falls to the classifier until the reinstall",
++        "The older programs know nothing of the header and read the prose, but four of them read lines of the header as prose lines",
++        "a scratch copy of this repository's records",
++        "never the live records",
++        "the same IDs",
++        "`note: status: 39 lines / 9943 chars (cap 120 / 12000)`",
++        "`note: status: 52 lines / 11986 chars (cap 120 / 12000)`",
++        "under both caps",
++        "is not the status file's (\"release b2's stage h1 closed 2026-11-11): bring it up to date at this reflection point`",
++        "`conformance-check: 24 OK, 0 MISSING, 2 NOTE`",
++        "`conformance-check: 24 OK, 0 MISSING, 3 NOTE`",
++        "`HEADER DISAGREES: <key>`",
++        "read the status header's `phase:` line as its `Phase:` line",
++        "reads that line and the header's `stage:` line as `Phase:` and `Stage:`",
++        "reads the plan header's `satisfies:` lists beside the prose's `Satisfies:` lines",
++        "shaped first as TASK-054 will shape this repository's",
++        "where header and prose held the same values",
++        "is written in the header's `phase:` or `stage:` line as well as its prose line",
++        "the loop guard refusing stops as in the old phase and the hook naming the old phase's modules",
++    ):
++        assert words in joined, words
++    for checker in ("`completion-check.py --mode plan`", "`plan-check.py`", "`diagram-check.py --mode code`",
++                    "`workflow-check.py --status`", "`session-start.py`", "`loop-guard.py`", "`inventory-check.py`",
++                    "`conformance-check.py`"):
++        assert checker in joined, checker
++    allow = json.load(open(SETTINGS, encoding="utf-8"))["permissions"]["allow"]
++    assert MIGRATE_RULE in allow, "the allow entry the rollback removes is the release's"
++
++
++def test_r064_the_field_acceptance_names_its_stand_in():
++    joined = flat(" ".join(items("**Field acceptance**")))
++    for words in ("The TDP, the trial,", "While it has no increment at the gate", "stand in",
++                  "recorded when its next increment comes", "reAngle and the video factory calibrate when the owner resumes them"):
++        assert words in joined, words
++
++
++def test_r064_the_items_for_the_maintainer_are_listed():
++    joined = flat(" ".join(items("**For the maintainer**")))
++    for words in ("`pyyaml` at run time once the installed programs have a declared environment",
++                  "a header for `run/supervisor/in-flight.md` and the SCOPE files where a second reader appears",
++                  "the CHANGELOG template's and the release procedure's migration sentence"):
++        assert words in joined, words
++
++
++def test_r064_every_row_is_built_with_evidence_in_the_grammar():
++    cc = load(COMPLETION, "completion_check_for_b2_stamp")
++    header, rows = cc.parse_register(read(REGISTER))
++    assert len(header) == 5, "the register's five columns"
++    by_id = {r[0]: r for r in rows}
++    statuses = {rid: by_id[rid][3] for rid in BUILT_ROWS + ["R-063"]}
++    assert statuses["R-063"] in ("planned", "built"), "R-063 is TASK-054's, after the stamp"
++    for rid in BUILT_ROWS + (["R-063"] if statuses["R-063"] == "built" else []):
++        cells = by_id[rid]
++        assert len(cells) == 5, rid
++        requirement, status, evidence = cells[1], cells[3], cells[4]
++        assert status == "built", rid
++        entries = [e.strip() for e in evidence.split(";")]
++        for label in labels_of(requirement):
++            hits = [e for e in entries if e.startswith(label + ":") and named_tests(e)]
++            assert hits, "%s: no `%s: <test>` entry" % (rid, label)
++        tests = named_tests(evidence)
++        assert tests, "%s: at least one test" % rid
++        for t in tests:
++            path, _, node = t.partition("::")
++            full = os.path.join(ROOT, *path.split("/"))
++            assert os.path.isfile(full), "%s: %s" % (rid, path)
++            if node:
++                assert re.search(r"^def %s\b" % re.escape(node), read(full), re.M), "%s: %s" % (rid, t)
++
++
++def test_r064_the_completion_check_passes_in_plan_mode():
++    if not os.path.exists(os.path.join(ROOT, ".git")):
++        assert "GITHUB_ACTIONS" not in os.environ, "CI holds a checkout, so this test never skips there"
++        pytest.skip("completion-check.py reads `git ls-files`, and mutation-run.py's copy holds no repository")
++    p = subprocess.run([sys.executable, COMPLETION, "--mode", "plan"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
++    assert p.returncode == 0 and "RESULT: OK" in p.stdout, p.stdout[-800:]
