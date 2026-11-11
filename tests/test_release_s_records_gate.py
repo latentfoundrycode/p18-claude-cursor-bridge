@@ -256,6 +256,33 @@ def test_only_a_heading_markdown_would_draw_ends_the_threat_model_s_section(repo
     assert rc == 1 and "or one under a heading that names it, changed" in out, out
 
 
+@pytest.mark.parametrize("above,heading", [
+    ("| D-031 | the block from `<!--` to its end marker | KP-001 |\n", "## Threat model\n"),   # a comment mark in a row is no comment (Review A's delta read)
+    ("```INVENTORY.md``` is this file\n", "## Threat model\n"),                                 # a code span at a line's start is no fence
+    ("", "## Threat model <!-- see KP-032\n"),                                                  # the heading opens whatever follows on its line
+    ("", "##Threat model\n"),                                                                   # without its space: read as the heading it was meant as
+    ("", "Threat model\n---\n"),                                                                # an underlined heading that names the model
+    ("```\nsample\n```\n", "  ### The threat model of the guard\n"),
+])
+def test_a_threat_model_s_section_opens_wherever_its_heading_can_be_read(repo, above, heading):
+    """The two ends are read unlike: a section opens on any line that reads as a heading naming the model, so nothing
+    above it (a stray comment mark, a code span) and no spelling of it can leave its lines on the short gate."""
+    section = INVENTORY + "\n" + above + "\n" + heading + "\n- a finding outside it is recorded\n"
+    change(repo, "docs/INVENTORY.md", section)
+    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    change(repo, "docs/INVENTORY.md", section.replace("a finding outside it is recorded", "every finding blocks"))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 1 and "or one under a heading that names it, changed" in out, out
+
+
+def test_a_tool_s_configuration_by_a_longer_name_keeps_the_full_gate(repo):
+    for name in ("docs/tsconfig.build.json", "handoff/jsconfig.app.json"):
+        change(repo, name, "{}\n")
+        rc, out = run(repo, "premerge-records")
+        assert rc == 1 and "FULL GATE  %s: a tool's configuration" % name in out, out
+        git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+
+
 def test_a_dirty_tree_no_change_and_an_unknown_upstream_cannot_be_checked(repo):
     rc, out = run(repo, "premerge-records")
     assert rc == 2 and "HEAD changes nothing against origin/main" in out, out

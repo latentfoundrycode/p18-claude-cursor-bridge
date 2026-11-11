@@ -1256,38 +1256,46 @@ def _at(rev, path, root, common):
     return bridge_env.decode_record_bytes(p.stdout.encode("utf-8")) if p.returncode == 0 else None
 
 
-FENCE_MARK = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+FENCE_MARK = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 ATX_HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]|$)")
+LOOSE_HEADING = re.compile(r"^\s*(#{1,6})")
+UNDERLINE = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
+COMMENT_OPEN = re.compile(r"^ {0,3}<!--")
 
 
 def threat_model_lines(text):
     """The inventory's lines that bound what a finding blocks: every line that names the threat model, and
-    every line of a section whose heading names it, each with its white space folded. Only a heading
-    Markdown would draw ends a section: a `#` line inside a fenced block, inside an HTML comment or
-    indented as code is a line of the section like any other (an underlined heading ends none, which
-    keeps more lines, never fewer)."""
+    every line of a section whose heading names it, each with its white space folded. The two ends of a
+    section are read unlike, each to the side that keeps more lines. It OPENS on any line that starts with
+    `#` and names the model, wherever it stands and with or without its space, and on a line naming the model
+    that the next line underlines. It ENDS only on a heading Markdown would draw, of the same or a higher
+    level: a `#` line inside a fenced block (a backtick fence whose first line holds another backtick is a
+    code span, no fence), inside an HTML comment that begins its line, indented as code or without its space
+    is a line of the section like any other, and an underlined heading ends none."""
+    lines = (text or "").splitlines()
     out, depth, fence, comment = [], 0, None, False        # depth: the level of the open heading that names the model, 0 outside one
-    for line in (text or "").splitlines():
-        low = line.lower()
-        mark, heading = FENCE_MARK.match(line), None
+    for n, line in enumerate(lines):
+        names = "threat model" in line.lower()
+        mark, ends = FENCE_MARK.match(line), None
         if fence:
-            if mark and mark.group(1)[0] == fence[0] and len(mark.group(1)) >= len(fence) and not line.strip().strip(fence[0]):
+            if mark and mark.group(1)[0] == fence[0] and len(mark.group(1)) >= len(fence) and not mark.group(2).strip():
                 fence = None
         elif comment:
             comment = "-->" not in line
-        elif mark:
+        elif mark and not (mark.group(1)[0] == "`" and "`" in mark.group(2)):
             fence = mark.group(1)
-        elif "<!--" in line and "-->" not in line.split("<!--", 1)[1]:
-            comment = True
+        elif COMMENT_OPEN.match(line):
+            comment = "-->" not in line.split("<!--", 1)[1]
         else:
-            heading = ATX_HEADING.match(line)
-        if heading:
-            level = len(heading.group(1))
-            if "threat model" in low:
-                depth = level if not depth else min(depth, level)
-            elif depth and level <= depth:                 # a sub-heading stays inside; a heading of the same or a higher level ends it
-                depth = 0
-        if depth or "threat model" in low:
+            ends = ATX_HEADING.match(line)
+        opens = LOOSE_HEADING.match(line) if names else None
+        under = UNDERLINE.match(lines[n + 1]) if names and not opens and n + 1 < len(lines) else None
+        if opens or under:
+            level = len(opens.group(1)) if opens else (1 if under.group(1)[0] == "=" else 2)
+            depth = level if not depth else min(depth, level)
+        elif ends and depth and len(ends.group(1)) <= depth:   # a sub-heading stays inside; a heading of the same or a higher level ends it
+            depth = 0
+        if depth or names:
             out.append(" ".join(line.split()))
     return sorted(l for l in out if l)
 
@@ -1327,6 +1335,7 @@ def full_gate_reasons(paths, base, head, root, common):
             continue
         name = low.rsplit("/", 1)[-1]
         if path != "project.json" and (name in TOOL_FILES or (name.startswith("requirements") and name.endswith(".txt"))
+                                       or (name.startswith(("tsconfig.", "jsconfig.")) and name.endswith(".json"))
                                        or any(part.startswith(".") for part in low.split("/"))):
             out.append((path, "a tool's configuration or a hidden file or folder: a tool may run or build from it, so both reviewers read it"))
             continue

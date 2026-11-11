@@ -265,6 +265,36 @@ def test_a_worktree_of_the_same_repository_is_inside(program, tmp_path):
     assert br.outside_target(["pytest", str(stray / "tests")], str(ws)) is not None
     assert br.outside_target(["uv", "run", "--directory", str(stray), "pytest"], str(ws)) is not None
     assert br.outside_target(["python", "-m", "pytest", str(tree / "tests")], str(ws)) is None, "the one under Worktrees/ still is inside"
+    # launched in the worktree itself, the Workspace and a sibling worktree are the same project (Review A's delta read: the
+    # sibling folder was looked for beside the worktree, `Worktrees/Worktrees`, and neither counted)
+    sibling = tmp_path / "Worktrees" / "task-003"
+    p = subprocess.run(["git", "worktree", "add", "-q", "-b", "task-003", str(sibling)], cwd=str(ws), capture_output=True, text=True, env=env)
+    assert p.returncode == 0, p.stderr
+    for target in (str(ws / "tests"), str(sibling / "tests"), "tests"):
+        assert br.outside_target(["python", "-m", "pytest", target], str(tree)) is None, target
+    assert br.outside_target(["pytest", str(stray / "tests")], str(tree)) is not None
+    assert br.outside_target(["pytest", str(tmp_path / "elsewhere" / "test_a.py")], str(tree)) is not None
+
+
+def test_what_review_a_s_delta_read_found_in_the_target_rule(program, tmp_path):
+    """Each form reproduced by a reviewer: a word `pytest` anywhere made a unittest run be read as pytest, so its `-s` went
+    unread; a path after a bare `--` that starts with `-` was read as an option; `-c` behind flags in one word loaded an
+    outside configuration; pytest expands `@file` in an option's value too."""
+    br = program("bridge-run")
+    base = tmp_path / "ws"
+    (base / "tests").mkdir(parents=True)
+    out = str(tmp_path / "elsewhere")
+    for argv in (["python", "-m", "unittest", "discover", "-s", out, "-k", "pytest"],
+                 ["pytest", "--", "-x/../../elsewhere/test_probe.py"], ["python", "-m", "unittest", "discover", "--", "-x/../../elsewhere"],
+                 ["python", "-m", "pytest", "-vc" + os.path.join(out, "pytest.ini"), "tests"], ["pytest", "-qc", "pytest.ini", "tests"],
+                 ["pytest", "-xp", "probeplugin", "tests"], ["uv", "run", "pytest", "-vc" + os.path.join(out, "pytest.ini")],
+                 ["python", "-m", "pytest", "-k", "@" + os.path.join(out, "args.txt"), "tests"], ["pytest", "--junitxml", "@args.txt"],
+                 ["pytest", "-o", "@args.txt", "tests"], ["uv", "run", "--project", "pytest", "pytest", out]):
+        assert br.outside_target(argv, str(base)) is not None, argv
+    for argv in (["python", "-m", "pytest", "-p", "no:cacheprovider", "-rp", "-sv", "-xq", "tests"], ["pytest", "-rA", "-vv", "--", "tests/test_a.py"],
+                 ["python", "-m", "unittest", "tests.test_a", "-k", "pytest"], ["python", "-m", "unittest", "discover", "-s", "tests", "--", "tests"],
+                 ["python", "-m", "pytest", "tests", "-k", "a@b"]):
+        assert br.outside_target(argv, str(base)) is None, argv
 
 
 # ---------------------------------------------------------------- M1: the round's cause

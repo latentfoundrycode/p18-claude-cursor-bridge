@@ -202,7 +202,10 @@ def test_a_document_about_tests_under_a_record_folder_is_no_test(tmp_path):
 
 
 @pytest.mark.parametrize("token", ["./docs/test_plan.md", "foo/../../docs/test_plan.md", "docs//test_plan.md", "Docs/./test_plan.md",
-                                   "docs./test_plan.md", "../elsewhere/tests/test_a.py", "/tests/test_a.py", "C:/x/tests/test_a.py"])
+                                   "docs./test_plan.md", "../elsewhere/tests/test_a.py", "/tests/test_a.py", "C:/x/tests/test_a.py",
+                                   # wrapped as a cell wraps a path (Review A's delta read: each counted as a test)
+                                   "[plan](docs/test_plan.md)", "(docs/test_plan.md)", '"docs/test_plan.md"', "<docs/test_plan.md>",
+                                   "'docs/test_plan.md'", "(`docs/test_plan.md`).", "~/docs/test_plan.md"])
 def test_a_record_by_another_spelling_of_its_path_is_no_test_either(program, tmp_path, token):
     """Review B, round 1: `./docs/test_plan.md` and a path that climbs and comes back counted as a test in plan mode. The
     path is read as the file system reads it, and one that climbs or starts at a root names no file of the Workspace."""

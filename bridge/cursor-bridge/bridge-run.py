@@ -383,6 +383,20 @@ def ini_override(a):
     return None
 
 
+def hidden_escape(a):
+    """True where a word of a pytest run carries `-c` (a configuration file) or `-p` (a plugin)
+    behind pytest's flags in one word, `-vc<file>`: `test_suite` refuses the two by their own
+    words, and a form it does not read is refused here, whatever its value."""
+    if a.startswith("--"):
+        return False
+    for j, ch in enumerate(a[1:], 1):
+        if ch in "cp":
+            return j > 1
+        if ch not in "xvqsl":
+            return False
+    return False
+
+
 def option_kind(word, a):
     """(kind, value) of one option word of a pytest or unittest run: kind "folder" where the option
     names a folder or file the run loads, "value" where its value is no target, None for a flag;
@@ -414,13 +428,13 @@ def _real_path(path):
 
 
 def launch_roots(folder):
-    """The folders a test run may name, each resolved through its links: the launch folder, and
-    the repository's worktrees where rule 39 keeps them, under `Worktrees/` beside the Workspace.
-    A worktree registered anywhere else (one a run made in a temporary folder in passing) and
-    one git calls prunable are not among them."""
+    """The folders a test run may name, each resolved through its links: the launch folder, the
+    repository's main worktree (the Workspace) and its worktrees where rule 39 keeps them, under
+    `Worktrees/` beside the Workspace, whichever of them the run was launched in. A worktree
+    registered anywhere else (one a run made in a temporary folder in passing) and one git calls
+    prunable are not among them."""
     base = folder or os.getcwd()
     roots = [_real_path(base)]
-    home = _real_path(os.path.join(base, os.pardir, "Worktrees")).rstrip(os.sep) + os.sep
     try:
         p = subprocess.run(["git", "-C", base, "worktree", "list", "--porcelain"], capture_output=True, text=True, encoding="utf-8",
                            errors="replace", creationflags=NO_WINDOW, timeout=bridge_env.GIT_TIMEOUT)
@@ -428,12 +442,15 @@ def launch_roots(folder):
         return roots
     if p.returncode != 0:
         return roots
+    trees = []
     for block in p.stdout.split("\n\n"):
         lines = block.strip().splitlines()
-        if lines and lines[0].startswith("worktree ") and not any(l.split(" ", 1)[0] == "prunable" for l in lines[1:]):
-            tree = _real_path(lines[0][len("worktree "):].strip())
-            if tree.startswith(home):
-                roots.append(tree)
+        if lines and lines[0].startswith("worktree "):
+            trees.append((_real_path(lines[0][len("worktree "):].strip()), any(l.split(" ", 1)[0] == "prunable" for l in lines[1:])))
+    if trees:
+        main = trees[0][0]                                 # git lists the main worktree first: the Workspace, wherever the run was launched
+        home = _real_path(os.path.join(main, os.pardir, "Worktrees")).rstrip(os.sep) + os.sep
+        roots += [tree for tree, prunable in trees if not prunable and (tree == main or tree.startswith(home)) and tree not in roots]
     return roots
 
 
@@ -448,13 +465,23 @@ def outside_target(argv, folder=None):
     and passes); the file `--config-file` names and the folders `--confcutdir` and `--rootdir`
     name; unittest's start and top-level folders in every form argparse reads (`option_kind`); an
     ini override of `testpaths` or `pythonpath`, and one of `addopts` that is not empty, whose
-    options no rule here reads; an `@file` of arguments, which hides its targets and is refused
-    whatever it holds."""
+    options no rule here reads; `-c` or `-p` behind pytest's flags in one word; every word after
+    a bare `--` as a target; an `@file` of arguments, which hides its targets and is refused
+    whatever it holds, for pytest in an option's value too."""
     head = head_of(argv)
-    if head not in ("pytest", "python", "python3", "py", "uv"):
+    if head == "pytest":
+        word, start = "pytest", 1
+    elif head in ("python", "python3", "py"):               # `python -m pytest` and `python -m unittest`, the two forms `named_suite` takes
+        if argv[1:2] != ["-m"] or argv[2:3] not in (["pytest"], ["unittest"]):
+            return None
+        word, start = argv[2], 3
+    elif head == "uv":                                      # the runner's word is the first that is no option of uv's and no option's value
+        word, start = "pytest", 2
+        while start < len(argv) and argv[start] != "pytest":
+            start += 2 if argv[start] in UV_VALUE_OPTIONS else 1
+        start += 1
+    else:
         return None
-    word = "pytest" if head == "pytest" or "pytest" in argv[1:] else "unittest"
-    start = 1 if head == "pytest" else (argv.index(word, 1) + 1 if word in argv[1:] else len(argv))
     roots = launch_roots(folder)
     base = folder or os.getcwd()
 
@@ -475,13 +502,22 @@ def outside_target(argv, folder=None):
                 i += 1 if eq else 2
                 continue
             i += 1
-    i = start
+    if word == "pytest":                                   # pytest's parser reads a file of arguments for every word that starts with @, an option's value too
+        hidden = next((a for a in argv[start:] if a.startswith("@")), None)
+        if hidden is not None:
+            return hidden
+    i, options = start, True
     while i < len(argv):
         a = argv[i]
         i += 1
         if a.startswith("@"):
             return a
-        if a.startswith("-"):
+        if a == "--" and options:                          # every word after it is a target, whatever it starts with
+            options = False
+            continue
+        if a.startswith("-") and options:
+            if word == "pytest" and hidden_escape(a):
+                return a
             kind, value = option_kind(word, a)
             shown = a
             setting = ini_override(a) if word == "pytest" else None
