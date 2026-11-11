@@ -80,15 +80,17 @@ def premerge_record(repo):
 
 
 def test_records_alone_take_the_short_gate_and_nothing_is_written_without_a_pull_request(repo):
-    """The status file, a new brief, the register's Evidence cell and a new `planned` row, the inventory's other rows, project.json."""
+    """The status file, a new brief, a planned row's sentence and Evidence and a new `planned` row, the inventory's other rows,
+    project.json's state, a picture."""
     change(repo, "docs/PROJECT_STATUS.md", "Phase: done\n")
     change(repo, "handoff/TASK-002.md", "# TASK-002\n")
-    change(repo, "docs/REQUIREMENTS.md", REGISTER.replace("tests/test_parse.py", "tests/test_parse.py; tests/test_more.py").replace("write the file", "write the file whole")
+    change(repo, "docs/REQUIREMENTS.md", REGISTER.replace("write the file | owner | planned | - |", "write the file whole | owner | planned | TASK-002 |")
            + "| R-003 | show a graph | owner | planned | - |\n")
     change(repo, "docs/INVENTORY.md", INVENTORY.replace("simpler", "simpler to compare"))
     change(repo, "project.json", '{"phase": "done"}\n')
+    change(repo, "docs/screens/first.PNG", "not really a picture\n")
     rc, out = run(repo, "premerge-records")
-    assert rc == 0 and "SHORT GATE - 5 changed file(s)" in out and "nothing was written" in out, out
+    assert rc == 0 and "SHORT GATE - 6 changed file(s)" in out and "nothing was written" in out, out
     assert premerge_record(repo) == []
 
 
@@ -101,6 +103,16 @@ def test_records_alone_take_the_short_gate_and_nothing_is_written_without_a_pull
     ("docs/BUILD_PLAN-2.md", "# Plan two\n", "the plan decides"),
     ("docs/ROSTER.json", '{"builder": "x"}\n', "the roster decides"),
     ("docs/ROSTER.resolved.json", '{"builder": "x"}\n', "the roster decides"),
+    ("docs/build_plan-3.md", "# Plan three\n", "the plan decides"),                    # the names are compared in lower case
+    ("docs/diagrams/DEVIATIONS.md", "| crossing | why |\n", "decide what the diagram check allows"),
+    ("docs/diagrams/INDEX.md", "| D-001 | context |\n", "decide what the diagram check allows"),
+    ("docs/diagrams/D-001-context.md", "flowchart LR\n", "decide what the diagram check allows"),
+    ("docs/conf.py", "import os\n", "not a record by its type"),                       # a program under a record folder (Review A, round 1)
+    ("docs/conftest.py", "import os\n", "not a record by its type"),
+    ("handoff/run.sh", "echo x\n", "not a record by its type"),
+    ("docs/mockups/first.html", "<script>x()</script>\n", "not a record by its type"),
+    ("docs/notes", "no type at all\n", "not a record by its type"),
+    ("docs/mkdocs.yml", "plugins: [x]\n", "not a record by its type"),
 ])
 def test_a_path_that_is_no_record_or_decides_a_gate_keeps_the_full_gate(repo, path, text, why):
     """One such file beside a plain record is enough: the whole pull request takes the round."""
@@ -122,6 +134,48 @@ def test_the_register_keeps_the_full_gate_where_a_status_changed(repo, register,
     assert rc == 1 and "FULL GATE  docs/REQUIREMENTS.md: a Status cell changed, a row left, or a new row is not `planned`: %s" % named in out, out
 
 
+@pytest.mark.parametrize("evidence", ["tests/test_parse.py; tests/test_more.py", "text: guide/loop.md :: The pause (#7)", "-"])
+def test_the_register_keeps_the_full_gate_where_a_built_row_s_evidence_changed(repo, evidence):
+    """The Evidence of a built row is what completion-check.py accepts as its proof: a test named, a text entry written in
+    its place, or the cell emptied, each is read by both reviewers (Review A, round 1: a text entry alone once passed here)."""
+    change(repo, "docs/REQUIREMENTS.md", REGISTER.replace("| built | tests/test_parse.py |", "| built | %s |" % evidence))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 1 and "FULL GATE  docs/REQUIREMENTS.md: the Evidence of a built row changed" in out and "R-001" in out, out
+
+
+@pytest.mark.parametrize("path", ["docs/PROJECT_STATUS.md", "docs/INVENTORY.md", "docs/REQUIREMENTS.md", "project.json"])
+def test_a_removed_record_the_guards_and_checks_read_keeps_the_full_gate(repo, path):
+    change(repo, "handoff/TASK-002.md", "# TASK-002\n")
+    git(repo, "rm", "-q", path)
+    git(repo, "commit", "-q", "-m", "removed")
+    rc, out = run(repo, "premerge-records")
+    assert rc == 1 and "FULL GATE  %s: removed" % path in out, out
+
+
+@pytest.mark.parametrize("mode,why", [("120000", "a link"), ("160000", "a link"), ("100755", "a link")])
+def test_a_link_a_submodule_entry_and_an_executable_are_no_records(repo, program, mode, why):
+    """Written into the index by its mode, as a checkout on any system can commit it; read in-process, since the working
+    tree of this scratch repository does not hold what the index says."""
+    mod = program("review-guard")
+    base = git(repo, "rev-parse", "HEAD")
+    value = "0" * 39 + "1" if mode == "160000" else git(repo, "hash-object", "-w", "docs/PROJECT_STATUS.md")
+    git(repo, "update-index", "--add", "--cacheinfo", "%s,%s,docs/extra.md" % (mode, value))
+    git(repo, "commit", "-q", "-m", "an entry that is no plain file")
+    root, _, common = mod.find_git_dirs(str(repo))
+    reasons = mod.full_gate_reasons(["docs/extra.md"], base, git(repo, "rev-parse", "HEAD"), root, common)
+    assert len(reasons) == 1 and why in reasons[0][1] and mode in reasons[0][1], reasons
+
+
+@pytest.mark.parametrize("after,why", [
+    ('{"instruction_texts": ["guide/"]}\n', "`instruction_texts` changed"),
+    ("{not json\n", "cannot be read on both sides"),
+])
+def test_the_project_file_keeps_the_full_gate_where_its_instruction_texts_changed(repo, after, why):
+    change(repo, "project.json", after)
+    rc, out = run(repo, "premerge-records")
+    assert rc == 1 and "FULL GATE  project.json: " in out and why in out, out
+
+
 def test_a_register_that_cannot_be_read_row_for_row_keeps_the_full_gate(repo):
     """The same ID twice: which row's Status counts is not for the guard to choose."""
     change(repo, "docs/REQUIREMENTS.md", REGISTER + "| R-002 | write the file | owner | built | tests/x.py |\n")
@@ -137,7 +191,20 @@ def test_a_register_that_cannot_be_read_row_for_row_keeps_the_full_gate(repo):
 def test_the_inventory_keeps_the_full_gate_where_a_threat_model_line_changed(repo, inventory):
     change(repo, "docs/INVENTORY.md", inventory)
     rc, out = run(repo, "premerge-records")
-    assert rc == 1 and "FULL GATE  docs/INVENTORY.md: a line that names the threat model changed" in out, out
+    assert rc == 1 and "FULL GATE  docs/INVENTORY.md: a line that names the threat model, or one under a heading that names it, changed" in out, out
+
+
+def test_the_inventory_keeps_the_full_gate_where_a_line_under_a_threat_model_heading_changed(repo):
+    """A model written as a section: its bullets do not name it, its heading does; the next heading ends it."""
+    section = INVENTORY + "\n## The review guard's threat model\n\n- a reviewer in passing is inside it\n\n## Dates\n\n- UTC\n"
+    change(repo, "docs/INVENTORY.md", section)                 # the section added: a heading that names the model
+    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    change(repo, "docs/INVENTORY.md", section.replace("- UTC", "- UTC, always"))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 0 and "SHORT GATE" in out, out
+    change(repo, "docs/INVENTORY.md", section.replace("is inside it", "is outside it"))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 1 and "or one under a heading that names it, changed" in out, out
 
 
 def test_a_dirty_tree_no_change_and_an_unknown_upstream_cannot_be_checked(repo):
@@ -177,8 +244,9 @@ def guard(repo, program, monkeypatch):
     return mod, sleeps, github
 
 
-def state(repo, files, head=None, base=None):
-    return {"head": head or git(repo, "rev-parse", "HEAD"), "base": base or git(repo, "rev-parse", "refs/remotes/origin/main"), "files": list(files)}
+def state(repo, files, head=None, base=None, into="main"):
+    return {"head": head or git(repo, "rev-parse", "HEAD"), "base": base or git(repo, "rev-parse", "refs/remotes/origin/main"), "into": into,
+            "files": list(files)}
 
 
 def test_with_the_pull_request_the_record_is_written_and_the_permission_guard_lets_the_merge_through(repo, guard, capsys):
@@ -248,6 +316,8 @@ def test_a_failed_gh_a_list_at_its_limit_and_a_base_not_fetched_write_nothing(re
     assert mod.cmd_premerge_records(str(repo), "12") == 1 and "FULL GATE - the pull request changes 100 files or more" in capsys.readouterr().out
     github(state(repo, ["docs/PROJECT_STATUS.md"], base="1" * 40))
     assert mod.cmd_premerge_records(str(repo), "12") == 2 and "fetch first" in capsys.readouterr().out
+    github(state(repo, ["docs/PROJECT_STATUS.md"], into="release-1"))
+    assert mod.cmd_premerge_records(str(repo), "12") == 1 and "FULL GATE - the pull request merges into release-1, not main" in capsys.readouterr().out
     assert premerge_record(repo) == []
 
 

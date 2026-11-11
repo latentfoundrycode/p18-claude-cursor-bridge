@@ -353,25 +353,88 @@ def test_suite(argv, folder=None):
     return True
 
 
+PYTEST_VALUE_OPTIONS = ("-k", "-m", "-p", "-o", "--override-ini", "-W", "--pythonwarnings", "-n", "-r", "--junitxml", "--junit-xml", "--junit-prefix",
+                        "--log-file", "--log-level", "--log-cli-level", "--log-file-level", "--ignore", "--ignore-glob", "--deselect", "--maxfail",
+                        "--tb", "--durations", "--durations-min", "--cov", "--cov-report", "--cov-config", "--cov-fail-under", "--timeout",
+                        "--import-mode", "--color", "--capture", "--show-capture")
+# The word after each of these is the option's value, never a target: a report or a log written to a temporary folder is ordinary.
+PYTEST_FOLDER_OPTIONS = ("--config-file", "--confcutdir")   # these name what pytest loads: inside the project like a target
+
+
+def _real_path(path):
+    return os.path.normcase(os.path.realpath(os.path.abspath(path)))
+
+
+def launch_roots(folder):
+    """The folders a test run may name: the launch folder and the repository's worktrees (rule 39
+    keeps a second live branch under `<root>/Worktrees/`, outside the Workspace), each resolved
+    through its links."""
+    base = folder or os.getcwd()
+    roots = [base]
+    try:
+        p = subprocess.run(["git", "-C", base, "worktree", "list", "--porcelain"], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", creationflags=NO_WINDOW, timeout=bridge_env.GIT_TIMEOUT)
+        if p.returncode == 0:
+            roots += [line[len("worktree "):].strip() for line in p.stdout.splitlines() if line.startswith("worktree ")]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return [_real_path(r) for r in roots if r]
+
+
 def outside_target(argv, folder=None):
-    """The first target of a pytest or unittest run that resolves outside the launch folder, or
-    None (release S). A test run reads the project's own tests: a probe written in a temporary
-    folder and run through the launcher would run code no diff shows, in the project's
-    environment. Every word after `pytest` or `unittest` that is no option is resolved against
-    the launch folder (a `::node` suffix dropped); a `-k` expression or a marker resolves
-    inside it and passes."""
+    """The first word of a pytest or unittest run that leads outside the project, or None (release
+    S). A test run reads the project's own tests: a probe written in a temporary folder and run
+    through the launcher would run code no diff shows, in the project's environment. Inside means
+    under the launch folder or one of the repository's worktrees, links resolved. Checked: uv's
+    `--project` and `--directory` before the word pytest, the second of which becomes the folder
+    the targets are read against; every word after `pytest` or `unittest` that is no option and
+    no option's value (a `::node` suffix dropped; a `-k` expression or a marker resolves inside
+    and passes); the file `--config-file` names and the folder `--confcutdir` names; an `@file`
+    of arguments, which hides its targets and is refused whatever it holds."""
     head = head_of(argv)
     if head not in ("pytest", "python", "python3", "py", "uv"):
         return None
     word = "pytest" if head == "pytest" or "pytest" in argv[1:] else "unittest"
     start = 1 if head == "pytest" else (argv.index(word, 1) + 1 if word in argv[1:] else len(argv))
-    base = _normcase_path(folder or os.getcwd())
-    for a in argv[start:]:
-        path = a.split("::", 1)[0]
-        if a.startswith("-") or not path:
+    roots = launch_roots(folder)
+    base = folder or os.getcwd()
+
+    def inside(path, against):
+        full = _real_path(os.path.join(against, path))
+        return any(full == r or full.startswith(r.rstrip(os.sep) + os.sep) for r in roots)
+
+    if head == "uv":
+        i = 2
+        while i < start - 1:
+            name, eq, value = argv[i].partition("=")
+            if name in ("--project", "--directory"):
+                value = value if eq else (argv[i + 1] if i + 1 < len(argv) else "")
+                if not inside(value, folder or os.getcwd()):
+                    return argv[i] if eq else "%s %s" % (name, value)
+                if name == "--directory":
+                    base = os.path.join(folder or os.getcwd(), value)
+                i += 1 if eq else 2
+                continue
+            i += 1
+    i = start
+    while i < len(argv):
+        a = argv[i]
+        name, eq, value = a.partition("=")
+        i += 1
+        if a.startswith("@"):
+            return a
+        if a.startswith("-"):
+            if name in PYTEST_FOLDER_OPTIONS:
+                if not eq:
+                    value = argv[i] if i < len(argv) else ""
+                    i += 1
+                if not inside(value, base):
+                    return a if eq else "%s %s" % (a, value)
+            elif not eq and name in PYTEST_VALUE_OPTIONS:
+                i += 1                                     # its value, whatever it reads like
             continue
-        full = _normcase_path(os.path.join(base, path))
-        if not (full == base or full.startswith(base.rstrip(os.sep) + os.sep)):
+        path = a.split("::", 1)[0]
+        if path and not inside(path, base):
             return a
     return None
 

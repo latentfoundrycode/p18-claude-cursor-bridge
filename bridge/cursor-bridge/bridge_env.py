@@ -342,7 +342,7 @@ def app_links(name, owner, skeleton, create=True, repair=False):
                     continue
                 remove_link(link) if is_link(link) else os.rmdir(link)   # rmdir removes an empty folder only
             except OSError:
-                return "%s is a folder with content, not a link to %s" % (link, target)
+                return "%s is a folder with content (or a file, or a folder in use), not a link to %s" % (link, target)
         if not os.path.lexists(link):
             if not create:
                 continue

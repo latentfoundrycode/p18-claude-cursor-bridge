@@ -830,11 +830,16 @@ What each step does:
             guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command
             with `--match-head-commit`.
   premerge-records  (release S) the short gate: a pull request whose every changed file is a
-            record (under docs/ or handoff/, or project.json) and none of them one a program
-            reads to decide a gate merges on CI and one Review A read, without the cross-family
-            round. The full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*.md,
-            docs/ROSTER*, the register where a Status cell changed, a row left or a new row is
-            not `planned`, the inventory where a line naming the threat model changed, and
+            record (under docs/ or handoff/, or project.json; a text or a picture by its type,
+            a plain file by its mode) and none of them one a program reads to decide a gate
+            merges without the cross-family round, on CI, which the branch rule holds, and one
+            Review A read, which is the supervisor's step: this command checks neither. The
+            full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*, docs/ROSTER*,
+            everything under docs/diagrams/, a removed status file, inventory, register or
+            project file, the register where a Status cell changed, a row left, a new row is
+            not `planned` or a built row's Evidence changed, the inventory where a line naming
+            the threat model or under a heading naming it changed, the project file where
+            `instruction_texts` changed, a pull request into another branch than main, and
             every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the
             branch against origin/main and writes nothing. With <pr> the changed files are
             GitHub's list of the pull request joined with the local diff from its base, its

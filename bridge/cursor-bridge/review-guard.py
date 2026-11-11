@@ -60,11 +60,16 @@ What each step does:
             guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command
             with `--match-head-commit`.
   premerge-records  (release S) the short gate: a pull request whose every changed file is a
-            record (under docs/ or handoff/, or project.json) and none of them one a program
-            reads to decide a gate merges on CI and one Review A read, without the cross-family
-            round. The full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*.md,
-            docs/ROSTER*, the register where a Status cell changed, a row left or a new row is
-            not `planned`, the inventory where a line naming the threat model changed, and
+            record (under docs/ or handoff/, or project.json; a text or a picture by its type,
+            a plain file by its mode) and none of them one a program reads to decide a gate
+            merges without the cross-family round, on CI, which the branch rule holds, and one
+            Review A read, which is the supervisor's step: this command checks neither. The
+            full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*, docs/ROSTER*,
+            everything under docs/diagrams/, a removed status file, inventory, register or
+            project file, the register where a Status cell changed, a row left, a new row is
+            not `planned` or a built row's Evidence changed, the inventory where a line naming
+            the threat model or under a heading naming it changed, the project file where
+            `instruction_texts` changed, a pull request into another branch than main, and
             every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the
             branch against origin/main and writes nothing. With <pr> the changed files are
             GitHub's list of the pull request joined with the local diff from its base, its
@@ -1206,15 +1211,19 @@ def cmd_premerge(nnn, cwd, pr=None):
 # ---------------------------------------------------------------- the short gate of a records-only pull request (release S)
 
 RECORD_ROOTS = ("docs/", "handoff/")                    # where a project's records live; `project.json` beside them
-FULL_GATE_RECORDS = (("docs/RUN_PARAMETERS.md", "the run parameters decide the ceilings and who merges"),
-                     ("docs/BUILD_PLAN", "the plan decides what is built and in what order"),
-                     ("docs/ROSTER", "the roster decides which model builds and which reviews"))
+RECORD_TYPES = (".md", ".json", ".txt", ".csv", ".png", ".jpg", ".jpeg", ".gif", ".webp")   # what a record is written in: text and pictures, never a program, a page or a configuration a tool runs
+FULL_GATE_RECORDS = (("docs/run_parameters.md", "the run parameters decide the ceilings and who merges"),
+                     ("docs/build_plan", "the plan decides what is built and in what order"),
+                     ("docs/roster", "the roster decides which model builds and which reviews"),
+                     ("docs/diagrams/", "the diagrams, their index and the deviations decide what the diagram check allows"))   # compared in lower case
+KEPT_RECORDS = ("docs/project_status.md", "docs/inventory.md", "docs/requirements.md", "project.json")   # the guards test that the status file exists; the checks read the others
+PLAIN_MODES = ("100644", "000000")                      # a plain file, or no file on that side; a link (120000), a submodule (160000) and an executable (100755) are no record
 PR_FILES_MAX = 100                                      # gh lists a pull request's first hundred files
 
 
-def register_statuses(text):
-    """{requirement ID: Status cell} of a register's text, read as completion-check.py reads it; None when
-    it cannot be read row for row (a malformed header or row, an ID twice)."""
+def register_rows(text):
+    """{requirement ID: (Status cell, Evidence cell)} of a register's text, read as completion-check.py reads
+    it; None when it cannot be read row for row (a malformed header or row, an ID twice)."""
     try:
         header, body = bridge_env.read_header(text)
     except bridge_env.HeaderError:
@@ -1226,13 +1235,15 @@ def register_statuses(text):
             if len(r) < len(columns):
                 return None
             count += 1
-            out[bridge_env.register_row_role(r, columns, roles, "id").strip("`* ")] = bridge_env.register_row_role(r, columns, roles, "status").strip("`* ")
+            evidence = bridge_env.register_row_role(r, columns, roles, "evidence") if roles.get("evidence") else ""
+            out[bridge_env.register_row_role(r, columns, roles, "id").strip("`* ")] = (
+                bridge_env.register_row_role(r, columns, roles, "status").strip("`* "), " ".join((evidence or "").split()))
     else:
         for r in bridge_env.parse_register(text)[1]:
             if len(r) < 4:
                 return None
             count += 1
-            out[r[0].strip("`* ")] = r[3].strip("`* ")
+            out[r[0].strip("`* ")] = (r[3].strip("`* "), " ".join(" | ".join(r[4:]).split()))
     return out if len(out) == count else None
 
 
@@ -1242,42 +1253,91 @@ def _at(rev, path, root, common):
     return bridge_env.decode_record_bytes(p.stdout.encode("utf-8")) if p.returncode == 0 else None
 
 
+def threat_model_lines(text):
+    """The inventory's lines that bound what a finding blocks: every line that names the threat model, and
+    every line of a section whose heading names it, each with its white space folded."""
+    out, inside = [], False
+    for line in (text or "").splitlines():
+        if line.lstrip().startswith("#"):
+            inside = "threat model" in line.lower()
+        if inside or "threat model" in line.lower():
+            out.append(" ".join(line.split()))
+    return sorted(l for l in out if l)
+
+
+def changed_modes(base, head, root, common):
+    """{path: (mode before, mode after, status letter)} of the local diff, renames shown as a removal and an
+    addition."""
+    out = {}
+    words = run_git(["diff", "--raw", "--no-renames", "--no-abbrev", "-z", base, head], root, common).split("\0")
+    for i in range(0, len(words) - 1, 2):
+        meta = words[i].lstrip(":").split()
+        if len(meta) >= 5:
+            out[words[i + 1].replace("\\", "/")] = (meta[0], meta[1], meta[4][:1])
+    return out
+
+
 def full_gate_reasons(paths, base, head, root, common):
-    """[(path, why)] of the changed paths that keep the full gate: a path that is no record, a record a
-    program reads to decide a gate, the register where a Status cell changed, the inventory where a
-    threat-model line changed. Empty when the change is records the short gate takes."""
-    out = []
+    """[(path, why)] of the changed paths that keep the full gate. A path takes the short gate only where it
+    is a record by its folder, by its type and by its mode, and is none of the records a program reads to
+    decide a gate: the run parameters, a plan, the roster, anything under docs/diagrams/, a removed status
+    file, inventory, register or project file, the register where a Status cell changed, a row left, a new
+    row is not `planned` or a built row's Evidence changed, the inventory where the threat model changed,
+    the project file where its `instruction_texts` changed. Empty when every path takes the short gate."""
+    out, modes = [], changed_modes(base, head, root, common)
     for path in sorted(set(p.replace("\\", "/") for p in paths)):
+        low = path.lower()
+        before_mode, after_mode, status = modes.get(path, ("100644", "100644", "M"))
         if path != "project.json" and not path.startswith(RECORD_ROOTS):
             out.append((path, "not a record: only docs/, handoff/ and project.json take the short gate"))
             continue
-        named = [why for prefix, why in FULL_GATE_RECORDS if path == prefix or path.startswith(prefix)]
+        if before_mode not in PLAIN_MODES or after_mode not in PLAIN_MODES:
+            out.append((path, "a link, a submodule entry or an executable file (mode %s to %s) is no record" % (before_mode, after_mode)))
+            continue
+        if os.path.splitext(low)[1] not in RECORD_TYPES:
+            out.append((path, "not a record by its type: a record is one of %s; a program, a page or a tool's configuration under a record folder is read by both reviewers" % ", ".join(RECORD_TYPES)))
+            continue
+        named = [why for prefix, why in FULL_GATE_RECORDS if low.startswith(prefix)]
         if named:
             out.append((path, named[0]))
-        elif path == "docs/REQUIREMENTS.md":
+        elif status == "D" and low in KEPT_RECORDS:
+            out.append((path, "removed: the guards and the checks read this record"))
+        elif low == "docs/requirements.md":
             before, after = _at(base, path, root, common), _at(head, path, root, common)
-            old = register_statuses(before) if before is not None else {}
-            new = register_statuses(after) if after is not None else None
+            old = register_rows(before) if before is not None else {}
+            new = register_rows(after) if after is not None else None
             if old is None or new is None:
                 out.append((path, "the register cannot be read row for row on both sides"))
                 continue
-            moved = sorted(i for i in old if i not in new or new[i] != old[i]) + sorted(i for i in new if i not in old and new[i].lower() != "planned")
+            moved = sorted(i for i in old if i not in new or new[i][0] != old[i][0]) + sorted(i for i in new if i not in old and new[i][0].lower() != "planned")
             if moved:
                 out.append((path, "a Status cell changed, a row left, or a new row is not `planned`: %s" % ", ".join(moved[:8])))
-        elif path == "docs/INVENTORY.md":
-            sides = []
+                continue
+            proved = sorted(i for i in new if new[i][0].lower() == "built" and i in old and new[i][1] != old[i][1])
+            if proved:
+                out.append((path, "the Evidence of a built row changed, which is what the completion check accepts as its proof: %s" % ", ".join(proved[:8])))
+        elif low == "docs/inventory.md":
+            if threat_model_lines(_at(base, path, root, common)) != threat_model_lines(_at(head, path, root, common)):
+                out.append((path, "a line that names the threat model, or one under a heading that names it, changed: it bounds what a reviewer's finding blocks"))
+        elif low == "project.json":
+            texts = []
             for rev in (base, head):
-                text = _at(rev, path, root, common) or ""
-                sides.append(sorted(" ".join(line.split()) for line in text.splitlines() if "threat model" in line.lower()))
-            if sides[0] != sides[1]:
-                out.append((path, "a line that names the threat model changed: it bounds what a reviewer's finding blocks"))
+                try:
+                    data = json.loads(_at(rev, path, root, common) or "{}")
+                    texts.append(data.get("instruction_texts") if isinstance(data, dict) else ValueError)
+                except ValueError:
+                    texts.append(ValueError)
+            if ValueError in texts:
+                out.append((path, "the project file cannot be read on both sides"))
+            elif texts[0] != texts[1]:
+                out.append((path, "`instruction_texts` changed: it decides where the completion check accepts a text as evidence"))
     return out
 
 
 def pr_state(pr, root):
     """({"head", "base", "files"} of the pull request on GitHub, None) or (None, the reason gh failed)."""
     try:
-        g = subprocess.run(["gh", "pr", "view", str(pr), "--json", "headRefOid,baseRefOid,files"], cwd=root, capture_output=True, text=True,
+        g = subprocess.run(["gh", "pr", "view", str(pr), "--json", "headRefOid,baseRefOid,baseRefName,files"], cwd=root, capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, " (%s)" % e
@@ -1285,14 +1345,16 @@ def pr_state(pr, root):
         return None, ": %s" % (g.stderr.strip() or g.stdout.strip())[:200]
     try:
         data = json.loads(g.stdout)
-        return {"head": data["headRefOid"], "base": data["baseRefOid"], "files": [f["path"] for f in data["files"]]}, None
+        return {"head": data["headRefOid"], "base": data["baseRefOid"], "into": data["baseRefName"], "files": [f["path"] for f in data["files"]]}, None
     except (ValueError, KeyError, TypeError) as e:
         return None, ": its reply cannot be read (%s)" % e
 
 
 def cmd_premerge_records(cwd, pr=None):
     """The short gate (release S): a pull request that changes only records, none of them one a program
-    reads to decide a gate, merges on CI and one Review A read, without the cross-family round. Without
+    reads to decide a gate, merges without the cross-family round. This command decides that by path,
+    type and mode and nothing else: CI is held by the repository's branch rule and the one Review A
+    read by the supervisor's step, neither is checked here. Without
     <pr> it only says which gate the branch takes, against origin/main, and writes nothing. With <pr> the
     changed files are GitHub's own list beside the local diff (a local ref moved, by anyone, cannot
     shrink it), the pull request's head must be the local HEAD, and the record the permission guard
@@ -1317,6 +1379,9 @@ def cmd_premerge_records(cwd, pr=None):
             return 2
         if state["head"] != head:
             print("review-guard: NOT READY - the pull request's head on GitHub (%s) is not the local head (%s), after waiting %d seconds: push first" % (state["head"][:12], head[:12], waited))
+            return 1
+        if state["into"] != "main":
+            print("review-guard: FULL GATE - the pull request merges into %s, not main: the short gate is for records that reach main" % state["into"])
             return 1
         if len(state["files"]) >= PR_FILES_MAX:
             print("review-guard: FULL GATE - the pull request changes %d files or more, beyond what its list shows whole" % PR_FILES_MAX)

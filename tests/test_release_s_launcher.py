@@ -132,8 +132,76 @@ def test_the_target_rule_reads_every_runner_form_of_pytest_and_unittest(program,
                  ["python", "-m", "unittest", out], ["python3", "-m", "pytest", "tests/a.py", out + "::test_x"]):
         assert br.outside_target(argv, base) is not None, argv
     for argv in (["pytest"], ["pytest", "tests", "-k", "x"], ["python", "-m", "pytest", "tests/test_a.py::test_x", "--junitxml=" + out],
-                 ["uv", "run", "--project", out, "pytest", "tests"], ["python", "-m", "unittest", "tests.test_a"], ["npm", "test", out], ["go", "test", out]):
+                 ["python", "-m", "unittest", "tests.test_a"], ["npm", "test", out], ["go", "test", out]):
         assert br.outside_target(argv, base) is None, argv
+
+
+def test_the_target_rule_reads_what_leads_outside_by_another_word(program, tmp_path):
+    """Review A, round 1 (both reviewers reproduced each): uv's own folder options before the word pytest, a file of
+    arguments, the configuration file pytest is told to load. Each led a run outside and passed."""
+    br = program("bridge-run")
+    base = tmp_path / "ws"
+    (base / "sub" / "tests").mkdir(parents=True)
+    out = str(tmp_path / "elsewhere")
+    for argv in (["uv", "run", "--project", out, "pytest", "tests"], ["uv", "run", "--directory", out, "pytest"],
+                 ["uv", "run", "--directory=" + out, "--frozen", "pytest", "tests"], ["uv", "run", "--directory", "sub", "pytest", "../../elsewhere"],
+                 ["python", "-m", "pytest", "@" + os.path.join(out, "args.txt")], ["pytest", "@args.txt"],
+                 ["pytest", "--config-file=" + os.path.join(out, "pytest.ini")], ["pytest", "--config-file", os.path.join(out, "pytest.ini"), "tests"],
+                 ["pytest", "--confcutdir", out, "tests"]):
+        assert br.outside_target(argv, str(base)) is not None, argv
+    for argv in (["uv", "run", "--project", "sub", "pytest", "sub/tests"], ["uv", "run", "--directory", "sub", "pytest", "tests", ".."],
+                 ["pytest", "--config-file", "sub/pytest.ini", "sub/tests"]):
+        assert br.outside_target(argv, str(base)) is None, argv
+
+
+def test_an_option_s_value_is_no_target_wherever_it_points(program, tmp_path):
+    """A report, a log or an ignored path named as a separate word: its value may lie in a temporary folder, and the run is
+    not refused for it (Review A, round 1: each was refused with 125, which stops the loop)."""
+    br = program("bridge-run")
+    out = str(tmp_path.parent / "x" / "report.xml")
+    for option in ("--junitxml", "--junit-xml", "--log-file", "--ignore", "--deselect", "--cov-report", "-o", "-W", "-k", "-m"):
+        assert br.outside_target(["python", "-m", "pytest", "tests", option, out, "tests/test_a.py"], str(tmp_path)) is None, option
+    assert br.outside_target(["pytest", "--junitxml", out, out], str(tmp_path)) == out, "the word after the value is a target again"
+
+
+def _link(link, target):
+    try:
+        os.symlink(str(target), str(link), target_is_directory=True)
+    except (OSError, NotImplementedError):
+        try:
+            import _winapi
+            _winapi.CreateJunction(str(target), str(link))
+        except (ImportError, OSError):
+            pytest.skip("this account can make neither a symbolic link nor a junction")
+
+
+def test_a_link_inside_the_launch_folder_that_leads_outside_is_outside(program, tmp_path):
+    br = program("bridge-run")
+    base, outside = tmp_path / "ws", tmp_path / "elsewhere"
+    (base / "tests").mkdir(parents=True)
+    outside.mkdir()
+    _link(base / "tests" / "ext", outside)
+    try:
+        assert br.outside_target(["pytest", "tests/ext/test_probe.py"], str(base)) is not None
+        assert br.outside_target(["pytest", "tests"], str(base)) is None
+    finally:
+        os.rmdir(str(base / "tests" / "ext")) if os.name == "nt" else os.unlink(str(base / "tests" / "ext"))
+
+
+def test_a_worktree_of_the_same_repository_is_inside(program, tmp_path):
+    """Rule 39 keeps a second live branch in a worktree under `<root>/Worktrees/`, beside the Workspace: its suite is
+    launched from the Workspace by its path and is the project's own; a folder that is no worktree stays outside."""
+    br = program("bridge-run")
+    env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
+    ws, tree = tmp_path / "Workspace", tmp_path / "Worktrees" / "task-002"
+    ws.mkdir()
+    for args in (["init", "-q", "-b", "main"], ["commit", "-q", "--allow-empty", "-m", "base"], ["worktree", "add", "-q", "-b", "task-002", str(tree)]):
+        p = subprocess.run(["git"] + args, cwd=str(ws), capture_output=True, text=True, env=env)
+        assert p.returncode == 0, p.stderr
+    for argv in (["python", "-m", "pytest", str(tree / "tests")], ["uv", "run", "--directory", str(tree), "pytest", "tests"],
+                 ["pytest", os.path.join("..", "Worktrees", "task-002", "tests", "test_a.py") + "::test_a"]):
+        assert br.outside_target(argv, str(ws)) is None, argv
+    assert br.outside_target(["pytest", str(tmp_path / "Worktrees" / "probe" / "test_a.py")], str(ws)) is not None
 
 
 # ---------------------------------------------------------------- M1: the round's cause
