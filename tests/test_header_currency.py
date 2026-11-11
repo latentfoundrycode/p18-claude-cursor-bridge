@@ -7,10 +7,12 @@ docstrings stripped by `ast`, so a description never matches (KP-073).
 enforces: docs/DESIGN.md, "Change: release B2", "The fallback readers, one copy each" and "The retired readings,
 enumerated"; docs/BUILD_PLAN.md, TASK-050's Done when; R-057.
 
-Two of the eleven are matched in their own program only, because another program keeps a like form for another
-purpose by design: (2) the four exact `Awaiting user on:` values in session-start.py (loop-guard.py keeps the set for
-its own normalisation); (4) the `Phase: ` reading in conformance-check.py (workflow-check.py keeps its placement
-check). The others are matched over the twelve programs that read a dual-read record.
+Four of the eleven are matched in one program only: two because another program keeps a like form for another
+purpose by design, (2) the four exact `Awaiting user on:` values in session-start.py (loop-guard.py keeps the set for
+its own normalisation) and (4) the `Phase: ` reading in conformance-check.py (workflow-check.py keeps its placement
+check); two because the reading was that program's alone, (5) the `Satisfies` pattern in completion-check.py and (8)
+the diagram index's column-position read in plan-check.py. The others are matched over the twelve programs that read a
+dual-read record.
 
 The supervisor's cases stand above the marker at the end of this file. The builder adds its own cases below the
 marker and edits nothing above it.
@@ -155,8 +157,18 @@ def reading_7(tree):
     return [p for p in re_patterns(tree) if p == r"^##\s+(\w+)"]
 
 
+def pipe_splits(tree):
+    """Every `<expr>.split("|")` call: the index's column-position read split each table line at its bars."""
+    return ["split(%r) at line %d" % (n.args[0].value, n.lineno) for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "split"
+            and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "|"]
+
+
 def reading_8(tree):
-    return ([] if "diagram_index_selected_ids" in names(tree) else ["no call of bridge_env.diagram_index_selected_ids"])
+    """(8) plan-check's column-position read of the diagram index: its replacement's call present, and no split of a
+    line at `|` left (the old read, `line.strip().strip("|").split("|")`; stage H1's review, least confident 2)."""
+    return (([] if "diagram_index_selected_ids" in names(tree) else ["no call of bridge_env.diagram_index_selected_ids"])
+            + pipe_splits(tree))
 
 
 def reading_9(tree):

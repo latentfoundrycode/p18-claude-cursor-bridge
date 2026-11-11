@@ -5,8 +5,8 @@
   "version": "2026.11.09a",
   "state": {
     "phase": "changing",
-    "stage": "release B2: stage H1's increments merged (TASK-046 to TASK-050); the intake hotfix 2026.11.09a (HOTFIX-003) installed and carried onto main; stage H1's close next",
+    "stage": "release B2: stage H1 closed 2026-11-11 (TASK-046 to TASK-050, its refactoring pass, its review and demonstration); the intake hotfix 2026.11.09a carried onto main; stage H2 next",
     "bridge": "2026.11.09a",
-    "updated": "2026-11-09"
+    "updated": "2026-11-11"
   }
 }
