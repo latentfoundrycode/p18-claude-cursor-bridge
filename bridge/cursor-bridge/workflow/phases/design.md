@@ -220,9 +220,19 @@ their reasons, and the current state. It is the first of the Documents set (see 
 layout") and is patched at every reflection point from here on. It is a translation of
 `docs/DESIGN.md` for a reader who will never open `docs/`, not a copy of it.
 
-**Before presenting the design, write the requirements register — `docs/REQUIREMENTS.md`.** Every requirement the owner stated at intake, every one in a requirements document they supplied, and every one the design commits to becomes **one row with an ID** (`R-001`, `R-002`, … — never reused, never renumbered): one checkable sentence in the owner's terms, where it came from, and its status. A screen, a tab, a setting, a command, a behaviour — each is a row; a requirement too large to check in one sentence is split. This is the list "done" is measured against: the project is finished when every row is built and tested or the owner has deferred or dropped it, and not before (rule 44). Format, parsed by `completion-check.py`:
+**Before presenting the design, write the requirements register — `docs/REQUIREMENTS.md`.** Every requirement the owner stated at intake, every one in a requirements document they supplied, and every one the design commits to becomes **one row with an ID** (`R-001`, `R-002`, … — never reused, never renumbered): one checkable sentence in the owner's terms, where it came from, and its status. A screen, a tab, a setting, a command, a behaviour — each is a row; a requirement too large to check in one sentence is split. This is the list "done" is measured against: the project is finished when every row is built and tested or the owner has deferred or dropped it, and not before (rule 44). Format, parsed by `completion-check.py`, its header first (the table's columns in order, the column each role reads, the four status words a Status cell may open with; the core's "Project state", "The header"):
 
 ```markdown
+---
+record: requirements
+header: 1
+columns: [ID, Requirement, Source, Status, Evidence]
+roles:
+  id: ID
+  status: Status
+  evidence: Evidence
+statuses: [planned, built, deferred, dropped]
+---
 # Requirements — <Name>
 | ID | Requirement | Source | Status | Evidence |
 |---|---|---|---|---|

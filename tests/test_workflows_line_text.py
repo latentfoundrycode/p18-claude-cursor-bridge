@@ -35,7 +35,7 @@ def model_section():
 
 def template():
     a = TEXT.index("## Project state")
-    a = TEXT.index("```markdown\n# Project Status\n", a)
+    a = TEXT.rindex("```markdown\n", a, TEXT.index("\n# Project Status\n", a))  # TASK-052: the fence opens with its header
     return TEXT[a:TEXT.index("\n```", a + 3)]
 
 

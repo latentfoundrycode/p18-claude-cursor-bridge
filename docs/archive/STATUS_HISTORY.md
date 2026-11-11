@@ -265,3 +265,7 @@ Stage: release B2's stage H1's increments merged (TASK-046 to TASK-050), the int
 ## Moved 2026-11-11 (TASK-051's records, PR #146)
 
 Last accepted: stage H1's close records (PR #145, at its merge): the stage review's and the demonstration's records, the two least-confident tests (R-057, R-059), the hook's threat model revised, HOTFIX-003's two records findings; before it REFAC-005 and REFAC-006 (PR #144), stage H1's refactoring pass; before it HOTFIX-003 (PR #143); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-050, BUG-001 to BUG-043, the refactoring passes of B2 to B5, T1, T2 and H1, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+
+## Moved 2026-11-11 (TASK-052's records, PR #147)
+
+Last accepted: TASK-051 (PR #146, at its merge): records-migrate.py, R-062's program (three builder rounds, HARDENING, Release B2's stage H2); before it stage H1's close records (PR #145), REFAC-005 and REFAC-006 (PR #144), HOTFIX-003 (PR #143); earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-051, BUG-001 to BUG-043, the refactoring passes of B2 to B5, T1, T2 and H1, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004

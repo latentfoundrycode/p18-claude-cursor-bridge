@@ -67,9 +67,24 @@ Order: the object diagram, then the three parallel kinds.
 
 ## 3. Files
 
-**The index** — `docs/diagrams/INDEX.md`, one table, parsed by `diagram-check.py`:
+**The index** — `docs/diagrams/INDEX.md`, one table, parsed by `diagram-check.py`, its header first, declaring the table's columns in order and the column each role reads (`supervisor.md`, "Project state", "The header"); the check fails a header whose columns differ from the table's own header row:
 
 ```markdown
+---
+record: diagram-index
+header: 1
+columns: [ID, Level, Kind, Status, File, Refines, Realizes, "Enforced by", Why]
+roles:
+  id: ID
+  level: Level
+  kind: Kind
+  status: Status
+  file: File
+  refines: Refines
+  realizes: Realizes
+  enforced_by: "Enforced by"
+  why: Why
+---
 | ID | Level | Kind | Status | File | Refines | Realizes | Enforced by | Why |
 |---|---|---|---|---|---|---|---|---|
 | D-001 | 1 | use-case | selected | docs/diagrams/D-001-use-cases.md | - | R-001, R-002, R-003 | review: plan-critic — every use case traced | - |
@@ -84,9 +99,21 @@ Order: the object diagram, then the three parallel kinds.
 - `Enforced by`: one or more of `check:components`, `check:schema <file>`, `tests: <path>, <path>`, `review: <reviewer> — <what it checks>`, separated by `;`.
 - `Why`: for a selected Level 4 or 5 diagram, the load-bearing category word (`concurrency`, `security`, `integrity`, `performance`, `protocol`, `prior-failure`), a colon, and one sentence; for an omitted row, the reason; otherwise `-`.
 
-**The known deviations** — `docs/diagrams/DEVIATIONS.md` (release A3, plan 8.7), one table the code check reads, for a project whose diagrams were drawn as built after the code (§8) or whose code drifted before a check caught it:
+**The known deviations** — `docs/diagrams/DEVIATIONS.md` (release A3, plan 8.7), one table the code check reads, for a project whose diagrams were drawn as built after the code (§8) or whose code drifted before a check caught it, its header first, as the index's:
 
 ```markdown
+---
+record: deviations
+header: 1
+columns: [Diagram, From, To, "As built", Since, "Resolved by"]
+roles:
+  diagram: Diagram
+  from: From
+  to: To
+  as_built: "As built"
+  since: Since
+  resolved_by: "Resolved by"
+---
 | Diagram | From | To | As built | Since | Resolved by |
 |---|---|---|---|---|---|
 | D-004 | settings_ui | key_store | the view reads the store directly; the design routes it through the settings service | 2026-10-12 | TASK-041 |

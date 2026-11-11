@@ -143,6 +143,7 @@ item into exactly one of:
 
 Rules while applying **Now** items:
 
+- **The records' headers** (release B2) are a record-keeping addition, applied at every calibration that finds a record without one (a merged brief left header-less by rule apart), before the next brief is packaged: from the Workspace root, run the one command `python ~/.claude/cursor-bridge/records-migrate.py --check` first, and put its lines in the calibration's report. Each record it lists `cannot read` is repaired in its prose where it can be (a plan's `Scope:` line with an unbalanced parenthesis, an unmerged brief's elided or empty Scope); a merged brief never: it stays header-less, its prose the record of what its builder was given, and the report names it. Each status file it lists `cannot write` is trimmed by the project's supervisor before the run (history moved to the archive, never a field dropped). Those repairs and trims are committed first, records-only, in a commit of their own. Then run `python ~/.claude/cursor-bridge/records-migrate.py` itself and commit what it wrote, and nothing else, as the calibration's checkpoint in a records-only commit of its own. The migration is append-only: a header is written from the prose as it stands and no value changes, so it reopens no gate.
 - The inventory's `Development data:` decision (release A1b) is added before the next brief is
   packaged: from the design where it states it, or as `Development data: none, the product keeps
   no data of the owner's` where that is true. A brief packaged without it stops the builder.

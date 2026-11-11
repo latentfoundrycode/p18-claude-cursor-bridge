@@ -58,6 +58,19 @@ Record the answers in **`docs/RUN_PARAMETERS.md`**, which you read at every resu
 before every stage close and merge:
 
 ```markdown
+---
+record: run-parameters
+header: 1
+stage_pause: run
+merge_authority: supervisor
+refactoring_pass: "on"
+installer_verification: local
+parallel_increments: "off"
+agent_ceiling: null
+ceiling_above_twice: []
+design_rounds_above_five: []
+review_rounds_above_ceiling: []
+---
 # Run parameters
 Set: <date>   (owner may change any of these at any time by saying so; update this file)
 Stage pause: run | pause
@@ -65,6 +78,15 @@ Merge authority: supervisor | owner
 Refactoring pass: on | off | off for <stages>
 Installer verification: local | ci-only | n/a (nothing installs)
 Parallel increments: off | on
+```
+
+The header above the lines holds the same answers (the core's "Project state", "The header"): each of the five as its line gives it, one word, `on`, `off` and `n/a` double-quoted; `agent_ceiling` the `Agent ceiling:` line's seconds, or `null` where none stands; and each of the three lists below one block-form entry per line the owner's word wrote, `[]` where none stands: `ceiling_above_twice` entries of `kind`, `seconds` and `words` (the parenthesis's text whole), `design_rounds_above_five` of `subject`, `rounds`, `words` and `date`, `review_rounds_above_ceiling` of `id`, `rounds`, `words` and `date`, for example
+
+```
+ceiling_above_twice:
+  - kind: review
+    seconds: 9000
+    words: "the review may run two and a half hours, 2026-11-02"
 ```
 
 Four optional lines are never asked and are written only on the owner's recorded word (release A2; the third 2026.10.18a; the fourth release B): `Agent ceiling: <seconds>` raises the hour a background agent may run before the loop guard stops counting it, `Ceiling above twice: <kind> <seconds> (<the owner's words>, <date>)` lets the launcher's learned limit for one kind of run (builder, driver, review, watch, test) exceed twice its default, and `Design rounds above five: <subject> <rounds> (<the owner's words>, <date>)` lets one subject's design critique run past its ceiling (Phase 2; written before this step when the subject is the design or the plan), and `Review rounds above the ceiling: <ID> <rounds> (<the owner's words>, <date>)` lets one increment's code review, or a stage's (`<ID>` then `STAGE-<name>`), run past the code gate's three-round ceiling up to `<rounds>`, at least the larger of the review guard's and the launcher's next counts for it (Phase 6, step 7, "The review ceiling").

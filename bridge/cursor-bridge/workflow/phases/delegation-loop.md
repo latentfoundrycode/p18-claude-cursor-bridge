@@ -125,7 +125,13 @@ ceiling: ` is the design critique's ceiling holding, never a model's failure: it
 and no `--record-failure` follows it; Phase 2. A design-critique reply that names nothing from
 its file is recorded like any failed call and follows the exits below, which Phase 2 counts: the
 exit-4 retry, the exit-3 re-resolve and one run on the profile it gives, then the wait Phase 2
-describes. Nor is a refusal of the code gate's programs a model's failure: the launcher's
+describes. Nor is the launcher's and the guard's `header: ` refusal a model's failure: a header of a brief, of
+the run parameters or, where a merge unit is checked, of the plan that the reader cannot read or the
+schema refuses, a brief's header that disagrees with the brief's prose, a run parameters' lift list (the
+launcher's three, the guard's `review_rounds_above_ceiling`) that disagrees with its lines, or a plan header
+whose increments differ from the plan's headings or a plan heading standing outside any stage, is put right, the header and the prose made to agree, a
+brief by a new numbered brief where a run of it completed; it is never a failed launch or a model's failure, and no
+`--record-failure` follows it. Nor is a refusal of the code gate's programs a model's failure: the launcher's
 `review ceiling: `, `brief rule: `, `revised in place: ` and `branch rule: ` refusals (a fourth round
 with no lift, no brief or two, a builder launch on `main`, a brief revised after a completed run, a
 brief under another ID on a counted branch) and the guard's `review ceiling: ` and `branch rule: `

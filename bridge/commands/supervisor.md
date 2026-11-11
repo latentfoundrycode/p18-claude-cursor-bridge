@@ -392,7 +392,22 @@ on them. If they must read the technical detail to find that out, the report is 
 
 Keep `docs/PROJECT_STATUS.md` current after every accepted increment. **It is current state, not history:** every field is rewritten in place, nothing is appended, and the file stays within **120 lines and 12,000 characters** (`inventory-check.py` fails it above that). What happened belongs in `CHANGES.md` and git; what the software is, has, and has settled belongs in `docs/INVENTORY.md`. A status file that has grown into a log is read in slices, and the fact the next session needed is in the slice it skipped.
 
+**The header.** Eight records that a bridge program reads as well as you open with a small YAML header between two `---` lines: this file, the inventory, `docs/REQUIREMENTS.md`, every `docs/BUILD_PLAN*.md`, each brief, `docs/diagrams/INDEX.md`, `docs/diagrams/DEVIATIONS.md` and `docs/RUN_PARAMETERS.md`. It holds exactly the values the programs read, each typed (`bridge_env.HEADER_SCHEMAS`); the prose beneath stays, and it is what you, the owner and every instruction read. A program reads the header first and falls back to the prose for a record without one; the record's own checker compares the two and fails a disagreement (`HEADER DISAGREES: <key>`) and a header it cannot read (`HEADER MALFORMED`), so a value is changed in both places or the next checkpoint fails. A record gets its header from `python ~/.claude/cursor-bridge/records-migrate.py`, which writes it from the prose and reads it back before it replaces the file, at the calibration that finds a record without one (`calibrate-bridge.md`, step 4); a new record is written from its template, which shows its header beside its prose (the two below, and those of the register, the plan, the brief, the index, the deviations file and the run parameters in their modules). In a header a string the plain form would read as another type or cannot hold (a date, a version, `on`, `n/a`, a value with a space or a `/`) is double-quoted, and a list of mappings is written in block form, one `- ` entry per item. The status file's caps above count its body beneath the header.
+
 ```markdown
+---
+record: project-status
+header: 1
+phase: building
+workflows:
+  - type: "<Workflow name>"
+    subtype: "<Sub-workflow name>"
+    traits: ["<Trait name>"]
+awaiting_user_on: ""
+bridge_version: "<contents of ~/.claude/cursor-bridge/VERSION when last calibrated>"
+stage: "<the Stage: line's whole value>"
+open_issues: ["<each segment of the Open issues: line>"]
+---
 # Project Status
 Last updated: <timestamp>
 Phase: <intake | design | mockups | planning | configuration | building | done | changing>
@@ -421,6 +436,8 @@ Calibration pending: <items still to apply, each with the phase that triggers it
 Run parameters: see docs/RUN_PARAMETERS.md (stage pause / merge authority / refactoring pass / installer verification / parallel increments)
 ```
 
+The header holds each line's value as the record's checker reads it from the prose: `phase` the `Phase:` value; one `workflows` entry per `Workflows:` line (`subtype: null` where the part has none, `[]` while a part is not yet classified); `awaiting_user_on` `""` where the line begins with nothing, none or n/a; `bridge_version` the stamp, or `""`; `stage` the `Stage:` line's whole value, its `Last reflection:` part included; `open_issues` one entry per segment of the `Open issues:` line, split at `;` and at `. `, so `none` is `["none"]` and `ISS-001, ISS-002` one entry.
+
 **Awaiting user on** is read by the `loop-guard` Stop hook (rule 43): `nothing` means the loop is running and must not stop without a pending background task to wake it; anything else means you are legitimately waiting for the owner. Set it whenever you stop for them — an escalation, a gate, a pause they asked for, a stage pause — and clear it when they answer. A stale entry either traps the loop in idleness or hides a real wait, so it is rewritten at every stop.
 
 **Workflows** records, for each part, the conditional workflows it runs: one `Workflows:` line per part, directly after `Phase:`; with the `Phase:` line they name exactly what a resumed session must read (see "Main and conditional workflows"). A line has this grammar:
@@ -443,9 +460,28 @@ fresh session reads it to know what needs re-anchoring and what can simply be na
 Write it so a fresh session with no memory of this conversation can pick up the work
 from this file and the inventory alone. That is the actual test of whether it is good enough. **Claude Code's private memory is not project state:** it is tied to one machine and one folder path, the next session may not read it, and nothing checks it. Anything a later session must know goes into these two files, never only into memory.
 
-**The inventory — `docs/INVENTORY.md`** is the project's current-state record of what the software *is*: its features, the resources it depends on, the decisions that shaped it, and what was deferred. Where `CHANGES.md` is the history, the inventory is the present — rows are edited in place when a feature changes and removed when it is removed, so the file stays proportional to the product, not to the time spent on it. It is AI-facing, committed, and rides each increment's PR like `CHANGES.md`; it never holds a secret value, only a secret's name and where it lives. The format, which `inventory-check.py` parses:
+**The inventory — `docs/INVENTORY.md`** is the project's current-state record of what the software *is*: its features, the resources it depends on, the decisions that shaped it, and what was deferred. Where `CHANGES.md` is the history, the inventory is the present — rows are edited in place when a feature changes and removed when it is removed, so the file stays proportional to the product, not to the time spent on it. It is AI-facing, committed, and rides each increment's PR like `CHANGES.md`; it never holds a secret value, only a secret's name and where it lives. The format, which `inventory-check.py` parses, its header first (`reflected_through` the `Reflected through:` line's text, `none` included; `development_data` the first cell of the Decisions row that begins `Development data:`; each table's columns in order and the column that names a row):
 
 ```markdown
+---
+record: inventory
+header: 1
+reflected_through: "<the exact heading of the newest docs/CHANGES.md entry absorbed here>"
+development_data: "Development data: <the decision, as the Decisions row that begins so states it>"
+tables:
+  features:
+    columns: [Feature, "What it does", Where, Tests, Since]
+    key: Feature
+  resources:
+    columns: [Name, Kind, "Where it lives", "Used by", Provided]
+    key: Name
+  decisions:
+    columns: [Decision, Reason, Settled, "Revisit only if"]
+    key: Decision
+  deferred:
+    columns: [Item, "Why deferred", Since, "Owner decision needed"]
+    key: Item
+---
 # Inventory — <Name>
 Reflected through: <the exact heading of the newest docs/CHANGES.md entry absorbed here | none>
 Updated: <date>
