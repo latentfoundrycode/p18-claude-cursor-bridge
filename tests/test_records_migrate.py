@@ -1387,6 +1387,74 @@ def test_r062_r2_a_record_that_is_a_symbolic_link_is_not_followed(tmp_path):
         assert read(root, "store/inventory-target.md") == FIXTURES["docs/INVENTORY.md"][1]
 
 
+# ---------------------------------------------------------------- round 3: the reviewers' findings on round 2
+
+
+def make_folder_link(link, target):
+    """A link from the folder `link` to the folder `target`: a junction on Windows, which needs no privilege, a
+    symbolic link elsewhere; the test skips where neither can be made."""
+    if sys.platform == "win32":
+        import _winapi
+        try:
+            _winapi.CreateJunction(str(target), str(link))
+            return
+        except OSError as exc:
+            pytest.skip("this account cannot create a junction: %s" % exc)
+    try:
+        os.symlink(str(target), str(link), target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip("this account cannot create a folder link: %s" % exc)
+
+
+@pytest.mark.parametrize("given", [False, True], ids=["enumerated", "given"])
+def test_r062_r3_a_record_below_a_linked_folder_is_not_followed(tmp_path, given):
+    """Security audit (blocking) and Review A, round 2, convergent: the link check looked at the record's own name
+    only, so a record whose parent folder is a link or a junction was read through it and rewritten outside the
+    project, its temporary file created there too. Enforces R-062, the brief's Security context ("never follows a
+    symbolic link to write elsewhere") and its F14 ruling extended to every folder between the root and the record:
+    the record is listed `cannot read <path>: <reason>`, the file behind the link byte-identical, no temporary file
+    beside it, the exit unchanged, for an enumerated and a given record, with and without --check."""
+    outside = tmp_path / "outside"
+    original = FIXTURES["docs/INVENTORY.md"][1]
+    write(outside, "docs/INVENTORY.md", original)
+    root = tmp_path / "proj"
+    root.mkdir()
+    make_folder_link(root / "docs", outside / "docs")
+    paths = ("docs/INVENTORY.md",) if given else ()
+    for check in (("--check",), ()):
+        code, out = migrate(root, *(check + paths))
+        assert code == 0, out
+        reasons = listed(out, "cannot read ", "docs/INVENTORY.md")
+        assert len(reasons) == 1 and reasons[0].strip(), out
+        assert read(outside, "docs/INVENTORY.md") == original
+        assert temporaries_under(outside) == []
+
+
+def test_r062_r3_a_file_already_at_the_temporary_name_is_never_removed(tmp_path, monkeypatch, capsys):
+    """Review A (blocking) and the security audit (advisory), round 2, convergent: when the exclusive open of the
+    temporary file failed because a file already stood at its name, the failure branch removed that file, which the
+    program never created. Enforces R-062, the brief's F8 ruling ("removed on every failure path after its
+    creation, and only there"): exit 3, the record byte-identical, the file that stood at the temporary name still
+    there with its bytes."""
+    import uuid
+    root = project(tmp_path, ["docs/INVENTORY.md"])
+    before = read(root, "docs/INVENTORY.md")
+    mod = load_migrate()
+    fixed = uuid.UUID(int=0x1234)
+    squatter = os.path.join(str(root), "docs", ".records-migrate-%s.tmp" % fixed.hex)
+    with open(squatter, "wb") as f:
+        f.write(b"someone else's file")
+    monkeypatch.chdir(str(root))
+    monkeypatch.setattr(mod.uuid, "uuid4", lambda: fixed)
+    code = call_main(mod, ["docs/INVENTORY.md"])
+    monkeypatch.undo()
+    capsys.readouterr()
+    assert code == 3
+    assert read(root, "docs/INVENTORY.md") == before
+    with open(squatter, "rb") as f:
+        assert f.read() == b"someone else's file"
+
+
 # ---------------------------------------------------------------- builder's cases below this line
 
 
