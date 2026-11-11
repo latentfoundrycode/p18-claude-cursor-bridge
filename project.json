@@ -5,7 +5,7 @@
   "version": "2026.11.09a",
   "state": {
     "phase": "changing",
-    "stage": "release B2: stage H2 in progress (TASK-051, the migration program, merged); TASK-052 to TASK-054 next",
+    "stage": "release B2: stage H2 in progress (TASK-051 and TASK-052 merged); the stage review of the release text, TASK-053 and TASK-054 next",
     "bridge": "2026.11.09a",
     "updated": "2026-11-11"
   }
