@@ -1,4 +1,7 @@
-# SCOPE for BUG-044 (Review B, round 1)
+# SCOPE for BUG-044 (Review B, round 2)
+
+## Round 1 and its disposition
+Review B, round 1 (BUG-044-r1), REJECT on one finding, behaviour: bridge/commands/calibrate-bridge.md step 4 said a run stopping on HEADER MALFORMED (exit 2) is repaired at the line the message names, while records-migrate.py prints check_header's findings for a header that breaks its schema, which name keys and no line. It confirmed the program repairs the named cause at the read-back, the reproduction tests unedited and run-parameters.md's sentence. The supervisor's fix (this round, the guard's round 2, no builder run; below the ceiling, so no Blocking class line): the sentence names the line for a header that cannot be read and the keys for a schema break; test_bug044_the_calibration_s_malformed_stop_says_what_the_message_names (at the end of tests/test_bug044.py) enforces it, running the program on a brief whose header holds only record and header (exit 2, keys, no line number) and on one with a tab in its header (exit 2, line N), and asserting the text's wording, which the earlier commit lacks. Review A's confirming read APPROVE. The rest of this file is round 1's, unchanged but for the evidence.
 
 The fix: BUG-044, a defect found after TASK-051's and TASK-052's merges by stage H2's review, round 1 (both reviewers' blocking findings, one cause). Branch bug-044 from main 86a37e3 (PR #147's merge). The fix brief is handoff/BUG-044.md (spec-packager's fix variant), committed as 2770867, the builder's checkpoint; one builder round (composer-2.5). This is the review guard's first round for BUG-044, below the code gate's ceiling: there is no Blocking class line.
 
@@ -54,7 +57,8 @@ docs/HARDENING.md, Release B2's stage H2 (in the diff): TASK-051's recorded item
 - the fix's own test files: "1021 passed, 1 skipped in 54.09s" (the skip is the symlink privilege on this account).
 - Review A: APPROVE ("148 passed in 3.72s", "186 passed, 1 skipped in 112.10s", "RESULT: SOURCES MATCH bridge 2026.11.09a"); its should-fix (m02's expected list) and wording items taken before this round. Security audit: PASS, two advisories (one a test, taken; one a HARDENING lead).
 - the texts and the fix after those items: "202 passed in 4.68s".
-- the full suite with the pull request's variables (GITHUB_REF=refs/pull/148/merge): 5080 passed, 41 skipped in 1899.68s (0:31:39)
+- the full suite with the pull request's variables (GITHUB_REF=refs/pull/148/merge), on round 1's head: 5080 passed, 41 skipped in 1899.68s (0:31:39)
+- round 2's fix: tests/test_bug044.py "22 passed in 3.80s"; Review A's confirming read "22 passed in 3.68s" and "106 passed, 1 skipped in 42.09s".
 
 ## Expected bookkeeping and records in the diff
 handoff/BUG-044.md (the brief) and handoff/BUG-044-report.md (the builder's report); docs/debug/BUG-044.md (the root-cause record); bridge/cursor-bridge/MANIFEST.json (regenerated); the supervisor's records commit: docs/HARDENING.md, docs/INVENTORY.md, docs/PROJECT_STATUS.md (as at PR #148's merge), docs/archive/STATUS_HISTORY.md, docs/BUILDER_NOTES.md, project.json; and run/review/ (these files).
