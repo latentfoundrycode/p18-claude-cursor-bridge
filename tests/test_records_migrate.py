@@ -1507,9 +1507,10 @@ def test_r062_ruling1_wrote_line_on_enumerated_run(tmp_path):
 
 
 def test_r062_ruling2_given_path_shown_as_given(tmp_path):
-    """R16 / ruling 2: a given record path is shown exactly as given."""
+    """R16 / ruling 2: a given record path is shown exactly as given. The path is written with the platform's own
+    separator (a backslash names a file on Linux, CI's ubuntu run 42960332750)."""
     root = project(tmp_path, ["docs/INVENTORY.md"])
-    given = "docs\\INVENTORY.md"
+    given = os.path.join("docs", "INVENTORY.md")
     code, out = migrate(root, given)
     assert code == 0, out
     assert any(line.startswith("wrote ") and given.replace("\\", "/") in line.replace("\\", "/") for line in out.splitlines()), out
