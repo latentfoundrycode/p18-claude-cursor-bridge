@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-008
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/workflow-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-008-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-008: The Workflows status line: enforced
 
 ## Objective

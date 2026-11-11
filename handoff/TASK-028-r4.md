@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-028
+round: 4
+satisfies: [R-039]
+scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-028-r4-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-028 (round 4): Windowless launches enforced by the bridge: two code fixes past the review ceiling
 
 ## Objective

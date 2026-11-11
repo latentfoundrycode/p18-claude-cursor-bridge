@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-047
+round: 4
+satisfies: [R-058]
+scope: ["bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-047-r4-report.md"]
+merge_unit: null
+blocking_class: "failing test"
+---
 # TASK-047-r4: The status file's header in its six readers, round 4 (conformance-check through a link)
 
 Blocking class: failing test - CI on PR #138, bridge programs (ubuntu-latest), run 42359390308: tests/test_workflows_line_check.py::test_r015_checker_is_found_beside_the_real_file_not_the_link[conformance-check.py]

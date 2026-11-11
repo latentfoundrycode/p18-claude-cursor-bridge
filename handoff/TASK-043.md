@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-043
+round: 1
+satisfies: [R-042, R-055]
+scope: ["bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-043-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-043: BUG-039, the review guard's four sites (the early flags void the launch; the void during the run; premerge's git call through the helper; the re-snapshot keeps the flag)
 
 ## Objective

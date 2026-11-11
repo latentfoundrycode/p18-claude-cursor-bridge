@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: CONFIG-B3b
+round: 1
+satisfies: []
+scope: ["tools/dump-cli.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", ".github/workflows/tests.yml", ".githooks/pre-commit", "bridge/cursor-bridge/completion-check.py", "bridge/cursor-bridge/plan-check.py", "bridge/cursor-bridge/diagram-check.py", "bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/sync-check.py", "bridge/cursor-bridge/evaluate-reports.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/CONFIG-B3b-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # CONFIG-B3b: the generated command reference of the bridge's programs
 
 ## Objective

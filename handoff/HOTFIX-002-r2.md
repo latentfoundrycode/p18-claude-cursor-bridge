@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: HOTFIX-002
+round: 2
+satisfies: []
+scope: ["bridge/cursor-bridge/conformance-check.py", "handoff/HOTFIX-002-r2-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # HOTFIX-002 round 2: no computer path in conformance-check.py's docstring
 
 ## Objective

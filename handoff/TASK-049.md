@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-049
+round: 1
+satisfies: [R-060, R-058]
+scope: ["bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/completion-check.py", "bridge/cursor-bridge/diagram-check.py", "bridge/cursor-bridge/plan-check.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_header_tables.py", "tests/test_conformance_check.py", "tests/test_completion_check.py", "tests/test_diagram_check.py", "tests/test_plan_check.py", "tests/test_text_consistency.py", "docs/BUILDER_NOTES.md", "handoff/TASK-049-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-049: The tabular records' headers
 
 ## Objective

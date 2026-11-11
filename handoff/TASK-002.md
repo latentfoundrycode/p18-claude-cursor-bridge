@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-002
+round: 1
+satisfies: [R-002]
+scope: [".github/workflows/tests.yml", ".semgrep.yml", osv-scanner.toml, socket.yml, requirements.lock, "tests/test_release_b_ci_floor.py", "docs/BUILDER_NOTES.md", "handoff/TASK-002-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-002: The security floor in the bridge's CI
 
 ## Objective

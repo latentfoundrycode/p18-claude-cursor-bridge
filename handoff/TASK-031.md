@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-031
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/mutation-run.py", "tests/test_mutation_run.py", "tests/test_dump_cli.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-031-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-031: Mutation reruns that skip what is unchanged: `mutation-run.py`
 
 ## Objective

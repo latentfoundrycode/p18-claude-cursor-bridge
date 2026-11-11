@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-050
+round: 1
+satisfies: [R-061, R-061, R-057, R-057]
+scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/loop-guard.py", "bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_header_run_parameters.py", "tests/test_header_currency.py", "tests/test_loop_guard.py", "tests/test_bridge_run_design_ceiling.py", "tests/test_bridge_run_review_ceiling.py", "tests/test_review_guard_ceiling.py", "tests/test_release_b_bootstrap.py", "docs/BUILDER_NOTES.md", "handoff/TASK-050-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-050: The run parameters' header (R-061)
 
 ## Objective

@@ -1,3 +1,22 @@
+---
+record: inventory
+header: 1
+reflected_through: none
+development_data: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)"
+tables:
+  features:
+    columns: [Feature, "What it does", Where, Tests, Since]
+    key: Feature
+  resources:
+    columns: [Name, Kind, "Where it lives", "Used by", Provided]
+    key: Name
+  decisions:
+    columns: [Decision, Reason, Settled, "Revisit only if"]
+    key: Decision
+  deferred:
+    columns: [Item, "Why deferred", Since, "Owner decision needed"]
+    key: Item
+---
 # Inventory — Claude-Cursor Bridge
 Reflected through: none
 Updated: 2026-11-11

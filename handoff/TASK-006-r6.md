@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-006
+round: 6
+satisfies: [R-014, R-033]
+scope: ["bridge/cursor-bridge/workflow-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-006-r6-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-006 round 6: the workflow check — the fifth review's corrections
 
 ## Objective

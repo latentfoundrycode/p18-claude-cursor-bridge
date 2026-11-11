@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-047
+round: 2
+satisfies: [R-058]
+scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/loop-guard.py", "bridge/cursor-bridge/session-start.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/workflow-check.py", "bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/evaluate-reports.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_header_status.py", "tests/test_loop_guard.py", "tests/test_session_start.py", "tests/test_session_start_module.py", "tests/test_conformance_check.py", "tests/test_workflows_line_check.py", "tests/test_workflow_check.py", "tests/test_evaluate_reports.py", "docs/BUILDER_NOTES.md", "handoff/TASK-047-r2-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-047-r2: The status file's header in its six readers, round 2 (the reviewers' findings)
 
 ## Objective

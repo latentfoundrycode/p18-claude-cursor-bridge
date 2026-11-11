@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: REFAC-001
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/session-start.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/REFAC-001-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # REFAC-001: pointers_part's workflow read as one helper with plain returns
 
 ## Objective

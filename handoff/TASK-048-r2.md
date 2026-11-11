@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-048
+round: 2
+satisfies: [R-059]
+scope: ["bridge/cursor-bridge/plan-check.py", "bridge/cursor-bridge/scope-check.py", "bridge/cursor-bridge/completion-check.py", "bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_header_plan.py", "tests/test_header_plan_r2.py", "tests/test_plan_check.py", "tests/test_scope_check.py", "tests/test_completion_check.py", "tests/test_bridge_run_review_ceiling.py", "tests/test_review_guard_ceiling.py", "tests/test_task032_supervisor_launcher.py", "docs/BUILDER_NOTES.md", "handoff/TASK-048-r2-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-048-r2: The plan's and the briefs' headers, round 2 (the reviewers' findings)
 
 ## Objective

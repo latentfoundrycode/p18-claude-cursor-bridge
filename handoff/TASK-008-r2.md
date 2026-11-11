@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-008
+round: 2
+satisfies: [R-015]
+scope: ["bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-008-r2-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-008 round 2: the Workflows status line — the first review's corrections
 
 ## Objective

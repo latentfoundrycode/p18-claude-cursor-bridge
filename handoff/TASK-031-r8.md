@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-031
+round: 8
+satisfies: []
+scope: ["bridge/cursor-bridge/mutation-run.py", "tests/test_mutation_run.py", "docs/BUILDER_NOTES.md", "handoff/TASK-031-r8-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-031 round 8: the blocking finding of round 7's gate
 
 ## Objective

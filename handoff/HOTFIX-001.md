@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: HOTFIX-001
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/bridge-run.py", "handoff/HOTFIX-001-r1-report.md", "handoff/HOTFIX-001-r2-report.md", "handoff/HOTFIX-001-r3-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # HOTFIX-001: the launcher holds the design critique's ceiling
 
 ## Objective

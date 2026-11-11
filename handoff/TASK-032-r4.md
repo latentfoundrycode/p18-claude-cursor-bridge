@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-032
+round: 4
+satisfies: []
+scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-032-r4-report.md"]
+merge_unit: null
+blocking_class: behaviour
+---
 # TASK-032-r4: The code-review ceiling held by the launcher and the guard — round 4, blocking-class fixes only
 
 Blocking class: behaviour - an identical-bytes relaunch of a brief name whose first logged run had other bytes is counted as a new round, and its class line as already used (Review A, round 3, N1)

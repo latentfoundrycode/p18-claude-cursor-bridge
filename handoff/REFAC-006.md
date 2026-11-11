@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: REFAC-006
+round: 1
+satisfies: [R-059, R-060]
+scope: ["bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/completion-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/REFAC-006-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # REFAC-006: stage H1's two repeats go from conformance-check.py and completion-check.py
 
 ## Objective

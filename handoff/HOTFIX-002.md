@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: HOTFIX-002
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/records-check.py", "bridge/cursor-bridge/stage-diff.py", "handoff/HOTFIX-002-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # HOTFIX-002: the hotfix's two new programs, with a top-level build_parser()
 
 ## Objective

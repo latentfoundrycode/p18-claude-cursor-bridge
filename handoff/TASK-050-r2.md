@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-050
+round: 2
+satisfies: [R-061, R-061, R-057]
+scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/inventory-check.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_header_run_parameters.py", "tests/test_bridge_run_design_ceiling.py", "docs/BUILDER_NOTES.md", "handoff/TASK-050-r2-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-050 round 2: the run parameters' header, round 1's confirmed findings fixed (R-061)
 
 ## Objective

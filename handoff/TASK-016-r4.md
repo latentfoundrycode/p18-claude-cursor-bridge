@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-016
+round: 4
+satisfies: [R-029]
+scope: ["bridge/cursor-bridge/trace-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-016-r4-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-016 round 4: no link anywhere the program reads, the placeholder kept, citations read once
 
 ## Objective

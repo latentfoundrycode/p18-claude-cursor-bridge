@@ -1,3 +1,16 @@
+---
+record: project-status
+header: 1
+phase: changing
+workflows:
+  - type: "Host Extension Development"
+    subtype: "Claude Code Extension"
+    traits: [Installable]
+awaiting_user_on: ""
+bridge_version: "2026.11.11a"
+stage: "release B2's stage H1 closed 2026-11-11 (HARDENING, Release B2's stage H1 — the close), stage H2 in progress (TASK-051, TASK-052, BUG-044 and TASK-053 merged; the stage review's round 2 approved by both 2026-11-11; the owner's install, TASK-054); release T's T1 closed 2026-11-02, T2 2026-11-04, its project end 2026-11-04; release B's stages and project end: docs/archive/STATUS_HISTORY.md. Last reflection: stage H1's close, 2026-11-11 (stage review STAGE-H1-r1 approved by both; demonstration live on main d40e6d2, 54 of 54 checks passed; conformance 25 OK, 0 MISSING, 5 NOTE; Issues ISS-031 and ISS-032 added; Feedback FB-085 to FB-091; Project Summary, User Manual and the Guide patched); before it release B2's design gate, 2026-11-04"
+open_issues: ["ISS-031 open (invisible-check misses U+2028, U+2029, U+0085 and the C0 controls; a program item for the maintainer)", "ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on)", "ISS-024 recurred, counter 2", "ISS-013 mitigated (the plan check's rule, TASK-033, installed)", "Every other issue fixed or closed: the Issues file in Documents/, and docs/archive/STATUS_HISTORY.md"]
+---
 # Project Status
 Last updated: 2026-11-11
 Phase: changing

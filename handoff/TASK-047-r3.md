@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: TASK-047
+round: 3
+satisfies: [R-058]
+scope: ["bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/workflow-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-047-r3-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-047-r3: The status file's header in its six readers, round 3 (a part named twice)
 
 ## Objective

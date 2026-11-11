@@ -1,3 +1,13 @@
+---
+record: brief
+header: 1
+id: REFAC-002
+round: 1
+satisfies: []
+scope: ["bridge/cursor-bridge/loop-guard.py", "docs/BUILDER_NOTES.md", "handoff/REFAC-002-r1-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # REFAC-002: loop-guard.py imports only the datetime name it uses
 
 ## Objective
