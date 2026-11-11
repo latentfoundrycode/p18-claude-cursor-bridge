@@ -491,8 +491,10 @@ UV_ENV_FOLDERS = (("UV_WORKING_DIR", "--directory"), ("UV_PROJECT", "--project")
 # where the computer keeps uv's cache and its managed interpreters. Any other `UV_` name is refused: the interpreter
 # (`UV_PYTHON`), its environment (`UV_PROJECT_ENVIRONMENT`), a file of variables or of settings (`UV_ENV_FILE`,
 # `UV_CONFIG_FILE`) and whatever a later uv adds stand for options the command line refuses, or for none it knows.
+# A name joins the list only if it changes no interpreter, environment, configuration file or package source;
+# `UV_RUN_RECURSION_DEPTH` is uv's own counter, which it sets in every process it starts.
 UV_ENV_PLAIN = ("UV_CACHE_DIR", "UV_NO_CACHE", "UV_PYTHON_INSTALL_DIR", "UV_FROZEN", "UV_LOCKED", "UV_NO_SYNC", "UV_OFFLINE", "UV_NO_PROGRESS",
-                "UV_LINK_MODE", "UV_COMPILE_BYTECODE", "UV_MANAGED_PYTHON", "UV_NO_MANAGED_PYTHON")
+                "UV_LINK_MODE", "UV_COMPILE_BYTECODE", "UV_MANAGED_PYTHON", "UV_NO_MANAGED_PYTHON", "UV_RUN_RECURSION_DEPTH")
 
 
 def outside_by_environment(argv, environ, folder=None):

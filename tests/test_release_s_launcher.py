@@ -248,7 +248,8 @@ def test_options_pytest_reads_from_the_environment_are_held_to_the_command_line_
                       ({"UV_CONFIG_FILE": "uv.toml"}, "UV_CONFIG_FILE"), ({"UV_A_LATER_NAME": "1"}, "UV_A_LATER_NAME")):
         assert br.outside_by_environment(uv, env, str(base)) == name, env
     for env in ({"UV_WORKING_DIR": "sub"}, {"UV_PROJECT": "."}, {"UV_WORKING_DIR": "sub", "PYTEST_ADDOPTS": "../tests"}, {"UV_CACHE_DIR": out}, {"UV_FROZEN": "1"},
-                {"UV_ENV_FILE": ""}, {"UV_LINK_MODE": "copy", "UV_PYTHON_INSTALL_DIR": out, "UV_NO_PROGRESS": "1"}, {"UVICORN_PORT": "1"}):
+                {"UV_ENV_FILE": ""}, {"UV_LINK_MODE": "copy", "UV_PYTHON_INSTALL_DIR": out, "UV_NO_PROGRESS": "1"}, {"UVICORN_PORT": "1"},
+                {"UV": "uv.exe", "UV_RUN_RECURSION_DEPTH": "1"}):          # what uv itself sets in a process it starts
         assert br.outside_by_environment(uv, env, str(base)) is None, env
     assert br.outside_by_environment(run, {"UV_WORKING_DIR": out, "UV_ENV_FILE": ".env", "UV_PYTHON": out}, str(base)) is None
     assert br.outside_by_environment(["python", "-m", "unittest", "discover"], {"PYTEST_ADDOPTS": "../elsewhere"}, str(base)) is None
