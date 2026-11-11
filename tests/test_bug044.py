@@ -184,15 +184,15 @@ def test_bug044_a_plan_heading_outside_any_stage_is_listed_cannot_read_and_not_w
 
 def test_bug044_a_bold_satisfies_line_is_listed_cannot_read_and_not_written(tmp_path):
     """Review B, STAGE-H2-r1: a bold Satisfies line the prose fallback does not read and completion-check.py's
-    outside-header scan does. The migration writes nothing and lists the plan `cannot read`, the reason naming an
-    increment holding such a line and the `Satisfies:` form the prose must take."""
+    outside-header scan does. The migration writes nothing and lists the plan `cannot read`, the reason naming an R-id
+    on such a line and the plain `Satisfies:` form the prose must take."""
     root = project(tmp_path, [(PLAN_REL, BOLD_SATISFIES_PLAN)])
     before = read(root, PLAN_REL)
     code, out = migrate(root, "--check")
     assert not lines_naming(out, "would write ", PLAN_REL), out
     hits = lines_naming(out, "cannot read ", PLAN_REL)
     assert len(hits) == 1, out
-    assert ("TASK-001" in hits[0] or "TASK-002" in hits[0]) and "Satisfies" in hits[0], hits
+    assert ("R-099" in hits[0] or "R-011" in hits[0]) and "Satisfies" in hits[0], hits
     assert code == 0, out
     code, out = migrate(root)
     assert read(root, PLAN_REL) == before, out
@@ -223,7 +223,7 @@ def requirements_for(ids):
 
 GATE_CASES = {
     "outside-stage": (OUTSIDE_STAGE_PLAN, ["R-001", "R-002"]),
-    "bold-satisfies": (BOLD_SATISFIES_PLAN, ["R-004", "R-011", "R-099"]),
+    "bold-satisfies": (BOLD_SATISFIES_PLAN, ["R-004"]),
     "plain": (PLAIN_PLAN, ["R-004", "R-011", "R-099"]),
 }
 
