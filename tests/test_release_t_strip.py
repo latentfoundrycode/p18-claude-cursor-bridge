@@ -4,10 +4,10 @@ enforces: docs/REQUIREMENTS.md R-052 (the loop's suite and driver launches carry
 the note "Stripped environment" (what is withheld and what is set).
 
 One environment test beside a pin of `stripped_env`, neither in a mutants file's new_tests (m42 the pin's proof): it reads the environment this pytest process was
-given. Under `bridge-run.py --strip` the launcher sets GH_CONFIG_DIR to the empty folder and HOME to the agent home, while
-LOCALAPPDATA stays the owner's real folder (docs/diagrams/D-004-context-dfd.md's note, a program item), so the owner's profile is read from it. Where GH_CONFIG_DIR
-is set and HOME is not the owner's profile, the run is a stripped one, and HOME must be the agent home and every name the
-note lists as withheld absent. Anywhere else (CI, a plain local run) it skips and says why. The environment is read when
+given. Under `bridge-run.py --strip` the launcher sets GH_CONFIG_DIR to the empty folder and HOME to the agent home, and
+since release S (C1) APPDATA and LOCALAPPDATA to that folder's skeleton (docs/diagrams/D-004-context-dfd.md's note). Where
+GH_CONFIG_DIR is set and HOME is an agent home, the run is a stripped one: USERPROFILE and the two application folders must
+agree with it and every name the note lists as withheld be absent. Anywhere else (CI, a plain local run) it skips and says why. The environment is read when
 the module is collected, before tests/conftest.py's autouse fixture `home_of_the_tests` points HOME and USERPROFILE at a
 temporary folder for the test itself."""
 import os
@@ -31,13 +31,12 @@ def _same(a, b):
     return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
 
 
-def owner_profile():
-    """The owner's profile folder, read from LOCALAPPDATA (<profile>/AppData/Local), which the strip leaves the owner's;
-    None where it is not set."""
-    local = LAUNCH_ENV.get("LOCALAPPDATA")
-    if not local:
-        return None
-    return os.path.dirname(os.path.dirname(os.path.normpath(local)))
+def is_agent_home(home):
+    """True when `home` is `<some profile>/.cursor-bridge/agent-home`, the folder a stripped launch hands the run. Since
+    release S (C1) the strip points LOCALAPPDATA into that folder too, so the owner's profile can no longer be read from
+    it; the folder's own two last names are the tell."""
+    parts = os.path.normcase(os.path.normpath(home)).replace("\\", "/").rstrip("/").split("/")
+    return parts[-2:] == [".cursor-bridge", "agent-home"]
 
 
 def git_bash_put_it_back(name, value):
@@ -60,16 +59,15 @@ def test_r052_the_strip_itself_withholds_git_bash_s_helper(tmp_path, monkeypatch
 
 def test_r052_a_stripped_suite_launch_gets_the_agent_home_and_no_withheld_name():
     env = LAUNCH_ENV
-    profile = owner_profile()
     home = env.get("HOME", "")
     if not env.get("GH_CONFIG_DIR"):
         pytest.skip("GH_CONFIG_DIR is not set: this run was not launched with --strip")
-    if profile is None:
-        pytest.skip("LOCALAPPDATA is not set: the owner's profile cannot be read, so a stripped run cannot be told apart")
-    if not home or _same(home, profile):
-        pytest.skip("HOME is the owner's profile: this run was not launched with --strip")
-    assert _same(home, os.path.join(profile, ".cursor-bridge", "agent-home")), "HOME is not the agent home: " + home
+    if not home or not is_agent_home(home):
+        pytest.skip("HOME is not an agent home: this run was not launched with --strip")
     assert _same(env.get("USERPROFILE", ""), home), "USERPROFILE is not the agent home"
+    for name, rel in (("APPDATA", os.path.join("AppData", "Roaming")), ("LOCALAPPDATA", os.path.join("AppData", "Local"))):
+        if env.get(name):                                  # release S (C1): the run's own application folders, never the owner's
+            assert _same(env[name], os.path.join(home, rel)), "%s is not the agent home's skeleton: %s" % (name, env[name])
     present = [name for name in WITHHELD if name in env and not git_bash_put_it_back(name, env[name])]
     assert not present, "withheld names present: " + ", ".join(present)
     secret = sorted(name for name in env if bridge_env.secret_like(name))

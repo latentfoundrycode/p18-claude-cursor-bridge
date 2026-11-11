@@ -21,6 +21,11 @@ WITHHELD = ["ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "AZURE_DI_API_KEY", "MODA
             "GOOGLE_APPLICATION_CREDENTIALS", "LLM_APIKEY", "GH_TOKEN", "GITHUB_TOKEN", "TOKEN", "SECRET",
             "SFVF_SECRETS_PASSPHRASE", "SFVF_SECRETS_PATH", "DEPLOY_KEYS", "API_TOKENS", "MY_PASSWD", "MY_PASSPHRASE",
             "DEPLOY_KEY", "AWS_ACCESSKEY", "MY_PRIVATEKEY", "GIT_ASKPASS", "SSH_ASKPASS"]
+# release S (C1): what the recipe passes through by the tool's own variable, each from the owner's real folder
+APP_CACHE_FOLDERS = {"UV_CACHE_DIR": ("localappdata", "uv/cache"), "UV_PYTHON_INSTALL_DIR": ("appdata", "uv/python"),
+                     "PIP_CACHE_DIR": ("localappdata", "pip/Cache"), "PYTHONUSERBASE": ("appdata", "Python"),
+                     "NPM_CONFIG_CACHE": ("localappdata", "npm-cache"), "YARN_CACHE_FOLDER": ("localappdata", "Yarn/Cache"),
+                     "PLAYWRIGHT_BROWSERS_PATH": ("localappdata", "ms-playwright"), "GOCACHE": ("localappdata", "go-build")}
 KEPT = ["PATH", "HOME", "CURSOR_API_KEY", "CURSOR_TOKEN", "TOKENIZERS_PARALLELISM", "SECRETARY", "KEYBOARD_LAYOUT",
         "MONKEY", "PYTHONUTF8", "DATABASE_URL", "REANGLE_INSTANCE_NAME", "LOG_LEVEL"]
 
@@ -36,6 +41,13 @@ def sample_env(tmp_path):
     env = {k: "v" for k in WITHHELD + KEPT}
     env["PATH"] = os.environ.get("PATH", "")
     env["LOCALAPPDATA"] = str(tmp_path / "localappdata")
+    env["APPDATA"] = str(tmp_path / "appdata")
+    for base, rel in APP_CACHE_FOLDERS.values():           # the tools' caches and installed packages under the owner's real folders
+        (tmp_path / base / rel).mkdir(parents=True, exist_ok=True)
+    (tmp_path / "appdata" / "TDP").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "appdata" / "TDP" / "keys.env").write_text("NOT_FOR_A_RUN=1\n", encoding="utf-8")
+    (tmp_path / "appdata" / "Cursor").mkdir(exist_ok=True)   # where cursor-agent reads its login (probed 2026-11-11): reached by a link
+    (tmp_path / "appdata" / "Cursor" / "login-state").write_text("the CLI's own\n", encoding="utf-8")
     env["HOME"] = env["USERPROFILE"] = str(home)
     for k in ("SYSTEMROOT", "SystemRoot", "TEMP", "TMP", "COMSPEC", "PATHEXT"):
         if k in os.environ:
@@ -67,6 +79,21 @@ def assert_own_home(out, tmp_path):
     for k, v in out.items():
         assert os.path.normcase(os.path.abspath(v)) not in hidden, "%s=%s would show the owner's token file again" % (k, v)
     assert "HF_HOME" not in out and "XDG_CACHE_HOME" not in out
+    # release S (C1): the run's own application folders are the agent home's skeleton, so a program that writes its key
+    # file through APPDATA writes there; the owner's real folders are named by no variable but the tools' own caches
+    assert same_path(out["APPDATA"], str(agent_home / "AppData" / "Roaming")), out["APPDATA"]
+    assert same_path(out["LOCALAPPDATA"], str(agent_home / "AppData" / "Local")), out["LOCALAPPDATA"]
+    for var, (base, rel) in APP_CACHE_FOLDERS.items():
+        assert same_path(out[var], str(tmp_path / base / rel)), "%s: passed through by its own variable" % var
+    for bare in (tmp_path / "appdata", tmp_path / "localappdata", tmp_path / "appdata" / "TDP"):
+        folder = os.path.normcase(os.path.abspath(str(bare)))
+        named = [k for k, v in out.items() if os.path.normcase(os.path.abspath(v)) == folder]
+        assert not named, "%s names the owner's real folder %s" % (named, bare)
+    # the one thing a run still reaches there: cursor-agent's login, by a link in the skeleton as .cursor is; nothing else of APPDATA
+    roaming = agent_home / "AppData" / "Roaming"
+    assert sorted(os.listdir(roaming)) == ["Cursor"], "the skeleton's Roaming folder holds the link and nothing of the owner's beside it"
+    assert os.path.samefile(roaming / "Cursor", tmp_path / "appdata" / "Cursor") and (roaming / "Cursor" / "login-state").is_file()
+    assert not (roaming / "TDP").exists(), "the owner's key file is not reached through the redirected folder"
 
 
 def link_state(tmp_path, state):
@@ -132,6 +159,57 @@ def test_a_healthy_link_is_accepted_and_the_rename_probe_passes(program, tmp_pat
     assert not os.path.lexists(tmp_path / "home" / ".cursor-bridge" / "probe-link") and not (tmp_path / "home" / ".cursor-bridge" / "probe-target").exists()
 
 
+def shim_env(tmp_path, env):
+    """The shim's own text with its last line replaced by `env`, run on the sample: {name: value}, or None without a shell."""
+    if not shutil.which("sh"):
+        return None
+    text = open(SHIM, encoding="utf-8").read()
+    probe = tmp_path / "shim-probe.sh"
+    probe.write_text(text.rstrip()[: -len('exec cursor-agent.cmd "$@"')] + "env\n", encoding="utf-8", newline="\n")
+    p = subprocess.run([shutil.which("sh"), str(probe)], capture_output=True, text=True, env=env)
+    assert p.returncode == 0, p.stderr
+    return dict(line.split("=", 1) for line in p.stdout.splitlines() if "=" in line)
+
+
+@pytest.mark.parametrize("state", ["no folder", "folder with content", "link elsewhere", "empty folder"])
+def test_c1_the_login_link_decides_whether_appdata_is_redirected_in_both_recipes(program, tmp_path, state):
+    """Release S (C1), the probe's finding: cursor-agent is logged out when APPDATA is redirected and its `Cursor` folder is not
+    reached. Where the owner has no such folder there is nothing to reach and APPDATA is redirected. Where the link's place holds
+    a folder with content, or a link that leads elsewhere, the run keeps the owner's APPDATA (the login matters more than the
+    redirect) and LOCALAPPDATA is redirected all the same; nothing in the link's place is removed. An empty folder left there is
+    replaced by the link by the Python recipe."""
+    be = program("bridge_env")
+    env = sample_env(tmp_path)
+    roaming = tmp_path / "home" / ".cursor-bridge" / "agent-home" / "AppData" / "Roaming"
+    place = roaming / "Cursor"
+    if state == "no folder":
+        shutil.rmtree(str(tmp_path / "appdata" / "Cursor"))
+    elif state == "folder with content":
+        place.mkdir(parents=True)
+        (place / "left-by-a-run").write_text("x\n", encoding="utf-8")
+    elif state == "empty folder":
+        place.mkdir(parents=True)
+    else:
+        (tmp_path / "other").mkdir()
+        roaming.mkdir(parents=True)
+        assert be.make_link(str(place), str(tmp_path / "other")) is None
+    redirected = state in ("no folder", "empty folder")
+    want = str(roaming) if redirected else str(tmp_path / "appdata")
+    for out in (be.stripped_env(env), None if state == "empty folder" else shim_env(tmp_path, env)):
+        if out is None:
+            continue                                       # no shell here; or the empty folder, which the Python recipe has just replaced
+        assert same_path(out["APPDATA"], want), (state, out["APPDATA"])
+        assert same_path(out["LOCALAPPDATA"], str(roaming.parent / "Local")), "LOCALAPPDATA holds nothing the CLI needs: redirected whatever the link"
+    if state == "no folder":
+        assert not os.path.lexists(place)
+    elif state == "folder with content":
+        assert (place / "left-by-a-run").is_file() and not be.is_link(str(place))
+    elif state == "link elsewhere":
+        assert os.path.samefile(place, tmp_path / "other")
+    else:
+        assert os.path.samefile(place, tmp_path / "appdata" / "Cursor")
+
+
 @pytest.mark.skipif(shutil.which("sh") is None, reason="needs a POSIX shell (Git Bash on Windows)")
 def test_shim_withholds_exactly_what_the_python_recipe_does(program, tmp_path):
     """Run the shim's own text with its last line replaced by `env`, on the same sample."""
@@ -178,7 +256,7 @@ def d004_stripped_note():
     """(withheld names, the words of the `SECRET_LIKE` clause, the kept prefixes, set names) as D-004's note lists them."""
     with open(D004, encoding="utf-8") as f:
         note = next(line for line in f if line.startswith("- **Stripped environment**"))
-    m = re.search(r"Withheld: (.*?), every name `SECRET_LIKE` matches \((.*?)\) but (.*?)\. Set: (.*?)\. `APPDATA`", note)
+    m = re.search(r"Withheld: (.*?), every name `SECRET_LIKE` matches \((.*?)\) but (.*?)\. Set: (.*?)\. Passed:", note)
     assert m, "D-004's note on the stripped environment has lost its shape"
     withheld = re.findall(r"`([A-Z0-9_]+)`", m.group(1))
     words = set(re.findall(r"[A-Z_]{3,}", m.group(2)))
@@ -210,17 +288,25 @@ def test_r055_d004_the_withheld_names_are_the_notes(program, tmp_path, monkeypat
 
 def test_r055_d004_the_set_names_are_the_notes(program, tmp_path, monkeypatch):
     """R-055, D-004 (`p_bridge_env`). enforces: docs/BUILD_PLAN.md TASK-044 Done when: the variables the recipe gives a
-    value of its own are exactly the ones the note says it sets, read from the diagram; every other one, `APPDATA` and
-    `LOCALAPPDATA` by name, passes as it was."""
+    value of its own are exactly the ones the note says it sets, read from the diagram, `APPDATA` and `LOCALAPPDATA`
+    among them since release S (C1); every other one passes as it was. A variable the launcher's environment does not
+    have is not invented: without `APPDATA` the run gets none."""
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "localappdata"))
     be = program("bridge_env")
     _, _, _, set_names = d004_stripped_note()
     sample = sample_env(tmp_path)
-    sample["APPDATA"] = str(tmp_path / "appdata")
     out = be.stripped_env(sample)
     written = {k for k, v in out.items() if sample.get(k) != v}
     expected = set(set_names) if os.name == "nt" else set(set_names) - {"HOMEDRIVE", "HOMEPATH"}
     assert written == expected
     for name in set(sample) - set(WITHHELD) - expected:
         assert out.get(name) == sample[name], "%s did not pass as it was" % name
-    assert out["LOCALAPPDATA"] == sample["LOCALAPPDATA"] and out["APPDATA"] == sample["APPDATA"]
+    agent_home = tmp_path / "home" / ".cursor-bridge" / "agent-home"
+    assert same_path(out["LOCALAPPDATA"], str(agent_home / "AppData" / "Local")) and same_path(out["APPDATA"], str(agent_home / "AppData" / "Roaming"))
+    bare = sample_env(tmp_path)
+    del bare["APPDATA"]
+    again = be.stripped_env(bare)
+    assert "APPDATA" not in again and "UV_PYTHON_INSTALL_DIR" not in again and "PYTHONUSERBASE" not in again
+    preset = sample_env(tmp_path)
+    preset["UV_CACHE_DIR"] = str(tmp_path / "elsewhere")
+    assert be.stripped_env(preset)["UV_CACHE_DIR"] == preset["UV_CACHE_DIR"], "a cache variable the owner set is kept as set"

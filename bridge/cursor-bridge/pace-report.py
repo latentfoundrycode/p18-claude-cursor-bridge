@@ -14,7 +14,10 @@ GRAMMAR_ID_PATTERN; with a tracked handoff/ only IDs that have a brief, with han
 every ID the reader finds), rounds mean and max among merges that week, mean
 days from known start to merge, docs/HARDENING.md lines added on main that week (added lines only).
 A total row follows. Below the table, IDs over --ceiling with round counts and lifts (class, owner,
-none, unknown), then stage reviews (STAGE-<name>). With --tokens, token millions (sum of
+none, unknown), then stage reviews (STAGE-<name>); then, from the launcher's builder rows launched in
+the window, why the rounds after the first were opened (the `cause` the launcher read from each
+brief's `Round cause:` line; a row without one counts as unstated) and the builder rounds per model
+(release S). With --tokens, token millions (sum of
 input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens per message id,
 greatest total kept) from ~/.claude/projects/<key>/*.jsonl and <key>/**/subagents/*.jsonl for keys
 from evaluate-reports.py's project_keys, plus tokens per merged increment.
@@ -423,6 +426,50 @@ def _lift_map(ws, common, id_part):
             elif lift is None:
                 lifts.setdefault(rn, "none")
     return lifts
+
+
+ROUND_CAUSES = ("defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error", "unstated")
+
+
+def _builder_rounds(ws, weeks):
+    """{(brief id, round): (model, cause)} of the launcher's builder rows launched in the window, a
+    round launched twice counted once and its last row kept (release S: M1, M2)."""
+    seen = {}
+    for row in bridge_env.read_runs_jsonl(ws):
+        if row.get("kind") != "builder" or not row.get("brief") or row.get("slot") == "not free":
+            continue
+        try:
+            rnd = int(row.get("round") or 1)
+        except (TypeError, ValueError):
+            continue
+        when = _parse_run_time(str(row.get("id", ""))[:20])
+        if when is None or _iso_week(when) not in weeks:
+            continue
+        cause = row.get("cause")
+        seen[(str(row["brief"]), rnd)] = (str(row.get("model") or "unknown"), cause if cause in ROUND_CAUSES else "unstated")
+    return seen
+
+
+def _cause_and_model_lines(ws, weeks):
+    """Two lines below the table: why the rounds after the first were opened (M1, the launcher's
+    reading of each brief's `Round cause:` line), and the builder rounds each model took per
+    increment (M2). Neither line where the window holds no such row."""
+    rounds = _builder_rounds(ws, weeks)
+    out = []
+    later = [cause for (_, rnd), (_, cause) in rounds.items() if rnd > 1]
+    if later:
+        parts = ["%s %d (%d%%)" % (c, later.count(c), round(100.0 * later.count(c) / len(later))) for c in ROUND_CAUSES if later.count(c)]
+        out.append("Round causes (%d builder rounds after the first): %s" % (len(later), "; ".join(parts)))
+    by_model = {}
+    for (ident, _), (model, _) in rounds.items():
+        by_model.setdefault(model, []).append(ident)
+    if by_model:
+        parts = []
+        for model in sorted(by_model):
+            ids = by_model[model]
+            parts.append("%s %d round(s) over %d increment(s), mean %s" % (_ascii_name(model), len(ids), len(set(ids)), _fmt_num(len(ids) / float(len(set(ids))))))
+        out.append("Builder rounds per model: " + "; ".join(parts))
+    return out
 
 
 def _entry_is_link(entry):
@@ -848,6 +895,12 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
             lv = lifts.get(r, "unknown")
             parts.append("r%d %s" % (r, lv))
         lines.append("- " + "; ".join(parts))
+
+    extra = _cause_and_model_lines(ws, set(weeks))
+    if extra:
+        if over or stage:
+            lines.append("")
+        lines.extend(extra)
 
     unknown_starts = [
         i

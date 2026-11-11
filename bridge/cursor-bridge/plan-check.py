@@ -45,7 +45,10 @@ Checks (exit 1 on any):
               the increment satisfies (release A4, 13.1). A builder's report file beside the
               brief (`TASK-nnn-rN-report.md`, 2026.10.11d) is not a brief and is not read.
 Report: MERGED count, READY increments (not merged, all dependencies merged, not deferred),
-and which ready increments may run together.
+and which ready increments may run together. An unmerged increment whose `Done when:` field
+holds more than twelve acceptance items (list lines, clauses between semicolons or lettered
+marks), or whose Scope names more than twelve paths, is noted as large (release S): a note,
+never a failure, since no program knows what one subsystem is.
 """
 import argparse
 import glob
@@ -117,6 +120,9 @@ def stages_without_demonstration(paths):
 
 BOOKKEEPING = ("docs/BUILDER_NOTES.md", "docs/BOUNDARY_VIOLATIONS.md", "run/")   # every brief names them; no plan lists them
 REPORT_RX = re.compile(r"handoff/[A-Z]+-\w+-r\d+-report\.md$")                 # the builder's report file, named in every Scope (2026.10.11d)
+
+
+SIZE_NOTE_ABOVE = 12                                       # release S: above a dozen acceptance items or Scope paths, an increment is noted
 
 
 def unreadable(value):
@@ -380,6 +386,15 @@ def main():
         if any(t not in merged_ready for t in ids):                 # a closed stage is not noted
             notes.append("stage '%s' names no Demonstration: line; the stage close runs it live (release A1b), add one from the stage's increments" % s[:60])
     ready = [t for t in inc if t not in done and not items[t]["deferred"] and deps[t] <= done]
+    accept = bridge_env.plan_done_when_items(paths, read)
+    for t in inc:                                               # release S: an increment too large to converge is split before its first brief
+        if t in done or items[t]["deferred"] or t in historic_exempt:
+            continue
+        n_items, n_paths = accept.get(t, 0), len(items[t]["scope"])
+        if n_items > SIZE_NOTE_ABOVE or n_paths > SIZE_NOTE_ABOVE:
+            notes.append("large increment: %s has %d acceptance item(s) in its Done when and %d Scope path(s); above %d of either an increment tends to "
+                         "need more rounds than the ceiling gives: consider splitting it before its first brief (a note, never a failure)" % (
+                             t, n_items, n_paths, SIZE_NOTE_ABOVE))
     if paren_note_ids:
         notes.append(
             "unbalanced parenthesis in Scope not checked against a merged set: %s"

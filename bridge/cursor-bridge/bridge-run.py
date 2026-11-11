@@ -40,8 +40,10 @@ below the default and never above twice it unless `docs/RUN_PARAMETERS.md` carri
 owner's words on a line `Ceiling above twice: <kind> <seconds> (<their words>, <date>)`. The
 supervisor marks a run healthy with `--healthy <run id>` once its work passed the gate (the
 id is the launch time on the first stderr line, given whole or as a prefix that fits exactly
-one run; a run ended at its limit whose kept work merged counts too, so the ceiling can grow);
-a test run that exits 0 is marked by the launcher itself. The run that raised a ceiling is
+one run); a test run that exits 0 is marked by the launcher itself. A builder, review or watch
+run that ended at its limit (exit 124) is never marked healthy and never counts toward the
+learned limit, whatever became of its kept work: its seconds are the limit, not the work's
+time (ISS-030); work that needs longer is launched with an explicit `--limit`. The run that raised a ceiling is
 named when the ceiling is chosen. A slow but healthy task is never ended before its ceiling.
 An owner's cap below twice the default is ignored with a note: the line says "above twice".
 Refuses a design critique round above the ceiling (exit 125, `design ceiling:`).
@@ -111,6 +113,7 @@ DRIVER_KEYFILE_REFUSE = ("bridge-run: refused - driver kind: --key-file is not a
                          "before the program runs)\n")
 LOG = os.path.join("run", "launcher", "runs.jsonl")
 LEARN_FACTOR = 1.5
+LEARN_EXITS = {"driver": (0, 1), "test": (0, 124)}        # the exits a healthy run of a kind may have; every other kind: 0 only
 CAP_FACTOR = 2
 HEAVY_KINDS = frozenset(("builder", "driver", "test"))
 SLOT_GRACE = 120
@@ -348,6 +351,49 @@ def test_suite(argv, folder=None):
             and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0] + ".cmd")):
         return False                                       # npx would fetch it from the registry, outside the gate
     return True
+
+
+def outside_target(argv, folder=None):
+    """The first target of a pytest or unittest run that resolves outside the launch folder, or
+    None (release S). A test run reads the project's own tests: a probe written in a temporary
+    folder and run through the launcher would run code no diff shows, in the project's
+    environment. Every word after `pytest` or `unittest` that is no option is resolved against
+    the launch folder (a `::node` suffix dropped); a `-k` expression or a marker resolves
+    inside it and passes."""
+    head = head_of(argv)
+    if head not in ("pytest", "python", "python3", "py", "uv"):
+        return None
+    word = "pytest" if head == "pytest" or "pytest" in argv[1:] else "unittest"
+    start = 1 if head == "pytest" else (argv.index(word, 1) + 1 if word in argv[1:] else len(argv))
+    base = _normcase_path(folder or os.getcwd())
+    for a in argv[start:]:
+        path = a.split("::", 1)[0]
+        if a.startswith("-") or not path:
+            continue
+        full = _normcase_path(os.path.join(base, path))
+        if not (full == base or full.startswith(base.rstrip(os.sep) + os.sep)):
+            return a
+    return None
+
+
+ROUND_CAUSES = ("defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error")
+ROUND_CAUSE_RE = re.compile(r"^Round cause:[ \t]*(.*?)[ \t]*$", re.M)
+
+
+def round_cause(brief_text):
+    """(cause, note) from a brief's `Round cause: <cause> - <one line>` (release S, M1): why this
+    round was opened, one of ROUND_CAUSES, read into the run log for pace-report.py. A brief of
+    round two or later without the line, or with a word outside the list, is logged `unstated`
+    with a note; never a refusal, the measure must not hold a build."""
+    m = ROUND_CAUSE_RE.search(brief_text or "")
+    if not m:
+        return "unstated", "the brief has no `Round cause:` line (one of: %s); logged as unstated" % ", ".join(ROUND_CAUSES)
+    value = m.group(1).lower()
+    for cause in sorted(ROUND_CAUSES, key=len, reverse=True):
+        rest = value[len(cause):].lstrip()
+        if value.startswith(cause) and (not rest or rest[0] in "-:(,;–—"):
+            return cause, None
+    return "unstated", "the brief's `Round cause:` names none of: %s; logged as unstated" % ", ".join(ROUND_CAUSES)
 
 
 def kind_of(argv):
@@ -749,6 +795,10 @@ def builder_review_refusal(argv, folder, kind):
         "merge_ids": tuple(declared),
         "branch": br,
     }
+    if name_round > 1:                                     # release S, M1: why the round was opened, for pace-report.py
+        meta["cause"], cause_note = round_cause(brief_text)
+        if cause_note:
+            NOTES.append(cause_note)
     return None, meta
 
 
@@ -757,7 +807,7 @@ def learned_limit(kind, folder):
     never below the default and never above twice it without the owner's words."""
     default = KINDS[kind]
     cap, _ = cap_for(kind, folder)
-    exits = (0, 1) if kind == "driver" else (0, 124)   # 124: ended at its limit, its kept work merged (test kind)
+    exits = LEARN_EXITS.get(kind, (0,))                    # a run ended at its limit measures the limit, not the work (ISS-030)
     healthy = [r for r in read_log(folder) if r.get("kind") == kind and r.get("healthy") is True
                and isinstance(r.get("seconds"), (int, float)) and r.get("exit") in exits]
     if not healthy:
@@ -784,6 +834,11 @@ def mark_healthy(run_id, folder, kind=None):
         return 1
     if hit[0].get("kind") == "driver" and hit[0].get("exit") not in (0, 1):
         sys.stderr.write("bridge-run: refused - a driver run is healthy at exit 0 or 1 only\n")
+        return 1
+    if hit[0].get("exit") == 124 and hit[0].get("kind") != "test":
+        sys.stderr.write("bridge-run: refused - a %s run that ended at its limit is not marked healthy: its seconds are the limit, "
+                         "not the time the work takes, and would lengthen every later run (ISS-030); where the work needs longer, "
+                         "launch with an explicit --limit\n" % hit[0].get("kind"))
         return 1
     for r in hit:
         r["healthy"] = True
@@ -1483,6 +1538,12 @@ def main():
     elif not accepted(cmd, folder):
         sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
         return 125
+    if kind != "driver" and named_suite(cmd):
+        outside = outside_target(cmd, folder)
+        if outside is not None:
+            sys.stderr.write("bridge-run: refused - the test target %r lies outside the folder the launcher runs in; a test run reads the project's own tests: "
+                             "write a probe under the project's tests folder and run it from there\n" % outside)
+            return 125
     if "--key-file" in flags and is_agent_argv(cmd):
         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
         return 125
@@ -1594,6 +1655,8 @@ def main():
         )
         if brief_meta.get("lift_line"):
             entry["lift_line"] = brief_meta["lift_line"]
+        if brief_meta.get("cause"):
+            entry["cause"] = brief_meta["cause"]
     if kind == "watch" and head.startswith("gh pr checks"):
         line = wait_for_first_check(argv[argv.index("--") + 1:], folder)
         if line:

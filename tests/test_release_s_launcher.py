@@ -1,0 +1,232 @@
+"""Release S: the launcher's three additions (bridge-run.py).
+
+C18 (ISS-030): a builder, review or watch run that ended at its limit measures the limit, not the work; it is never marked healthy and
+never counts toward the learned limit, so one over-long run no longer lengthens every later one. A test run keeps its exit-124 rule.
+
+The test target: a pytest or unittest run through the launcher reads the project's own tests; a target that resolves outside the launch
+folder is refused before anything starts.
+
+M1: a builder brief of round two or later carries `Round cause: <cause> - <one line>`; the launcher reads the cause into the run log
+(`cause`) for pace-report.py, logs `unstated` with a note where the line is missing or names no known cause, and never refuses for it."""
+import json
+import os
+import subprocess
+import sys
+
+import pytest
+
+import test_pace_report as P
+from test_task032_supervisor_launcher import Lab, assert_ran, build, launch, write_brief
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "bridge-run.py")
+PACE = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "pace-report.py")
+
+
+def write_rows(folder, rows):
+    log = folder / "run" / "launcher"
+    log.mkdir(parents=True, exist_ok=True)
+    (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+
+def rows_of(folder):
+    return [json.loads(line) for line in (folder / "run" / "launcher" / "runs.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+# ---------------------------------------------------------------- C18: the learned limit
+
+
+@pytest.mark.parametrize("kind,default", [("builder", 7200), ("review", 3600), ("watch", 3600)])
+def test_c18_a_run_ended_at_its_limit_never_raises_the_learned_limit(program, tmp_path, kind, default):
+    """The row is on record as healthy (as the TDP's 7201-second builder run of 2026-10-12 is): it no longer counts. The same
+    seconds at exit 0 do, so the test can fail."""
+    br = program("bridge-run")
+    row = {"id": "2026-10-12T10:00:00Z", "kind": kind, "seconds": default + 1, "exit": 124, "healthy": True}
+    write_rows(tmp_path, [row])
+    limit, why = br.learned_limit(kind, str(tmp_path))
+    assert limit == default and why == "the default for %s" % kind, (limit, why)
+    write_rows(tmp_path, [dict(row, exit=0)])
+    assert br.learned_limit(kind, str(tmp_path))[0] == int(1.5 * (default + 1)), "a healthy run that ended by itself is learned from"
+
+
+def test_c18_a_test_run_and_a_driver_run_keep_their_own_exits(program, tmp_path):
+    """A test run ended at its limit whose kept work merged still counts (release A2's finding 5); a driver run counts at exit 0 or 1
+    and never at 124."""
+    br = program("bridge-run")
+    write_rows(tmp_path, [{"id": "2026-10-07T12:00:00Z", "kind": "test", "seconds": 2000, "exit": 124, "healthy": True}])
+    assert br.learned_limit("test", str(tmp_path))[0] == 3000
+    write_rows(tmp_path, [{"id": "2026-10-07T12:00:00Z", "kind": "driver", "seconds": 6000, "exit": 1, "healthy": True}])
+    assert br.learned_limit("driver", str(tmp_path))[0] == 9000
+    write_rows(tmp_path, [{"id": "2026-10-07T12:00:00Z", "kind": "driver", "seconds": 7200, "exit": 124, "healthy": True}])
+    assert br.learned_limit("driver", str(tmp_path))[0] == 7200
+
+
+@pytest.mark.parametrize("kind", ["builder", "review", "watch"])
+def test_c18_healthy_refuses_a_run_that_ended_at_its_limit(tmp_path, kind):
+    """`--healthy` on such a run: exit 1, the reason, and the log untouched."""
+    row = {"id": "2026-10-12T10:00:00Z", "kind": kind, "seconds": 7201, "exit": 124, "healthy": None}
+    write_rows(tmp_path, [row])
+    p = subprocess.run([sys.executable, PROG, "--healthy", row["id"]], capture_output=True, text=True, cwd=str(tmp_path))
+    assert p.returncode == 1 and "refused - a %s run that ended at its limit is not marked healthy" % kind in p.stderr, p.stderr
+    assert "explicit --limit" in p.stderr and rows_of(tmp_path) == [row]
+
+
+def test_c18_healthy_still_marks_a_test_run_at_its_limit_and_a_builder_run_that_ended_by_itself(tmp_path):
+    rows = [{"id": "2026-10-12T10:00:00Z", "kind": "test", "seconds": 1800, "exit": 124, "healthy": None},
+            {"id": "2026-10-12T11:00:00Z", "kind": "builder", "seconds": 5000, "exit": 0, "healthy": None}]
+    write_rows(tmp_path, rows)
+    for row in rows:
+        p = subprocess.run([sys.executable, PROG, "--healthy", row["id"]], capture_output=True, text=True, cwd=str(tmp_path))
+        assert p.returncode == 0 and "marked healthy" in p.stderr, p.stderr
+    assert [r["healthy"] for r in rows_of(tmp_path)] == [True, True]
+
+
+# ---------------------------------------------------------------- the test target
+
+
+def suite_run(folder, *target, allow_any=False):
+    env = dict(os.environ, LOCALAPPDATA=str(folder.parent / "localappdata"))
+    env.pop("BRIDGE_RUN_ALLOW_ANY", None)
+    if allow_any:
+        env["BRIDGE_RUN_ALLOW_ANY"] = "1"
+    return subprocess.run([sys.executable, PROG, "--limit", "120", "--kind", "test", "--", "python", "-m", "pytest", "-q", "-p", "no:cacheprovider"] + list(target),
+                          capture_output=True, text=True, cwd=str(folder), env=env)
+
+
+@pytest.fixture
+def project(tmp_path):
+    ws = tmp_path / "ws"
+    (ws / "tests").mkdir(parents=True)
+    (ws / "tests" / "test_inside.py").write_text("def test_inside():\n    assert True\n", encoding="utf-8")
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (outside / "test_probe.py").write_text("import pathlib\n\n\ndef test_probe():\n    pathlib.Path(__file__).with_name('probe-ran.txt').write_text('ran')\n", encoding="utf-8")
+    return ws, outside
+
+
+@pytest.mark.parametrize("form", ["absolute", "relative", "node"])
+def test_a_test_target_outside_the_launch_folder_is_refused_before_it_runs(project, form):
+    ws, outside = project
+    target = {"absolute": str(outside / "test_probe.py"), "relative": os.path.join("..", "elsewhere", "test_probe.py"),
+              "node": str(outside / "test_probe.py") + "::test_probe"}[form]
+    p = suite_run(ws, target, allow_any=(form == "node"))      # the tests' own switch exempts nothing here
+    assert p.returncode == 125 and "refused - the test target" in p.stderr and "lies outside the folder the launcher runs in" in p.stderr, p.stderr
+    assert "bridge-run: started" not in p.stderr and not (outside / "probe-ran.txt").exists(), "the probe ran"
+    assert not (ws / "run" / "launcher" / "runs.jsonl").exists(), "a refused run is not logged"
+
+
+def test_a_target_inside_the_launch_folder_runs_whatever_its_form(project):
+    """A file, a node of it, the folder, a `-k` expression with a slash and no target at all: each runs."""
+    ws, _ = project
+    for target in (["tests/test_inside.py"], [str(ws / "tests" / "test_inside.py") + "::test_inside"], ["tests", "-k", "inside or a/b"], []):
+        p = suite_run(ws, *target)
+        assert p.returncode == 0 and "bridge-run: exit 0" in p.stderr, (target, p.stderr)
+
+
+def test_the_target_rule_reads_every_runner_form_of_pytest_and_unittest(program, tmp_path):
+    """In-process, over the forms `named_suite` accepts: the word after which targets begin differs per runner."""
+    br = program("bridge-run")
+    base = str(tmp_path)
+    out = str(tmp_path.parent / "x" / "test_a.py")
+    for argv in (["pytest", out], ["python", "-m", "pytest", "-q", out], ["py", "-m", "pytest", out], ["uv", "run", "--frozen", "pytest", out],
+                 ["python", "-m", "unittest", out], ["python3", "-m", "pytest", "tests/a.py", out + "::test_x"]):
+        assert br.outside_target(argv, base) is not None, argv
+    for argv in (["pytest"], ["pytest", "tests", "-k", "x"], ["python", "-m", "pytest", "tests/test_a.py::test_x", "--junitxml=" + out],
+                 ["uv", "run", "--project", out, "pytest", "tests"], ["python", "-m", "unittest", "tests.test_a"], ["npm", "test", out], ["go", "test", out]):
+        assert br.outside_target(argv, base) is None, argv
+
+
+# ---------------------------------------------------------------- M1: the round's cause
+
+
+@pytest.mark.parametrize("line,cause", [
+    ("Round cause: defect - the save loses the last row", "defect"),
+    ("Round cause: fix-induced - round 2's fix broke the import", "fix-induced"),
+    ("Round cause: no external path", "no external path"),
+    ("Round cause: Builder incomplete: the tests were not written", "builder incomplete"),
+    ("Round cause:   security (the path is not checked)", "security"),
+    ("Round cause: records", "records"),
+    ("Round cause: brief error - the brief named the wrong file", "brief error"),
+])
+def test_m1_a_later_round_s_cause_is_read_into_the_run_log(tmp_path, line, cause):
+    lab = Lab(tmp_path)
+    write_brief(lab.root, "TASK-001-r2", extra="\n%s\n" % line)
+    res = launch(lab, build("TASK-001-r2"))
+    row = assert_ran(res)
+    assert row["cause"] == cause and row["round"] == 2, row
+    assert "Round cause" not in res.err, "a stated cause prints no note"
+
+
+@pytest.mark.parametrize("extra,said", [("", "has no `Round cause:` line"), ("\nRound cause: polish - nicer names\n", "names none of"),
+                                        ("\nRound cause: defective - close to a cause, not one\n", "names none of")])
+def test_m1_a_missing_or_unknown_cause_is_logged_unstated_with_a_note_and_never_refused(tmp_path, extra, said):
+    lab = Lab(tmp_path)
+    write_brief(lab.root, "TASK-001-r2", extra=extra)
+    res = launch(lab, build("TASK-001-r2"))
+    row = assert_ran(res)
+    assert row["cause"] == "unstated", row
+    notes = [l for l in res.err.splitlines() if l.startswith("bridge-run: note - ") and said in l]
+    assert len(notes) == 1 and "logged as unstated" in notes[0], res.err
+    assert res.err.splitlines()[0].startswith("bridge-run: started "), "the launch line stays the first"
+
+
+def test_m1_a_first_round_carries_no_cause(tmp_path):
+    lab = Lab(tmp_path)
+    write_brief(lab.root, "TASK-001", extra="\nRound cause: defect - written by mistake in a first brief\n")
+    row = assert_ran(launch(lab, build("TASK-001")))
+    assert "cause" not in row, row
+
+
+def test_m1_the_launcher_and_the_pace_report_hold_one_list_of_causes(program):
+    """pace-report.py counts what the launcher writes: its list is the launcher's and `unstated`."""
+    assert program("pace-report").ROUND_CAUSES == program("bridge-run").ROUND_CAUSES + ("unstated",)
+
+
+# ---------------------------------------------------------------- M1 and M2 in the pace report
+
+
+def builder_row(ident, rnd, when, model="composer-2.5", cause=None, **more):
+    row = {"id": P.run_id(when), "kind": "builder", "model": model, "branch": ident.lower(), "exit": 0, "brief": ident, "round": rnd,
+           "brief_name": ident if rnd == 1 else "%s-r%d" % (ident, rnd), "merge_ids": [ident]}
+    if cause:
+        row["cause"] = cause
+    row.update(more)
+    return row
+
+
+def pace_lines(tmp_path, rows):
+    p = P.MiniProject(tmp_path)
+    p.brief("TASK-501")
+    p.commit("records: brief", P.at(6))
+    write_rows(p.ws, rows)
+    rc, out, err = P.pace([p.root], tmp_path)
+    assert rc == 0, err
+    return out.splitlines()
+
+
+def test_m1_m2_the_pace_report_counts_causes_and_rounds_per_model(tmp_path):
+    """Six builder rounds in the window over three increments: four after the first, of three causes and one row from before the
+    release that carries none. A relaunch of one round counts once (its last row), a run that ended waiting for the slot and a run
+    launched before the window not at all; a review run is no builder round."""
+    rows = [builder_row("TASK-501", 1, P.at(3)),
+            builder_row("TASK-501", 2, P.at(3, hour=13), cause="defect"),
+            builder_row("TASK-501", 3, P.at(3, hour=14), cause="unstated"),
+            builder_row("TASK-501", 3, P.at(3, hour=15), cause="fix-induced"),                       # the relaunch of round 3: counted once, this row
+            builder_row("TASK-502", 1, P.at(2), model="grok-4.7-high"),
+            builder_row("TASK-502", 2, P.at(2, hour=13), model="grok-4.7-high", cause="fix-induced"),
+            builder_row("TASK-503", 2, P.at(1)),                                                    # written before release S: no cause
+            builder_row("TASK-504", 2, P.at(1), cause="defect", slot="not free"),
+            builder_row("TASK-505", 2, P.at(30), cause="security"),
+            dict(builder_row("TASK-506", 2, P.at(1), cause="records"), kind="review")]
+    lines = pace_lines(tmp_path, rows)
+    causes = [l for l in lines if l.startswith("Round causes")]
+    models = [l for l in lines if l.startswith("Builder rounds per model")]
+    assert causes == ["Round causes (4 builder rounds after the first): defect 1 (25%); fix-induced 2 (50%); unstated 1 (25%)"], lines
+    assert models == ["Builder rounds per model: composer-2.5 4 round(s) over 2 increment(s), mean 2; grok-4.7-high 2 round(s) over 1 increment(s), mean 2"], lines
+
+
+def test_m1_m2_neither_line_where_the_window_holds_no_builder_round(tmp_path):
+    lines = pace_lines(tmp_path, [dict(builder_row("TASK-501", 1, P.at(2)), kind="test")])
+    assert not [l for l in lines if l.startswith(("Round causes", "Builder rounds per model"))], lines
+    lines = pace_lines(tmp_path / "second", [builder_row("TASK-501", 1, P.at(2))])
+    assert not [l for l in lines if l.startswith("Round causes")] and len([l for l in lines if l.startswith("Builder rounds per model")]) == 1, lines

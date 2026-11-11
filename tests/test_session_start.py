@@ -115,7 +115,7 @@ def test_both_parts_fit_under_the_cap_for_every_phase_on_a_realistic_status_file
         assert len(out) < CAP and "cut at" not in out and "truncated" not in out
     assert "PROJECT STATE: Phase: %s" % phase in pointers
     assert "BEFORE YOUR NEXT ACTION" in pointers and "  - ~/.claude/cursor-bridge/workflow/phases/" in pointers   # TASK-015: modules, not line ranges
-    assert "Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41)." in pointers
+    assert "read docs/PROJECT_STATUS.md whole" in pointers and "the ONE phase file" in pointers and "On demand, by the section" in pointers   # release S
     assert "WAITING FOR THE OWNER" in pointers and "(read it whole in docs/PROJECT_STATUS.md)" in pointers
     assert "**Founding rules.**" in digest and "43 Never end a turn" in digest
     installed = open(os.path.join(CLAUDE, "cursor-bridge", "VERSION"), encoding="utf-8").read().strip()
@@ -142,7 +142,7 @@ def test_pointers_name_the_phase_sections_and_conventions(tmp_path, home):
         rc, out = run_hook(cwd, home)                     # both parts
         assert rc == 0
         assert "  - ~/.claude/cursor-bridge/workflow/phases/delegation-loop.md" in out   # TASK-015: the module, whole
-        assert "Merge-Verification-Policy.md, whole" in out
+        assert "  - on demand: ~/.claude/cursor-bridge/Merge-Verification-Policy.md\n" in out   # release S: by section, at the merge step
         assert "Continue from where the status file says the work is." in out and "WAITING" not in out
         assert "**Founding rules.**" in out
     (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text("**Phase:** design\n", encoding="utf-8")

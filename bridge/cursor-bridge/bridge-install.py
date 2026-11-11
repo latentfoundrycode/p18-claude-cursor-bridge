@@ -440,6 +440,8 @@ def prepare_agent_home(source_dir, dry):
         home, problem = mod.agent_home(create=True, repair=True)
         if problem is None and hasattr(mod, "rename_probe"):
             problem = mod.rename_probe()
+        if problem is None and hasattr(mod, "app_links_problem"):
+            problem = mod.app_links_problem(repair=True)   # release S: the login link in the redirected Roaming folder
     except Exception as e:
         return "agent home: NOT prepared (%s)" % e
     return "agent home: %s" % (home if problem is None else "NOT prepared - " + problem)

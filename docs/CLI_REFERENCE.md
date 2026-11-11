@@ -189,8 +189,10 @@ below the default and never above twice it unless `docs/RUN_PARAMETERS.md` carri
 owner's words on a line `Ceiling above twice: <kind> <seconds> (<their words>, <date>)`. The
 supervisor marks a run healthy with `--healthy <run id>` once its work passed the gate (the
 id is the launch time on the first stderr line, given whole or as a prefix that fits exactly
-one run; a run ended at its limit whose kept work merged counts too, so the ceiling can grow);
-a test run that exits 0 is marked by the launcher itself. The run that raised a ceiling is
+one run); a test run that exits 0 is marked by the launcher itself. A builder, review or watch
+run that ended at its limit (exit 124) is never marked healthy and never counts toward the
+learned limit, whatever became of its kept work: its seconds are the limit, not the work's
+time (ISS-030); work that needs longer is launched with an explicit `--limit`. The run that raised a ceiling is
 named when the ceiling is chosen. A slow but healthy task is never ended before its ceiling.
 An owner's cap below twice the default is ignored with a note: the line says "above twice".
 Refuses a design critique round above the ceiling (exit 125, `design ceiling:`).
@@ -773,6 +775,7 @@ before the launch, verified and restored after it, and checked once more before 
   python ~/.claude/cursor-bridge/review-guard.py snapshot <nnn>          before launching Review B
   python ~/.claude/cursor-bridge/review-guard.py verify   <nnn>          after it returns
   python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> [<pr>]   after the review files are removed, committed and pushed
+  python ~/.claude/cursor-bridge/review-guard.py premerge-records [<pr>] the short gate of a pull request that changes only records
 
 Why (release 0b review, finding 2 and its second pass): Review B keeps `--force` so it can
 run the tests and build reproductions (the owner's decision), and it acts after Review A and
@@ -826,6 +829,17 @@ What each step does:
             wait is printed either way (2026-10-18 C2). It writes the record the permission
             guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command
             with `--match-head-commit`.
+  premerge-records  (release S) the short gate: a pull request whose every changed file is a
+            record (under docs/ or handoff/, or project.json) and none of them one a program
+            reads to decide a gate merges on CI and one Review A read, without the cross-family
+            round. The full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*.md,
+            docs/ROSTER*, the register where a Status cell changed, a row left or a new row is
+            not `planned`, the inventory where a line naming the threat model changed, and
+            every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the
+            branch against origin/main and writes nothing. With <pr> the changed files are
+            GitHub's list of the pull request joined with the local diff from its base, its
+            head must be the local HEAD (read again as premerge does), and on OK the same
+            record is written and the merge command printed. Exit 1 on FULL GATE or NOT READY.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
 a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY;
@@ -1004,11 +1018,15 @@ part that was cut was the pointers), so the bridge registers the hook TWICE for 
 event, each run printing one part under its own cap:
 
   --part pointers   the project's phase from docs/PROJECT_STATUS.md (the "awaiting" text
-                    capped), the phase module file(s) to re-read whole, any sub-files and
-                    variant files named on those modules' pointer lines, the conditional
-                    workflow files (type, then sub-type, then traits in open-list order) that
-                    touch the phase, the conventions that phase relies on, and whether to
-                    continue or to wait for the owner; no supervisor.md line ranges;
+                    capped); what to read first (the status file whole, the last entries
+                    of run/supervisor/in-flight.md); the phase module file(s), any sub-files
+                    and variant files named on those modules' pointer lines, of which the ONE
+                    that holds the step in hand is re-read whole (release S: until then
+                    every file was), with the conditional workflow files (type, then
+                    sub-type, then traits in open-list order) that touch the phase; the
+                    conventions that phase relies on and the inventory, read on demand by
+                    section; and whether to continue or to wait for the owner; no
+                    supervisor.md line ranges;
   --part digest     the digest at the top of ~/.claude/commands/supervisor.md (between the
                     markers <!-- digest:start --> and <!-- digest:end -->), the one text the
                     maintainer keeps as the condensed core.

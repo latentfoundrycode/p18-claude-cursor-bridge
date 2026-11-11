@@ -102,6 +102,43 @@ def test_the_check_reports_a_missing_or_damaged_agent_home(tmp_path):
     assert rc == 0 and os.path.samefile(link, os.path.join(os.environ["USERPROFILE"], ".cursor")), "the install repairs a link that leads elsewhere: " + out
 
 
+def test_c1_the_check_reports_and_the_install_repairs_the_login_link(tmp_path, monkeypatch):
+    """Release S (C1): the agent home's `AppData/Roaming/Cursor` leads to the owner's `%APPDATA%/Cursor`, where
+    cursor-agent keeps its login. The install makes it and repairs one that leads elsewhere; the check writes nothing,
+    passes what the next run puts right by itself, and reports what only the install or the owner can."""
+    if sys.platform != "win32":
+        pytest.skip("APPDATA and the check of the agent's home are Windows only")
+    appdata = tmp_path / "appdata"
+    (appdata / "Cursor").mkdir(parents=True)
+    (appdata / "Cursor" / "login-state").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("APPDATA", str(appdata))
+    target = tmp_path / ".claude"
+    rc, out = run(INSTALL, tmp_path, "--target", str(target))
+    link = __import__("pathlib").Path(os.environ["USERPROFILE"]) / ".cursor-bridge" / "agent-home" / "AppData" / "Roaming" / "Cursor"
+    assert rc == 0 and os.path.samefile(link, appdata / "Cursor"), "the install makes the link: " + out
+    assert run(CHECK, tmp_path, "--root", str(target))[0] == 0
+    os.rmdir(link)                                              # the link, not the folder it leads to
+    rc, out = run(CHECK, tmp_path, "--root", str(target))
+    assert rc == 0 and not os.path.lexists(link), "a missing link is the next run's to make; the check writes nothing: " + out
+    link.mkdir()
+    assert run(CHECK, tmp_path, "--root", str(target))[0] == 0, "an empty folder gives way at the next run"
+    (link / "state.json").write_text("{}", encoding="utf-8")
+    rc, out = run(CHECK, tmp_path, "--root", str(target))
+    assert rc == 1 and "STALE    agent home" in out and "folder with content" in out and "runs keep the owner's APPDATA" in out, out
+    rc, out = run(INSTALL, tmp_path, "--target", str(target))
+    assert rc == 1 and "agent home: NOT prepared - " in out and (link / "state.json").is_file(), "a folder with content is never removed: " + out
+    (link / "state.json").unlink()
+    link.rmdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(elsewhere)], capture_output=True)
+    rc, out = run(CHECK, tmp_path, "--root", str(target))
+    assert rc == 1 and "STALE    agent home" in out and "does not lead to" in out, out
+    rc, out = run(INSTALL, tmp_path, "--target", str(target))
+    assert rc == 0 and os.path.samefile(link, appdata / "Cursor"), "the install repairs a link that leads elsewhere: " + out
+    assert (appdata / "Cursor" / "login-state").is_file() and elsewhere.is_dir(), "nothing was removed through a link"
+
+
 def test_install_over_owner_settings_keeps_them_and_backs_up(tmp_path):
     target = tmp_path / ".claude"
     target.mkdir()

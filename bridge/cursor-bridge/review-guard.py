@@ -5,6 +5,7 @@ before the launch, verified and restored after it, and checked once more before 
   python ~/.claude/cursor-bridge/review-guard.py snapshot <nnn>          before launching Review B
   python ~/.claude/cursor-bridge/review-guard.py verify   <nnn>          after it returns
   python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> [<pr>]   after the review files are removed, committed and pushed
+  python ~/.claude/cursor-bridge/review-guard.py premerge-records [<pr>] the short gate of a pull request that changes only records
 
 Why (release 0b review, finding 2 and its second pass): Review B keeps `--force` so it can
 run the tests and build reproductions (the owner's decision), and it acts after Review A and
@@ -58,6 +59,17 @@ What each step does:
             wait is printed either way (2026-10-18 C2). It writes the record the permission
             guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command
             with `--match-head-commit`.
+  premerge-records  (release S) the short gate: a pull request whose every changed file is a
+            record (under docs/ or handoff/, or project.json) and none of them one a program
+            reads to decide a gate merges on CI and one Review A read, without the cross-family
+            round. The full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*.md,
+            docs/ROSTER*, the register where a Status cell changed, a row left or a new row is
+            not `planned`, the inventory where a line naming the threat model changed, and
+            every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the
+            branch against origin/main and writes nothing. With <pr> the changed files are
+            GitHub's list of the pull request joined with the local diff from its base, its
+            head must be the local HEAD (read again as premerge does), and on OK the same
+            record is written and the merge command printed. Exit 1 on FULL GATE or NOT READY.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
 a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY;
@@ -1191,8 +1203,168 @@ def cmd_premerge(nnn, cwd, pr=None):
     return 0
 
 
+# ---------------------------------------------------------------- the short gate of a records-only pull request (release S)
+
+RECORD_ROOTS = ("docs/", "handoff/")                    # where a project's records live; `project.json` beside them
+FULL_GATE_RECORDS = (("docs/RUN_PARAMETERS.md", "the run parameters decide the ceilings and who merges"),
+                     ("docs/BUILD_PLAN", "the plan decides what is built and in what order"),
+                     ("docs/ROSTER", "the roster decides which model builds and which reviews"))
+PR_FILES_MAX = 100                                      # gh lists a pull request's first hundred files
+
+
+def register_statuses(text):
+    """{requirement ID: Status cell} of a register's text, read as completion-check.py reads it; None when
+    it cannot be read row for row (a malformed header or row, an ID twice)."""
+    try:
+        header, body = bridge_env.read_header(text)
+    except bridge_env.HeaderError:
+        return None
+    out, count = {}, 0
+    if header is not None:
+        columns, roles = list(header.get("columns") or []), header.get("roles") or {}
+        for r in bridge_env.parse_register(body or "")[1]:
+            if len(r) < len(columns):
+                return None
+            count += 1
+            out[bridge_env.register_row_role(r, columns, roles, "id").strip("`* ")] = bridge_env.register_row_role(r, columns, roles, "status").strip("`* ")
+    else:
+        for r in bridge_env.parse_register(text)[1]:
+            if len(r) < 4:
+                return None
+            count += 1
+            out[r[0].strip("`* ")] = r[3].strip("`* ")
+    return out if len(out) == count else None
+
+
+def _at(rev, path, root, common):
+    """The text of `path` at `rev`, or None where the commit holds no such file."""
+    p = _git_proc(["show", "%s:%s" % (rev, path)], root, common)
+    return bridge_env.decode_record_bytes(p.stdout.encode("utf-8")) if p.returncode == 0 else None
+
+
+def full_gate_reasons(paths, base, head, root, common):
+    """[(path, why)] of the changed paths that keep the full gate: a path that is no record, a record a
+    program reads to decide a gate, the register where a Status cell changed, the inventory where a
+    threat-model line changed. Empty when the change is records the short gate takes."""
+    out = []
+    for path in sorted(set(p.replace("\\", "/") for p in paths)):
+        if path != "project.json" and not path.startswith(RECORD_ROOTS):
+            out.append((path, "not a record: only docs/, handoff/ and project.json take the short gate"))
+            continue
+        named = [why for prefix, why in FULL_GATE_RECORDS if path == prefix or path.startswith(prefix)]
+        if named:
+            out.append((path, named[0]))
+        elif path == "docs/REQUIREMENTS.md":
+            before, after = _at(base, path, root, common), _at(head, path, root, common)
+            old = register_statuses(before) if before is not None else {}
+            new = register_statuses(after) if after is not None else None
+            if old is None or new is None:
+                out.append((path, "the register cannot be read row for row on both sides"))
+                continue
+            moved = sorted(i for i in old if i not in new or new[i] != old[i]) + sorted(i for i in new if i not in old and new[i].lower() != "planned")
+            if moved:
+                out.append((path, "a Status cell changed, a row left, or a new row is not `planned`: %s" % ", ".join(moved[:8])))
+        elif path == "docs/INVENTORY.md":
+            sides = []
+            for rev in (base, head):
+                text = _at(rev, path, root, common) or ""
+                sides.append(sorted(" ".join(line.split()) for line in text.splitlines() if "threat model" in line.lower()))
+            if sides[0] != sides[1]:
+                out.append((path, "a line that names the threat model changed: it bounds what a reviewer's finding blocks"))
+    return out
+
+
+def pr_state(pr, root):
+    """({"head", "base", "files"} of the pull request on GitHub, None) or (None, the reason gh failed)."""
+    try:
+        g = subprocess.run(["gh", "pr", "view", str(pr), "--json", "headRefOid,baseRefOid,files"], cwd=root, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, " (%s)" % e
+    if g.returncode != 0:
+        return None, ": %s" % (g.stderr.strip() or g.stdout.strip())[:200]
+    try:
+        data = json.loads(g.stdout)
+        return {"head": data["headRefOid"], "base": data["baseRefOid"], "files": [f["path"] for f in data["files"]]}, None
+    except (ValueError, KeyError, TypeError) as e:
+        return None, ": its reply cannot be read (%s)" % e
+
+
+def cmd_premerge_records(cwd, pr=None):
+    """The short gate (release S): a pull request that changes only records, none of them one a program
+    reads to decide a gate, merges on CI and one Review A read, without the cross-family round. Without
+    <pr> it only says which gate the branch takes, against origin/main, and writes nothing. With <pr> the
+    changed files are GitHub's own list beside the local diff (a local ref moved, by anyone, cannot
+    shrink it), the pull request's head must be the local HEAD, and the record the permission guard
+    reads is written."""
+    root, _, common = find_git_dirs(cwd)
+    if root is None:
+        print("review-guard: CANNOT CHECK - not inside a git repository")
+        return 2
+    if run_git(["status", "--porcelain"], root, common).strip():
+        print("review-guard: CANNOT CHECK - the tree is not clean; commit the records first")
+        return 2
+    head = run_git(["rev-parse", "HEAD"], root, common).strip()
+    listed, waited = [], 0
+    if pr:
+        state, err = pr_state(pr, root)
+        while err is None and state["head"] != head and waited < PR_HEAD_WAIT:
+            time.sleep(PR_HEAD_STEP)                       # GitHub can lag a push, as in premerge
+            waited += PR_HEAD_STEP
+            state, err = pr_state(pr, root)
+        if err is not None:
+            print("review-guard: CANNOT CHECK - gh pr view failed%s" % err)
+            return 2
+        if state["head"] != head:
+            print("review-guard: NOT READY - the pull request's head on GitHub (%s) is not the local head (%s), after waiting %d seconds: push first" % (state["head"][:12], head[:12], waited))
+            return 1
+        if len(state["files"]) >= PR_FILES_MAX:
+            print("review-guard: FULL GATE - the pull request changes %d files or more, beyond what its list shows whole" % PR_FILES_MAX)
+            return 1
+        upstream, listed = state["base"], state["files"]
+    else:
+        upstream = "origin/main"
+    p = _git_proc(["merge-base", upstream, head], root, common)
+    if p.returncode != 0 or not p.stdout.strip():
+        print("review-guard: CANNOT CHECK - %s is not known here or shares no history with HEAD; fetch first" % upstream)
+        return 2
+    base = p.stdout.strip()
+    local = [l.strip() for l in run_git(["diff", "--name-only", "--no-renames", base, head], root, common).splitlines() if l.strip()]
+    paths = sorted(set(local) | set(listed))
+    if not paths:
+        print("review-guard: CANNOT CHECK - HEAD changes nothing against %s" % upstream)
+        return 2
+    reasons = full_gate_reasons(paths, base, head, root, common)
+    for path, why in reasons:
+        print("  FULL GATE  %s: %s" % (path, why))
+    if reasons:
+        print("review-guard: FULL GATE - %d of %d changed file(s) keep the whole round: snapshot, Review B, verify, premerge" % (len(reasons), len(paths)))
+        return 1
+    if not pr:
+        print("review-guard: SHORT GATE - %d changed file(s), every one a record no program reads to decide a gate; after CI and one Review A read, "
+              "run it again with the pull request's number (nothing was written)" % len(paths))
+        return 0
+    folder = os.path.join(common, "bridge", "premerge")
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, head), "w", encoding="utf-8") as f:
+            json.dump({"pr": pr, "review": "records", "files": paths, "written": time.strftime("%Y-%m-%dT%H:%M:%S")}, f)
+    except OSError as e:
+        print("review-guard: CANNOT CHECK - the pre-merge record could not be written (%s)" % e)
+        return 2
+    print("review-guard: OK - records only, %d file(s); the pull request's head matches%s" % (len(paths), (" (waited %d seconds)" % waited) if waited else ""))
+    print("review-guard: merge with  gh pr merge %s --squash --match-head-commit %s" % (pr, head))
+    return 0
+
+
 def main():
     argv = sys.argv[1:]
+    if argv[:1] == ["premerge-records"] and len(argv) <= 2:
+        try:
+            return cmd_premerge_records(os.getcwd(), argv[1] if len(argv) > 1 else None)
+        except (RuntimeError, subprocess.TimeoutExpired, OSError) as e:
+            print("review-guard: CANNOT VERIFY - %s" % e)
+            return 2
     if len(argv) < 2 or argv[0] not in ("snapshot", "verify", "premerge"):
         print(__doc__.split("\n\n")[1])
         return 2

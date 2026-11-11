@@ -10,7 +10,7 @@ files are computed here from the texts, not from the hook: the phase's modules a
 own type, sub-type and traits (the open list's workflow names) each written file that changes a point the registry
 (extension-points.md) declares in one of those modules, or replaces one, in the order additions apply in (type,
 sub-type, the traits in the open list's order; the core's "The order additions apply in"). R-030's layers are the
-workflow files; beside them the hook names the phase's reference texts (`and <file>, whole`), and every other file it
+workflow files; beside them the hook names the phase's reference texts (`on demand: <file>`), and every other file it
 names is checked to be such a text at the bridge's top folder, the same for every project at that phase whatever its
 type, sub-type and traits (no layer of its own). The hook reads an installed
 bridge: each test copies the repository's bridge/ into a temporary home, as bridge-install.py lays it out.
@@ -164,7 +164,7 @@ def named(out):
     return [re.match(r"  - (\S+)", l).group(1) for l in out.split("\n") if l.startswith("  - " + W)]
 
 
-REFERENCE = re.compile(r"  - and ~/\.claude/cursor-bridge/[A-Za-z-]+\.md, whole")
+REFERENCE = re.compile(r"  - on demand: ~/\.claude/cursor-bridge/[A-Za-z-]+\.md")    # release S: read by section when a step names them
 
 
 def references(out):

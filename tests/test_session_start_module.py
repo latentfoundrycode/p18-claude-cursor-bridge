@@ -5,6 +5,7 @@ re-reads (R-005).
 enforces: docs/REQUIREMENTS.md R-005 and docs/BUILD_PLAN.md TASK-015's Done when (handoff/TASK-015.md, its
 Requirements); the order of conditional files is the core's "The order additions apply in" (R-034). The hook reads an
 installed bridge: each test copies the repository's bridge/ into a temporary home, as bridge-install.py would."""
+import importlib.util
 import json
 import os
 import re
@@ -24,6 +25,16 @@ P = W + "phases/"
 MERGE, PITFALLS = "~/.claude/cursor-bridge/Merge-Verification-Policy.md", "~/.claude/cursor-bridge/Known-Pitfalls.md"
 DIAGRAMS, GLOSSARY = "~/.claude/cursor-bridge/Diagram-Planning-Conventions.md", "~/.claude/cursor-bridge/Glossary.md"
 CONFIG = "~/.claude/cursor-bridge/Cursor-Project-Configuration.md"
+
+
+def _hook():
+    spec = importlib.util.spec_from_file_location("session_start_sentences", PROG)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+HOOK = _hook()                                             # the sentences the hook prints are read from the program, never copied here
 
 # the shared Phase -> module table (BUILD_PLAN TASK-015), every template value, and the conventions each re-reads
 EXPECTED = {
@@ -81,7 +92,18 @@ def named(out):
 
 
 def conventions(out):
-    return [m.group(1) for m in re.finditer(r"^  - and (\S+), whole$", out, re.M)]
+    """The phase's reference texts: since release S named to be read on demand, by section, after the list of phase files."""
+    return [m.group(1) for m in re.finditer(r"^  - on demand: (\S+)$", out, re.M)]
+
+
+def listed(out):
+    """The lines between the hook's two sentences of release S: the list of which the one file of the step in hand is
+    re-read whole, down to the sentence that names what is read on demand. The sentences are the program's own."""
+    lines = out.split("\n")
+    at = lines.index(HOOK.READ_ONE)
+    end = [i for i, l in enumerate(lines) if l.startswith(HOOK.ON_DEMAND)]
+    assert len(end) == 1 and end[0] > at and lines[at - 1] == HOOK.READ_FIRST, out
+    return lines[at + 1:end[0]]
 
 
 def test_r005_the_table_maps_every_template_phase_value():
@@ -111,11 +133,13 @@ def own_loop(home, pointer_lines):
 def test_r005_each_phase_names_its_modules_in_order_and_its_conventions(tmp_path, home, phase):
     modules, convs = EXPECTED[phase]
     out = pointers(project(tmp_path, "Phase: %s (Stage 2)" % phase, "Workflows: not yet classified"), home)
-    assert "BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:" in out, out
+    assert [re.match(r"  - (\S+)", l).group(1) for l in listed(out)] == named(out), "the list holds the phase's files and nothing else"
     assert named(out) == [P + f for m in modules for f in [m + ".md"] + POINTED.get(m, [])], out
     assert conventions(out) == convs, out
     assert "lines " not in out, "no line ranges: a module is read whole"
-    assert "Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41)." in out
+    assert out.count("docs/PROJECT_STATUS.md whole") == 1 and "run/supervisor/in-flight.md" in out and out.index(HOOK.READ_FIRST) < out.index(HOOK.READ_ONE), \
+        "the position is read first, then the one file of the step in hand (release S)"
+    assert (HOOK.ON_DEMAND + (" and each file below:" if convs else ".")) in out.split("\n"), "the inventory and the reference texts are read on demand"
 
 
 @pytest.mark.parametrize("phase", ["building", "changing"])
@@ -325,10 +349,7 @@ def add_intake_sub_file(home):
 
 
 def cannot_read_lines(out):
-    lines = out.split("\n")
-    at = lines.index("BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:")
-    rest = lines[at + 1:lines.index("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")]
-    return [l for l in rest if not l.startswith("  - ")]
+    return [l for l in listed(out) if not l.startswith("  - ")]
 
 
 CHECKER, OPEN, REGISTRY = "~/.claude/cursor-bridge/workflow-check.py", W + "open-list.md", W + "extension-points.md"
@@ -865,10 +886,7 @@ def test_r005_no_cannot_read_line_when_nothing_needed_the_read(tmp_path):
     h = tmp_path / "home"
     shutil.copytree(os.path.join(BRIDGE, "commands"), str(h / ".claude" / "commands"))
     out = pointers(project(tmp_path, "Phase: building", "Workflows: not yet classified"), h)
-    lines = out.split("\n")
-    at = lines.index("BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:")
-    rest = lines[at + 1:lines.index("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")]
-    assert all(l.startswith("  - ") for l in rest), out
+    assert all(l.startswith("  - ") for l in listed(out)), out
     assert named(out) == [P + "delegation-loop.md", P + "reflection.md", P + "project-end.md"], out
 
 

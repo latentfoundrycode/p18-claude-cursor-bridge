@@ -18,12 +18,18 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
               increment: the plan that built it may be gone (the video factory's older plans).
   UNAPPROVED  a deferred/dropped row without "owner" and a date.
   NO EVIDENCE a `built` requirement whose Evidence cell names no test file (release A4: a
-              release was declared complete while features returned empty data).
+              release was declared complete while features returned empty data). A requirement
+              an instruction text satisfies may name the text instead (release S), each entry
+              `text: <file>.md :: <heading> (#<pull request>)`: the file must exist, hold that
+              heading, and the pull request's squash stand on origin/main (a note on a branch
+              of unmerged work and in a shallow clone, a failure on merged work). Never for a
+              row whose sentence names a program (`name.py`): a test proves what a program does.
   stand-ins are listed as notes (mid-build a later stage may legitimately be pending).
 --mode done  (project end, and the start of every change cycle) - everything above, plus:
   NOT BUILT   a requirement still `planned`.
   NO EVIDENCE also a `built` requirement whose ID appears in no tracked test file. Tests carry
-              the requirement ID (a comment, docstring, or test name) - that is the trace.
+              the requirement ID (a comment, docstring, or test name) - that is the trace. A row
+              whose text entries all hold needs no test that names it.
 --only R-001,R-002  limits every check to those IDs (an older project brought under the
               register part by part, or one stage's requirements; release A4).
   STAND-IN    shipped (non-test) code shows a user-visible stand-in, in any of these forms:
@@ -69,6 +75,11 @@ CODE_EXT = {".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".vue", ".svelt
             ".rb", ".php", ".ps1", ".xaml", ".qml"}
 TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec|specs|e2e|testing|fixtures)(/|$)"
                        r"|(^|/)test_[^/]*$|_test\.[a-z]+$|\.(test|spec)\.[a-z]+$", re.I)
+# Text evidence (release S): a requirement an instruction text satisfies names where the text
+# stands and the pull request that merged it, `text: <file>.md :: <heading> (#<n>)`.
+TEXT_EVIDENCE = re.compile(r"\btext:\s*`?([^\s`|;]+\.md)`?\s*::\s*(.+?)\s*\(#(\d+)\)")
+PROGRAM_NAME = re.compile(r"(?<![\w/.-])[\w-]+\.(?:py|ps1|sh|js|mjs|cjs|ts|tsx|jsx|cs|rs|go|java|kt|swift|rb|php)\b")
+HEADING_RX = re.compile(r"^#{1,6}[ \t]+(.*?)[ \t]*#*[ \t]*$")
 SKIP_PATH = re.compile(r"(^|/)(docs|\.claude|\.cursor|\.github|node_modules|vendor|third_party|"
                        r"dist|build|bench|benchmarks|scripts/dev)(/|$)", re.I)
 
@@ -86,6 +97,76 @@ def tracked():
 
 def parse_register(text):
     return bridge_env.parse_register(text)
+
+
+def git_out(*args):
+    try:
+        p = subprocess.run(("git",) + args, capture_output=True, creationflags=NO_WINDOW, timeout=120)
+    except (OSError, subprocess.TimeoutExpired):
+        return None, ""
+    return p.returncode, p.stdout.decode("utf-8", "replace")
+
+
+class Merged(object):
+    """Which pull requests' squash commits stand on origin/main, asked of git once. `state` is
+    "strict" where HEAD is merged work (a missing squash is a failure), "ahead" where HEAD holds
+    commits origin/main lacks (the cell may name its own pull request: a note), or the reason the
+    question cannot be answered here (a note)."""
+
+    def __init__(self):
+        self.numbers, self.state = None, None
+
+    def load(self):
+        if self.state is not None:
+            return
+        code, out = git_out("rev-parse", "--is-shallow-repository")
+        if code != 0:
+            self.state = "not a git repository"
+        elif out.strip() == "true":
+            self.state = "a shallow clone holds no history"
+        else:
+            code, out = git_out("log", "origin/main", "--format=%s")
+            if code != 0:
+                self.state = "origin/main is not known here"
+            else:
+                self.numbers = set(re.findall(r"\(#(\d+)\)[ \t]*$", out, re.M))
+                self.state = "strict" if git_out("merge-base", "--is-ancestor", "HEAD", "origin/main")[0] == 0 else "ahead"
+
+
+def text_evidence(rid, requirement, cell, merged):
+    """(valid entries, failures, notes) of a row's `text:` entries. An entry is valid when its
+    file exists under the Workspace, holds the heading, and its pull request's squash is on
+    origin/main; never for a row whose sentence names a program, which a test proves."""
+    entries = TEXT_EVIDENCE.findall(cell or "")
+    fails, notes, valid = [], [], 0
+    if not entries:
+        return 0, fails, notes
+    program = PROGRAM_NAME.search(requirement or "")
+    if program:
+        fails.append("NO EVIDENCE: %s names a program (%s): a text entry is no evidence of what a program does, name its test" % (rid, program.group(0)))
+        return 0, fails, notes
+    for path, heading, number in entries:
+        shown = path.replace("\\", "/")
+        if os.path.isabs(path) or ".." in shown.split("/") or not os.path.isfile(path):
+            fails.append("NO EVIDENCE: %s names the text %s, which is no file of this Workspace" % (rid, shown))
+            continue
+        try:
+            lines = read(path).splitlines()
+        except OSError:
+            lines = []
+        if not any(m and m.group(1) == heading for m in (HEADING_RX.match(line) for line in lines)):
+            fails.append("NO EVIDENCE: %s names the heading '%s', which %s does not hold" % (rid, heading[:80], shown))
+            continue
+        merged.load()
+        if merged.numbers is None:
+            notes.append("%s: pull request #%s not looked up (%s)" % (rid, number, merged.state))
+        elif number not in merged.numbers:
+            if merged.state == "strict":
+                fails.append("NO EVIDENCE: %s names pull request #%s, whose squash is not on origin/main" % (rid, number))
+                continue
+            notes.append("%s: pull request #%s is not on origin/main yet (this branch is unmerged work; checked again once it is merged)" % (rid, number))
+        valid += 1
+    return valid, fails, notes
 
 
 def build_parser():
@@ -234,8 +315,17 @@ def main():
         for rid, (kind, text) in sorted(reqs.items()):
             if kind == "planned" and rid not in satisfied:
                 fails.append("UNPLANNED: %s (%s) is in no increment's Satisfies: field" % (rid, text[:70]))
+    merged, by_text = Merged(), set()
     for rid, (kind, text) in sorted(reqs.items()):
-        if kind == "built" and not any(TEST_PATH.search(tok.strip("`*, ").replace("\\", "/")) for tok in evidence.get(rid, "").split()):
+        if kind != "built":
+            continue
+        valid, text_fails, text_notes = text_evidence(rid, text, evidence.get(rid, ""), merged)
+        fails.extend(text_fails)
+        notes.extend(text_notes)
+        if valid and not text_fails:
+            by_text.add(rid)
+        cell = TEXT_EVIDENCE.sub(" ", evidence.get(rid, ""))    # a text's own path is no test file, whatever folder holds it
+        if not valid and not text_fails and not any(TEST_PATH.search(tok.strip("`*, ").replace("\\", "/")) for tok in cell.split()):
             fails.append("NO EVIDENCE: %s (%s) is marked built but its Evidence names no test file" % (rid, text[:60]))
 
     files = tracked()
@@ -257,7 +347,7 @@ def main():
         for rid, (kind, text) in sorted(reqs.items()):
             if kind == "planned":
                 fails.append("NOT BUILT: %s (%s) is still planned" % (rid, text[:70]))
-            elif kind == "built" and rid not in test_ids:
+            elif kind == "built" and rid not in test_ids and rid not in by_text:
                 fails.append("NO EVIDENCE: %s (%s) is marked built but no tracked test names it" % (rid, text[:60]))
 
     # stand-ins

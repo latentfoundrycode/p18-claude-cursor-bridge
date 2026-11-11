@@ -48,6 +48,17 @@ if sys.platform == "win32" and not getattr(subprocess.Popen.__init__, "windowles
 # review-guard.py's snapshot-hash copies (2026.10.25a) never reach the owner's ~/.cursor-bridge.
 os.environ["BRIDGE_REVIEW_HASHES"] = tempfile.mkdtemp(prefix="bridge-review-hashes-")
 
+# Release S (C1): a stripped run links the agent home's `AppData/Roaming/Cursor` to `%APPDATA%/Cursor`, where
+# cursor-agent keeps its login. No test may make such a link to the owner's real folder (a link left in a temporary
+# folder leads into it, and a cleanup that follows links would empty it), so for the whole session APPDATA is an empty
+# temporary folder, as HOME is below. The packages the owner installed for their user stay importable in the programs
+# the tests start: Python finds them through PYTHONUSERBASE, set here to where it found them before.
+if os.environ.get("APPDATA"):
+    import site
+
+    os.environ.setdefault("PYTHONUSERBASE", site.getuserbase())
+    os.environ["APPDATA"] = tempfile.mkdtemp(prefix="bridge-tests-appdata-")
+
 
 def load_program(name):
     """Import ~/.claude/cursor-bridge/<name>.py (a dash in the name is fine) as a module."""
