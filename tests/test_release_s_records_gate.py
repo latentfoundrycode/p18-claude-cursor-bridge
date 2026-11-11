@@ -234,6 +234,28 @@ def test_a_sub_heading_stays_inside_the_threat_model_s_section(repo):
     assert rc == 1 and "or one under a heading that names it, changed" in out, out
 
 
+@pytest.mark.parametrize("sample", [
+    "```\n# a comment in a sample\n```\n",                           # a fenced block (Review B, round 1: its `#` line ended the section)
+    "````text\n```\n# still inside the longer fence\n```\n````\n",   # a shorter fence inside a longer one closes nothing
+    "~~~\n## not a heading\n~~~\n",
+    "<!--\n# a note to the editor\n-->\n",                           # an HTML comment
+    "    # indented as code\n",
+    "#no space, no heading\n",
+])
+def test_only_a_heading_markdown_would_draw_ends_the_threat_model_s_section(repo, sample):
+    """A line that starts with `#` inside a code sample, a comment or an indented block is a line of the section: the line
+    below it is still the model's, and its change keeps the full gate."""
+    section = INVENTORY + "\n## Threat model\n\n- the builder is outside input\n\n" + sample + "\n- a finding outside it is recorded\n\n## Dates\n\n- UTC\n"
+    change(repo, "docs/INVENTORY.md", section)
+    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    change(repo, "docs/INVENTORY.md", section.replace("- UTC", "- UTC, always"))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 0 and "SHORT GATE" in out, out
+    change(repo, "docs/INVENTORY.md", section.replace("a finding outside it is recorded", "every finding blocks"))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 1 and "or one under a heading that names it, changed" in out, out
+
+
 def test_a_dirty_tree_no_change_and_an_unknown_upstream_cannot_be_checked(repo):
     rc, out = run(repo, "premerge-records")
     assert rc == 2 and "HEAD changes nothing against origin/main" in out, out

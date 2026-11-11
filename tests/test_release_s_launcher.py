@@ -154,6 +154,61 @@ def test_the_target_rule_reads_what_leads_outside_by_another_word(program, tmp_p
         assert br.outside_target(argv, str(base)) is None, argv
 
 
+def test_unittest_s_start_and_top_folders_are_read_in_every_form_argparse_takes(program, tmp_path):
+    """Review B, round 1: `-s=<dir> -t=<dir>`, `--start-directory=<dir>` and `-s<dir>` ran a TestCase outside the launch
+    folder, because only the separate-word form met the target rule. argparse also takes a long option by its prefix and a
+    short one behind flags in one word; `--rootdir` reaches `uv run pytest`, whose escape list does not hold it."""
+    br = program("bridge-run")
+    base = tmp_path / "ws"
+    (base / "tests").mkdir(parents=True)
+    out = str(tmp_path / "elsewhere")
+    up = os.path.join("..", "elsewhere")
+    for words in (["-s=" + out, "-t=" + out], ["-s" + out], ["-t" + out], ["-s=" + up, "-t=" + up], ["--start-directory=" + out],
+                  ["--top-level-directory=" + out], ["--start=" + out], ["--top", out], ["--s", out], ["-vs" + out], ["-vs", out],
+                  ["-bt=" + out], ["-s", out], ["-s", "tests", "-t", out]):
+        argv = ["python", "-m", "unittest", "discover"] + words
+        assert br.outside_target(argv, str(base)) is not None, argv
+    for words in (["-s", "tests", "-t", "."], ["-s=tests"], ["-stests", "-v"], ["--start-directory=tests", "--top=."], ["-k", out], ["-vk", out],
+                  ["--pattern", "test*.py"], ["-f", "-b"], ["-vs", "tests"]):
+        argv = ["python", "-m", "unittest", "discover"] + words
+        assert br.outside_target(argv, str(base)) is None, argv
+    assert br.outside_target(["uv", "run", "pytest", "--rootdir=" + out, "tests"], str(base)) == "--rootdir=" + out
+    assert br.outside_target(["uv", "run", "pytest", "--rootdir", out, "tests"], str(base)) == "--rootdir " + out
+    assert br.outside_target(["uv", "run", "pytest", "--rootdir=.", "tests", "-s"], str(base)) is None, "pytest's own -s is a flag"
+
+
+def test_an_ini_override_that_names_an_outside_folder_is_a_target_by_another_word(program, tmp_path):
+    """`-o testpaths=<dir>` has pytest collect there when no target is given, and `-o pythonpath=<dir>` has it import from
+    there: the same run as an outside target. Every form pytest reads the option in; another setting's value is no path."""
+    br = program("bridge-run")
+    base = tmp_path / "ws"
+    (base / "tests").mkdir(parents=True)
+    out = str(tmp_path / "elsewhere")
+    for words in (["-o", "testpaths=" + out], ["-otestpaths=" + out], ["--override-ini=testpaths=" + out], ["--override-ini", "pythonpath=" + out],
+                  ["-qo", "testpaths=" + out], ["-o", "testpaths=tests " + out], ["-o", "pythonpath=" + os.path.join("..", "elsewhere"), "tests"],
+                  ["-o", "addopts=--rootdir " + out, "tests"], ["--override-ini=addopts=-q", "tests"]):   # options in a value are read by no rule
+        argv = ["python", "-m", "pytest"] + words
+        assert br.outside_target(argv, str(base)) is not None, argv
+    for words in (["-o", "testpaths=tests"], ["-o", "pythonpath=. tests"], ["-o", "junit_family=xunit2"], ["-o", "cache_dir=" + out, "tests"],
+                  ["--override-ini=addopts=", "tests"], ["-o", "addopts=", "tests"], ["-qo", "console_output_style=classic"]):
+        argv = ["python", "-m", "pytest"] + words
+        assert br.outside_target(argv, str(base)) is None, argv
+
+
+def test_a_unittest_discovery_started_outside_is_refused_before_it_runs(project):
+    """The same through the program: the form that ran in the review exits 125 and the outside case never starts."""
+    ws, outside = project
+    (outside / "test_case.py").write_text("import pathlib\nimport unittest\n\n\nclass Probe(unittest.TestCase):\n    def test_probe(self):\n"
+                                          "        pathlib.Path(__file__).with_name('probe-ran.txt').write_text('ran')\n", encoding="utf-8")
+    env = dict(os.environ, LOCALAPPDATA=str(ws.parent / "localappdata"))
+    env.pop("BRIDGE_RUN_ALLOW_ANY", None)
+    for words in (["-s=" + str(outside), "-t=" + str(outside)], ["-s" + str(outside)], ["--start-directory=" + str(outside)]):
+        p = subprocess.run([sys.executable, PROG, "--limit", "120", "--kind", "test", "--", "python", "-m", "unittest", "discover"] + words,
+                           capture_output=True, text=True, cwd=str(ws), env=env)
+        assert p.returncode == 125 and "refused - the test target" in p.stderr, (words, p.stderr)
+        assert "bridge-run: started" not in p.stderr and not (outside / "probe-ran.txt").exists(), "the outside case ran"
+
+
 def test_an_option_s_value_is_no_target_wherever_it_points(program, tmp_path):
     """A report, a log or an ignored path named as a separate word: its value may lie in a temporary folder, and the run is
     not refused for it (Review A, round 1: each was refused with 125, which stops the loop)."""

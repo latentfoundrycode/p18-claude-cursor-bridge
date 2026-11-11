@@ -1256,19 +1256,38 @@ def _at(rev, path, root, common):
     return bridge_env.decode_record_bytes(p.stdout.encode("utf-8")) if p.returncode == 0 else None
 
 
+FENCE_MARK = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+ATX_HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]|$)")
+
+
 def threat_model_lines(text):
     """The inventory's lines that bound what a finding blocks: every line that names the threat model, and
-    every line of a section whose heading names it, each with its white space folded."""
-    out, depth = [], 0                                     # depth: the level of the open heading that names the model, 0 outside one
+    every line of a section whose heading names it, each with its white space folded. Only a heading
+    Markdown would draw ends a section: a `#` line inside a fenced block, inside an HTML comment or
+    indented as code is a line of the section like any other (an underlined heading ends none, which
+    keeps more lines, never fewer)."""
+    out, depth, fence, comment = [], 0, None, False        # depth: the level of the open heading that names the model, 0 outside one
     for line in (text or "").splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith("#"):
-            level = len(stripped) - len(stripped.lstrip("#"))
-            if "threat model" in line.lower():
+        low = line.lower()
+        mark, heading = FENCE_MARK.match(line), None
+        if fence:
+            if mark and mark.group(1)[0] == fence[0] and len(mark.group(1)) >= len(fence) and not line.strip().strip(fence[0]):
+                fence = None
+        elif comment:
+            comment = "-->" not in line
+        elif mark:
+            fence = mark.group(1)
+        elif "<!--" in line and "-->" not in line.split("<!--", 1)[1]:
+            comment = True
+        else:
+            heading = ATX_HEADING.match(line)
+        if heading:
+            level = len(heading.group(1))
+            if "threat model" in low:
                 depth = level if not depth else min(depth, level)
             elif depth and level <= depth:                 # a sub-heading stays inside; a heading of the same or a higher level ends it
                 depth = 0
-        if depth or "threat model" in line.lower():
+        if depth or "threat model" in low:
             out.append(" ".join(line.split()))
     return sorted(l for l in out if l)
 

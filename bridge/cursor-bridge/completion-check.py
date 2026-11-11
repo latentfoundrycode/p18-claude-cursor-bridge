@@ -159,9 +159,18 @@ class Merged(object):
 def is_test_path(path):
     """A test file by its path, and never a record: `docs/test_plan.md` is a document about tests,
     and a record can reach main by the short gate, which nothing that counts as evidence may
-    (release S; until then such a file named a row for done mode)."""
+    (release S; until then such a file named a row for done mode). The path is read as the file
+    system reads it, `./` and doubled slashes dropped and a part's trailing dots and spaces with
+    them; one that climbs (`..`) or starts at a root or a drive names no file of the Workspace by
+    its own words and is no test either."""
     path = path.strip("`*, ").replace("\\", "/")
-    return bool(TEST_PATH.search(path)) and not path.lower().startswith(RECORD_FOLDERS)
+    if not TEST_PATH.search(path):
+        return False
+    parts = [p.rstrip(". ") if p.strip(".") else p for p in path.split("::", 1)[0].split("/")]
+    if ".." in parts or path.startswith("/") or re.match(r"[A-Za-z]:", path):
+        return False
+    clean = "/".join(p for p in parts if p not in ("", "."))
+    return not (clean.lower() + "/").startswith(RECORD_FOLDERS)
 
 
 def instruction_texts():

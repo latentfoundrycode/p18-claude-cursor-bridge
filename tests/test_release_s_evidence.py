@@ -14,6 +14,8 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "completion-check.py")
 ENV = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
@@ -197,6 +199,19 @@ def test_a_document_about_tests_under_a_record_folder_is_no_test(tmp_path):
     assert "R-001" in lines[0] and "names no test file" in lines[0]
     assert "R-001" in lines[1] and "no tracked test names it" in lines[1]
     assert "R-002" in lines[2] and "no tracked test names it" in lines[2], "the plan's mention of R-002 is no trace; the test file does not name it"
+
+
+@pytest.mark.parametrize("token", ["./docs/test_plan.md", "foo/../../docs/test_plan.md", "docs//test_plan.md", "Docs/./test_plan.md",
+                                   "docs./test_plan.md", "../elsewhere/tests/test_a.py", "/tests/test_a.py", "C:/x/tests/test_a.py"])
+def test_a_record_by_another_spelling_of_its_path_is_no_test_either(program, tmp_path, token):
+    """Review B, round 1: `./docs/test_plan.md` and a path that climbs and comes back counted as a test in plan mode. The
+    path is read as the file system reads it, and one that climbs or starts at a root names no file of the Workspace."""
+    cc = program("completion-check")
+    assert not cc.is_test_path(token), token
+    assert cc.is_test_path("tests/test_import.py::test_import") and cc.is_test_path("`./tests/test_import.py`,") and cc.is_test_path("src/app.test.ts")
+    r = make(tmp_path, "| R-001 | the user exports their rows as a CSV file | owner | built | %s |\n" % token, texts=None)
+    rc, out = run(r, "plan")
+    assert rc == 1 and "R-001" in out and "names no test file" in out, out
 
 
 def test_a_shallow_clone_checks_file_and_heading_and_notes_the_rest(tmp_path):

@@ -358,7 +358,55 @@ PYTEST_VALUE_OPTIONS = ("-k", "-m", "-p", "-o", "--override-ini", "-W", "--pytho
                         "--tb", "--durations", "--durations-min", "--cov", "--cov-report", "--cov-config", "--cov-fail-under", "--timeout",
                         "--import-mode", "--color", "--capture", "--show-capture", "--html", "--alluredir", "--json-report-file", "--benchmark-json")
 # The word after each of these is the option's value, never a target: a report or a log written to a temporary folder is ordinary.
-PYTEST_FOLDER_OPTIONS = ("--config-file", "--confcutdir")   # these name what pytest loads: inside the project like a target
+PYTEST_FOLDER_OPTIONS = ("--config-file", "--confcutdir", "--rootdir")   # these name what pytest loads: inside the project like a target
+UNITTEST_FOLDER_OPTIONS = ("--start-directory", "--top-level-directory")   # -s and -t: where discovery starts and what it imports from
+UNITTEST_VALUE_OPTIONS = ("--pattern", "--durations")                     # -p and -k beside them: a value, never a target
+
+
+INI_PATH_SETTINGS = ("testpaths", "pythonpath")        # what `-o <name>=<paths>` makes pytest collect, or import from
+
+
+def ini_override(a):
+    """The `<name>=<value>` an option word of a pytest run sets by `-o` or `--override-ini`: "" where
+    the setting is the next word, None where the word is no such option. Read as argparse reads
+    it: `--override-ini=<setting>`, `-o<setting>`, and `-o` behind pytest's flags in one word."""
+    if a == "--override-ini" or a.startswith("--override-ini="):
+        return a.partition("=")[2]
+    if a.startswith("--"):
+        return None
+    for j, ch in enumerate(a[1:], 1):
+        if ch == "o":
+            rest = a[j + 1:]
+            return rest[1:] if rest.startswith("=") else rest
+        if ch not in "xvqsl":                              # no flag of pytest's: read no further
+            return None
+    return None
+
+
+def option_kind(word, a):
+    """(kind, value) of one option word of a pytest or unittest run: kind "folder" where the option
+    names a folder or file the run loads, "value" where its value is no target, None for a flag;
+    value None where the value is the next word. unittest reads its options as argparse does: a
+    long option by any prefix that names one option only (`--start=`, `--top`), a short one
+    with its value attached (`-s<dir>`, `-s=<dir>`) and behind flags in one word (`-vs<dir>`)."""
+    name, eq, value = a.partition("=")
+    if word == "pytest":
+        if name in PYTEST_FOLDER_OPTIONS:
+            return "folder", (value if eq else None)
+        return ("value", None) if not eq and name in PYTEST_VALUE_OPTIONS else (None, None)
+    if a.startswith("--"):
+        if len(name) > 2:
+            for kind, options in (("folder", UNITTEST_FOLDER_OPTIONS), ("value", UNITTEST_VALUE_OPTIONS)):
+                if any(o.startswith(name) for o in options):
+                    return kind, (value if eq else None)
+        return None, None
+    for j, ch in enumerate(a[1:], 1):
+        if ch in "st" or ch in "pk":
+            rest = a[j + 1:]
+            return ("folder" if ch in "st" else "value"), ((rest[1:] if rest.startswith("=") else rest) or None)
+        if ch not in "vqfcb":                              # no flag of unittest's: read no further
+            break
+    return None, None
 
 
 def _real_path(path):
@@ -397,8 +445,11 @@ def outside_target(argv, folder=None):
     `--project` and `--directory` before the word pytest, the second of which becomes the folder
     the targets are read against; every word after `pytest` or `unittest` that is no option and
     no option's value (a `::node` suffix dropped; a `-k` expression or a marker resolves inside
-    and passes); the file `--config-file` names and the folder `--confcutdir` names; an `@file`
-    of arguments, which hides its targets and is refused whatever it holds."""
+    and passes); the file `--config-file` names and the folders `--confcutdir` and `--rootdir`
+    name; unittest's start and top-level folders in every form argparse reads (`option_kind`); an
+    ini override of `testpaths` or `pythonpath`, and one of `addopts` that is not empty, whose
+    options no rule here reads; an `@file` of arguments, which hides its targets and is refused
+    whatever it holds."""
     head = head_of(argv)
     if head not in ("pytest", "python", "python3", "py", "uv"):
         return None
@@ -427,19 +478,30 @@ def outside_target(argv, folder=None):
     i = start
     while i < len(argv):
         a = argv[i]
-        name, eq, value = a.partition("=")
         i += 1
         if a.startswith("@"):
             return a
         if a.startswith("-"):
-            if name in PYTEST_FOLDER_OPTIONS:
-                if not eq:
-                    value = argv[i] if i < len(argv) else ""
+            kind, value = option_kind(word, a)
+            shown = a
+            setting = ini_override(a) if word == "pytest" else None
+            if setting is not None:                        # an ini value set on the command line: the paths it has pytest collect or import from
+                if not setting:
+                    setting = argv[i] if i < len(argv) else ""
+                    shown = "%s %s" % (a, setting)
                     i += 1
-                if not inside(value, base):
-                    return a if eq else "%s %s" % (a, value)
-            elif not eq and name in PYTEST_VALUE_OPTIONS:
-                i += 1                                     # its value, whatever it reads like
+                key, _, paths = setting.partition("=")
+                if key.strip() in INI_PATH_SETTINGS and any(not inside(p, base) for p in paths.split()):
+                    return shown
+                if key.strip() == "addopts" and paths.strip():   # options inside a value are read by no rule here: on the command line, or not at all
+                    return shown
+                continue
+            if kind and value is None:                     # the next word is its value, whatever it reads like
+                value = argv[i] if i < len(argv) else ""
+                shown = "%s %s" % (a, value)
+                i += 1
+            if kind == "folder" and not inside(value, base):
+                return shown
             continue
         path = a.split("::", 1)[0]
         if path and not inside(path, base):
