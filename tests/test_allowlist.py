@@ -243,3 +243,12 @@ def test_r049_d4_the_guard_treats_the_stage_tag_as_it_treats_the_loop_s_state_co
     for cmd in ("git cat-file -p stage-review/<name>-<n>:<path>", "git branch -r", "git tag -l"):
         assert cmd in documented or cmd == "git tag -l", cmd
         assert not guard.state_changing(guard.words(cmd)), cmd
+
+
+def test_r062_records_migrate_rule_in_allow():
+    """R13: records-migrate.py is allowed for a normal run and for --check."""
+    rule = "Bash(python ~/.claude/cursor-bridge/records-migrate.py:*)"
+    assert rule in ALLOW
+    for cmd in ("python ~/.claude/cursor-bridge/records-migrate.py",
+                "python ~/.claude/cursor-bridge/records-migrate.py --check"):
+        assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd

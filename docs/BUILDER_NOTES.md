@@ -37,3 +37,5 @@
 2026-10-27 TASK-031-r11: on Python 3.12, only an empty `PYTHONPATH` entry puts the working folder on `sys.path`; round 11's `find_spec` check still refused ordinary layouts when another copy of the project package was on `PYTHONPATH`, which round 12 replaced with a fixed list of names pytest imports for configuration.
 
 2026-10-31 BUG-038-r1: `tests/test_bug038.py` test 3 uses `text[:text.index('"""', 3)]`, which on `completion-check.py` (shebang then opening `"""` on line 2) slices only the shebang line, so `STAND-IN` is never in `doc` and the test fails before and after the docstring fix; keyword checks pass with `ast.get_docstring`-style extraction.
+
+2026-11-11 TASK-051: `test_fix001_no_test_starts_a_program_around_the_default` fails on supervisor `tests/test_records_migrate.py` lines 76 and 81 (`creationflags=NO_WINDOW`); Scope forbids editing above the builder marker, so the supervisor should spell `getattr(subprocess, "CREATE_NO_WINDOW", 0)` there.

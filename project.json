@@ -5,7 +5,7 @@
   "version": "2026.11.09a",
   "state": {
     "phase": "changing",
-    "stage": "release B2: stage H1 closed 2026-11-11 (TASK-046 to TASK-050, its refactoring pass, its review and demonstration); the intake hotfix 2026.11.09a carried onto main; stage H2 next",
+    "stage": "release B2: stage H2 in progress (TASK-051, the migration program, merged); TASK-052 to TASK-054 next",
     "bridge": "2026.11.09a",
     "updated": "2026-11-11"
   }

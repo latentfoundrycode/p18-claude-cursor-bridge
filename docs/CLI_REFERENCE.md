@@ -713,6 +713,24 @@ Every TASK/BUG/FIX id merged since a commit has its docs/CHANGES.md line.
 - `--ref`; default: "origin/main"; required: false
 - `--changes`; default: "docs/CHANGES.md"; required: false
 
+## records-migrate.py
+
+Path: `bridge/cursor-bridge/records-migrate.py`
+
+```
+Write record headers from prose fallbacks.
+```
+
+### Positionals
+
+- `paths`; default: null; required: false; project root and/or record paths
+
+### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--check`; default: false; required: false; list what would be written, write nothing
+- `--base`; default: "origin/main"; required: false; git ref for merged increment IDs
+
 ## refactor-check.py
 
 Path: `bridge/cursor-bridge/refactor-check.py`
