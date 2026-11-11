@@ -486,33 +486,43 @@ def runner_word(argv):
 
 PYTEST_ENV_WORDS = "PYTEST_ADDOPTS"                    # options pytest reads from the environment, in front of the command's own
 PYTEST_ENV_PLUGINS = "PYTEST_PLUGINS"                  # plugins pytest loads by name from the environment, as `-p` does
+UV_ENV_FOLDERS = (("UV_WORKING_DIR", "--directory"), ("UV_PROJECT", "--project"))   # uv reads each as that option where the command gives none
+UV_ENV_FILE = "UV_ENV_FILE"                            # a file of variables uv hands the run, as `--env-file` does: its lines are read by no rule here
 
 
 def outside_by_environment(argv, environ, folder=None):
-    """The name of a variable in the environment a pytest run is about to get that would have it
-    load a plugin or take an option or a target the launcher refuses on the command line, or None
-    (release S). `PYTEST_ADDOPTS` is read in both ways a value's words can be (`value_words`) and
-    held to `test_suite`'s escape list for pytest and to `outside_target`, behind the command's own
-    words up to `pytest` (uv's `--directory` is the folder its targets are read against);
-    `PYTEST_PLUGINS` set at all is `-p` by another route. Names are compared without regard to
-    case, as Windows reads them. The value is never printed: a key file's lines reach this
-    environment (`--key-file`). What the interpreter itself reads from the environment
-    (`PYTHONPATH` and its kin) is no word of the run and is not read here."""
+    """The name of a variable in the environment a pytest run is about to get that carries a word
+    the launcher refuses on the command line, or None (release S). The variables by which the two
+    runners take the command line's own words, and no others: for a uv run `UV_WORKING_DIR` and
+    `UV_PROJECT`, read as `--directory` and `--project` in front of the command's own (which win
+    where both are given), and `UV_ENV_FILE` set at all; `PYTEST_PLUGINS` set at all, `-p` by
+    another route; `PYTEST_ADDOPTS`, read in both ways a value's words can be (`value_words`) and
+    held to `test_suite`'s escape list for pytest and to `outside_target` behind the command's
+    words up to `pytest` (so uv's folder is the one its targets are read against), a bare `--`
+    among them refused, since it would turn the command's own option values into targets. Names
+    are compared without regard to case, as Windows reads them. The value is never printed: a key
+    file's lines reach this environment (`--key-file`). What the interpreter itself reads from the
+    environment (`PYTHONPATH` and its kin) is no word of the run and is not read here."""
     word, start = runner_word(argv)
     if word != "pytest":
         return None
-    for name, value in environ.items():
-        if not (value or "").strip():
-            continue
-        if name.upper() == PYTEST_ENV_PLUGINS:
-            return name
-        if name.upper() == PYTEST_ENV_WORDS:
-            readings = value_words(value)
-            if readings is None:
-                return name
-            for words in readings:
-                if not test_suite(["pytest"] + words, folder) or outside_target(argv[:start] + words, folder) is not None:
+    env = {name.upper(): value for name, value in environ.items() if (value or "").strip()}
+    lead = argv[:start]
+    if head_of(argv) == "uv":
+        if UV_ENV_FILE in env:
+            return UV_ENV_FILE
+        for name, option in UV_ENV_FOLDERS:
+            if name in env:
+                lead = lead[:2] + [option, env[name]] + lead[2:]
+                if outside_target(lead + argv[start:], folder) is not None:
                     return name
+    if PYTEST_ENV_PLUGINS in env:
+        return PYTEST_ENV_PLUGINS
+    if PYTEST_ENV_WORDS in env:
+        readings = value_words(env[PYTEST_ENV_WORDS])
+        if readings is None or any("--" in words or not test_suite(["pytest"] + words, folder) or outside_target(lead + words, folder) is not None
+                                   for words in readings):
+            return PYTEST_ENV_WORDS
     return None
 
 
@@ -1770,17 +1780,18 @@ def main():
             sys.stderr.write("bridge-run: refused - the test target %r lies outside the folder the launcher runs in; a test run reads the project's own tests: "
                              "write a probe under the project's tests folder and run it from there\n" % outside)
             return 125
-        coming = dict(os.environ)                          # what the run is about to get: a stripped run keeps every name that is no key, and the key file's lines join it
+        coming = dict(os.environ)                          # what the run is about to get, or more: a stripped run gets no name this one lacks, and the key file's lines join it
         if "--key-file" in flags:
             try:
                 read_keys = key_file_env(flags[flags.index("--key-file") + 1], folder)
-                coming.update(read_keys)                   # read once: the lines checked here are the lines the run gets
-            except (IndexError, OSError, ValueError):
-                pass                                       # refused below, where the key file is read for the run
+            except (IndexError, OSError, ValueError) as e:  # never read a second time for the run: the lines checked here are the lines it gets
+                sys.stderr.write("bridge-run: refused - key file: %s\n" % e)
+                return 125
+            coming.update(read_keys)
         by_environment = outside_by_environment(cmd, coming, folder)
         if by_environment is not None:
-            sys.stderr.write("bridge-run: refused - %s in this run's environment would have pytest load a plugin, or take an option or a target the launcher refuses "
-                             "on the command line; a test run reads the project's own tests: unset it, or write its words on the command line\n" % by_environment)
+            sys.stderr.write("bridge-run: refused - %s in this run's environment carries a word the launcher refuses on the command line (a plugin, an option, a folder "
+                             "or a target outside the project); a test run reads the project's own tests: unset it, or write its words on the command line\n" % by_environment)
             return 125
     if "--key-file" in flags and is_agent_argv(cmd):
         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")

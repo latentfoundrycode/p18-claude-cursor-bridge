@@ -226,9 +226,10 @@ def test_options_pytest_reads_from_the_environment_are_held_to_the_command_line_
     run = ["python", "-m", "pytest", "-q"]
     for env in ({"PYTEST_ADDOPTS": "../elsewhere"}, {"PYTEST_ADDOPTS": '"%s"' % out}, {"PYTEST_ADDOPTS": "-p probeplugin"}, {"PYTEST_ADDOPTS": "--rootdir " + out},
                 {"PYTEST_ADDOPTS": "-c %s/pytest.ini" % out}, {"PYTEST_ADDOPTS": "-o testpaths=" + out}, {"PYTEST_ADDOPTS": '-k "open'},
-                {"pytest_addopts": "../elsewhere"}, {"PYTEST_PLUGINS": "probeplugin"}, {"Pytest_Plugins": "a,b"}):
+                {"pytest_addopts": "../elsewhere"}, {"PYTEST_PLUGINS": "probeplugin"}, {"Pytest_Plugins": "a,b"},
+                {"PYTEST_ADDOPTS": "-q --"}):                              # a bare `--` would turn the command's own option values into targets
         for argv in (run, ["pytest"], ["uv", "run", "--frozen", "pytest", "tests"]):
-            assert br.outside_by_environment(argv, env, str(base)) == list(env)[0], (env, argv)
+            assert br.outside_by_environment(argv, env, str(base)) == list(env)[0].upper(), (env, argv)
     for env in ({}, {"PYTEST_ADDOPTS": ""}, {"PYTEST_ADDOPTS": "  "}, {"PYTEST_ADDOPTS": "--color=yes -p no:cacheprovider -q"}, {"PYTEST_ADDOPTS": '-k "a or b" tests'},
                 {"PYTEST_PLUGINS": ""}, {"PYTHONPATH": out}):
         assert br.outside_by_environment(run, env, str(base)) is None, env
@@ -236,30 +237,54 @@ def test_options_pytest_reads_from_the_environment_are_held_to_the_command_line_
     there = ["uv", "run", "--directory", "sub", "pytest"]                  # the environment's targets are read against the folder the run's own are
     assert br.outside_by_environment(there, {"PYTEST_ADDOPTS": "../tests"}, str(base)) is None
     assert br.outside_by_environment(there, {"PYTEST_ADDOPTS": "../../elsewhere"}, str(base)) == "PYTEST_ADDOPTS"
+    # Review A's read of the round's fix: uv reads `UV_WORKING_DIR` as `--directory` and `UV_PROJECT` as `--project` where the
+    # command gives none, and `UV_ENV_FILE` as a file of variables for the run; a run without uv reads none of the three.
+    uv = ["uv", "run", "--frozen", "pytest", "tests"]
+    for env, name in (({"UV_WORKING_DIR": out}, "UV_WORKING_DIR"), ({"UV_PROJECT": "../elsewhere"}, "UV_PROJECT"), ({"uv_working_dir": out}, "UV_WORKING_DIR"),
+                      ({"UV_ENV_FILE": ".env"}, "UV_ENV_FILE"), ({"UV_WORKING_DIR": "sub", "PYTEST_ADDOPTS": "../../elsewhere"}, "PYTEST_ADDOPTS")):
+        assert br.outside_by_environment(uv, env, str(base)) == name, env
+    for env in ({"UV_WORKING_DIR": "sub"}, {"UV_PROJECT": "."}, {"UV_WORKING_DIR": "sub", "PYTEST_ADDOPTS": "../tests"}, {"UV_CACHE_DIR": out}, {"UV_FROZEN": "1"},
+                {"UV_ENV_FILE": ""}):
+        assert br.outside_by_environment(uv, env, str(base)) is None, env
+    assert br.outside_by_environment(run, {"UV_WORKING_DIR": out, "UV_ENV_FILE": ".env"}, str(base)) is None
     assert br.outside_by_environment(["python", "-m", "unittest", "discover"], {"PYTEST_ADDOPTS": "../elsewhere"}, str(base)) is None
     assert br.outside_by_environment(["npm", "test"], {"PYTEST_PLUGINS": "x"}, str(base)) is None
 
 
-@pytest.mark.parametrize("route", ["environment", "key file"])
+@pytest.mark.parametrize("route", ["environment", "key file", "uv's folder"])
 def test_an_outside_target_in_the_environment_is_refused_before_the_run_starts(project, route):
-    """Through the program, by the launcher's own environment and by a key file's line: exit 125, the variable named and
-    its value not printed, nothing started, the probe not run."""
+    """Through the program, by the launcher's own environment, by a key file's line and by uv's own variable: exit 125,
+    the variable named and its value not printed, nothing started, the probe not run."""
     ws, outside = project
     env = dict(os.environ, LOCALAPPDATA=str(ws.parent / "localappdata"))
-    for name in ("BRIDGE_RUN_ALLOW_ANY", "PYTEST_ADDOPTS", "PYTEST_PLUGINS"):
+    for name in ("BRIDGE_RUN_ALLOW_ANY", "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "UV_WORKING_DIR", "UV_PROJECT", "UV_ENV_FILE"):
         env.pop(name, None)
-    flags = ["--limit", "120", "--kind", "test"]
+    flags, name, run = ["--limit", "120", "--kind", "test"], "PYTEST_ADDOPTS", ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider"]
     if route == "environment":
         env["PYTEST_ADDOPTS"] = str(outside).replace("\\", "/")
-    else:
+    elif route == "key file":
         keys = ws.parent / "keys.env"
         keys.write_text("PYTEST_ADDOPTS=%s\n" % str(outside).replace("\\", "/"), encoding="utf-8")
         flags += ["--key-file", str(keys)]
-    p = subprocess.run([sys.executable, PROG] + flags + ["--", "python", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
-                       capture_output=True, text=True, cwd=str(ws), env=env)
-    assert p.returncode == 125 and "refused - PYTEST_ADDOPTS in this run's environment" in p.stderr, p.stderr
+    else:
+        name, run = "UV_WORKING_DIR", ["uv", "run", "--frozen", "pytest", "-q", "-p", "no:cacheprovider"]
+        env[name] = str(outside)
+    p = subprocess.run([sys.executable, PROG] + flags + ["--"] + run, capture_output=True, text=True, cwd=str(ws), env=env)
+    assert p.returncode == 125 and "refused - %s in this run's environment" % name in p.stderr, p.stderr
     assert "elsewhere" not in p.stderr, "the value is not printed"
     assert "bridge-run: started" not in p.stderr and not (outside / "probe-ran.txt").exists(), "the probe ran"
+
+
+def test_a_key_file_that_cannot_be_read_refuses_a_test_run_before_it_starts(project):
+    """The key file's lines are checked before the run starts and never read a second time for it: one that cannot be
+    read at the check refuses there, so no line reaches a run unchecked."""
+    ws, _ = project
+    env = dict(os.environ, LOCALAPPDATA=str(ws.parent / "localappdata"))
+    env.pop("BRIDGE_RUN_ALLOW_ANY", None)
+    for flags in (["--key-file", str(ws.parent / "no-such-keys.env")], ["--key-file", str(ws / "keys.env")], ["--key-file"]):
+        p = subprocess.run([sys.executable, PROG, "--limit", "120", "--kind", "test"] + flags + ["--", "python", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
+                           capture_output=True, text=True, cwd=str(ws), env=env)
+        assert p.returncode == 125 and "refused - key file" in p.stderr and "bridge-run: started" not in p.stderr, (flags, p.stderr)
 
 
 def test_a_unittest_discovery_started_outside_is_refused_before_it_runs(project):
