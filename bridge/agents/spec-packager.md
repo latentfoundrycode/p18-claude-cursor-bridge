@@ -52,7 +52,19 @@ the diff without them. Nothing else under `docs/` or `handoff/` goes in Scope.
 
 ## Write to `handoff/TASK-<nnn>.md`
 
+The brief opens with its header (the core's "Project state", "The header"): `id` and `round` as the file's name gives them (`round: 1` for a plain name, `<N>` for `-r<N>`), `satisfies` the `Satisfies:` line's IDs, `scope` one entry per Scope bullet in the same order and spelling, `merge_unit` and `blocking_class` the `Merge unit:` and `Blocking class:` lines' values, or `null` where the brief has no such line. Write the prose first and the header from it; the launcher refuses a brief whose header disagrees with its prose (`header: `), before any run.
+
 ```markdown
+---
+record: brief
+header: 1
+id: "TASK-<nnn>"
+round: 1
+satisfies: [R-004, R-011]
+scope: ["path/one", "path/two", "docs/BUILDER_NOTES.md", "handoff/TASK-<nnn>-r<N>-report.md"]
+merge_unit: null
+blocking_class: null
+---
 # TASK-<nnn>: <title>
 
 ## Objective

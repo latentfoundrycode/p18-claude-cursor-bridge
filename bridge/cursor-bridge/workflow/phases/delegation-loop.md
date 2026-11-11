@@ -131,7 +131,10 @@ with no lift, no brief or two, a builder launch on `main`, a brief revised after
 brief under another ID on a counted branch) and the guard's `review ceiling: ` and `branch rule: `
 refusals and its refusals of a round off its count or already reviewed are the ceiling's
 programs holding, neither a failed launch nor a model's failure, handled as step 7's "The review
-ceiling" says; every other `bridge-run: refused - ` of a builder or review launch (the slot's
+ceiling" says; the launcher's and the guard's `header: ` refusal (a brief whose header the reader
+cannot read, or that disagrees with the brief's prose) is a record to put right, the header and the prose
+made to agree, by a new numbered brief where a run of the brief completed, never a failed launch or a
+model's failure; every other `bridge-run: refused - ` of a builder or review launch (the slot's
 `heavy.lock`, a limit, a key file) and every other `review-guard: refused - ` is no model's failure
 either, and is read and fixed as its message says.)
 

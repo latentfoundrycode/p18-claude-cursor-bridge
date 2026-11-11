@@ -116,7 +116,9 @@ def test_item1_fences_open_and_close_as_trace_check_reads_them():
 # re-takes its pin in the same diff as its `reword` entry, and a reviewer reads the change to a pin as a new trace
 # exception; an increment that adds an entry adds its section's pin. HOTFIX-003 (hotfix 2026.11.09a) re-takes three:
 # change-cycle.md's procedure (item 1's form of the change's intake), design.md's gate (the paragraph on a question
-# before the gate) and intake.md's procedure (the batches paragraph's sorting of questions).
+# before the gate) and intake.md's procedure (the batches paragraph's sorting of questions). TASK-052 re-takes four: step 3b
+# (the header refusal among the stops), design.md's gate (the register's header), planning.md's plan (the plan
+# file's header and its example) and run-parameters.md's procedure (the fence's header and its lists).
 EXCUSED_MODULE_SECTIONS = {
     ("change-cycle.md", "The procedure"): (7844, "d1c7da9bcba70710a1b85427c1bde7e95c43dbd739899bd87dd0c8d92d09bde7"),
     ("change-cycle.md", "What must survive a compaction"): (2143, "3cb57dbda1906c93b20e17a0e3cd13e38c2a3084fad1db978ce6ae888c08fada"),
@@ -127,7 +129,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("configuration.md", "What must survive a compaction"): (963, "338b5c4e338a41c95c7b9b2e1a110ed4e1473a8ad4ed04298359f8b21fd0984a"),
     ("delegation-loop.md", "2. Package the brief"): (964, "5394e345e8d43f10f2f9d98db2d5b092b96d0deea6e2dd75a4d3bb47b45e7e2e"),
     ("delegation-loop.md", "3. Delegate to Cursor"): (7786, "f53b36612879c3d100add48cabde59781aff6374b28a08bb3dc27f71f2cd3d00"),
-    ("delegation-loop.md", "3b. A model fails mid-step — switch automatically, restart the step, never wait"): (9130, "97e2d03f7c16f85f558c8f918e49ea45a68d541801da3e68f9424f95e98894fa"),
+    ("delegation-loop.md", "3b. A model fails mid-step — switch automatically, restart the step, never wait"): (9438, "31bea3b5bb8817d79ea34c98f5dfc6daeb8d32e4e2d24fed11676b2f13a1028f"),
     ("delegation-loop.md", "4. Inspect"): (16968, "eb909f117a45fa28fc1b773e4a140b2d3c313c202091513d75e3d1fa0839e0e8"),
     ("delegation-loop.md", "5. Scan"): (954, "f43c63ec4a4be8ab8fa53e691d96d613479f7db171215ae3b4e7d9c4fa6a1a56"),
     ("delegation-loop.md", "7. Decide — in a sub-file"): (241, "9146216638749b537ebdd42d28bdad75eb7ecfdafea1f8236bf90c7bb07c55ee"),
@@ -151,7 +153,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("design.md", "A part without screens"): (268, "2a16dc74e42feea8823e7d580109fbed8dd2783aae9e58b8ea9fc36058211446"),
     ("design.md", "Extension points"): (761, "0084dfd13bf170a046f673a2312ed9580521c8be2a0a428b167b06aca65ffeb1"),
     ("design.md", "The delivery kind"): (494, "6b32868830fa9a36639468c4485c247450ad5d9337993b315eaed2480bf51dd5"),
-    ("design.md", "The gate"): (3727, "1b916ecf69566bef622d72d3c83416aa2e680c606a80ec43571e7a55720a890b"),
+    ("design.md", "The gate"): (4089, "25cc3191c621a2f07ebe7976dd87f73017aa6fc3d08e682393296ce03a0d8a5c"),
     ("design.md", "The procedure"): (17003, "78c8814af6b1548c34772b0fb46453ba1a8a38ab9eb6dd0642ed4d305233dca8"),
     ("design.md", "Traits at the design gate"): (3403, "653036f6b84c11afd94a9900be1477d23e9b839bc1c9e2eb933a0d03860a617b"),
     ("design.md", "What must survive a compaction"): (1906, "c02f83be92ac4da84e33cffdcafd0117448fae2be656e6685b11e1a6e4d11f9e"),
@@ -168,7 +170,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("interface.md", "Which variants a part runs"): (1922, "82a465d2e23ba652f9704bedd8abeb28d031fadb17385366063f4766a1593068"),
     ("planning.md", "Extension points"): (1220, "7c60fc3db2dd655458f81bae44119268990eb368b946e71acfb98eacd3750dfe"),
     ("planning.md", "Step 0 — Prior-project lessons (ask before drafting)"): (2264, "48550c1f28154614dad3e93db34babdca1eb5906c75c3288198be40d0f4af65a"),
-    ("planning.md", "The plan"): (4637, "b94b0a9115ecc429c405f4ef177a9680b640dd767f33d8f52fa2c257648e9f16"),
+    ("planning.md", "The plan"): (6096, "ff75f697a0b814bb5c91a566aebac408482e0030516ef582d6bddc95cd37226f"),
     ("planning.md", "What must survive a compaction"): (1906, "a78f8ce042481394087c27a1095d89f0955dfdbecee1d473c2327974452d4162"),
     ("planning.md", "What the interface phase hands to the plan"): (1239, "c0159380131640dd4e5c5d86d5cc6904a9cedc9d3eb4276dac36ecdeb9264e09"),
     ("project-end.md", "Extension points"): (1215, "b43b5ed92b4810f1da52e175f743c08db42a712311f25476bfa586af47ee56c6"),
@@ -183,7 +185,7 @@ EXCUSED_MODULE_SECTIONS = {
     ("reflection.md", "What must survive a compaction"): (1836, "87bdea3faeda10fa68f51d4fa10b4459fa6b5b62e0dff6c155cac05dd8da7c21"),
     ("reflection.md", "Whether a compaction preceded it"): (897, "ebc5c943f5efaf88ed526fe33cf0e9ffa9364891949c853d27f525a674969be4"),
     ("run-parameters.md", "Extension points"): (683, "5ef8d017187dfd16f8fa971a8e7ef3551136b497387f14e9477562f84331976c"),
-    ("run-parameters.md", "The procedure"): (6446, "2bfb2c58c7017bcb7e643c184dd52cb3ecc6f670ca5f655e878fc6e7e29428c4"),
+    ("run-parameters.md", "The procedure"): (7469, "e2bdac6ed9305ec6c79e11ede9c0c68686482621899e8f7aad543fa14902fd01"),
     ("run-parameters.md", "What must survive a compaction"): (821, "d67698de27c0e6d55d3d347079911111df122fb0b3cb667fcb937b4ff1f55979"),
     ("run-parameters.md", "Writing the answers down"): (779, "ed3fe29e9fe1c96fa0348e57540a525572f2a646250b2adae046fc231b17b731"),
     ("traits/ai-models.md", "Add at configuration.items"): (1640, "4fd6accd73dbe9210a071eac20aff8753b354f0e990ce4d5398eee7c5674ee69"),

@@ -60,6 +60,44 @@ Write `docs/BUILD_PLAN.md` as an ordered list of increments. Each increment must
 - **Placed** — its heading is `### TASK-nnn — <title>` and its field lines state `Parent:` (a group increment it helps fulfil, or none), `Depends on:` (the increments that must be merged first, or none), `Parallel:` (yes if it may be built alongside other ready increments), `Diagrams:` (the normative diagrams its brief carries), and `Scope:`. A large task is a `Kind: group` heading whose children are increments; the group is done when all its children are. Status is never written in the plan: `python ~/.claude/cursor-bridge/plan-check.py` derives it from the commits on `origin/main`, validates the fields (missing dependencies, cycles, parallel increments whose scopes overlap, diagrams not in the index), and lists what is ready.
 - **Traced** — it names the requirement IDs it satisfies (`Satisfies: R-004, R-011`). Every `planned` requirement in `docs/REQUIREMENTS.md` is satisfied by at least one increment; `python ~/.claude/cursor-bridge/completion-check.py --mode plan` must pass before the plan gate; it counts an increment's `Satisfies:` field, never a mention in prose, and fails a `built` requirement whose Evidence names no test file (release A4). On an older project brought under the register part by part, `--only R-001,R-002` limits a run to those rows. A requirement no increment satisfies is either planned now or put to the owner as a deferral — never left out silently.
 
+The plan file opens with its header, one entry per stage and, inside it, one per increment, each field as its line gives it: `demonstration` `true` where the stage's `Demonstration:` line stands; `kind` `increment` where no `Kind:` line stands; `parallel` `true` for `yes` and `false` for `no` or no line; `parent` `null` and `depends_on`, `diagrams`, `scope` and `satisfies` `[]` for `none` or no line; `deferred` `null` until the owner defers it; `historic` `false` (the migration's mark for an increment merged before the fields existed). `plan-check.py` fails a header that disagrees with the prose (the core's "Project state", "The header"). For example:
+
+```markdown
+---
+record: build-plan
+header: 1
+stages:
+  - name: "S1 — the first slice"
+    demonstration: true
+    increments:
+      - id: TASK-001
+        title: "The key store"
+        kind: increment
+        parent: null
+        depends_on: []
+        parallel: false
+        diagrams: [D-004]
+        scope: ["src/key_store.py", "tests/test_key_store.py"]
+        satisfies: [R-004, R-011]
+        deferred: null
+        historic: false
+---
+# Build plan
+
+## S1 — the first slice
+Demonstration: <what is shown live, on the product as built, when the stage closes>
+
+### TASK-001 — The key store
+Author: builder.
+Parent: none
+Depends on: none
+Parallel: no
+Diagrams: D-004
+Scope: src/key_store.py; tests/test_key_store.py
+Satisfies: R-004, R-011
+Done when: <the acceptance criteria, checkable>
+```
+
 Each increment with **logic, auth, input-handling, or data-access surface** carries
 **security acceptance criteria** too ("no new Semgrep high findings", "passes OSV-Scanner
 and Socket", "authorization enforced at the boundary per ASVS §x") — checkable, not
