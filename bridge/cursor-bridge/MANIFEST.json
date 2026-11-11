@@ -1,6 +1,6 @@
 {
-  "version": "2026.11.09a",
-  "generated": "2026-11-11 11:01",
+  "version": "2026.11.11a",
+  "generated": "2026-11-11 13:04",
   "files": {
     "agents/cursor-configurator.md": "894222cbc903d02de8ea7eb03b1b59238a014d46435fd9467efcb49de2a690fc",
     "agents/design-auditor.md": "34418f6975a5d6646302bc01419f73ad18c9e15c0b5cdd278915af6ddc48cec9",
@@ -15,7 +15,7 @@
     "commands/calibrate-bridge.md": "b770834d7729329b202ff05cfd5b4cdf0895eb198bbb9dc6addf9c108259f68e",
     "commands/evaluate-reports.md": "3a72fa1647401c9bec9dfd267ee93fe2651dd3fdc9ede571674a502dae543383",
     "commands/supervisor.md": "f3f0597bef7271319c9c14134aaa58fe00ce914ae1fe3514e021ce9bd4c724ac",
-    "cursor-bridge/CHANGELOG.md": "90c4f14746f2ce1d91e654a7753465250260ebe299537a45f007a91a2316af5f",
+    "cursor-bridge/CHANGELOG.md": "7cf1a662377bed99007d13d09b0969b81fd5d6e1fddacf07fe8d8bef0977cece",
     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
     "cursor-bridge/Cursor-Project-Configuration.md": "e901421ce9a49abc76f0d254738143eb96d3b46caadaa7ea5227dead252bb734",
     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
@@ -26,7 +26,7 @@
     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
-    "cursor-bridge/VERSION": "bb3dd1febc69da7fc4eb3bd53a8d7446f269c302c37d47687dff837fef99df6a",
+    "cursor-bridge/VERSION": "0e59042035b480e48ed737c84e5e76f03c6b89c6ac60fe58660670bcee128823",
     "cursor-bridge/bench-check.py": "ea34fa87a1f3383cd34600f48a817a23b6fc0cd4ad461a77b796baf05ef2643e",
     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
     "cursor-bridge/bridge-check.py": "8f9aee982cd2a077f6498a7c37a1fd120996aa603f40c8668fd9025cdfbe8f4e",
