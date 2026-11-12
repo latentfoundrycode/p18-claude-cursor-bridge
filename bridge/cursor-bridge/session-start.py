@@ -14,11 +14,15 @@ part that was cut was the pointers), so the bridge registers the hook TWICE for 
 event, each run printing one part under its own cap:
 
   --part pointers   the project's phase from docs/PROJECT_STATUS.md (the "awaiting" text
-                    capped), the phase module file(s) to re-read whole, any sub-files and
-                    variant files named on those modules' pointer lines, the conditional
-                    workflow files (type, then sub-type, then traits in open-list order) that
-                    touch the phase, the conventions that phase relies on, and whether to
-                    continue or to wait for the owner; no supervisor.md line ranges;
+                    capped); what to read first (the status file whole, the last entries
+                    of run/supervisor/in-flight.md); the phase module file(s), any sub-files
+                    and variant files named on those modules' pointer lines, of which the ONE
+                    that holds the step in hand is re-read whole (release S: until then
+                    every file was), with the conditional workflow files (type, then
+                    sub-type, then traits in open-list order) that touch the phase; the
+                    conventions that phase relies on and the inventory, read on demand by
+                    section; and whether to continue or to wait for the owner; no
+                    supervisor.md line ranges;
   --part digest     the digest at the top of ~/.claude/commands/supervisor.md (between the
                     markers <!-- digest:start --> and <!-- digest:end -->), the one text the
                     maintainer keeps as the condensed core.
@@ -117,6 +121,15 @@ PLAIN_REASON = re.compile(r"[A-Za-z0-9 #().,'-]+")
 PLAIN_TYPE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 TABLES_NOT_INSTALLED = "%s: cannot be used (its tables are not at their installed paths)" % CHECKER_SHOWN
 PROJECT_END_NOTE = "(read at the close of the plan's last stage)"
+# What a resumed supervisor reads (release S): the position first, then the one file of the step in hand; the
+# rest when the work reaches it. Until 2026.11.11a every file of the phase was named to be re-read whole (the
+# building phase: about 43,000 words after each compaction, of which three files in eleven were read).
+READ_FIRST = ("BEFORE YOUR NEXT ACTION, read docs/PROJECT_STATUS.md whole with the Read tool and, where run/supervisor/in-flight.md exists, "
+              "its last entries: the live position between merges (the status file reads as at its last merge, ISS-009).")
+READ_ONE = ("Then re-read whole the ONE phase file of this list that holds the step you are about to run, and with it every conditional "
+            "workflow file listed after the phase files; the other phase files when the work reaches their step, not before:")
+ON_DEMAND = ("On demand, by the section, heading or entry the step in hand names, never whole as a block: docs/INVENTORY.md (whole at an "
+             "increment's checkpoint, rule 41)")
 TRAITS_MARK = "; traits: "
 ARROW = "\u2192"
 
@@ -548,8 +561,9 @@ def pointers_part(status, source, status_path):
     pointer_blocks = []
     conditional_lines = []
     workflows = values.get("workflows") or []
+    out.append(READ_FIRST)
     if module_keys:
-        out.append("BEFORE YOUR NEXT ACTION, re-read these files whole with the Read tool:")
+        out.append(READ_ONE)
         printed_paths = {PHASE_PREFIX + key + ".md" for key in module_keys}
         if needs_workflow_read(module_keys, workflows):
             wc, load_err = load_checker_module()
@@ -577,11 +591,11 @@ def pointers_part(status, source, status_path):
             out.append(read_error)
         out.extend(conditional_lines)
     elif phase:
-        out.append("BEFORE YOUR NEXT ACTION, re-read the procedure for phase '%s' (not in the hook's map: see ## The phase modules in ~/.claude/commands/supervisor.md)." % phase_show)
-    for conv in PHASE_CONVENTIONS.get(phase, []):
-        out.append("  - and %s, whole" % conv)
-    out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")
-    out.append("The status file reads as at its last merge (ISS-009): where run/supervisor/in-flight.md exists, read its last entries first, the live position between merges.")
+        out.append("Then re-read the procedure for phase '%s' (not in the hook's map: see ## The phase modules in ~/.claude/commands/supervisor.md)." % phase_show)
+    conventions = PHASE_CONVENTIONS.get(phase, [])
+    out.append(ON_DEMAND + (" and each file below:" if conventions else "."))
+    for conv in conventions:
+        out.append("  - on demand: %s" % conv)
     if source == "forked from another session":
         out.append("This session is a COPY; the original may still be the supervisor. Do not continue the loop unless the owner says this session is the supervisor now.")
     elif waiting:

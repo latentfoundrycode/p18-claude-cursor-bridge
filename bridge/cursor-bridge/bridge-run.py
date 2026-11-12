@@ -40,8 +40,10 @@ below the default and never above twice it unless `docs/RUN_PARAMETERS.md` carri
 owner's words on a line `Ceiling above twice: <kind> <seconds> (<their words>, <date>)`. The
 supervisor marks a run healthy with `--healthy <run id>` once its work passed the gate (the
 id is the launch time on the first stderr line, given whole or as a prefix that fits exactly
-one run; a run ended at its limit whose kept work merged counts too, so the ceiling can grow);
-a test run that exits 0 is marked by the launcher itself. The run that raised a ceiling is
+one run); a test run that exits 0 is marked by the launcher itself. A builder, review or watch
+run that ended at its limit (exit 124) is never marked healthy and never counts toward the
+learned limit, whatever became of its kept work: its seconds are the limit, not the work's
+time (ISS-030); work that needs longer is launched with an explicit `--limit`. The run that raised a ceiling is
 named when the ceiling is chosen. A slow but healthy task is never ended before its ceiling.
 An owner's cap below twice the default is ignored with a note: the line says "above twice".
 Refuses a design critique round above the ceiling (exit 125, `design ceiling:`).
@@ -92,6 +94,7 @@ import json
 import math
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -111,6 +114,7 @@ DRIVER_KEYFILE_REFUSE = ("bridge-run: refused - driver kind: --key-file is not a
                          "before the program runs)\n")
 LOG = os.path.join("run", "launcher", "runs.jsonl")
 LEARN_FACTOR = 1.5
+LEARN_EXITS = {"driver": (0, 1), "test": (0, 124)}        # the exits a healthy run of a kind may have; every other kind: 0 only
 CAP_FACTOR = 2
 HEAVY_KINDS = frozenset(("builder", "driver", "test"))
 SLOT_GRACE = 120
@@ -348,6 +352,295 @@ def test_suite(argv, folder=None):
             and not os.path.isfile(os.path.join(folder or os.getcwd(), "node_modules", ".bin", rest[0] + ".cmd")):
         return False                                       # npx would fetch it from the registry, outside the gate
     return True
+
+
+PYTEST_VALUE_OPTIONS = ("-k", "-m", "-p", "-o", "--override-ini", "-W", "--pythonwarnings", "-n", "-r", "--junitxml", "--junit-xml", "--junit-prefix",
+                        "--log-file", "--log-level", "--log-cli-level", "--log-file-level", "--ignore", "--ignore-glob", "--deselect", "--maxfail",
+                        "--tb", "--durations", "--durations-min", "--cov", "--cov-report", "--cov-config", "--cov-fail-under", "--timeout",
+                        "--import-mode", "--color", "--capture", "--show-capture", "--html", "--alluredir", "--json-report-file", "--benchmark-json")
+# The word after each of these is the option's value, never a target: a report or a log written to a temporary folder is ordinary.
+PYTEST_FOLDER_OPTIONS = ("--config-file", "--confcutdir", "--rootdir")   # these name what pytest loads: inside the project like a target
+UNITTEST_FOLDER_OPTIONS = ("--start-directory", "--top-level-directory")   # -s and -t: where discovery starts and what it imports from
+UNITTEST_VALUE_OPTIONS = ("--pattern", "--durations")                     # -p and -k beside them: a value, never a target
+
+
+INI_PATH_SETTINGS = ("testpaths", "pythonpath")        # what `-o <name>=<paths>` makes pytest collect, or import from
+PYTEST_FLAG_LETTERS = "xvqslVh"                        # pytest's own one-letter options that take no value: another option may follow one in the same word
+
+
+def value_words(value):
+    """Every reading of a value that holds several words: split at white space, and split as pytest
+    splits an ini value and `PYTEST_ADDOPTS`, by the shell's rules, where quotes join and leave and a
+    backslash escapes. A list of lists; None where the shell's rules cannot read it (an open quote)."""
+    try:
+        return [value.split(), shlex.split(value)]
+    except ValueError:
+        return None
+
+
+def ini_override(a):
+    """The `<name>=<value>` an option word of a pytest run sets by `-o` or `--override-ini`: "" where
+    the setting is the next word, None where the word is no such option. Read as argparse reads
+    it: `--override-ini=<setting>`, `-o<setting>`, and `-o` behind pytest's flags in one word."""
+    if a == "--override-ini" or a.startswith("--override-ini="):
+        return a.partition("=")[2]
+    if a.startswith("--"):
+        return None
+    for j, ch in enumerate(a[1:], 1):
+        if ch == "o":
+            rest = a[j + 1:]
+            return rest[1:] if rest.startswith("=") else rest
+        if ch not in PYTEST_FLAG_LETTERS:                  # no flag of pytest's: read no further
+            return None
+    return None
+
+
+def hidden_escape(a):
+    """True where a word of a pytest run carries `-c` (a configuration file) or `-p` (a plugin)
+    behind pytest's flags in one word, `-vc<file>`: `test_suite` refuses the two by their own
+    words, and a form it does not read is refused here, whatever its value."""
+    if a.startswith("--"):
+        return False
+    for j, ch in enumerate(a[1:], 1):
+        if ch in "cp":
+            return j > 1
+        if ch not in PYTEST_FLAG_LETTERS:
+            return False
+    return False
+
+
+def option_kind(word, a):
+    """(kind, value) of one option word of a pytest or unittest run: kind "folder" where the option
+    names a folder or file the run loads, "value" where its value is no target, None for a flag;
+    value None where the value is the next word. unittest reads its options as argparse does: a
+    long option by any prefix that names one option only (`--start=`, `--top`), a short one
+    with its value attached (`-s<dir>`, `-s=<dir>`) and behind flags in one word (`-vs<dir>`)."""
+    name, eq, value = a.partition("=")
+    if word == "pytest":
+        if name in PYTEST_FOLDER_OPTIONS:
+            return "folder", (value if eq else None)
+        return ("value", None) if not eq and name in PYTEST_VALUE_OPTIONS else (None, None)
+    if a.startswith("--"):
+        if len(name) > 2:
+            for kind, options in (("folder", UNITTEST_FOLDER_OPTIONS), ("value", UNITTEST_VALUE_OPTIONS)):
+                if any(o.startswith(name) for o in options):
+                    return kind, (value if eq else None)
+        return None, None
+    for j, ch in enumerate(a[1:], 1):
+        if ch in "st" or ch in "pk":
+            rest = a[j + 1:]
+            return ("folder" if ch in "st" else "value"), ((rest[1:] if rest.startswith("=") else rest) or None)
+        if ch not in "vqfcb":                              # no flag of unittest's: read no further
+            break
+    return None, None
+
+
+def _real_path(path):
+    return os.path.normcase(os.path.realpath(os.path.abspath(path)))
+
+
+def launch_roots(folder):
+    """The folders a test run may name, each resolved through its links: the launch folder, the
+    repository's main worktree (the Workspace) and its worktrees where rule 39 keeps them, under
+    `Worktrees/` beside the Workspace, whichever of them the run was launched in. A worktree
+    registered anywhere else (one a run made in a temporary folder in passing) and one git calls
+    prunable are not among them."""
+    base = folder or os.getcwd()
+    roots = [_real_path(base)]
+    try:
+        p = subprocess.run(["git", "-C", base, "worktree", "list", "--porcelain"], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", creationflags=NO_WINDOW, timeout=bridge_env.GIT_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired):
+        return roots
+    if p.returncode != 0:
+        return roots
+    trees = []
+    for block in p.stdout.split("\n\n"):
+        lines = block.strip().splitlines()
+        if lines and lines[0].startswith("worktree "):
+            trees.append((_real_path(lines[0][len("worktree "):].strip()), any(l.split(" ", 1)[0] == "prunable" for l in lines[1:])))
+    if trees:
+        main = trees[0][0]                                 # git lists the main worktree first: the Workspace, wherever the run was launched
+        home = _real_path(os.path.join(main, os.pardir, "Worktrees")).rstrip(os.sep) + os.sep
+        roots += [tree for tree, prunable in trees if not prunable and (tree == main or tree.startswith(home)) and tree not in roots]
+    return roots
+
+
+def runner_word(argv):
+    """(`pytest` or `unittest`, the index of the first word after it) for a run of one of the two,
+    read where `named_suite` reads it; (None, 0) for any other command."""
+    head = head_of(argv)
+    if head == "pytest":
+        return "pytest", 1
+    if head in ("python", "python3", "py"):                 # `python -m pytest` and `python -m unittest`, the two forms `named_suite` takes
+        if argv[1:2] == ["-m"] and argv[2:3] in (["pytest"], ["unittest"]):
+            return argv[2], 3
+        return None, 0
+    if head == "uv":                                        # the runner's word is the first that is no option of uv's and no option's value
+        start = 2
+        while start < len(argv) and argv[start] != "pytest":
+            start += 2 if argv[start] in UV_VALUE_OPTIONS else 1
+        return "pytest", start + 1
+    return None, 0
+
+
+PYTEST_ENV_WORDS = "PYTEST_ADDOPTS"                    # options pytest reads from the environment, in front of the command's own
+PYTEST_ENV_PLUGINS = "PYTEST_PLUGINS"                  # plugins pytest loads by name from the environment, as `-p` does
+UV_ENV_FOLDERS = (("UV_WORKING_DIR", "--directory"), ("UV_PROJECT", "--project"))   # uv reads each as that option where the command gives none
+# uv's other variables a test run may carry, as `uv_run_pytest` lists the options it may: how uv syncs, links and reports, and
+# where the computer keeps uv's cache and its managed interpreters. Any other `UV_` name is refused: the interpreter
+# (`UV_PYTHON`), its environment (`UV_PROJECT_ENVIRONMENT`), a file of variables or of settings (`UV_ENV_FILE`,
+# `UV_CONFIG_FILE`) and whatever a later uv adds stand for options the command line refuses, or for none it knows.
+# A name joins the list only if it changes no interpreter, environment, configuration file or package source;
+# `UV_RUN_RECURSION_DEPTH` is uv's own counter, which it sets in every process it starts.
+UV_ENV_PLAIN = ("UV_CACHE_DIR", "UV_NO_CACHE", "UV_PYTHON_INSTALL_DIR", "UV_FROZEN", "UV_LOCKED", "UV_NO_SYNC", "UV_OFFLINE", "UV_NO_PROGRESS",
+                "UV_LINK_MODE", "UV_COMPILE_BYTECODE", "UV_MANAGED_PYTHON", "UV_NO_MANAGED_PYTHON", "UV_RUN_RECURSION_DEPTH")
+
+
+def outside_by_environment(argv, environ, folder=None):
+    """The name of a variable in the environment a pytest run is about to get that carries a word
+    the launcher refuses on the command line, or None (release S). pytest's and uv's own
+    variables, and no others: for a uv run every `UV_` name is held to a list as the command's
+    options are (`uv_run_pytest`): `UV_WORKING_DIR` and `UV_PROJECT` are read as `--directory`
+    and `--project` in front of the command's own (which win where both are given), the names of
+    `UV_ENV_PLAIN` pass, any other set at all is refused; `PYTEST_PLUGINS` set at all, `-p` by
+    another route; `PYTEST_ADDOPTS`, read in both ways a value's words can be (`value_words`) and
+    held to `test_suite`'s escape list for pytest and to `outside_target` behind the command's
+    words up to `pytest` (so uv's folder is the one its targets are read against), a bare `--`
+    among them refused, since it would turn the command's own option values into targets. Names
+    are compared without regard to case, as Windows reads them, and of two spellings of one name
+    the later is read, the one a child process gets on Windows (a key file's line after the
+    launcher's own). The value is never printed: a key file's lines reach this environment
+    (`--key-file`). What decides which program a bare name starts (`PATH`) and what the
+    interpreter itself reads from the environment (`PYTHONPATH` and its kin) are no words of the
+    run and are not read here."""
+    word, start = runner_word(argv)
+    if word != "pytest":
+        return None
+    env = {name.upper(): value for name, value in environ.items() if (value or "").strip()}
+    lead = argv[:start]
+    if head_of(argv) == "uv":
+        unknown = sorted(name for name in env if name.startswith("UV_") and name not in dict(UV_ENV_FOLDERS) and name not in UV_ENV_PLAIN)
+        if unknown:
+            return unknown[0]
+        for name, option in UV_ENV_FOLDERS:
+            if name in env:
+                lead = lead[:2] + [option, env[name]] + lead[2:]
+                if outside_target(lead + argv[start:], folder) is not None:
+                    return name
+    if PYTEST_ENV_PLUGINS in env:
+        return PYTEST_ENV_PLUGINS
+    if PYTEST_ENV_WORDS in env:
+        readings = value_words(env[PYTEST_ENV_WORDS])
+        if readings is None or any("--" in words or not test_suite(["pytest"] + words, folder) or outside_target(lead + words, folder) is not None
+                                   for words in readings):
+            return PYTEST_ENV_WORDS
+    return None
+
+
+def outside_target(argv, folder=None):
+    """The first word of a pytest or unittest run that leads outside the project, or None (release
+    S). A test run reads the project's own tests: a probe written in a temporary folder and run
+    through the launcher would run code no diff shows, in the project's environment. Inside means
+    under the launch folder or one of the repository's worktrees, links resolved. Checked: uv's
+    `--project` and `--directory` before the word pytest, the second of which becomes the folder
+    the targets are read against; every word after `pytest` or `unittest` that is no option and
+    no option's value (a `::node` suffix dropped; a `-k` expression or a marker resolves inside
+    and passes); the file `--config-file` names and the folders `--confcutdir` and `--rootdir`
+    name; unittest's start and top-level folders in every form argparse reads (`option_kind`); an
+    ini override of `testpaths` or `pythonpath`, and one of `addopts` that is not empty, whose
+    options no rule here reads; `-c` or `-p` behind pytest's flags in one word; every word after
+    a bare `--` as a target; an `@file` of arguments, which hides its targets and is refused
+    whatever it holds, for pytest in an option's value too."""
+    head = head_of(argv)
+    word, start = runner_word(argv)
+    if word is None:
+        return None
+    roots = launch_roots(folder)
+    base = folder or os.getcwd()
+
+    def inside(path, against):
+        full = _real_path(os.path.join(against, path))
+        return any(full == r or full.startswith(r.rstrip(os.sep) + os.sep) for r in roots)
+
+    def climbs(path):                                      # pytest reads an ini path against the folder of the configuration file it found, which may lie deeper than the launch folder
+        return os.path.normpath(path).split(os.sep)[0] == os.pardir
+
+    if head == "uv":
+        i = 2
+        while i < start - 1:
+            name, eq, value = argv[i].partition("=")
+            if name in ("--project", "--directory"):
+                value = value if eq else (argv[i + 1] if i + 1 < len(argv) else "")
+                if not inside(value, folder or os.getcwd()):
+                    return argv[i] if eq else "%s %s" % (name, value)
+                if name == "--directory":
+                    base = os.path.join(folder or os.getcwd(), value)
+                i += 1 if eq else 2
+                continue
+            i += 1
+    if word == "pytest":                                   # pytest's parser reads a file of arguments for every word that starts with @, an option's value too
+        hidden = next((a for a in argv[start:] if a.startswith("@")), None)
+        if hidden is not None:
+            return hidden
+    i, options = start, True
+    while i < len(argv):
+        a = argv[i]
+        i += 1
+        if a.startswith("@"):
+            return a
+        if a == "--" and options:                          # every word after it is a target, whatever it starts with
+            options = False
+            continue
+        if a.startswith("-") and options:
+            if word == "pytest" and hidden_escape(a):
+                return a
+            kind, value = option_kind(word, a)
+            shown = a
+            setting = ini_override(a) if word == "pytest" else None
+            if setting is not None:                        # an ini value set on the command line: the paths it has pytest collect or import from
+                if not setting:
+                    setting = argv[i] if i < len(argv) else ""
+                    shown = "%s %s" % (a, setting)
+                    i += 1
+                key, _, paths = setting.partition("=")
+                readings = value_words(paths)
+                if key.strip() in INI_PATH_SETTINGS and (readings is None or any(not inside(p, base) or climbs(p) for words in readings for p in words)):
+                    return shown                           # pytest reads the value by the shell's rules: `testpaths="../elsewhere"` is that folder
+                if key.strip() == "addopts" and paths.strip():   # options inside a value are read by no rule here: on the command line, or not at all
+                    return shown
+                continue
+            if kind and value is None:                     # the next word is its value, whatever it reads like
+                value = argv[i] if i < len(argv) else ""
+                shown = "%s %s" % (a, value)
+                i += 1
+            if kind == "folder" and not inside(value, base):
+                return shown
+            continue
+        path = a.split("::", 1)[0]
+        if path and not inside(path, base):
+            return a
+    return None
+
+
+ROUND_CAUSES = ("defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error")
+ROUND_CAUSE_RE = re.compile(r"^Round cause:[ \t]*(.*?)[ \t]*$", re.M)
+
+
+def round_cause(brief_text):
+    """(cause, note) from a brief's `Round cause: <cause> - <one line>` (release S, M1): why this
+    round was opened, one of ROUND_CAUSES, read into the run log for pace-report.py. A brief of
+    round two or later without the line, or with a word outside the list, is logged `unstated`
+    with a note; never a refusal, the measure must not hold a build."""
+    m = ROUND_CAUSE_RE.search(brief_text or "")
+    if not m:
+        return "unstated", "the brief has no `Round cause:` line (one of: %s); logged as unstated" % ", ".join(ROUND_CAUSES)
+    value = m.group(1).lower()
+    for cause in sorted(ROUND_CAUSES, key=len, reverse=True):
+        rest = value[len(cause):].lstrip()
+        if value.startswith(cause) and (not rest or rest[0] in "-:(,;–—"):
+            return cause, None
+    return "unstated", "the brief's `Round cause:` names none of: %s; logged as unstated" % ", ".join(ROUND_CAUSES)
 
 
 def kind_of(argv):
@@ -749,6 +1042,10 @@ def builder_review_refusal(argv, folder, kind):
         "merge_ids": tuple(declared),
         "branch": br,
     }
+    if name_round > 1:                                     # release S, M1: why the round was opened, for pace-report.py
+        meta["cause"], cause_note = round_cause(brief_text)
+        if cause_note:
+            NOTES.append(cause_note)
     return None, meta
 
 
@@ -757,7 +1054,7 @@ def learned_limit(kind, folder):
     never below the default and never above twice it without the owner's words."""
     default = KINDS[kind]
     cap, _ = cap_for(kind, folder)
-    exits = (0, 1) if kind == "driver" else (0, 124)   # 124: ended at its limit, its kept work merged (test kind)
+    exits = LEARN_EXITS.get(kind, (0,))                    # a run ended at its limit measures the limit, not the work (ISS-030)
     healthy = [r for r in read_log(folder) if r.get("kind") == kind and r.get("healthy") is True
                and isinstance(r.get("seconds"), (int, float)) and r.get("exit") in exits]
     if not healthy:
@@ -784,6 +1081,11 @@ def mark_healthy(run_id, folder, kind=None):
         return 1
     if hit[0].get("kind") == "driver" and hit[0].get("exit") not in (0, 1):
         sys.stderr.write("bridge-run: refused - a driver run is healthy at exit 0 or 1 only\n")
+        return 1
+    if hit[0].get("exit") == 124 and hit[0].get("kind") != "test":
+        sys.stderr.write("bridge-run: refused - a %s run that ended at its limit is not marked healthy: its seconds are the limit, "
+                         "not the time the work takes, and would lengthen every later run (ISS-030); where the work needs longer, "
+                         "launch with an explicit --limit\n" % hit[0].get("kind"))
         return 1
     for r in hit:
         r["healthy"] = True
@@ -1483,6 +1785,27 @@ def main():
     elif not accepted(cmd, folder):
         sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
         return 125
+    read_keys = None
+    if kind != "driver" and named_suite(cmd):
+        outside = outside_target(cmd, folder)
+        if outside is not None:
+            sys.stderr.write("bridge-run: refused - the test target %r lies outside the folder the launcher runs in; a test run reads the project's own tests: "
+                             "write a probe under the project's tests folder and run it from there\n" % outside)
+            return 125
+        coming = dict(os.environ)                          # what the run is about to get, or more: a stripped run gets no name this one lacks, and the key file's lines join it
+        if "--key-file" in flags:
+            try:
+                read_keys = key_file_env(flags[flags.index("--key-file") + 1], folder)
+            except (IndexError, OSError, ValueError) as e:  # never read a second time for the run: the lines checked here are the lines it gets
+                sys.stderr.write("bridge-run: refused - key file: %s\n" % e)
+                return 125
+            coming.update(read_keys)
+        by_environment = outside_by_environment(cmd, coming, folder)
+        if by_environment is not None:
+            sys.stderr.write("bridge-run: refused - %s in this run's environment: it carries a word the launcher refuses on the command line (a plugin, an option, a folder "
+                             "or a target outside the project), or it is a variable of uv's that a test run through the launcher does not take; a test run reads the "
+                             "project's own tests: unset it for the launch, or write its words on the command line\n" % by_environment)
+            return 125
     if "--key-file" in flags and is_agent_argv(cmd):
         sys.stderr.write("bridge-run: refused - a key file never goes to a cursor-agent run (the builder and the reviewer must not see a key)\n")
         return 125
@@ -1575,7 +1898,7 @@ def main():
         return 125
     if "--key-file" in flags:
         try:
-            keys = key_file_env(flags[flags.index("--key-file") + 1], folder)
+            keys = read_keys if read_keys is not None else key_file_env(flags[flags.index("--key-file") + 1], folder)
         except (IndexError, OSError, ValueError) as e:
             sys.stderr.write("bridge-run: refused - key file: %s\n" % e)
             return 125
@@ -1594,6 +1917,8 @@ def main():
         )
         if brief_meta.get("lift_line"):
             entry["lift_line"] = brief_meta["lift_line"]
+        if brief_meta.get("cause"):
+            entry["cause"] = brief_meta["cause"]
     if kind == "watch" and head.startswith("gh pr checks"):
         line = wait_for_first_check(argv[argv.index("--") + 1:], folder)
         if line:

@@ -214,6 +214,34 @@ CACHES = (("HF_HUB_CACHE", os.path.join(".cache", "huggingface", "hub")),
           ("PUPPETEER_CACHE_DIR", os.path.join(".cache", "puppeteer")))
 
 
+# The run's own application folders (release S, C1): APPDATA and LOCALAPPDATA name the agent
+# home's skeleton, so a program a builder, a reviewer or a stripped suite starts that writes
+# its key file, cache or state through either variable writes there and never into the
+# owner's real folders (the TDP's key file was overwritten twice that way, 2026-11-01 and 02).
+# The skeleton sits in the profile root, outside AppData, so the desktop app's private copy
+# of AppData (KP-055) does not come into it. A program that asks Windows itself for a known
+# folder (SHGetKnownFolderPath) is not redirected: a project's own test isolation stays its duty.
+APP_FOLDERS = (("APPDATA", os.path.join("AppData", "Roaming")),
+               ("LOCALAPPDATA", os.path.join("AppData", "Local")))
+# What a run must still find in the owner's real folders, reached by a link in the skeleton as
+# `.cursor` is: cursor-agent reads its login under %APPDATA%\Cursor (probed 2026-11-11 on the
+# owner's computer: with APPDATA redirected and no link the CLI is logged out; LOCALAPPDATA
+# holds nothing it needs). Where a link cannot be made or leads elsewhere, that variable keeps
+# the owner's folder for the run, as before release S: the login matters more than the redirect.
+APP_LINKS = (("APPDATA", "Cursor"),)
+# What the tools keep under the owner's real folders and a run would otherwise download or
+# build again: package and browser caches and the user's installed packages, each passed by
+# the tool's own variable where that is unset and the folder exists; never a store of keys.
+APP_CACHES = (("UV_CACHE_DIR", "LOCALAPPDATA", os.path.join("uv", "cache")),
+              ("UV_PYTHON_INSTALL_DIR", "APPDATA", os.path.join("uv", "python")),
+              ("PIP_CACHE_DIR", "LOCALAPPDATA", os.path.join("pip", "Cache")),
+              ("PYTHONUSERBASE", "APPDATA", "Python"),
+              ("NPM_CONFIG_CACHE", "LOCALAPPDATA", "npm-cache"),
+              ("YARN_CACHE_FOLDER", "LOCALAPPDATA", os.path.join("Yarn", "Cache")),
+              ("PLAYWRIGHT_BROWSERS_PATH", "LOCALAPPDATA", "ms-playwright"),
+              ("GOCACHE", "LOCALAPPDATA", "go-build"))
+
+
 def write_gitconfig(real):
     """`<profile>/.cursor-bridge/gitconfig`: includes the owner's global git config when it
     exists and resets the credential helper list (an empty `helper =` resets it, as git
@@ -244,8 +272,10 @@ def write_gitconfig(real):
 def stripped_env(env=None):
     """Return a copy of `env` (default: os.environ) in which gh is logged out, no token
     variable and no variable named like an account key survives, git has no credential
-    helper and never prompts, and the home folder is the agent's own (KP-038). Raises
-    AgentHomeError when that folder cannot be prepared: the run must not start."""
+    helper and never prompts, and the home folder is the agent's own (KP-038), APPDATA and
+    LOCALAPPDATA with it where they are set (release S: APP_FOLDERS, the tools' caches
+    passed first by APP_CACHES). Raises AgentHomeError when that folder cannot be
+    prepared: the run must not start."""
     e = dict(os.environ if env is None else env)
     empty = gh_empty_dir()
     try:
@@ -278,7 +308,68 @@ def stripped_env(env=None):
     for var, rel in CACHES:
         if not e.get(var) and os.path.isdir(os.path.join(real, rel)):
             e[var] = os.path.join(real, rel)
+    owners = {name: e.get(name) for name, _ in APP_FOLDERS}
+    for var, base, rel in APP_CACHES:
+        if not e.get(var) and owners.get(base) and os.path.isdir(os.path.join(owners[base], rel)):
+            e[var] = os.path.join(owners[base], rel)
+    for name, rel in APP_FOLDERS:
+        if owners[name] and app_links(name, owners[name], os.path.join(home, rel)) is None:
+            e[name] = os.path.join(home, rel)              # set where the launcher's own environment has it (Windows always does)
     return e
+
+
+def app_links(name, owner, skeleton, create=True, repair=False):
+    """None when every folder of APP_LINKS for this variable that the owner has is reached from
+    the skeleton by a link that leads to it; else what is wrong, and the run keeps the owner's
+    folder under that variable. A missing link is made (create), and an empty folder left in its
+    place gives way to it; a link that leads elsewhere is removed, by itself and never through
+    it, and made again only by the install (repair); a folder with content is never removed.
+    With create=False (bridge-check.py) nothing is written, and what the next run puts right by
+    itself, a missing link or an empty folder in its place, is no problem."""
+    for var, folder in APP_LINKS:
+        if var != name:
+            continue
+        target, link = os.path.join(owner, folder), os.path.join(skeleton, folder)
+        if not os.path.isdir(target):
+            continue                                       # the owner has no such folder: nothing to reach
+        if os.path.lexists(link) and not leads_to(link, target):
+            if is_link(link) and not repair:
+                return "%s is a link that does not lead to %s" % (link, target)
+            try:
+                if not create:
+                    if os.listdir(link):
+                        raise OSError("not empty")
+                    continue
+                remove_link(link) if is_link(link) else os.rmdir(link)   # rmdir removes an empty folder only
+            except OSError:
+                return "%s is a folder with content (or a file, or a folder in use), not a link to %s" % (link, target)
+        if not os.path.lexists(link):
+            if not create:
+                continue
+            try:
+                os.makedirs(skeleton, exist_ok=True)
+            except OSError as e:
+                return "cannot prepare %s (%s)" % (skeleton, e)
+            err = make_link(link, target)
+            if err:
+                return "cannot link %s to %s (%s)" % (link, target, err)
+        if not leads_to(link, target):
+            return "%s was made but does not lead to %s" % (link, target)
+    return None
+
+
+def app_links_problem(env=None, repair=False):
+    """What bridge-check.py reports and the install repairs: the first APP_LINKS link of the agent
+    home that leads elsewhere or has a folder with content in its place, or None. While it stands,
+    runs still work and keep the owner's folder under that variable, so the redirect is off for it."""
+    env = os.environ if env is None else env
+    home = os.path.join(real_home(env), ".cursor-bridge", "agent-home")
+    for name, rel in APP_FOLDERS:
+        if env.get(name):
+            problem = app_links(name, env[name], os.path.join(home, rel), create=repair, repair=repair)
+            if problem:
+                return problem
+    return None
 
 
 def cursor_agent_launcher():
@@ -568,6 +659,54 @@ def walk_plan_prose_body(body):
     elif increments:
         outside_stage = list(increments)
     return {"stages": stages, "outside_stage": outside_stage}
+
+
+DONE_WHEN_RX = re.compile(r"^\s*(?:[-*]\s+)?Done when\s*:\s*(.*)$", re.I)
+_OTHER_FIELD_RX = re.compile(r"^\s*(?:[-*]\s+)?[A-Z][A-Za-z ]{1,24}:(?:\s|$)")
+_BULLET_RX = re.compile(r"^\s*(?:[-*]|\d{1,2}[.)])\s+")
+_LETTERED_RX = re.compile(r"\((?:[a-z]|\d{1,2})\)")
+
+
+def plan_done_when_items(paths, read_text):
+    """{increment ID: the number of acceptance items of its `Done when:` field}, for plan-check's size
+    note (release S). The field is no header key and no FIELD_RX key, so it is walked here, beside the
+    one plan walker. It runs to the next field line, heading or empty line; its items are its list
+    lines, or its clauses between semicolons, or its lettered or numbered marks `(a)`, `(2)`, whichever
+    count is greatest. A size reading for a note, never a rule: what one item is stays the plan
+    author's. A plan whose header cannot be read is skipped; its own check reports it."""
+    counts = {}
+    for path in paths:
+        try:
+            body = plan_body(read_text(path))
+        except HeaderError:
+            continue
+        cur, text = None, None
+
+        def close():
+            if cur is not None and text is not None:
+                joined = " ".join(text)
+                bullets = sum(1 for line in text[1:] if _BULLET_RX.match(line))
+                clauses = len([c for c in joined.split(";") if c.strip()])
+                counts[cur] = max(bullets, clauses, len(_LETTERED_RX.findall(joined)))
+
+        for line in (body or "").splitlines():
+            head = HEAD_RX.match(line)
+            if head or line.startswith("#"):
+                close()
+                cur, text = (head.group(1) if head else None), None
+                continue
+            m = DONE_WHEN_RX.match(line)
+            if m and cur is not None:
+                close()
+                text = [m.group(1)]
+            elif text is not None:
+                if not line.strip() or (_OTHER_FIELD_RX.match(line) and not _BULLET_RX.match(line)):
+                    close()
+                    text = None
+                else:
+                    text.append(line)
+        close()
+    return counts
 
 
 def plan_check_parse(paths, read_text):

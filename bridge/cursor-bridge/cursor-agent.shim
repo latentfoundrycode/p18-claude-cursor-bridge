@@ -81,6 +81,57 @@ unset BRIDGE_GITCONFIG BRIDGE_REAL_HOME_M
 [ -z "$HF_HUB_CACHE" ] && [ -d "$BRIDGE_REAL_HOME/.cache/huggingface/hub" ] && export HF_HUB_CACHE="$BRIDGE_REAL_HOME_W/.cache/huggingface/hub"
 [ -z "$TORCH_HOME" ] && [ -d "$BRIDGE_REAL_HOME/.cache/torch" ] && export TORCH_HOME="$BRIDGE_REAL_HOME_W/.cache/torch"
 [ -z "$PUPPETEER_CACHE_DIR" ] && [ -d "$BRIDGE_REAL_HOME/.cache/puppeteer" ] && export PUPPETEER_CACHE_DIR="$BRIDGE_REAL_HOME_W/.cache/puppeteer"
+# The run's own application folders (release S): APPDATA and LOCALAPPDATA name the agent
+# home's skeleton, so a program the run starts writes its key file, cache or state there and
+# never into the owner's real folders; the tools' package caches and the user's installed
+# packages are passed through by their own variables first. The same recipe as
+# bridge_env.APP_FOLDERS and APP_CACHES; each variable is set only where it was set.
+mkdir -p "$BRIDGE_AGENT_HOME/AppData/Local" "$BRIDGE_AGENT_HOME/AppData/LocalLow" "$BRIDGE_AGENT_HOME/AppData/Roaming" \
+  "$BRIDGE_AGENT_HOME/Documents" "$BRIDGE_AGENT_HOME/Desktop" "$BRIDGE_AGENT_HOME/Downloads" 2>/dev/null
+bridge_pass() {   # <variable> <owner's folder> <relative path>: pass the owner's folder by the tool's own variable
+  eval "BRIDGE_CUR=\${$1}"
+  if [ -z "$BRIDGE_CUR" ] && [ -n "$2" ] && [ -d "$2/$3" ]; then
+    if command -v cygpath >/dev/null 2>&1; then export "$1=$(cygpath -w "$2/$3")"; else export "$1=$2/$3"; fi
+  fi
+}
+bridge_pass UV_CACHE_DIR "$LOCALAPPDATA" uv/cache
+bridge_pass UV_PYTHON_INSTALL_DIR "$APPDATA" uv/python
+bridge_pass PIP_CACHE_DIR "$LOCALAPPDATA" pip/Cache
+bridge_pass PYTHONUSERBASE "$APPDATA" Python
+bridge_pass NPM_CONFIG_CACHE "$LOCALAPPDATA" npm-cache
+bridge_pass YARN_CACHE_FOLDER "$LOCALAPPDATA" Yarn/Cache
+bridge_pass PLAYWRIGHT_BROWSERS_PATH "$LOCALAPPDATA" ms-playwright
+bridge_pass GOCACHE "$LOCALAPPDATA" go-build
+unset -f bridge_pass
+unset BRIDGE_CUR
+# cursor-agent reads its login under %APPDATA%/Cursor (probed 2026-11-11: logged out without
+# it), so the skeleton's Roaming folder holds a link `Cursor` to the owner's, made here when
+# missing, as `.cursor` above; the same recipe as bridge_env.APP_LINKS. Where the owner has
+# the folder and the link is not one that leads to it, APPDATA keeps the owner's folder for
+# this run: the login matters more than the redirect.
+BRIDGE_ROAMING_OK=1
+if [ -n "$APPDATA" ] && [ -d "$APPDATA/Cursor" ]; then
+  BRIDGE_LINK="$BRIDGE_AGENT_HOME/AppData/Roaming/Cursor"
+  if [ ! -e "$BRIDGE_LINK" ]; then
+    if command -v cmd >/dev/null 2>&1 && command -v cygpath >/dev/null 2>&1; then
+      cmd //d //c mklink //J "$(cygpath -w "$BRIDGE_LINK")" "$(cygpath -w "$APPDATA/Cursor")" >/dev/null 2>&1
+    else
+      ln -s "$APPDATA/Cursor" "$BRIDGE_LINK" 2>/dev/null
+    fi
+  fi
+  if [ "$(cd "$BRIDGE_LINK" 2>/dev/null && pwd -P)" != "$(cd "$APPDATA/Cursor" 2>/dev/null && pwd -P)" ] || [ -z "$(cd "$APPDATA/Cursor" 2>/dev/null && pwd -P)" ]; then
+    BRIDGE_ROAMING_OK=0
+  fi
+  unset BRIDGE_LINK
+fi
+if command -v cygpath >/dev/null 2>&1; then
+  [ -n "$APPDATA" ] && [ "$BRIDGE_ROAMING_OK" = 1 ] && export APPDATA="$(cygpath -w "$BRIDGE_AGENT_HOME/AppData/Roaming")"
+  [ -n "$LOCALAPPDATA" ] && export LOCALAPPDATA="$(cygpath -w "$BRIDGE_AGENT_HOME/AppData/Local")"
+else
+  [ -n "$APPDATA" ] && [ "$BRIDGE_ROAMING_OK" = 1 ] && export APPDATA="$BRIDGE_AGENT_HOME/AppData/Roaming"
+  [ -n "$LOCALAPPDATA" ] && export LOCALAPPDATA="$BRIDGE_AGENT_HOME/AppData/Local"
+fi
+unset BRIDGE_ROAMING_OK
 export HOME="$BRIDGE_AGENT_HOME_W" USERPROFILE="$BRIDGE_AGENT_HOME_W"
 case "$BRIDGE_AGENT_HOME_W" in
   [A-Za-z]:*) export HOMEDRIVE="${BRIDGE_AGENT_HOME_W%%:*}:" HOMEPATH="${BRIDGE_AGENT_HOME_W#?:}" ;;

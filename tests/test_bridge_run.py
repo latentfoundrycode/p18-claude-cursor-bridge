@@ -281,17 +281,20 @@ def test_stripped_environment_reaches_the_child(tmp_path):
 def test_r055_d004_a_stripped_run_gets_the_notes_names(tmp_path):
     """R-055, D-004 (`p_bridge_run` to `p_test_suite`). enforces: docs/BUILD_PLAN.md TASK-044 Done when: through the
     launcher's `--strip`, the child holds none of the withheld names the diagram's note lists, and every name it says is set,
-    the owner's three caches being present here, its home the agent's and not the owner's; without the flag the same variables
-    reach the child, so the test can fail."""
+    the owner's caches being present here (the three under the home, and since release S the eight under the two application
+    folders), its home the agent's and not the owner's; without the flag the same variables reach the child, so the test can fail."""
     withheld, _, _, set_names = d004_stripped_note()
     home = tmp_path / "home"
     for rel in (".cursor", os.path.join(".cache", "huggingface", "hub"), os.path.join(".cache", "torch"), os.path.join(".cache", "puppeteer")):
         (home / rel).mkdir(parents=True)
+    for base, rel in (("localappdata", "uv/cache"), ("appdata", "uv/python"), ("localappdata", "pip/Cache"), ("appdata", "Python"),
+                      ("localappdata", "npm-cache"), ("localappdata", "Yarn/Cache"), ("localappdata", "ms-playwright"), ("localappdata", "go-build")):
+        (tmp_path / base / rel).mkdir(parents=True)        # bridge_env.APP_CACHES: the owner's folders the strip passes by the tool's own variable
     extra = {name: "v" for name in withheld}
-    extra.update(HOME=str(home), USERPROFILE=str(home))
+    extra.update(HOME=str(home), USERPROFILE=str(home), APPDATA=str(tmp_path / "appdata"))
     env = env_for(tmp_path, **extra)
     for name in set_names:
-        if name not in ("HOME", "USERPROFILE"):
+        if name not in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA"):
             env.pop(name, None)
     code = "import json, os; print(json.dumps({'names': sorted(os.environ), 'homes': [os.environ.get('HOME'), os.environ.get('USERPROFILE')]}))"
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--strip", "--", sys.executable, "-c", code], capture_output=True, text=True, env=env)
@@ -301,7 +304,7 @@ def test_r055_d004_a_stripped_run_gets_the_notes_names(tmp_path):
     assert [os.path.basename(h) for h in seen["homes"]] == ["agent-home", "agent-home"], "the run's home is the agent's"
     assert not set(withheld) & names, "a name the note withholds reached the child"
     missing = set(set_names) - names if os.name == "nt" else set(set_names) - names - {"HOMEDRIVE", "HOMEPATH"}
-    assert not missing, "a name the note says is set did not reach the child"
+    assert not missing, "a name the note says is set did not reach the child: " + ", ".join(sorted(missing))
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--", sys.executable, "-c", code], capture_output=True, text=True, env=env)
     assert p.returncode == 0 and set(withheld) <= set(json.loads(p.stdout)["names"]), p.stderr
 

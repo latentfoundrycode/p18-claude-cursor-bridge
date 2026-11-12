@@ -31,7 +31,8 @@ REVIEW_MODEL = "gpt-5.5-high"
 CLASSES = ("behaviour", "security", "data integrity", "safety mechanism", "failing test")
 OLD_FIELDS = {"id", "kind", "head", "model", "branch", "limit", "seconds", "exit", "healthy", "boundary", "waited", "slot",
               "pid", "child_pid"}
-NEW_FIELDS = {"brief", "round", "brief_sha256", "lift", "brief_name", "merge_ids", "lift_line"}
+NEW_FIELDS = {"brief", "round", "brief_sha256", "lift", "brief_name", "merge_ids", "lift_line",
+              "cause"}                                     # release S (M1): a round after the first carries why it was opened, never the prompt
 NAME_RX = re.compile(r"^(.*?)(?:-r([1-9][0-9]*))?$")
 DASH = chr(0x2014)
 E_ACUTE = chr(0xE9)

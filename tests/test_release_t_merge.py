@@ -10,6 +10,7 @@ and the three allow rules with the commands they admit. KP-052: the one non-ASCI
 dash, is built with chr(), never typed."""
 import json
 import os
+import re
 
 from permission_rules import rule_matches
 from phase_modules import flat, numbered_rule as rule, read, section
@@ -99,9 +100,10 @@ def test_r045_t11_t17_the_status_file_as_at_the_merge():
     assert "copied to the status file after `verify`" not in rule(43)
     assert "\n" + 'In flight: none (the file a pull request carries reads as at its merge; between merges the live position is written in run/supervisor/in-flight.md, rule 43: TASK-nnn in <checkout> since <time>, one line per parallel increment; <agent> in the background since <HH:MM>, ceiling <HH:MM>)' + "\n" in read(CORE)
     assert "| TASK-nnn in <checkout>" not in read(CORE)
-    hook = read(HOOK)
-    first = hook.index('out.append("Then read docs/PROJECT_STATUS.md and docs/INVENTORY.md whole (rule 41).")')
-    assert hook.index('out.append(' + '"The status file reads as at its last merge (ISS-009): where run/supervisor/in-flight.md exists, read its last entries first, the live position between merges."' + ')') > first
+    hook = re.sub(r'"\s*\n\s*"', "", read(HOOK))            # release S: the sentence is the hook's first, one string over two source lines
+    assert ('READ_FIRST = ("BEFORE YOUR NEXT ACTION, read docs/PROJECT_STATUS.md whole with the Read tool and, where run/supervisor/in-flight.md exists, '
+            'its last entries: the live position between merges (the status file reads as at its last merge, ISS-009).")') in hook
+    assert hook.index("out.append(READ_FIRST)") < hook.index("out.append(READ_ONE)")
     assert flat(" So is a pull request whose status file another pull request's merge overtook: the file a pull request carries reads as at that pull request's merge (ISS-009, KP-069), so where another merged first the branch rewrites it as at its own merge and merges `main`, and the reviews read the new head again (T11, T17).") in step8()
 
 

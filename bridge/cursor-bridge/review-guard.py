@@ -5,6 +5,7 @@ before the launch, verified and restored after it, and checked once more before 
   python ~/.claude/cursor-bridge/review-guard.py snapshot <nnn>          before launching Review B
   python ~/.claude/cursor-bridge/review-guard.py verify   <nnn>          after it returns
   python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> [<pr>]   after the review files are removed, committed and pushed
+  python ~/.claude/cursor-bridge/review-guard.py premerge-records [<pr>] the short gate of a pull request that changes only records
 
 Why (release 0b review, finding 2 and its second pass): Review B keeps `--force` so it can
 run the tests and build reproductions (the owner's decision), and it acts after Review A and
@@ -58,6 +59,23 @@ What each step does:
             wait is printed either way (2026-10-18 C2). It writes the record the permission
             guard reads (<git common dir>/bridge/premerge/<head>) and prints the merge command
             with `--match-head-commit`.
+  premerge-records  (release S) the short gate: a pull request whose every changed file is a
+            record (under docs/ or handoff/, or project.json; a text or a picture by its type,
+            a plain file by its mode) and none of them one a program reads to decide a gate
+            merges without the cross-family round, on CI, which the branch rule holds, and one
+            Review A read, which is the supervisor's step: this command checks neither. The
+            full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*, docs/ROSTER*,
+            everything under docs/diagrams/, a removed status file, inventory, register or
+            project file, the register where a Status cell changed, a row left, a new row is
+            not `planned` or a built row changed in any cell, a tool's configuration or a
+            hidden file under a record folder, the inventory where a line naming
+            the threat model or under a heading naming it changed, the project file where
+            `instruction_texts` changed, a pull request into another branch than main, and
+            every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the
+            branch against origin/main and writes nothing. With <pr> the changed files are
+            GitHub's list of the pull request joined with the local diff from its base, its
+            head must be the local HEAD (read again as premerge does), and on OK the same
+            record is written and the merge command printed. Exit 1 on FULL GATE or NOT READY.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
 a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY;
@@ -1191,8 +1209,269 @@ def cmd_premerge(nnn, cwd, pr=None):
     return 0
 
 
+# ---------------------------------------------------------------- the short gate of a records-only pull request (release S)
+
+RECORD_ROOTS = ("docs/", "handoff/")                    # where a project's records live; `project.json` beside them
+RECORD_TYPES = (".md", ".json", ".txt", ".csv", ".png", ".jpg", ".jpeg", ".gif", ".webp")   # what a record is written in: text and pictures, never a program, a page or a configuration a tool runs
+FULL_GATE_RECORDS = (("docs/run_parameters.md", "the run parameters decide the ceilings and who merges"),
+                     ("docs/build_plan", "the plan decides what is built and in what order"),
+                     ("docs/roster", "the roster decides which model builds and which reviews"),
+                     ("docs/diagrams/", "the diagrams, their index and the deviations decide what the diagram check allows"))   # compared in lower case
+TOOL_FILES = ("package.json", "package-lock.json", "tsconfig.json", "jsconfig.json", "composer.json", "deno.json", "lerna.json", "nx.json",
+              "turbo.json", "vercel.json", "firebase.json")   # a tool's own configuration, which it runs or builds from, whatever folder holds it; with them every `requirements*.txt`, which an installer reads
+KEPT_RECORDS = ("docs/project_status.md", "docs/inventory.md", "docs/requirements.md", "project.json")   # the guards test that the status file exists; the checks read the others
+PLAIN_MODES = ("100644", "000000")                      # a plain file, or no file on that side; a link (120000), a submodule (160000) and an executable (100755) are no record
+PR_FILES_MAX = 100                                      # gh lists a pull request's first hundred files
+
+
+def register_rows(text):
+    """{requirement ID: (Status cell, the whole row with its white space folded)} of a register's text, read
+    as completion-check.py reads it; None when it cannot be read row for row (a malformed header or row,
+    an ID twice)."""
+    try:
+        header, body = bridge_env.read_header(text)
+    except bridge_env.HeaderError:
+        return None
+    out, count = {}, 0
+    if header is not None:
+        columns, roles = list(header.get("columns") or []), header.get("roles") or {}
+        for r in bridge_env.parse_register(body or "")[1]:
+            if len(r) < len(columns):
+                return None
+            count += 1
+            out[bridge_env.register_row_role(r, columns, roles, "id").strip("`* ")] = (
+                bridge_env.register_row_role(r, columns, roles, "status").strip("`* "), " ".join(" | ".join(r).split()))
+    else:
+        for r in bridge_env.parse_register(text)[1]:
+            if len(r) < 4:
+                return None
+            count += 1
+            out[r[0].strip("`* ")] = (r[3].strip("`* "), " ".join(" | ".join(r).split()))
+    return out if len(out) == count else None
+
+
+def _at(rev, path, root, common):
+    """The text of `path` at `rev`, or None where the commit holds no such file."""
+    p = _git_proc(["show", "%s:%s" % (rev, path)], root, common)
+    return bridge_env.decode_record_bytes(p.stdout.encode("utf-8")) if p.returncode == 0 else None
+
+
+FENCE_MARK = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+ATX_HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]|$)")
+LOOSE_HEADING = re.compile(r"^\s*(#{1,6})")
+UNDERLINE = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
+COMMENT_OPEN = re.compile(r"^ {0,3}<!--")
+
+
+def threat_model_lines(text):
+    """The inventory's lines that bound what a finding blocks: every line that names the threat model, and
+    every line of a section whose heading names it, each with its white space folded. The two ends of a
+    section are read unlike, each to the side that keeps more lines. It OPENS on any line that starts with
+    `#` and names the model, wherever it stands and with or without its space, and on a line naming the model
+    that the next line underlines. It ENDS only on a heading Markdown would draw, of the same or a higher
+    level: a `#` line inside a fenced block (a backtick fence whose first line holds another backtick is a
+    code span, no fence), inside an HTML comment that begins its line, indented as code or without its space
+    is a line of the section like any other, and an underlined heading ends none."""
+    lines = (text or "").splitlines()
+    out, depth, fence, comment = [], 0, None, False        # depth: the level of the open heading that names the model, 0 outside one
+    for n, line in enumerate(lines):
+        names = "threat model" in line.lower()
+        mark, ends = FENCE_MARK.match(line), None
+        if fence:
+            if mark and mark.group(1)[0] == fence[0] and len(mark.group(1)) >= len(fence) and not mark.group(2).strip():
+                fence = None
+        elif comment:
+            comment = "-->" not in line
+        elif mark and not (mark.group(1)[0] == "`" and "`" in mark.group(2)):
+            fence = mark.group(1)
+        elif COMMENT_OPEN.match(line):
+            comment = "-->" not in line.split("<!--", 1)[1]
+        else:
+            ends = ATX_HEADING.match(line)
+        opens = LOOSE_HEADING.match(line) if names else None
+        under = UNDERLINE.match(lines[n + 1]) if names and not opens and n + 1 < len(lines) else None
+        if opens or under:
+            level = len(opens.group(1)) if opens else (1 if under.group(1)[0] == "=" else 2)
+            depth = level if not depth else min(depth, level)
+        elif ends and depth and len(ends.group(1)) <= depth:   # a sub-heading stays inside; a heading of the same or a higher level ends it
+            depth = 0
+        if depth or names:
+            out.append(" ".join(line.split()))
+    return sorted(l for l in out if l)
+
+
+def changed_modes(base, head, root, common):
+    """{path: (mode before, mode after, status letter)} of the local diff, renames shown as a removal and an
+    addition."""
+    out = {}
+    words = run_git(["diff", "--raw", "--no-renames", "--no-abbrev", "-z", base, head], root, common).split("\0")
+    for i in range(0, len(words) - 1, 2):
+        meta = words[i].lstrip(":").split()
+        if len(meta) >= 5:
+            out[words[i + 1].replace("\\", "/")] = (meta[0], meta[1], meta[4][:1])
+    return out
+
+
+def full_gate_reasons(paths, base, head, root, common):
+    """[(path, why)] of the changed paths that keep the full gate. A path takes the short gate only where it
+    is a record by its folder, by its type and by its mode, and is none of the records a program reads to
+    decide a gate: the run parameters, a plan, the roster, anything under docs/diagrams/, a removed status
+    file, inventory, register or project file, the register where a Status cell changed, a row left, a new
+    row is not `planned` or a built row changed in any cell, a tool's configuration or a hidden file
+    under a record folder, the inventory where the threat model changed,
+    the project file where its `instruction_texts` changed. Empty when every path takes the short gate."""
+    out, modes = [], changed_modes(base, head, root, common)
+    for path in sorted(set(p.replace("\\", "/") for p in paths)):
+        low = path.lower()
+        before_mode, after_mode, status = modes.get(path, ("100644", "100644", "M"))
+        if path != "project.json" and not path.startswith(RECORD_ROOTS):
+            out.append((path, "not a record: only docs/, handoff/ and project.json take the short gate"))
+            continue
+        if before_mode not in PLAIN_MODES or after_mode not in PLAIN_MODES:
+            out.append((path, "a link, a submodule entry or an executable file (mode %s to %s) is no record" % (before_mode, after_mode)))
+            continue
+        if os.path.splitext(low)[1] not in RECORD_TYPES:
+            out.append((path, "not a record by its type: a record is one of %s; a program, a page or a tool's configuration under a record folder is read by both reviewers" % ", ".join(RECORD_TYPES)))
+            continue
+        name = low.rsplit("/", 1)[-1]
+        if path != "project.json" and (name in TOOL_FILES or (name.startswith("requirements") and name.endswith(".txt"))
+                                       or (name.startswith(("tsconfig.", "jsconfig.")) and name.endswith(".json"))
+                                       or any(part.startswith(".") for part in low.split("/"))):
+            out.append((path, "a tool's configuration or a hidden file or folder: a tool may run or build from it, so both reviewers read it"))
+            continue
+        named = [why for prefix, why in FULL_GATE_RECORDS if low.startswith(prefix)]
+        if named:
+            out.append((path, named[0]))
+        elif status == "D" and low in KEPT_RECORDS:
+            out.append((path, "removed: the guards and the checks read this record"))
+        elif low == "docs/requirements.md":
+            before, after = _at(base, path, root, common), _at(head, path, root, common)
+            old = register_rows(before) if before is not None else {}
+            new = register_rows(after) if after is not None else None
+            if old is None or new is None:
+                out.append((path, "the register cannot be read row for row on both sides"))
+                continue
+            moved = sorted(i for i in old if i not in new or new[i][0] != old[i][0]) + sorted(i for i in new if i not in old and new[i][0].lower() != "planned")
+            if moved:
+                out.append((path, "a Status cell changed, a row left, or a new row is not `planned`: %s" % ", ".join(moved[:8])))
+                continue
+            proved = sorted(i for i in new if new[i][0].lower() == "built" and i in old and new[i][1] != old[i][1])
+            if proved:
+                out.append((path, "a built row changed, its sentence or its Evidence, which is what the completion check holds the build to: %s" % ", ".join(proved[:8])))
+        elif low == "docs/inventory.md":
+            if threat_model_lines(_at(base, path, root, common)) != threat_model_lines(_at(head, path, root, common)):
+                out.append((path, "a line that names the threat model, or one under a heading that names it, changed: it bounds what a reviewer's finding blocks"))
+        elif low == "project.json":
+            texts = []
+            for rev in (base, head):
+                try:
+                    data = json.loads(_at(rev, path, root, common) or "{}")
+                    texts.append(data.get("instruction_texts") if isinstance(data, dict) else ValueError)
+                except ValueError:
+                    texts.append(ValueError)
+            if ValueError in texts:
+                out.append((path, "the project file cannot be read on both sides"))
+            elif texts[0] != texts[1]:
+                out.append((path, "`instruction_texts` changed: it decides where the completion check accepts a text as evidence"))
+    return out
+
+
+def pr_state(pr, root):
+    """({"head", "base", "files"} of the pull request on GitHub, None) or (None, the reason gh failed)."""
+    try:
+        g = subprocess.run(["gh", "pr", "view", str(pr), "--json", "headRefOid,baseRefOid,baseRefName,files"], cwd=root, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, " (%s)" % e
+    if g.returncode != 0:
+        return None, ": %s" % (g.stderr.strip() or g.stdout.strip())[:200]
+    try:
+        data = json.loads(g.stdout)
+        return {"head": data["headRefOid"], "base": data["baseRefOid"], "into": data["baseRefName"], "files": [f["path"] for f in data["files"]]}, None
+    except (ValueError, KeyError, TypeError) as e:
+        return None, ": its reply cannot be read (%s)" % e
+
+
+def cmd_premerge_records(cwd, pr=None):
+    """The short gate (release S): a pull request that changes only records, none of them one a program
+    reads to decide a gate, merges without the cross-family round. This command decides that by path,
+    type and mode and nothing else: CI is held by the repository's branch rule and the one Review A
+    read by the supervisor's step, neither is checked here. Without
+    <pr> it only says which gate the branch takes, against origin/main, and writes nothing. With <pr> the
+    changed files are GitHub's own list beside the local diff (a local ref moved, by anyone, cannot
+    shrink it), the pull request's head must be the local HEAD, and the record the permission guard
+    reads is written."""
+    root, _, common = find_git_dirs(cwd)
+    if root is None:
+        print("review-guard: CANNOT CHECK - not inside a git repository")
+        return 2
+    if run_git(["status", "--porcelain"], root, common).strip():
+        print("review-guard: CANNOT CHECK - the tree is not clean; commit the records first")
+        return 2
+    head = run_git(["rev-parse", "HEAD"], root, common).strip()
+    listed, waited = [], 0
+    if pr:
+        state, err = pr_state(pr, root)
+        while err is None and state["head"] != head and waited < PR_HEAD_WAIT:
+            time.sleep(PR_HEAD_STEP)                       # GitHub can lag a push, as in premerge
+            waited += PR_HEAD_STEP
+            state, err = pr_state(pr, root)
+        if err is not None:
+            print("review-guard: CANNOT CHECK - gh pr view failed%s" % err)
+            return 2
+        if state["head"] != head:
+            print("review-guard: NOT READY - the pull request's head on GitHub (%s) is not the local head (%s), after waiting %d seconds: push first" % (state["head"][:12], head[:12], waited))
+            return 1
+        if state["into"] != "main":
+            print("review-guard: FULL GATE - the pull request merges into %s, not main: the short gate is for records that reach main" % state["into"])
+            return 1
+        if len(state["files"]) >= PR_FILES_MAX:
+            print("review-guard: FULL GATE - the pull request changes %d files or more, beyond what its list shows whole" % PR_FILES_MAX)
+            return 1
+        upstream, listed = state["base"], state["files"]
+    else:
+        upstream = "origin/main"
+    p = _git_proc(["merge-base", upstream, head], root, common)
+    if p.returncode != 0 or not p.stdout.strip():
+        print("review-guard: CANNOT CHECK - %s is not known here or shares no history with HEAD; fetch first" % upstream)
+        return 2
+    base = p.stdout.strip()
+    local = [l.strip() for l in run_git(["diff", "--name-only", "--no-renames", base, head], root, common).splitlines() if l.strip()]
+    paths = sorted(set(local) | set(listed))
+    if not paths:
+        print("review-guard: CANNOT CHECK - HEAD changes nothing against %s" % upstream)
+        return 2
+    reasons = full_gate_reasons(paths, base, head, root, common)
+    for path, why in reasons:
+        print("  FULL GATE  %s: %s" % (path, why))
+    if reasons:
+        print("review-guard: FULL GATE - %d of %d changed file(s) keep the whole round: snapshot, Review B, verify, premerge" % (len(reasons), len(paths)))
+        return 1
+    if not pr:
+        print("review-guard: SHORT GATE - %d changed file(s), every one a record no program reads to decide a gate; after CI and one Review A read, "
+              "run it again with the pull request's number (nothing was written)" % len(paths))
+        return 0
+    folder = os.path.join(common, "bridge", "premerge")
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, head), "w", encoding="utf-8") as f:
+            json.dump({"pr": pr, "review": "records", "files": paths, "written": time.strftime("%Y-%m-%dT%H:%M:%S")}, f)
+    except OSError as e:
+        print("review-guard: CANNOT CHECK - the pre-merge record could not be written (%s)" % e)
+        return 2
+    print("review-guard: OK - records only, %d file(s); the pull request's head matches%s" % (len(paths), (" (waited %d seconds)" % waited) if waited else ""))
+    print("review-guard: merge with  gh pr merge %s --squash --match-head-commit %s" % (pr, head))
+    return 0
+
+
 def main():
     argv = sys.argv[1:]
+    if argv[:1] == ["premerge-records"] and len(argv) <= 2:
+        try:
+            return cmd_premerge_records(os.getcwd(), argv[1] if len(argv) > 1 else None)
+        except (RuntimeError, subprocess.TimeoutExpired, OSError) as e:
+            print("review-guard: CANNOT VERIFY - %s" % e)
+            return 2
     if len(argv) < 2 or argv[0] not in ("snapshot", "verify", "premerge"):
         print(__doc__.split("\n\n")[1])
         return 2

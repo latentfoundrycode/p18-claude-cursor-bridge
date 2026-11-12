@@ -18,12 +18,23 @@ docs/REQUIREMENTS.md holds one table (see supervisor.md, "The requirements regis
               increment: the plan that built it may be gone (the video factory's older plans).
   UNAPPROVED  a deferred/dropped row without "owner" and a date.
   NO EVIDENCE a `built` requirement whose Evidence cell names no test file (release A4: a
-              release was declared complete while features returned empty data).
+              release was declared complete while features returned empty data). A requirement
+              an instruction text satisfies may name the text instead (release S), each entry
+              `text: <file>.md :: <heading> (#<pull request>)`, only in a project whose
+              project.json declares where its instruction texts are (`instruction_texts`, a
+              list of folders, never a record folder): the file must stand under one of them,
+              hold that heading outside a code block, and the pull request's squash stand on
+              origin/main and have changed that file (a note on a branch of unmerged work and
+              in a shallow clone, a failure on merged work). For a row whose sentence names a
+              program (`name.py`) a text entry never counts: a test proves what a program
+              does, and the cell names it beside the entry.
   stand-ins are listed as notes (mid-build a later stage may legitimately be pending).
 --mode done  (project end, and the start of every change cycle) - everything above, plus:
   NOT BUILT   a requirement still `planned`.
   NO EVIDENCE also a `built` requirement whose ID appears in no tracked test file. Tests carry
-              the requirement ID (a comment, docstring, or test name) - that is the trace.
+              the requirement ID (a comment, docstring, or test name) - that is the trace. A row
+              whose text entries all hold, its sentence naming no program, needs no test that
+              names it.
 --only R-001,R-002  limits every check to those IDs (an older project brought under the
               register part by part, or one stage's requirements; release A4).
   STAND-IN    shipped (non-test) code shows a user-visible stand-in, in any of these forms:
@@ -40,6 +51,7 @@ Exit 0 = OK, 1 = at least one failure.
 """
 import argparse
 import glob
+import json
 import os
 import re
 import subprocess
@@ -69,6 +81,13 @@ CODE_EXT = {".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".vue", ".svelt
             ".rb", ".php", ".ps1", ".xaml", ".qml"}
 TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec|specs|e2e|testing|fixtures)(/|$)"
                        r"|(^|/)test_[^/]*$|_test\.[a-z]+$|\.(test|spec)\.[a-z]+$", re.I)
+# Text evidence (release S): a requirement an instruction text satisfies names where the text
+# stands and the pull request that merged it, `text: <file>.md :: <heading> (#<n>)`.
+TEXT_EVIDENCE = re.compile(r"\btext:\s*`?([^\s`|;]+\.md)`?\s*::\s*(.+?)\s*\(#(\d+)\)")
+PROGRAM_NAME = re.compile(r"(?<![\w/.-])[\w-]+\.(?:py|ps1|sh|js|mjs|cjs|ts|tsx|jsx|cs|rs|go|java|kt|swift|rb|php)\b")
+HEADING_RX = re.compile(r"^#{1,6}[ \t]+(.*?)[ \t]*#*[ \t]*$")
+FENCE_RX = re.compile(r"^\s{0,3}(```|~~~)")
+RECORD_FOLDERS = ("docs/", "handoff/", "run/")            # records: a change there can take the short gate (review-guard.py premerge-records)
 SKIP_PATH = re.compile(r"(^|/)(docs|\.claude|\.cursor|\.github|node_modules|vendor|third_party|"
                        r"dist|build|bench|benchmarks|scripts/dev)(/|$)", re.I)
 
@@ -86,6 +105,169 @@ def tracked():
 
 def parse_register(text):
     return bridge_env.parse_register(text)
+
+
+def git_out(*args):
+    try:
+        p = subprocess.run(("git",) + args, capture_output=True, creationflags=NO_WINDOW, timeout=120)
+    except (OSError, subprocess.TimeoutExpired):
+        return None, ""
+    return p.returncode, p.stdout.decode("utf-8", "replace")
+
+
+class Merged(object):
+    """Which pull requests' squash commits stand on origin/main and which files each changed,
+    asked of git once. `state` is "strict" where HEAD is merged work (a missing squash is a
+    failure), "ahead" where HEAD holds commits origin/main lacks (the cell may name its own pull
+    request: a note), or the reason the question cannot be answered here (a note)."""
+
+    def __init__(self):
+        self.numbers, self.state, self.commits, self.files = None, None, {}, {}
+
+    def load(self):
+        if self.state is not None:
+            return
+        code, out = git_out("rev-parse", "--is-shallow-repository")
+        if code != 0:
+            self.state = "not a git repository"
+        elif out.strip() == "true":
+            self.state = "a shallow clone holds no history"
+        else:
+            code, out = git_out("log", "origin/main", "--format=%H%x09%s")
+            if code != 0:
+                self.state = "origin/main is not known here"
+            else:
+                for line in out.splitlines():
+                    sha, _, subject = line.partition("\t")
+                    m = re.search(r"\(#(\d+)\)[ \t]*$", subject)
+                    if m:
+                        self.commits.setdefault(m.group(1), []).append(sha)
+                self.numbers = set(self.commits)
+                self.state = "strict" if git_out("merge-base", "--is-ancestor", "HEAD", "origin/main")[0] == 0 else "ahead"
+
+    def changed(self, number):
+        """The paths the squash of pull request <number> changed, renames as both their names."""
+        if number not in self.files:
+            paths = set()
+            for sha in self.commits.get(number, ()):
+                code, out = git_out("diff-tree", "--no-commit-id", "--name-only", "--no-renames", "--root", "-r", "-z", sha)
+                paths.update(p.replace("\\", "/") for p in out.split("\0") if p)
+            self.files[number] = paths
+        return self.files[number]
+
+
+EVIDENCE_WRAP = "`*, ()[]<>{}\"'"                          # what a register's cell wraps a path in
+
+
+def is_test_path(path):
+    """A test file by its path, and never a record: `docs/test_plan.md` is a document about tests,
+    and a record can reach main by the short gate, which nothing that counts as evidence may
+    (release S; until then such a file named a row for done mode). The path is read as the file
+    system reads it, `./` and doubled slashes dropped and a part's trailing dots and spaces with
+    them; one that climbs (`..`) or starts at a root, a drive or the home folder names no file of
+    the Workspace by its own words and is no test either. The path is taken out of what a cell
+    wraps it in first: a Markdown link's target, quotes, brackets, and the punctuation after it."""
+    path = path.strip("`*, ").replace("\\", "/")
+    if not TEST_PATH.search(path):                         # what reads as a test's path is what read as one before release S: the unwrapping only ever refuses
+        return False
+    if "](" in path:                                       # [words](the path)
+        path = path.rsplit("](", 1)[1]
+    path = path.lstrip(EVIDENCE_WRAP).rstrip(EVIDENCE_WRAP + ".:;!?")
+    if "://" in path:                                      # an address: no file of the Workspace by its own words; a record's is no test
+        return not re.search(r"/(?:docs|handoff|run)/", path.lower())
+    parts = [p.rstrip(". ") if p.strip(".") else p for p in path.split("::", 1)[0].split("/")]
+    if ".." in parts or path.startswith(("/", "~")) or re.match(r"[A-Za-z]:", path):
+        return False
+    clean = "/".join(p for p in parts if p not in ("", "."))
+    return not (clean.lower() + "/").startswith(RECORD_FOLDERS)
+
+
+def instruction_texts():
+    """The folders this project declares as holding its instruction texts, each as `folder/`:
+    `instruction_texts` in project.json, a list of folders under the Workspace root. A folder of
+    records (docs/, handoff/, run/) is never one: a change there can take the short gate, and a
+    text counts as evidence only where both reviewers read the pull request that wrote it. Empty
+    where the project declares none, which is every project whose product is no instruction text."""
+    try:
+        data = json.loads(read("project.json"))
+    except (OSError, ValueError):
+        return ()
+    declared = data.get("instruction_texts") if isinstance(data, dict) else None
+    out = []
+    for folder in declared if isinstance(declared, list) else ():
+        if not isinstance(folder, str):
+            continue
+        folder = folder.replace("\\", "/").strip("/") + "/"
+        parts = folder.split("/")
+        if folder == "/" or ":" in folder or ".." in parts or "." in parts or folder.lower().startswith(RECORD_FOLDERS):
+            continue
+        out.append(folder)
+    return tuple(out)
+
+
+def headings_of(lines):
+    """The words of every Markdown heading outside a fenced code block."""
+    out, fence = [], None
+    for line in lines:
+        mark = FENCE_RX.match(line)
+        if mark and fence is None:
+            fence = mark.group(1)[0]
+        elif mark and mark.group(1)[0] == fence:
+            fence = None
+        elif fence is None:
+            m = HEADING_RX.match(line)
+            if m:
+                out.append(m.group(1))
+    return out
+
+
+def text_evidence(rid, requirement, cell, merged, roots):
+    """(valid entries, failures, notes) of a row's `text:` entries. An entry is valid when its
+    file stands under one of the project's declared instruction texts, holds the heading outside
+    a code block, and its pull request's squash is on origin/main and changed that file. For a
+    row whose sentence names a program the entries are checked and never count: what a program
+    does is proved by a test, which the cell names beside them."""
+    entries = TEXT_EVIDENCE.findall(cell or "")
+    fails, notes, valid = [], [], 0
+    if not entries:
+        return 0, fails, notes
+    if not roots:
+        fails.append("NO EVIDENCE: %s carries a text entry, and this project declares no instruction texts (`instruction_texts` in project.json): name its test" % rid)
+        return 0, fails, notes
+    for path, heading, number in entries:
+        shown = path.replace("\\", "/")
+        if os.path.isabs(path) or ":" in shown or ".." in shown.split("/") or not os.path.isfile(path):
+            fails.append("NO EVIDENCE: %s names the text %s, which is no file of this Workspace" % (rid, shown))
+            continue
+        if not shown.startswith(roots):
+            fails.append("NO EVIDENCE: %s names the text %s, which is under none of this project's instruction texts (%s)" % (rid, shown, ", ".join(roots)))
+            continue
+        try:
+            lines = read(path).splitlines()
+        except OSError:
+            lines = []
+        if heading not in headings_of(lines):
+            fails.append("NO EVIDENCE: %s names the heading '%s', which %s does not hold" % (rid, heading[:80], shown))
+            continue
+        merged.load()
+        if merged.numbers is None:
+            notes.append("%s: pull request #%s not looked up (%s)" % (rid, number, merged.state))
+        elif number not in merged.numbers:
+            if merged.state == "strict":
+                fails.append("NO EVIDENCE: %s names pull request #%s, whose squash is not on origin/main" % (rid, number))
+                continue
+            notes.append("%s: pull request #%s is not on origin/main yet (this branch is unmerged work; checked again once it is merged)" % (rid, number))
+        elif shown not in merged.changed(number):
+            fails.append("NO EVIDENCE: %s names pull request #%s, whose squash did not change %s" % (rid, number, shown))
+            continue
+        valid += 1
+    program = PROGRAM_NAME.search(requirement or "")
+    if program:
+        rest = TEXT_EVIDENCE.sub(" ", cell)
+        if not fails and not any(is_test_path(tok) for tok in rest.split()):
+            fails.append("NO EVIDENCE: %s names a program (%s): a text entry alone is no evidence of what a program does, name its test beside it" % (rid, program.group(0)))
+        return 0, fails, notes
+    return valid, fails, notes
 
 
 def build_parser():
@@ -234,15 +416,24 @@ def main():
         for rid, (kind, text) in sorted(reqs.items()):
             if kind == "planned" and rid not in satisfied:
                 fails.append("UNPLANNED: %s (%s) is in no increment's Satisfies: field" % (rid, text[:70]))
+    merged, by_text, roots = Merged(), set(), instruction_texts()
     for rid, (kind, text) in sorted(reqs.items()):
-        if kind == "built" and not any(TEST_PATH.search(tok.strip("`*, ").replace("\\", "/")) for tok in evidence.get(rid, "").split()):
+        if kind != "built":
+            continue
+        valid, text_fails, text_notes = text_evidence(rid, text, evidence.get(rid, ""), merged, roots)
+        fails.extend(text_fails)
+        notes.extend(text_notes)
+        if valid and not text_fails:
+            by_text.add(rid)
+        cell = TEXT_EVIDENCE.sub(" ", evidence.get(rid, ""))    # a text's own path is no test file, whatever folder holds it
+        if not valid and not text_fails and not any(is_test_path(tok) for tok in cell.split()):
             fails.append("NO EVIDENCE: %s (%s) is marked built but its Evidence names no test file" % (rid, text[:60]))
 
     files = tracked()
     if files is None:
         notes.append("not a git repository - evidence and stand-ins not checked")
         files = []
-    tests = [f for f in files if TEST_PATH.search(f.replace("\\", "/"))]
+    tests = [f for f in files if is_test_path(f)]
     shipped = [f for f in files if os.path.splitext(f)[1].lower() in CODE_EXT
                and not TEST_PATH.search(f.replace("\\", "/")) and not SKIP_PATH.search(f.replace("\\", "/"))]
 
@@ -257,7 +448,7 @@ def main():
         for rid, (kind, text) in sorted(reqs.items()):
             if kind == "planned":
                 fails.append("NOT BUILT: %s (%s) is still planned" % (rid, text[:70]))
-            elif kind == "built" and rid not in test_ids:
+            elif kind == "built" and rid not in test_ids and rid not in by_text:
                 fails.append("NO EVIDENCE: %s (%s) is marked built but no tracked test names it" % (rid, text[:60]))
 
     # stand-ins

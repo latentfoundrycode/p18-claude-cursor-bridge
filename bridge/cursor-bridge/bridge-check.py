@@ -128,6 +128,10 @@ def check_agent_home():
     home, problem = bridge_env.agent_home(create=False)
     if problem is None:
         problem = bridge_env.rename_probe()
+        if problem is None and hasattr(bridge_env, "app_links_problem"):
+            problem = bridge_env.app_links_problem()       # release S: the link through which a run still finds cursor-agent's login
+            if problem is not None:
+                problem += "; until the install repairs it, runs keep the owner's APPDATA (no redirect)"
         if problem is None:
             return "OK", home
         return "STALE", problem
