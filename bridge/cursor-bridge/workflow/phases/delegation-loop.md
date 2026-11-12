@@ -361,7 +361,7 @@ The tests already ran in step 4, before the first reviewer, the ones you wrote f
 
 ### 7. Decide — in a sub-file
 
-Step 7, the decision on the increment with the mutation run its last pass launches, stands in the sub-file `delegation-loop/decide.md` ("The procedure" names it), read whole with this module; step 8 follows it.
+Step 7, the decision on the increment with the mutation run its last pass launches, stands in the sub-file `delegation-loop/decide.md` ("The procedure" names it); step 8 follows it.
 
 ### 8. Merge — in a sub-file
 

@@ -2,7 +2,7 @@
 
 ### Where this sub-file belongs
 
-This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 7, which runs for every increment after step 6 and before step 8, the merge: the decision on the increment, and the mutation run each pass through the step launches before step 8's snapshot. It stands in a file of its own so that after a compaction the step in hand is read alone (rule 28).
+This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"). It holds the loop's step 7, which runs for every increment after step 6 and before step 8, the merge: the decision on the increment, and the mutation run each pass through the step launches before step 8's snapshot. It stands in a file of its own so that after a compaction the step in hand is read alone (rule 28).
 
 ### 7. Decide (accept the increment)
 

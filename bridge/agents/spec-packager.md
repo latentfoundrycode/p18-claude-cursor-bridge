@@ -105,7 +105,7 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
 ## Acceptance criteria
 - [ ] Observable outcomes that determine whether this is done.
 - [ ] Copied from the build plan, made concrete.
-- [ ] Every requirement under "Satisfies" is fully met — no stand-in, placeholder screen, "coming soon" or "arrives in a later stage" text — and at least one test names each requirement ID (in its name, docstring, or a comment) so the trace is checkable.
+- [ ] Every requirement under "Satisfies" is fully met — no stand-in, placeholder screen, "coming soon" or "arrives in a later stage" text — and at least one test names each requirement ID (in its name, docstring, or a comment) so the trace is checkable; instruction text has its text for evidence, no test.
 
 ## Constraints
 - Do not add dependencies.

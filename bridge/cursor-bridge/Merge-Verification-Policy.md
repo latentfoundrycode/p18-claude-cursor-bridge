@@ -284,7 +284,7 @@ Each reviewer returns exactly one of:
   categories in §"What the human decides." Never for "is this code correct."
 
 Merge is authorised iff: **CI green AND Review A = APPROVE AND Review B = APPROVE AND no
-open gate-integrity flag.** Anything else does not merge. A reply from either reviewer that
+open gate-integrity flag.** Anything else does not merge, the records-only short gate apart. A reply from either reviewer that
 carries none of the three verdicts is a failed launch, never a verdict of any kind: the
 supervisor re-runs it once and then takes the roster's failure path (release A5).
 

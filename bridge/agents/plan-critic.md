@@ -28,7 +28,7 @@ explicitly instead of raising it as new. Your reply ends with the counts per gra
 (more only under the owner's line in `docs/RUN_PARAMETERS.md`, which runs the same shape once
 more), then one confirming read if the text changed (round five at the most, or `<rounds>`
 at the most under a line already written), then one resolution round for what is still Blocking or non-convergent (`R1`, or
-`R2` under the line), then the gate, whatever is still open. A round whose file opens with *This round is the
+`R2` under the line), then the gate, whatever is still open; instruction text alone takes that module's shorter loop. A round whose file opens with *This round is the
 confirming read* is one: raise a finding only on text changed since your last read (the file
 holds that diff), or a Blocking finding anywhere; never the same point again in other words.
 A resolution round's file opens with *This is the resolution round*: answer every open
