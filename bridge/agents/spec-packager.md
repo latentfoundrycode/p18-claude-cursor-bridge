@@ -52,7 +52,7 @@ the diff without them. Nothing else under `docs/` or `handoff/` goes in Scope.
 
 ## Write to `handoff/TASK-<nnn>.md`
 
-The brief opens with its header (the core's "Project state", "The header"): `id` and `round` as the file's name gives them (`round: 1` for a plain name, `<N>` for `-r<N>`), `satisfies` the `Satisfies:` line's IDs, `scope` one entry per path the Scope bullets name, as `scope-check.py`'s `parse_scope` reads them (a bullet naming two paths gives two entries, a comment after a path is dropped), `merge_unit` the `Merge unit:` line's IDs as a list, `blocking_class` the `Blocking class:` line's class (the words before ` - `, double-quoted where it holds a space), each `null` where the brief has no such line. The template's header agrees with its prose once its placeholders are filled (`TASK-<nnn>` an ID, `<N>` a round): a path holding `<` or `>` is no path `parse_scope` reads. Write the prose first and the header from it; the launcher refuses a brief whose header disagrees with its prose (`header: `), before any run.
+The brief opens with its header (the core's "Project state", "The header"): `id` and `round` as the file's name gives them (`round: 1` for a plain name, `<N>` for `-r<N>`), `satisfies` the `Satisfies:` line's IDs, `scope` one entry per path the Scope bullets name, as `scope-check.py`'s `parse_scope` reads them (a bullet naming two paths gives two entries, a comment after a path is dropped), `merge_unit` the `Merge unit:` line's IDs as a list, `blocking_class` the `Blocking class:` line's class (the words before ` - `, double-quoted where it holds a space), each `null` where the brief has no such line. The template's header agrees with its prose once its placeholders are filled (`TASK-<nnn>` an ID, `<N>` a round): a path holding `<` or `>` is no path `parse_scope` reads. Write the prose first and the header from it; the launcher refuses a brief whose header disagrees with its prose (`header: `), before any run. A re-delegation brief (`-r<N>`) carries one line more, `Round cause: <cause>`, the cause copied as the supervisor gives it (the delegation loop's step 7); it has no header key, and the launcher records it.
 
 ```markdown
 ---
@@ -105,7 +105,7 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
 ## Acceptance criteria
 - [ ] Observable outcomes that determine whether this is done.
 - [ ] Copied from the build plan, made concrete.
-- [ ] Every requirement under "Satisfies" is fully met — no stand-in, placeholder screen, "coming soon" or "arrives in a later stage" text — and at least one test names each requirement ID (in its name, docstring, or a comment) so the trace is checkable.
+- [ ] Every requirement under "Satisfies" is fully met — no stand-in, placeholder screen, "coming soon" or "arrives in a later stage" text — and at least one test names each requirement ID (in its name, docstring, or a comment) so the trace is checkable; instruction text has its text for evidence, no test.
 
 ## Constraints
 - Do not add dependencies.
@@ -164,7 +164,7 @@ The normative diagrams this increment implements (the build plan's `Diagrams:` f
   what caught it; you mutate by hand in your own run and no script of it lands in the diff:
   the mutation run itself (the supervisor's mutants file, applied by the bridge's
   `mutation-run.py` on a scratch copy of the Workspace) is the supervisor's side's, written after your run with the criterion
-  tests, and a fix brief after a driver run asks you for the code fix only. Where the Done section runs the whole suite, this bullet names the failures already known outside the Scope, each by its test id, so that you report them as known and fix none of them.
+  tests, and a fix brief after a driver run asks you for the code fix only. No brief has you run the whole test tree: its commands name the increment's own test files, each runs in the foreground, and nothing is left running when you end; the whole suite is CI's run (a builder told to run a long command ran it in the background and waited past its limit, KP-083).
 - Prefer reuse over new code — existing helpers, the standard library, native platform
   features, already-installed dependencies — and write the minimum that meets the
   acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a
@@ -177,7 +177,7 @@ what you did, what you changed, what you ran and what it printed, what you could
 so that nothing of it is lost when your run ends early. When you finish, it holds a list of
 every file you changed, a one-paragraph summary of what you did, and a section headed
 exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
-Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. Each mutation is listed by this brief's own label and text, with what caught it. A command you did not run is written `not run`, never described as run. Where this brief has you run the suite, run it once, after your last edit, and write the report's results after that run, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
+Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. Each mutation is listed by this brief's own label and text, with what caught it. A command you did not run is written `not run`, never described as run. Run this brief's test commands once more after your last edit, and write the report's results after that run, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
 Your last message is the summary and the report file's path, and nothing follows it: the
 supervisor reads only the last message, and a message printed earlier and then followed by
 more work is lost.
@@ -195,7 +195,7 @@ differences, stated verbatim in the brief:
   change in behaviour**." Then the candidate's sites (file:lines), its proposed shape, and
   every caller to update.
 - **Scope** names the sites and the callers, and `docs/BUILDER_NOTES.md` and the report file (`handoff/REFAC-<nnn>-r<N>-report.md`) as in every brief. Nothing else.
-- **Acceptance criteria** are: the full test suite passes with the **same** test set; every
+- **Acceptance criteria** are: the full test suite passes with the **same** test set (the supervisor's run and CI's, never the builder's); every
   listed caller now uses the single implementation; no public signature outside the listed
   sites changed; the duplicate/dead code is gone.
 - **Constraints** add: do not edit any test file (if a mechanical rename of a test import
@@ -238,7 +238,7 @@ Same file shape, with these differences, stated verbatim:
   and must pass.
 - **Scope** names the file(s) the cause lives in, the reproduction test, and `docs/BUILDER_NOTES.md` and the report file (`handoff/<ID>-r<N>-report.md` inside a gate, `handoff/BUG-<nnn>-r<N>-report.md` after a merge) as in every brief (a cause the builder found on the way belongs in the notes). Nothing else.
 - **Acceptance criteria**: the reproduction test passes; the full suite passes with no
-  other change in results; the named cause is addressed at the mechanism the evidence
+  other change in results (CI's run, never the builder's); after a fix that regressed, the tests that hold the touched subsystem, named here, pass in the builder's own run; the named cause is addressed at the mechanism the evidence
   points at (state the mechanism).
 - **Constraints** add: do not fix by suppressing the symptom — no retry, broad
   `try/except`, widened tolerance, added `sleep`, or null-check that hides a wrong value;

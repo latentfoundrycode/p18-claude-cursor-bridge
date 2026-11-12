@@ -4,10 +4,9 @@
 
 After a compaction or a resume in this phase, read these before your next action:
 
-- this module, whole, with `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole (the session-start hook names both for this phase);
-- the approved design and plan: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/BUILD_PLAN.md` and `docs/RUN_PARAMETERS.md`, whole: only the items that are load-bearing for this project are applied;
+- this module, whole; `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` by the section of the item in hand and `~/.claude/cursor-bridge/Known-Pitfalls.md` by the entry a heading or an item names (the session-start hook lists both as on demand);
 - `docs/PROJECT_STATUS.md`, whole: its `Next:` line names the items configured so far and the next one ("Keeping the position"), its `Awaiting user on:` line an escalation that waits for the owner, and its `Workflows:` line the conditional workflows that add items at `configuration.items`;
-- `docs/INVENTORY.md`, whole: its Resources rows record each pinned tool and version, each mode in force and each spending limit as the items are configured.
+- when the item in hand needs them, by the section it names: the approved design and plan (`docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/BUILD_PLAN.md`, `docs/RUN_PARAMETERS.md`; only the items that are load-bearing for this project are applied) and `docs/INVENTORY.md`'s Resources rows, which record each pinned tool and version, each mode in force and each spending limit as the items are configured.
 
 ### The procedure
 

@@ -5,8 +5,8 @@
 After a compaction or a resume in this step, read these before your next action:
 
 - this module, whole;
-- `docs/RUN_PARAMETERS.md` as written so far, whole: each answer is written there as the owner gives it ("Writing the answers down"), so the questions still to ask are the parameters it does not yet hold;
-- `docs/BUILD_PLAN.md`, the approved plan, whole: a refactoring answer may name its stages, and parallel increments apply only where the plan marks increments `Parallel: yes`;
+- `docs/RUN_PARAMETERS.md` as written so far: each answer is written there as the owner gives it ("Writing the answers down"), so the questions still to ask are the parameters it does not yet hold;
+- `docs/BUILD_PLAN.md`, the approved plan, where a question needs it: a refactoring answer may name its stages, and parallel increments apply only where the plan marks increments `Parallel: yes`;
 - `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which add parameters at `run-parameters.parameters` and show whether a part is installable, as installer verification needs, and its `Awaiting user on:` line names the question that waits for the owner.
 
 ### The procedure

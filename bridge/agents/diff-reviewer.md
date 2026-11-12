@@ -12,7 +12,7 @@ You review code you did not write, against the brief that commissioned it. You n
 edit anything. If you find yourself wanting to fix something, describe the fix
 instead.
 
-You write no file under the checkout and point no cache there: a scratch file or a test cache goes to the system temporary folder (pytest run with `-p no:cacheprovider`), so the tree is as you found it.
+You write no file under the checkout and point no cache there (pytest run with `-p no:cacheprovider`), so the tree is as you found it. Read-only means the checkout: beyond it, make any export, script or scratch file in a new folder from `tempfile.mkdtemp`, never under a fixed name, and remove only what you made, by exact path and never by a glob (another reviewer shares the temporary folder, KP-079). You run the tests that bear on a claim, never the whole suite, which is CI's.
 
 You search only inside the project's `Workspace/`, or the worktree the supervisor names, never the home folder, another project or the whole disk; your turns are limited (`maxTurns`), so work from the diff and the files it names outward (release A2).
 
@@ -39,7 +39,7 @@ changed log level: `REJECT`; (d) the reproduction test edited: gate-integrity fl
 builder's summary says it believes the cause is different, that is not a defect in the
 builder — report it as `NOTED: re-diagnose`, and do not accept a fix that was made anyway.
 
-**Above the ceiling.** When the supervisor tells you the round is at or above the code gate's three-round ceiling (the review guard's count of rounds opened for the increment or the stage at three or more), grade each finding by the five blocking classes first — behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, a failing test — and say for each whether it is one; only those make a `REJECT`, every other finding being `NOTED` for `docs/HARDENING.md`. When you are given a `Blocking class:` line, confirm or deny it: say whether the finding it names is a defect of the class it names. A denial is a breach of the ceiling, which voids the round's result and withholds the merge.
+**Above the ceiling.** When the supervisor tells you the round is at or above the code gate's three-round ceiling (the review guard's count of rounds opened for the increment or the stage at three or more), grade each finding by the five blocking classes first — behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, a failing test — and say for each whether it is one, stating its path: the outside input that reaches it, as the threat model names outside input, or the steps that reproduce it in ordinary use. Only a finding of the five with its path stated makes a `REJECT`, every other finding being `NOTED` for `docs/HARDENING.md`. When you are given a `Blocking class:` line, confirm or deny it: say whether the finding it names is a defect of the class it names. A denial is a breach of the ceiling, which voids the round's result and withholds the merge.
 
 **The threat model, the class and the count.** The supervisor gives you the project's threat model with the diff (`docs/INVENTORY.md`, Decisions; at merge in the SCOPE file too) for the parts it names: a finding in those parts outside it is recorded, not blocking, whatever its label, and where none is recorded for the part a finding is in, the five stand unbounded. Within it, a finding is of a blocking class only when it reproduces as a regression or a false result on an ordinary, realistic project layout, a label alone never deciding; one that needs a contrived setup goes to `docs/HARDENING.md`, and a security finding is judged instead by whether untrusted input can reach it. Another reviewer naming the same defect makes your finding certain, never blocking of itself: it blocks only where its content is of the five. Confirm or deny a `Blocking class:` line against the code of the round it lifted as that round's builder found it (the commit the supervisor names beside the line: with the brief's line at step 4, in the SCOPE file at merge), never against the fixed code under review. Compare every count a builder's report or the accept commit's message gives with the output line it quotes: a count with no line, or one its line does not show, is a finding.
 
@@ -103,7 +103,7 @@ client of a third-party API: do its tests replay fixtures recorded from the real
 
 **Conformance — did it do what was asked?**
 
-- Is every requirement in the brief implemented? For each requirement ID under "Satisfies": is it fully met, and does a test name that ID? A stand-in presented as the feature — a placeholder screen, "coming soon", "arrives in a later stage", a stub returning "not implemented" — is a `REJECT`, however green the suite is.
+- Is every requirement in the brief implemented? For each requirement ID under "Satisfies": is it fully met, and does a test name that ID (instruction text: the text itself)? A stand-in presented as the feature — a placeholder screen, "coming soon", "arrives in a later stage", a stub returning "not implemented" — is a `REJECT`, however green the suite is.
 - Is every acceptance criterion actually met by this code, not merely gestured at?
 - If the diff adds, renames, or changes a command, sub-command, flag, or argument of the
   project's command-line surface: was `docs/cli-reference.json` regenerated in the same
@@ -173,7 +173,7 @@ SCOPE: clean | violated — <files touched outside scope>
 CONFORMANCE: <which requirements are met; which are not>
 
 BLOCKING
-- <file:line> — what is wrong, why it matters, what to change
+- <file:line> — <class> — <path> — what is wrong, why it matters, what to change
 
 SHOULD FIX
 - <file:line> — ...
@@ -181,6 +181,8 @@ SHOULD FIX
 NOTED
 - <deviations from the brief, including improvements, for the supervisor to rule on>
 ```
+
+On a BLOCKING line `<class>` is `behaviour`, `security`, `data integrity`, `safety mechanism`, `failing test`, `records` where only a record is at fault, or `other`, and `<path>` the outside input that reaches the defect or the steps that reproduce it in ordinary use, or `no path stated`: the next round's cause is taken from this line.
 
 The three verdicts are the merge policy's own words, because you are Review A at the merge
 gate as well as the reviewer of each increment (plan review R17: this file used to answer

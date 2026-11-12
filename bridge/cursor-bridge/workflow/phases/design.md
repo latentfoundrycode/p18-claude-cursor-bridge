@@ -4,13 +4,10 @@
 
 After a compaction or a resume in this phase, read these before your next action:
 
-- this module, `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` and `~/.claude/cursor-bridge/Glossary.md`, each whole (the session-start hook names all three);
-- what the design has written so far: `docs/DESIGN.md`, `docs/diagrams/INDEX.md` and every diagram it lists, and `docs/REQUIREMENTS.md` and `docs/INVENTORY.md` once written;
-- `docs/DESIGN_CRITIQUE.md`, whole, while the critique runs: its rounds and its accepted list are what the stop rule and the four-round ceiling count, so that a resumed session never runs a round twice or raises an accepted finding again; with it `docs/RUN_PARAMETERS.md`, where an owner's `Design rounds above five:` line lifts the ceiling, and the round's files under `run/review/` (`DESIGN-<subject>-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in flight;
-- the owner's Initial Design Draft, every requirements document they supplied and `run/supervisor/intake-notes.md`, whole: the design and the requirements register answer them;
 - `docs/PROJECT_STATUS.md`, whole: its `Workflows:` line holds the traits proposed at intake, which this phase's gate settles;
-- `~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in flight or a launch has failed: a round is snapshotted and verified as step 8 says, the snapshot's hash written to `run/supervisor/in-flight.md` at the launch and each critic's verdict there as it returns, both read from that file mid-round, and a failed launch is handled as step 3b says;
-- once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished ("Keeping the position"), until the reflection point is done.
+- this module, whole;
+- while the critique runs: `docs/DESIGN_CRITIQUE.md`, whole, since its rounds and its accepted list are what the stop rule and the four-round ceiling count, so that a resumed session never runs a round twice or raises an accepted finding again; `docs/RUN_PARAMETERS.md`, where an owner's `Design rounds above five:` line lifts the ceiling; and the round's files under `run/review/`. A round is snapshotted and verified as the delegation loop's step 8 says, the snapshot's hash written to `run/supervisor/in-flight.md` at the launch and each critic's verdict there as it returns, and a failed launch is handled as its step 3b says;
+- when the step in hand needs them, by the section it names: `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` and `~/.claude/cursor-bridge/Glossary.md` (the session-start hook lists both as on demand); what the design has written so far (`docs/DESIGN.md`, `docs/diagrams/INDEX.md` and its diagrams, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`); the owner's Initial Design Draft, their requirements documents and `run/supervisor/intake-notes.md`; and, once this phase's gate is approved, `reflection.md` with the last entries of `run/supervisor/in-flight.md` ("Keeping the position").
 
 ### The procedure
 
@@ -18,7 +15,7 @@ After a compaction or a resume in this phase, read these before your next action
 
 1. **Select.** Write `docs/diagrams/INDEX.md`: every catalogue kind selected or omitted with a one-line reason, IDs assigned, each selected diagram tied to the requirement IDs it realizes and to what enforces it. Levels 4 and 5 only where a detail is **load-bearing** (concurrency, security, integrity — every persistent schema — performance, protocol, prior-failure), each with its reason; everything else stays the builder's free implementation space.
 2. **Draft top-down, level by level, with `diagram-specialist` subagents**: kinds the catalogue marks parallel in separate runs at once, a mutually dependent pair in one run, each run given the approved upstream diagrams, its register rows, the design text, and (Levels 4-5) its load-bearing reason as fixed inputs.
-3. **Integrate.** Reconcile the drafts — identifiers, boundaries, contradictions, open points; settle each specialist objection or escalate it per "Objections — bottom-up escalation". `python ~/.claude/cursor-bridge/diagram-check.py --mode design` must pass.
+3. **Integrate.** Reconcile the drafts — identifiers, boundaries, contradictions, open points; write each specialist's `NOTATION` line into the index's `## Notation` section (`Diagram-Planning-Conventions.md`, §3); settle each specialist objection or escalate it per "Objections — bottom-up escalation". `python ~/.claude/cursor-bridge/diagram-check.py --mode design` must pass.
 4. **Critique.** `plan-critic` reviews the text and the diagrams together.
 
 Write `docs/DESIGN.md`. It covers: purpose and scope; explicit non-goals;
@@ -87,6 +84,7 @@ failure, an exit 5, or no usable profile makes the design wait (below), Review B
 re-runs. If that launch fails too, Review B's row stays `not run (<the reason>)` and the subject goes on to its
 resolution round or its gate, the report escalating it to the owner.
 
+- **A change to instruction text alone** (no program, no stored data, no interface changes with it) takes a shorter loop (release S): round 1 by both critics; a round 2 only where round 1 held a Blocking finding, read by the critic that raised it; no confirming read.
 - **The confirming read.** When the critique ends and the text changed after either critic last
   read it, both critics read it once more, as the next round (the fifth at the most, or
   `<rounds>` at the most under an owner's line already written). Its file

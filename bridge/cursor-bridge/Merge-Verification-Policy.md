@@ -12,7 +12,8 @@ supervisor applies it.
 
 ## The gate: all four must hold to merge
 
-A branch merges to `main` only when every one of these is true. Any failure means
+A branch merges to `main` only when every one of these is true (records alone take the
+short gate, conditions 1, 2 and 4, as `review-guard.py premerge-records` decides it). Any failure means
 **do not merge** — route per §"What each outcome does" below.
 
 1. **Executable floor — CI is green.** The required GitHub status check ran the real
@@ -209,7 +210,7 @@ must treat any of these as such:
 
 - adding a `nosemgrep` / inline suppression, an `osv-scanner.toml` `[[IgnoredVulns]]`, or a
   `@SocketSecurity ignore` to silence a **real** finding rather than a justified, expiring
-  false positive;
+  false positive. A false positive is ruled by `security-auditor`, with its reason and an expiry date; `cursor-configurator` writes the suppression as configuration from that ruling; the ruling goes into `docs/HARDENING.md` and the SCOPE file, and both reviewers confirm or deny it. It costs no builder round;
 - removing or weakening input validation, an authz check, output encoding, or a crypto choice;
 - editing the CI `gate` job to skip, `continue-on-error`, or drop a security step;
 - downgrading the ASVS level or narrowing the rule globs to dodge coverage;
@@ -283,7 +284,7 @@ Each reviewer returns exactly one of:
   categories in §"What the human decides." Never for "is this code correct."
 
 Merge is authorised iff: **CI green AND Review A = APPROVE AND Review B = APPROVE AND no
-open gate-integrity flag.** Anything else does not merge. A reply from either reviewer that
+open gate-integrity flag.** Anything else does not merge, the records-only short gate apart. A reply from either reviewer that
 carries none of the three verdicts is a failed launch, never a verdict of any kind: the
 supervisor re-runs it once and then takes the roster's failure path (release A5).
 
@@ -301,36 +302,9 @@ merges first; then `main` is merged into each blocked branch, whose checks go gr
 a change of their own. Nothing in a blocked branch is edited to pass; no finding is ignored
 or suppressed (§Anti-gaming).
 
-**Re-delegation runs while the code converges, and converges by defect class rather than a
-round count.** Several REJECTs are not a stop. If each round surfaces *new, legitimate*
-concerns that then get fixed — a thorough cross-family Review B catching real edges Review A
-approved past is the system working, not failing — keep re-delegating. **A round count is
-never itself a reason to stop or to involve the human.** Once the increment's core behaviour
-is implemented and verified, and the findings that keep arriving are all the long tail of one
-genuinely hard subsystem (subprocess teardown, retry/timeout races, kill paths, concurrency
-edges), the supervisor draws a **by-class line**: it records each such finding to
-`docs/HARDENING.md` and merges, rather than re-delegating the tail indefinitely. A late
-finding blocks the merge only if it is of one of the five **blocking classes** — behaviour
-against the brief or the register, security, data integrity, a defeated safety mechanism the
-increment relies on (a bug in the very timeout or kill path built to protect the run is core,
-not tail), a failing test. What a defect of the five is for the project is bounded by its threat model, recorded in `docs/INVENTORY.md` (Decisions) with its reason and what would reopen it and given to the reviewers with the diff, for the parts the model names: a finding in those parts outside it is recorded, not blocking, whatever its label and however many reviewers name it, and where the inventory records none for the part a finding is in, the five stand unbounded. Within it, a finding is a member of a blocking class when it reproduces as a regression or a false result on an ordinary, realistic project layout, a reviewer's label alone never deciding: one that needs a contrived setup goes to `docs/HARDENING.md` with the increment, and a security finding is judged instead by whether untrusted input can reach it (files a builder or reviewer writes, a cloned or third-party repository), never by the layout's ordinariness. Two reviewers naming the same late finding make it certain, never blocking of itself: it blocks only where its content is of the five ("Convergence is a signal", below). The class is the defect, not the operator that exposed it: a
-further mutant, input or operator family that shows a class already recorded in
-`docs/HARDENING.md` under the by-class line for the increment or the stage is that class and
-never a new one, while a defect of one of the five blocks whatever was recorded before.
-**The ceiling** (R-042): three rounds per increment and per stage review, the owner's number,
-held by `bridge-run.py`, which counts the builder rounds, and `review-guard.py`, which counts
-the Review B rounds; the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`,
-step 7, "The review ceiling"). Below it the by-class line is the supervisor's judgment; at and above it
-the line is the rule: only a finding of the five sends the work back, every other finding goes
-to `docs/HARDENING.md` with the increment, and a round above the ceiling runs only under a
-`Blocking class:` line or the owner's `Review rounds above the ceiling:` line. Every reviewer
-and auditor grades each finding of a round at or above the ceiling by the five first and confirms
-or denies the round's `Blocking class:` line where it has one, against the code of the round it lifted, never against the fixed code under review; a denial is a breach, which voids the round's result and
-withholds the merge as GATE-INTEGRITY does, recorded in `docs/HARDENING.md` and as an issue. Stop entirely only on genuine non-convergence: the **same** defect unfixed twice, or a
-fix that **regresses** something already passing. A deadlock over what the software should
-**do** is the one thing that reaches the human, as an intent question.
+**Re-delegation runs while the code converges, and converges by defect class rather than a round count.** Several REJECTs are not a stop, and a round count is never itself a reason to stop or to involve the human. The rule is stated once, in the delegation loop's step 7 (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`, "When to stop re-delegating" and "The review ceiling"): the by-class line, the five **blocking classes** bounded by the project's threat model, membership by reproduction and by a stated path, the ceiling of three rounds (R-042) held by `bridge-run.py` and `review-guard.py`, its two lifts, and what follows a fix that regresses. What it asks of the gate here: every reviewer and auditor grades each finding of a round at or above the ceiling by the five first and confirms or denies the round's `Blocking class:` line where it has one, against the code of the round it lifted, never against the fixed code under review; a denial is a breach, which voids the round's result and withholds the merge as GATE-INTEGRITY does, recorded in `docs/HARDENING.md` and as an issue. A deadlock over what the software should **do** is the one thing that reaches the human, as an intent question.
 
-**Convergence is a signal.** When two or more reviewers or auditors independently name the same defect, it is certain even if each alone marked it advisory — decorrelated reviewers agreeing is the strongest evidence this gate produces (three of four converged on a lock-leaking lifecycle bug that each had called advisory); two findings on one line are one defect only where they name the same fault in it. The rule is the code gate's: a design critique's two critics are bounded by rounds instead (§"Review B's design mode", below), and a finding both name keeps the grade its content earns. The rule grades a finding's certainty, never its class. Two reviewers independently naming the same defect make it blocking where its content is of one of the five blocking classes, at any round; a convergent finding of another class is fixed by the next increment that edits its file, or recorded in `docs/HARDENING.md`, marked convergent, with no gate pass of its own. A class already recorded under the by-class line for that increment or that stage stays that class: two reviewers naming a further mutant, input or operator family of it name that class, which stays recorded and starts no round, and no class of the five is ever on that line. A finding outside the threat model `docs/INVENTORY.md` (Decisions) records for the part it is in is recorded, not blocking, however many reviewers name it; where none is recorded for that part, the five stand unbounded.
+**Convergence is a signal.** Two or more reviewers or auditors independently naming the same defect make it certain, never blocking of itself (three of four once converged on a lock-leaking lifecycle bug each had called advisory): it blocks where its content is of the five. The rule, its treatment of a class already recorded and its bound by the threat model are stated in the delegation loop's steps 7 and 8 (`decide.md`, `merge.md`). It is the code gate's rule: a design critique's two critics are bounded by rounds instead (§"Review B's design mode", below).
 
 **Split verdicts are resolved by the supervisor, not escalated.** First **name the
 disagreement out loud** — `REVIEWERS DISAGREE on <crux>`, which reviewers, and whether the
@@ -444,7 +418,7 @@ the required check regardless of *who* triggers the merge, so a direct `gh pr me
 bypass CI any more than auto-merge can. The armed `--auto` form (with the same `--match-head-commit`) is still set first,
 as a **safety net** in case the session ends before the check is green; it is not the
 mechanism to wait on. Never complete a merge before the required check is green or before
-both reviews have APPROVED — the direct path is a convenience over the queue, never a
+both reviews have APPROVED (the short gate: its one read) — the direct path is a convenience over the queue, never a
 shortcut around the gate.
 
 So the model reviews gate the *authorisation*; the required CI check gates the *merge*; and
@@ -507,78 +481,10 @@ hunts, plus the security anti-gaming checks in §Anti-gaming. This is a **prompt
 not a new model or invocation: the directive prompt tells it to check those classes too.
 Two options for reaching it:
 
-- *Default — via Cursor's CLI (no new secret, no script):* write the verification brief and
-  the diff to a committed file **inside the workspace** (`run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot,
-  committed on the increment's branch, `git rm`-ed before the merge — never a temp path
-  outside `Workspace/`, which the boundary blocks), **generated only from committed state**
-  (`git status --porcelain` empty, then `git diff <merge-base>...HEAD`; a working-tree diff
-  omits every untracked new file, and a reviewer that receives an incomplete diff has
-  correctly refused it twice), then invoke Review B **through the launcher, with execution**:
-  `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --kind review -- cursor-agent -p --force --model <Review B from docs/ROSTER.resolved.json> "<prompt>" 2> run/review/REVIEW-<ID>-r<N>.err`
-  (`--force` lets it run the project's tests, write throwaway reproductions, and try a
-  temporary mutation to see whether the tests catch it — the reviewer's strongest findings
-  in the record came from exactly that, and the owner decided on 2026-10-04 to keep it
-  after a read-only mode was tried and found weaker; the launcher withholds the owner's
-  GitHub identity from the process, so a post, push or merge from inside the review fails,
-  and ends the run at the limit, KP-032 and KP-033) with
-  a prompt that tells it to **read the diff from that file** — do **not** pass the diff
-  inline through the shell — and that names `run/review/SCOPE-<ID>.md`, committed beside
-  the diff before the snapshot, where the supervisor wrote the brief's Scope and Out of scope, the project's threat model from `docs/INVENTORY.md`'s Decisions, the tests it wrote
-  first with the paragraph each enforces, and the bookkeeping files in the diff that are
-  expected (`docs/BUILDER_NOTES.md`, the builder's report file under `handoff/`); the prompt itself says only that design for later increments is not this diff's
-  defect, that a claim about a build is verified by building it, that the reviewer writes no file under the checkout and points no cache there, its scratch files and test caches going to the system temporary folder, and edits nothing, that at a round at or above the
-  ceiling every finding is graded by the five blocking classes first and the SCOPE file's
-  `Blocking class:` line, where it has one, confirmed or denied against the code of the round it lifted, never against the fixed code under review, and that the reply is one of
-  the three verdicts (release A5; `~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`, step 8, has the clauses). (Inline heredocs mangle or drop the diff; a reviewer that got no
-  diff can still reply with something APPROVE-shaped, silently bypassing the gate. This is a
-  real failure that has happened — the file path avoids it.) Confirm from its reply that it
-  actually saw the diff before trusting the verdict. It also reads `run/review/ASSUMPTIONS-<ID>-r<N>.md` — the branch's builder assumption lists with their dispositions (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`, step 8) — as extra places to look, never as its scope. Per the roster above, Review B is
-  **GPT-5.6 Sol** while the builder is Grok 4.7 (full profile), or **Grok 4.7** while the builder is Composer 2.5 (native profile) — a genuine third family either way; the ids in use are always the ones in `docs/ROSTER.resolved.json`.
-  (`cursor-agent --list-models` shows what your plan offers; the invariant is Review B ≠
-  builder family and ≠ Anthropic.) Instruct it to output only a verdict and to modify
-  nothing that reaches the branch: run it on a clean committed checkpoint, **commit your
-  own work first and write nothing to the checkout while it runs** (no builder, no
-  `test-runner`, no commit; the launch is in the background and its completion wakes you).
-  The checkpoint is guarded by `review-guard.py`: `snapshot <ID>-r<N>` before the launch, `<N>`
-  the round it opens by the guard's count, the SCOPE file committed first since the guard reads
-  its `Blocking class:` line (it refuses a dirty tree, a round off its count and a round above
-  the ceiling with no lift, and records HEAD, the branch, the refs, the stashes, `.git/config`,
-  the hooks folder and the ignored entries), `verify <ID>-r<N>` after the run, and
-  `premerge <ID>-r<N>` before `gh pr merge`; since release A1b `verify` writes a verified mark when it prints OK (the snapshot's hash, the launch time and the exit code of the Review B run from `run/review/REVIEW-<ID>-r<N>.err`; `snapshot` and `verify` remove an older mark first), `premerge` refuses a snapshot without that mark, with a mark of another snapshot, with a launch before the snapshot or with an exit other than 0, and then writes a record of the head it approved (`<git common dir>/bridge/premerge/<sha>`), and the `permission-guard` hook refuses a `gh pr merge` whose `--match-head-commit <sha>` has no such record, so a merge that skipped the cross-family review or the pre-merge check is refused by the computer, not only by the rule (the sha alone proves nothing; the mark and the record do). A pull request that changes only records takes the same round. **What the restore covers and what it does not:**
-  `verify` puts tracked and untracked files back with `git reset --hard` and `git clean -fd`
-  (keeping the launcher's own `run/review/REVIEW-<ID>-r<N>.err`, whose first line it prints) and
-  lists what it removed — a temporary file or mutation the reviewer made for a check is
-  expected. A commit, a moved HEAD or branch, a new or moved local ref or stash, a changed
-  `.git/config` or hook file, a changed record under `docs/`, `handoff/` or `run/review/`
-  even where the project gitignores it, or a changed `.env` is **reported as
-  `GATE-INTEGRITY`**: the tree and the refs are put back, the flag opens, the merge waits.
-  The configuration, the active hooks folder (`core.hooksPath`) and `.git/hooks` are read as
-  files before any git command runs, because a `core.fsmonitor` line or a planted hook
-  would run the reviewer's program with the owner's identity on the supervisor's next git
-  command — and every git command the guard runs has the repository's hooks and file
-  monitor switched off, so the guard itself never runs one. A moved remote-tracking ref (a
-  fetch) is only a note. The guard prints the snapshot file's hash at both ends, because a
-  reviewer could rewrite the snapshot. It does not see the contents of cache folders,
-  anything outside the checkout (the owner's profile, the installed bridge, other projects),
-  or a reviewer that reaches for the credential store on purpose: it is a guard against
-  what a reviewer does in passing, not a sandbox (KP-032). `premerge <ID>-r<N> <pr>`, run after
-  the review files are removed, committed and pushed, then proves the head about to merge
-  descends from the reviewed head, differs from it only by that removal, and is the pull
-  request's head on GitHub; the merge uses `--match-head-commit` with that head. **Then check it wrote nowhere else:**
-  `python ~/.claude/cursor-bridge/pr-activity-check.py <n> --since <the launch time>`, where
-  the launch time is the launcher's first stderr line (`bridge-run: started <time>Z`, the
-  first line of the `.err` file; a time without a zone is refused). It lists every comment
-  and review on the pull request since the launch and flags any written as the owner (the
-  reviewer once posted its verdict on a pull request under the owner's name, twice:
-  KP-032), and it flags what the owner's account did elsewhere in the repository meanwhile
-  that an agent would cause: a comment or review on another pull request, a merge, a push
-  to `main`. `GATE-INTEGRITY` means do not merge; record the flag and an issue (a merge of
-  *another* pull request by the supervisor itself while the review ran is legitimate and is
-  simply recorded). `CANNOT VERIFY` is not clean: fix the cause and re-run before the
-  merge. The check sees the likely cases, not every edit; the identity withheld from the
-  agents is what stops the rest.
+- *Default — via Cursor's CLI (no new secret, no script):* the procedure is the delegation loop's step 8 (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`), stated there once: the diff written from committed state to a committed file inside the workspace (`run/review/REVIEW-<ID>-r<N>.diff`; a working-tree diff omits every untracked new file, and a diff passed inline is mangled or dropped by the shell, after which a reviewer can still reply with something APPROVE-shaped, a failure that has happened), the SCOPE and assumptions files beside it, the guard's `snapshot`, the launch through the launcher, `verify`, `premerge`, and the prompt's clauses. What this policy fixes about it: Review B runs **with execution** (`--force` lets it run the project's tests, write throwaway reproductions, and try a temporary mutation to see whether the tests catch it — its strongest findings in the record came from exactly that, and the owner decided on 2026-10-04 to keep it after a read-only mode was tried and found weaker), with the owner's GitHub identity withheld by the launcher, so a post, push or merge from inside the review fails, and under the launcher's limit (KP-032 and KP-033); it is of a family that is neither the builder's nor Anthropic's (**GPT-5.6 Sol** while the builder is Grok 4.7, the full profile, or **Grok 4.7** while the builder is Composer 2.5, the native profile; the ids in use are always the ones in `docs/ROSTER.resolved.json`, and `cursor-agent --list-models` shows what the plan offers); it runs on a clean committed checkpoint, the supervisor writing nothing to the checkout while it runs; and its reply is trusted only once it shows that it saw the diff.
+  The checkpoint is guarded by `review-guard.py`: since release A1b `verify` writes a verified mark when it prints OK (the snapshot's hash, the launch time and the exit code of the Review B run from `run/review/REVIEW-<ID>-r<N>.err`; `snapshot` and `verify` remove an older mark first), `premerge` refuses a snapshot without that mark, with a mark of another snapshot, with a launch before the snapshot or with an exit other than 0, and then writes a record of the head it approved (`<git common dir>/bridge/premerge/<sha>`), and the `permission-guard` hook refuses a `gh pr merge` whose `--match-head-commit <sha>` has no such record, so a merge that skipped the cross-family review or the pre-merge check is refused by the computer, not only by the rule (the sha alone proves nothing; the mark and the record do). A pull request that changes only records, none of them one a program reads to decide a gate, takes the short gate instead: `review-guard.py premerge-records` decides it by path, type and mode and writes that record, asked for only after one Review A read and CI, neither of which it checks (`merge.md`, step 8). **What the restore covers and what it does not** (step 8 has the commands): `verify` puts tracked and untracked files back and reports as `GATE-INTEGRITY` a commit, a moved HEAD or branch, a new or moved local ref or stash, a changed `.git/config` or hook file, a changed record under `docs/`, `handoff/` or `run/review/` even where the project gitignores it, or a changed `.env`: the tree and the refs are put back, the flag opens, the merge waits. It reads the configuration and the hooks folders as files before any git command, and runs its own git with the repository's hooks and file monitor switched off, because a planted hook or a `core.fsmonitor` line would run the reviewer's program with the owner's identity. It does not see the contents of cache folders, anything outside the checkout (the owner's profile, the installed bridge, other projects), or a reviewer that reaches for the credential store on purpose: it is a guard against what a reviewer does in passing, not a sandbox (KP-032). **Then check it wrote nowhere else:** `pr-activity-check.py <n> --since <the launch time>` flags a comment or review written as the owner on the pull request since the launch (the reviewer once posted its verdict under the owner's name, twice: KP-032), and what the owner's account did elsewhere in the repository meanwhile that an agent would cause: a comment or review on another pull request, a merge, a push to `main`. `GATE-INTEGRITY` means do not merge; record the flag and an issue (a merge of *another* pull request by the supervisor itself while the review ran is legitimate and is simply recorded). `CANNOT VERIFY` is not clean: fix the cause and re-run before the merge. The check sees the likely cases, not every edit; the identity withheld from the agents is what stops the rest.
 
-  **Two launch failures that have actually happened — prevent both, don't just catch them:**
+**Two launch failures that have actually happened — prevent both, don't just catch them:**
 
   1. **Workspace-trust gate.** In a folder Cursor has not trusted yet (a fresh clone or
      worktree) `cursor-agent` refuses to run

@@ -252,7 +252,7 @@ def test_bug035_a_change_cycle_reads_the_conditional_workflows_of_the_step_it_ha
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     text = flat(section(module("change-cycle"), "What must survive a compaction", 3))
-    clause = "the module of the step the change has reached, whole, with the conditional workflows the `Workflows:` line names that touch that module, each whole"
+    clause = "the module of the step the change has reached, with the conditional workflows the `Workflows:` line names that touch it"
     assert clause in text, "the change cycle's survival list does not name the step's conditional workflows"
     hook = mod.PHASE_MODULES["changing"]
     named = text[text.index(clause):].split("):", 1)[0]

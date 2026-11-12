@@ -70,17 +70,7 @@ WEEKLY = (
 )
 
 # --- the configurator and the frozen block
-CONFIGURATOR_ITEM = (
-    "- The **weekly dependency scan**, `.github/workflows/dependency-scan.yml`, a workflow file of its own beside the "
-    "gate's, for **every** project: written verbatim from the frozen block (\"The weekly scan's frozen block\", below), "
-    "its one fill-in `<fill-in>` replaced by the value the floor's OSV-Scanner step in the project's gate workflow gives "
-    "`--lockfile=` (`requirements.txt:requirements.lock`, say), with one more `--lockfile=<value>` word for each further "
-    "lockfile that step names. Never add a step, a permission, a secret or a token, never change a pin or the exit-code "
-    "handling, and never regenerate, trim or reorder the block. Its checkout and OSV-Scanner pins are the floor's: where "
-    "the project's floor pins another checkout commit or another OSV-Scanner release, stop and report it rather than "
-    "write the file."
-)
-CHECKOUT = "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"
+CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
 OSV_URL = "https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"
 OSV_SHA = "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b"
 FROZEN = (
@@ -96,7 +86,7 @@ FROZEN = (
     "    name: dependency scan\n"
     "    runs-on: ubuntu-latest\n"
     "    steps:\n"
-    "      - uses: " + CHECKOUT + " # v5\n"
+    "      - uses: " + CHECKOUT + " # v7.0.1\n"
     "        with:\n"
     "          persist-credentials: false\n"
     "      - name: OSV-Scanner\n"
@@ -204,7 +194,6 @@ SUITE_CMD = LAUNCHER + "--kind test -- <the recorded suite command> > run/agent/
 CHECKPOINT_CMD = (LAUNCHER + MUTATION_RUN + "--checkpoint <the increment's checkpoint commit> " + SCRATCH
                   + " > run/agent/<id>-checkpoint.out 2>&1")
 MUTATION_CMD = LAUNCHER + MUTATION_RUN + SCRATCH + " > run/agent/<id>-mutation.out 2>&1"
-P7_CMD = LAUNCHER + "--key-file <a file outside the Workspace> --kind test -- python -m pytest -q tests"
 CALIBRATE_CMD = LAUNCHER + "--kind test -- <the recorded suite command> -rA > run/agent/calibrate-suite-before.out 2>&1"
 KP061 = "(`bridge-run.py --limit auto --strip --kind test`)"
 LOOP_SUITE = ("The suite runs through the launcher in the background, whatever its length, with the owner's environment "
@@ -225,8 +214,6 @@ DECIDE_WHY = ("The strip keeps the owner's login and secret-like variables from 
               "for local service passwords), and the driver kind refuses `--key-file`, so a mutation run whose suite "
               "needs a variable beyond `.env` runs without `--strip` only under a Decision in `docs/INVENTORY.md` naming "
               "the variable, until the launcher gains a driver key file.")
-MERGE_P7 = ("the full suite runs once with the pull request's variables set, as CI runs it on the pull request's merge, "
-            "stripped as every suite of the loop runs (`delegation-loop.md`, step 4):")
 CALIBRATE_LEAD = ("in the background through the launcher, stripped as the loop's suites run "
                   "(`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`, step 4): `" + CALIBRATE_CMD + "`")
 UNSTRIPPED = ("--limit auto --kind test", "--limit auto --kind driver", "--limit auto --key-file")
@@ -285,9 +272,7 @@ def test_r052_the_weekly_scan_is_every_project_s():
 
 
 def test_r052_the_configurator_writes_the_scan_from_the_frozen_block():
-    t = flat(read(CONFIGURATOR))
-    what = t.split("## What you write", 1)[1].split("## Hard limits", 1)[0]
-    assert flat(CONFIGURATOR_ITEM) in what
+    """The block every project receives, held whole; the item's own sentences are no longer held (release S)."""
     assert frozen_block() == FROZEN
 
 
@@ -354,10 +339,8 @@ def test_r052_the_stripped_launches_in_the_loop_and_its_sub_files():
     loop, decide, merge = module("delegation-loop.md"), module("delegation-loop/decide.md"), module("delegation-loop/merge.md")
     assert SUITE_CMD in bash_blocks(loop) and CHECKPOINT_CMD in bash_blocks(loop)
     assert MUTATION_CMD in bash_blocks(decide)
-    assert P7_CMD in bash_blocks(merge)
     assert LOOP_SUITE in flat(loop) and LOOP_CHECKPOINT in flat(loop)
     assert DECIDE_LEAD in flat(decide) and DECIDE_WHY in flat(decide)
-    assert MERGE_P7 in flat(merge)
     for name, text in (("loop", loop), ("decide", decide), ("merge", merge)):
         for old in UNSTRIPPED:
             assert old not in text, (name, old)

@@ -87,7 +87,6 @@ def test_r045_t11_t17_the_status_file_as_at_the_merge():
     """T11 and T17: the status file as at the merge, the live position in in-flight.md, an overtaken pull request
     rewritten and re-reviewed (rule 43, the template, the hook's text, step 8)."""
     assert flat("write it in `run/supervisor/in-flight.md` (where the live position between merges lives: the status file a pull request carries reads as at that pull request's merge, its `In flight:` line `none`, ISS-009 and KP-069; a resume reads `in-flight.md`'s last entries first) and start its ceiling timer in the background: `python ~/.claude/cursor-bridge/wake-timer.py <seconds> \"<the agent>\"`") in rule(43)
-    assert flat(" A pull request whose status file another pull request's merge overtook has the file rewritten as at its own merge and `main` merged into it, a new head the reviews read again (the delegation loop's step 8), above the ceiling under the class line step 8 gives it.") in rule(43)
     assert "copied to the status file after `verify`" not in rule(43)
     assert "\n" + 'In flight: none (the file a pull request carries reads as at its merge; between merges the live position is written in run/supervisor/in-flight.md, rule 43: TASK-nnn in <checkout> since <time>, one line per parallel increment; <agent> in the background since <HH:MM>, ceiling <HH:MM>)' + "\n" in read(CORE)
     assert "| TASK-nnn in <checkout>" not in read(CORE)
@@ -99,8 +98,9 @@ def test_r045_t11_t17_the_status_file_as_at_the_merge():
 
 
 def test_r045_c_the_three_allow_rules_and_the_commands_they_admit():
-    """Done when (c): `Bash(git branch -D:*)` beside the narrower stage rule, which stays, and the two reads for P7's
-    prediction; each documented command is admitted, the remote delete on the existing `Bash(git push:*)`."""
+    """Done when (c): `Bash(git branch -D:*)` beside the narrower stage rule, which stays, and the two reads that were
+    P7's prediction (the rules stay; the prediction left the text with release S); each documented command is admitted,
+    the remote delete on the existing `Bash(git push:*)`."""
     allow = json.loads(read(SETTINGS))["permissions"]["allow"]
     for r in ("Bash(git branch -D stage/*)", "Bash(git branch -D:*)", "Bash(gh pr list:*)", "Bash(gh issue list:*)",
               "Bash(git push:*)"):
@@ -109,22 +109,19 @@ def test_r045_c_the_three_allow_rules_and_the_commands_they_admit():
                 "gh issue list --state all --limit 1"):
         assert any(rule_matches(r, cmd) for r in allow), cmd
     merge = read(MERGE)
-    for cmd in ("`git branch -D <branch>`", "`git push origin --delete <branch>`", "`gh pr list --state all --limit 1`",
-                "`gh issue list --state all --limit 1`"):
+    for cmd in ("`git branch -D <branch>`", "`git push origin --delete <branch>`"):   # P7's two reads left the text with release S
         assert cmd in merge, cmd
 
 
 def test_r046_t5_where_a_reviewer_may_write():
-    """T5: the directive's clause, the policy's invocation, the design critique's constant prompt (its two copies one
-    text) and the reviewer's definition say where a reviewer may write and that it edits nothing."""
+    """T5: the directive names where a reviewer may write as one of its clauses, and the design critique's constant
+    prompt (its two copies one text) says it edits nothing. The clause's own words are no longer held (release S: a new
+    `tempfile.mkdtemp` folder, the policy pointing at step 8)."""
     assert "with five short clauses (release A5; where a reviewer writes, release T)" in step8()
     assert "a sixth clause: grade every" in step8() and "a fifth clause" not in step8()
-    assert flat('write no file under the checkout and point no cache there, scratch files and test caches going to the system temporary folder, and edit nothing (what `verify` restores was still written, and a write under `docs/`, `handoff/` or `run/review/` is a flag);') in step8()
-    assert flat('that the reviewer writes no file under the checkout and points no cache there, its scratch files and test caches going to the system temporary folder, and edits nothing,') in flat(section(read(POLICY), "Invocation", 2))
     prompt = design_prompt(read(DESIGN))
     assert "Write no file under the checkout, point no cache there, and edit nothing." in prompt
     assert design_prompt(read(POLICY)) == prompt
-    assert flat('You write no file under the checkout and point no cache there: a scratch file or a test cache goes to the system temporary folder (pytest run with `-p no:cacheprovider`), so the tree is as you found it.') in flat(read(REVIEWER))
 
 
 def test_r046_t16_single_test_files_beside_review_b():

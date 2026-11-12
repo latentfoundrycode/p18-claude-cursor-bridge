@@ -54,7 +54,7 @@ POINTS = {
                                       "one re-delegates (step 7), a builder's objection goes to \"Objections — bottom-up "
                                       "escalation\", and a consequence the owner bears goes to the owner (rule 56).",
     "delegation-loop.test-checks": "tests and checks run with the tests of every change of the part the loop checks "
-                                   "(step 4: the change's tests, the suite, the new tests against the checkpoint), such "
+                                   "(step 4: the change's tests, the new ones against the checkpoint), such "
                                    "as the observability tests of a part with screens or the benchmark floor (step 6); a "
                                    "failing one is a correctness-class block, re-delegated like any defect (step 7).",
     "delegation-loop.brief-constraints": "constraints every brief for the part carries beside spec-packager's template, "
@@ -104,31 +104,17 @@ def test_r032_the_delegation_loop_names_its_sub_files_on_its_pointer_line():
     assert pointer_lines(text) == [line], pointer_lines(text)
     proc = section(text, "The procedure", 3)
     assert "\n" + line + "\n" in proc
-    assert flat(proc).strip() == ("Steps 1 to 8 below run for every increment, steps 7 and 8 in sub-files of this module; step "
-                                  "9, the refactoring and optimization pass at a stage's close, is in another. Each "
-                                  "sub-file is read whole with the module wherever the module is read: " + line
-                                  + " For each increment, in order:")
     folder = os.path.join(PHASES, "delegation-loop")
     assert sorted(os.listdir(folder)) == sorted(os.path.basename(s) for s in SUBS)
 
 
 def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
-    """R-032 (TASK-030): the module grew past what its bound allowed with TASK-030's text, so step 7 moved into a
-    sub-file, as step 9 did (TASK-013): the sub-file opens with its own heading and a paragraph that says it is part of
-    the module and when its step runs, holds step 7 under its heading, then the review ceiling (TASK-034) and the
-    mutation run; the module keeps a
-    pointer section under the step's number, and no other file under workflow/phases/ holds the step's heading."""
+    """R-032 (TASK-030): step 7 stands in a sub-file, as step 9 does (TASK-013): the sub-file opens with its own
+    heading, holds step 7 under its heading, then the review ceiling (TASK-034) and the mutation run, and no other file
+    under workflow/phases/ holds the step's heading. The two paragraphs' own words are no longer held (release S)."""
     sub = module(DECIDE)
     assert headings(sub) == [(2, "The decision (Phase 6, step 7)"), (3, "Where this sub-file belongs"), (3, STEP7),
                              (4, "The review ceiling"), (4, "The mutation run")], headings(sub)
-    assert flat(section(sub, "Where this sub-file belongs", 3)).strip() == (
-        "This file is a sub-file of the delegation-loop module (`delegation-loop.md`, \"The procedure\"), read whole "
-        "with it. It holds the loop's step 7, which runs for every increment after step 6 and before step 8, the "
-        "merge: the decision on the increment, and the mutation run each pass through the step launches before step "
-        "8's snapshot. It stands in a file of its own to keep the module within its size bound.")
-    assert flat(section(module("delegation-loop"), "7. Decide — in a sub-file", 3)).strip() == (
-        "Step 7, the decision on the increment with the mutation run its last pass launches, stands in the sub-file "
-        "`delegation-loop/decide.md` (\"The procedure\" names it), read whole with this module; step 8 follows it.")
     for root, _dirs, files in os.walk(PHASES):
         for f in files:
             rel = os.path.relpath(os.path.join(root, f), PHASES).replace(os.sep, "/")

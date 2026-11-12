@@ -73,7 +73,7 @@ the version has not changed (the owner is asking for certainty, not a version ch
 8. `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` and `Glossary.md` (every project: the diagram catalogue, its rules, and the bridge's vocabulary)
 9. Every `SKILL.md` under `~/.claude/skills/`
 
-The session-start hook's table (`PHASE_MODULES` in `session-start.py`), which also names these modules after every compaction and resume:
+The session-start hook's table (`PHASE_MODULES` in `session-start.py`), which also lists these modules after every compaction and resume, asking then only for the one that holds the step in hand (rule 28):
 
 | `Phase:` | Modules |
 |---|---|

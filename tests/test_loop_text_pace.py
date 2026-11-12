@@ -82,9 +82,9 @@ def test_r042_the_text_names_the_programs_constants():
     assert set(FIVE) == set(bridge_env.BLOCKING_CLASSES)
     assert bridge_env.REVIEW_ROUNDS in NUMBER_WORDS, bridge_env.REVIEW_ROUNDS
     word = NUMBER_WORDS[bridge_env.REVIEW_ROUNDS]
-    assert ("The code gate's ceiling is %s rounds per increment and per stage review" % word) in rule(6)
+    assert ("The code gate's ceiling is %s rounds per increment" % word) in rule(6)
     assert ("The code gate stops at %s rounds per increment" % word) in ceiling()
-    assert ("**The ceiling** (R-042): %s rounds per increment and per stage review" % word) in f(policy())
+    assert ("the ceiling of %s rounds (R-042) held by `bridge-run.py` and `review-guard.py`" % word) in f(policy())
     assert ("from round %s (program-held) only the five blocking classes send work back" % word) in digest()
     assert ("%s-round ceiling" % word) in f(text("agents", "diff-reviewer.md"))
 
