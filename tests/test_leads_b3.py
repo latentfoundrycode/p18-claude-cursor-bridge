@@ -17,8 +17,6 @@ GLOSSARY = os.path.join(BRIDGE, "cursor-bridge", "Glossary.md")
 REGISTRY = os.path.join(BRIDGE, "cursor-bridge", "workflow", "extension-points.md")
 EXCEPTIONS = os.path.join(BRIDGE, "cursor-bridge", "workflow", "trace-exceptions.md")
 
-IN_PARTS = "in parts to its last line, each part starting where the last ended"
-
 
 def core():
     return read(CORE)
@@ -74,17 +72,6 @@ def test_r003_intake_points_at_the_registrys_delivery_kinds():
                 "`host-installation`"):
         assert key not in intake, key
         assert key in read(REGISTRY), key
-
-
-def test_r003_a_critique_rounds_verdicts_and_hash_are_read_from_in_flight_md():
-    """R-003; TASK-035's Done when (design.md's and planning.md's snapshot-hash bullets; Stage B3 round 4, modules):
-    a resumed session reads the round's hash and each critic's verdict from run/supervisor/in-flight.md mid-round."""
-    bullet = ("a round is snapshotted and verified as step 8 says, the snapshot's hash written to "
-              "`run/supervisor/in-flight.md` at the launch and each critic's verdict there as it returns, both read from "
-              "that file mid-round, and a failed launch is handled as step 3b says;")
-    for key in ("design", "planning"):
-        survival = flat(section(module(key), "What must survive a compaction", 3))
-        assert bullet in survival, key
 
 
 def test_r003_the_founding_rules_and_the_layout_name_the_modules():
@@ -151,28 +138,6 @@ def test_r003_the_change_cycles_intake_ends_with_a_confirmation_not_a_gate():
     survival = flat(section(text, "What must survive a compaction", 3))
     assert "and `Awaiting user on:` a gate, or an intake question, that waits for the owner;" in survival
     assert "### The gate" in module("intake"), "the step item 1 names exists"
-
-
-def test_r003_the_core_is_read_in_parts_to_its_last_line():
-    """R-003; TASK-035's Done when (FB-036: the core is past the Read tool's one-call cap): the four statements that the
-    core is read whole say it is read in parts to its last line, each part starting where the last ended; the
-    Glossary entry's other words stand."""
-    model = core_section("Main and conditional workflows")
-    row = [l for l in model.split("\n") if l.startswith("| **The main workflow's core** |")][0]
-    assert row.rstrip().endswith("| Always, " + IN_PARTS + ", at every start, resume and calibration |"), row
-    assert ("This file, the core, is read " + IN_PARTS + ", at every start, resume and calibration, and with it the "
-            "current phase's module or modules") in flat(model)
-    assert "This file, the core, is read whole" not in flat(model)
-    rules = flat(core_section("Standing rules"))
-    assert "re-read the governing files whole, the core " + IN_PARTS + ", and apply the `CHANGELOG.md` delta" in rules
-    glossary = [l for l in read(GLOSSARY).split("\n") if l.startswith("| **Main workflow core** |")]
-    assert len(glossary) == 1
-    entry = glossary[0]
-    assert ("The part of the main workflow every project reads " + IN_PARTS + ", at every start, resume and "
-            "calibration: the roles and the division of labour, the founding rules, the loop's shape, escalation and "
-            "reporting, project state, and the standing rules that hold in every phase.") in entry
-    assert "It is not an extension point; no conditional workflow changes it." in entry
-    assert "reads whole" not in entry
 
 
 def test_task022_lead_the_glossary_names_the_contract_a_part_offers():

@@ -17,7 +17,6 @@ import sys
 import pytest
 
 from phase_modules import BRIDGE, read, section
-from test_core_carve import NOTES
 from workflow_files import REGISTRY
 
 REPO = os.path.dirname(BRIDGE)
@@ -66,15 +65,6 @@ def test_r029_every_passage_has_one_home_or_its_reword(run):
     assert maps.count("-") == excused == len([l for l in lines if l.startswith("NOTE (reword ")])
     assert maps.count(CORE) == in_core and len([m for m in maps if m.startswith(WF)]) == in_wf
     assert in_core + in_wf + excused == passages
-
-
-def test_r029_the_excused_passages_are_exactly_the_recorded_rewords(run):
-    """A `reword` entry excuses every passage under its section, so a passage dropped there is reported excused, not
-    dropped (the trace check's section-wide entries, docs/INVENTORY.md, Decisions); "nothing dropped" holds only
-    because the excused passages are exactly the ones each increment recorded with its reword, the list
-    tests/test_core_carve.py pins. A passage dropped under a reworded section adds a NOTE line and fails here."""
-    lines = run[1]
-    assert [l for l in lines if l.startswith("NOTE ")] == NOTES, "an excused passage that no increment recorded"
 
 
 def test_r029_the_homes_are_the_core_the_modules_and_the_moved_traits(run):

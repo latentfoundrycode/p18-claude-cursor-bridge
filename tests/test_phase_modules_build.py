@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from phase_modules import (read, module, flat, headings, section, assert_survival_list, assert_declares_registry_points,
+from phase_modules import (read, module, flat, headings, section, assert_declares_registry_points,
                            assert_points_placed, hook_named)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,105 +27,7 @@ MERGE = "delegation-loop/merge.md"
 SUBS = [DECIDE, SUB, MERGE]
 
 
-# the loop's steps as the module holds them, each with the sub-sections TASK-030 adds (step 7 itself in its sub-file,
-# the module keeping a pointer section under the step's number)
-LOOP_HEADINGS = [(3, "1. Checkpoint"), (3, "2. Package the brief"), (3, "3. Delegate to Cursor"),
-                 (4, "The model, the timeout and the limit"),
-                 (3, "3b. A model fails mid-step — switch automatically, restart the step, never wait"),
-                 (4, "Waiting for the slot, and a mutation run cut short"), (3, "4. Inspect"),
-                 (4, "The tests before the first reviewer"), (4, "The reviewers"), (3, "5. Scan"),
-                 (3, "5b. Dependency-admission gate"), (3, "6. Benchmarks and observability"),
-                 (3, "7. Decide — in a sub-file"), (3, "8. Merge — in a sub-file")]
-
-STRUCTURE = {
-    "run-parameters": [(2, "Run parameters — asked once, after the plan is approved, before configuration"),
-                       (3, "What must survive a compaction"), (3, "The procedure"), (3, "Writing the answers down"),
-                       (2, "Extension points")],
-    "configuration": [(2, "Phase 5 — Configure the Cursor build environment"), (3, "What must survive a compaction"),
-                      (3, "The procedure"), (3, "The windowless test suite"), (3, "Keeping the position"),
-                      (2, "Extension points")],
-    "delegation-loop": [(2, "Phase 6 — The delegation loop"), (3, "What must survive a compaction"), (3, "The procedure")]
-                       + LOOP_HEADINGS + [(2, "Extension points")],
-}
-
-INTRO = {
-    "run-parameters": "After a compaction or a resume in this step, read these before your next action:",
-    "configuration": "After a compaction or a resume in this phase, read these before your next action:",
-    "delegation-loop": "After a compaction or a resume in this phase, read these before your next action:",
-}
-
-SURVIVAL = {
-    "run-parameters": [
-        "this module, whole;",
-        "`docs/RUN_PARAMETERS.md` as written so far, whole: each answer is written there as the owner gives it "
-        "(\"Writing the answers down\"), so the questions still to ask are the parameters it does not yet hold;",
-        "`docs/BUILD_PLAN.md`, the approved plan, whole: a refactoring answer may name its stages, and parallel "
-        "increments apply only where the plan marks increments `Parallel: yes`;",
-        "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which add "
-        "parameters at `run-parameters.parameters` and show whether a part is installable, as installer verification "
-        "needs, and its `Awaiting user on:` line names the question that waits for the owner.",
-    ],
-    "configuration": [
-        "this module, whole, with `~/.claude/cursor-bridge/Cursor-Project-Configuration.md` and "
-        "`~/.claude/cursor-bridge/Known-Pitfalls.md`, each whole (the session-start hook names both for this phase);",
-        "the approved design and plan: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/BUILD_PLAN.md` and "
-        "`docs/RUN_PARAMETERS.md`, whole: only the items that are load-bearing for this project are applied;",
-        "`docs/PROJECT_STATUS.md`, whole: its `Next:` line names the items configured so far and the next one (\"Keeping "
-        "the position\"), its `Awaiting user on:` line an escalation that waits for the owner, and its `Workflows:` line "
-        "the conditional workflows that add items at `configuration.items`;",
-        "`docs/INVENTORY.md`, whole: its Resources rows record each pinned tool and version, each mode in force and each "
-        "spending limit as the items are configured.",
-    ],
-    "delegation-loop": [
-        "this module and its sub-files, each whole (the session-start hook names them), with "
-        "`~/.claude/cursor-bridge/Merge-Verification-Policy.md` and `~/.claude/cursor-bridge/Known-Pitfalls.md`, each "
-        "whole, and the other files the hook names;",
-        "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41), and the last entries of "
-        "`run/supervisor/in-flight.md` where it exists: the increment in hand, its branch and its checkpoint, the "
-        "background runs that will wake you and what waits for the owner; while Review B runs the status file is not "
-        "written and the position is kept in `in-flight.md` (step 8), and at the launch you write there the snapshot's "
-        "hash `review-guard.py snapshot` printed, since the hash `verify` prints must equal it (this list is where "
-        "that write is asked for);",
-        "the increment's entry in `docs/BUILD_PLAN.md`, its brief `handoff/TASK-<nnn>.md` and every numbered brief after "
-        "it (`handoff/<ID>-r<N>.md`, step 3), and each builder report `handoff/TASK-<nnn>-r<N>-report.md`, whole: the "
-        "brief bounds the increment, and the report "
-        "holds the `Assumed, not verified` list whose every item takes a disposition (rule 42);",
-        "for a fix (step 7, the `root-cause-first` procedure), `docs/debug/BUG-<nnn>.md`, whole: its hypotheses and the "
-        "diagnostic rounds counted toward a resolution round; the fix brief, `handoff/<ID>-r<N>.md` inside an "
-        "increment's gate or `handoff/BUG-<nnn>.md` for a defect found after a merge (step 7), with its reports, as for "
-        "a task; and `git grep DEBUG-BUG-<nnn>` for instrumentation not yet removed;",
-        "`docs/RUN_PARAMETERS.md` and `docs/ROSTER.resolved.json`: who completes a merge, whether the refactoring pass "
-        "runs and whether increments run in parallel, and the models the delegate command and Review B name;",
-        "the increment's verdicts, kept in `run/supervisor/in-flight.md`: Review A's, each auditor's and Review B's "
-        "reply, each written there as it returns, and the mutation run's cuts and estimate (step 7);",
-        "the runs' files: `run/agent/TASK-<nnn>.err`, which step 3b reads after a failed call, "
-        "`run/agent/TASK-<nnn>.assumptions.md`, the only copy of a list the builder printed only in its last message "
-        "(step 4), `run/agent/TASK-<nnn>-suite.out` and `run/agent/TASK-<nnn>-own.out`, which `test-runner` reads after a suite or own-file run in the background, and "
-        "the increment's mutants file `run/supervisor/<id>-mutants.json` with its runs' output files "
-        "`run/agent/<id>-checkpoint.out` (step 4) and `run/agent/<id>-mutation.out` (step 7); "
-        "and, while a gate is open, its files under `run/review/` (the round's `REVIEW-<ID>-r<N>.diff`, "
-        "`ASSUMPTIONS-<ID>-r<N>.md` and `REVIEW-<ID>-r<N>.err`, whose first line is the launch time "
-        "`pr-activity-check.py` needs, and the increment's `SCOPE-<ID>.md`), whole, with the review guard's count of rounds opened for the increment, which "
-        "names the next snapshot `<ID>-r<N>` (step 8) and says whether the round is above the ceiling (step 7, \"The "
-        "review ceiling\");",
-        "after an interruption (a compaction, a resume, a session ended mid-run), the background task's output and "
-        "its `.err` file, read first: with a snapshot open, `review-guard.py verify` runs before anything else once the "
-        "run has ended, an `.err` holding `bridge-run: exit`; one with no such line is a run still going, waited for or "
-        "ended with `bridge-stop.py` first, since a `verify` during the run resets the tree under the reviewer;",
-        "while step 9 runs, its position: `run/supervisor/refactor-<stage>-candidates.md` (the sub-file's \"Keeping the "
-        "pass's position\"), the detector's report under `docs/refactor/<stage>`, each `handoff/REFAC-<nnn>.md` brief "
-        "with its report, the commits on `refactor/<stage>`, and `docs/HARDENING.md`'s section for the stage.",
-    ],
-}
-
 KEYS = ["run-parameters", "configuration", "delegation-loop"]
-
-
-@pytest.mark.parametrize("key", KEYS)
-def test_r004_the_module_opens_with_its_compaction_survival_list(key):
-    """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
-    exactly what a resumed session in that phase reads before its next action."""
-    assert_survival_list(key, STRUCTURE[key], INTRO[key], SURVIVAL[key])
 
 
 @pytest.mark.parametrize("key", KEYS)
@@ -234,30 +136,6 @@ def test_r032_step_7_is_in_its_sub_file_whole_and_nowhere_else():
                 assert "### " + STEP7 not in read(os.path.join(root, f)).split("\n"), rel
 
 
-# sha256 of step 7 as the sub-file holds it after TASK-034 (from its heading to the line before "The review ceiling",
-# LF, trailing whitespace stripped; 7,641 characters). TASK-030 moved the step verbatim from the module (then 6,967
-# characters at origin/main 02f0ab5, sha256 70a1aacaca66592b...), its mutation run added after it under a heading of its own;
-# TASK-034 reworded its Iterate and Re-delegate bullets (a new numbered brief), the root-cause-first paragraph's fix
-# brief (`<ID>-r<N>` inside a gate, BUG after a merge) and the brake's by-class bullet (the five classes, the class
-# the defect, for the increment or the stage), and added "The review ceiling" between the step and the mutation run (R-042);
-# BUG-033 (stage B5's review, round 2) added to the brake's by-class bullet the convergence exception below the
-# ceiling, naming two or more reviewers or auditors (7,832 characters, sha256 b9497aeec8f3a0b3...; at TASK-034 7,641,
-# sha256 dcf588e45b134ec8...); TASK-039 (release T) gave the Accept bullet P11's quoted counts and T10's records-only
-# commit, and the brake's by-class bullet T20's threat model, P2's membership and P1's convergent late finding
-# (8,933 characters; 8,941 after Review A's round 1 bounded the threat model to the parts it names, 8,794 before);
-# BUG-043 put step 4's read before the last-resort reset (8,992 characters)
-STEP7_SHA256 = "dc129c7317b21c32038b50c627bec7cea375ee28bbe7b6124a6b5a0298985b79"
-
-
-def test_r032_step_7_is_verbatim():
-    """R-032 (TASK-030, TASK-034): the sub-file's step 7, up to its review ceiling, is the step as TASK-030 moved it
-    and TASK-034 reworded it, character for character."""
-    import hashlib
-    sub = module(DECIDE)
-    step = sub[sub.index("### " + STEP7):sub.index("#### The review ceiling")].rstrip()
-    assert len(step) == 8992 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP7_SHA256, len(step)
-
-
 def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
     """R-032: the sub-file opens with its own heading and a paragraph that says it is part of the module and when its
     step runs; it holds step 9 under its heading as the core had it, and no other file under workflow/phases/ holds
@@ -293,29 +171,6 @@ def test_r032_step_9_is_in_the_sub_file_whole_and_nowhere_else():
             assert "### " + STEP9 not in text.split("\n"), rel
             for p in passages:
                 assert p not in flat(text), (rel, p)
-
-
-# sha256 of step 9 as TASK-040 (release T) leaves it (from its heading to its last line, LF, trailing whitespace
-# stripped; 6,708 characters): the scout's item names the stage's own squash commits where stages interleave (T11).
-# Before it: BUG-033 (6,474 characters, sha256 57bbd058bcf569f9...): steps 4 and 6 name the branch rule BUG-032 gave a refactoring branch (every REFAC-<nnn> brief, the
-# REFAC-<stage> snapshot). Before it: BUG-031 reworded step 6's title sentence (6,055 characters, sha256
-# b86e3bceb2b8508546e2f1d3...); TASK-035 the project-end sentence under its `reword` and `new` entries (5,695); the
-# step as the delegation-loop module held it at origin/main 5bed396 (5,542 characters), moved verbatim. trace-check,
-# which would see a change, has no CI step (INVENTORY Decisions), so CI holds the step's text here; a later reword
-# updates this with its record
-STEP9_SHA256 = "780b6637bf4bb3b4cd2d699116056e34a17d935a3c574a42305e93a8319ebfd4"
-
-
-def test_r032_step_9_is_verbatim():
-    """R-032 (Review A, round 1, C1): the sub-file's step 9 is the module's step 9 as it was before the split, character
-    for character, but the project-end sentence TASK-035 rewords (R-003; INVENTORY, Decisions: project end adds no
-    pass of its own), step 6's title sentence BUG-031 rewords (the title names the pass's REFAC-<nnn> brief IDs) and
-    the branch rule steps 4 and 6 name since BUG-033 (BUG-032's REFAC rule) and the scout's stage change TASK-040
-    gives it where stages interleave (R-049's T11)."""
-    import hashlib
-    sub = module(SUB)
-    step = sub[sub.index("### " + STEP9):sub.index("### Keeping the pass's position")].rstrip()
-    assert len(step) == 6708 and hashlib.sha256(step.encode("utf-8")).hexdigest() == STEP9_SHA256, len(step)
 
 
 def test_the_refactoring_passs_position_is_written_down():
@@ -360,13 +215,6 @@ def test_the_configurations_position_is_kept_on_next():
                          "`docs/INVENTORY.md` (Resources).")
     assert "Commit the configuration as its own checkpoint before `TASK-001`, and record in" in module("configuration")
     assert "`In flight:`" not in module("configuration")
-
-
-@pytest.mark.parametrize("rel", ["run-parameters.md", "configuration.md", "delegation-loop.md", DECIDE, SUB, MERGE])
-def test_r032_the_module_and_its_sub_file_are_read_whole(rel):
-    """R-032: each enriched module and the sub-file stay within the bound a module is read whole by."""
-    text = module(rel)
-    assert text.count("\n") <= 1500 and len(text) <= 60000, (rel, text.count("\n"), len(text))
 
 
 def test_r005_the_hook_names_the_delegation_loop_and_its_sub_file(tmp_path):

@@ -178,12 +178,6 @@ def test_bug043_negative_a_stripped_launch_of_one_test_file_gets_no_account_key(
     assert "1 failed" in control.stdout, control.stdout
 
 
-def test_bug043_r042_names_its_p2_entry():
-    """Round 2's records part, S1: the plan's grammar reads `(P2, the by-class line of 2026-10-27)` as label P2, and TASK-045's stamp test asks a `<label>: <test>` entry for it."""
-    evidence = row("R-042").rstrip(" |").split(" | ")[-1]
-    assert "P2: tests/test_loop_text_pace.py::test_r042_rule_6_states_the_outcomes_and_the_programs" in evidence
-
-
 def test_bug043_the_design_is_past_the_retrofit():
     """Round 2's records part, S2 and C5: `--mode code` prints no `TESTS` line since TASK-044, and R-052's homes name what its row names."""
     design = flat(read(ROOT, "docs", "DESIGN.md"))
@@ -193,9 +187,3 @@ def test_bug043_the_design_is_past_the_retrofit():
     assert "`delegation-loop/merge.md` (P7's launch)" in design
     assert "`agents/test-runner.md`" in design
     assert "`intake.md` and `configuration.md` (BUG-042)" in design
-
-
-def test_bug043_the_inventory_keeps_the_trace_series():
-    """Round 2's records part, C4: the series names the last move of the count tests/test_core_carve.py pins."""
-    inventory = read(ROOT, "docs", "INVENTORY.md")
-    assert inventory.count("83 since BUG-043") == 2

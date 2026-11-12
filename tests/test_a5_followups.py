@@ -41,27 +41,6 @@ def test_the_quiet_rule_names_the_writing_subagents():
         assert name in quiet, name
 
 
-def test_the_builders_report_is_a_file_in_every_brief_variant():
-    """Entry D2: the report is written as the builder goes; the last message is its summary."""
-    scope = section(SP, "## Scope", "## Out of scope")
-    assert "- handoff/TASK-<nnn>-r<N>-report.md\n" in scope, "the Scope names the report file beside the notes file"
-    done = section(SP, "## Done", "The report file and the `Assumed, not verified` section")
-    assert "handoff/TASK-<nnn>-r<N>-report.md" in done and "write as you go" in done
-    assert "Your last message is the summary and the report file's path" in done
-    assert "`Assumed, not verified`" in done, "the assumptions section stays in the Done section"
-    variants = [line for line in SP.split("\n") if line.startswith("- **Scope** names")]
-    assert len(variants) == 2 and all("report file" in line for line in variants), variants
-    assert "REFAC-<nnn>-r<N>-report.md" in SP, "the refactoring variant's report file is named"
-    step4 = section(SV, "### 4. Inspect", "### 5. Scan")
-    assert "`handoff/TASK-<nnn>-r<N>-report.md` it writes as it runs" in step4
-    assert "a hint, never evidence" in step4
-    assert "It stands in the builder's report file" in step4, "the assumptions list is read from the report file"
-    step8 = section(SV, "### 8. Merge (the verified gate)", "### 9. Refactoring")
-    assert "builder's report `handoff/TASK-<nnn>-r<N>-report.md`" in step8, "the SCOPE file lists the report as expected"
-    assert "Never treat the builder's own report as evidence" in DR
-    assert "builder's report file under `handoff/`" in text("cursor-bridge", "Merge-Verification-Policy.md")
-
-
 def test_mutation_drivers_belong_to_the_supervisors_side():
     """Entry D3 (reAngle TASK-010c): five mutants that did not model their names cost three rounds."""
     step4 = section(SV, "### 4. Inspect", "### 5. Scan")

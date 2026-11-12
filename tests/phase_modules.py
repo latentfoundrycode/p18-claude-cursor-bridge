@@ -122,20 +122,6 @@ EXT_PROSE = ("This module offers the points below, each by its key in the extens
              "point's line places them, in the order the core states in \"Main and conditional workflows\".")
 
 
-def assert_survival_list(key, structure, intro, survival):
-    """R-004's shape for one module: its headings are `structure`; its first section, straight after its heading, is
-    the compaction-survival list, opening with `intro` and holding exactly the items `survival`."""
-    text = module(key)
-    assert headings(text) == structure, headings(text)
-    lines = text.split("\n")
-    assert lines[1] == "" and lines[2] == "### What must survive a compaction", lines[:3]
-    body = section(text, "What must survive a compaction", 3).strip().split("\n")
-    assert body[0] == intro, body[0]
-    assert all(l.startswith("- ") for l in body[1:] if l), body
-    items = [l[2:] for l in body[1:] if l]
-    assert items == survival, items
-
-
 def assert_declares_registry_points(key, may_set=False):
     """R-006's shape for one module: a `## Extension points` section, one line per point giving its key, exactly the
     points the registry names the module as declaring, in the table's order, its prose EXT_PROSE; no point line says

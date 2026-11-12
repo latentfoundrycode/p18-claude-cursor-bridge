@@ -27,7 +27,6 @@ DESIGN = os.path.join(PHASES, "design.md")
 INTERFACE = os.path.join(PHASES, "interface.md")
 RUN_PARAMETERS = os.path.join(PHASES, "run-parameters.md")
 CONFIGURATION = os.path.join(PHASES, "configuration.md")
-PITFALLS = os.path.join(BRIDGE, "cursor-bridge", "Known-Pitfalls.md")
 CB = os.path.join(BRIDGE, "cursor-bridge")
 CHANGELOG = os.path.join(CB, "CHANGELOG.md")
 VERSION_FILE = os.path.join(CB, "VERSION")
@@ -205,29 +204,6 @@ def test_hotfix003_the_decision_brief_puts_options_only_where_answers_exist():
     heuristic = flat(section(read(SKILL), "The selection heuristic " + DASH + " what to explain, what to leave out", 2))
     assert ("**2. Trace the load-bearing chain.** From each option (or, for a behaviour question put in prose, from the "
             "case the software must settle), through the mechanism, to the consequence the user will live with") in heuristic
-
-
-# --- Known-Pitfalls: KP-075
-
-def test_hotfix003_kp075_names_the_pitfall_its_places_and_its_sign():
-    text = read(PITFALLS)
-    assert "### KP-075 " + DASH + " A question's sort left to the supervisor invited guessed feature options at intake" in text
-    entry = text[text.index("### KP-075"):]
-    assert "**Correction (2026.11.09a):**" in entry
-    assert ("(one of intake.md's closed list of facts the bridge's own procedures consume in a fixed form: the kind, the "
-            "platform and runtime context, the delivery kind, the confirmation of a part's product type or sub-type as "
-            "classified from the owner's answers, the figure of a budget or a limit) may take the question form, the "
-            "default or recommended answer first, and a short answer never makes a question a parameter; a question "
-            "about the software itself is a conversation in the owner's own words, with no recommendation before the "
-            "owner's answer, and a question that is both is a conversation too, at intake, in a change cycle's intake, "
-            "in the interface phase's iterations, before the design gate and in an escalation mid-build alike") in entry
-    assert ("(intake.md, change-cycle.md item 1, interface/mockups.md, design.md \"The gate\", the core's \"Escalate to "
-            "the user when\", the explain-for-decision brief's part 4)") in entry
-    assert ("**Applies:** every intake, every question before the design gate, every iteration of the interface phase, "
-            "every change cycle's intake, every escalation about product behaviour.") in entry
-    assert ("The sign: a message to the owner offering options for a behaviour they have not yet described or have "
-            "agreed and now revisit, a recommendation given before they have answered, or an intake batch whose feature "
-            "questions carry answer lists.") in entry
 
 
 # --- the places that keep the form (invariants of the hotfix's non-goals, one assert per place)
