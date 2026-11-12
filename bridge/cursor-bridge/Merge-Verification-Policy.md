@@ -418,7 +418,7 @@ the required check regardless of *who* triggers the merge, so a direct `gh pr me
 bypass CI any more than auto-merge can. The armed `--auto` form (with the same `--match-head-commit`) is still set first,
 as a **safety net** in case the session ends before the check is green; it is not the
 mechanism to wait on. Never complete a merge before the required check is green or before
-both reviews have APPROVED — the direct path is a convenience over the queue, never a
+both reviews have APPROVED (the short gate: its one read) — the direct path is a convenience over the queue, never a
 shortcut around the gate.
 
 So the model reviews gate the *authorisation*; the required CI check gates the *merge*; and

@@ -18,7 +18,7 @@ the per-project `docs/HARDENING.md` (project-local hardening) and `docs/CHANGES.
 **Curation rule:** keep entries *generalizable* (they recur across projects). Project-specific
 trivia stays in that project's Issues file. Prune entries that a later bridge change has
 made obsolete. Each entry: **misconception/mistake → how it surfaced → the correction → where
-it applies.** Each heading states its pitfall in one sentence, since the headings are what is read first (`### KP-`, rule 15) and the entry only when its heading or a step names it. The rulebook has a word budget, held by a test of the bridge's repository: a new entry, rule or procedure sentence retires or shortens text of at least its size, and the budget is raised only visibly, in the pull request that needs it (release S).
+it applies.** Each heading states its pitfall in one sentence, since the headings are what is read first (`### KP-`, rule 15) and the entry only when its heading or a step names it. The rulebook has a word budget, held by a test of the bridge's repository: a new entry, rule or procedure sentence retires or shortens text of at least its size, and the budget is raised only visibly, in the pull request that needs it.
 
 ---
 
@@ -646,7 +646,7 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 
 ### KP-079 — Read-only subagents share the session's temporary folders
 - **Surfaced:** the bridge (ISS-027, twice): an auditor's `rm -rf` on a fixed-name scratch folder emptied another reviewer's export; a later glob cleanup removed a folder it had not made.
-- **Correction:** a reviewer or auditor writes only in a new `tempfile.mkdtemp` folder and removes only what it made, by exact path (their definitions, release S).
+- **Correction:** a reviewer or auditor writes only in a new `tempfile.mkdtemp` folder and removes only what it made, by exact path (their definitions).
 - **Applies:** every run of two or more subagents at once.
 
 ### KP-080 — A mutation run's copy of the Workspace holds no repository

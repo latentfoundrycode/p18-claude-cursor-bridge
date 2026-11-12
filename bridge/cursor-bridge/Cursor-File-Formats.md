@@ -550,8 +550,8 @@ rules:
 - Use the curated registry packs (`p/…`) as the floor and vendor a fixed rule file into the
   repo for anything that must stay the same between sessions. Pin the **Semgrep CLI version** too (`docs/INVENTORY.md` (Resources)).
 - Findings above the chosen severity block in CI. Inline `# nosemgrep` suppressions are a
-  **gate-integrity flag** (see `Merge-Verification-Policy.md`) unless justified as a false
-  positive with a stated reason.
+  **gate-integrity flag**; a false positive is ruled and written as configuration
+  (see `Merge-Verification-Policy.md`).
 - **Always add the bundled bridge rules.** `cursor-configurator` copies
   `~/.claude/cursor-bridge/semgrep-bridge-rules.yml` into the project at
   `.semgrep/bridge-rules.yml` and appends `--config .semgrep/bridge-rules.yml` to the gate
