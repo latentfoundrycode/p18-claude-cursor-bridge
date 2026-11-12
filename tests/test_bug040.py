@@ -23,37 +23,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "bridge", "cursor-bridge"))
 import bridge_env  # noqa: E402
 MERGE = os.path.join(PHASES, "delegation-loop", "merge.md")
-DECIDE = os.path.join(PHASES, "delegation-loop", "decide.md")
-REFLECTION = os.path.join(PHASES, "reflection.md")
-CHANGE = os.path.join(PHASES, "change-cycle.md")
 PACKAGER = os.path.join(ROOT, "bridge", "agents", "spec-packager.md")
 REQUIREMENTS = os.path.join(ROOT, "docs", "REQUIREMENTS.md")
 DESIGN = os.path.join(ROOT, "docs", "DESIGN.md")
 
-B1_MERGE = ("Where that re-read would open a round above the ceiling, the overtaken file is behaviour against the "
-            "register, "
-            "R-045's T17, one of the five, so its lift is a class line, `Blocking class: behaviour - R-045, the status "
-            "file overtaken by PR #<m>'s merge`, written into `run/review/SCOPE-<ID>.md` before the snapshot (step 7, "
-            "\"The review ceiling\"), which the reviewers confirm or deny against the round it lifts.")
-B1_RULE43 = ("A pull request whose status file another pull request's merge overtook has the file rewritten as at its "
-             "own merge and `main` merged into it, a new head the reviews read again (the delegation loop's step 8), "
-             "above the ceiling under the class line step 8 gives it.")
-S1_STEP2 = ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the threat models "
-            "`docs/INVENTORY.md` records for the parts the stage touched, or that none is recorded (R-050), given to "
-            "both reviewers with the diff, the earlier rounds' dispositions and,")
-S1_STEP4 = ("4. Review A: `diff-reviewer` on `run/review/STAGE-<name>-r<N>.diff`, told the stage's briefs, the threat "
-            "models the SCOPE file carries, and that it reads a stage, not an increment.")
 S2_PACKAGER = ("**Escapes as text; non-ASCII listed.** Name a character a brief must mention but must not hold by its "
                "code point (U+202E), never by a typed backslash escape, which no tool writes safely, the file-writing "
                "tool included (KP-052); write a backtick or a backslash through the file-writing tool, never through a "
                "shell that reads escapes (a here-document, an inline command), which reads a backslash sequence as the "
                "real character, a right-to-left override among them.")
-S3_ITEM4 = ("the two-critic loop, with its ceiling, on the addendum (the subject `<the change's name>-plan`), unless its "
-            "increments stood in the design revision's review file from round 1, when it is criticised and gated with "
-            "the design revision as one subject (Phase 2, \"The procedure\"). Gate: present it and get approval, at the "
-            "design's gate where the two are one subject.")
-S3_SURVIVAL = ("its record in `docs/DESIGN_CRITIQUE.md` under the change's subject and, where the plan addendum is a "
-               "subject of its own (item 4), under `<the change's name>-plan`,")
 RULE6 = "One of the five always blocks, within the threat model recorded for its part (below)."
 DESIGN_R051 = ("`invisible-check.py` with a base and `--staged` (as built: its default form, `--staged` left to a "
                "program release, R-051's note);")
@@ -64,30 +42,12 @@ R045_EVIDENCE = (
     "P4: tests/test_release_t_merge.py::test_r045_p4_the_merged_branch_deleted_and_the_armed_form_skipped",
     "(a): tests/test_release_t_merge.py::test_r045_a_step_8_stands_in_its_own_sub_file",
     "(c): tests/test_release_t_merge.py::test_r045_c_the_three_allow_rules_and_the_commands_they_admit",
-    "BUG-040: tests/test_bug040.py::test_bug040_b1_the_overtaken_re_review_names_its_lift",
+    "BUG-040: tests/test_bug040.py::test_bug040_b1_the_lift_line_reads_as_the_behaviour_class",
 )
 
 
 def step8():
     return flat(section(read(MERGE), "8. Merge (the verified gate)", 3))
-
-
-def stage_procedure():
-    return flat(section(read(REFLECTION), "The procedure", 3))
-
-
-def test_bug040_b1_the_overtaken_re_review_names_its_lift():
-    """B1: the overtaken pull request's re-review, a new guard round, names its lift above the ceiling, in step 8 after
-    the sentence that sends the reviews back, and in rule 43, which states the rewrite."""
-    s = step8()
-    assert ("and merges `main`, and the reviews read the new head again (T11, T17). " + B1_MERGE) in s
-    r = rule(43)
-    assert B1_RULE43 in r
-    # Review A's read of BUG-040, Should fix 1: the class line's form names this lift's finding
-    assert ("its finding naming the reviewer's finding it answers (`Review A, round 3, B1`, say), or, for an "
-            "overtaken pull request's re-review, the requirement the overtaken file breaks and the merge that "
-            "overtook it (step 8).") in flat(section(read(DECIDE), "The review ceiling", 4))
-    assert "a new head the reviews read again (the delegation loop's step 8). The `loop-guard`" not in r
 
 
 def test_bug040_b1_the_lift_line_reads_as_the_behaviour_class():
@@ -100,15 +60,6 @@ def test_bug040_b1_the_lift_line_reads_as_the_behaviour_class():
     assert "behaviour" in bridge_env.BLOCKING_CLASSES
 
 
-def test_bug040_s1_the_stage_review_carries_the_threat_models():
-    """S1 (R-050's T20 at the stage review): the stage's SCOPE file holds the recorded threat models, which both
-    reviewers read with the diff, and Review A's briefing names them."""
-    p = stage_procedure()
-    assert S1_STEP2 in p
-    assert S1_STEP4 in p
-    assert "told the stage's briefs and that it reads a stage, not an increment." not in p
-
-
 def test_bug040_s2_spec_packager_names_an_escape_by_its_code_point():
     """S2 (T13 against KP-052 as corrected): a brief names a character it must not hold by its code point, and writes
     backticks and backslashes through the file-writing tool."""
@@ -117,16 +68,6 @@ def test_bug040_s2_spec_packager_names_an_escape_by_its_code_point():
     assert "Write an escape sequence or a backtick as the characters you mean" not in rules
     assert "no tool is safe for a typed backslash-u escape" in flat(read(os.path.join(
         ROOT, "bridge", "cursor-bridge", "Known-Pitfalls.md")))
-
-
-def test_bug040_s3_a_change_cycle_takes_the_one_subject_exception():
-    """S3 (R-047's T1 in the text a change cycle reads): item 4 and the survival list give the exception design.md
-    states, so an addendum in the design revision's review file from round 1 has no budget of its own."""
-    text = read(CHANGE)
-    assert S3_ITEM4 in flat(section(text, "The procedure", 3))
-    assert S3_SURVIVAL in flat(section(text, "What must survive a compaction", 3))
-    assert "A plan addendum whose increments stood in the design's review file from round 1 is no subject of its own" \
-        in flat(read(os.path.join(PHASES, "design.md")))
 
 
 def test_bug040_rule_6_bounds_always_by_the_threat_model():

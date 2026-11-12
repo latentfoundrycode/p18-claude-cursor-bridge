@@ -311,8 +311,8 @@ def test_r056_every_row_is_built_with_evidence_in_the_grammar():
         entries = [e.strip() for e in evidence.split(";")]
         labels = labels_of(requirement)
         for label in labels:
-            hits = [e for e in entries if e.startswith(label + ":") and named_tests(e)]
-            assert hits, "%s: no `%s: <test>` entry" % (rid, label)
+            hits = [e for e in entries if e.startswith(label + ":") and (named_tests(e) or cc.TEXT_EVIDENCE.search(e))]
+            assert hits, "%s: no `%s: <test>` or `%s: text: <file> :: <heading> (#<pr>)` entry" % (rid, label, label)   # release S: the text form, which completion-check.py reads
         tests = named_tests(evidence)
         assert tests, "%s: at least one test" % rid
         for t in tests:

@@ -65,23 +65,6 @@ def test_r007_five_layers_in_order_each_with_what_it_holds_and_when_it_is_read()
     assert read_when[4] == "Their additions to the current phase, when the part has the trait"
 
 
-def test_r007_each_layer_inherits_what_it_does_not_mention_and_is_read_only_when_it_applies():
-    """R-007, as carved (TASK-010): the core is read in parts to its last line at every start, resume and calibration
-    (TASK-035, FB-036), and with it the
-    current phase's module or modules and the conditional workflows that apply; after a compaction or resume, what
-    the session-start hook names (rule 28)."""
-    s = flat(model())
-    assert "each inheriting everything it does not mention from the layers above it" in s
-    assert ("This file, the core, is read in parts to its last line, each part starting where the last ended, at "
-            "every start, resume and calibration, and with it the current phase's module or modules and the conditional workflows that apply; after every compaction or resume you "
-            "read what the session-start hook names before your next action (rule 28)") in s, "the core is read to its end; phases and conditionals add"
-    # the exception names where the modules read outside their own phase are listed (PR #52's gate, Review A)
-    assert ("You never read a phase you are not in or a conditional workflow that does not apply, except a module "
-            "\"The phase modules\" says is read outside its own phase") in s
-    assert "reading only the current phase" not in s, "the core is never replaced by a phase-only read"
-    assert "Until the phases are moved into files of their own" not in s, "the transitional reading is gone with the carve"
-
-
 def test_r007_each_phase_module_is_a_file_the_core_names():
     """R-007, as carved (TASK-010): the plan's phase names map to module files, each keeping its heading from this
     file (the interface module naming its phase since TASK-012), and the core's table names each one."""

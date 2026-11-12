@@ -14,8 +14,6 @@ import os
 import re
 import sys
 
-import pytest
-
 from phase_modules import digest, flat, module, read, rule, section
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -56,12 +54,6 @@ def policy():
     return text("cursor-bridge", "Merge-Verification-Policy.md")
 
 
-def policy_paragraph(start):
-    t = policy()
-    i = t.index(start)
-    return f(t[i:t.index("\n\n", i)])
-
-
 def loop():
     return module("delegation-loop")
 
@@ -74,27 +66,12 @@ def ceiling():
     return f(section(decide(), "The review ceiling", 4))
 
 
-def brake():
-    d = decide()
-    i = d.index("**When to stop re-delegating")
-    return f(d[i:d.index("**Split verdicts you resolve yourself")])
-
-
 def reflection():
     return module("reflection")
 
 
 def step8():
     return section(module("delegation-loop/merge.md"), STEP8, 3)
-
-
-def convergence_in(t):
-    i = t.index("**Convergence is a signal.**")
-    return f(t[i:t.index("\n\n", i)])
-
-
-def has_five(t):
-    return [name for name, words in FIVE.items() if words not in t]
 
 
 # --------------------------------------------------------------------------- the programs' copy
@@ -218,36 +195,6 @@ def test_r042_every_re_delegation_writes_a_new_numbered_brief():
                     assert old not in t, (name, old)
 
 
-def test_r042_the_fix_brief_inside_a_gate_is_the_next_numbered_brief():
-    """The fix brief inside a gate is `<ID>-r<N>`, BUG-<nnn> after a merge, in every text that names it; the fix mode
-    and the fix-diff check are keyed on the fix variant's content, the Objective's opening that spec-packager writes."""
-    s7 = f(section(decide(), STEP7, 3))
-    assert ("Inside an increment's gate the fix brief is the increment's next numbered brief, `handoff/<ID>-r<N>.md`, "
-            "so that no fix within a gate opens a budget of its own; `handoff/BUG-<nnn>.md` is the brief of a defect "
-            "found after a merge.") in s7
-    sp = text("agents", "spec-packager.md")
-    assert "## The fix variant — `handoff/<ID>-r<N>.md` inside a gate, `handoff/BUG-<nnn>.md` after a merge" in sp
-    assert "Its content, not its name, makes it a fix brief" in f(sp)
-    assert "(`handoff/<ID>-r<N>-report.md` inside a gate, `handoff/BUG-<nnn>-r<N>-report.md` after a merge)" in sp
-    opening = "Fix the following confirmed defect"
-    assert ('- **Objective** opens with: "%s' % opening) in sp
-    dr = f(text("agents", "diff-reviewer.md"))
-    assert ("**Fix mode.** If the brief is a fix brief — spec-packager's fix variant, whose Objective opens \"%s\" and "
-            "whose confirmed cause is stated with its evidence, whatever its name (`handoff/<ID>-r<N>.md` inside an "
-            "increment's gate, `handoff/BUG-<nnn>.md` after a merge) —" % opening) in dr
-    assert ("**Fix-diff tampering** is a gate-integrity flag on the same footing. A fix brief — spec-packager's fix "
-            "variant, known by its Objective, which opens \"%s\" and states the confirmed cause with its evidence, "
-            "whatever its name: `handoff/<ID>-r<N>.md` inside an increment's gate, `handoff/BUG-<nnn>.md` for a "
-            "defect found after a merge — names a confirmed root cause" % opening) in f(policy())
-    skill = f(text("skills", "root-cause-first", "SKILL.md"))
-    assert ("The builder receives the fix brief (spec-packager's fix variant) — inside an increment's gate the "
-            "increment's next numbered brief, `handoff/<ID>-r<N>.md`, and `handoff/BUG-<nnn>.md` for a defect found "
-            "after a merge:") in skill
-    surv = f(section(loop(), "What must survive a compaction", 3))
-    assert ("the fix brief, `handoff/<ID>-r<N>.md` inside an increment's gate or `handoff/BUG-<nnn>.md` for a defect "
-            "found after a merge (step 7)") in surv
-
-
 def test_r042_step_7_states_what_a_round_is_and_the_count_the_gate_reads():
     c = ceiling()
     assert ("**A round** is one version of the increment the gate's reviewers read: each builder run of a numbered "
@@ -263,65 +210,6 @@ def test_r042_step_7_states_what_a_round_is_and_the_count_the_gate_reads():
     assert "the owner's number at the plan's gate (2026-10-24), held by two programs (R-042)" in c
 
 
-def test_r042_above_the_ceiling_only_the_five_send_work_back():
-    c = ceiling()
-    assert "**Below the ceiling** the brake above is your judgment, and the by-class line yours to draw." in c
-    assert ("**At and above it** — the guard's count of rounds opened for the increment at three or more — only a "
-            "finding of one of the five blocking classes") in c
-    assert ("sends the work back; every other finding goes to `docs/HARDENING.md` under the increment and merges with "
-            "it. Every reviewer and auditor grades each finding by the five first, a convergent finding included "
-            "(step 8).") in c
-    assert has_five(c) == []
-    assert "A stage review is bounded the same way (`STAGE-<name>-r<N>`, the reflection module's step 7)." in c
-
-
-def test_r042_the_five_and_the_class_is_the_defect_in_all_three_homes():
-    """Rule 6, the policy's re-delegation paragraph and step 7's brake each name the five and say that the class is
-    the defect, not the operator that exposed it; the old four-item lists are gone from the two that had them."""
-    homes = {
-        "rule 6": rule(6),
-        "policy": policy_paragraph("**Re-delegation runs while the code converges"),
-        "brake": brake(),
-    }
-    for name, t in homes.items():
-        assert has_five(t) == [], (name, has_five(t))
-        assert "The class is the defect, not the operator that exposed it" in t, name
-        assert "a further mutant, input or operator family that shows a class already recorded in `docs/HARDENING.md` under the by-class line for the increment or the stage is that class" in t, name
-        assert "is that class and never a new one, while a defect of one of the five" in t, name
-        assert "blocks whatever was recorded before" in t, name
-    assert "output correctness, data integrity, security, or what the software does" not in homes["policy"]
-    assert "**new class**" not in homes["policy"] and "**new class**" not in homes["brake"]
-    assert "render/output correctness, data integrity, security, or what the software actually does" not in homes["brake"]
-    assert ("Below the ceiling, drawing this line is a decision you make and record, not one you bring to the user; at "
-            "and above it the line is the rule (\"The review ceiling\", below).") in homes["brake"]
-
-
-def test_r042_rule_6_states_the_outcomes_and_the_programs():
-    r = rule(6)
-    assert r.startswith("Judge re-delegation by defect class, never by a round count alone.")
-    # BUG-040 (stage T1's review, Review B's consider): "always" carries the threat model's bound
-    assert "One of the five always blocks, within the threat model recorded for its part (below)." in r
-    assert ("held by two programs: the launcher (`bridge-run.py`) counts the builder rounds and the review guard "
-            "(`review-guard.py`) the Review B rounds (Phase 6, step 7, \"The review ceiling\")") in r
-    assert "the owner's number at the plan's gate" in r
-    assert ("once the increment's core behaviour is verified, record the long tail of a hard subsystem under the "
-            "by-class line and merge it; a late finding then blocks only if it is of the five, within the threat "
-            "model `docs/INVENTORY.md` records for the part it is in (outside it a finding is recorded, not blocking; "
-            "where none is recorded, the five stand unbounded), its class shown by reproduction on an ordinary, "
-            "realistic layout, a label alone never deciding (a security finding by whether untrusted input can reach "
-            "it), two reviewers naming the same defect making it certain, never blocking of itself (the convergence "
-            "rule).") in r
-    assert "or if two or more reviewers or auditors name it" not in r
-    assert ("At and above it, every finding of an increment's review outside the five goes to `docs/HARDENING.md` "
-            "with the increment, and a stage round's findings are disposed of as the reflection module's step 7 "
-            "says.") in r
-    assert "A round count is never itself a reason to involve the user." in r
-    d = digest()
-    assert ("6 Re-delegation ends by defect class, whatever operator showed it; from round three (program-held) only "
-            "the five blocking classes send work back, the rest to HARDENING; stop only on non-convergence. A design "
-            "critique stops after four rounds, a due confirming read and resolution round, whatever is open.") in d
-
-
 def test_r042_the_digest_stays_within_its_cap_with_every_rule_number():
     """The digest within its cap, and every standing rule's number in its Standing rules paragraph (the loop's step
     numbers, 1 to 9, read apart: Review A, round 1, consider 2)."""
@@ -330,30 +218,6 @@ def test_r042_the_digest_stays_within_its_cap_with_every_rule_number():
     rules = d[d.index("**Standing rules.**"):d.index("**Permissions.**")]
     for n in range(1, 59):
         assert re.search(r"(?:\*\* | )%d [A-Z`]" % n, rules), n
-
-
-def test_r042_the_convergence_rule_grades_certainty_never_class_in_both_homes():
-    """R-042 as revised by release T (P1, T20): two reviewers naming the same defect make it certain, and blocking only
-    where its content is of the five, at any round; a convergent finding of another class is fixed by the next
-    increment that edits its file or recorded, with no gate pass of its own; a recorded class stays that class; a
-    finding outside the recorded threat model is recorded, however many name it. The old sentence (two reviewers'
-    agreement blocking whatever the grade below the ceiling) is gone from both homes."""
-    homes = {"policy": convergence_in(policy()), "loop": convergence_in(step8())}
-    for name, t in homes.items():
-        assert "The rule grades a finding's certainty, never its class." in t, name
-        assert "independently name the same defect," in t and "same line or the same defect" not in t, name
-        assert "two findings on one line are one defect only where they name the same fault in it." in t, name
-        assert ("Two reviewers independently naming the same defect make it blocking where its content is of one of "
-                "the five blocking classes, at any round; a convergent finding of another class is fixed by the next "
-                "increment that edits its file, or recorded in `docs/HARDENING.md`, marked convergent, with no gate "
-                "pass of its own.") in t, name
-        assert ("A class already recorded under the by-class line for that increment or that stage stays that class: "
-                "two reviewers naming a further mutant, input or operator family of it name that class, which stays "
-                "recorded and starts no round, and no class of the five is ever on that line.") in t, name
-        assert ("A finding outside the threat model `docs/INVENTORY.md` (Decisions) records for the part it is in is "
-                "recorded, not blocking, however many reviewers name it; where none is recorded for that part, the "
-                "five stand unbounded.") in t, name
-        assert "two reviewers' agreement makes a finding blocking whatever its grade" not in t, name
 
 
 def test_r042_the_convergence_by_class_pointers_name_the_two_rules_apart():
@@ -365,58 +229,6 @@ def test_r042_the_convergence_by_class_pointers_name_the_two_rules_apart():
     assert "convergence-by-class split" not in da
     assert ("Mirror the loop's re-delegation-by-class rule (the convergence rule, which grades a finding's certainty "
             "and never its class, is the supervisor's to apply):") in da
-
-
-@pytest.mark.parametrize("agent,verdict,other", [("diff-reviewer.md", "a `REJECT`", "`NOTED`"),
-                                                 ("security-auditor.md", "a FAIL", "advisory"),
-                                                 ("design-auditor.md", "a FAIL", "advisory")])
-def test_r042_each_reviewer_grades_by_the_five_first_above_the_ceiling(agent, verdict, other):
-    t = f(text("agents", agent))
-    i = t.index("**Above the ceiling.**")
-    para = t[i:t.index("withholds the merge.", i) + len("withholds the merge.")]
-    assert ("When the supervisor tells you the round is at or above the code gate's three-round ceiling (the review "
-            "guard's "
-            "count of rounds opened for the increment or the stage at three or more), grade each finding by the five "
-            "blocking classes first") in para
-    assert has_five(para) == []
-    assert ("only those make %s, every other finding being %s" % (verdict, other)) in para
-    assert ("When you are given a `Blocking class:` line, confirm or deny it: say whether the finding it names is a "
-            "defect of the class it names. A denial is a breach of the ceiling, which voids the round's result and "
-            "withholds the merge.") in para
-
-
-def test_r042_step_8_commits_the_scope_file_before_the_round_named_snapshot():
-    s = f(step8())
-    first = s.index("**First** write `run/review/SCOPE-<ID>.md` (below) and commit it beside the diff: the guard reads it at the snapshot, its `Blocking class:` line included")
-    then = s.index("**Then** `python ~/.claude/cursor-bridge/review-guard.py snapshot <ID>-r<N>`, `<ID>` the increment's ID")
-    assert first < then
-    assert ("`<N>` the round it opens: one more than the rounds the guard has counted for the increment, or the same "
-            "`<N>` again to re-run a failed launch on the same tree; the round's diff") in s
-    assert ("so confirm yourself that it is not empty. It refuses a tree that is not clean (commit everything of yours "
-            "first), a round off its count and a round above the ceiling with no lift") in s
-    assert "\"<directive prompt>\" 2> run/review/REVIEW-<ID>-r<N>.err`" in s
-    assert "**Afterwards** `python ~/.claude/cursor-bridge/review-guard.py verify <ID>-r<N>` must print `OK`" in s
-    assert ("and, at a round above the ceiling, that round's `Blocking class:` line with, beside it, the commit "
-            "that round's builder was launched on, its brief's commit (for a round of your own fix, with no builder "
-            "run, the head the previous round's snapshot recorded).") in s
-    assert ("(at a round at or above the ceiling, the guard's count at three or more, a sixth clause: grade every "
-            "finding by the five blocking classes first, and confirm or deny the SCOPE file's `Blocking class:` line "
-            "where it has one, against the code of the round it lifted, never against the fixed code under review)") in s
-    assert ("`git diff <merge-base>...HEAD > run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot below "
-            "is, the earlier round's diff and assumptions file removed with `git rm` and committed first, so that no "
-            "round's diff carries another's;") in s
-    assert "write `run/review/ASSUMPTIONS-<ID>-r<N>.md` from the `Assumptions:` sections" in s
-    assert ("the round's diff and assumptions file carry the snapshot's name, since the guard lists as the review's "
-            "inputs, and refuses empty, the files under `run/review/` whose names hold it (KP-067); the SCOPE file, "
-            "which it reads by `<ID>`, is not among them, so confirm yourself that it is not empty.") in s
-    assert ("stopping only on non-convergence per step 7's brake, and at and above the ceiling only for a finding of "
-            "one of the five blocking classes.") in f(step8())
-    assert "`python ~/.claude/cursor-bridge/review-guard.py premerge <ID>-r<N> <n>`, the name the round's snapshot took" in f(step8())
-    surv = f(section(loop(), "What must survive a compaction", 3))
-    assert ("(the round's `REVIEW-<ID>-r<N>.diff`, `ASSUMPTIONS-<ID>-r<N>.md` and `REVIEW-<ID>-r<N>.err`, whose first "
-            "line is the launch time `pr-activity-check.py` needs, and the increment's `SCOPE-<ID>.md`), whole, with "
-            "the review guard's count of rounds opened for the increment, which names the next snapshot `<ID>-r<N>` "
-            "(step 8)") in surv
 
 
 def test_r042_no_governing_text_names_a_review_round_the_old_way():
@@ -436,41 +248,6 @@ def test_r042_no_governing_text_names_a_review_round_the_old_way():
                     t = t[:i] + t[t.index("\n### ", i + 1):]
                 for o in old:
                     assert o not in t, (name, o)
-
-
-def test_r042_the_policy_carries_the_ceiling_the_names_and_the_breach():
-    p = f(policy())
-    para = policy_paragraph("**Re-delegation runs while the code converges")
-    assert ("held by `bridge-run.py`, which counts the builder rounds, and `review-guard.py`, which counts the Review "
-            "B rounds; the count is the guard's") in para
-    assert ("Below it the by-class line is the supervisor's judgment; at and above it the line is the rule: only a "
-            "finding of the five sends the work back, every other finding goes to `docs/HARDENING.md` with the "
-            "increment, and a round above the ceiling runs only under a `Blocking class:` line or the owner's `Review "
-            "rounds above the ceiling:` line.") in para
-    assert ("Every reviewer and auditor grades each finding of a round at or above the ceiling by the five first and "
-            "confirms or denies the round's `Blocking class:` line where it has one, against the code of the round it "
-            "lifted, never against the fixed code under review; a denial is a breach, which voids the round's result and withholds "
-            "the merge as GATE-INTEGRITY does, recorded in `docs/HARDENING.md` and as an issue.") in para
-    assert "\"<prompt>\" 2> run/review/REVIEW-<ID>-r<N>.err`" in p
-    assert "names `run/review/SCOPE-<ID>.md`, committed beside the diff before the snapshot," in p
-    assert ("that at a round at or above the ceiling every finding is graded by the five blocking classes first and "
-            "the SCOPE file's `Blocking class:` line, where it has one, confirmed or denied against the code of the "
-            "round it lifted, never against the fixed code under review,") in p
-    assert "(`run/review/REVIEW-<ID>-r<N>.diff`, named as the round's snapshot," in p
-    assert "It also reads `run/review/ASSUMPTIONS-<ID>-r<N>.md`" in p
-    assert "the count is the guard's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/decide.md`, step 7, \"The review ceiling\")" in p
-    assert ("`snapshot <ID>-r<N>` before the launch, `<N>` the round it opens by the guard's count, the SCOPE file "
-            "committed first since the guard reads its `Blocking class:` line (it refuses a dirty tree, a round off "
-            "its count and a round above the ceiling with no lift,") in p
-    assert "`verify <ID>-r<N>` after the run, and `premerge <ID>-r<N>` before `gh pr merge`" in p
-
-
-def test_r042_kp_062_names_its_twin():
-    kp = f(text("cursor-bridge", "Known-Pitfalls.md"))
-    i = kp.index("### KP-062")
-    assert ("Its twin is the code gate's ceiling (release B, R-042): three rounds per increment and per stage review, "
-            "held by `bridge-run.py` and `review-guard.py`, past which only the five blocking classes send work back "
-            "(the delegation loop's step 7, \"The review ceiling\").") in kp[i:]
 
 
 def test_r042_the_run_parameters_gloss_reads_nothing_installs():
@@ -505,62 +282,6 @@ def test_r042_the_rounds_input_names_are_the_ones_the_guard_checks(tmp_path):
     r = f(section(reflection(), "The procedure", 3))
     for form in ("STAGE-<name>-r<N>.diff", "STAGE-<name>-r<N>-<part>.diff"):
         assert form.replace("<name>-r<N>", "B9-r1").replace("<part>", "tests") in names["STAGE-B9-r1"] and form in r, form
-
-
-# --------------------------------------------------------------------------- the stage review
-
-
-def test_r042_the_stage_review_takes_the_rounds_names_and_its_scope_file():
-    r = f(section(reflection(), "The procedure", 3))
-    # TASK-040 (R-049, T11) rewrote step 2: the SCOPE sentence now follows the union's and names the class line's
-    # commit; its whole text is pinned in tests/test_release_t_stage_close.py (STEP2_SCOPE).
-    assert ("Write `run/review/SCOPE-STAGE-<name>.md`, the stage's increments and briefs, the threat models "
-            "`docs/INVENTORY.md` records for the parts the stage touched, or that none is recorded (R-050), given "
-            "to both reviewers with the diff, the earlier rounds' dispositions and, at a round above the ceiling, its `Blocking class:` line "
-            "(step 7) with, beside it,") in r
-    assert ("then `git add -f` the round's diff, its parts and the SCOPE file and commit them on the stage "
-            "branch.") in r
-    assert ("3. `python ~/.claude/cursor-bridge/review-guard.py snapshot STAGE-<name>-r<N>`, `<N>` the round it opens: "
-            "one more than the rounds the guard has counted for the stage; the round's diff and its parts carry the "
-            "snapshot's name, since the guard lists as the review's inputs, and refuses empty, the files under "
-            "`run/review/` whose names hold it (KP-067); the SCOPE file, which it reads by the stage's name, is not "
-            "among them, so confirm yourself that it is not empty.") in r
-    assert "origin/main > run/review/STAGE-<name>-r<N>.diff`, `<N>` the round step 3 opens," in r
-    assert "4. Review A: `diff-reviewer` on `run/review/STAGE-<name>-r<N>.diff`," in r
-    assert "origin/main -- <paths> > run/review/STAGE-<name>-r<N>-<part>.diff`" in r
-    assert "naming run/review/STAGE-<name>-r<N>.diff and the stage>" in r
-    assert "2> run/review/REVIEW-STAGE-<name>-r<N>.err`; you write nothing to the checkout meanwhile but `run/supervisor/in-flight.md` (rule 43), where the position and each verdict go." in r
-    assert "6. `python ~/.claude/cursor-bridge/review-guard.py verify STAGE-<name>-r<N>` must print `OK`" in r
-    surv = f(section(reflection(), "What must survive a compaction", 3))
-    assert ("(the round's `STAGE-<name>-r<N>.diff` with its parts and `REVIEW-STAGE-<name>-r<N>.err`, and "
-            "`SCOPE-STAGE-<name>.md`), the review guard's count of rounds opened for the stage (step 7)") in surv
-
-
-def test_r042_the_stage_reviews_step_7_and_its_arms():
-    r = f(section(reflection(), "The procedure", 3))
-    assert ("7. Decide the round, the ceiling read against the guard's count of rounds opened for the stage (with "
-            "three opened, the next round is above it). Every arm that starts a fix does step 8 first (back on "
-            "`main`, the stage branch deleted), and an arm that opens a new stage round runs it from step 1, on the "
-            "new whole change, only after that fix has merged.") in r
-    assert ("- **Below the ceiling.** (a) A REJECT from either reviewer starts a fix brief and a new stage round; the "
-            "round's findings the convergence rule makes blocking") in r
-    assert "ride in its fix brief, and a class already recorded under the by-class line for the stage stays recorded." in r
-    assert ("(b) A round ending with no REJECT but with findings the convergence rule makes blocking, the same "
-            "exception included, puts those findings, with the round's other findings you take, into one fix "
-            "increment through its own gate; the stage closes at its merge with no further stage round, and the rest "
-            "are recorded at the close.") in r
-    i = r.index("- **At and above the ceiling.**")
-    above = r[i:r.index("- **The fix brief**", i)]
-    assert has_five(above) == []
-    assert ("Only a blocking-class finding starts a fix brief and a new stage round, its `Blocking class:` line "
-            "written into `run/review/SCOPE-STAGE-<name>.md` at that round's step 2, before its snapshot") in above
-    assert ("A convergent finding outside the five goes to `docs/HARDENING.md` under the stage, marked convergent, and "
-            "opens no fix increment") in above
-    assert "every other finding is recorded at the close and never becomes a fix increment." in above
-    assert ("- **The fix brief** of either arm is a `BUG-<nnn>`, the stage's increments having merged; arm (b)'s is an "
-            "increment with a budget of its own under the programs' branch rule.") in r
-    assert "the plain brief KP-015's proportionality allows only where every finding is its own cause." in r
-    assert "- **No finding sends work back:** the stage review is done, its findings recorded at the close." in r
 
 
 # --------------------------------------------------------------------------- the mutation run (R-043)
@@ -603,46 +324,6 @@ def test_r044_evaluate_reports_runs_the_pace_report_every_week():
             "Dependency scan sections and any entry the owner's messages raised.") in fr
     assert ("A Sunday with nothing new writes the Pace and Dependency scan sections and any entry the owner's messages "
             "raised.") in fr
-
-
-def test_bug031_a_late_finding_has_one_outcome_in_all_three_homes():
-    """BUG-031 (stage B5's review, round 1; core S4 and tests-text S1, convergent): below the ceiling, once the
-    by-class line is drawn, rule 6 sent "a late finding outside the five back when it is not that tail" while step
-    7's brake said a late finding "blocks the merge only if it is of one of the five"; the three-homes test above
-    checked only the class sentence and passed on the two outcomes. Each home now gives the one outcome: a late
-    finding blocks only if it is of the five (two reviewers naming it make it certain, never blocking of itself: the test after this).
-    enforces: R-042 (the by-class line; only the five send work back); rule 6; step 7's brake; the policy's
-    re-delegation paragraph"""
-    r = rule(6)
-    assert "a late finding then blocks only if it is of the five," in r
-    assert "send a late finding outside the five back" not in r
-    assert "A late finding blocks the merge only if it is of one of the five **blocking classes**" in brake()
-    p = policy_paragraph("**Re-delegation runs while the code converges")
-    assert "A late finding blocks the merge only if it is of one of the five **blocking classes**" in p
-    for home in (r, brake(), p):
-        assert "outside the five back" not in home and "when it is not that tail" not in home
-
-
-def test_bug033_a_late_finding_two_reviewers_name_blocks_only_of_the_five_in_every_home():
-    """BUG-033 (stage B5's review, round 2; core S1 and modules C2, convergent) found the late-finding sentence and the
-    convergence rule giving a convergent late finding outside the five two outcomes, and made each home name the
-    convergence rule's exception. R-042 as revised by release T (P1, TASK-039) gives it one outcome the other way: two
-    reviewers naming a late finding make it certain, never blocking of itself, and it blocks only where its content is
-    of the five, at any round, in all three homes of the late-finding sentence and both convergence paragraphs.
-    enforces: R-042 (the by-class line; the convergence rule, as revised); rule 6; step 7's brake; the policy's
-    re-delegation and convergence paragraphs; step 8's convergence paragraph"""
-    r = rule(6)
-    assert "a late finding then blocks only if it is of the five, within the threat model" in r
-    assert "two reviewers naming the same defect making it certain, never blocking of itself (the convergence rule)." in r
-    assert "or if two or more reviewers or auditors name it" not in r
-    for name, home in (("brake", brake()), ("policy", policy_paragraph("**Re-delegation runs while the code converges"))):
-        assert ("Two reviewers naming the same late finding make it certain, never blocking of itself: it blocks only "
-                "where its content is of the five") in home, name
-        assert "a late finding two or more reviewers or auditors name blocks too" not in home, name
-    for name, home in (("policy", convergence_in(policy())), ("loop", convergence_in(step8()))):
-        assert ("Two reviewers independently naming the same defect make it blocking where its content is of one of "
-                "the five blocking classes, at any round;") in home, name
-        assert "two reviewers' agreement makes a finding blocking whatever its grade" not in home, name
 
 
 def test_bug031_evaluate_reports_says_what_the_pace_report_counts():

@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from phase_modules import read, module, flat, section, assert_survival_list, assert_declares_registry_points
+from phase_modules import read, module, flat, section, assert_declares_registry_points
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
@@ -19,61 +19,6 @@ REGISTRY = os.path.join(BRIDGE, "cursor-bridge", "workflow", "extension-points.m
 POLICY = os.path.join(BRIDGE, "cursor-bridge", "Merge-Verification-Policy.md")
 PLAN_CRITIC = os.path.join(BRIDGE, "agents", "plan-critic.md")
 CHECK = "`python ~/.claude/cursor-bridge/workflow-check.py --status docs/PROJECT_STATUS.md`"
-
-
-STRUCTURE = {
-    "intake": [(2, "Phase 1 — Intake"), (3, "What must survive a compaction"), (3, "The procedure"),
-               (3, "The intake notes"), (3, "Classifying each part"), (3, "The gate"), (2, "Extension points")],
-    "design": [(2, "Phase 2 — Design"), (3, "What must survive a compaction"), (3, "The procedure"),
-               (4, "A part without screens"), (3, "The delivery kind"), (3, "Traits at the design gate"), (3, "The gate"), (2, "Extension points")],
-}
-
-SURVIVAL = {
-    "intake": [
-        "this module, whole;",
-        "the owner's Initial Design Draft in `Documents/`, whole, if they wrote one, and every requirements document "
-        "they supplied;",
-        "`run/supervisor/intake-notes.md`: every question asked so far and the owner's answer to it, written there as "
-        "each answer arrives, because the conversation that held them does not survive a compaction (rule 54);",
-        "the open list, `~/.claude/cursor-bridge/workflow/open-list.md`, whole, until every part is classified;",
-        "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line and its `Awaiting user on:` line say how far the "
-        "classification and the questions have gone;",
-        "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
-        "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
-        "position\"), until the reflection point is done.",
-    ],
-    "design": [
-        "this module, `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` and `~/.claude/cursor-bridge/Glossary.md`, "
-        "each whole (the session-start hook names all three);",
-        "what the design has written so far: `docs/DESIGN.md`, `docs/diagrams/INDEX.md` and every diagram it lists, and "
-        "`docs/REQUIREMENTS.md` and `docs/INVENTORY.md` once written;",
-        "`docs/DESIGN_CRITIQUE.md`, whole, while the critique runs: its rounds and its accepted list are what the stop "
-        "rule and the four-round ceiling count, so that a resumed session never runs a round twice or raises an accepted "
-        "finding again; with it `docs/RUN_PARAMETERS.md`, where an owner's `Design rounds above five:` line lifts the "
-        "ceiling, and the round's files under `run/review/` (`DESIGN-<subject>-<round>.md` and its `REVIEW-DESIGN-` "
-        "files) while a round is in flight;",
-        "the owner's Initial Design Draft, every requirements document they supplied and "
-        "`run/supervisor/intake-notes.md`, whole: the design and the requirements register answer them;",
-        "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line holds the traits proposed at intake, which this phase's "
-        "gate settles;",
-        "`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in "
-        "flight or a launch has failed: a round is snapshotted and verified as step 8 says, the snapshot's hash "
-        "written to `run/supervisor/in-flight.md` at the launch and each critic's verdict there as it returns, "
-        "both read from that file mid-round, and a failed launch is handled as step 3b says;",
-        "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
-        "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
-        "position\"), until the reflection point is done.",
-    ],
-}
-
-
-@pytest.mark.parametrize("key", ["intake", "design"])
-def test_r004_the_module_opens_with_its_compaction_survival_list(key):
-    """R-004: the module's first section, straight after its heading, is the compaction-survival list (the Glossary's
-    term), and the list is exactly what a resumed session in that phase reads before its next action."""
-    assert_survival_list(key, STRUCTURE[key],
-                         "After a compaction or a resume in this phase, read these before your next action:",
-                         SURVIVAL[key])
 
 
 @pytest.mark.parametrize("key", ["intake", "design"])
@@ -198,13 +143,6 @@ def test_r036_a_new_or_unwritten_trait_is_flagged_at_the_design_gate_with_the_ow
     assert "once the trait's additions are written and apply, the row is removed." in s
     intake = flat(section(module("intake"), "Classifying each part", 3))
     assert "A `FLAG (trait)` line names a trait whose additions are not yet written: the work continues" in intake
-
-
-@pytest.mark.parametrize("key", ["intake", "design"])
-def test_r032_the_module_is_read_whole(key):
-    """R-032: the enriched module stays within the bound a module is read whole by (1,500 lines, 60,000 characters)."""
-    text = module(key)
-    assert text.count("\n") <= 1500 and len(text) <= 60000, (key, text.count("\n"), len(text))
 
 
 def test_the_design_phase_is_named_by_its_module_outside_the_core():

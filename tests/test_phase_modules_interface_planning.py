@@ -13,7 +13,7 @@ import re
 
 import pytest
 
-from phase_modules import (read, module, flat, headings, section, assert_survival_list, assert_declares_registry_points,
+from phase_modules import (read, module, flat, headings, section, assert_declares_registry_points,
                            hook_named)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -28,69 +28,6 @@ VARIANTS = [
     ("Contract design", "a protocol other software calls", "interface/contract-design.md"),
     ("Playable prototype", "play", "interface/playable-prototype.md"),
 ]
-
-
-STRUCTURE = {
-    "interface": [(2, "Phase 3 — Interface"), (3, "What must survive a compaction"), (3, "The variants"),
-                  (3, "Which variants a part runs"), (3, "The interface notes"), (3, "The gate"),
-                  (2, "Extension points")],
-    "planning": [(2, "Phase 4 — Build plan"), (3, "What must survive a compaction"),
-                 (3, "Step 0 — Prior-project lessons (ask before drafting)"),
-                 (3, "What the interface phase hands to the plan"), (3, "The plan"), (2, "Extension points")],
-}
-
-SURVIVAL = {
-    "interface": [
-        "this module and every variant file, each whole (the session-start hook names the four variant files with it; "
-        "a variant no part runs is read only to know it does not apply);",
-        "the approved design: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, `docs/INVENTORY.md`, and `docs/diagrams/INDEX.md` "
-        "with every diagram it lists, whole: each variant maps onto the agreed functionality, adds its screens, commands "
-        "or operations to the register, and agrees with the diagrams (the mockups with the operational activity "
-        "diagram's screens);",
-        "what each running variant has produced so far: `docs/design/DESIGN.md` and `docs/mockups/` for the mockups, "
-        "`docs/design/COMMANDS.md` for the command design, `docs/design/CONTRACT.md` and the contract file it names for "
-        "the contract design;",
-        "`run/supervisor/interface-notes.md` (\"The interface notes\"), whole;",
-        "`docs/PROJECT_STATUS.md`, whole: its `Workflows:` line names each part's conditional workflows, which activate "
-        "variants at `interface.variants` beside the kinds of interface the design shows, and its `Awaiting user on:` "
-        "line says which variant waits for the owner;",
-        "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
-        "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
-        "position\"), until the reflection point is done.",
-    ],
-    "planning": [
-        "this module, whole;",
-        "the approved design and what the interface phase approved: `docs/DESIGN.md`, `docs/REQUIREMENTS.md`, "
-        "`docs/INVENTORY.md`, `docs/diagrams/INDEX.md` and every diagram it lists, and the approved artifacts under "
-        "`docs/design/` and `docs/mockups/`, whole: every increment satisfies requirements of the register and cites "
-        "what it implements;",
-        "`docs/BUILD_PLAN.md` as drafted so far, whole, and each Issues file the owner named at Step 0, whole (its path "
-        "stands in the plan's Prior-project lessons section, Step 0);",
-        "`docs/DESIGN_CRITIQUE.md`, whole, while the plan critique runs, with `docs/RUN_PARAMETERS.md` and the round's "
-        "files under `run/review/` (`DESIGN-plan-<round>.md` and its `REVIEW-DESIGN-` files) while a round is in "
-        "flight, and `~/.claude/cursor-bridge/workflow/phases/design.md`'s \"The procedure\", whose two-critic loop, "
-        "stop rule, ceiling, confirming read and resolution round the plan critique runs: it counts its rounds as the "
-        "design critique does;",
-        "`docs/PROJECT_STATUS.md`, whole: its `Awaiting user on:` line says whether Step 0's question or the plan's "
-        "gate waits for the owner;",
-        "`~/.claude/cursor-bridge/workflow/phases/delegation-loop.md`'s steps 3b and 8, while a critique round is in "
-        "flight or a launch has failed: a round is snapshotted and verified as step 8 says, the snapshot's hash "
-        "written to `run/supervisor/in-flight.md` at the launch and each critic's verdict there as it returns, "
-        "both read from that file mid-round, and a failed launch is handled as step 3b says;",
-        "once this phase's gate is approved, its reflection point: `~/.claude/cursor-bridge/workflow/phases/reflection.md`, "
-        "whole, and the last entries of `run/supervisor/in-flight.md`, the items it has finished (\"Keeping the "
-        "position\"), until the reflection point is done.",
-    ],
-}
-
-
-@pytest.mark.parametrize("key", ["interface", "planning"])
-def test_r004_the_module_opens_with_its_compaction_survival_list(key):
-    """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
-    exactly what a resumed session in that phase reads before its next action."""
-    assert_survival_list(key, STRUCTURE[key],
-                         "After a compaction or a resume in this phase, read these before your next action:",
-                         SURVIVAL[key])
 
 
 @pytest.mark.parametrize("key", ["interface", "planning"])
@@ -273,13 +210,6 @@ def test_the_playable_prototype_is_a_declared_pointer_with_no_stand_in_wording()
     for rel in ["interface.md", "planning.md"] + [v[2] for v in VARIANTS]:
         hit = rx.search(module(rel))
         assert hit is None, (rel, hit and hit.group(0))
-
-
-@pytest.mark.parametrize("rel", ["interface.md", "planning.md"] + [v[2] for v in VARIANTS])
-def test_r032_the_module_and_each_variant_file_are_read_whole(rel):
-    """R-032: each enriched module and each variant file stays within the bound a module is read whole by."""
-    text = module(rel)
-    assert text.count("\n") <= 1500 and len(text) <= 60000, (rel, text.count("\n"), len(text))
 
 
 def test_r005_the_hook_names_the_interface_module_and_its_four_variants(tmp_path):

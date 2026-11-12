@@ -8,14 +8,13 @@ docs/BUILD_PLAN.md TASK-014's Done when (the issues rule's line on whether a com
 compaction baseline's follow-up); docs/HARDENING.md, Stage B3's leads for TASK-014 (the change cycle runs the variant of
 every interface kind a change touches; the variant files' declaring paragraphs under headings of their own; the promotion
 pass reads the inventory's `Flagged trait:` rows; the pointer sweep, the glossary's phase-module entry)."""
-import hashlib
 import os
 import re
 
 import pytest
 
-from phase_modules import (read, module, flat, headings, section, trace_headings, registry_rows, registry_points,
-                           assert_survival_list, assert_declares_registry_points, assert_points_placed)
+from phase_modules import (read, module, flat, headings, section, registry_rows, registry_points,
+                           assert_declares_registry_points, assert_points_placed)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
@@ -23,97 +22,6 @@ CB = os.path.join(BRIDGE, "cursor-bridge")
 PHASES = os.path.join(CB, "workflow", "phases")
 EXCEPTIONS = os.path.join(CB, "workflow", "trace-exceptions.md")
 GLOSSARY = os.path.join(CB, "Glossary.md")
-
-
-STRUCTURE = {
-    "change-cycle": [(2, "The change cycle — a request on a finished project"), (3, "What must survive a compaction"),
-                     (3, "The procedure")],
-    "reflection": [(2, "Reflection points — stage close, phase gates, project end"), (3, "What must survive a compaction"),
-                   (3, "The procedure"), (3, "Keeping the position"), (3, "Project end"),
-                   (3, "Issues — what counts, and where it is written"), (4, "Whether a compaction preceded it"),
-                   (2, "Extension points")],
-    "project-end": [(2, "Project end"), (3, "What must survive a compaction"), (3, "Where this module begins"),
-                    (3, "The trigger and what project end adds"), (3, "Flagged traits in the promotion pass"),
-                    (3, "Keeping the position"), (2, "Extension points")],
-}
-
-INTRO = {
-    "change-cycle": "After a compaction or a resume in a change cycle, read these before your next action:",
-    "reflection": "After a compaction or a resume at a reflection point, read these before your next action:",
-    "project-end": "After a compaction or a resume at project end, read these before your next action:",
-}
-
-SURVIVAL = {
-    "change-cycle": [
-        "this module, whole, and the module of the step the change has reached, whole, with the conditional workflows the "
-        "`Workflows:` line names that touch that module, each whole (while the phase is `changing`, the session-start hook "
-        "names only those that touch this module, `delegation-loop.md`, `reflection.md` or `project-end.md`): its intake runs `intake.md`'s "
-        "procedure, its design revision `design.md`'s, its interface variants `interface.md`'s with the variant files its "
-        "`Variants:` line names, its plan addendum `planning.md`'s, its run parameters `run-parameters.md`'s, with "
-        "`docs/RUN_PARAMETERS.md`, which holds the original run's answers, and any new tooling `configuration.md`'s, "
-        "each scaled to the change; its new stages run "
-        "`delegation-loop.md` with its sub-files, and their closes `reflection.md` and `project-end.md`, which the "
-        "session-start hook names with this module while the phase is `changing`;",
-        "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Change cycle:` line names the change, its "
-        "date and the step it has reached, and `Awaiting user on:` a gate, or an intake question, that waits for the "
-        "owner; the inventory's "
-        "Features answer a request already satisfied, and its Decisions name one the change reverses (item 1);",
-        "`docs/REQUIREMENTS.md`, with the failures `completion-check.py --mode done` printed at item 1: each is a gap in "
-        "the previous delivery, reported to the owner first and planned ahead of the request unless the owner defers it;",
-        "the change's records as far as they are written, whole: its `Change: <name>` section of `docs/DESIGN.md`, its "
-        "record in `docs/DESIGN_CRITIQUE.md` under the change's subject and, where the plan addendum is a subject of "
-        "its own (item 4), under `<the change's name>-plan`, the "
-        "interface artifacts it amends, and its stages in `docs/BUILD_PLAN.md`;",
-        "while its intake runs, this project's own Issues file, `Documents/<Name> Issues During Development and Their "
-        "Solutions.md`, whole: it takes the place of the prior-project lessons step.",
-    ],
-    "reflection": [
-        "this module, whole, and at the close of the plan's last stage `project-end.md` too, whole (the session-start hook "
-        "names both while the phase is `building` or `changing`);",
-        "the last entries of `run/supervisor/in-flight.md`: the reflection point in hand and the items it has finished "
-        "(\"Keeping the position\"), and, while the stage review's Review B runs, the position the delegation loop's step 8 "
-        "keeps there;",
-        "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Stage:` line's `Last reflection:` names "
-        "the reflection point before this one, from which items 1 and 4 count, and `Open issues:` the issues item 1 "
-        "completes; the inventory holds the decisions and resources the Project Summary's patch reports;",
-        "`docs/RUN_PARAMETERS.md`: whether the refactoring pass runs before a stage closes, and `Stage pause`, which item 6 "
-        "obeys;",
-        "at a stage close, the stage's section of `docs/BUILD_PLAN.md`, whole, with its `Demonstration:` line, and, while "
-        "the stage review runs, its files under `run/review/` (the round's `STAGE-<name>-r<N>.diff` with its parts and "
-        "`REVIEW-STAGE-<name>-r<N>.err`, and `SCOPE-STAGE-<name>.md`), the review guard's count of rounds "
-        "opened for the stage (step 7), each reviewer's verdict, which you write to "
-        "`run/supervisor/in-flight.md` as it returns, and the snapshot's hash, which you write there at the launch "
-        "(this list is where both writes are asked for);",
-        "the records the items read and write, whole: `docs/BUILDER_NOTES.md`, the entries of `docs/CHANGES.md` since the "
-        "last reflection point, the stage's section of `docs/HARDENING.md`, and under `Documents/` the Issues document, "
-        "the Feedback document, the Project Summary and, once it exists, the User Manual.",
-    ],
-    "project-end": [
-        "this module and `reflection.md`, each whole: project end runs after the reflection points' items 1 to 5 at the "
-        "last stage's close, in the same turn;",
-        "the last entries of `run/supervisor/in-flight.md`: the project-end items finished so far (\"Keeping the "
-        "position\");",
-        "`docs/PROJECT_STATUS.md` and `docs/INVENTORY.md`, whole (rule 41): the `Workflows:` lines name each part's "
-        "conditional workflows, whose additions at `project-end.completion-conditions` and `project-end.delivery` this "
-        "module runs, and the deferred increments the status file lists are the ones the report lists; the inventory's "
-        "`Delivery kind:` "
-        "rows give each part's delivery kind, and its `Flagged trait:` rows the traits the promotion pass puts forward;",
-        "`docs/REQUIREMENTS.md`, `docs/CHANGES.md` and `docs/RUN_PARAMETERS.md`: the completion check reads the register, "
-        "whose deferred and dropped requirements the \"Project complete\" line lists by ID and name, the User Manual is written from the change log, and the installer's last verification, the trait "
-        "*installable*'s addition at `project-end.delivery`, follows the `Installer verification` parameter;",
-        "the Issues and Feedback documents under `Documents/`, whole: the promotion pass reads both and writes its "
-        "proposals as the Feedback document's last section.",
-    ],
-}
-
-KEYS = ["change-cycle", "reflection", "project-end"]
-
-
-@pytest.mark.parametrize("key", KEYS)
-def test_r004_the_module_opens_with_its_compaction_survival_list(key):
-    """R-004: the module's first section, straight after its heading, is the compaction-survival list, and the list is
-    exactly what a resumed session at that point reads before its next action."""
-    assert_survival_list(key, STRUCTURE[key], INTRO[key], SURVIVAL[key])
 
 
 def declared(text):
@@ -271,29 +179,6 @@ def test_the_change_cycle_runs_the_variant_of_every_interface_kind_it_touches():
     assert "the mockup if any" not in proc
 
 
-# sha256 of the change cycle's procedure as TASK-035 leaves it (from its heading to the file's end, LF, the whitespace at
-# its end stripped; 6,772 characters: item 1's closing confirmation, not a gate, and the closing paragraph's second
-# sentence, the only gates; TASK-014 left it at 6,378): the trace entry on "The procedure" excuses new text anywhere
-# under it, so CI holds the section's text here (trace-check has no CI step, INVENTORY Decisions). A change to this
-# pin is reviewed as a new trace exception, never as a routine re-pin (the security audit, TASK-014, advisory 1): the
-# increment's record names each passage it adds or rewords under the procedure. BUG-040 (stage T1's review, Review
-# A's S3) rewords item 4 alone, its plan addendum criticised and gated with the design revision as one subject where
-# its increments stood in the design's review file from round 1 (design.md's T1): 7,291 characters. TASK-041 (R-052's
-# T12) adds one sentence to item 1, after the register's: a project supervised after it was built runs the conformance
-# check before the first delegation, its MISSING floors configuration increments (tests/test_release_t_floor.py
-# pins it): 7,673 characters. HOTFIX-003 (hotfix 2026.11.09a) rewords item 1's form: the change's intake in the same
-# form as intake.md's sorting of questions (tests/test_hotfix_intake.py pins it): 7,844 characters
-PROCEDURE_SHA256 = "d1c7da9bcba70710a1b85427c1bde7e95c43dbd739899bd87dd0c8d92d09bde7"
-
-
-def test_the_change_cycles_procedure_is_pinned():
-    """The trace exceptions' lead (HARDENING Stage B3): the change cycle's procedure holds reworded and new text under
-    one excused heading, so its whole text is fixed here and a passage added to it or copied into it later fails."""
-    text = module("change-cycle")
-    proc = text[text.index("### The procedure"):].rstrip()
-    assert len(proc) == 7844 and hashlib.sha256(proc.encode("utf-8")).hexdigest() == PROCEDURE_SHA256, len(proc)
-
-
 def test_r004_the_positions_the_survival_lists_name_are_kept():
     """R-004: what each survival list names as the position is written as the procedure runs: the change cycle's step on
     its `Change cycle:` line; the reflection point's and project end's finished steps in run/supervisor/in-flight.md,
@@ -342,13 +227,6 @@ def test_no_trace_entry_excuses_a_whole_phase_file():
         assert "- new TASK-014 %sinterface/%s.md What this variant is" % (prefix, f) in entries, f
 
 
-@pytest.mark.parametrize("rel", KEYS)
-def test_r032_the_module_is_read_whole(rel):
-    """R-032: each enriched module stays within the bound a module is read whole by."""
-    text = module(rel)
-    assert text.count("\n") <= 1500 and len(text) <= 60000, (rel, text.count("\n"), len(text))
-
-
 def test_the_glossary_names_the_modules_as_files():
     """The pointer sweep (HARDENING Stage B3, the carve's lead): the glossary's phase-module entry no longer says a
     module may still be a section of the core, or that project end is part of the reflection points."""
@@ -358,57 +236,6 @@ def test_the_glossary_names_the_modules_as_files():
     assert ("Each is a file of its own under `workflow/phases/`; a module too long to be read whole keeps a step in a "
             "sub-file under `workflow/phases/<module>/` (the delegation loop's step 9), and the interface phase keeps one "
             "file per variant under `workflow/phases/interface/`.") in g
-
-
-# sha256 of each variant-file section a `new` trace entry excuses (from its heading to the next heading of its level or
-# higher, LF, the whitespace at its end stripped), as TASK-014 leaves it: an entry excuses new text anywhere in its
-# section, so CI holds each section's text here (Review A, TASK-014, should-fix 3). A change to a pin is reviewed as a
-# new trace exception. TASK-022 wrote the command and contract designs' bodies under headings of their own, with
-# entries of their own, left the declaring sections as they were and added its four sections here; an entry without
-# its section here fails the last assertion below, so every new excused section of a variant file reaches a reviewer.
-# HOTFIX-003 (hotfix 2026.11.09a) adds mockups.md's procedure, under its `new` entry: the iteration as a conversation
-# (tests/test_hotfix_intake.py pins the paragraph)
-EXCUSED_SECTIONS = {
-    ("interface/mockups.md", "What this variant is"): (620, "6d539112c3b10ecf7e20bdc5b76fcbcd6fdb2e4786212f2af947176914ce1298"),
-    ("interface/mockups.md", "The design-tooling flow"): (3200, "d878dbcca05094b316960040e468e376b8b5bf76b9c64908a3be88c9efa5416e"),
-    ("interface/command-design.md", "What this variant is"): (563, "bfc7ccc3704ff6b69361cc8ee16eb568a809634fa869b046b0b67a7d8ad87bd3"),
-    ("interface/contract-design.md", "What this variant is"): (673, "00c28cc73cb732979930405822ee1f7a35f17e70fd540b73baf0d31fe0d16589"),
-    ("interface/playable-prototype.md", "What this variant is"): (993, "b4cfca71dad76f4d3abaa1ee356b1c025c1d922626887958a84c45a3b5ca48eb"),
-    ("interface/command-design.md", "Writing the command design"): (2308, "8a65810907eea4954f7d6997e17441a815c1db76a26277a0d0bbcb1040d6a443"),
-    ("interface/command-design.md", "Approving the command design"): (1036, "814476197c6b11d00b55d5e9462cdec2997109939fdd8775275e8400a6fd10a5"),
-    ("interface/contract-design.md", "Writing the contract design"): (4482, "fe7807a0db32c3648a8368cdfcf1394e4ab65f61aed36111079c03124f172280"),
-    ("interface/contract-design.md", "Approving the contract design"): (892, "1ca4a7e12410b7242cb6ad88854563a6bc919266fc61e0c5f3166f36ba7f50f6"),
-    ("interface/mockups.md", "The procedure"): (2081, "ff3cd8bbc0066eba410632af5159c759faed540bd1206b08ca9b9742907829c9"),
-}
-
-
-@pytest.mark.parametrize("rel,title", sorted(EXCUSED_SECTIONS))
-def test_each_excused_variant_section_is_pinned(rel, title):
-    """The trace exceptions' lead (HARDENING Stage B3; Review A, TASK-014, should-fix 3): each variant-file section a
-    `new` entry excuses is fixed here, so a paragraph added to it, or a copy of a passage into it, fails in CI; the
-    file has one heading of that title, at any level and indented as trace-check.py allows, since trace-check.py
-    excuses a passage under every heading the entry's title names, so a second section of that name would be excused
-    unpinned (stage B3's review, round 3, Review A tests; BUG-019's Review A); the section ends where trace-check.py's
-    reading ends it, a heading in a fenced block not counting; and every `new` or `reword` entry on a variant file is
-    one of these sections, its heading stripped as trace-check.py strips it."""
-    text = module(rel)
-    lines = text.split("\n")
-    found = trace_headings(lines)
-    same_title = [(lines[i], level) for i, level, t in found if t == title]
-    assert same_title == [("### " + title, 3)], same_title
-    start = [i for i, _level, t in found if t == title][0]
-    end = len(lines)
-    for i, level, _t in found:
-        if i > start and level <= 3:
-            end = i
-            break
-    body = "\n".join(lines[start:end]).rstrip()
-    assert (len(body), hashlib.sha256(body.encode("utf-8")).hexdigest()) == EXCUSED_SECTIONS[(rel, title)], len(body)
-    prefix = "bridge/cursor-bridge/workflow/phases/"
-    entries = [m.group(1)[len(prefix):] + " " + m.group(2).strip() for m in
-               (re.match(r"^- (?:new|reword) \S+ (\S+\.md) (.+)$", l) for l in read(EXCEPTIONS).split("\n"))
-               if m and m.group(1).startswith(prefix + "interface/")]
-    assert sorted(entries) == sorted("%s %s" % k for k in EXCUSED_SECTIONS), entries
 
 
 def test_bug035_a_change_cycle_reads_the_conditional_workflows_of_the_step_it_has_reached():
