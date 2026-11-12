@@ -7,11 +7,15 @@ Each entry has three parts. **What changed** is for the maintainer and the curio
 **Running projects must** is the part `/calibrate-bridge` acts on: every item names the
 **phase** it belongs to, so a project that has already passed that phase does not reopen
 it, a project in it applies the item now, and a project before it applies the item when it
-arrives. An item marked *(all phases)* applies immediately. **If rolled back** (since
+arrives. An item marked *(all phases)* applies immediately. A release that adds a safety
+mechanism says there how the loop holds it by hand until the install, and one that adds a
+header key or a record kind how a running project's records gain it. **If rolled back** (since
 2026.10.05a) says what a project that calibrated to the release must restore when the
 release is taken back with `bridge-install.py --rollback`; an entry without it restores
-nothing. A release with new mechanisms also names its **field acceptance**: what the trial
-project must show before the other projects resume.
+nothing, and a fix release's entry names the way back its install removes, the installer
+keeping one earlier release. A release with new mechanisms also names its **field acceptance**: what the trial
+project must show before the other projects resume. The last stage's review of a release's
+text runs before its stamp, so that what is stamped is what both reviewers read.
 
 ---
 

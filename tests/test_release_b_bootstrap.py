@@ -289,26 +289,23 @@ def _own_pull_request(env):
 
 def _position_faults(status, n):
     """Why the status file does not state the position at the merge of pull request n, as a list (empty when it does):
-    its Last accepted line names that pull request first, its Increment line begins `none`, and its In flight line is
-    `none` alone."""
+    its In flight line is `none` alone, and since release S it carries no `Increment:` and no `Last accepted:` line
+    (no program read them, git names the merged increment, and a line naming its own pull request's number in advance
+    cost a re-review whenever another merge came first; `n` is kept for the message)."""
     faults = []
-    last = [line for line in status.splitlines() if line.startswith("Last accepted: ")]
-    named = re.findall(r"PR #([0-9]+)", last[0]) if len(last) == 1 else []
-    if not named or int(named[0]) != n:
-        faults.append(f"Last accepted names PR #{named[0] if named else '?'} first, not PR #{n}")
     flight = [line.rstrip() for line in status.splitlines() if line.startswith("In flight: ")]
     if flight != ["In flight: none"]:
-        faults.append(f"In flight is not none at the merge: {flight[:1]}")
-    increment = [line for line in status.splitlines() if line.startswith("Increment: ")]
-    if len(increment) != 1 or not re.match(r"Increment: none( |$)", increment[0]):
-        faults.append(f"Increment is not none at the merge: {increment[:1]}")
+        faults.append(f"In flight is not none at the merge of PR #{n}: {flight[:1]}")
+    for gone in ("Increment: ", "Last accepted: "):
+        if any(line.startswith(gone) for line in status.splitlines()):
+            faults.append(f"the status file still carries a `{gone.strip()}` line, which release S took out")
     return faults
 
 
 def test_r001_status_names_its_own_merge():
     """R-001 (docs/BUILD_PLAN.md, stage B1's demonstration: a fresh session resumes from PROJECT_STATUS.md alone): the
     status file a pull request carries states the position at that pull request's merge, since a squash puts it on
-    main unchanged: its Last accepted line names this pull request first, and nothing is in flight. Stage B1's review
+    main unchanged: nothing is in flight, and the two lines release S retired are gone. Stage B1's review
     rounds 1 and 3 rejected the file on main describing its own pull request before the gate (ISS-009). CI only: a
     local run has no pull request to name."""
     n = _own_pull_request(os.environ)
@@ -333,14 +330,13 @@ def test_r001_status_position_parse(tmp_path):
     assert _own_pull_request({"GITHUB_REF": "refs/heads/bug-016", "GITHUB_EVENT_PATH": str(event)}) is None
     event.write_text(json.dumps({"head_commit": {"message": "a direct push"}}), encoding="utf-8")
     assert _own_pull_request({"GITHUB_REF": "refs/heads/main", "GITHUB_EVENT_PATH": str(event)}) is None
-    good = "Increment: none — at the merge\nLast accepted: BUG-016 (PR #45, at its merge); before it BUG-015 (PR #44)\nIn flight: none\n"
+    good = "Next: the step after the merge\nIn flight: none\n"
     assert _position_faults(good, 45) == []
-    assert len(_position_faults(good, 44)) == 1
-    assert len(_position_faults(good.replace("PR #45", "PR #450"), 45)) == 1
     assert len(_position_faults(good.replace("In flight: none", "In flight: none (BUG-016 on its branch, before its gate)"), 45)) == 1
     for old, new in (("In flight: none", "In flight: none (BUG-017 under Review B since 14:00)"),
                      ("In flight: none", "In flight: nonesuch builder running"),
-                     ("Increment: none — at the merge", "Increment: BUG-016 on branch bug-016, before its merge")):
+                     ("Next: ", "Increment: none — at the merge\nNext: "),
+                     ("Next: ", "Last accepted: BUG-016 (PR #45, at its merge)\nNext: ")):
         assert len(_position_faults(good.replace(old, new), 45)) == 1, new
 
 

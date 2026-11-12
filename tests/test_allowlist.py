@@ -162,12 +162,13 @@ def test_r052_the_documented_strip_launches_run_on_the_heavy_launch_rules():
     """TASK-041 (R-052): the loop's suite and driver launches carry `--strip` between `--limit` and `--kind`. One such
     launch was observed from the supervisor's session on 2026-11-02 running with no prompt and no refusal (docs/DESIGN.md,
     the host table), so the two heavy-launch rules are kept as they are, and the documented commands are pinned here as
-    matching them: the suite, the new tests against the checkpoint, the mutation run, P7's suite and, since BUG-043, the
-    increment's own test files."""
+    matching them: the suite, the new tests against the checkpoint, the mutation run and, since BUG-043, the
+    increment's own test files (P7's whole-suite run before the first push left the text with release S: CI's run on the
+    pull request is that run)."""
     for rule in HEAVY_RULES:
         assert rule in ALLOW
     strip = [cmd for _src, cmd in collect_commands() if " --strip " in cmd]
-    assert len(strip) == 5, strip
+    assert len(strip) == 4, strip
     for cmd in strip:
         assert cmd.startswith("python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip "), cmd
         assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd

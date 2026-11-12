@@ -57,7 +57,7 @@ One term per thing. The supervisor, the subagents, and every brief use these ter
 | **Workflow name** | A product type's workflow named as the work rather than the product (`Host Extension Development`, `Game Development`), fixed in the open list and used in the status file's `Workflows:` line. |
 | **Sub-workflow name** | A sub-type's workflow named for the kind of product its sub-type makes (`Claude Code Extension`, `Roblox Game`), as the open list fixes it, and written after the workflow name and an arrow in the `Workflows:` line. |
 | **Workflow check** | `workflow-check.py`: the one-shot program that checks every conditional workflow against the open list and the extension-point registry, and a status file's `Workflows:` lines against the open list; `inventory-check.py` and `conformance-check.py` use its grammar and placement checks to judge a project's `Workflows:` line. In the workflow check itself an unwritten product type or sub-type fails (the pause at intake), and an unwritten trait is flagged and the work continues. |
-| **Compaction-survival list** | The short list a phase module opens with, naming what a session in that phase must re-read after a compaction or a resume before its next action. The phase modules written in release B each open with one. |
+| **Compaction-survival list** | The short list a phase module opens with, naming what a session in that phase must re-read after a compaction or a resume before its next action: since release S the status file, the in-flight log's last entries and the file of the step in hand, the rest on demand. |
 
 ## Roles
 

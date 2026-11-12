@@ -113,22 +113,12 @@ def test_r054_p21_kp071_to_kp074():
 
 
 def test_r054_kp038_narrowed_and_d004_first_deviation_closed():
-    """KP-038 says what the code does: the stores under the profile root are not found by default, a store reached
-    through APPDATA or LOCALAPPDATA is, until a probed release redirects them. D-004 draws the edge so, and
-    DEVIATIONS.md no longer lists it (the design corrected to the code, conventions section 8's second case)."""
-    kp = read(KP)
-    assert_entry(kp, 38, "cursor-agent imports Claude Code's hooks from `~/.claude/settings.json` and, under Git Bash, "
-                         "denies every tool call with them",
-                 "the owner's stores under the profile root (`.ssh`, `.aws`, `.docker` and the like) are no longer found "
-                 "by default; a store a tool reaches through `APPDATA` or `LOCALAPPDATA` still is")
-    body = entry(kp, 38)
-    for clause in ("until a probed release redirects them", "a program item for the maintainer"):
-        assert clause in body, clause
-    assert "`.docker` and other stores are no longer found by default" not in body, "the over-wide sentence is gone"
+    """D-004 draws what the code does and DEVIATIONS.md no longer lists it (the design corrected to the code,
+    conventions section 8's second case). KP-038's own sentences are no longer held: release S redirects APPDATA and
+    LOCALAPPDATA, the entry says so, and tests/test_account_keys.py holds the programs to D-004's note."""
     d004 = read(D004)
     assert "(DEVIATIONS; KP-038 narrowed)" not in d004, "the edge no longer marks a deviation"
-    assert ("found by default: ~/AppData through APPDATA and LOCALAPPDATA, which stay the owner's until a probed "
-            "release redirects them (KP-038)") in d004
+    assert "which stay the owner's until a probed release redirects them" not in d004, "release S redirected them: the edge says what a run still finds"
     dev = read(DEV)
     assert "| D-004 | p_bridge_env |" not in dev, "D-004's first deviation is removed"
     # re-taken at TASK-041, which closed the suite's edge (p_bridge_run -> p_test_suite), and at TASK-043, which closed the last

@@ -2,19 +2,19 @@
 
 ### Where this sub-file belongs
 
-This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 7, which runs for every increment after step 6 and before step 8, the merge: the decision on the increment, and the mutation run each pass through the step launches before step 8's snapshot. It stands in a file of its own to keep the module within its size bound.
+This file is a sub-file of the delegation-loop module (`delegation-loop.md`, "The procedure"), read whole with it. It holds the loop's step 7, which runs for every increment after step 6 and before step 8, the merge: the decision on the increment, and the mutation run each pass through the step launches before step 8's snapshot. It stands in a file of its own so that after a compaction the step in hand is read alone (rule 28).
 
 ### 7. Decide (accept the increment)
 
 - **Accept** — local review, scan, and tests pass. Run `scope-check.py` once more just
   before this commit (its base is the commit that committed the brief, so a builder's own
   commits are inside the diff; release A4). Commit to the increment branch with a
-  message referencing the task ID, every count and every claim of a check in it quoting the output line that shows it (a reviewer compares each count with its line). Then the records go in a records-only commit after the accept commit: update `docs/PROJECT_STATUS.md` (rewrite the fields; never append history) and, when the increment changes behaviour or needs a new resource, `docs/INVENTORY.md`, with the increment's `CHANGES.md` entry in the same records commit, moving `Reflected through:` to that entry (rule 41); when the increment completes a requirement, set its row in `docs/REQUIREMENTS.md` to `built` and name the tests — which carry the requirement's ID — in its Evidence cell, in that records commit. Move to the next
+  message referencing the task ID, every count and every claim of a check in it quoting the output line that shows it (a reviewer compares each count with its line). Then the records go in a records-only commit after the accept commit: update `docs/PROJECT_STATUS.md` (rewrite the fields; never append history) and, when the increment changes behaviour or needs a new resource, `docs/INVENTORY.md`, with the increment's `CHANGES.md` entry in the same records commit, moving `Reflected through:` to that entry (rule 41); when the increment completes a requirement, set its row in `docs/REQUIREMENTS.md` to `built` and name the tests — which carry the requirement's ID — in its Evidence cell, in that records commit; a requirement met by instruction text alone, its sentence naming no program, names the text instead, `text: <file>.md :: <heading> (#<the pull request>)`, only in a project whose `project.json` declares the text's folder under `instruction_texts`; `completion-check.py` reads the entry against that declaration, the heading and the pull request's squash, which must have changed the file (release S). Move to the next
   increment. Increments accumulate on the branch; merging to `main` is a separate,
   verified step (below), not something you do per increment.
 - **Iterate** — something is wrong and you understand why. Write the next numbered brief,
   `handoff/<ID>-r<N>.md`, with specific corrections (never a revision in place, step 3), commit
-  it, and re-issue the same constant delegate command, naming it. Never inline the corrections into the CLI prompt (step 3).
+  it, and re-issue the same constant delegate command, naming it. Never inline the corrections into the CLI prompt (step 3). Every numbered brief after the first carries one line `Round cause: <cause>`, which the launcher records and `pace-report.py` counts: `security` or `defect` by the class on the reviewer's finding line (`defect` for every class but security and `records`), `no external path` where that line reads `no path stated`, `records` where only a record was at fault, and, yours to judge, `fix-induced` (the previous fix caused it), `builder incomplete` (reported done with the brief unmet) and `brief error`.
 - **Re-delegate on a review REJECT** — if a reviewer rejects the work (see step 8), that
   is a code defect, which is the loop's problem, not the user's. Feed the reasons into the
   next numbered brief and re-delegate — again via the file, never the prompt. This does
@@ -67,10 +67,10 @@ make and record. Judge it like this:
   whatever was recorded before. Below the ceiling, drawing this line is a decision you make and
   record, not one you bring to the user; at and above it the line is the rule ("The review
   ceiling", below).
-- **Stop** on genuine *non-convergence*: the **same** defect rejected twice unfixed, or a
-  fix that **regresses** something already passing. That is a broken brief or design — say so
-  plainly in your report. Raw "several REJECTs" is *not* a stop if each round found a
-  different, legitimate, now-fixed issue. The one kind of deadlock that goes to the user is
+- **Stop** on genuine *non-convergence*: the **same** defect rejected twice unfixed, or a second
+  fix running that **regresses** something already passing. That is a broken brief or design — say so
+  plainly in your report, and settle it by a resolution round (rule 11), never by a further guessed brief. Raw "several REJECTs" is *not* a stop if each round found a
+  different, legitimate, now-fixed issue. **A fix that regresses** (a round whose cause is `fix-induced`) is met in two steps: after the first, the next fix brief gets one `diff-reviewer` read before its launch, against the finding and the tests that hold the subsystem it touches, which the brief names and the builder runs (minutes, not a round); after the second, the resolution round. A class line never lifts a round for a regression the previous fix caused: that case goes to the resolution round instead. The one kind of deadlock that goes to the user is
   an **intent** deadlock — reviewers at odds over what the software should *do* — and it goes
   as an intent question, never a correctness one.
 
@@ -102,7 +102,7 @@ step 4's read of `.git/config` and the hooks folders, then `git reset --hard HEA
 
 The code gate stops at three rounds per increment, the owner's number at the plan's gate (2026-10-24), held by two programs (R-042). **A round** is one version of the increment the gate's reviewers read: each builder run of a numbered brief (`handoff/<ID>.md`, then `handoff/<ID>-r<N>.md`, step 3), and each Review B read that `review-guard.py snapshot <ID>-r<N>` opens (step 8), spent when its reply arrived. A fix you make and Review A re-reads before step 8's snapshot is no round, and a failed launch's re-run re-snapshots the same tree under the same name. **The count the gate reads** is the guard's count of rounds opened for the increment, which your report names; the launcher's count of builder rounds holds the briefs to it. The two move independently — a Review A rejection spends a builder round with no snapshot, a fix of yours after a Review B REJECT a guard round with no builder run — so where a next count matters, take the larger of the guard's and the launcher's.
 
-**Below the ceiling** the brake above is your judgment, and the by-class line yours to draw. **At and above it** — the guard's count of rounds opened for the increment at three or more — only a finding of one of the five blocking classes (behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, a failing test) sends the work back; every other finding goes to `docs/HARDENING.md` under the increment and merges with it. Every reviewer and auditor grades each finding by the five first, a convergent finding included (step 8).
+**Below the ceiling** the brake above is your judgment, and the by-class line yours to draw. **At and above it** — the guard's count of rounds opened for the increment at three or more — only a finding of one of the five blocking classes (behaviour against the brief or the register, security, data integrity, a defeated safety mechanism the increment relies on, a failing test) sends the work back; every other finding goes to `docs/HARDENING.md` under the increment and merges with it. Every reviewer and auditor grades each finding by the five first, a convergent finding included (step 8), and states its path: the outside input that reaches it, as the project's threat model names outside input, or the steps that reproduce it in ordinary use. A finding of the five with no path stated is recorded like the others; where you doubt a stated path, reproduce it, and the reproduction decides (rule 26).
 
 **A round above the ceiling is lifted** one of two ways:
 
@@ -111,11 +111,11 @@ The code gate stops at three rounds per increment, the owner's number at the pla
 
 **The refusals are stops, not failures.** The launcher's `bridge-run: refused - review ceiling: ` and the guard's `review-guard: refused - review ceiling: `, and their other refusals of the ceiling's rules (the launcher's `brief rule: ` and `revised in place: `, the `branch rule: ` either prints, a brief revised after a completed run, a new round under a name whose round already has its reply or off the count, a brief or a snapshot under another ID on a counted branch), are the ceiling's programs holding: neither a failed launch nor a model's failure (step 3b), never retried as one and never passed to `roster-check.py`. Read the refusal; then write the next numbered brief or the round's right name, write the class line where a blocking-class finding stands, or record the finding in `docs/HARDENING.md`.
 
-A stage review is bounded the same way (`STAGE-<name>-r<N>`, the reflection module's step 7).
+A stage review is held by the same programs (`STAGE-<name>-r<N>`) and stops earlier by its own rule: two whole passes at the most (the reflection module's step 7).
 
 #### The mutation run
 
-The increment's mutants are in its mutants file, `run/supervisor/<id>-mutants.json`, which you wrote at step 4 with the criterion tests, never the builder. The mutation run is launched here, on every pass through this step: once Review A and the auditors have accepted the increment's behaviour, and before step 8's snapshot; never at every round's step 4 (the owner's decision of 2026-10-20: the mutation run comes when the increment is otherwise accepted, not every round). The new tests' run against the checkpoint (`--checkpoint`) stays at step 4, before any reviewer. The Accept bullet's commit may come before the run; the move to the next increment waits for its result. Launch the run in the background through the launcher's driver kind, under the heavy launch's `timeout` (`delegation-loop.md`, step 3), stripped and with its scratch folder named:
+The increment's mutants are in its mutants file, `run/supervisor/<id>-mutants.json`, which you wrote at step 4 with the criterion tests, never the builder. An increment that changes instruction text alone has no mutants and no mutation run (step 4). The mutation run is launched here, on every pass through this step: once Review A and the auditors have accepted the increment's behaviour, and before step 8's snapshot; never at every round's step 4 (the owner's decision of 2026-10-20: the mutation run comes when the increment is otherwise accepted, not every round). The new tests' run against the checkpoint (`--checkpoint`) stays at step 4, before any reviewer. The Accept bullet's commit may come before the run; the move to the next increment waits for its result. Launch the run in the background through the launcher's driver kind, under the heavy launch's `timeout` (`delegation-loop.md`, step 3), stripped and with its scratch folder named:
 
 ```bash
 python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind driver -- python ~/.claude/cursor-bridge/mutation-run.py run/supervisor/<id>-mutants.json --scratch ~/.cursor-bridge/scratch/<the project root's folder name> > run/agent/<id>-mutation.out 2>&1

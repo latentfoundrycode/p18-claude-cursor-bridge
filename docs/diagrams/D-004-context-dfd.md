@@ -155,7 +155,7 @@ p_builder & p_review_b --x|"no .claude in the home: hooks not imported"| ext_cla
 p_builder & p_review_b -.->|"deliberate only"| ext_credential_store
 p_test_suite -.->|"deliberate only"| ext_credential_store
 p_builder & p_review_b -.->|"deliberate only, not found by default: the profile root's stores (~/.gitconfig, ~/.ssh, ~/.aws)"| ext_owner_profile
-p_builder & p_review_b -->|"found by default: ~/AppData through APPDATA and LOCALAPPDATA, which stay the owner's until a probed release redirects them (KP-038)"| ext_owner_profile
+p_builder & p_review_b -->|"found by default: cursor-agent's login folder under APPDATA, by one link, and the tools' caches by their own variables; APPDATA and LOCALAPPDATA otherwise name the agent home since release S (KP-038)"| ext_owner_profile
 p_builder & p_review_b -.->|"UNTRUSTED: write, reported after as BOUNDARY"| ext_beside_workspace
 p_review_b -.->|"deliberate only: same user"| ds_review_hashes
 

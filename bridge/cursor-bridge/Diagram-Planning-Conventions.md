@@ -99,6 +99,8 @@ roles:
 - `Enforced by`: one or more of `check:components`, `check:schema <file>`, `tests: <path>, <path>`, `review: <reviewer> — <what it checks>`, separated by `;`.
 - `Why`: for a selected Level 4 or 5 diagram, the load-bearing category word (`concurrency`, `security`, `integrity`, `performance`, `protocol`, `prior-failure`), a colon, and one sentence; for an omitted row, the reason; otherwise `-`.
 
+**The notation record** (release S) — a section `## Notation` in the index, after the table, a plain list and never a table (the check reads the file's first table only). The table says why each diagram exists; this section says why the diagrams are drawn as they are, one line per free choice of notation: `- a message queue is drawn as a data-store container — its messages persist and several components read them (D-004)`. Whoever draws a diagram reads it first, follows a recorded choice, and records a new one, or the reason for departing, in the same change, so that later diagrams and a fresh context draw alike.
+
 **The known deviations** — `docs/diagrams/DEVIATIONS.md` (release A3, plan 8.7), one table the code check reads, for a project whose diagrams were drawn as built after the code (§8) or whose code drifted before a check caught it, its header first, as the index's:
 
 ```markdown

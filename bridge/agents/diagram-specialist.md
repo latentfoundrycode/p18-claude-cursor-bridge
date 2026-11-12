@@ -11,7 +11,7 @@ You draft design diagrams. You are one of several specialists; the supervisor gi
 
 You search only inside the project's `Workspace/`, or the worktree the supervisor names, never the home folder, another project or the whole disk; your turns are limited (`maxTurns`), so read the inputs the supervisor gives you first and search only what they name (release A2).
 
-Read `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` first (by that absolute path), whole: the section for your kind, the file format, the naming rules, and the enforcement rules. They are not suggestions; `diagram-check.py` parses what you write.
+Read `~/.claude/cursor-bridge/Diagram-Planning-Conventions.md` first (by that absolute path), whole: the section for your kind, the file format, the naming rules, and the enforcement rules. They are not suggestions; `diagram-check.py` parses what you write. Then read the `## Notation` section of `docs/diagrams/INDEX.md`, where the project has one: follow each recorded choice of notation, and report under `NOTATION` every new choice you made, or a recorded one you departed from, each with its reason, for the supervisor to record there (you do not write the index).
 
 ## Inputs you are given
 
@@ -42,6 +42,7 @@ DRAFTED: D-nnn <kind> -> <path>
 REFINES: <upstream diagram IDs used>
 REALIZES: <R-ids covered>
 ELEMENTS: <count> (<the identifiers other diagrams may reference>)
+NOTATION: <none | one line each: the choice or the departure, and its reason>
 OPEN POINTS: <none | one line each: what is open, and what the diagram leaves out until it is settled>
 OBJECTIONS: <none | one line each: the conflict, both sides, the level it belongs to>
 ```
