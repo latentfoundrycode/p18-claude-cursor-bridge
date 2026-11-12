@@ -5,10 +5,8 @@ enforces: docs/HARDENING.md, Stage B3, "Least confident (stage close, 2026-10-24
 Item 1: the phase-module tests read a heading as trace-check.py reads one (tests/phase_modules.py's trace_headings,
 which headings(), section() and section_span() use), so an indented heading of an excused title, which trace-check.py
 excuses text under, is seen by every test that reads a module's headings or sections.
-Item 2: every section an entry of trace-exceptions.md excuses in a phase module (the interface variant files apart,
-which test_phase_modules_close.py pins) has one heading of its title and is pinned by its length and sha256, the set of
-pins derived from the entries, so an edit of an excused passage fails until its pin is re-taken with the edit's own
-`reword` entry, and a new entry fails until its section is pinned here.
+Item 2 (every excused section pinned by its length and sha256): retired by release S, which holds no size or hash of
+instruction text in a test; an edit of an excused passage is a reviewer's read.
 
 Supervisor-written; no builder run."""
 import importlib.util

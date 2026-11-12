@@ -4,10 +4,11 @@ and the accept step.
 enforces: docs/REQUIREMENTS.md R-050, R-051, R-042 (its revision sentence); docs/BUILD_PLAN.md TASK-039, Done when;
 docs/DESIGN.md, Change: release T (the table of what changes, rows R-050 and R-051).
 
-One test per item label of the two rows (R-050: P1, P2, P3, T20, T18; R-051: T21, P11, P12, T10, T15, P13, T24, P6,
-T13), each pinning its sentence in every home the design's table names. R-042's revision is pinned where its old
-sentence was, by the rewritten convergence tests of tests/test_loop_text_pace.py. KP-052: the one non-ASCII character
-these pins need, the em dash, is built with chr(), never typed."""
+One test per item label that keeps one (R-050: T18; R-051: T21, P11, T15, P13, T24, P6, T13), each pinning its
+sentence in every home the design's table names. Release S retired the tests of R-050's P1, P2, P3 and T20 and of
+R-051's P12 and T10, and the convergence tests of tests/test_loop_text_pace.py that held R-042's revision (prose
+literals; the register names the text). KP-052: the one non-ASCII character these pins need, the em dash, is built
+with chr(), never typed."""
 import os
 
 from phase_modules import flat, read

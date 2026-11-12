@@ -1,8 +1,8 @@
 """BUG-040 (stage T1's review, round 1): the findings of Review A's parts and Review B's consider, each its own cause.
 
-enforces: docs/REQUIREMENTS.md R-042 (the ceiling's lifts), R-045 (T11, T17: the overtaken status file), R-047 (T1:
-one subject for a design and its addendum), R-049 (D2: the stage review's SCOPE file and its parts), R-050 (T20: the
-threat model given to the reviewers with the diff), R-051 (T13: escapes as text, KP-052 as corrected by R-054).
+enforces: docs/REQUIREMENTS.md R-042 (the ceiling's lifts), R-045 (T11, T17: the overtaken status file), R-050 (rule
+6's bound by the threat model), R-051 (T13: escapes as text, KP-052 as corrected by R-054). Release S retired the
+tests of the overtaken re-review's wording, S1 and S3 (prose literals); the lift line, which a program parses, stays.
 
 Review A's bridge part, Blocking 1: an overtaken pull request's re-review is a new snapshot, a guard round, and at a
 round above the ceiling the text named no lift that fits, so the loop met a refusal it could not lawfully pass. The

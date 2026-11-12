@@ -1,8 +1,8 @@
 """TASK-010: the core and its phase modules (R-003, R-032).
 
 enforces: docs/REQUIREMENTS.md R-003 (the core holds the roles and division of labour, the founding rules, the loop's
-shape, escalation and reporting, project state and the standing rules; each phase's procedure is a module) and R-032
-(each module is read whole: within 1,500 lines and 60,000 characters); docs/BUILD_PLAN.md TASK-010's Done when (the
+shape, escalation and reporting, project state and the standing rules; each phase's procedure is a module);
+docs/BUILD_PLAN.md TASK-010's Done when (the
 core's section set, no phase procedure left in it, the modules exist, workflow/** installs from the regenerated
 manifest)."""
 import json
@@ -124,8 +124,9 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
-    """The traceability check (R-029) on the repository: every passage of the baseline traced, none dropped. It
-    needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+    """The traceability check (R-029) on the repository ends OK with none dropped. A passage under a section an
+    exception excuses counts as excused, not dropped, so its loss shows here only in the excused count, which
+    release S no longer pins: a reviewer reads that. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
     have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
