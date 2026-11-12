@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-12 12:43",
+  "generated": "2026-11-12 13:04",
   "files": {
     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -15,13 +15,13 @@
     "commands/calibrate-bridge.md": "74fb51a1e6022ee891218864e0297b1930cda9dd4fc5866544ea7e0f3bb87097",
     "commands/evaluate-reports.md": "7e08366b499b688c6d6fe492119103e9a3fba5055a69dfacead8007a1b6f1ca1",
     "commands/supervisor.md": "3a8afeb7d7da69bfc4cfa95849a61d342d2bc9fe4defcb66c37e49bc3ab1a593",
-    "cursor-bridge/CHANGELOG.md": "13c7d84d37a13c155447eff399fc1cd57c7fdf3b8ef41a96d5fc9f20eb88d595",
+    "cursor-bridge/CHANGELOG.md": "7335f19de5886a067de3f0432736eced4c10050404fc18ca50d5ea7cd03837b2",
     "cursor-bridge/Cursor-File-Formats.md": "7857012c09f7d24984cc5b74885d8d320638845cc303c17369f5302d9bb4e73d",
     "cursor-bridge/Cursor-Project-Configuration.md": "e901421ce9a49abc76f0d254738143eb96d3b46caadaa7ea5227dead252bb734",
     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
     "cursor-bridge/Diagram-Planning-Conventions.md": "52ae7a341030be82c22630662dc148f5f2740bc860e2354a10327228ad45fbb9",
     "cursor-bridge/Glossary.md": "e9fb987436d8655195bc50ac3d916d14518a5f082105c8da4c2d78fe45ed69a6",
-    "cursor-bridge/Known-Pitfalls.md": "d521ace3fb911156e678494301657bda2e587a102e6a48f99a35a03b2e727aff",
+    "cursor-bridge/Known-Pitfalls.md": "471a0618ef30f1bad887b1d77d21a03f785333a7ac325779bfc00f13cb7f8969",
     "cursor-bridge/Merge-Verification-Policy.md": "066bd8050d8397a0ce6a3da41e245eba2135a7c8ab3563e761b40d460fd065ec",
     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",

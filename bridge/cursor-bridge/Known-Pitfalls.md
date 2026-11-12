@@ -666,5 +666,5 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 
 ### KP-083 — A builder told to run a long command runs it in the background and waits past its limit
 - **Surfaced:** the bridge (ISS-030): a builder ran the whole test tree in the background and waited on it to the launcher's limit, its edits complete; marked healthy at the merge, that run then lengthened the learned limit of every builder run after it.
-- **Correction:** no brief has a builder run the whole test tree (`spec-packager`); a run that ended at its limit never raises the learned limit, and the launcher refuses its `--healthy` mark (release S).
+- **Correction:** no brief has a builder run the whole test tree (`spec-packager`); a builder or review run that ended at its limit never raises the learned limit, and the launcher refuses its `--healthy` mark.
 - **Applies:** every brief with a verification command.
