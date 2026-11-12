@@ -54,7 +54,7 @@ POINTS = {
                                       "one re-delegates (step 7), a builder's objection goes to \"Objections — bottom-up "
                                       "escalation\", and a consequence the owner bears goes to the owner (rule 56).",
     "delegation-loop.test-checks": "tests and checks run with the tests of every change of the part the loop checks "
-                                   "(step 4: the change's tests, the suite, the new tests against the checkpoint), such "
+                                   "(step 4: the change's tests, the new ones against the checkpoint), such "
                                    "as the observability tests of a part with screens or the benchmark floor (step 6); a "
                                    "failing one is a correctness-class block, re-delegated like any defect (step 7).",
     "delegation-loop.brief-constraints": "constraints every brief for the part carries beside spec-packager's template, "
