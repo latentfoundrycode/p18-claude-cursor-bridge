@@ -1,4 +1,4 @@
-"""TASK-010: the core and its phase modules (R-003, R-032).
+"""TASK-010: the core and its phase modules (R-003).
 
 enforces: docs/REQUIREMENTS.md R-003 (the core holds the roles and division of labour, the founding rules, the loop's
 shape, escalation and reporting, project state and the standing rules; each phase's procedure is a module);
@@ -125,8 +125,8 @@ def test_r003_a_module_read_outside_its_own_phase_is_named_with_when():
 
 def test_r003_the_carve_traces_with_exactly_its_excuses():
     """The traceability check (R-029) on the repository ends OK with none dropped. A passage under a section an
-    exception excuses counts as excused, not dropped, so its loss shows here only in the excused count, which
-    release S no longer pins: a reviewer reads that. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
+    exception excuses counts as excused, not dropped, so its loss shows only in the excused count and a NOTE line,
+    neither of which release S pins any longer: a reviewer reads them. It needs the baseline commit, which CI's depth-1 checkout lacks (INVENTORY Decisions): skipped there, run in
     the supervisor's checkout."""
     repo = os.path.abspath(os.path.join(HERE, os.pardir))
     have = subprocess.run(["git", "cat-file", "-e", "0a186da^{commit}"], cwd=repo, capture_output=True)
