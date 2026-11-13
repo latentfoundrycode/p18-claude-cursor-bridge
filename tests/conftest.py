@@ -53,11 +53,19 @@ os.environ["BRIDGE_REVIEW_HASHES"] = tempfile.mkdtemp(prefix="bridge-review-hash
 # folder leads into it, and a cleanup that follows links would empty it), so for the whole session APPDATA is an empty
 # temporary folder, as HOME is below. The packages the owner installed for their user stay importable in the programs
 # the tests start: Python finds them through PYTHONUSERBASE, set here to where it found them before.
+# TASK-055 (R-076): the value this run was launched with is kept first, under a name of the tests' own, for the test that
+# reads the launch environment (tests/test_release_t_strip.py: under `bridge-run.py --strip` it is the agent home's
+# skeleton). It is set, never kept from a parent: a pytest a test starts records its own launch value. The programs the
+# tests start inherit the name with the rest of the environment; it is the tests' own, and no program reads it.
+LAUNCH_APPDATA = "BRIDGE_TESTS_LAUNCH_APPDATA"
 if os.environ.get("APPDATA"):
     import site
 
     os.environ.setdefault("PYTHONUSERBASE", site.getuserbase())
+    os.environ[LAUNCH_APPDATA] = os.environ["APPDATA"]
     os.environ["APPDATA"] = tempfile.mkdtemp(prefix="bridge-tests-appdata-")
+else:
+    os.environ.pop(LAUNCH_APPDATA, None)
 
 
 def load_program(name):
