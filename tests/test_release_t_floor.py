@@ -272,7 +272,8 @@ def test_r052_the_weekly_scan_is_every_project_s():
 
 
 def test_r052_the_configurator_writes_the_scan_from_the_frozen_block():
-    """The block every project receives, held whole; the item's own sentences are no longer held (release S)."""
+    """The block every project receives, held whole; the item's own sentences are no longer held (release S). R-075: the block's
+    checkout pin, v7.0.1, is in FROZEN."""
     assert frozen_block() == FROZEN
 
 
@@ -296,7 +297,8 @@ def test_r052_the_frozen_block_is_the_workflow_whole():
 
 
 def test_r052_the_block_s_pins_are_the_floor_s():
-    """The one pin stated twice: the floor's checkout and OSV-Scanner version and SHA-256 equal the block's."""
+    """The one pin stated twice: the floor's checkout and OSV-Scanner version and SHA-256 equal the block's (R-075: this repository's
+    floor job pins the block's checkout)."""
     osv, checkout = floor_osv_step()
     block = frozen_block()
     assert checkout["uses"] == CHECKOUT and ("uses: " + CHECKOUT) in block

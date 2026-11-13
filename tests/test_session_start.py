@@ -103,6 +103,7 @@ def realistic_status(phase, awaiting="nothing"):
     return text
 
 
+# R-069 (release S, S4): the status file whole, the ONE phase file of the step in hand and the on-demand line, in every phase.
 @pytest.mark.parametrize("phase", TEMPLATE_PHASES)
 def test_both_parts_fit_under_the_cap_for_every_phase_on_a_realistic_status_file(tmp_path, home, phase):
     root = tmp_path / "proj"
@@ -133,6 +134,7 @@ def test_a_project_calibrated_to_the_installed_bridge_is_not_told_otherwise(tmp_
     assert rc == 0 and "(bridge %s)" % installed in out and "not calibrated" not in out, out
 
 
+# R-069 (release S, S4): a conventions file of the phase named on an `on demand:` line.
 def test_pointers_name_the_phase_sections_and_conventions(tmp_path, home):
     root = tmp_path / "proj"
     (root / "Workspace" / "docs").mkdir(parents=True)

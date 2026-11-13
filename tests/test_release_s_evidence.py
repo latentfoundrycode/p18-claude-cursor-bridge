@@ -8,7 +8,9 @@ unmerged work). For a row whose sentence names a program a text entry never coun
 as `origin`.
 
 Review A, round 1 (both reviewers): the first form asked only for a file, a heading and any merged number, so a product row with
-no test passed done mode on `text: README.md :: Install (#1)`; `test_a_product_row_cannot_be_proved_by_a_text` is that case."""
+no test passed done mode on `text: README.md :: Install (#1)`; `test_a_product_row_cannot_be_proved_by_a_text` is that case.
+
+Register: R-066 (its text form of Evidence and the document that is never a test) is held by every test of this file."""
 import json
 import os
 import subprocess

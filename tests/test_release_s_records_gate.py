@@ -4,7 +4,9 @@ A pull request whose every changed file is a record, none of them one a program 
 read: the guard writes the record the permission guard reads without a snapshot, a Review B run or a verified mark. Everything else keeps
 the whole round. The changed files are GitHub's list of the pull request joined with the local diff from its base, so a moved local ref
 cannot shrink what is classified. Scratch repositories; `gh` is replaced in-process by `pr_state`, as the head-wait tests replace
-`pr_head`."""
+`pr_head`.
+
+Register: R-067 (the short gate, its three answers, what a record is and every path that keeps the full gate) is held by this file."""
 import json
 import os
 import subprocess
