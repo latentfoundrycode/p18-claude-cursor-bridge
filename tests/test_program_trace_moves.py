@@ -294,6 +294,27 @@ def test_r077_a_passage_outside_ascii_has_an_escaped_entry_that_excuses_it(repo)
     assert_ok(rc, out)
 
 
+def test_r077_one_entry_excuses_one_passage_even_where_two_are_alike(repo):
+    """One passage per entry (the builder's assumptions 2 and 3, round 1): a passage standing twice in a file, both dropped,
+    needs two entries; one entry leaves one failure, and two identical entry lines, both added, excuse both."""
+    git(repo, "checkout", "-q", "main")
+    put(repo, BETA, doc("Beta", PB, P4, P4))
+    commit(repo, "a passage written twice")
+    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(repo, "checkout", "-q", "-B", "work", "main")
+    put(repo, BETA, doc("Beta", PB))
+    add_entries(repo, P4)
+    commit(repo)
+    rc, out = run(repo)
+    assert_fails(rc, out)
+    assert len([l for l in fail_lines(out) if words(P4) in l]) == 1, out
+    add_entries(repo, P4)
+    commit(repo, "the second entry")
+    rc, out = run(repo)
+    assert_ok(rc, out)
+    assert count(out, "excused") == 2, out
+
+
 def test_r077_a_deleted_file_fails_for_each_of_its_passages(repo):
     (repo / BETA).unlink()
     commit(repo)
@@ -312,6 +333,19 @@ def test_r077_a_renamed_file_passes(repo):
     rc, out = run(repo)
     assert_ok(rc, out)
     assert count(out, "excused") == 0, out
+
+
+def test_r077_a_renamed_file_that_drops_a_passage_fails(repo):
+    """A rename read as a deletion and an addition, whatever git's rename detection: the old path's passages are compared, so a
+    passage dropped in the same commit as the rename fails."""
+    renamed = "bridge/cursor-bridge/workflow/phases/alpha-renamed.md"
+    git(repo, "mv", ALPHA, renamed)
+    put(repo, renamed, doc("Alpha", P1, P3))
+    commit(repo)
+    git(repo, "config", "diff.renames", "true")
+    rc, out = run(repo)
+    assert_fails(rc, out)
+    assert any(ALPHA in l and words(P2) in l for l in fail_lines(out)), out
 
 
 def test_r077_a_base_two_merges_back_reads_an_earlier_drop_with_the_entry_that_merge_added(repo):
@@ -365,6 +399,48 @@ def test_r077_a_base_beginning_with_a_dash_is_refused(repo):
     rc, out = run(repo, "--base=--output=x")
     assert rc == 2 and "RESULT: OK" not in out, out
     assert not (repo / "x").exists()
+
+
+def test_r077_a_dashed_base_is_a_usage_error_before_any_git_call(tmp_path):
+    """Review A, round 1, Blocking 1: the refusal comes first, so even a folder that is no repository answers with the usage
+    error, never with what git would have said about the folder."""
+    folder = tmp_path / "not-a-repository"
+    folder.mkdir()
+    rc, out = run(folder, "--base=--output=x")
+    assert rc == 2 and "ERROR: usage:" in out and "not a git work tree" not in out, out
+    assert not (folder / "x").exists()
+
+
+def test_r077_only_a_file_read_at_the_base_is_counted_as_compared(repo):
+    """Review A, round 1, Blocking 2: `file(s) compared` counts the changed files whose passages at the base were read, so an
+    added file counts for nothing and a rename counts its old path once."""
+    put(repo, "bridge/cursor-bridge/workflow/phases/gamma.md", doc("Gamma", "A passage of a file the branch adds."))
+    commit(repo)
+    rc, out = run(repo)
+    assert_ok(rc, out)
+    assert count(out, "file(s) compared") == 0 and count(out, "passage(s) compared") == 0, out
+    git(repo, "mv", BETA, "bridge/commands/beta-renamed.md")
+    commit(repo, "a rename")
+    rc, out = run(repo)
+    assert_ok(rc, out)
+    assert count(out, "file(s) compared") == 1 and count(out, "passage(s) compared") == 1, out
+
+
+def test_r077_the_help_names_the_move_mode_and_its_base():
+    """Review A, round 1, Should fix 1: the two options are shown, as the command reference lists them, never hidden."""
+    p = subprocess.run([sys.executable, str(TRACE), "-h"], capture_output=True, text=True, env=env(), encoding="utf-8", errors="replace")
+    usage = p.stdout.split("\n\n", 1)[0]
+    assert p.returncode == 0 and "--moves" in usage and "--base" in usage, p.stdout
+    assert "SUPPRESS" not in (REPO / "docs" / "cli-reference.json").read_text(encoding="utf-8")
+
+
+def test_r077_an_instruction_file_not_readable_at_head_is_named(repo):
+    """Review A, round 1, Should fix 2: a file under bridge/ that is not UTF-8 at HEAD stops the check, naming the file."""
+    bad = "bridge/cursor-bridge/workflow/phases/latin.md"
+    (repo / bad).write_bytes(b"# Latin\n\nA caf\xe9 passage.\n")
+    commit(repo)
+    rc, out = run(repo)
+    assert rc == 2 and "RESULT: OK" not in out and bad in out, out
 
 
 # ---------------------------------------------------------------- this repository's own history
