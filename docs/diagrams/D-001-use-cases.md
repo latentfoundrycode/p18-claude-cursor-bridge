@@ -2,7 +2,7 @@
 
 Level 1. Refines nothing. Drawn at release T (docs/DESIGN.md, "Change: release T", "Architecture — the retrofit's diagrams") as the retrofit of release B: the inputs are the requirements register (docs/REQUIREMENTS.md, R-001 to R-056) and the core's division of labour (bridge/commands/supervisor.md, "The roles": the owner, the supervisor, the Cursor builder, the supervisor's specialists, Review B, the maintainer, GitHub), not the code. The system is the bridge's own workflow as a supervised project; the phases are subgraphs inside the system boundary `sys_bridge`, and the actors stand outside it.
 
-Revised 2026-11-04 for release B2 (docs/DESIGN.md, "Change: release B2", "Architecture — the diagrams the change touches"): the IDs R-057 to R-064 are added to the labels of the use cases that read or write the records (the hooks and the core's order, resuming, keeping project state, the design, the plan, the run parameters, the brief, the inspection's checks, Review B's guard, the calibration with its migration, the project end, the install, the report cycle, and the change cycle that migrates this repository's own records); no actor, use case, edge or identifier is added or removed; revised again 2026-11-13 for the program release (docs/DESIGN.md, "Change: the program release (2026-11-13)"), whose IDs R-066 to R-102 are added in the same way to the labels of the use cases that realize them, with no actor, use case, edge or identifier added or removed.
+Revised 2026-11-04 for release B2 (docs/DESIGN.md, "Change: release B2", "Architecture — the diagrams the change touches"): the IDs R-057 to R-064 are added to the labels of the use cases that read or write the records (the hooks and the core's order, resuming, keeping project state, the design, the plan, the run parameters, the brief, the inspection's checks, Review B's guard, the calibration with its migration, the project end, the install, the report cycle, and the change cycle that migrates this repository's own records); no actor, use case, edge or identifier is added or removed; revised again 2026-11-13 for the program release (docs/DESIGN.md, "Change: the program release (2026-11-13)"), whose IDs R-066 to R-104 are added in the same way to the labels of the use cases that realize them, with R-065, the intake hotfix's row, which had been left off its use case, and with no actor, use case, edge or identifier added or removed.
 
 Each use case names the requirement IDs it serves; an edge joins an actor to a use case it takes part in. Enforced by `plan-critic`'s review (every use case traced to the register by the IDs in its node); `completion-check.py` traces the register itself, not this diagram. R-031 and R-037 are owner-deferred (2026-10-31) and drawn under the use cases they belong to.
 
@@ -23,10 +23,10 @@ flowchart LR
             uc_report(["Report to the owner leading with the decision, keep project state, write run sheets R-048, R-053, R-058, R-062, R-088, R-101"])
         end
         subgraph ph_intake_design ["Intake and design, with their gates"]
-            uc_intake(["Take in a project, classify each part, pause on an unwritten type R-001, R-013, R-014, R-015, R-035"])
+            uc_intake(["Take in a project, classify each part, pause on an unwritten type R-001, R-013, R-014, R-015, R-035, R-065"])
             uc_design(["Draw the design text and its normative diagrams R-053, R-055, R-060"])
             uc_interface(["Design the interface by its variants: mockups, command, contract, prototype R-010, R-012, R-026"])
-            uc_design_critique(["Critique the design in bounded rounds, one subject with its addendum R-046, R-047"])
+            uc_design_critique(["Critique the design in bounded rounds, one subject with its addendum R-046, R-047, R-104"])
             uc_design_gate(["Approve the design, the traits and the Level 1 diagrams at the design gate R-035, R-036"])
         end
         subgraph ph_plan_config ["Plan, run parameters and configuration"]
@@ -38,7 +38,7 @@ flowchart LR
             uc_brief(["Package the brief and delegate it through the launcher, one heavy slot at a time R-039, R-040, R-051, R-059, R-061, R-073, R-074, R-080, R-095, R-100"])
             uc_build(["Build the increment inside its Scope and report with the Assumed, not verified list R-051"])
             uc_inspect(["Inspect, test and scan the increment, mutation checks once per pass R-039, R-040, R-041, R-043, R-051, R-057, R-058, R-059, R-060, R-061, R-063, R-076, R-077, R-078, R-081, R-086, R-087, R-090"])
-            uc_review_a(["Decide by defect class with Review A and the auditors R-050, R-068"])
+            uc_review_a(["Decide by defect class with Review A and the auditors R-050, R-068, R-103"])
             uc_review_b(["Review the snapshot cross-family, rounds counted against the ceiling R-042, R-046, R-050, R-059, R-061, R-079, R-084"])
             uc_merge(["Merge through the verified gate: CI green, both reviews, no gate-integrity flag R-002, R-045, R-067, R-082, R-083, R-085"])
         end
